@@ -13,7 +13,7 @@ describe('Knowledge list empty actions', () => {
     [[{}], 'missing', 'knowledgeCenter.emptyNoHits'],
   ])('keeps the empty explanation without duplicating the toolbar import action', (spaces, searchQuery, reason) => {
     const state = { spaces, searchQuery, viewMode: 'cards', index: { cardCount: 0 }, hits: [],
-      loadingQuery: false, loadingOverview: false, setSearchQuery: vi.fn(), pack: null,
+      loadingQuery: false, loadingOverview: false, setSearchQuery: vi.fn(), pack: null, page: {},
     } as unknown as Parameters<typeof ListColumn>[0]['state'];
     const html = renderToStaticMarkup(createElement(ListColumn, { state, inbox: null }));
     expect(html).toContain(reason);

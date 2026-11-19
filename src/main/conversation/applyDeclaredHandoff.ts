@@ -1,4 +1,5 @@
 import type { SessionRecord } from '@shared/types/session';
+import { randomUUID } from 'node:crypto';
 import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { isHandoffContinueAction } from '@shared/types/planReview';
 import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
@@ -14,6 +15,7 @@ export interface ApplyDeclaredHandoffInput {
   sessionId: string;
   agent: string;
   label: string;
+  expectedPlanHash?: string;
 }
 
 export interface ApplyDeclaredHandoffResult {
@@ -66,6 +68,16 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
     return { success: false, error: 'DECLARED_HANDOFF_NOT_FOUND: continue action is not declared on the current or offering profile.' };
   }
   const approved = planReviewStateStore.read(input.sessionId);
+  if (input.expectedPlanHash && (approved?.status !== 'approved' || approved.approvedHash !== input.expectedPlanHash)) {
+    return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
+  }
+  const approvalChanged = () => {
+    if (!input.expectedPlanHash) return false;
+    const latest = planReviewStateStore.read(input.sessionId);
+    return latest?.status !== 'approved' || latest.approvedHash !== input.expectedPlanHash
+      || storageAdapter.readConversationHistory(input.sessionId).some(message => message.role === 'user' && message.createdAt >= latest.updatedAt);
+  };
+  if (approvalChanged()) return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
     try {
       if (approved.approvedHandoff?.agent !== input.agent || approved.approvedHandoff.label !== input.label) {
@@ -96,9 +108,11 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
   if (!await dispatchRuntimeHooks('agent.before-handoff', hookContext)) {
     return { success: false, error: 'HOOK_DENIED: agent.before-handoff' };
   }
+  if (approvalChanged()) return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
     storageAdapter.executionOffers.write(input.sessionId, {
       schemaVersion: EXECUTION_OFFER_SCHEMA,
+      offerId: randomUUID(),
       sourceAgentId,
       targetAgentId: input.agent,
       plan: { uri: approved.frozenUri, hash: approved.approvedHash },
@@ -136,8 +150,12 @@ export function writeExecutionOfferFromApproval(input: {
 }): PlanReviewHandoffSuggestion | null {
   const declared = findDeclaredHandoff(input.sourceAgentId, input.projectRoot, input.handoff.agent, input.handoff.label);
   if (!declared) return null;
+  const existing = storageAdapter.executionOffers.read(input.sessionId);
+  const sameApproval = existing?.plan.uri === input.plan.uri && existing.plan.hash === input.plan.hash
+    && existing.sourceAgentId === input.sourceAgentId && existing.targetAgentId === declared.agent;
   storageAdapter.executionOffers.write(input.sessionId, {
     schemaVersion: EXECUTION_OFFER_SCHEMA,
+    offerId: (sameApproval && existing.offerId) || randomUUID(),
     sourceAgentId: input.sourceAgentId,
     targetAgentId: declared.agent,
     plan: input.plan,

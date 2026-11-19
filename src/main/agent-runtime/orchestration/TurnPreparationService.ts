@@ -3,6 +3,10 @@ import { withRdcHostRuntimeEnv } from '../../rdc/withRdcHostRuntimeEnv';
 import { assertRdcContextLeaseOwnership } from '../../rdc/RdcRuntimeContextRegistry';
 import { assertExecutionOfferSkillCompatibility } from '../../sessions/run/handoffSkillCompatibility';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
+import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
+import { approvedInvestigationContract } from '../../sessions/run/approvedInvestigationContract';
+import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import { approvedExecutionOfferFact } from '../prompt/PromptPlanBuilder';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
@@ -42,6 +46,7 @@ import { agentSlotKey } from './AgentSlotRegistry';
 import { resolveExecutionScopeId } from './executionScope';
 import {
   combineActiveSkillAllowlists,
+  isToolAllowedByFrozenAllowlist,
 } from './RuntimeToolPolicy';
 import {
   isMcpPrefixedToolName,
@@ -193,6 +198,16 @@ export class TurnPreparationService {
       compiledPolicy.contextCompactionPercent,
     );
     const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
+    const offerSegment = promptPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer');
+    if (Boolean(approvedExecutionOffer) !== Boolean(offerSegment)
+      || (approvedExecutionOffer && offerSegment?.sourceHash !== hashScopedResource(approvedExecutionOfferFact(approvedExecutionOffer)))) {
+      throw new Error('APPROVED_PLAN_CHANGED: rebuild the prompt and preparation for the current plan.');
+    }
+    const approvedExecution = approvedExecutionOffer && input.sessionId ? {
+      offer: structuredClone(approvedExecutionOffer),
+      investigation: approvedInvestigationContract(approvedExecutionOffer, planArtifactWriter.readMarkdown(input.sessionId,
+        approvedExecutionOffer.plan.uri, approvedExecutionOffer.plan.hash).markdown),
+    } : null;
     const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...(approvedExecutionOffer?.requiredSkillIds ?? [])])] };
     const profileSkills = profile.skills;
     const resolvedSkills = resolveSkillIntersection(
@@ -212,6 +227,21 @@ export class TurnPreparationService {
       deniedTools: compiledPolicy.deniedTools,
     });
     const preparedToolAllowlist = skillIntersection ?? input.toolAllowlist;
+    if (input.frozenDelegationCapsule) {
+      const canUse = (tool: string) => !compiledPolicy.deniedTools.includes(tool)
+        && isToolAllowedByFrozenAllowlist(tool, input.agentId, preparedToolAllowlist);
+      const refs = [
+        ...input.frozenDelegationCapsule.inputArtifactRefs,
+        ...input.frozenDelegationCapsule.challengeRefs,
+      ];
+      const missing: string[] = [];
+      if (!canUse('turn_complete')) missing.push('turn_complete');
+      if (refs.length && !canUse('artifact_read')
+        && (refs.some(ref => !ref.startsWith('session://investigation/')) || !canUse('investigation_read'))) {
+        missing.push('artifact_read (or investigation_read for Investigation records)');
+      }
+      if (missing.length) throw new Error(`DELEGATION_PREPARATION_CONFLICT: ${input.agentId} cannot use ${missing.join(', ')} under the prepared Profile, Skill intersection or policy. Review the declared methods and authorized profile; do not bypass policy or approved Task requirements.`);
+    }
     const acquiredMcp = await this.deps.mcp.acquireConnections(
       input.agentId,
       input.projectRootPath,
@@ -461,6 +491,7 @@ export class TurnPreparationService {
         credentialHandle: input.credentialHandle,
         promptCache,
         effectivePlan,
+        approvedExecution,
       },
     };
     } catch (error) {

@@ -60,6 +60,7 @@ import {
 import { requireInvestigationKind } from './investigationKindRegistry';
 import {
   assertInvestigationIndexIntegrity,
+  assertReadySourcesUnchanged,
   assertTripleContentHash,
   parseVerifiedRecordBody,
 } from './investigationReadIntegrity';
@@ -83,6 +84,7 @@ import {
   InvestigationArtifactManifestSchema,
   InvestigationIndexDocumentSchema,
   parseInvestigationRecord,
+  parseInvestigationWriteRecord,
 } from './investigationRecordSchemas';
 import {
   rejectOpaqueWriteInput,
@@ -140,7 +142,7 @@ export class InvestigationArtifactService {
     const kindEntry = requireInvestigationKind(input.kind);
     let parsed: InvestigationRecord;
     try {
-      parsed = parseInvestigationRecord(kindEntry.recordType, input.record) as InvestigationRecord;
+      parsed = parseInvestigationWriteRecord(kindEntry.recordType, input.record) as InvestigationRecord;
     } catch (error) {
       throw new InvestigationError(
         'INVESTIGATION_SCHEMA_INVALID',
@@ -225,6 +227,7 @@ export class InvestigationArtifactService {
         workingIndex = stale.index;
       }
     }
+    if (requestedReady) assertReadySourcesUnchanged(sourceRefs, workingIndex);
     mutations.push({ uri: contentUri, text: contentText, role: 'content' });
     mutations.push({
       uri: manifestUriFor(artifactId),
@@ -581,7 +584,7 @@ export class InvestigationArtifactService {
     } catch (error) {
       if (error instanceof InvestigationError) throw error;
       if (error instanceof SessionArtifactError && error.code === 'ARTIFACT_HASH_MISMATCH') {
-        throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', `content ${uri} hash mismatch`, {
+        throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', `content ${uri} hash mismatch. A SHA-256 has 64 hexadecimal digits. In the owning session, use artifact_read with the URI only (omit expectedHash and selectors) to inspect the current hash; compare it with the original source before correcting the reference. Do not silently substitute changed content.`, {
           invariantId: 'S-CTX-01',
         });
       }
@@ -600,7 +603,7 @@ export class InvestigationArtifactService {
     if (evidence.contentHashes.length !== evidence.artifactRefs.length) {
       throw new InvestigationError(
         'INVESTIGATION_HASH_MISMATCH',
-        'contentHashes must correspond 1:1 with artifactRefs',
+        'contentHashes must correspond 1:1 with artifactRefs: each entry is the matching artifactRef expectedHash, not the capture hash.',
       );
     }
     for (const [index, ref] of evidence.artifactRefs.entries()) {

@@ -54,6 +54,31 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
 }
 
 describe('planModelRequest', () => {
+  it('keeps model identity stable when only evidence freshness timestamps change', () => {
+    const evidence = { field: 'toolCalling.state', source: 'discovery' as const, value: 'supported',
+      observedAt: '2026-11-01T00:00:00.000Z', refreshedAt: '2026-11-01T00:00:00.000Z',
+      expiresAt: '2026-11-02T00:00:00.000Z', sourceRevision: 'catalog-v1', sourceHash: 'source-a' };
+    const first = planModelRequest({ model: model({ catalogRevision: 'catalog', routeRevision: 'route', provenance: [evidence] }) });
+    const refreshed = planModelRequest({ model: model({ catalogRevision: 'catalog', routeRevision: 'route', provenance: [{ ...evidence,
+      observedAt: '2026-11-03T00:00:00.000Z', refreshedAt: '2026-11-03T00:00:00.000Z', expiresAt: '2026-11-04T00:00:00.000Z',
+    }] }) });
+    const changedSource = planModelRequest({ model: model({ catalogRevision: 'catalog', routeRevision: 'route',
+      provenance: [{ ...evidence, sourceHash: 'source-b' }] }) });
+    expect(first.ok && refreshed.ok && changedSource.ok).toBe(true);
+    if (!first.ok || !refreshed.ok || !changedSource.ok) return;
+    expect(refreshed.plan.executionIdentity.modelSnapshotId).toBe(first.plan.executionIdentity.modelSnapshotId);
+    expect(refreshed.plan.executionIdentity.fingerprint).toBe(first.plan.executionIdentity.fingerprint);
+    expect(changedSource.plan.executionIdentity.modelSnapshotId).not.toBe(first.plan.executionIdentity.modelSnapshotId);
+
+    const withoutCatalog = planModelRequest({ model: model({ routeRevision: 'route', provenance: [evidence] }) });
+    const renewedWithoutCatalog = planModelRequest({ model: model({ routeRevision: 'route', provenance: [{ ...evidence,
+      observedAt: '2026-11-03T00:00:00.000Z', refreshedAt: '2026-11-03T00:00:00.000Z', expiresAt: '2026-11-04T00:00:00.000Z',
+    }] }) });
+    expect(withoutCatalog.ok && renewedWithoutCatalog.ok).toBe(true);
+    if (!withoutCatalog.ok || !renewedWithoutCatalog.ok) return;
+    expect(renewedWithoutCatalog.plan.executionIdentity.fingerprint).toBe(withoutCatalog.plan.executionIdentity.fingerprint);
+  });
+
   it('records unknown provider reasoning without emitting an Off selection or wire patch', () => {
     const result = planModelRequest({
       model: model({

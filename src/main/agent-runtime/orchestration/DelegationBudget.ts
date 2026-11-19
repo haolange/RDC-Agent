@@ -12,11 +12,11 @@ export function deriveChildPolicyBudget(parent: PolicyBudgetState, requested: De
   const child: PolicyBudgetState = {
     toolCalls, subagents, reservedSubagentSlots: 0,
     childDepth: Math.max(parent.childDepth + 1, restored?.childDepth ?? 0),
-    maxToolCalls: Math.min(requested.maxToolCalls, restored?.maxToolCalls ?? Infinity, toolCalls + Math.max(0, parent.maxToolCalls - parent.toolCalls)),
+    maxToolCalls: Math.min(requested.maxToolCalls ?? Infinity, restored?.maxToolCalls ?? Infinity, toolCalls + Math.max(0, parent.maxToolCalls - parent.toolCalls)),
     maxSubagents: Math.min(requested.maxSubagents ?? parent.maxSubagents, restored?.maxSubagents ?? Infinity, subagents + Math.max(0, parent.maxSubagents - parent.subagents)),
     maxChildDepth: Math.min(parent.maxChildDepth, restored?.maxChildDepth ?? Infinity),
     wallStartedAt: parent.wallStartedAt,
-    maxWallTimeMs: Math.min(parent.maxWallTimeMs, now - parent.wallStartedAt + requested.maxWallTimeMs, restored ? restored.wallStartedAt + restored.maxWallTimeMs - parent.wallStartedAt : Infinity),
+    maxWallTimeMs: Math.min(parent.maxWallTimeMs, requested.maxWallTimeMs === undefined ? Infinity : now - parent.wallStartedAt + requested.maxWallTimeMs, restored ? restored.wallStartedAt + restored.maxWallTimeMs - parent.wallStartedAt : Infinity),
   };
   parents.set(child, parent);
   return child;

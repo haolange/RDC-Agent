@@ -59,6 +59,19 @@ describe('TraceService canonical channel reload', () => {
       ]),
     ], 'run-1')).toBe('Same bytes');
   });
+
+  it('reads only confirmed final items from a mixed-phase model response', () => {
+    const mixed = block('mixed', 'Checking.Final answer.', 'final_answer');
+    mixed.outputItems = [
+      { providerOutputRef: { protocol: 'test', providerBlockKey: 'a', contentIndex: 0 },
+        text: 'Checking.', phase: 'commentary', status: 'complete', displayOrder: 1 },
+      { providerOutputRef: { protocol: 'test', providerBlockKey: 'b', contentIndex: 1 },
+        text: 'Final answer.', phase: 'final_answer', status: 'complete', displayOrder: 2 },
+    ];
+    expect(findCanonicalFinalAnswer([assistant('Final answer.', [mixed])], 'run-1')).toBe('Final answer.');
+    mixed.result!.stopReason = 'max_tokens';
+    expect(findCanonicalFinalAnswer([assistant('', [mixed])], 'run-1')).toBeNull();
+  });
 });
 
 describe('TraceService history-turn profile projection', () => {

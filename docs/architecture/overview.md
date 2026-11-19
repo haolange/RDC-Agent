@@ -36,6 +36,4 @@ RDC-Tool is independently distributed. Settings accepts its root directory; main
 
 Use `pnpm run typecheck` for static validation. For renderer or IPC changes, also run `pnpm run check:architecture`, `pnpm run check:fidelity`, and `pnpm run check:shared-exports`. For shell/window/local invocation boundaries, build first and then run the relevant smoke test.
 
-Source development uses pnpm `11.7.0` with a per-user store under `~/.cache/rdc-agent`; every human/browser and production/development source entry reaches the shared launcher. Dependency and build fingerprints avoid repeated preparation while preserving a `--force-prepare` recovery path. Packaged applications contain compiled runtime inputs only and never depend on the source package manager or launcher.
-
-Directory packaging uses electron-builder 26.16.1 or later in the 26.x line: earlier pnpm collectors can omit deduplicated transitive dependencies and leave a live process that failed to initialize. The desktop smoke isolates both resource and application-data roots and requires the packaged main services to initialize; process survival alone is not a pass. Visual rendering remains a separate acceptance check.
+源码开发、打包与 smoke 的构建约束见根目录 `AGENTS.md` §9。

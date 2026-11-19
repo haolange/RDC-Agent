@@ -82,6 +82,10 @@ export interface AgentSlotRequest {
   policyMaxTurns?: number;
   profileMaxTurns?: number | null;
   beforeRequestMessages?: AgentLoopConfig['beforeRequestMessages'];
+  beforeTerminalResponse?: AgentLoopConfig['beforeTerminalResponse'];
+  onLoopBudget?: AgentLoopConfig['onLoopBudget'];
+  resolvePromptPlan?: () => PromptPlan;
+  resolveRuntimeFingerprint?: () => string;
   onProviderRequestCommitted?: AgentProfileTurnOptions['onProviderRequestCommitted'];
 }
 
@@ -89,7 +93,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
   const {
     agentId, providerId, modelId, systemPrompt, streamOptions, tools, toolExecutor, turnSignature,
     contextWindow, contextTokenLimit, promptPlan, initialMessages, contextDiagnostic, signatureTools,
-    routeCapabilityOverride, policyMaxTurns, profileMaxTurns, beforeRequestMessages, onProviderRequestCommitted,
+    routeCapabilityOverride, policyMaxTurns, profileMaxTurns, beforeRequestMessages, beforeTerminalResponse, onLoopBudget, resolvePromptPlan, resolveRuntimeFingerprint, onProviderRequestCommitted,
   } = request;
   if (!promptPlan) {
     throw new Error('PromptPlan is required before creating an agent runtime slot.');
@@ -161,9 +165,12 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     toolExecutor,
     streamOptions,
     maxTurns: resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns),
+    beforeTerminalResponse,
+    onLoopBudget,
+    resolvePromptPlan,
     transformContext: (messages, signal, onProgress) => {
       contextManager.setRequestTokenLimit(
-        requestCompactionThreshold - promptPlan.totalTokenEstimate - RUNTIME_PERMISSION_TOKEN_RESERVE - toolSchemaTokens(),
+        requestCompactionThreshold - (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate - RUNTIME_PERMISSION_TOKEN_RESERVE - toolSchemaTokens(),
       );
       return contextManager.compress(messages, signal, onProgress);
     },
@@ -171,13 +178,16 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     resolveMaxTokens: (messages) => resolveTurnOutputTokens({
       contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
       maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
-      promptTokens: promptPlan.totalTokenEstimate + RUNTIME_PERMISSION_TOKEN_RESERVE + toolSchemaTokens()
+      promptTokens: (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate + RUNTIME_PERMISSION_TOKEN_RESERVE + toolSchemaTokens()
         + deps.tokenizerService.countMessagesTokens(messages, modelId),
     }),
     onRequest: async ({ model, context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
       const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
+      const currentPrompt = resolvePromptPlan?.() ?? promptPlan;
+      const actualSegments = requestContext.systemPromptSegments ?? currentPrompt.segments;
       const snapshot = requestEnvelopeBuilder.build({
-        promptPlan,
+        promptPlan: { ...currentPrompt, segments: actualSegments, systemPrompt: requestContext.systemPrompt ?? currentPrompt.systemPrompt,
+          totalTokenEstimate: actualSegments.reduce((sum, segment) => sum + segment.tokenEstimate, 0) },
         sessionId: executionScopeId,
         turnId: turnSignature || undefined,
         callIndex,
@@ -197,6 +207,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
           reasoningSelection: requestOptions.reasoning?.selection,
           contextDiagnostic,
           runtimePermissionContext: requestContext.systemPromptSegments?.find((segment) => segment.id === 'runtime:permission'),
+          runtimePlanFingerprint: resolveRuntimeFingerprint?.(),
         },
         reasoning: reasoningContract,
         cache: requestOptions.promptCache ?? streamOptions.promptCache ?? promptCacheCompiler.compile({

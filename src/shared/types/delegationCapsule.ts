@@ -1,7 +1,6 @@
 /** Caller-authored delegation data. Capability requests never grant authority. */
 import { z } from 'zod';
 import { parseSessionArtifactUri } from './sessionArtifact';
-import { REASONING_SELECTIONS } from './modelCapability';
 export const DELEGATION_CAPSULE_ERROR = 'DELEGATION_CAPSULE_INVALID';
 export const DELEGATION_CAPSULE_MAX_CHARS = 24_000;
 const text = z.string().trim().min(1).max(4_000);
@@ -15,9 +14,9 @@ export const DelegationCapsuleSchema = z.object({
   negativePaths: z.array(z.object({ path: text, reason: text, applicableWhen: text, recheckWhen: text }).strict()).max(32),
   inputArtifactRefs: refs, outputRequirements: text, stopConditions: texts,
   requiredSkillIds: texts,
-  budget: z.object({ maxToolCalls: z.number().int().positive(), maxWallTimeMs: z.number().int().positive(), maxSubagents: z.number().int().nonnegative().optional() }).strict(),
+  budget: z.object({ maxToolCalls: z.number().int().positive().optional(), maxWallTimeMs: z.number().int().positive().optional(), maxSubagents: z.number().int().nonnegative().optional() }).strict().default({}),
   domainExtensions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
-  profile: text.optional(), model: text.optional(), reasoningLevel: z.enum(REASONING_SELECTIONS).optional(),
+  profile: text.optional(),
 }).strict();
 export type DelegationCapsule = z.infer<typeof DelegationCapsuleSchema>;
 export type DelegationCapsuleBudget = DelegationCapsule['budget'];
@@ -50,12 +49,11 @@ export const DELEGATION_CAPSULE_JSON_SCHEMA = {
     hypotheses: arraySchema, challengeRefs: refsSchema,
     negativePaths: { type: 'array', maxItems: 32, items: object({ path: stringSchema, reason: stringSchema, applicableWhen: stringSchema, recheckWhen: stringSchema }) },
     inputArtifactRefs: { ...refsSchema, description: 'Exact existing session:// contentUri values the child must read. Copy them from the parent read/list result, including Investigation records. Artifact IDs mentioned in scope are not read grants. Grant only the needed records.' }, outputRequirements: stringSchema, stopConditions: arraySchema, requiredSkillIds: arraySchema,
-    budget: { type: 'object', required: ['maxToolCalls', 'maxWallTimeMs'], additionalProperties: false, properties: {
+    budget: { type: 'object', additionalProperties: false, properties: {
       maxToolCalls: { type: 'integer', minimum: 1 }, maxWallTimeMs: { type: 'integer', minimum: 1 }, maxSubagents: { type: 'integer', minimum: 0 },
     } },
     domainExtensions: { type: 'object', description: 'Domain capability requests; no authorization is granted.' },
-    reasoningLevel: { type: 'string', enum: REASONING_SELECTIONS, description: 'Optional reasoning selection such as low; validated by the selected Provider route. Never an agent identity.' },
-    profile: { ...stringSchema, description: 'Agent identity ID, e.g. general; omit to use the calling identity. This is not reasoning effort or model name.' }, model: { ...stringSchema, description: 'Canonical providerId:modelId with a colon, never providerId/modelId; required when the child profile has no configured route. Never inherited from the parent session. Use reasoningLevel for effort.' },
+    profile: { ...stringSchema, description: 'Agent identity ID, e.g. general; omit to use the calling identity. Model and reasoning come from that Agent configuration.' },
   }),
-  required: ['goal', 'task', 'scope', 'acceptedFacts', 'hypotheses', 'challengeRefs', 'negativePaths', 'inputArtifactRefs', 'outputRequirements', 'stopConditions', 'requiredSkillIds', 'budget'],
+  required: ['goal', 'task', 'scope', 'acceptedFacts', 'hypotheses', 'challengeRefs', 'negativePaths', 'inputArtifactRefs', 'outputRequirements', 'stopConditions', 'requiredSkillIds'],
 };

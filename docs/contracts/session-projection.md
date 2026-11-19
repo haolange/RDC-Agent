@@ -54,6 +54,7 @@ interface ActiveTurnContext {
 ```
 
 - Session 切换时清空 context 与 `isPromptSending`；Agent 运行态只读取当前 context 的 `agentId`，禁止扫描历史 draft/streaming 消息推断。
+- Work Process 的模型段落内，文本项、thinking、工具、审批和 Tasks 快照以首次可见顺序排列，更新按输出项身份或 toolCallId 原位落位；子代理过程沿用相同规则。同回合新增记录使用主进程记录的顺序，旧记录只按已有时间及存储顺序投影。中性流式文本的阶段确认不重建或搬移节点；Stop 与终态不得复活流式动效。
 - Stop 只读当前 session 的 context；禁止依赖跨 session 的 stale `activeRequestIdRef`。
 - Send、Rewrite、Stop 与运行中菜单状态都按 `sessionId + requestId + agentId` 投影。Monotonic stop 以 **`requestId` 为主**、`turnId` 为辅：optimistic → real turnId 替换后，已停止的 request 仍拒绝迟到 `draft`/`streaming` patch。
 
@@ -89,15 +90,17 @@ interface ActiveTurnContext {
 
 ## Right Rail scoped payloads
 
-Right Rail task resources and Capture state are scoped by the full `{ projectId, sessionId, payload }` envelope. `context:get`, `capture:getOpenedState`, replay apply, and close requests require an explicit scope and return `null` when no owner scope exists. `context:changed`, `capture:openedStateChanged`, and session capture status updates use the same envelope. Renderer caches background payloads by owner session; only the active session hydrates Context resources and the always-visible Capture area, and late events from another session cannot overwrite either surface.
+Right Rail 的任务资源与 Capture 状态以完整的 `{ projectId, sessionId, payload }` envelope 限定作用域。`context:get`、`capture:getOpenedState`、replay apply 与 close 请求必须显式给出 scope，无 owner scope 时返回 `null`。`context:changed`、`capture:openedStateChanged` 与会话 capture 状态更新使用同一 envelope。Renderer 按 owner session 缓存后台 payload；只有 Active Session 会 hydrate Context 资源与常驻的 Capture 区域，其他 session 的迟到事件不能覆盖这两处。
 
-Outputs use the same session-owned projection path. `output_register` writes an explicit run-scoped artifact record after copying one completed project file; a refresh for that session projects it into Outputs. Investigation Artifacts ride the same `tracePresentation.rightPanel` envelope as `Progress / Artifacts / Outputs / Context / Capture` and never mix with Outputs. No renderer-side path discovery or background-session artifact event may populate the active rail.
+Outputs 走同一条 session 所属的投影路径。`output_register` 在复制一个已完成的项目文件后写入显式的 run 级制品记录；该 session 刷新后投影进 Outputs。`tracePresentation.rightPanel` 承载 Progress、Artifacts、Outputs、Context，Capture 走独立 scoped 通道；整体为 Progress / Artifacts / Outputs / Context / Capture 单轨。Investigation Artifacts 与 Outputs 不混用。renderer 不做路径发现，后台 session 的制品事件不得填充当前右栏。
 
 ## Capture Replay projection
 
 `capture:replayChanged` 携带 projectId/sessionId、binding generation 与单调 revision。只有 Active Session 能写当前卡片；其他会话继续拥有其 context。`capture:getReplayState` 读取所属完整快照，不使用全局最近 context。刷新与事件应用仅改变 owning binding；requestedEventId、appliedEventId、imageEventId 不互相代替。切 session 时丢弃旧订阅、请求结果和历史图片结果。RDC 列表为空保持原空态，不因残留历史或错误重新挂载新增内容。
 
 `project:inputsChanged` 反映完整扫描确认并持久化的当前输入，发布不等待回放清理成功。清理错误与待办通过独立 `replayCleanupPending` 和 `project:inputsError` 保留；renderer 不从清理待办、旧 capture binding 或历史足迹恢复已确认不存在的 RDC。最后一个输入删除后，重新挂载或重启仍显示原空态。
+
+Right Rail 的轨迹刷新读取最近一次持久化的项目输入快照，不因每条进度事件触发新的 capture 扫描或哈希。该快照只用于投影；计划冻结和打开输入仍各自核验当前文件身份与内容，不能以显示在列表中代替准入检查。
 
 Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不能出现解锁间隙；delegation 和 native process 未确认退出仍为锁定。运行中同一画面和 EID 控件继续投影实际状态，禁止人工打开/关闭/切文件/切设备/事件 apply。
 
@@ -114,7 +117,7 @@ Progress 的任务定位仅通过 renderer 内部有类型的请求收集工作�
 
 ## 调查制品摘要与完整列表
 
-main-owned artifacts 投影仅含 rows（最多5项）、totalCount、storeDegraded；同一选择路径排除已被取代记录并按 createdAt、artifactId 倒序。只读 investigation:list 请求显式 projectId/sessionId 及可选 createdAt/artifactId 游标，主进程校验当前session/project归属、严格游标和固定50项页面；返回 rows/totalCount/storeDegraded 及可选 nextCursor。renderer不重建版本关系，不访问存储。存档及 supersedes 链保持，旧的替代/截断计数UI字段删除。
+main-owned artifacts 投影仅含 rows（最多5项）、totalCount、storeDegraded；同一选择路径排除已被取代记录并按 createdAt、artifactId 倒序。只读 investigation:list 请求显式 projectId/sessionId 及可选 createdAt/artifactId 游标，主进程校验当前session/project归属、严格游标和固定50项页面；返回 rows/totalCount/storeDegraded 及可选 nextCursor。renderer不重建版本关系，不访问存储。存档及 supersedes 链保持。
 
 列表、分页和预览状态按完整project/session身份隔离，切换时关闭并拒收旧结果。预览沿既有 investigation:read 与 expectedHash，分页不能扩大读取权限。上下文只限量展示，不改变被冻结Prompt段和成功tool result的资源来源。
 
@@ -139,6 +142,8 @@ Composer 与计划审批使用同一目录能力状态解析：尚在加载/刷�
 
 Stop 后 cancelled 只提供阅读器“重新审批”，有效 awaiting 在进入所属 session 时恢复原 Composer 审批区，不执行模型。approved/rejected/superseded、草稿不自动恢复；文件、hash、owner 或分支证明无效时拒绝恢复。存在其他请求禁止重开，重复或旧 reviewId 不能提交。重开不改旧历史；批准沿既有冻结、Task、offer 与声明 handoff，恢复不重启旧循环。决定响应不确定时读取当前状态，不自动重发或执行。
 
+已批准计划尚未发出后续用户请求时，重进会话可显式显示其声明交接：主进程核对当前可见来源、owner、冻结文件与 hash、批准状态、offer、Agent 声明和必需准备要求；用户点按钮才沿现有 handoff／Composer 链继续。点击时再次核对预期计划 hash 与没有后续请求；批准变化、出现后续请求或来源不可证时拒绝，不能自动重发。该投影不新增持久 handoff 状态，也不重写历史取消记录或重置任务消费。
+
 EffectiveCatalogSnapshot 的 scopeGeneration 由主进程配置代次签发，projectionVersion 在代次内单调，generatedAt 只审计。IPC 返回和事件进入同一接收器，失效后以有效读取绑定代次并吸收同代次暂存事件。菜单打开与会话进入只读重验证合并在途读取；Retry 才强制刷新 Provider，保持 TTL 与退避，无定时轮询。
 
 
@@ -151,7 +156,7 @@ EffectiveCatalogSnapshot 的 scopeGeneration 由主进程配置代次签发，pr
 ProgressTask 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、可选 title、reason: unfinished/unverified/missing）。五种 status 不因依赖变化改写；statusReason 只保留任务本身原因。主进程执行准入和等待信息共用同一证明判定。右栏读取任务与执行的一致快照，任务事件在当前事务中冻结同一信息；renderer 不重算依赖，历史快照不跟随最新状态。pending 等待使用灰色空心圆及“等待前置任务”提示，原因按需展开；真正 blocked 才使用黄色受阻标记。
 
 
-### 自动审查与计划交接
+### 计划批准与交接
 
 Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。准备时保留本次选择并标待确认，不能投影旧请求模型/参数。
 

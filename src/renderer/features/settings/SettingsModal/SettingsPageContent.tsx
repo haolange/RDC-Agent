@@ -16,7 +16,7 @@ type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'handleAccountSave' | 'setLanguage' | 'globalInstructionsDraft' | 'setGlobalInstructionsDraft' | 'handleSavePersonalization' |
   'setTheme' | 'setFontScale' | 'setComposerMarkdown' | 'setUsePointerCursors' |
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
-  'handleRefreshProviderModels' | 'handleDisconnectProvider' | 'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' |
+  'handleRefreshProviderModels' | 'handleDisconnectProvider' | 'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
   'rdcCliDraft' | 'codeInterpreterDraft' | 'shellDraft' | 'setRdcCliDraft' |
   'setCodeInterpreterDraft' | 'setShellDraft' | 'handleSaveToolsConfig' | 'dirty'>;
@@ -55,6 +55,7 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     handleDisconnectProvider,
     openProviderConnection,
     agentManifestDrafts,
+    agentManifestContextReady,
     setAgentManifestDrafts,
     handleSaveAgentManifests,
     handleImportAgentManifest,
@@ -124,6 +125,7 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         currentProjectId={currentProjectId}
         settings={settings}
         agentManifestDrafts={agentManifestDrafts}
+        agentManifestContextReady={agentManifestContextReady}
         onAgentManifestDraftsChange={setAgentManifestDrafts}
         onRetrySaveAgentManifests={handleSaveAgentManifests}
         onImportAgentManifest={handleImportAgentManifest}

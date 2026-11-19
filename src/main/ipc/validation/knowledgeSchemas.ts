@@ -5,7 +5,8 @@ import {
   KNOWLEDGE_RETRIEVAL_LANES,
 } from '@shared/types/knowledge';
 import { KNOWLEDGE_EXPORT_FORMATS, KNOWLEDGE_EXPORT_SCOPES } from '@shared/types/knowledgeExport';
-import { KnowledgeCardRecordSchema } from '../../knowledge/knowledgeCardSchema';
+import { KnowledgeCardRecordSchema, KnowledgeScopeSchema } from '../../knowledge/knowledgeCardSchema';
+import { KnowledgeTopicChangesSchema } from '../../knowledge/KnowledgeTopicStore';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 const KnowledgeSpaceIdSchema = ipcNonEmptyString(200, 'spaceId');
@@ -15,6 +16,13 @@ const KnowledgeConfirmationSchema = z.object({
 }).strict();
 
 export const KnowledgeOverviewArgsSchema = z.tuple([]);
+export const KnowledgeTopicSuggestArgsSchema = z.tuple([]);
+export const KnowledgeTopicPreviewArgsSchema = z.tuple([KnowledgeTopicChangesSchema]);
+export const KnowledgeTopicApplyArgsSchema = z.tuple([z.object({
+  changes: KnowledgeTopicChangesSchema,
+  changeHash: z.string().regex(/^[a-f0-9]{64}$/u),
+  confirmation: z.object({ explicitHumanConfirmation: z.literal(true) }).strict(),
+}).strict()]);
 
 export const KnowledgeQueryArgsSchema = z.tuple([
   z.object({
@@ -25,8 +33,12 @@ export const KnowledgeQueryArgsSchema = z.tuple([
     type: z.array(z.enum(KNOWLEDGE_CARD_TYPES)).max(KNOWLEDGE_CARD_TYPES.length).optional(),
     lifecycle: z.array(z.enum(KNOWLEDGE_LIFECYCLES)).max(KNOWLEDGE_LIFECYCLES.length).optional(),
     relationTargetCardId: ipcString(400, 'relationTargetCardId').optional(),
+    scope: KnowledgeScopeSchema.optional(),
     asOf: z.number().int().nonnegative().optional(),
     lanes: z.array(z.enum(KNOWLEDGE_RETRIEVAL_LANES)).max(KNOWLEDGE_RETRIEVAL_LANES.length).optional(),
+    offset: z.number().int().nonnegative().optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+    expectedRevision: ipcNonEmptyString(128, 'expectedRevision').optional(),
   }).strict(),
 ]);
 
@@ -35,12 +47,29 @@ export const KnowledgeCardArgsSchema = z.tuple([
   ipcNonEmptyString(1024, 'relativePath'),
 ]);
 
+export const KnowledgeReadArgsSchema = z.tuple([z.object({
+  spaceId: KnowledgeSpaceIdSchema,
+  relativePath: ipcNonEmptyString(1024, 'relativePath'),
+  mode: z.enum(['summary', 'section', 'range', 'full']),
+  contentHash: z.string().regex(/^[a-f0-9]{64}$/u).optional(),
+  heading: ipcNonEmptyString(512, 'heading').optional(),
+  headingLine: z.number().int().positive().optional(),
+  startLine: z.number().int().positive().optional(),
+  endLine: z.number().int().positive().optional(),
+}).strict().superRefine((request, context) => {
+  if (request.mode !== 'summary' && !request.contentHash) context.addIssue({ code: 'custom', message: 'contentHash is required for versioned reading.' });
+  if (request.mode === 'section' && !request.heading) context.addIssue({ code: 'custom', message: 'heading is required for a section.' });
+  if (request.mode === 'range' && (!request.startLine || !request.endLine)) context.addIssue({ code: 'custom', message: 'startLine and endLine are required for a range.' });
+})]);
+
 export const KnowledgeCompileArgsSchema = z.tuple([
   z.object({
     spaceIds: z.array(KnowledgeSpaceIdSchema).max(64).optional(),
     text: ipcString(4000, 'text').optional(),
     type: z.array(z.enum(KNOWLEDGE_CARD_TYPES)).max(KNOWLEDGE_CARD_TYPES.length).optional(),
     lifecycle: z.array(z.enum(KNOWLEDGE_LIFECYCLES)).max(KNOWLEDGE_LIFECYCLES.length).optional(),
+    scope: KnowledgeScopeSchema.optional(),
+    asOf: z.number().int().nonnegative().optional(),
     lanes: z.array(z.enum(KNOWLEDGE_RETRIEVAL_LANES)).max(KNOWLEDGE_RETRIEVAL_LANES.length).optional(),
     limit: z.number().int().min(1).max(50).optional(),
   }).strict(),

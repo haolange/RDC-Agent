@@ -23,11 +23,12 @@ export function firstImportedSpaceCard(result: KnowledgeImportResult): {
 export function knowledgeExportScopeCounts(input: {
   selected: { spaceId: string; relativePath: string } | null;
   hits: readonly KnowledgeLaneHit[];
+  filteredCount?: number;
   spaceCount: number;
 }): { selected: number; filtered: number; space: number } {
   return {
     selected: input.selected ? 1 : 0,
-    filtered: input.hits.length,
+    filtered: input.filteredCount ?? input.hits.length,
     space: input.spaceCount,
   };
 }

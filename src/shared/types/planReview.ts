@@ -23,6 +23,10 @@ export interface PlanReviewHandoffSuggestion extends PlanReviewHandoffOption {
   send: boolean;
 }
 
+export interface RecoverableApprovedHandoff extends PlanReviewHandoffSuggestion {
+  planHash: string;
+}
+
 export type PlanReviewDecision =
   | { kind: 'approve'; handoff: PlanReviewHandoffIdentity }
   | { kind: 'reject'; feedback: string };
@@ -122,6 +126,7 @@ export interface PlanReviewProjection {
   projectionVersion: number;
   review: PlanReviewContext | null;
   recoverable: PlanReadRequest | null;
+  approvedHandoff?: RecoverableApprovedHandoff;
   error?: string;
   decision?: { reviewId: string; kind: 'approve' | 'reject' | 'cancel' };
 }

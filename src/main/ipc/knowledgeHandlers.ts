@@ -14,6 +14,8 @@ import {
 import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { knowledgeQueryService } from '../knowledge/KnowledgeQueryService';
 import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
+import { knowledgeTopicService } from '../knowledge/KnowledgeTopicService';
+import { projectKnowledgeRead } from '../knowledge/KnowledgeReadService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -32,6 +34,10 @@ import {
   KnowledgeQueryArgsSchema,
   KnowledgeExportArgsSchema,
   KnowledgeWriteArgsSchema,
+  KnowledgeTopicSuggestArgsSchema,
+  KnowledgeTopicPreviewArgsSchema,
+  KnowledgeTopicApplyArgsSchema,
+  KnowledgeReadArgsSchema,
 } from './validation/knowledgeSchemas';
 
 const knowledgeExportService = new KnowledgeExportService(createDefaultExportDependencies({
@@ -159,8 +165,12 @@ function toQueryRequest(input: {
   type?: KnowledgeQueryRequest['type'];
   lifecycle?: KnowledgeQueryRequest['lifecycle'];
   relationTargetCardId?: string;
+  scope?: KnowledgeQueryRequest['scope'];
   asOf?: number;
   lanes?: KnowledgeQueryRequest['lanes'];
+  offset?: number;
+  limit?: number;
+  expectedRevision?: string;
 }): KnowledgeQueryRequest {
   return {
     ...(input.spaceIds ? { spaceIds: input.spaceIds } : {}),
@@ -170,8 +180,12 @@ function toQueryRequest(input: {
     ...(input.type ? { type: input.type } : {}),
     ...(input.lifecycle ? { lifecycle: input.lifecycle } : {}),
     ...(input.relationTargetCardId ? { relationTargetCardId: input.relationTargetCardId } : {}),
+    ...(input.scope ? { scope: input.scope } : {}),
     ...(input.asOf != null ? { asOf: input.asOf } : {}),
     ...(input.lanes ? { lanes: input.lanes } : {}),
+    ...(input.offset !== undefined ? { offset: input.offset } : {}),
+    ...(input.limit !== undefined ? { limit: input.limit } : {}),
+    ...(input.expectedRevision ? { expectedRevision: input.expectedRevision } : {}),
   };
 }
 
@@ -183,6 +197,25 @@ function rethrowKnowledgeError(error: unknown): never {
 }
 
 export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
+  ipcMain.handle('knowledge:topics:suggest', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(KnowledgeTopicSuggestArgsSchema, rawArgs, { label: 'knowledge:topics:suggest', maxBytes: 1024 });
+    return knowledgeTopicService.suggest();
+  });
+
+  ipcMain.handle('knowledge:topics:preview', async (_event, ...rawArgs: unknown[]) => {
+    const [changes] = parseIpcArgs(KnowledgeTopicPreviewArgsSchema, rawArgs, { label: 'knowledge:topics:preview', maxBytes: 2 * 1024 * 1024 });
+    return knowledgeTopicService.preview(changes);
+  });
+
+  ipcMain.handle('knowledge:topics:apply', async (_event, ...rawArgs: unknown[]) => {
+    const [input] = parseIpcArgs(KnowledgeTopicApplyArgsSchema, rawArgs, { label: 'knowledge:topics:apply', maxBytes: 2 * 1024 * 1024 });
+    const preview = await knowledgeTopicService.preview(input.changes);
+    if (preview.changeHash !== input.changeHash) throw new Error('KNOWLEDGE_TOPICS_PREVIEW_CHANGED: review the changes again.');
+    const detail = `topics: ${preview.topics.map(topic => topic.label).join(', ')}; cards: ${preview.cards.length}`;
+    if (!await confirmKnowledgeMutation('knowledge.write', 'user', detail)) return { cancelled: true as const };
+    return knowledgeTopicService.apply(input.changes, input.changeHash);
+  });
+
   ipcMain.handle('knowledge:overview', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(KnowledgeOverviewArgsSchema, rawArgs, { label: 'knowledge:overview', maxBytes: 1024 });
     return {
@@ -217,6 +250,14 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     } catch (error) {
       rethrowKnowledgeError(error);
     }
+  });
+
+  ipcMain.handle('knowledge:read', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(KnowledgeReadArgsSchema, rawArgs, { label: 'knowledge:read', maxBytes: 8 * 1024 });
+    assertKnownSpaces([request.spaceId]);
+    const card = await knowledgeQueryService.getCard(request.spaceId, request.relativePath);
+    if (!card) throw new Error('KNOWLEDGE_CARD_NOT_FOUND');
+    return projectKnowledgeRead(card, request);
   });
 
   ipcMain.handle('knowledge:compile', async (_event, ...rawArgs: unknown[]) => {

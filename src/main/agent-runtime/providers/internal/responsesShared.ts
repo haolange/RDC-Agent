@@ -149,6 +149,7 @@ export async function consumeResponsesEventStream(input: {
       case 'response.output_item.added': {
         const item = readRecord(event.item);
         const identity = items.identityFromEvent(event, item);
+        if (readString(item?.type) === 'message') items.setTextPhase(identity, readOutputPhase(item?.phase));
         const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
         if (reasoningArtifact) {
           if (!deepSeekResponses) {
@@ -226,6 +227,7 @@ export async function consumeResponsesEventStream(input: {
           }
           builder.endToolCall(toolRef);
         } else if (readString(item?.type) === 'message') {
+          items.setTextPhase(identity, readOutputPhase(item?.phase));
           items.closeText(identity);
         }
         break;
@@ -408,17 +410,9 @@ function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
           message.content.some((candidate) => candidate.type === 'toolCall'),
         );
         if (replayItem) items.push(replayItem);
-      }
-    }
-    const text = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
-    if (text) {
-      items.push({ role: 'assistant', content: text, type: 'message' });
-    }
-    for (const block of message.content) {
-      if (block.type === 'toolCall') {
+      } else if (block.type === 'text' && block.text) {
+        items.push({ role: 'assistant', content: block.text, type: 'message', ...(block.phase ? { phase: block.phase } : {}) });
+      } else if (block.type === 'toolCall') {
         items.push({
           type: 'function_call',
           call_id: block.id,
@@ -440,6 +434,10 @@ function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
     call_id: message.toolCallId,
     output,
   }];
+}
+
+function readOutputPhase(value: unknown): 'commentary' | 'final_answer' | undefined {
+  return value === 'commentary' || value === 'final_answer' ? value : undefined;
 }
 
 function toInputMessage(role: 'user' | 'assistant', content: InputMessageContent): unknown {

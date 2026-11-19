@@ -21,6 +21,7 @@ import {
   resolveCaptureStatusTone,
 } from './CaptureReplayStatus';
 import { useCaptureReplay } from './useCaptureReplay';
+import { useCaptureRecovery } from './useCaptureRecovery';
 import { clearOpenedCapture, getTraceProjection, openProjectCaptureInput, refreshProjectCaptureInputs, refreshReplayDevices, refreshReplayFrame, type CaptureScope } from './capturePanelActions';
 import './CaptureReplay.css';
 
@@ -30,9 +31,11 @@ const sizeLabel = (size: number) => size >= 1024 ** 3 ? `${(size / 1024 ** 3).to
 function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdcContextPanelViewModel }) {
   const { t } = useI18n();
   const { state, selection, error: connectionError, actionFailure, reload, receive } = useCaptureReplay(scope);
+  const recovery = useCaptureRecovery(scope, state?.revision);
   const devices = useDeviceStore((value) => value.devices);
   const [draft, setDraft] = useState<{ inputId: string } | null>(null);
   const [action, setAction] = useState<Action | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState<{ message: string; action: Action } | null>(null);
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -47,8 +50,8 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const locked = Boolean(state?.interactionLock);
   const preparing = state ? isDevicePreparing(state.preparation.phase) : false;
   const installUnconfirmed = isDeviceInstallationUnconfirmed(state?.preparation);
-  const disabled = locked || installUnconfirmed || phaseBusy || preparing || action !== null || !state;
-  const deviceDisabled = locked || installUnconfirmed || (!preparing && phaseBusy) || action !== null || !state;
+  const disabled = locked || installUnconfirmed || phaseBusy || preparing || restoring || action !== null || !state;
+  const deviceDisabled = locked || installUnconfirmed || (!preparing && phaseBusy) || restoring || action !== null || !state;
   const deviceReady = targetDeviceId === 'local' || state?.preparation.phase === 'ready';
   const partial = isCapturePartialReady(state);
   const refreshProjection = useCallback(async () => {
@@ -122,6 +125,17 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput || (!open && !deviceReady)} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
     </div>
     {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {devices.find((device) => device.id === actualDeviceId)?.label}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
+    {recovery.status && <div className="capture-replay-callout is-warning" aria-live="polite">
+      <div className="capture-replay-callout-copy"><strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
+        <small>{recovery.status.original ? `${recovery.status.original.fileName} · ${recovery.status.original.deviceId} · EID ${recovery.status.original.eventId}` : t('control.replay.recoveryNoCapture')}</small>
+        <small>{t('control.replay.recoveryDescription')}</small></div>
+      <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} onClick={() => {
+        if (!state) return;
+        setRestoring(true);
+        void recovery.restore(state.generation).then(async next => { if (next) { receive(next); await refreshProjection(); } }).finally(() => setRestoring(false));
+      }}>{t('control.replay.recoveryAction')}</Button>
+    </div>}
+    {recovery.error && <div className="capture-replay-callout is-error" role="alert"><div className="capture-replay-callout-copy"><strong>{t('control.replay.recoveryFailed')}</strong><small>{recovery.error}</small></div></div>}
     <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} hasCapture={open} disabled={locked}
       onRetry={() => { void useSessionDeviceStore.getState().prepare(scope, installUnconfirmed ? targetDeviceId : actionFailure?.deviceId ?? targetDeviceId); }}
       onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />

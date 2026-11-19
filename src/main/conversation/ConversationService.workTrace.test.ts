@@ -10,6 +10,15 @@ import {
 import { applyPlanReviewRequested } from './ConversationPlanReviewEvents';
 
 describe('ConversationService work trace tool approvals', () => {
+  it('keeps a question owned by the model loop across later updates', () => {
+    let trace = upsertRuntimeToolCall(undefined, { id: 'ask', toolName: 'ask_user', status: 'pending' }, { loopId: 'loop' });
+    trace = upsertRuntimeToolCall(trace, { id: 'ask', toolName: 'ask_user', status: 'running',
+      userInputQuestions: [{ questionId: 'q', prompt: 'Proceed?', options: [], allowFreeform: true }] });
+    expect(trace.blocks.map((block) => [block.id, block.parentLoopId])).toEqual([
+      ['loop', undefined], ['runtime-user-input-ask', 'loop'],
+    ]);
+    expect(trace.blocks[1].toolCalls[0].displayOrder).toBe(1);
+  });
   it('preserves the real execution start and terminal status under late declarations', () => {
     let trace = upsertRuntimeToolCall(undefined, { id: 'call', toolName: 'read_file', status: 'pending', startedAt: 100 });
     trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'running', executionStartedAt: 500 });

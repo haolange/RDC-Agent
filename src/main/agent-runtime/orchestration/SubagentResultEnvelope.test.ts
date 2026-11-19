@@ -9,7 +9,7 @@ afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursiv
 it('persists and pages the complete result while the parent receives qualified bounded fields', () => {
  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'subagent-result-')); roots.push(root); fs.writeFileSync(path.join(root, 'session.json'), '{}');
  const resolver = new SessionArtifactResolver({ resolveSessionPath: (sessionId) => sessionId === 'owner' ? root : null });
- const complete = { status: 'complete' as const, text: 'private exploration '.repeat(10000), completionDeclaration: { disposition: 'partial' as const, evidenceRefs: [{ uri: 'session://tool-outputs/before.png', hash: 'b'.repeat(64) }], result: { summary: 'Hypothesis only', outputs: { report: 'bounded output' }, counterevidence: ['Driver Y untested'], unresolved: ['Driver Y'], scope: 'Capture A; driver X only; recheck on driver change', sideEffects: ['No mutation'], recoveryState: ['Baseline unchanged'] } } };
+ const complete = { status: 'complete' as const, text: 'private exploration '.repeat(10000), completionDeclaration: { disposition: 'partial' as const, evidenceRefs: [{ uri: 'session://tool-outputs/before.png', hash: 'b'.repeat(64) }], result: { summary: 'Hypothesis only', outputs: { report: 'bounded output' }, counterevidence: ['Driver Y untested'], unresolved: [{ gap: 'Driver Y', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'Capture A; driver X only; recheck on driver change', sideEffects: ['No mutation'], recoveryState: ['Baseline unchanged'] } } };
  const ref = persistSubagentResult('owner', 'execution-1', complete, resolver);
  const pieces: string[] = [];
  for (let offset = 1; ; offset += 2) { const read = resolver.read('owner', ref.uri, { expectedHash: ref.hash, offset, limit: 2 }); pieces.push(read.text!); if (!read.truncated) break; }
@@ -17,16 +17,16 @@ it('persists and pages the complete result while the parent receives qualified b
  const normalized = normalizeSubagentResult(complete.text, complete.status, complete.completionDeclaration, ref);
  const projection = projectSubagentResult(normalized);
  expect(projection.resultHash).toBe(ref.hash);
- expect(projection).toMatchObject({ scope: complete.completionDeclaration.result.scope, counterevidence: ['Driver Y untested'], unresolved: ['Driver Y'], sideEffects: ['No mutation'], recoveryState: ['Baseline unchanged'], evidenceRefs: complete.completionDeclaration.evidenceRefs });
+ expect(projection).toMatchObject({ scope: complete.completionDeclaration.result.scope, counterevidence: ['Driver Y untested'], unresolved: [{ gap: 'Driver Y', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], sideEffects: ['No mutation'], recoveryState: ['Baseline unchanged'], evidenceRefs: complete.completionDeclaration.evidenceRefs });
  expect(JSON.stringify(projection)).not.toContain('private exploration');
 });
 it('marks over-limit fields as externalized without silently truncating or upgrading their meaning', () => {
- const full = { disposition: 'partial' as const, summary: 'hypothesis only', outputs: { raw: 'x'.repeat(100000) }, scope: 'fixed camera '.repeat(2000), counterevidence: ['negative '.repeat(2000)], unresolved: ['unknown'], sideEffects: [], recoveryState: [], resultRef: 'session://tool-outputs/result.json', resultHash: 'a'.repeat(64) };
+ const full = { disposition: 'partial' as const, summary: 'hypothesis only', outputs: { raw: 'x'.repeat(100000) }, scope: 'fixed camera '.repeat(2000), counterevidence: ['negative '.repeat(2000)], unresolved: [{ gap: 'unknown', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], sideEffects: [], recoveryState: [], resultRef: 'session://tool-outputs/result.json', resultHash: 'a'.repeat(64) };
  const projection = projectSubagentResult(full);
  expect(Buffer.byteLength(JSON.stringify(projection))).toBeLessThan(14000);
  expect(projection.externalizedFields).toEqual(expect.arrayContaining(['outputs', 'scope', 'counterevidence']));
  expect(projection.outputs).toEqual({}); expect(projection.counterevidence).toEqual([]);
- expect(projection.disposition).toBe('partial'); expect(projection.unresolved).toEqual(['unknown']);
+ expect(projection.disposition).toBe('partial'); expect(projection.unresolved).toEqual([full.unresolved[0]]);
  expect(() => projectSubagentResult({ ...full, resultRef: undefined })).toThrow('REFERENCE_REQUIRED');
 });
 it('never returns exploratory final text when structured completion is absent or execution failed', () => {
@@ -35,6 +35,13 @@ it('never returns exploratory final text when structured completion is absent or
   expect(JSON.stringify(projectSubagentResult(result))).not.toContain('private scratch');
   expect(result.disposition).not.toBe('completed');
  }
+});
+it('returns the actionable trusted preparation conflict to the parent without promoting a failed result', () => {
+ const artifact = { uri: 'session://tool-outputs/result.json', hash: 'a'.repeat(64) };
+ const text = 'DELEGATION_PREPARATION_CONFLICT: verifier cannot use turn_complete, artifact_read under the prepared Profile, Skill intersection or policy.';
+ expect(projectSubagentResult(normalizeSubagentResult(text, 'failed', undefined, artifact))).toMatchObject({
+  disposition: 'blocked', summary: text, error: 'DELEGATION_PREPARATION_CONFLICT', resultRef: artifact.uri, resultHash: artifact.hash,
+ });
 });
 it('distinguishes a wall-time limit from an explicit subagent cancellation', () => {
  const artifact = { uri: 'session://tool-outputs/result.json', hash: 'a'.repeat(64) };

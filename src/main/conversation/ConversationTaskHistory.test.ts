@@ -15,7 +15,7 @@ it('keeps one immutable Task card per event and deduplicates replay by event ID'
   });
   const handler = createAgentEventHandler({
     host, sessionId: 'session-1', input: { userMessage: {} }, turnStreamState: state,
-    commitAssistantMessage: commit,
+    commitAssistantMessage: commit, currentLoopId: () => 'between',
   } as unknown as Parameters<typeof createAgentEventHandler>[0]);
   const emit = (id: string, type: 'task.created' | 'task.updated', statuses: Array<'pending' | 'completed'>) => handler({
     id, type, sessionId: 'session-1', timestamp: id === 'created' ? 10 : 30,

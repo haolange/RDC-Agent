@@ -66,6 +66,27 @@
   font-size: var(--text-xs);
   white-space: nowrap;
 }
+.work-process-outcome:has(> .work-process-outcome-items) { flex-wrap: wrap; }
+.work-process-outcome-items {
+  flex-basis: 100%;
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-4);
+}
+.work-process-outcome-items li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  color: var(--token-text-body);
+}
+.work-process-outcome-item-gap { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.work-process-outcome-item-detail {
+  flex-basis: 100%;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
 @container (max-width: 400px) {
   .work-process-outcome { flex-wrap: wrap; gap: var(--space-1); }
   .work-process-outcome-title { flex-basis: 100%; }

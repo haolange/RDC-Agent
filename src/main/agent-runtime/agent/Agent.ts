@@ -98,6 +98,9 @@ export interface AgentOptions {
   onRequest?: AgentLoopConfig['onRequest'];
   onResponse?: AgentLoopConfig['onResponse'];
   beforeRequestMessages?: AgentLoopConfig['beforeRequestMessages'];
+  beforeTerminalResponse?: AgentLoopConfig['beforeTerminalResponse'];
+  onLoopBudget?: AgentLoopConfig['onLoopBudget'];
+  resolvePromptPlan?: AgentLoopConfig['resolvePromptPlan'];
   resolvePermissionState?: AgentLoopConfig['resolvePermissionState'];
 }
 
@@ -375,6 +378,9 @@ export class Agent {
       onRequest: opts.onRequest,
       onResponse: opts.onResponse,
       beforeRequestMessages: opts.beforeRequestMessages,
+      beforeTerminalResponse: opts.beforeTerminalResponse,
+      onLoopBudget: opts.onLoopBudget,
+      resolvePromptPlan: opts.resolvePromptPlan,
       resolvePermissionState: opts.resolvePermissionState,
     };
   }

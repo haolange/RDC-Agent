@@ -46,9 +46,8 @@ export function assertRdcCliBinding(settings: RdcCliInvokerSettings): void {
     if (name.startsWith('RDX_')) {
       throw new Error('RDC_BINDING_INVALID: retired environment variable; use RDC_TOOL_* (RDC_TOOL_INTERMEDIATE_ROOT for temporary data).');
     }
-    if ((name === 'RDC_TOOL_ROOT' && normalizeAbsoluteBindingPath(value) !== root)
-      || (['PYTHONHOME', 'PYTHONPATH'].includes(name) && value.trim())) {
-      throw new Error('RDC_BINDING_INVALID: environment must not redirect the Python or Tools installation.');
+    if (['PYTHONHOME', 'PYTHONPATH'].includes(name) && value.trim()) {
+      throw new Error('RDC_BINDING_INVALID: environment must not redirect the bundled Python.');
     }
   }
 }

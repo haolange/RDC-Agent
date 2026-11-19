@@ -152,7 +152,7 @@ export function evidenceOf(
   worldStateId: string,
   artifact: { uri: string; hash: string },
   evidenceId = 'ev-1',
-): EvidenceRecord {
+): Omit<EvidenceRecord, 'contentHashes'> {
   return {
     evidenceId,
     mission: 'debugger',
@@ -162,7 +162,6 @@ export function evidenceOf(
     worldStateId,
     source: { kind: 'tool', name: 'image_compare', parameterFingerprint: 'fp-1' },
     artifactRefs: [{ uri: artifact.uri, expectedHash: artifact.hash }],
-    contentHashes: [artifact.hash],
     claimIds: [],
     strength: 'strong',
     stale: false,

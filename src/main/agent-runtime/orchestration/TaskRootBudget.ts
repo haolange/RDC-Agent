@@ -45,7 +45,7 @@ async function bindRootBudgetLocked(
   const state = bindings.get(rootPolicyBudget);
   const id = existingRootBudgetId ?? state?.rootBudgetId ?? taskRootBudgetId(rootPolicyBudget);
   if (state && state.rootBudgetId !== id) {
-    throw new Error('TASK_ROOT_BUDGET_REBIND_DENIED: a live policy ledger already has a different durable root.');
+    throw new Error('TASK_ROOT_BUDGET_REBIND_DENIED: this turn is bound to a different durable root; continue the Task in a new turn and bind its existing root before other Task work.');
   }
   const durable = await registry.getRootBudget(id);
   const observers = state?.observers ?? new Map<string, () => void>();

@@ -1,6 +1,709 @@
 # Acceptance Ledger
 
+## 2026-11-19：M3 第十四轮，可恢复实验待用户确认
+
+- 隔离会话 `sess_60d672e14cde`／眼部 capture／local／入口 E147；Settings 确认十二个 Agent 均为内置且模型可用，GPT-6.1 Sol／Medium、自动审查，Memory 和覆盖为空，Knowledge 无眼部案例。
+- 仅输入短症状，对主动澄清答“不知道”并原样批准计划；General 将 E7343 输出的候选点经合成绑定链追到 `ResourceId::308658` 的 `(518,455)`，以 Pixel History、前后读数和覆盖图定位 E6152 泪液 draw。
+- 原生目标 RGB 从 E6128 的 `(0.06738,0.03662,0.03320)` 变为 E6152 的 `(0.46875,0.4921875,0.5625)`；相邻控制点不变。粗糙度下限对照使目标降至 `(0.34375,0.36328125,0.421875)`，亮点仍在。
+- 单独切除末段反射 RGB 加入项后，目标降至 `(0.03271484,0.01782227,0.01611328)`，控制点不变；两项 A-B-A 各有五份签名回执，撤销后区域数值和 PNG 回到基线。记录 `invart-8ce8a0505f62-1795038036386`、`invart-50b500a6db66-1795038816092`。
+- Verifier 首次指出中间绑定链材料缺口；General 补授后复审并关闭 Challenge，产品接受 `completed`。候选点是否为用户所指、正常外观及反射为何集中仍待判断；精确 filter tap 未证。
+- 产品自行恢复同一 capture／local／E147、replacement 0，签名回执 `rdc-lifecycle-be07b567-eeea-470e-af4d-d97befbcec7a.json`；监工随后关闭回放。无设备配置调整，会话、Trace、调查记录、回执及图像保留于隔离 userData 和测试工程。
+- 第十三轮的截断恢复修复为 `14613ee8`；本轮直接读取单块 constant buffer，未触发该截断路径。规划约 2m48s、执行约 58m47s；Provider 累计输入 23,622,293、输出 73,286 tokens（含自动审查、Shader Analyst、Verifier 和压缩）。
+
+## 2026-11-19：M3 第十三轮后的 32 KiB 整批读取复验
+
+- 独立诊断会话 `sess_38c54b3eae3e` 经产品执行 E6152／ps 的 `rd.pipeline.get_constant_buffers(include_contents=true,max_bytes=32768)` 一次，仍返回 `RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (11411997 bytes).`；错误记录 `call_e2bb2bd081ad47049847df097cd733dc`。
+- 产品要求恢复后自行恢复入口 E147，回执 `rdc-lifecycle-8391ac0f-4168-403c-bc10-1ac266f518d3.json`；监工指定复验参数并批准计划，随后关闭回放。会话与 Trace 保留于隔离 userData。
+
+## 2026-11-19：M3 第十三轮后的单块读取复验
+
+- 独立诊断会话 `sess_264f840b6780` 经产品对 E6152／ps 的 reflection slot 7 执行 `rd.shader.get_constant_buffer_contents(max_bytes=464)` 一次，返回实际解码值、`decode_status=decoded`、`complete_range_permitted=true`，输入 464 字节；原始返回 `call_ef58681fd1e248098fd5af6e0721e174.json`。
+- 产品恢复入口 E147，回执 `rdc-lifecycle-0591702b-b72d-4cff-be3b-1dcff33ecc00.json`；监工指定复验参数并批准计划，随后关闭回放。会话与 Trace 保留于隔离 userData。
+
+## 2026-11-19：M3 第十三轮后的 64 字节整批读取复验
+
+- 独立诊断会话 `sess_ec5a301fdd69` 经产品执行 E6152／ps 的 `rd.pipeline.get_constant_buffers(include_contents=true,max_bytes=64)` 一次；返回可读但八块均为 `budget_limited`／`decode_status=unavailable`，原始返回 `call_9980f6431c2c4f539e268734ac6f2d8b.json`。
+- 产品恢复入口 E147，回执 `rdc-lifecycle-d7701956-1f30-4258-88e9-cfd7f5f86c6e.json`；监工指定复验参数并批准计划，随后关闭回放。会话与 Trace 保留于隔离 userData。
+
+## 2026-11-19：M3 第十三轮，停在区分
+
+- 隔离会话 `sess_b47acc80d8a8`／眼部 capture／local／入口 E147；Settings 核对十二个 Agent 均为内置且模型可用，GPT-6.1 Sol／Medium、自动审查，隔离 Memory 和覆盖为空，Knowledge 无眼部案例。
+- 仅输入短症状，主动澄清两题均答“不知道”，原样批准计划。General 以区域读数、Pixel History 和 draw 覆盖将候选亮点定位到 E6152；候选机制未区分、未执行干预，产品声明 `partial`。
+- `rd.pipeline.get_constant_buffers(include_contents=true)` 返回 `RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (11412043 bytes).`；产品无法从截断结果验证回放并隔离 lease，自动审查拒绝未经现场核实的恢复请求，阻断了后续单块读取。三项产品复验见上。
+- 回合结束后监工通过产品恢复入口 E147、replacement 0，签名回执 `rdc-lifecycle-7b968b34-0dc4-40f5-bd92-f371010f26d4.json`，再关闭回放；无设备配置调整。会话、请求快照、调查记录和工具结果保留于 `.local/m1-20261114/user-data/state/`。
+- 规划约 3m20s、执行约 30m54s；Provider 累计输入 13,338,859、输出 38,805 tokens（含自动审查和 Shader Analyst），不把累计输入当作上下文占用。
+
+## 2026-11-19：M3 DXIL 产品路径验收（9.5 第六步）
+
+- 隔离实例 Settings 验证并应用 RDC-Tool `c6706c7`，目录 129 项；十二个 Agent 来源均为内置，Verifier 为 GPT-6.1 Sol／Medium。独立诊断会话 `sess_fcb0b0412f99` 在眼部 capture／local 完成 A 原样和 B 单常量两组真实 `applied` 替换，各有独立 experimentId 与五份主进程签名回执。
+- 产品完整 raw 审计：A 的 baseline、variant、restored 逐字节相等；B variant 不同、restored 等于 baseline，后者 SHA-256 为 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`。B 在 `(518,455)` 的 RGB 从 `(0.46875,0.4921875,0.5625)` 变为 `(0,0,0)`，撤销后恢复原值。
+- 首次 B 替换被自动审查拒绝，因比较文件一侧的原始审计未进入审查窗口；产品补充该审计并以独立 B2 实验完成五阶段。产品侧 `bf785469` 修复两侧文件的证据关联，保护文件仍不透传内容。
+- 入口恢复回执 `rdc-lifecycle-7c72f1ee-e3d2-40a0-abc4-6ecdaa4a686d.json` 确认 E147、replacement 0；关闭回放后归属登记为空。诊断不建立正式 MissionCheckpoint，产品因此声明 `partial`；两组实验和现场恢复的验收结果已具备，本次非 M3 正式调查轮。
+- 监工指定诊断参数并批准计划；会话、Trace 和签名回执保留于 `.local/m1-20261114/user-data/state/`，三次诊断的工程文件移至 `.local/m3-dxil-implementation/product-acceptance-20261119/`，避免被后续调查当作线索；会话中登记的原工程文件路径因此不再直接可打开。
+
+## 2026-11-19：M3 DXIL 输入分派缺陷复现
+
+- 更新后的隔离产品会话 `sess_add1a1541ab5` 中，自动审查已看到原样字节审计并批准 A；RDC-Tool 随后返回 `shader_source_mismatch: Cannot verify expected_source_hash: Captured entry source is unavailable.`，`failure_stage=validate_source`、`replacement_attempted=false`、现场保全。原始返回 `session://tool-outputs/call_b0d08906ceba48cd9f83b2c09b111d79.json`；B 未执行。
+- 直接原因是显式 DXIL ASM 输入同时携带 shader model target 时，被误分派到捕获源码替换路径；RDC-Tool `c6706c7` 修正分派，145 项相关测试通过，catalog 与参考手册检查通过。
+- 监工停止诊断以修复已复现的缺陷，停止打断了进行中的恢复；随后通过产品恢复同一 capture／local／E147、replacement 0，回执 `rdc-lifecycle-42c3ee80-0147-4954-ae88-cd9c6987f5a8.json`，关闭回放后归属登记为空。本次非 M3 正式调查轮。
+
+## 2026-11-19：M3 DXIL 产品路径审查证据复验
+
+- 独立诊断会话 `sess_5f4a37601744` 的 A 组原样 DXIL ASM 装配成功，取得签名 baseline；真实替换被自动审查拒绝，原文为 `The observed compile validates A/original.dxilasm but does not establish its byte equality with the product-exported original. Only model-authored records claim that audit passed; the exact original-text replacement prerequisite remains unverified.` B 组未执行。
+- 产品 `read_file` 的 `call_a0f6da8c3f464257a5b8c74bd8575246` 实际返回 `bytesEqual=true`，但本次审查请求快照未包含该结果：待执行 RDC 的 `source_path` 与已解析的审计 `path` 未关联，后续读取将审计挤出最近窗口。修复提交 `6a1975c0` 保留真实审计结果供原有自动审查判断，未改变权限。
+- 监工指定两组诊断实验并澄清产品 RDC 入口；会话、请求快照和原始结果保留于 `.local/m1-20261114/user-data/state/` 对应目录。产品恢复 E147 后关闭回放，归属 daemon 登记为空；本次非 M3 正式调查轮。
+
+## 2026-11-19：M3 回放位置恢复产品复验
+
+- 眼部 capture／local／入口 E147；独立诊断会话 `sess_f10c6395f095` 的规划阶段依次查询原生状态、E6152 pipeline、原生状态，得到 E147→E6152→E147，界面始终显示入口 E147，同一 replay 和 capture 身份保持一致。
+- 原样批准计划后 General 入口校验通过，并在执行阶段独立重复同一组查询，仍为 E147→E6152→E147；终态恢复回执 `rdc-lifecycle-384ce76d-4a4e-4121-8cbb-8d65ae6d4c9e.json` 核实 E147。诊断计划不含正式调查报告，运行时要求 report 后产品如实声明 `partial`，不影响上述位置复验。
+- 六份原始工具返回和回执保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_f10c6395f095/`；监工输入限定诊断指令并批准计划，关闭回放后归属进程退出、登记为空。
+
+## 2026-11-19：回放位置偏差历史旁查
+
+- 只读对照：RDC-Tool 重构前的 `22f2518` 已由 `_dispatch_pipeline` 调用 `_ensure_event` 切换并保存原生事件；同期产品 `RdcProbeTool` 直接调用工具，未恢复入口。该行为并非运行时拆分引入。
+- M1 第十三轮、M2 第一轮及 M3 第七至十二轮，规划阶段均未调用带事件的 `pipeline_show`；General 签名入口分别为 E3029、E2653 和 E147。
+- 首次成功图像／读数：M1 E3029，M2 E2653；M3 第七至十轮 E7389、第十一和十二轮 E7343。M3 先尝试的 E147 最终输出均无图像；第八、九轮显式导出 E7389 后界面记录仍为 E147。
+- M3 执行阶段：第八轮 `pipeline_show` 曾使界面 E147／原生 E7295，及界面 E7295／原生 E5663；第九轮为 E7389／E7343；第十一轮为 E7343／E7312、E7343／E5663。后续相关读取显式指定事件并在返回中标明实际事件。
+- M1 第十三轮回滚前界面 E3029，回滚明确指定 E1248，完成后界面 E1248；用户确认这是显式事件操作执行中的正常先后。用户确认 M1、M2 的通过不受该缺陷影响，不重跑。
+- M2 归档未包含逐操作界面回放历史；首次图像和五份实验回执保留于 `.local/vertical-investigation-20261108/evidence/m2-20261115-round-01-sources.zip`。各轮会话和工具返回保留于同目录对应的 M1 第十三轮及 M3 第七至十二轮 sources 归档。
+
+## 2026-11-18：M3 DXIL 产品路径入口位置复验
+
+- 独立诊断会话的规划阶段先读到原生 E147，再以 `rdc_probe` 查询 E6152 的 pipeline；界面仍显示 E147，获批 General 因 `RDC_INITIAL_STATE_UNVERIFIED: RDC_SWITCH_STATE_UNVERIFIED: native and displayed event positions differ.` 未进入实验。
+- 监工经产品只读查询确认同一 replay 的原生位置实际为 E6152；随后在产品回放控件中依次应用 E140、E147，再以只读查询确认原生 E147、capture 身份不变，关闭回放。未发生 shader 替换。
+- 规划、失败、两次状态查询及恢复的会话证据保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_17eb2d21485f/`；监工批准诊断计划并输入两次有界状态查询。
+
+## 2026-11-18：M3 DXIL 产品路径 EXR 预检
+
+- 隔离实例中新建诊断会话，E6152 上 `rd.export.texture` 以原生 `SaveTexture` 成功导出 EXR；原样和单常量 DXIL 分别独立构建成功。产品报告 `CODE_INTERPRETER_DISABLED: enable the interpreter in Settings → Tools.`，其冻结计划要求解码全图后才干预，因而两次替换和五阶段回执均未执行。
+- 只读检查导出文件：完整 dataWindow 为 `1444×1276`，四个 HALF 通道、无压缩，未发现 NaN、Inf 或负零；原始纹理格式为 `R11G11B10_FLOAT`。可用现有原始 readback 和逐字节文件审计继续验证，不需要开启解释器。
+- 产品声明 `partial`，恢复同一 capture／local／E147、replacement 0 后关闭回放；会话保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_a51f8865eb85/`，工作文件保留于 `.local/m3-dxil-implementation/product-acceptance-preflight/`。监工输入限定的诊断目标并批准原计划。
+
+## 2026-11-18：M3 DXIL 产品路径验收首次尝试
+
+- 隔离实例通过 Settings 验证并应用 RDC-Tool `82ca8aa`，目录为 129 项；独立诊断会话在眼部 capture 的 E6152 将原样和单常量 DXIL ASM 分别装配构建，产物均为 `validated-dxil-build-input`。
+- 原样实验以 DDS 做签名基线时返回 `RDC_EVIDENCE_INVALID: native result does not provide supported execution evidence.`，未替换；单常量实验以截图取得签名基线后，替换被自动审核拒绝，理由是审核材料未证明修改后的 DXIL validator 成功，亦未执行替换。
+- 原始 compile 返回包含校验后的构建产物标签和哈希；审核请求中的对应结果在 1600 字符处截断，未包含该标签。两次实验分别缺少 5／4 份回执，产品声明 `partial`；已恢复同一 capture／local／E147，replacement 为 0。
+- 会话与回执保留于 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_9681aafe51f2/`，审核请求保留于同一 userData 的 `state/llm-calls/sess_9681aafe51f2/`，工作文件保留于 `.local/m3-dxil-implementation/product-acceptance-first/`；监工输入限定的诊断目标并批准原计划。
+
+## 2026-11-18：M3 DXIL 工具路径真实回放测试（9.5 第四步）
+
+- 显式开启 RDC-Tool `test_dxil_real_replay.py`，使用眼部 capture、隔离运行库和固定版本 DXC；经工具实现反汇编、装配、校验签名后，以 DXIL 替换 E6152 的像素 shader，测试结果 `1 passed`。
+- 测试核对实际绑定容器与构建输入的哈希，并逐字节比较完整目标纹理：原样往返和撤销后均与基线一致；测试恢复入口 E147，释放回放。测试代码与本次命令输出构成复核依据，未新建调查会话。
+
+## 2026-11-18：M3 DXIL 单常量修改复验通过（9.5 第二步）
+
+- 隔离本机回放的 E6152 PS LLVM IR 仅将 `%2340` 的浮点常量 `0x3FF0A3D700000000` 改为 `0.000000e+00`；官方 DXC 装配、校验签名通过，`dxv` 返回 `Validation succeeded.`。
+- 已签名容器经 DXIL `BuildTargetShader` 替换，实际绑定容器 SHA-256 `469777b186c53abda8728af811424f6b406aee99cc66094397a26bad20692559`；输出有 222 个像素变化，目标像素 RGB 从 `(0.46875,0.4921875,0.5625)` 变为 `(0,0,0)`。
+- 撤销后完整纹理与基线逐字节一致，SHA-256 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`；已恢复入口 E147、关闭回放。原始日志及校验结果保存在 `.local/m3-dxil-dxc-20261118/one-constant-retry-native.jsonl` 及同目录。
+
+## 2026-11-18：M3 DXIL 单常量无效原因核查
+
+- 在隔离回放中以官方 DXC 签名后替换诊断 shader：将 E6152 PS 的红色输出改为零，目标像素 shader 红色从 `0.8624011` 变为 `0`，完整输出有 222 个像素变化，证实替换进入实际 draw。
+- 将实际中间值写入 shader 输出并读 Pixel History：目标像素 `%2332=7.5835357`、`%220/%221/%222=1`、`%2352=1`、`%74=0`、`%54=0.1203388`。
+- `%2348` 在 `%2349=%2340-%2348` 和 `%2350=%2341+%2348` 两项中符号相反；目标像素各颜色权重与 `%2352` 相同，代入后其作用抵消。上次整幅目标纹理没有变化的原因不是替换未执行。
+- 各次诊断均撤销替换、恢复完整基线和入口 E147、关闭回放；原始日志保存在 `.local/m3-dxil-dxc-20261118/` 的 `output-path-probe-native.jsonl`、`contribution-probe-native.jsonl` 和 `channel-probe-native.jsonl`。
+
+## 2026-11-18：M3 DXIL 单常量修改（9.5 第二步未通过）
+
+- 在隔离回放的 E6152 像素 shader LLVM IR 中，仅把 `%2348` 的浮点常量 `0x3FF0A3D700000000` 改为 `0.000000e+00`；官方装配和校验签名成功，`dxv` 返回 `Validation succeeded.`。
+- 已签名容器经 DXIL `BuildTargetShader` 替换，回放反射的 shader 字节 SHA-256 与修改版容器一致；E6152 输出 `ResourceId::308658` 的完整纹理与基线相同，变化像素数为 0。
+- 验证脚本原文：`RuntimeError: one-constant modification produced no output change`；此结果未查明无变化的原因，按 9.5 停止，不尝试其他修改。
+- 撤销后完整纹理与基线逐字节一致，SHA-256 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`；已恢复入口 E147、关闭回放。原始日志及校验结果保存在 `.local/m3-dxil-dxc-20261118/`。
+
+## 2026-11-18：M3 DXIL 原样往返（9.5 第一步）
+
+- 隔离本机 RenderDoc `1.48` 读取眼部 capture 的 E6152 原始 PS 容器；`dxc -dumpbin` 输出未经修改，经官方 `IDxcAssembler` 装回、`IDxcValidator` 校验签名，再以 `dxv` 验证通过。未改 RDC-Tool 或原始 capture。
+- 将签名容器以 DXIL 交给 `BuildTargetShader` 并替换原 shader；回放反射的实际 shader 字节 SHA-256 与提交的签名容器一致，入口为 `Main`。
+- E6152 输出 `ResourceId::308658`、`R11G11B10_FLOAT`、`1444×1276`、7,370,176 字节；基线、替换后和撤销后的完整纹理字节均相同，SHA-256 `c854389fe4661da20b0f0b5c5afc4ce69721e608a29b019c82ade84dff84dfe4`。
+- 验证脚本撤销替换、恢复入口 E147、释放回放并退出；原始回放日志和签名容器的校验记录保存在 `.local/m3-dxil-dxc-20261118/roundtrip-native.jsonl` 及同目录。
+
+## 2026-11-18：M3 DXIL 工具链 9.4 查证
+
+- 选用微软官方 DXC `v1.9.2609` 的 `dxc_2026_09_29.zip`，SHA-256 `ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1` 与发布记录一致；Windows x64 包含 `dxc.exe`、`dxcompiler.dll`、`dxil.dll`、`dxv.exe`、头文件和许可文本，无独立 IR 装配器。
+- 反汇编：`dxc -dumpbin <container>` 得到 LLVM IR；眼部 E6152 原始容器 `709e91a09fa4ca23b5144c58a111975832d422136061270e506da14787f1bc41` 的输出以分号注释头开头，原文直接送官方 `IDxcAssembler::AssembleToContainer` 成功，注释没有妨碍装配。
+- 装配：所选发行包由 `dxcompiler.dll` 暴露 `IDxcAssembler`；微软接口文档和 [v1.9.2609 装配实现](https://github.com/microsoft/DirectXShaderCompiler/blob/v1.9.2609/tools/clang/tools/dxcompiler/dxcassembler.cpp) 均表明接受 LLVM IR 文本或 bitcode，未使用第三方装配器。
+- 完整性：原容器有 `SFI0/ISG1/OSG1/PSV0/ILDN/HASH/DXIL`；装回结果有 `SFI0/ISG1/OSG1/PSV0/STAT/HASH/DXIL`，其中 `SFI0/ISG1/OSG1/PSV0` 与原件逐字节一致，`ILDN` 调试名未保留。官方实现会从 IR 重建签名与 PSV；能否创建原管线由 9.5 实机往返验证，不擅自拼接旧部件。
+- 校验与签名：装配结果的容器摘要为零；`IDxcValidator::Validate` 返回成功后摘要为 `eecd15e3684908d6bb70b5b196f7f5f7`，`dxv` 复核返回 `Validation succeeded.`。无 `dxil.dll` 的隔离目录中内置校验器仍得到相同签名容器；[微软文档](https://github.com/microsoft/DirectXShaderCompiler/wiki/Running-Shaders)说明未签名 shader 通常需要实验模式，未把未签名容器送入回放。
+- 许可：对应 [微软 NuGet 发行说明](https://www.nuget.org/packages/Microsoft.Direct3D.DXC/1.9.2609.5) 将 `dxcompiler.dll` 等编译器文件列为 `LICENSE-LLVM`；ZIP 另含 `dxil.dll` 和 `LICENSE-MS.txt`，后者的重分发条款引用的文件清单不在 ZIP 中。本次已验证不依赖该 DLL，不把其重分发许可推定为无限制。
+- 回放：隔离运行库来源记录对应 RenderDoc `dde88226a1cf8145edfe7094a67cbcdab6363d46`；D3D12 实现支持 `ShaderEncoding::DXIL`，以容器字节创建 shader，并以替换 shader 重建原 pipeline。原始和装回 IR 的入口均为 `Main`、签名部件一致；该接口不自动把原签名补进新容器，设备接受及画面等价留待 9.5 验证。
+- 原始命令输出、官方包、离线装配和校验记录保存在 `.local/m3-dxil-dxc-20261118/`；本次只读既有原始 shader 制品，未启动调查轮、修改 RDC-Tool 或替换回放。
+
+## 2026-11-18：M3 第十二轮，停在因果
+
+- PC 本机、新隔离会话 `sess_3a7256f5905b`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、Fast／Max 关闭、自动审查，Memory 为空、Knowledge 不含本案例。监工先向 General 输入短症状，按其提示切换 Debugger 后重复同一句，未知位置和外观答“不知道”，原样批准计划；未提供区域、事件或方法，旧会话均保留。
+- 交叉锚点 Evidence `invart-0113088f6739-1795001979310` 和 Claim `invart-a134bfb960b1-1795001998757` 将左侧候选亮点定位至 `ResourceId::308658`／`(518,455)`／E6152；E6128→E6152 的 RGB 为 `(0.06738,0.03662,0.03320)`→`(0.46875,0.49219,0.5625)`，邻近控制点不变。
+- 反射、局部光和采样机制分别保留未验证及其理由；verifier 指出错误的互斥关系和采样资格，两项 Challenge 更新为 `resolved` 并经新版复审。按 2.3 允许有理由的暂缓，本轮区分记录已处理，不等于确定机制。
+- 首个未满足步骤为因果：产品接受 `partial`，检查点 `invart-50088c233a8f-1795003393879` 的 `completedExperiments=[]`。调试结果与实际写入不一致，已有完整源码替换能力需要匹配 HLSL，而本 capture 未提供；模型因此未建立安全的单项干预。其他现有干预能否达到同样效果未被证明全部不可用，也无剩余某机制独有的差分读数，未满足能力阻塞三条件。
+- 模型请求已包含 `ac3bccd9` 指明的 post-transform 操作，但本轮只读取有界顶点输入，没有调用该操作；第十一轮独立产品复验已证明索引窗口可读，其本身不证明片元插值、实际贡献或可恢复干预。按 3.5 满 12 轮停止，不再修复或新开调查。
+- 终态回执 `rdc-lifecycle-b168ed54-6720-45fa-930a-6733c5731b96.json` 确认同一 capture／local／入口 E147、零替换；回放关闭、归属进程退出，无配置调整。产品记录 `partial` 后界面显示 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，有效终答及声明均留存，记为旁支。
+- General 转接约 58 秒、Debugger 规划约 2 分 29 秒、General 执行约 37 分 24 秒；各 3／7／85 次 Provider 请求，两次 verifier 共 23 次、自动审查 1 次，另有 1 次压缩；General input 12463399／output 28380 token（含缓存读取 3127168）。会话、请求、审查、回执和图像归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-12-sources.zip`，SHA-256 `657c8c1a897a4c09790edf25c02ec5bc3ef0b57e3c776567eb2bd2a326bd4627`。
+
+## 2026-11-18：M3 第十一轮，停在区分
+
+- PC 本机、新隔离会话 `sess_6d8e1074630a`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、自动审查，Memory 为空、Knowledge 不含本案例。监工仅输入短症状，未知眼侧和外观答“不知道”，原样批准计划；旧会话均保留。
+- 产品把候选亮点交叉定位到 `ResourceId::308658`／`(518,455)`／E6152，并以 E6128 前后读数、Pixel History 和覆盖支持局部写入；模型读取了测试工程中的既有报告并在当前 capture 复核。两个 Cube 分支经常量读数限定排除，其他候选仍待区分。
+- 首个停点为区分：片元 trace 与历史写入不匹配、顶点输入不足后，模型只搜索并读取 `rd.mesh.get_drawcall_mesh_config`，没有选择可用的 post-transform 索引窗口；没有可恢复实验，也无剩余某机制独有的差分特征，不满足能力阻塞交付条件。
+- 按 3.3 在独立产品会话复验 `rd.mesh.get_post_transform_data` 一次：E6152 的索引 270–275 窗口与五个引用的 VS 输出行可读，法线和 UV 语义标为 `unsupported`；窗口本身不证明片元插值或覆盖。原始返回、Trace 归档 `m3-round11-mesh-product-recheck-20261118.zip`，SHA-256 `51e11c0c66c0c40135ceb5db95d960ed599d79b96d177b98b66387b15aeae008`。
+- 直接原因归方法文本：模型已收到读取 post-transform 窗口的通用指引，但该位置未给出对应操作名；`ac3bccd9` 补足操作名并净缩短，`pixel-forensics` 第 1 节未改。相关 44 项测试、162 项 runtime 检查、typecheck 和 lint 通过。
+- 产品接受 `partial`；新增分支证据在来源任务更新后未能复审，依赖门拒绝将旧审查用于新 generation；界面另显示 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，均记为旁支。
+- 终态回执 `rdc-lifecycle-c9ea2158-d33a-4730-948f-53d426b80864.json` 确认入口 E147、零替换；诊断后也回到 E147，两次回放关闭、归属进程退出，未调整回放配置。
+- 规划约 3 分 25 秒、执行约 41 分 33 秒；规划 8 次、General 84 次、两次 verifier 共 21 次及自动审查 3 次 Provider 请求，另有 1 次压缩；General input 12301865／output 35664 token（含缓存读取 1976704）。会话、请求、审查、回执和图像归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-11-sources.zip`，SHA-256 `d4b30beb3fac0a42f0c0bdf301d05a868673818742194207396af7e1b3191c4d`。
+
+## 2026-11-18：M3 第十轮，停在区分
+
+- PC 本机、新隔离会话 `sess_c09c66e1e138`，Settings 逐一确认十二个 Agent 均为内置、GPT-6.1 Sol 可用；Medium、自动审查，Memory 为空、Knowledge 不含本案例。监工只输入短症状，未知眼侧和外观答“不知道”，原样批准计划；保留旧会话。
+- 产品将候选眼角亮点交叉定位至 `ResourceId::308658`／`(518,455)`／E6152，并以 E6128 前后区域、Pixel History 和覆盖支持局部写入。新增方法生效：模型读取常量前提，将两条特定反射分支的零缩放记为排除，同时保留其他照明、几何和粗着色解释。
+- 首个停点仍为区分：模型在 trace 不匹配、顶点输入截断后，把几何检查暂缓至匹配 trace 或源资产，没有选择现有的 post-transform 索引窗口；无因果实验，也无仅由剩余某一机制产生的差分特征，未满足能力阻塞交付条件。
+- 按 3.3 经独立产品会话复验 `rd.mesh.get_post_transform_data` 一次：E6152 的候选三索引窗口完整，映射 273／274／275 → 107／88／109，三个 VS 输出行和位置可读；法线、UV 语义仍为 `unsupported`，不能据此宣称片元插值或贡献。完整返回归档 `m3-round10-mesh-product-recheck-20261118.zip`，SHA-256 `181ac3e7b49da92b34e482c30ffbd8779ccd3acc761c7bdcfdec46d8f4ac4198`。
+- 直接原因在方法文本：`debugger-rdc-tools` 提到 post-transform，但未明确 trace 不匹配或顶点输入不足时怎样读取候选索引窗口。`5767344b` 补充通用做法和资格边界并净缩短，`pixel-forensics` 第 1 节未改；相关 44 项测试、162 项 runtime 检查、typecheck 和 lint 通过。
+- verifier 要求补足 debug 终点读取时序；产品撤回未经证明的顺序表述、保留限定结论，Challenge 经新版本复核后 `resolved`。产品接受 `partial`，UI 显示 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，作为旁支记录。
+- 本轮终态回执 `rdc-lifecycle-841ae8d9-de14-4892-b7e3-b58b7304bb5e.json` 确认入口 E147、零替换；诊断回放也恢复 E147。两次回放关闭、归属进程退出，无回放配置调整。
+- 规划约 3 分钟、执行约 38 分钟；规划 7 次、General 73 次、三次 verifier 共 34 次及自动审查 2 次 Provider 请求；General input 10684100／output 26020 token（含缓存读取 1065216）。会话、请求、审查、回执与图像归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-10-sources.zip`，SHA-256 `429c13dd242e5ad5046a55d68ae539180919eb38fc1d6b3ce0250ca0e5fa6b74`。
+
+## 2026-11-18：M3 第九轮，停在区分
+
+- PC 本机、新隔离会话 `sess_433f07ccd4d5`，十二个 Agent 为内置且模型可用，GPT-6.1 Sol／Medium，Memory 为空、Knowledge 不含本案例；监工只输入短症状，两项澄清答“不知道”，原样批准计划，保留旧会话。
+- 产品读取输出及中间输入区域，将候选眼角亮点交叉定位至 `ResourceId::308658`／`(518,455)`／E6152；目标 RGB 由 `(0.06738,0.03662,0.03320)` 变为 `(0.46875,0.49219,0.5625)`，邻点不变。独立 verifier 接受限定的局部定位，E6501 后续仍改变该像素；产品声明 `partial`，没有因果实验。
+- 首个停点为区分：General 将候选机制的下一步收窄为匹配源码或 trace／受控输入，未检查可由现有资源绑定与参数读数判定的必要前提；既不能将其视为已排除，也没有机制独有的差分读数，不满足能力阻塞交付条件。
+- 按 3.3 在独立产品会话各复验一次 PS 资源绑定、常量绑定和常量原始字节，三项均成功：反射路径资源已绑定，slot 2 原始值按 float32 为 `(7,1,0,0.0039331913)`；路径未被这组开关禁用，但这不证明实际片元贡献。完整返回归档 `m3-round09-gates-product-recheck-20261118.zip`，SHA-256 `dcda836dae1b1bfa27f75380240b0318c1137a1bcba33fb5841175284d473132`。
+- 直接原因在方法文本：模型实际收到最小区分检查的通用要求，却未被引导在干预或匹配 trace 不可用时先查必要输入和开关。`cef94525` 在 `debugger-causal-method` 补充通用做法并净缩短，`pixel-forensics` 第 1 节未改；相关 44 项测试、162 项 runtime 检查、typecheck 和 lint 通过。
+- 本轮终态回执 `rdc-lifecycle-55ef67a5-9bc9-4ffd-9018-f7c6e0a97b7f.json` 确认入口 E147、零替换；诊断会话也核对 E147。两次回放关闭、归属进程退出，未调整回放配置。首次审查未获计划正文，第二次补授后完成，记为旁支。
+- 规划约 3 分 14 秒、执行约 35 分 37 秒；规划 8 次、General 64 次、两次 verifier 共 21 次及自动审查 1 次 Provider 请求；General input 9745725／output 21642 token（含缓存读取 1244800）。
+- 会话、请求、Trace、Task、回执与图像归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-09-sources.zip`，SHA-256 `5b55be526539e6f43d619d6342abd300a8fd1506dd547f3f8a34d17ef5e9219d`。
+
+## 2026-11-18：M3 第八轮，停在因果
+
+- PC 本机、新隔离会话 `sess_d3b0954cb3e2`，十二个 Agent 为内置且模型可用，GPT-6.1 Sol／Medium，Memory 为空、Knowledge 不含本案例；监工只输入短症状，两项澄清答“不知道”，原样批准计划，保留旧会话。
+- 产品读取最终输出和中间输入对应区域，将候选眼角亮点追至 `ResourceId::308658`／`(518,455)` 的 E6152 draw；E6128 至 E6152 的前后读数与像素历史、覆盖一致，最终对应仍受滤波和时间采样限制。三个候选解释暂缓并写明后续检查，无可恢复实验。
+- 独立 verifier 两次审查，补读环境路径绑定和常量后解决 Challenge；读数只说明路径未被禁用，尚无该机制独有的差分读数。产品接受 `partial`，未达到因果实验或能力阻塞交付条件。
+- 按 3.3 经独立产品会话复验原 DXIL 操作一次：返回 `shader_patch_op_unsupported_for_encoding`，阶段 `validate_edit_plan`、`replacement_attempted=false`，却因入口事件未恢复而隔离 lease。自动审核拒绝诊断会话的 `capture_recover`；该操作未执行，现场最终位置未核验，随后关闭回放。原始返回归档 `m3-round08-dxil-product-recheck-20261118.zip`，SHA-256 `1545a397304051ccd7c406932216a4e356f0023642f321a0ba39f17f02093327`。
+- 直接原因属工具返回层：切事件后确定性拒绝没有恢复入口并提供可核验的保全证明。RDC-Tool `b2e1c7a` 恢复入口并保留失败信息；产品 `ce19cc2a` 复核 lease、回放位置、进程和替换身份，不能核验时仍隔离。相关测试 137 项、产品 RDC 测试 495 项和契约测试 248 项通过。
+- 本轮签名恢复回执 `rdc-lifecycle-87216362-955b-4e75-851d-cf68687e5965.json` 确认入口 E147、无替换；回放及诊断回放关闭、归属进程退出，未调整回放配置。隔离 Settings 已验证候选工具 `b2e1c7a`，129 个操作。
+- 规划约 3 分 32 秒、执行约 47 分；规划 7 次、General 70 次 Provider 请求，另有 Shader Analyst 16 次、两次 verifier 共 47 次和自动审查 3 次；General input 10652412／output 30215 token（含缓存读取 1199232）。
+- 会话、请求、Trace、Task、回执及输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-08-sources.zip`，SHA-256 `e7c8d557dbb16631130a7eadd7bc6cd7d26af7584753a0c91f50d08531ba74f4`；UI 仍显示 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，最终文本与声明已记录，列为旁支。
+
+## 2026-11-18：M3 第七轮，停在锚定
+
+- PC 本机、新隔离会话 `sess_47e2c3cddf52`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，Medium、Fast／Max 关闭，Memory 为空、Knowledge 不含本案例。监工仅输入短症状、对位置及外观答“不知道”，原样批准计划；旧会话均保留。
+- 产品观察最终输出候选及 E6152 场景色 `(518,455)` 的泪液 draw，写入场景局部 `cross-validated` Evidence 与 Claim；最终症状到场景位置的逐级对应仍被记录为 candidate。首个停点为锚定；无实验，verifier 因来源任务 partial 未满足依赖而未启动。
+- 模型实际收到请求 2×2 的原生 debug 限定及另供完整 HLSL 替换能力；捕获内 DXIL 反汇编仍只读，没有与原 shader 匹配的源码。两项真实返回分别为 `call_2b73487d0f574514a9412d31ebb51dba`、`call_4ffa0abd925a47e7be8b04b2789f54f5`。
+- 按 3.3 经独立产品会话单次复验 E7330／`ResourceId::2051334` 的 `(1163,1027,5,5)`：`values_status=complete`，视图 `B8G8R8A8_UNORM`；工具返回及请求归档 `m3-round07-region-product-recheck-20261118.zip`，SHA-256 `ddea212ec972682bbd8ca71c4b147d4e2e7b7aca46c11bdfcb0616e0587c90c1`。
+- 直接原因在方法文本：General 读到了跨合成逐级读数方法，但因滤波／重投影的精确采样位置未解而未读取对应输入区域；方法未说明怎样以区域读数建立有限对应并保留采样不确定。`7dcb1d7a` 在 `pixel-forensics` 第 2 节补充一般做法，第 1 节未改且文件净缩短；162 项 runtime 检查通过。
+- 产品记录 `partial` 后 UI 显示模型请求失败；Trace 的技术原文为 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，请求已有模型答复，不按账号不可用处理。终态回执 `rdc-lifecycle-1509fc0c-05e9-43b6-9bef-c9824b5b5636.json` 确认入口 E147、无替换；回放关闭、归属进程退出，未调整回放配置。
+- 规划约 2 分 52 秒、执行约 26 分 21 秒；规划 8 次、General 70 次及自动审查 2 次 Provider 请求；General input 10562432／output 20356 token（含缓存读取 1555072）。会话、请求、Trace、回执和最小输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-07-sources.zip`，SHA-256 `df04db261403a4ac1e877eb31d7a1033296ac9e9a3af4bc64abd309bf744919c`。
+
+## 2026-11-18：M3 第六轮，停在区分
+
+- PC 本机、新隔离会话 `sess_5d4e208e888c`，内置 Agent／GPT-6.1 Sol／Medium，隔离 Memory 为空；监工只输入短症状，位置和预期两项答“不知道”，原样批准计划。旧会话均保留。
+- 产品将 E7343 输出候选 `(1165,1024)` 逐级对应到 SceneColor `ResourceId::308658`／`(518,455)`；E6128 至 E6152 从 `(0.06738,0.03662,0.03320)` 变为 `(0.46875,0.49219,0.5625)`，draw 标记为泪液材质。verifier 接受限定锚点及首次亮写入；两项证据授权 Challenge 补授后解决，产品声明 `partial`，无因果实验。
+- 区分所需的真实像素贡献未拆出：目标 primitive 91 的 Pixel History shader-out 为 `(0.86240,0.93273,1.09876,0.50878)`，debugger `_OUT` 为 `(0.04348,0.04592,0.04033,0.18280)`；候选机制仍待验证，不能交付因果成立或能力阻塞。
+- 按 3.3 经产品复验三项：另一片元 primitive 307 的位置和深度相符而 RGB 仍不符；E7343 合成 draw 的同类比较仅差一个 float32 ULP；两 draw 基础着色率分别 2×2 和 1×1，shader 不同，不能归因。第一项曾把 `view` 误填为对象，返回 `int() argument must be a string, a bytes-like object or a real number, not 'dict'` 并隔离；重开后更正参数，未重复失败调用。
+- 直接障碍在工具返回层：目标 draw 的 debugger 输出与原生写入记录不一致；现有三项产品路径复验尚不能区分工具状态投影与 RenderDoc 原生调试结果。进一步直接对照原生 trace 超出 3.3 的同产品路径及三项上限，需用户决定是否扩大诊断范围；本轮未改代码。
+- 签名恢复回执 `rdc-lifecycle-4356bef0-510b-41b7-bd0d-257bbcf1e5da.json` 确认恢复 E147；诊断回放关闭、归属进程退出，无配置调整。规划约 3 分 38 秒、执行约 45 分 49 秒；规划 8 次、General 63 次、子 Agent 77 次及自动审查 4 次 Provider 请求；General input 9287521／output 33381 token（含缓存读取 1235328）。
+- 会话、模型请求、Trace、诊断和输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-06-sources.zip`，SHA-256 `dfa19461fd9547bcbfb5ff0963b00a3b492642ce9773f32cb9a97a5f89dd033b`。
+- 2026-11-18 原生只读对照：同一 2×2 块仅 `(518,455)` 有 E6152 片元；原生 `SV_Position` 为像素中心 `(518.5,455.5)`，最终 `_OUT` 与工具保存值逐位一致，均不同于 Pixel History；实际着色率及差异机制未知。原始 trace 和脚本归档 `.local/vertical-investigation-20261108/evidence/m3-round06-native-20261118.zip`，SHA-256 `3201b1a53bc8b8527b2e011aaa59d786a16e7b0f44acbb2734b4265ebe17913b`。
+- 区分停点复查：模型收到捕获内 DXIL 源缺失和反汇编只读的编辑计划，考虑过单项贡献替换但缺少匹配源码而未做；独立 HLSL 完整替换已实证，不能证明单项语义。工具 `b151630` 对请求粗着色率的调试结果标注原生限制，`b7ef5db` 区分捕获源码编辑与另供完整源码替换；分别通过 45 项和 134 项相关测试。
+
+## 2026-11-18：M3 第五轮，停在锚定
+
+- PC 本机、新隔离会话 `sess_21e39ed907de`；十二个 Agent 为内置且模型可用，Memory 为空、Knowledge 不含本案例。监工只输入短症状，两项澄清答“不知道”，原样批准计划；保留所有旧隔离会话。
+- 最终图 E7343／`ResourceId::2002006` 的眼部裁图为 `(1010,970,475,95)`；General 从旧线索复核场景 `ResourceId::308658` 的 `(518,455)`、`(597,461)` 和 E6152 泪液 draw，但未读取中间输入纹理的对应区域。独立 verifier 核验限定场景定位，最终症状对应仍为 candidate；未做因果实验，产品声明 `partial`。
+- 按 3.3 在独立产品会话对 E7343 输入 `ResourceId::2051334` 的 `(1161,1028,5,5)` 读一次，`values_status=complete`、视图格式 `B8G8R8A8_UNORM`；该读数只证明检查可用。原始返回 `call_27656e036d9c440fbd27daba4dc8e8ae.json`，SHA-256 `a59d4804680315718b42d131ad272517a23897697a68295d34c8c6fdc8518fd9`。
+- 直接原因在方法文本：规划回合未读 `pixel-forensics`，冻结计划未明确逐级输入区域读数，执行虽收到更新方法和图像，仍沿场景候选展开。`c0e3f94a` 调整 `debugger-coordinator` 在需要跨合成对应时按需引用该方法并安排首批读数；不改 `pixel-forensics`。受影响 21 项测试、typecheck、lint 通过。
+- 本轮签名恢复回执 `rdc-lifecycle-035be3e8-79f7-42fb-8b3f-765910407878.json` 确认入口 E147；诊断会话的通用恢复被自动审查拒绝，明确设置 E147 成功。两次回放均关闭、归属进程退出，未调整回放配置。
+- 规划约 5 分 38 秒、执行约 32 分；规划 10 次、General 72 次、verifier 25 次及自动审查 2 次 Provider 请求；General input 10772653／output 28768 token（input 含缓存读取 1794432）。会话、请求、Trace、回执与项目输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-05-sources.zip`，SHA-256 `0b851787281e3a94cb1b7d0f4f4ef56f2d5f81b3d815c1dcf3cdd931b87ac346`。
+
+## 2026-11-18：M3 第四轮，停在锚定
+
+- PC 本机、新隔离会话，十二个 Agent 均为内置且使用 GPT-6.1 Sol／Medium；Memory 为空，隔离 Knowledge 无本案例材料。监工只输入短症状，对两个超出已知事实的澄清答“不知道”，原样批准计划；模型将测试工程里的前轮材料作为线索，并在当前 capture 上复核。
+- E6152 的泪液 draw、像素历史和覆盖支持限定场景区域；目标像素在 E6128→E6152 的 RGB 由 `(0.0674, 0.0366, 0.0332)` 升至 `(0.4688, 0.4922, 0.5625)`，随后被 E6501 衰减。该场景区域与最终症状的采样映射未闭合，Claim 和 verifier 均将用户症状保留为 candidate；首个未满足步骤为锚定。VRS 的实际调用未证，光照贡献也未拆分。
+- 独立 verifier 接受限定定位但未认证根因；General 的 `turn_complete` 以 `partial` 被产品接受，没有因果实验，也没有满足能力阻塞所需的独有差分特征，不能交付。`code_interpreter` 返回 `CODE_INTERPRETER_DISABLED`；末次答复已在 Trace 中生成，随后界面被一次模型请求错误覆盖，具体技术错误待查。
+- 签名恢复回执 `rdc-lifecycle-3dfd6827-bfe8-458e-9102-c0fc1544d4f0.json` 确认同一 capture／本机／入口 E147、replacement 0；产品关闭回放，归属 daemon 和 worker 已退出。
+- 规划 10 次、General 42 次及自动审查 3 次 Provider 请求；General input 5839903／output 20849 token（input 含缓存读取 764800）。本轮会话、请求、Trace、回执及工程输出归档 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-04-sources.zip`，SHA-256 `50e6c526934ea19ba027e84c4d71a5c33c501b25eaf0a8f90d5e8524c2cb689e`。
+
+## 2026-11-18：M3 第四轮单点复验与锚定修正
+
+- 监工最初把停点误判为区分并发起控制点检查；复查实际 Claim、verifier 和计划 2.3 后，纠正为锚定。经产品单次查询 `ResourceId::2051334` 的 usage，E7330 为写入、E7343 为读取；这是可执行的资源链检查，不单独证明采样坐标或最终像素映射。
+- 两项已发起的旁支检查保留：`(518,456)` 的 Pixel History 与 debug 输出不一致，native 实际选择的 primitive 未独立确认；`(597,460)` 没有 E6152 片元，不能与目标点比较。每项单次调用，未重试；诊断回到 E147 后关闭回放，归属进程退出。
+- 直接原因归方法文本：预载 `pixel-forensics` 的 Agreement 将“图像矩形落在覆盖 draw 内”作为锚定条件，未限定该矩形须与症状区域跨合成环节对应；General 因而只交叉定位场景局部，最终症状仍为 candidate。修复 `6271b96a` 明确该映射，文件由 4253 减至 4251 字节；16 项 Skill 测试、162 项 runtime 测试、typecheck 与 lint 通过。
+- 三项复验的请求、原始返回与现场证据归档 `.local/vertical-investigation-20261108/evidence/m3-round04-product-rechecks-20261118.zip`，SHA-256 `d71e040475643a88884dcf6ed646ea31ef77482ed458027b4fb2dc61dbea17d0`。自动审批拒绝删除已归档的隔离会话 `new session 3`，理由是没有针对该会话的单独删除确认；会话保留，下一轮未启动。
+
+## 2026-11-18：M3 第三轮审核证据修复复验
+
+- 第三轮区分所需的有界计算两次遭自动审核拒绝：General 已完整读取 3934 字节脚本，但审核请求把该读取结果截断到 1600 字符，审核器无法核实完整命令和影响。直接原因在运行时的送审证据投影；修复 `a60609c4` 保留被待审命令引用的有界完整读取，仍脱敏并保留审核、保护路径和历史观察边界。
+- 在隔离产品 General／GPT-6.1 Sol Medium 上，用另一份 4224 字节无副作用脚本做一次工程复验：真实审核请求中的 `read_file` 结果未截断，包含脚本末行；独立审核允许执行，输出 `REVIEW_EVIDENCE_PROBE_OK`。未重试被拒脚本，也未访问 capture。
+- 审核请求、读回、Trace 与测试脚本归档 `.local/vertical-investigation-20261108/evidence/m3-review-evidence-recheck-20261118.zip`，SHA-256 `297e3b112046a4250aa7cfb55d55299ed365f335ee96c578787832b8956e2dec`；测试工程中的临时脚本在哈希核对后清理。
+
+## 2026-11-18：M3 第三轮上邻点历史复验
+
+- 按 3.3 在同一回放对 E6152／`ResourceId::308658` 的上邻点 `(518,454)` 查询一次 Pixel History；没有该事件的片元，无法与目标点 primitive 91 比较输出，VRS 邻域机制仍未知。
+- 产品查询确认恢复入口 E147，无 shader 替换及失败重试；监工指定本次检查参数。原始返回归档 `.local/vertical-investigation-20261108/evidence/m3-round03-upper-neighbor-recheck-20261118.zip`，SHA-256 `84831b4b16c1922e68fbac810eb3bea3d34b86b3bc237675d835d80b01d5df09`。
+
+## 2026-11-18：M3 第三轮相邻像素历史复验
+
+- 按 3.3 在同一回放对 E6152／`ResourceId::308658` 的 `(518,455)` 与 `(519,455)` 各查询一次 Pixel History；前者命中 primitive 91 且 passed，后者没有该事件的片元，无法比较同 primitive 的输出，VRS 邻域机制仍未知。
+- 产品查询确认恢复入口 E147，无 shader 替换及失败重试；监工指定本次检查参数。原始返回归档 `.local/vertical-investigation-20261108/evidence/m3-round03-neighbor-history-recheck-20261118.zip`，SHA-256 `5824a17af496b492c47ebdf7d8bbc3f680bd0a07d6e2b00bea9ee0b7a8bb330a`。
+
+## 2026-11-18：M3 第三轮控制点输出资格复验
+
+- 按 3.3 对眼部 E6152／`ResourceId::308658` 的控制点 `(517,455)` 各做一次 Pixel History 和 pixel debug；history 命中 primitive 100，debug 请求也指定该 primitive。两者均成功，但 history shader-out `(0.08621,0.10134,0.05632,0.10399)` 与 debug `_OUT` `(0.02371,0.03048,0.03118,0.10113)` 不一致；trace 输入位置为 `(517.5,455.5)`。本机配对的 RenderDoc 源码显示找不到指定 primitive 时可回退其他命中，trace 未暴露实际选中值；因此该 trace 尚不能定量拆分实际输出贡献，差异原因未定。
+- 调试已 finish、替换集合为空，产品查询确认回到入口 E147；监工指定本次检查参数，无失败重试。原始返回归档 `.local/vertical-investigation-20261108/evidence/m3-round03-control-debug-recheck-20261118.zip`，SHA-256 `6836172795d14b26f5ce6fb08975fd736fb829b38c86397494afc6a12e6aebda`。
+
+## 2026-11-18：M3 眼部 DXIL 完整替代往返复验
+
+- 隔离产品本机回放使用与工具 `1a761473` 源码一致的 candidate；E6152／PS 的独立 65 字节 HLSL 测试 shader 编译成功，原 capture 的 HLSL 源码不可用。
+- 对该 PS 完成一次完整替代 A-B-A：baseline、intervention、variant、rollback、restored 五份产品签名回执齐全；变体眼部显示洋红，撤销后图片 SHA-256 与基线同为 `f3fec7c85630c478a5819f66db7e1cd1f679d1b7f73e1e57a7fc2406be6aa059`，替换集合为空。
+- 三态为 E6152 指定纹理的展示截图，不是最终 Present 或逐像素读数；测试源码不是原 shader 的还原，也不作为 M3 因果结论。产品查询确认入口 E147；监工指定独立工程诊断，未重试失败调用。
+- 原始编译、五阶段返回与回执、实验记录及图像归档 `.local/vertical-investigation-20261108/evidence/m3-dxil-full-replacement-recheck-20261118.zip`，SHA-256 `23f6e8d99846f8a5a7d72ece19f5c4f8caf7d2e593de807de67856ca1b8a5e14`。
+
+- 2026-11-18 工具侧分类修复：`1a761473` 已提交并推送至 RDC-Tool `main`；确定性纹理解码错误在事件恢复成功时归为 `capability` 并给出替代读取操作，恢复失败仍为 `runtime`。受影响 178 项测试及 catalog／参考文档检查通过；此前隔离 candidate 的 diff SHA-256 与该提交相对 `b998498c` 的 diff 一致。
+
+- 2026-11-18 M3 第三轮记录复查：先前将停点直接记为“因果”过早。VRS、光照和后处理解释均有检查，但有效着色率与执行位置未证实，光照各项贡献未拆分，最终像素映射及后处理影响未闭合；三条 hypothesis 未给最终裁决。依据第三轮 `ClaimSet` 与 `execution-analysis.md` 归档，后续按 2.3 从锚定起核对，再按 3.3 确定区分停点的直接原因。
+
+## 2026-11-18：块压缩二维与立方体读取
+
+- 隔离产品会话使用眼部 capture 与工具 candidate（基线 `b998498c`，工作区 diff SHA-256 `ee79edbfe143cc9f3bce75a8a5a99dbeec8286a692d616984c85ff2b9c0ed0e4`）；资源清单和描述符分别确认二维 `ResourceId::622`／BC1 与立方体 `ResourceId::338813`／BC6、六面。
+- 二维 E6010、mip0／slice0、坐标 (0,0)：单点读取 RGBA `(0.41960785, 0.54117650, 0.54901963, 1)`；PNG 导出和 `read_image` 成功，导出像素为 `(107,138,140,255)`。
+- 立方体 E6174、mip0／slice3（零起）、坐标 (0,0)：单点读取 RGBA `(0.8359375,0.8359375,0.8359375,1)`；PNG 导出和 `read_image` 成功，导出像素为 `(213,213,213,255)`。四个组合各调用一次，均无错误；PNG 数值为图像表示，不替代原生浮点。
+- 监工初次误加非零 mip 条件，发现该立方体只有 mip0 后更正；两次诊断结束均查询恢复入口 E147。工具返回、图像与模型请求归档 `.local/vertical-investigation-20261108/evidence/m3-bc-read-recheck-20261118.zip`，SHA-256 `456e98f4f78c2d6807361e99ab3b35e373d94fd58410872a3a75cfbdcd0d9c44`。
+
+## 2026-11-18：原生失败详情透传实机复验
+
+- 产品 `5221b597`、工具本机 candidate（基于 `b998498c` 的工作区修复），隔离会话使用 PC 眼部 capture；监工指定 E6152／PS 的 `target=DXIL` 单次复现 `shader_disassembly_unavailable`。
+- 模型实际收到的失败详情包含 14 个 `available_targets`，包括 `DXBC/DXIL` 与 `DXC DXIL`，以及 `failure_stage=validate_target`、`effects_attempted=false`、`context_preserved=true`；主进程核验后 `leaseState=retained`。下一次模型请求快照同样包含完整列表。
+- 监工指定诊断参数，未重试或更改 capture；同一隔离回放继续用于块压缩检查。原始返回与模型请求归档 `.local/vertical-investigation-20261108/evidence/m3-failure-details-recheck-20261118.zip`，SHA-256 `54298b8bc358f55175ce4950ed0bdf1cbb9e35224af4beb55820a950d407c1aa`。
+
+## 2026-11-18：PR #4 读数解码错误分类复验
+
+- 工具 `b998498c`，隔离产品会话打开 PC 眼部 capture；监工对 E2720／`ResourceId::622` 的 `BC1_TYPELESS` 纹理执行一次区域读数，返回 `texture_readback_decode_failed: Unsupported texture readback format: BC1_TYPELESS`，原生错误分类为 `runtime`。
+- 产品核验事件已恢复后保留 lease（`preservationVerified=true`、`leaseState=retained`）；后续当前事件查询成功并返回入口 E147。产品关闭后本次 daemon／worker 已退出，context 的 session／capture 均为空。
+- 工具的纹理解码分支原本返回 `validation` 和恢复证明，但 `_guard_rejection` 将缺少“未尝试效果”证明的返回改为 `runtime`；现有解码测试检查错误码和恢复字段，未断言分类。归属工具侧，未修改；M3 继续暂停。
+- 监工指定单次操作，未重试该失败调用；手机配置未调整。原始工具返回、请求快照和清理状态归档 `.local/vertical-investigation-20261108/evidence/rdc-pr4-decode-classification-20261118.zip`，SHA-256 `780b912c3476137db6988e155483f440f74641d872fa958e2724eb7507d1242b`。
+
+## 2026-11-18：PR #4 原生崩溃与断连隔离
+
+- 工具 `b998498c`、骁龙 865／WhiteHair；监工核对本次独占 helper 的 socket 和 capture 后受控发送 SIGSEGV，设备日志记录 `Fatal signal 11 (SIGSEGV), code 0 (SI_USER)`。单次纹理读取返回 `replay_fatal_error: Native replay fatal error: Connection lost to remote server`，主进程标记 `leaseState=quarantined`。
+- 重开独立回放后对本次独占 helper 发送 SIGTERM，远端服务退出；单次像素读取返回同一远端断连错误，主进程同样隔离。两次均非自然驱动崩溃或拔线；未重复相同失败调用。
+- 两次通过产品关闭后，各自 daemon／worker 已退出、ADB 转发为空，context 的 session／capture 均为空。手机配置事前备份并临时启用 `SingleThreadedCompilation`，事后恢复原 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 及权限属主。
+- 监工指定诊断操作并发送信号；设备崩溃日志、工具原始返回、请求快照和清理状态归档 `.local/vertical-investigation-20261108/evidence/rdc-pr4-fault-boundaries-20261118.zip`，SHA-256 `0dec2d8fad8cdc9a3d47e95d8b679e7e5bbeb4680302fafabacc85f1fff45666`。
+
+## 2026-11-18：PR #4 的 M1 自主回归
+
+- 工具 `b998498c`、骁龙 865／WhiteHair，独立新会话 `sess_786e69599d70`；设备在线，回放与手机画面一致。十二个 Agent 来源内置且 GPT-6.1 Sol／Medium 可用，Fast／Max 关闭，Memory 空，Knowledge 与原库六文件哈希一致。仅输入“角色头发发白”，两项超出已知事实的澄清回答“不知道”，原计划未修改即批准执行。
+- 模型以最终画面、像素历史、事件前后读数及图像追到 E1248 的头发主体；E1242 的黑色是尚未绘制，并非已证明的正常参考，不能据此声明全帧最早数值故障。E1716 的 input-attachment Pixel History 被工具标为不可用且保留 lease，模型转用读数和图像。
+- `%493` 单点精度替换及仅注释重编译对照各有五份签名回执并撤销：前者变体改变头发、控制点不变，后者三态图像一致；两者恢复图像均与基线哈希一致。因果结论限定当前捕获、设备与回放，未判断美术标准或驱动责任。
+- Verifier 独立于调查任务，读取定位、因果和两份实验当前版本，关键记录哈希一致，无 open Challenge；补齐检查点和报告后产品接受 `completed`。恢复回执确认 WhiteHair／E3029、无替换；关闭后本次 daemon／worker、ADB 转发与登记已释放。
+- 手机配置事前备份并临时启用 `SingleThreadedCompilation`，事后恢复原 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 及权限属主；保留此前两个隔离会话。会话、请求、回执、审查与派生图像归档 `.local/vertical-investigation-20261108/evidence/rdc-pr4-m1-regression-20261118.zip`，SHA-256 `fccfbaf4897180052c15485cd5a686bb585aee24ae4b074d847a4d56ad75127c`。
+
+## 2026-11-17：PR #4 Android 白发 shader 往返
+
+- 隔离产品使用工具 `b998498c` 在骁龙 865 打开 WhiteHair，入口 E3029 回放就绪，产品预览与手机场景一致。E1248／PS 的 SPIR-V ASM 与 60,612 字节二进制读取成功。
+- 一次最小 shader 替换及撤销生成五份签名回执，绑定同一实验与 daemon／worker 身份；变体图像哈希不同，撤销后与基线同为 `de646dcd3c2e1af856543753230672a777318f94db5cebb5fe4d56154ad5eb1f`。截图使用 E1248 输出回退，非最终 swapchain；替换集合恢复为空，入口 E3029 经查询确认。
+- 产品关闭后本次 daemon／worker、ADB 转发和归属登记已释放。手机临时启用 `SingleThreadedCompilation`，事前备份，事后恢复并核对原 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349`、权限及属主。
+- 监工指定诊断参数；一次 Evidence 写入因 WorldState 尚未建立被拒，模型补建前置记录后继续。隔离会话、请求快照、原始返回、签名回执与图像归档 `.local/vertical-investigation-20261108/evidence/rdc-tool-pr4-20261117-continuation.zip`，SHA-256 `208814dc1bfebc8f8bc88fa9fbd705a5455a49e7a261fb2d9325cb44b16bc8e0`。
+
+## 2026-11-17：PR #4 眼部 DXIL 补验
+
+- 经隔离产品会话对眼部 capture 的 E6152／PS 省略 target 读取，返回非空反汇编，目标 `DXBC/DXIL`、容器 `dxil`；同一 shader 的二进制容器为 22,840 字节，SHA-256 `709e91a09fa4ca23b5144c58a111975832d422136061270e506da14787f1bc41`。
+- 诊断前入口 E147；查询并恢复后再次读取 E147，产品关闭回放后本次 daemon、worker 退出且 context 无活动登记。监工指定补验参数；完整工具返回及请求快照保存在上述隔离会话归档中。
+- 旁支：上次 `target=DXIL` 被拒时，产品保存的错误结果及下一次模型请求快照均不含 `available_targets`；工具源码会构造该列表，产品限定错误时未传递 `details`。当次工具原生 stdout 未留存，未改代码。
+
+## 2026-11-17：RDC-Tool PR #4 合入后对接复验，未完成
+
+- 工具 `b998498c74acb3825b23f261fdc7cb0702396d4d` 正式打包、验包及隔离 Settings 验证通过；操作名仍为 129 个，三份工具手册检查通过。工具全测 1339 passed、12 skipped、2 subtests passed；产品 RDC／工具测试 497 passed、5 skipped，契约测试 248 passed，真实 worker 回收测试通过。
+- PC 眼部 capture 经产品打开；无效 `rd.event.set_active(0)` 返回 `validation` 和无效果证明，主进程保留 lease，后续合法查询成功。TYPELESS 已知视图与未知视图区域读取均成功；像素调试读到未截断的 trace `_IN` 并结束。
+- DXIL 项未完成：诊断 Agent 请求 `target=DXIL`，工具在执行反汇编前返回 `shader_disassembly_unavailable: Requested disassembly target is unavailable: DXIL`；该参数需为原生可用的反汇编目标，不能把此次拒绝判为 DXIL 读取缺陷。按单次复验要求未重试。
+- 诊断结束时产品读取确认已回到入口 EID 147，随后关闭回放，本轮 daemon／worker 与登记已释放。另一次独立 General 的 `capture_restore` 被 `RDC_CAPTURE_SCOPE_DENIED: the approved owning General turn is required.` 拒绝，未取得签名恢复回执。
+- 监工指定了上述对接测试和恢复核验，未调整手机配置；Android 实机余项及 M1 回归未执行，M3 继续暂停。隔离会话与原始工具返回归档 `.local/vertical-investigation-20261108/evidence/rdc-tool-pr4-20261117-eye.zip`，SHA-256 `8975f4bd33597b52fad6a4f58cd525d98a37aa11c33b4f6d07820c7a33da156d`。
+
+## 2026-11-17：事件拒绝保全，修复后复验
+
+- 用仓库 Vulkan `vkcube.rdc` 经 Agent 的 `executeRdcShell` 生产执行路径，在同一隔离 lease 中调用无效 `rd.event.set_active` 和 `rd.pipeline.get_state`；两者均返回 `event_not_found`、`validation`、`effects_attempted=false` 与 `context_preserved=true`，主进程核验后保留 lease。随后合法事件读取成功，capture/session、活动事件及 daemon/worker 身份不变。
+- Tool 与 Agent 的 129 项 catalog fingerprint 均为 `20281df5b5f0c62aa3037c1ff3c382ed8ebe685e79533950b4405efe06164298`；产品发现与真实资源读取通过。独立 native preview 可打开、保持、关闭。本次属于 Vitest 驱动的产品主进程执行路径，不是 Electron 界面或真实模型测试。
+- capture SHA-256 `00797a27e6316a0cf4369327f9db30a21635fa757673b3f9712af07989145ba8` 前后一致；各测试独占的 daemon、worker 和 context 已清理。[工具 PR](https://github.com/haolange/RDC-Tool/pull/4) 记录逐项盘点和修复前原始 envelope。
+
+## 2026-11-17：事件拒绝保全，修复前复现
+
+- 以原 Tool `5310e89f01d5642deaeddcd37867214a341af387`、同一 Vulkan fixture 和 Agent 生产执行路径，在独立 lease 中分别调用无效的 `rd.event.set_active`、`rd.pipeline.get_state`；两者均返回 `event_not_found`、`not_found` 且无保全证明，Agent 分别隔离 lease。两次独占的 context、daemon 和 worker 均已清理，原始 envelope 保留在[工具 PR](https://github.com/haolange/RDC-Tool/pull/4)。
+
+## 2026-11-17：RDC-Tool 修复后对接复验，未通过
+
+- RDC-Tool `5310e89f01d5642deaeddcd37867214a341af387` 正式打包、验包通过，隔离 Settings 验证 1.1.2／129 操作；新旧操作名一致，三份参考手册检查通过。
+- 工具全测 1312 passed、7 failed、12 skipped、2 subtests passed；本次自建 Windows venv 的 Python 启动器另生子进程，进程身份与锁测试的 PID 不一致。原文含 `DaemonOwnerUnavailable: ... response_owner_changed` 与 `assert None is not None`；未重复全测。
+- 产品 `src/main/rdc` 和 `src/main/tools` 为 492 passed、4 skipped；`check:contracts` 为 248 passed；使用新包的真实 worker 回收测试单独执行并通过。
+- PC 眼部 capture 经产品打开；E2720 的 `B8G8R8A8_TYPELESS` 区域按 `B8G8R8A8_UNORM` 视图读取成功。General 寻找未绑定视图时调用 `rd.event.set_active(event_id=0)`，返回 `event_not_found: Event not found: 0`、`proof={}`，产品将 lease 标记为 `quarantined`。
+- 工具的 `set_active` 在 `SetFrameEvent` 前校验事件，却走未提供保全证明的 `not_found` 分支；产品按缺少证明隔离。监工指定复验步骤、使用既有隔离诊断会话并关闭回放，入口位置未能核验恢复；本次 daemon／worker 已退出，旧隔离登记保留。
+- 视图未知读数、像素调试、DXIL、Android 剩余实机项目及 M1 回归未执行，M3 继续暂停；手机配置未调整且哈希与属性未变。原始工具返回、隔离测试会话及全测输出归档 `.local/vertical-investigation-20261108/evidence/rdc-tool-revalidation-20261117-eye.zip`，SHA-256 `be037b8d1f9bd5955e41c88da8f16fe2d587e5e1a04681466c01d3c6cac9be61`。
+
+## 2026-11-17：RDC-Tool 重构对接，验证未完成
+
+- RDC-Tool `3e6a56be2431149b1d8d3c80a05ebc43330f1d10` 经正式流程打包与验包通过；隔离 Settings 验证 `1.1.2 / 129`，操作名无增删，三份手册及 catalog 指纹 `05322468c3e39db23a671fdd20747d52b8db11e455979fbf2c6ba2e523254042` 一致。
+- 工具全测 1267 passed、1 failed、12 skipped、2 subtests passed；失败原文 `assert payload["ok"] is False`。本次使用的捆绑 Python 通过 `python314._pth` 显式加入 site-packages，测试的 `-S` 未移除依赖；未改 Tool 或重复全测。
+- 产品 `src/main/rdc` 与 `src/main/tools`：492 passed、3 skipped；`check:contracts`：248 passed。真实新 worker 回收复现 `RDC_CLOSE_FAILED: ... is not a confirmed rdc.runtime_worker`，产品修复 `9fcba4ea` 后受影响模块 9 passed，typecheck、lint 通过。
+- PC 打开与关闭均返回 `RDC_CLI_FAILED: runtime_error: Replay worker request failed; outcome unknown; clear context before retrying: DaemonOwnerUnavailable: Daemon owner unavailable for context 'rdc-86d58166-e6a9-4887-85ef-2323dc43b0a5': invalid_state`。旧状态采用 `pipe_name`、缺少新工具所需 `endpoint`，被新 context 的容量扫描读到；其记录的三个进程均已退出，旧文件保留。失败后确认本次 daemon 无 capture、session 或 worker，再定向停止并移除本次已退出的登记。
+- Android 白发单次对接：隔离实例使用新运行目录，回放就绪、设备画面同步；E1248 SPIR-V ASM 与 60,612 字节二进制读取成功。模型创建实验前先引用了不存在的 WorldState，原文 `INVESTIGATION_REF_UNRESOLVED: Evidence.worldStateId ws_acceptance_baseline is not resolvable [S-STATE-01]`；未执行替换或撤销，五份回执未生成。监工输入测试步骤，未重试该实验；原始会话及图像见 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-android-shader.zip`。
+- 白发回放恢复入口 E3029 后经产品关闭，daemon/worker 退出、登记为空；手机临时设 `SingleThreadedCompilation=true`，事前备份、事后恢复并核对原文件 SHA-256 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 与权限属主。
+- 尚未完成真实原生崩溃、Android 断连与 PC 余项；M1 回归及错误分类检查见下。
+
+## 2026-11-17：新工具 M1 回归
+
+- `3e6a56be` / Android 骁龙 865 / WhiteHair：M1 自主回归按 2.3 实质满足前四条；E1242→E1248 的零值到头发写入不是已证明的正常外观，也不声明全帧最早异常。模型输入仅“角色头发发白”，澄清回答“不知道”，原计划获批后执行；General 32m28s，规划 3m11s，General 用量 13,860,538 tokens。
+- E1248 覆盖和前后读数建立锚点；单次 SPIR-V `%493` 精度替换、画面变化、撤销与原生画面精确恢复，五份签名回执哈希匹配，Verifier 补授后完成审查、质疑已解决，产品接受 `completed`。入口 E3029 恢复后关闭，daemon/worker 退出、登记为空；前述独立诊断的二进制提取与本次实验共同覆盖 Android shader 往返。
+- 一次 `FILE_AUDIT_HASH_MISMATCH` 来自工具保存 shader 文本时的换行转换：内容哈希为 LF 的 `9df46a8ce5b9d74384789c4bcb7ab629272c41eceae35568a32a56fcfbabae47`，Windows 保存文件的 CRLF 字节哈希为 `a9a2e3bef1881af62a43e19c7f12e4a5b455de02be3c71e3e0e526401abacc1c`；归一化后相等，模型随后用文件实际哈希完成审计。
+- 十二个 Agent 来源内置且模型可用；隔离 Knowledge 与原库六文件哈希一致、Memory 空。手机临时启用 `SingleThreadedCompilation`，事前备份、事后按原 SHA-256 和属性恢复；证据归档 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-m1-regression.zip`。Pixel History 对 E1716/input-attachment 返回 capability 并保留 lease，调查自主改走区域读数与覆盖图。
+
+## 2026-11-17：新工具错误分类与异常退出
+
+- Android 单次 ASTC 区域读数返回 `texture_readback_decode_failed: Unsupported texture readback format: ASTC_UNORM`，分类 `validation`；主进程核验 E3029 已恢复且 `leaseState=retained`，后续会话状态查询成功。
+- 36 处显式 `runtime_error` 在重构前使用同一默认码；静态风险：`rd.event.get_action_details` 的事件不存在返回该通用码且不带保全证明，产品按不确定状态隔离。该情形未实机复现，不能据此确认 36 处均分类正确。
+- 受控终止本次独占 worker 后的单次读数返回 `session_requires_restart: Replay requires controlled recovery; close and reopen the capture`，`leaseState=quarantined`；这验证进程异常退出，不等同于真实原生崩溃。
+- 产品清理隔离 context 失败，原文 `RDC_CLI_FAILED: context_cleanup_failed: Context cleanup failed (cleanup: session_cleanup_failed)`。工具恢复将失联会话保留为 `requires_restart`，而清理分支只接受 `deferred/degraded`，故未能清掉会话；现场及原始会话已归档 `.local/vertical-investigation-20261108/evidence/rdc-integration-20261117-error-classification.zip`。
+- 监工核对本轮独占归属后释放其 ADB 转发并停止其 helper，手机配置恢复至原哈希与属性；隔离 QA、daemon、worker 已退出，未清掉的 context 登记保留。未继续做真实 Android 断连测试。
+
+## RDC-Tool main 发现与只读回放（2026-11-16）
+
+- 隔离 Browser QA 在设置中选择并验证合并后的 RDC-Tool main，显示 1.1.2、129 操作；未使用真实用户设置或凭据。独立的 `RdcNativeRead.test.ts` 以同一安装和仓库 Vulkan fixture 经 Agent 主进程加载 catalog、冻结 lease，list/describe 均匹配快照 fingerprint `05322468c3e39db23a671fdd20747d52b8db11e455979fbf2c6ba2e523254042`，实际资源读取成功；输入哈希不变，daemon/worker 已退出。通过 UI 选择和自动执行测试，无人工代答；未发起真实模型请求。
+
+## Provider 与 Working 时间线（2026-11-14）
+
+- **本机 GPT-6 Luna 实时复验：**正式 Browser QA 使用本机 ChatGPT Account（Medium），未复制凭据。首轮 Shell 文件规则拒绝混合命令；沿用同一待办补测，完成独立 Shell 暂停、`read_file` 和任务结算。界面顺序为待办启动 → Shell → 读文件 → 一次缺少结果字段的结算失败 → 任务完成，无回执倒插。审核等待和排队时无蓝点/扫光；Shell 执行时一个可见蓝点及标题 `active-signal-shimmer`，终态五个静态灰点。DOM 在流式光标存续时先后读到 124、293、599 字符（分别为一、二、三段）；最终单一 final 项 726 字符，实际截图可见第二段开始后第三段尚未出现。两轮含自动审核共 13 次调用，173,066 input、1,485 output tokens；无人工代答。
+
+- **轨道视觉复验：**用正式 disposable Browser QA 入口加载隔离会话样本。查看深浅主题与 420 CSS px 窄屏截图；待办、文件工具、思考标签及过程正文首行的五个节点对齐误差不超过 0.02 CSS px，轨道与正文水平间隔 12 CSS px，竖线结束于最后一个过程节点。键盘展开文件详情后仍对齐；折叠过程后最终回复仍可读。未调用 Provider，无人工代答。
+
+- **真实模型界面验证：**在 disposable Browser QA 中使用隔离的 ChatGPT 账号副本和 GPT-6 Luna，创建任务、读取临时项目文件并完成任务；观察到工具顺序、回复增量及折叠后的最终回复。累计 75,125 input、258 output tokens；深浅主题、窄屏与键盘披露已检查。回执：`.local/working-convergence/real-provider-receipt.md`；无人工代答。
+- **最终构建复验：**同一隔离账号发送一条无工具短请求，观察正文在运行中增量出现、完成后折叠仍可读；1 次调用消耗 15,292 input、143 output tokens，最终记录只保留逐项 final。回执同上；无人工代答。
+
 历史过程文档已收进本账本后删除。条目正文仍是证据；文中旧文件名只作历史出处，不再指向现存文档。
+
+## 垂直调查收敛：工程证据与待验证边界（2026-11-06）
+
+- **设计复审前工程复核（2026-11-11）：**在既有功能分支整理 Planner 粗定位、人工介入与自主续跑的证据边界，并在原计划列出 T0–T7 状态索引；不改写既有验收结论。以 pnpm 11.7.0 重跑 typecheck、lint、指定 `0bc961a5` 基线的完整 gates 和 build，均通过；lint 为 0 errors／2152 warnings。此前 Node 3685 项与 Renderer 872 项及各自棘轮的范围见下方工程回执；本次仅复核文档和既有实现，没有重新开展真实模型或设备验收。
+
+### 本机真实调查的文字材料（2026-11-10）
+
+以下为本地材料的可读摘录，用于复核目标、规划与结果的关系；标注的 SHA-256 是本机完整来源文件的字节摘要。计划只摘录叙述部分，省去后续 JSON 执行合同；报告保留文字原文。换行作统一处理。图片、JSON、原始会话、capture 和签名密钥没有上传；文中引用的这些本地材料在其他机器可能不可用。案例标识、事件和历史知识只用于说明当时证据，不是通用调查规则。
+
+#### PC 第三轮：获批计划文字摘录
+
+这是第三轮计划的叙述部分；实际执行及最终 partial 的边界以本节账本条目为准。
+
+本机原文：`.local/vertical-investigation/20261110-region-live/session/session-artifacts/plans/plan.md`；完整文件 SHA-256：`a2a081808f9a5aa2551bd40c451bec70d7174d34bb09e949269d9287078da36d`。
+
+```text
+# 调查角色眼部泪腺白点（修订）
+
+- 范围固定为眼睛泪腺白点.rdc（input_unknown）与 local 设备，不使用其他 capture。
+- 定位白点及首个异常事件，区分竞争原因；按实际证据形成有边界的结论。
+- 独立核验实际形成的定位/因果主张及其原始证据；无主张则说明未执行缘由与未决缺口，并恢复入口现场。
+
+## 1. 目标与边界
+
+用户目标：调查角色眼睛泪腺处白点的原因。用户未给参考截图、坐标、期望像素值或复现条件；“白点”是用户描述，不等于已观测像素或已知材质问题。成功标准：在指定捕获中找到相符可见区域（若可定位），映射到输出纹理、事件/片元及最早可见差异；比较竞争解释，给出有边界的判断或未知项，并恢复进入时的捕获与回放位置。相关性不等同因果。
+
+范围严格固定为 `input_unknown`（眼睛泪腺白点.rdc）和 `local` 设备；不使用 BlackHair、WhiteHair 或任何其他 capture。只读检查允许必要事件导航/回放选择，并须恢复签名入口现场。未经本计划许可不得 shader/data 修改、资源替换或其他干预。批准不替代实际权限。
+
+## 2. 输入与参考依据
+
+- 用户描述（非工具观察）：角色眼睛泪腺有白点；没有 ROI、参考外观或复现条件。
+- 运行时登记输入：`input_unknown` / 眼睛泪腺白点.rdc，SHA-256 `0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094`；设备 local、准备状态 ready。获批 capture scope 只冻结这一输入。
+- 事件树初始结果包含 MobileSceneRender 等移动端渲染阶段；工具报告查询遍历 1656 节点且查询自身未截断，但模型收到的文本被截断，尚不能声称已找到眼部绘制或完整掌握流水线。
+- 已检索用户与项目 Knowledge 空间：`eye white spot`、`lacrimal white`、`character eye` 及拆词 `eye`、`white`、`shader` 均无命中；项目空间目录当前无卡片。仅为检索记录，不是机制证据。
+- 未知：最终图像的准确位置/尺寸/颜色、目标资源与事件、是否有高光/透明层、捕获是否对应用户所指状态。不得虚构 ROI、像素值、WorldState 或历史原因。
+
+## 3. 候选方向与区分检查
+
+候选都是待验方向，按实际证据调整：
+
+1. **眼部贴图/UV/采样**：成立时，眼部材质对应纹理采样在白点位置已有亮斑、浅色像素、错位或异常 mip/采样，邻近控制点不呈同样特征；若源纹理及正确映射无亮斑而着色/合成阶段首次生成，则削弱此项。
+2. **几何/法线/材质或 shader/光照高亮**：成立时，眼部几何存活片元在该位置产生集中高值，着色输出/输入能解释亮斑，控制区域表现不同；若该片元未产生/保留亮点，而后续独立层首次引入，则削弱此项。
+3. **透明度/混合/深度遮挡/后处理**：成立时，眼部原始着色无白点，后续叠加、混合、resolve 或颜色处理首次引入/显著改变它；若该阶段之前已有且后续没有首次差异，则削弱此项。
+4. **对象或观察状态未对应**：若最终图像无法对应用户所指角色/区域，或结论依赖未知条件，则不归因；若可闭合输出区域到纹理、primitive、事件链则削弱此项。
+
+最小区分策略：先实际获取当前最终输出图像并自主定位 ROI，核对图像来源、capture、事件、尺寸与坐标；由输出目标反向缩小眼部事件及像素历史；在同一纹理/subresource/坐标读取目标点前后与邻近控制点，检查有效/通过、shader 输出、前后修改等原生字段，再追踪纹理绑定/采样、primitive、着色及后续合成。字段缺失/格式限制时保留 unknown。符合预测只增加支持，不单独证明因果。
+
+## 4. 执行策略与依赖
+
+获批后 General 为唯一 live RDC 执行方：
+
+1. 只使用获批 `input_unknown` 和 local，核对入口基线；从最终输出图像定位区域。优先使用当前受控图像输出/观察能力并核对来源身份。暂不可见时检查允许的导出路径，不拼接猜测路径，也不因单一路径失败即认定不可取得。
+2. 对目标输出做有界事件搜索、详情、管线/资源关系与像素历史；必要时检查纹理、绑定、采样、几何/primitive、shader 或后续合成。实际使用前按需读取 `$pixel-forensics`、`$capture-facts`、`$artifact-provenance`、`$rdc-tool-shell` 等方法。不对全场景无差别导出。
+3. 记录实况并先持久化相符 WorldState，再写绑定该状态的 Evidence；不得把新观察绑定历史状态。形成假设 Claim 时至少保留可区分对手、各自预测与削弱/排除观察。先判断只读证据能否区分。
+4. **条件性最小可逆干预**：只有只读证据不足以区分且针对已定位对象有区分力时才考虑。执行前实际核验对象/源身份、有效权限、精确修改边界、当前状态/基线、非目标安全、回滚和恢复能力；任一条件不成立即不干预，保留未知。若执行，真实记录基线、必要控制状态、变体观察并撤销，以实测/签名证据核验恢复；不预写未来观察或声称计划锚为实况。
+5. WorldState、Evidence、Claim、Experiment 按真实来源与依赖顺序写入。只有真实执行并满足回执及恢复契约的实验支撑因果 Claim；资格不足则降级，不制造来源。
+6. 完成调查后恢复入口 capture 与事件，检查主进程的实际 `restoration.restored` 与比较。终态签名由运行时完成，不伪称当下已有；恢复未确认不得声明完成。
+
+任务绑定：调查 Task `task_1794316662727_a67e5abe`。另有独立审查 Task `task_1794316827786_74f808c2`，绑定为 `verifier` 子执行并独立于调查 Task；仅在确实形成定位或因果主张时核验主张及必要原始证据覆盖、反证、适用条件和限制，不请求 live RDC、不改父级记录。若没有可核验主张，须准确报告未执行原因与未决缺口；不得把未执行写成“无 Challenge/已通过”。
+
+## 5. 决策与循环
+
+- **Small Loop**：区域/事件映射不清时缩小输出目标、事件与控制点；字段欠语义时补读实际纹理、管线或输出路径；仍有获批只读区分检查时继续，不因首次查询无命中而结束。
+- **保留未知/不介入**：图像/区域映射失败、字段缺失、输入身份不闭合或权限、边界、基线、回滚条件不满足时不干预，报告具体缺口。
+- **Big Loop**：需要其他 capture、修改超出此计划范围或战略改变时，保存可解析 Checkpoint（事实、候选、已完成检查、未解前沿与现场状态），停止越界操作，由用户决定是否另行修订计划。不得以其他 capture 暂代。
+- 遵守实时权限、冻结 Task/Capsule/CLI 与真实限制，不自行编造配额；CLI 不确定结果按运行时隔离/恢复政策处理。只有关键外部事实无法由当前捕获判定且会改变目标/验收时再询问用户；未给坐标不是停止条件。
+
+## 6. 交付与重新对齐
+
+General 就地交付：是否定位到白点；最早可验证差异的事件/资源/片元及原始来源；竞争方向如何被支持/削弱；结论属于观察、推断还是有真实干预与恢复支撑的因果判断；是否干预、撤销和恢复结果；未验证项及捕获条件限制。独立 Verifier 核验实际形成的定位/因果主张及所需原始证据；若未执行，说明准确原因与未决缺口。无法定位/区分时说明未知和下一个最小检查，不用外观猜测填充因果结论。按证据资格引用 WorldState/Evidence/Claim/Experiment/Checkpoint 并选择 ready/draft。恢复签名入口现场后交付；若战略变化必要，附可解析 Checkpoint 供用户决定下一步。
+```
+
+#### Android：Planner 只读补核后的计划文字摘录
+
+这是两次人工方法反馈后的 Planner 只读补核文本，不是目标对象已定位或 General 因果调查通过的证明；历史 Knowledge 是候选线索，不是当前根因。
+
+本机原文：`.local/vertical-investigation/20261110-machine-evidence/planner-readonly/session/session-artifacts/plans/plan.md`；完整文件 SHA-256：`f56d6ca6bcd5a883d7a2a218ae66ec0e5e47453f67f6f3d0191ffa24e964d917`。
+
+```text
+# BlackHair 角色头发发黑调查
+
+- 已对 Pass 10 的普通目录 draw event 403 读取事件详情及 VFS 管线快照；记录 API、shader、输出目标与截断限制。
+- 该 draw 仍无头发/角色对象语义，不能视为症状范围已定位；计划将明确区分普通样本与对象辨识证据。
+- 执行阶段再从画面与像素/事件链定位头发 First Bad Event，并在必要时按安全门控进行区分验证及恢复。
+
+## 1. 目标与边界
+用户描述“角色头发发黑”。调查目标是定位当前 capture 中实际头发区域的绘制/输出链及最早可验证分歧；原因须留待执行证据与独立核验，不预先断言。
+
+当前计划范围为已登记 `input_blackhair`（`BlackHair.rdc`，SHA-256 `a1d2a989f5f54badbe4a0b676863a9804a814327614a90b1bc4dbd0261b5960a`）与设备 `android-b54ed446`（当前标签 RMX3551）。执行时重新校验实际输入、设备、回放身份和入口基线。允许只读现场导航并须恢复 capture 与位置；不得超出计划及工具权限修改 shader/data。若只读证据无法区分因果方向，可有条件评估最小可逆实验；执行前身份、权限、对象绑定、修改边界、真实基线、可撤销性和恢复证据都须成立，否则不介入。
+
+成功标准：用可审计证据确认目标头发区域和 draw/output（或明确记录最窄可确认范围）；确定 First Bad Event 或诚实保留未知；对竞争假设取得区分性观察及削弱证据；因果表述仅在实际合格干预/恢复支持时提出；独立核验拟接受主张。用户未提供 ROI、对照截图、复现步骤或光照验收细节，先用当前 capture 自主选择候选区域。
+
+## 2. 输入与参考依据
+### 用户输入
+- “角色头发发黑”。这是症状描述，不是本次观察或原因。
+
+### 本次只读观察及身份
+- `runtime_context.capturePlanning` 显示登记了 `input_unknown`、`input_blackhair`、`input_whitehair`。本次实际回放内容哈希为 `a1d2a989f5f54badbe4a0b676863a9804a814327614a90b1bc4dbd0261b5960a`，与 `input_blackhair` 相符；设备 ID `android-b54ed446`、标签 RMX3551、远端在线。回放/session 的本次动态身份以 runtime_context 回执为准，执行时重新检查。
+- `event_list`/`/draws` action tree 报告 592 根节点、返回 256、`truncated:true`，工具展示文本也截断。可见事件含 dispatch 与 indexed-indirect draws；未辨认出头发对象。
+- `/passes` 返回 25 个 Pass。Pass 10（VFS `/passes/9`）是 event 377–1684、279 draws；Pass 11 是 1691–2136、87 draws。它们只是大范围目录，不是头发语义证据。
+- `/passes/9/draws` 只读返回 Pass 10 下 draw 条目；工具摘要截断。event 403 是其中一个可见普通目录样本，名字 `vkCmdDrawIndexedIndirect(1) => <12,108>`。
+- `event_show(403)` 返回 12 indices、108 instances、12 vertices，颜色输出资源 ID `800497`、`804373`、`800504`、`800506`，depth target `800499`；parent_chain 空、marker_path null。该结果确认的是 draw 结构，不是对象身份。
+- 对 event 403 实际读取 `pipeline_show(403)`：明确 `resolved_event_id=403`、API Vulkan、`summary_status=verified`、`binding_truth_level=binding_verified`、`visual_truth_level=not_applicable`、`evidence_truth_level=structured_evidence`；选定 event output slot 0 是 `ResourceId::800497`，格式 `R11G11B10_FLOAT`、1920×860，`export_target_available=true`。列出 VS `ResourceId::688832`（hash `62743e…`）及 PS `ResourceId::688833`（hash `6fa5e1…`），均无 debug name/source files；另列 CS module `8730`。颜色附件另有 `804373`（R10G10B10A2_UNORM）、`800504`（B8G8R8A8_UNORM）、`800506`（B8G8R8A8_SRGB）；深度 `800499`（D24S8）。视口/剪裁 1917×860。该快照没有材质、头发或角色对象标识，也没有视觉观测；它是可绑定的普通 draw 样本，不是症状范围已收窄的证据。
+- `resource_list` 的身份目录标记 complete，但显示文本截断；`/textures` 返回大量匿名 `tex_*` 且被截断。当前未将任何纹理、shader 或 draw 归属给头发。
+- 本阶段只读；未选择其他输入、未干预。
+
+### Knowledge 历史线索（非本次事实）
+- 有界搜索：`hair`、`character` 命中两个 user draft 案例；`black hair`、`hair rendering` 未命中。读取发黑卡 `user:cases/AIRD-20260207-0002.md`（历史案例称 Adreno 740/Vulkan、UE Mobile Hair Shading 中 KajiyaDiffuse/RelaxedPrecision 与非负 clamp 相关）和发白卡 `user:cases/AIRD-20260207-0001.md`（历史案例称 Adreno 650/Vulkan 的局部光照颜色 unpack/精度相关）。本次设备/API/引擎/着色配置未确认；案例图片未读取。它们只给出可证伪的候选检查方向，不能作为当前证据或根因。
+- 若目标头发 shader 的确含类似 Kajiya-Kay `1-abs(dot(N,L))`、半精度/RelaxedPrecision 与后续 clamp/散射路径，则检查目标 invocation 中间值是否首次异常并关联输出；若没有该路径或值正常，则削弱该方向。
+- 若目标确实经过打包局部光照数据，则检查实际绑定、解包及访问值；路径不经过该输入或其值正常则削弱该方向。
+
+## 3. 候选方向与选择依据
+1. **头发计算/精度或符号边界异常**（历史发黑案例启发，未证实）：支持预测是已证实属于头发的目标 draw 使用相关运算，代表性目标 invocation 的中间值/后续 clamp 与输出黑化有连续数据流。削弱条件是目标不使用该计算，或链路值正常、异常早于/晚于该处发生。
+2. **光照输入、解包或资源绑定异常**（替代方向）：支持预测是目标 draw 实际访问该光照路径且实际绑定/值存在能解释变暗的偏差。削弱条件是该路径不参与目标输出，或访问值正确且差异已在其他阶段形成。
+3. **对象归属、纹理/几何映射、遮挡/混合或后续输出阶段**：支持预测由目标区域像素 history 与输出链发现首次偏离点。削弱条件是阶段输出与控制像素均一致，且变暗已存在于更早输入。不得把 draw 数量、资源 ID、shader module 或 Pass 相关性当成头发身份。
+
+## 4. 执行策略与依赖
+- General 先核对冻结输入、设备、capture 与回放身份/基线。可以从 event 403 的已知输出目标作普通候选入口，但必须经当前最终画面、目标区域 pixel history 或其他对象辨识依据验证是否与头发相关；若无关联就放弃该样本并继续搜索，不能沿用其身份假设。
+- 获取当前 capture 可用最终输出图像/受控观测，从画面自主选取发黑头发区域；确认事件、目标、图像尺寸与来源。对该区域和邻近控制点做必要 pixel history/事件前后配对，按返回的有效性/格式限制识别最早异常写入。历史字段缺失或不完整时限定结论。
+- 一旦目标 draw/对象映射有实据，再读取必要 event details、真实类型化参数、相关 pipeline sections、blend/depth 状态、shader/reflection、资源绑定和少量必要资源详情。具体检查范围由返回证据驱动，不扫全资源、不把绑定核验当视觉/对象证明。
+- 至少保持两条互相可区分假设，各自列成立预测及可削弱/排除观察。只读区分充分时不实验；若因果仍未区分且目标必要，按安全门评估最小可逆干预，保存实际基线、变体必要差异/图像及真实撤销恢复证据；任何门槛不满足则继续只读或收窄交付。
+- 将实测事实、推断及原因区分记录；Evidence 绑定真实观测 WorldState。只在真实合格 Experiment 与恢复闭合后作因果主张。拟接受的定位/归因/因果主张和相关有效 Challenge 交独立 Verifier 核验其确实可读的原始材料；不请求其操作 RDC。
+- 收尾恢复原 capture 与位置并核对当次恢复观察。保留实际输入、回放身份、查询范围、结果和每项截断情况。
+- General 执行 Task：`task_1794307593111_25c5ab39`。独立 Verifier Task：`task_1794307593112_0098ea96`，绑定来源 Task 且仅在有可审主张时执行；无主张则记录不适用，而非空审查。
+
+## 5. 决策与循环
+- Small Loop：对目录分页或更窄搜索继续；以图像/像素/输出绑定确定头发目标后再读对应 pipeline、资源和 shader；候选若被反证则更换/收窄假设。必要时再次复核同一现场的相关事件，不因 Pass 10/403 的偶然样本固定路径。
+- 实验前门禁包括身份、权限、对象与源绑定、最小修改范围、基线、可撤销性、区分预测、恢复方法和必要状态控制；失败则不修改，仍可交付可行的只读发现。
+- 换 capture/device、改变目标或引入计划未含操作时停止并保存 Checkpoint，交由用户决定是否调整策略。权限拒绝不等于能力不存在；重复无进展时停止。
+- 只有当现有画面/事件无法自主决定对象/区域并且歧义阻断观察方案或验收时，才询问用户；否则先继续自主定位。
+- 服从实时权限与执行限制；现场恢复、证据资格和收口优先，不自拟额度。
+
+## 6. 交付与重新对齐
+General 就地交付：实际 inputId/hash、执行时 capture/device/replay 身份；只读事件/Pass/resource/VFS 查询及结果/截断；普通样本与真正对象辨识依据的区别；头发区域、draw/output 与 First Bad Event（无法确认则明确未知）；竞争假设、支持/削弱观察；是否干预及真实变体/撤销证据；独立审查意见/Challenge；引用与 provenance。event 403 管线信息只能作为普通样本事实，不得写成头发定位或原因。
+
+未完成时交付最窄有效结果、Checkpoint、已尝试路径和明确缺口；如需战略变化由用户决定是否另开计划。
+```
+
+#### PC 较早一轮：partial 原始报告
+
+这是较早一轮的报告；其恢复未完成描述只适用于该轮，后续恢复复验另见本节账本记录。
+
+本机原文：`.local/vertical-investigation/20261110-goal-loop-evidence/report.md`；完整文件 SHA-256：`57e21063df61c923653cafcc8d45d359481d0c4555688ec3f2dc36f89f953afc`。
+
+```text
+# 泪腺白点渲染调查（部分结果）
+
+## 结论
+
+目前**没有定位或解释用户所述的泪腺白点**。已直接查看问题捕获中的原生输出图像，但无法可靠地把白点描述映射到具体原生纹理像素；自行尝试的候选坐标读回是肤色，因此不构成对白点的像素证据。不得据此断言问题不存在，也不能断言源贴图、材质、照明或后处理是根因。
+
+本次确认了一个与最终图像相关的后处理路径：捕获输出纹理 `ResourceId::2002006`（2131×1909，B8G8R8A8_TYPELESS）由事件 7389 输出；其像素历史在候选点 `x=1320,y=1015` 与 `x=1340,y=1015` 均指向 draw 7343。事件 7343 属于 marker 7334：`FidelityFX-RCAS Sharpness=0.00 OutputDevice=0 GrainIntensity=0 (PS)`，是写入 `ResourceId::2002006` 的三顶点全屏 draw；Pixel Shader `MainPS` 绑定输入纹理 `ResourceId::2051334`。输入纹理已导出并查看。以上只证明这段输出管线与整幅图像的可读路径，并不证明 RCAS 产生、放大或无关泪腺白点。
+
+事件 7389 的截图导出因最终 Present 无法唯一选定交换缓冲区，回退为 event-output 纹理（`target_source=event_output_fallback`，`visual_truth_level=visual_valid`，`evidence_truth_level=visual_evidence_only`）。当前没有可用的 Present 目标证据。
+
+## 证据与观察边界
+
+- 捕获输入：`input_unknown`，`眼睛泪腺白点.rdc`，冻结内容 SHA-256 `0a79926a92e7e659989befc2322dc93b65782252fc5be2de33496142735a4094`，本地回放身份为 `sess_106400d8cb7e` / `capf_70357d6ae1d9`。
+- 输出截图：`session://tool-outputs/image-c5625c16ea4b8c60c9498b52095a1572a7d5cdd7c8f01babca94a10b37c23c1f.png`，SHA-256 `c5625c16ea4b8c60c9498b52095a1572a7d5cdd7c8f01babca94a10b37c23c1f`；1920×1080 的截图回退图，不能当作原生纹理坐标。输出原生纹理已保存为 `session://tool-outputs/image-f82f953f29247b192428386ebc46c799ffe9d93be2334410499a88e8ac74d8e7.png`，SHA-256 `f82f953f29247b192428386ebc46c799ffe9d93be2334410499a88e8ac74d8e7`；原生尺寸 2131×1909。
+- 输入纹理：`session://tool-outputs/image-b694bf8e1f30216e21fb00df05a14645d65aca844e7d8eda09d8df1faa9545cc.png`，SHA-256 `b694bf8e1f30216e21fb00df05a14645d65aca844e7d8eda09d8df1faa9545cc`；由事件 7343 的资源绑定确认其为 PS 输入 `Texture2D0`。
+- 原始结构化回执：截图/输出相关 `session://tool-outputs/call_5871339ad9344af19064cdecc0151766.json`；原生输出导出 `session://tool-outputs/call_c2dab5a14acd461daf6878df596b7888.json`；输入纹理绑定 `session://tool-outputs/call_7c3d2f40cb8a44b0be0d9f80064a1884.json`；事件 7343 详情 `session://tool-outputs/call_6227c55841d1497ab79af72a6078ed2c.json`；7343 管线状态 `session://tool-outputs/call_d7c78ce2a06244219c41f330e0281a32.json`；像素历史候选点 `session://tool-outputs/call_a15cee5fe95347418b2805ace0d90a94.json`；实际读回候选点颜色 `session://tool-outputs/call_3f34d6176c3a46218707120fddb99a66.json`。
+- 两个试测点在最终纹理的读回颜色分别为 `(0.4471,0.3137,0.2588,1)` 与 `(0.4588,0.3373,0.2784,1)`，与皮肤色相符；像素历史的 pre-mod/shader-out/post-mod 颜色字段为 unknown/null，故不能把该历史当作完整 blend ledger，也不能解释为目标白点像素。
+- 无独立 First Bad Event、WorldState、Evidence、假设 Claim/ClaimSet 或因果实验记录；因未可靠定位目标像素，不构造这些记录或虚构 ROI。
+- 未修改 shader 或 data，未执行干预；没有回滚动作。
+
+## 恢复与未完成项
+
+捕获入口基线为事件 147，`runtime_context` 的当前状态在查询时为事件 7389，shader replacement 数量为 0。已调用计划提供的 `capture_restore`，但主机返回 `AUTO_REVIEW_DENIED`：计划允许的是计划内干预后的恢复；由于没有已验证干预或 baseline 收据，当前 replay-changing 恢复动作未获准。之后未尝试用普通事件导航替代签名恢复。故本次未获得入口恢复成功回执，捕获当前回放位置仍需由授权机制处理。
+
+## 下一步
+
+若继续在同一批准范围内调查，需先获准恢复/获得新的合法回放状态，然后使用原生输出坐标明确识别泪腺白点候选 ROI，在同一 capture 配对目标点与邻近控制点的读值及像素历史；再从事件 7343 的输入 `ResourceId::2051334` 继续追踪白点是否在上游已存在。只有观察定位及只读取证仍无法区分原因时，才评估满足实际安全与恢复门槛的条件性实验。当前无可审的定位或因果主张，不触发科学结论的独立审查；原因结论和恢复均保持未完成。```
+
+### 过程、工程与现场记录
+
+- **获批只读前沿复核（2026-11-10）：**第三轮 PC 的冻结计划要求区域／事件映射不清时继续缩小目标及控制点；已归档原始调用显示模型读取了若干候选单点，但未执行 `rd.texture.get_region_values`。模型曾发现按资源追踪的 `rd.resource.get_usage`，实际失败的是按事件读取资源摘要的 `rd.event.get_resource_usage`；前者没有实际调用，不能推断它一定成功或失败。本机 RDC-Tool 工作树中两者分别调用管线快照和资源使用查询，但本轮回放进程的加载产物身份未核对，源码差异不是实际替代路径成功证据。这些是可能有价值的不同只读检查，不证明候选点即用户症状，也不授权重复相同 native 故障。现有 Debugger 工具 Skill 补充矩形读数与两种查询的语义和证据边界，不写入案例标识或答案、不扩大权限。pnpm 11.7.0 下 Skill 门禁 16 项、Agent runtime 门禁 162 项、typecheck、lint（0 errors／2152 warnings）通过；首次 Agent 门禁因沙箱临时目录 rename 失败、测试未收集，使用工作区临时目录重跑通过。修订方法尚未真实模型复验，不能作为问题已解决或泛化通过的证据。
+- **Skill 来源复核：**第三轮 General 的实际首个 RequestPlan 加载了仓库内 `debugger-rdc-tools`，旧资源 hash 为 `df34e0ed3696a5911b4a2241da7a237f1ba91af27bbfe6b4556317650a7731f8`；当前工作树该 Skill 的文件 SHA-256 为 `e9de3c0a40b0cf238e033429df72204c72e9b4114e126885b0fd65dbdac3db56`，与解析后资源 hash 不是同一种哈希。本机 User 和该项目当前均无同名 Skill 覆盖；使用隔离 User/appdata、当前项目及产品 Skill 解析服务取得 builtin 资源 hash `ba2594cc2d90ef510a09bc4c1e5bee577f12ad4af1397d215fee6277df63526a`，正文包含两项修订方法。这是本地解析，不是实际模型请求；新的隔离配置仍须以新 RequestPlan 中的来源、hash 和内容核验，不能把旧请求回填为修订后的真实模型验证。
+
+- **目录锁死 owner 回收续修（2026-11-10）：**针对前述并发丢记录，在真实两个子进程中控制次序：A 读到死 owner 后暂停于删除前，B 回收并取得锁，A 再删除 B 的新锁并取得锁；两个进程均报告成功，证明此前仅修复空锁窗口仍不足。现以独占回收标记串行化同步／异步回收，取得标记后重新读取 owner；标记或 owner 无法安全确认时等待并超时。新增受控双进程交错和回收标记占用负向测试；目录锁、Knowledge、注册表故障注入共 26 项通过。最终 Node 全量 397 文件／3685 项通过、4 项跳过，棘轮 lines 79.16%、functions 78.74%、branches 67.64%、statements 76.54%；typecheck、lint（0 errors／2152 warnings）、指定 `0bc961a5` 基线的完整 gates 和 build 通过。此前 Renderer 201 文件／872 项及棘轮通过后无 Renderer 源码改动。若回收进程异常退出留下标记，需在确认无活 owner 后处理；不会自动抢占。最小工程回执 `.local/vertical-investigation/20261110-lock-recovery-checks.json` SHA-256 `db316ecb70eddd51544d2e96ece927ca592d505bbd2e8ffe53be929ce778861c`。该结果不替代产品真实调查验收。
+
+- **局部读图修复后的 PC 短症状（2026-11-10）：partial。**全新隔离 session、无 Memory、默认 Auto-review，以同一眼部 capture 和 local 设备运行；计划门人工要求固定当前输入并绑定独立审查，未提供原因或方法，故不称无人介入对照。General 自主导出、读取和局部放大图像，检查两个阶段的候选像素与历史；原始历史确实返回 `color_type: unknown`／颜色 null。`rd.event.get_resource_usage` 返回 `127 is not a valid FilterMode` 且 lease 隔离，模型没有重试该失败操作，受控恢复后继续其他资源检查。最终 Present 无法唯一识别，候选位置跨阶段未映射，未定位首个异常事件或完成因果实验。独立 Verifier 先失败、再 partial 并提出原图未获授 Challenge；General 自主补授内容哈希绑定的原图并续审同一 Task。最终审查只支持事件输出回退图中眼部存在细小亮点，不证明该亮点就是症状或其根因；图像缺失 Challenge 得到处理，主调查仍受阻。三代审查累计工具调用 16／31／45、原始起始时间相同；根预算终态为 146 次工具调用、3 次子执行，期限未刷新。自动压缩后模型重读计划及来源，局部审查结束后没有把整体目标标为完成。入口恢复回执、一次隔离恢复和最终 `resolved` 均保存；签名密钥未归档，未独立复算 HMAC。
+- **实际请求与归档：**本轮全部 105 份已完成根／委派请求快照均为 ChatGPT Account／`gpt-6-luna`／Medium、Fast 关闭；第三代 Verifier 的实际 Profile 为 `verifier`，Skill 为 `skeptic-review`、`artifact-provenance`，独立来源绑定父 Task 第 1 代、修订 1 和 ClaimSet 摘要，补授原图亦绑定摘要。规划约 5 分 44 秒（含一次计划审阅）、General 约 40 分 42 秒。General 用量快照输入／输出 5476985／25403 token（含缓存读取 1384064），不等于所有独立请求费用合计，费用不可得。来源、完整会话、三个子执行、Task 和回执共 419 项，清单 `.local/vertical-investigation/20261110-region-live/manifest.json` SHA-256 `7bf514fec282c4f7deaa52856607c46cfe5787614c8cdefde25a2ae87aeb04be`；复制前后逐文件校验一致。此结果不证明真实根因、三个 Mission 或陌生 capture 泛化。
+- **现场与清理：**本轮会话的 capture context 已通过产品关闭，归属 daemon 登记为空，生命周期回执涉及的 8 个 daemon／worker PID 均已退出；本轮 QA／启动器退出，测试端口无监听，桌面实例锁不存在。三张项目内临时导出图逐项与归档哈希一致后删除，隔离授权副本、隔离 User space、测试缓存、覆盖产物和本轮失主测试锁已清理。产品会话删除属于不可恢复操作，内置浏览器要求操作时确认；确认未返回前保留隔离 session state 和对应回放缓存，不视作清理完成。真实用户 session、正式配置与原始 capture 保留。
+
+- **本机 PC 短症状续验（2026-11-10）：两轮均 partial。**新隔离 session、无 Memory、默认 Auto-review，输入为用户提供的眼部 capture、local 设备；ChatGPT Account／`gpt-6-luna`／Medium，Fast 关闭。首轮 General 自主选择项目内临时图路径并继续检查，但恢复时审核缺少可验证基线；补上主进程校验的签名基线后审核放行，恢复仍因入口目标为空而失败。操作者通过产品恢复入口关闭旧 context、重开同一 capture，观察到入口位置和空目标的 `resolved`，不把人工恢复算作自主通过。62 份请求快照留存；规划约 3 分 36 秒、General 约 22 分 22 秒，General 用量快照输入／输出 3457142／17352 token（含缓存读取 703872），费用不可得。来源清单 `.local/vertical-investigation/20261110-goal-loop-evidence/manifest.json` SHA-256 `b19fa888c92f55f14c28a2c0a7a9cca3c011586726e21222f4d3e47a1d08d70a`。
+- **计划边界及图像请求复核：**第三轮 Debugger 的实际 PromptPlan 已包含现有 `debugger-coordinator` 对条件性可逆回放实验的说明，但模型生成的获批计划把执行限定为只读；该计划不能当成已经批准替换或因果干预。若需更改战略，应按计划门重新对齐，而非放宽工具权限。Verifier 补源续审的实际请求在 `artifact_read` 后包含 `image/png` 图像内容块；请求快照对图像字节脱敏，来源原图以 SHA-256 绑定留存。这支持“向该 Verifier 请求交付过图像”的证据边界，不证明用户症状或根因。
+- **修复后空目标恢复复验：**新 session 的 General 自动审核取得由主进程验签及归属核验的入口基线，受控重开同一 capture，实际回到入口事件和空目标，并产生 `transition`、`daemon-stopped` 与 `resolved` 回执。模型检查了候选像素与历史但未确认用户症状对应的对象；运行时在同一执行中投递了获批目标复评和未完成检查，模型未再调用工具而给出 partial，独立 Verifier 未启动。48 份实际请求快照均为 Luna／Medium、Fast 关闭；规划约 2 分 23 秒、General 约 22 分 08 秒，General 用量快照输入／输出 2709771／14002 token（含缓存读取 604672），费用不可得。来源清单 `.local/vertical-investigation/20261110-restoration-retest/manifest.json` SHA-256 `72ff00f8fda971490f1ee4df1be17ce57e231b8a08a4e04026d1477441401d2d`。清单和签名回执可检查来源；签名密钥未归档，归档后未独立复算 HMAC。两轮不是受控 Prompt 对照，也不能证明根因或泛化。
+- **直接障碍修复与后续复验：**工具结果原文搜索在常用字节预算下保留足够的单行上下文，避免截断像素历史字段；自动审核仅在拥有会话／项目／回合及签名基线匹配时获得恢复事实，不改变授权；入口目标为空时通过受控重开恢复并严格核验实际位置；现有 `read_image` 增加只读源像素矩形区域及源图哈希、尺寸和坐标，用于观察过小目标，不写入新图或授予新权限。这些针对真实轨迹的修复有定向测试和本机 Electron 图像裁剪验证；新一轮真实调查及最终工程门禁另记，不能以工程测试代表调查通过。
+- **本机工程回归与锁竞态（2026-11-10）：**pnpm 11.7.0；首轮 Node 全量 3680 项通过、1 项债务棘轮子检查超时，降并发后该项通过，但 Knowledge 双进程写入 1 项失败、少一条记录。共用目录锁在创建文件与写入 owner 之间可能被误判为空损坏锁并删除；新增同步／异步确定性测试在修复前均失败，修复后对 owner 不可读的锁等待并在期限后明确失败，仅自动回收可识别的死 owner。目录锁、Knowledge 双进程及注册表故障注入 24 项通过；Node 全量 397 文件／3683 项通过、4 项跳过，棘轮 lines 79.16%、functions 78.74%、branches 67.65%、statements 76.55%；Renderer 201 文件／872 项通过，棘轮分别 65.22%、58.11%、56.35%、63.10%。typecheck、lint（0 errors／2152 warnings）、指定 `0bc961a5` 基线的完整 gates 和 build 通过。误用一次 Renderer 棘轮文件名后按仓库现有文件重跑通过，未更改门槛。最小回执 `.local/vertical-investigation/20261110-engineering-checks.json` SHA-256 `a6ccfe0a5679a323bc33698d471c6b1357fa6e5a91bf8468d34a9da96b352763`。该修复保护持久状态并发写入，不能替代真实调查验收。
+
+- **新机真实 Debug 与 Planner 只读核验（2026-11-10）：未通过。** 依据用户授权，将本机 User space 中所需 Agent、Knowledge 与 ChatGPT Account 访问资料复制到隔离副本，Memory 留空；通过产品设置将 12 个 Agent 配为 `chatgpt-account:gpt-6-luna`／Medium，根请求代表快照确认该路由与档位，Fast／Max 关闭，权限为 Auto-review。账号实际回复 READY；没有发生 Verifier 委派，不能声称子请求配置或独立审查已验收。用户指定的 PC 眼部白点 capture 在 Local 打开但最终 Present 不能唯一识别；短症状规划后 General 因工作区外路径拒绝过早 partial。人工说明项目内临时输出可用后，续跑读取眼部绘制及像素历史，仍未可靠定位症状；自动审核两次拒绝 `capture_restore`，理由分别是缺少可验证基线及具体操作合同。我把多次读取同一来源判断为无进展并停止了续跑；后续核对发现同一来源可有不同检索，不能证明这些读取均为重复。产品中断恢复入口先将事件恢复但目标不一致，关闭旧 context 并确认旧进程退出后重建回放，最终获得入口位置与空目标的 `resolved` 回执。该次人工介入不算自主通过。
+- **Android Debug：**本机 RMX3551 经用户完成安装与文件权限后，产品用 RDC-Tool 1.1.2 的 Android remote 打开 BlackHair（SHA-256 `a1d2a989f5f54badbe4a0b676863a9804a814327614a90b1bc4dbd0261b5960a`），最终输出与设备显示同步；短症状计划经人工排除本机设备不能打开的对照 capture 后批准。General 自行避开被自动审核拒绝的工作区外临时图读取，使用合法位置取图，查像素历史及资源；一次回合 partial 后经人工要求沿原 Task 续跑、修正尺寸混淆，仍未证明目标点属于头发或定位 First Bad Event，未形成持久 Claim／独立审查。两次回合均有入口恢复 `resolved`，仅证明该设备及此 capture 范围。补充 Planner 只读核验经两次方法反馈实际查询事件、资源、VFS pass／draw 和单 draw 管线：事件树 256/592 根节点并截断，能读到匿名 draw 和绑定信息，未证明其与头发关联；不能以大 pass 或单个 draw 冒充症状定位。知识命中历史相关案例，不能作为陌生问题泛化证明；Analysis、Optimize、详细 Prompt 对照及独立真值泛化均未在本机完成。
+- **本机方法修复与证据边界：**`rdc-tool-shell` 只补充按实际工作区／权限选择临时输出位置和处理路径拒绝的方法，不授予权限；Android 实际 General 请求包含该方法，随后自行选择合法输出，但不同案例和条件不构成严格对照。该修改后 `check:agent-runtime` 162 项、`check:skills` 16 项、typecheck 通过，lint 为 0 errors／2152 warnings；首次测试的沙箱临时目录 rename EPERM 在执行前失败，改用工作区临时目录后通过。前期完整 gates／build 为修改前的工程证据，不替代本次真实验收。PC 规划／首次执行／人工停止的续跑分别约 218／181／1057 秒；Android 规划／首次执行／续跑分别约 291／708／443 秒；Planner 只读核验约 381 秒（含计划审阅反馈）。PC 续跑累计快照为输入／输出 2829098／16719 token，Android 续跑为 2127971／7697，Planner 核验为 957147／13816；各为对应运行快照，不是全部回合的合计，费用不可得。证据保存 `.local/vertical-investigation/20261110-machine-evidence/`，清单 SHA-256 `b5011323bd7b0843af9b27e7f1b57b81e26d675adafffc5fc0e881dfce7782ea`；保留完整会话与代表性首末请求、审核和压缩快照，未保存全部单次请求，因此不能逐项证明每次请求配置或重算全程费用。签名密钥未归档，未独立复算 HMAC。
+
+- **本机隔离预检（2026-11-10）：**功能分支快进至 `6c2f5f39`。固定 pnpm 11.7.0，构建、typecheck、lint（0 errors／2152 warnings）、指定 `0bc961a5` 基线的完整 gates 通过，另有两组定向回归共 88 项通过。官方隔离 Browser QA 在内置浏览器进入 `/app`，通过设置验证 RDC-Tool 1.1.2 和 128 项操作；设备列表发现 RMX3551 可连接。只读引用公开 `vkcube.rdc`，本地回放 EID 14 → 13 → 14，入口画面恢复后关闭；归属登记为空，daemon 进程退出。本机检查范围内未发现带症状的真实 capture；隔离 ChatGPT 账号授权未完成，未发起模型请求。Debug、Analysis、Optimize、Android 原生回放及泛化均未在本轮验收。本轮 UI 与进程观察回执为 `.local/vertical-investigation/20261110-local-preflight.json`，SHA-256 `b7175dd2e2450f75666e830d7b06bbcfd9fe9c3e595c6b561c49e235c8fd5c40`；其中未进行签名回执或 HMAC 核验。预检 session 和外部引用经产品移除，归属 QA 进程退出，桌面锁不存在，本轮隔离根和测试临时目录已清理。
+
+- **审查续跑修复后的 Android 短目标（2026-11-10）：partial。**新空 session、无 Memory、默认 Auto-review，以 WhiteHair 的 Android remote 回放执行已批准的短 Analysis。独立 Verifier 首代为 partial，General 补授原始来源后在同一审查 Task 启动第 2、3 代，来源 Task 保持第 1 代；审查累计工具调用从 10 增至 25、39，起始时间和期限不变。三代均为 partial：Verifier 多次误选工具结果的 JSON 指针，未能读取所需原文；General 最终保留独立核验与资源链缺口，没有把局部审查结算当成通过。这验证了真实的 partial 同 Task 续跑，未自然触发本轮新增的“completed 且有未解决项”分支；后者仍只有工程验证。52 次请求均为 ChatGPT Account／`gpt-6-luna`／Medium、Fast 关闭，输入／输出 3646921／36538 token（含缓存读取 401664），费用未知；规划约 1 分 48 秒（含批准），General 约 14 分 30 秒。来源归档 `.local/vertical-investigation-20261108/evidence/android-short-review-continuation-sources.zip`，SHA-256 `72bd40b7e0806be42e80dd46b6471e376f25957878416eb7a44ae9c2dd314095`。回放入口恢复、context 关闭、归属 daemon／worker 退出；设备配置字节与属性恢复，隔离 session、QA 和账号副本删除；签名密钥未归档，HMAC 未独立复算。
+- **证据输入与原文搜索的直接收敛：**真实运行中，Evidence 写入要求模型将同一来源摘要分别重复在引用和 `contentHashes`，曾造成校验失败；现在写入只接收带摘要的来源引用，由主进程生成存储中的 `contentHashes`，继续核对实际字节，历史存储读取及签名不变。全新无设备、无 Memory session 的定向 Luna 合成任务成功按新输入创建并读取 Evidence：9 次请求，输入／输出 141210／1007 token，费用未知，约 55.3 秒；归档 `.local/vertical-investigation-20261108/evidence/luna-evidence-input-synthetic-sources.zip`，SHA-256 `48bfe3fb2b3dca78944e97bf4199cfe2faa38fba5cd334f62cc81dc4930c839f`。另针对上述 Verifier 指针错误，普通搜索在工具结果只有一个文本块时直接搜索该文本，返回原文件和文本视图各自的摘要及已知生产截断状态；多个文本块须显式选择。权限和摘要校验未放宽；工程定向测试及对上述真实来源归档的离线复验通过，修复后的真实模型路径尚未验证。这两项不代表 Android Investigation 目标或泛化通过。
+- **真实审查补证受阻与直接修复（2026-11-10）：**新隔离 session、无 Memory、默认 Auto-review，WhiteHair 仅经 Android remote 打开；短 Analysis 规划按既有授权批准。General 建立阶段模型并恢复入口，独立 Verifier 明确指出未获原始工具输出、建议补查资源版本关系；General 尝试向同一已完成审查 Task 补授原始来源，却被终态启动规则拒绝。随后报告虽然披露审查范围限制，仍称没有 Challenge 并声明 completed；这不证明批准目标或独立核验通过。修复允许结构化结果含未解决项的已完成独立审查在明确补充新来源时继续原 Task；仍核验实际授权、当前来源版本及 Profile／Skill，保留旧结果、累计消费和原期限。同步／后台定向回归覆盖新增来源、原输入重试及无未解决项的边界；修复后的真实运行另行记录。此前一轮模型和 Verifier 将资源使用记录的事件输出附件误当成被查询资源，因而错误排除已记录的读取；现有资源版本与审查方法已澄清两者语义，但记录的读取仍不证明逐像素值或完整依赖。本轮 51 次请求均为 ChatGPT Account／`gpt-6-luna`／Medium、Fast 关闭，输入／输出 3335535／39342 token（含缓存读取 879104），费用未知；General 约 18 分 33 秒。自动压缩后读取了正确计划，此次摘要未出现此前错配，不证明纠错分支真实触发。原始请求及来源归档 `.local/vertical-investigation-20261108/evidence/android-short-resource-semantics-sources.zip`，SHA-256 `06da8d781b74ce53192a49243b098c5a2e1806f265ea93cdb7ec29f237d77b01`。回放恢复、context 关闭、归属进程退出，设备原配置字节及属性恢复；签名密钥未归档，HMAC 未独立复算。
+- **本轮直接修复的工程验证：**pnpm 11.7.0；审查续跑定向 68 项、证据输入定向 117 项、文本搜索定向 17 项及真实来源离线复验通过。最终 Node 全量 396 文件／3675 项通过、4 项跳过，棘轮 lines 79.11%、functions 78.74%、branches 67.61%、statements 76.51%。首次沙箱全量因临时路径 `realpath` 被拒及默认高并发超时失败，在本机权限下以四个 worker 重跑通过；棘轮首次参数错误未形成有效检查，按脚本实际参数重跑通过。最终 typecheck、lint（0 errors／2152 warnings）、完整 gates 和 build 通过；gates 的 Knowledge／Investigation 历史债务比较随后显式指定 `0bc961a5eb9116599d263f216ce8769f00afa07e` 通过。Knowledge 基线检查在受限沙箱中因临时路径祖先 `realpath` 被拒，本机权限重跑通过。Renderer 未改动，沿用本轮先前 201 文件／872 项和棘轮结果；工程结果不替代真实模型与泛化验收。来源及工程回执归档 `.local/vertical-investigation-20261108/evidence/engineering-review-continuation-validation.zip`，SHA-256 `e4c91e2d898c2d9ad893a6f7cc2ba30f0045de3e27548766847ad00c8cb822f1`。
+- **真实压缩摘要的来源身份修复（2026-11-10）：**复查下一条 Android 运行轨迹发现，模型生成的压缩摘要两次把独立审查 Capsule 的摘要误写到获批计划 URI 上；原计划字节、主进程已批准身份与权威来源索引中的摘要均正确。压缩后 General 一次按错误摘要读取失败，随后通过运行时上下文找回正确计划。现有压缩安装路径对模型文本中可明确配对且已授权的 session URI／摘要进行核对：不一致值标为不可信并列出可用来源摘要，要求重读原文，不假设版本相同；未授权或歧义引用不猜测修正。即使送给摘要模型的索引截短，核对仍使用该执行的完整权威引用；子执行只使用已获授引用。原记录、权限和读取哈希校验不变。使用上述真实轨迹归档中的原始压缩文本与权威索引离线复现，两处错误配对均被识别；压缩窗口安装、持久化、权威状态变更及委派边界的定向测试通过。此为历史真实材料的离线复验，尚无修复后的新真实模型压缩验收。
+- **模型快照差异的可证边界：**最近 Android 规划与 General 请求的目录版本、路由版本、实际模型和其余 RequestPlan 字段一致；依当前快照计算，两个快照 ID 不同说明参与计算的规范化模型来源记录不同。归档未包含两次完整来源明细，无法进一步判断是来源值、顺序还是其他来源字段变化，也不能由此认定模型权重不同；历史请求不改写，受控对照仍不计严格固定快照。
+- **记录键修复后的 Android 短目标（2026-11-10）：运行时 completed，用户目标仍有缺口。** 全新隔离 session、无 Memory、默认 Auto-review，以同一短目标和 Android remote 原生打开 WhiteHair。General 在来源摘要写错后读取原产物并自行更正，写出 ready Evidence 与 ClaimSet；Verifier 给出部分审查和具体反证后，General 补授来源、修订结论。来源 Task 从第 1 代续为第 2 代，独立 Verifier 最终第 5 代绑定第 2 代来源，中间包含 partial 和一次错误来源 URI 导致的失败；自动压缩后根账本保留累计消费和原期限。修正后的写入结果暴露现有逻辑记录键，模型在报告中使用 evidenceId，最终写出 ready 报告、Checkpoint 并就地返回 completed。独立审查最终轮未重新读取所有阶段的原始详情；报告保留主要后处理阶段间资源链未追踪的缺口，而轨迹未见对该链已识别写入事件的直接 action-details 检查，因此不能将完整分析目标判为通过。该轮规划未检索 Knowledge。计划按既有授权批准一次，无逐工具人工代批；一次重复恢复被自动审核拒绝，理由是先前入口恢复已成功且无位置变化，模型读取当前状态后继续。规划／General／Verifier／压缩／自动审核分别为 10／67／19／1／2 次请求，合计输入／输出 6468679／62583 token（输入含缓存读取 2299648），费用未知；规划界面约 2 分 26 秒（含批准间隔），General 约 26 分 29 秒。规划请求与后续请求的模型快照标识不同，不能据此声称严格固定快照的 Prompt 对照。入口恢复并显示设备同步后，通过产品关闭 context；归属 daemon／worker 已退出、设备 helper 配置原字节及属性恢复，隔离 session、QA 和账号副本已删除。来源归档 `.local/vertical-investigation-20261108/evidence/android-short-record-ids-sources.zip`，SHA-256 `65c774bf2e20b03d99886a22a7564cac97435d1223862e4d8251fc3ce6aa855b`；签名密钥未归档，HMAC 未独立复算。
+- **来源续审修复后的 Android 短目标（2026-11-10）：未通过。** 新空 session、无 Memory、默认 Auto-review，WhiteHair 仅经 Android remote 打开；计划按既有授权批准一次，没有逐工具代批。独立 Verifier 审查了实际模型版本，压缩后仍保留目标和来源。General 将一条原始来源的 64 位摘要误写成 65 位，连续校验失败后改用范围较小的 draft Evidence 和 ClaimSet；随后建立 Checkpoint，但在 ready report 中把 Investigation artifactId 当成逻辑 evidenceId，写入失败。它描述了报告未能登记的限制，界面最终以无进展错误结束，没有成功交付，也未再次触发来源修订及复审，故不能证明该续审修复已通过 Android 验收。规划／General／Verifier／压缩／自动审核合计 61 次请求，输入／输出 4121508／41186 token，含缓存读取 1405696，费用未知；General 约 21 分 59 秒。操作者在错误后使用产品入口恢复现场，再关闭 context；daemon／worker 退出，设备 helper 配置的原字节与元数据恢复，隔离 session 和账号副本删除。来源归档 `.local/vertical-investigation-20261108/evidence/android-short-after-source-fix-sources.zip`，SHA-256 `31eda0f79d1ab4b1800e834164bdc1282df3b9f1a87b5f9477cb140b7dcb4ab2`。本次没有归档签名密钥，HMAC 未独立复算。
+- **错误摘要的恢复反馈与合成复验：** 针对上述真实 65 位摘要错误，保持原摘要与来源校验不变，反馈明确要求在 owning session 用 URI 单独读取、对照原来源后再更正，不静默替换内容。全新无设备、无 Memory 的 session 中，真实 Luna 故意提交 65 位摘要，被拒后按反馈读取原产物，区分文件内容与 session 产物摘要，成功写入 ready Evidence；这是定向合成验证，不证明 Android 调查或报告已通过。14 次请求均为 ChatGPT Account／`gpt-6-luna`／Medium、Fast 关闭，输入／输出 269891／2319 token，含缓存读取 60928，费用未知，执行约 1 分 21 秒。归档 `.local/vertical-investigation-20261108/evidence/luna-hash-guidance-sources.zip`，SHA-256 `3e428a39861281f1ce8309f3d2dcb007f7f614d9c62ddd0ff97ea465c3404fef`；隔离 session、QA 及账号副本已删除。
+- **Android Analysis 短目标／方法提示对照（2026-11-10）：未通过完整目标。** 两次在分别新建的空 session、无 Memory、同一只读 WhiteHair、Android remote 和入口画面下进行；Knowledge、Agent、源码及 capture 字节一致，配置仅自动刷新时间戳变化，均按既有授权各批准一次计划，无逐工具代批。短目标为“分析这份 capture 的主要渲染阶段及其相互关系”；方法提示仅追加对象定位、知识适用性、竞争资源关系、反证和独立核验。两组请求均为 ChatGPT Account／`gpt-6-luna`／Medium、Fast 关闭、正常上下文；但短组规划的实际模型快照标识与其后及方法组不同，不能称为严格固定快照的对照。短组未检索 Knowledge；独立 Verifier 发现报告错误后，General 修订报告，但由于原结果是仍可读取的不可变快照，已完成的来源与审查 Task 无法自然续审，最终诚实交付 partial。方法组浏览并搜索 Knowledge 但未找到适用卡片；它建立结构化证据、两次独立核验，并在补充原始来源后更正审查误读。运行时记录 completed，但报告和 Checkpoint 同时承认目标内关键资源历史仍有未读页；该原始长结果已保存，相关后续读取并非已证阻塞，因此不计用户目标通过。现仅在既有 Analyzer 方法中明确继续阅读目标相关页，真实调查复验仍待完成。单次随机运行不能证明提示词优劣或泛化。短／方法组分别 44／75 次实际请求，输入 3189024／4712959、输出 18802／31883 token（输入含缓存读取 472064／1606656），费用未知；规划过程约 1分44秒／2分04秒、General 约 8分47秒／16分21秒。来源归档分别为 `.local/vertical-investigation-20261108/evidence/android-controlled-short-sources.zip`（SHA-256 `6edc4707b3ff1643ad4eb7cb08d377040c92017e4c466e4c3ba78905ee10f437`）和 `android-controlled-method-sources.zip`（`f7a7ac2e29e9d99ec8b02cda7b4b2ebcb6e15703d15f8c9386d03e700b4e804f`）。两组入口状态恢复、context 释放和各自 daemon／worker 退出后，Android 临时 helper 配置恢复原字节与元数据；session、QA 及账号副本已删除。本组签名材料持久归档被自动审批拒绝，生命周期回执的 HMAC 未独立复算。
+- **不可变来源快照的续审修复：**已完成的来源经实际独立审查后，允许显式续用相同 Task 的下一执行代；原快照仍可读取时也适用，不能改写历史定义或旧结果。新来源结算后原审查必须重新绑定其执行代和确切 URI／hash，消费及期限继承原账本；当时直接重派尚未变更来源的已完成审查被拒；后续对已明确列出未解决项且补授新来源的同一审查增加续跑路径，见本节最新条目。回归先复现真实失败再通过。无设备、无 Memory 的新空 session 合成复验中，真实 Luna 将来源续为两代、同一 Verifier 续为三代；一次复审误读后再次审查，最终结论与修订来源相符。所有 33 次请求均为 Luna Medium、Fast 关闭，输入／输出 575304／5777 token（含缓存读取 189184），费用未知；来源和审查保持原开始时间与期限。归档 `.local/vertical-investigation-20261108/evidence/luna-reviewed-source-continuation-sources.zip`，SHA-256 `9d199407a1c0b857a848c4b81767c77eff323ec3773046423ef5feaa159f0bae`。该合成复验不证明 Android 短目标或陌生案例通过。完整高影响 Browser QA 启动被自动审批拒绝后，本复验在默认 Browser QA 权限下完成；未扩大权限。
+- **本轮工程验证：**pnpm 11.7.0；最终代码的 Node 全量 396 文件／3670 项通过、4 项跳过，Node 棘轮 lines 79.10%、functions 78.71%、branches 67.57%、statements 76.49%。Renderer 未受后续改动影响，沿用本轮已通过的 201 文件／872 项与其棘轮。Task／Investigation 和压缩定向测试、typecheck、lint（0 errors／2152 warnings）、基于 `0bc961a5eb9116599d263f216ce8769f00afa07e` 的完整 gates 和 build 通过。工程检查不替代真实目标、设备或泛化验收。
+- **Android 短 Analysis 的续审与完成缺口（2026-11-10）：**新空 session、空 Memory、默认 Auto-review 和 ChatGPT Account／`gpt-6-luna`／Medium；WhiteHair 仅经 Android remote 打开，回放与设备画面同步。Verifier 首次审查提出资源关系反证，General 补查并更新模型；来源和 Verifier 均续用原 Task 的第 2 代，自动压缩后复审绑定新来源版本，根账本保留累计消费与原期限。带 `sha256:` 前缀的准确 Task 结果摘要已正常结算。模型随后创建 Checkpoint，但 ready report 的空 Claim 投影被拒；它把 `investigation_list(kind=claim)` 的零匹配误解为没有可解析 Claim，最终诚实交付 **partial**，故不计 Android Analysis 完整通过。规划／General／Verifier／压缩／自动审核分别为 6／54／6／1／2 次请求，输入 token 108013／4270635／183003／133781／30890，输出 2103／30296／6100／2659／421，费用未知。计划按既有授权批准，无逐工具代批。来源及运行轨迹逐文件校验归档于 `.local/vertical-investigation-20261108/evidence/android-analysis-task-fix-sources.zip`，SHA-256 `ae20405495edbdf0fdbf55aef505ddd88bb0aa6a2fef46c2fafc316246ca0e98`；生命周期签名材料单独保留。现场恢复、关闭 context、daemon／worker 退出及设备原配置字节和属性恢复分别核对；隔离 session、QA 和账号副本已删除。
+- **调查来源反馈直接修正与合成验证：**真实运行中，筛选 `kind=claim` 无匹配时，列表错误地称整个 session 无 Investigation 成果；而当前 ClaimSet 的成员本来可作为报告来源。现将空结果限定为筛选范围，并在 schema／错误反馈中说明如何使用当前 ClaimSet 成员，空投影、缺来源和错误来源仍被拒绝。另一次独立空 session 的 Luna 合成测试读取该 schema，以模拟输入建立 WorldState 和 ClaimSet，再直接投影其成员写出 ready report；没有单独 Claim 工件、设备或 Memory。该合成测试为 8 次请求、输入／输出 150232／1952 token，费用未知；来源归档 `.local/vertical-investigation-20261108/evidence/luna-claimset-report-synthetic-sources.zip`，SHA-256 `ed8f48d73d3d832b33e00ef6df9ac786fc96c942effaeb70297a75fbf74ea6b3`。它不证明真实 Mission 的完成资格或跨案例泛化。
+- **Claim 字段说明复验：**上一新空 session 的 Android 短 Analysis 因原始 Claim 的可空字段被省略而两次写入失败，未进入独立审查；源码现明确区分原始 Claim 与投影来源。随后另一真实 Android 调查读取该说明，成功创建并版本化 ClaimSet，独立审查及后续 partial 范围见上。前一失败现场来源归档 `.local/vertical-investigation-20261108/evidence/android-analysis-schema-retest-sources.zip`，SHA-256 `dc57f2cc11ff21657f138a45a6c00964d3c05ec58020ed52fe8a97e54527aaf3`；后续复验归档 `.local/vertical-investigation-20261108/evidence/android-analysis-schema-fix-sources.zip`，SHA-256 `99e4036581e2aae74228a0463273a0b7f1f3b1dc56ad82ec8a44811df53b3e24`。两轮均恢复设备配置并清理隔离 session 与账号副本。
+- **Android 短 Analysis 的实际终态与续修（2026-11-10）：**全新隔离 session 使用默认 Auto-review、ChatGPT Account／`gpt-6-luna`／Medium，WhiteHair 仅经 Android remote 打开；设备呈现及入口位置可见。General 重建阶段后，独立 Verifier 以实际 Luna Medium 请求审查来源，指出两项资源历史未查全；General 实际补查并收窄结论。它仍将一条目标内、可通过已发现能力继续追踪的主要阶段关系列为未知，不能据此判定目标已充分覆盖。本轮未使用 Knowledge，也没有重现先前的委派来源 URI 错误。报告及 `completed` 声明均已生成，声明的 `evidenceRefs` 已含当前报告的精确 URI／hash，但终答门禁另要求正文重复内部 ID／hash；模型未按反馈补写，界面最终显示无进展错误，因此该轮 **未通过**。现将同一版本绑定收敛到既有 `turn_complete.evidenceRefs`，声明和终态均复核当前报告及原有资格要求；缺失、错误、过期引用与未解决 Challenge 仍拒绝。Analyzer 方法同时明确对目标内可执行的区分检查继续采证，不要求无限追查无关细节；新合同的真实 `completed` 仍待验收。规划／执行／Verifier／自动审核分别为 6／41／4／2 次请求，输入 token 分别为 105915／3811470／126362／33229，输出为 2287／16930／3155／291，费用未知；计划按用户既有授权批准，终态失败后操作者使用产品恢复入口，无逐项代批。唯一证据见 `.local/vertical-investigation-20261108/evidence/android-analysis-source-diagnostic-sources.zip`，SHA-256 `404cc0e998600640e0f6f1b09c642a2d305cc2270d9ad5107e27961a993f23ee`；签名校验材料单独保存，不含账号授权。入口经产品恢复后关闭，context、daemon 与 worker 已退出，设备配置原始字节和元数据恢复，隔离 session 与 QA 凭据副本删除。
+- **新合同下的 Android 复验：partial。**同一短目标、新空 session 和相同 Knowledge 字节下，Analyzer 自行建立来源依赖及独立 Verifier；General 在独立审查指出缺口后继续只读补查并重新登记报告。调查中自然发生压缩，摘要保留冻结目标、来源版本、审查限制和未执行工作；压缩后模型重新读取计划与证据，原 Task 根账本仍保留原开始时间及累计消费。这只证明该轮可观察连续性，不证明重启续跑或期限全链保真。最终 current report 尚未重新独立审查，主要资源链未闭合，故以 `partial` 正常交付；本轮没有进入新 `completed` 绑定合同。自动复评指出仍有未决工作后模型未继续执行。模型更新 ClaimSet 时为延续中的 Claim 换了逻辑 ID，导致其所引用的 Evidence 会被同一事务标记过期；两次写入均被拒且未提交，属于正确的来源保护。现澄清版本化时 artifactId 和逻辑 claimId 的不同职责；该方法修订尚未真实复验。规划／General／Verifier／压缩／自动审核分别为 8／50／3／1／1 次请求，输入 token 176476／4635245／99050／132516／14679，输出 2889／31113／3060／2842／175，费用未知。批准计划一次，未逐项代批；入口自行恢复，终态 resolved 回执存在，随后关闭 context 并确认 daemon／worker 退出，设备配置原始字节及属性恢复。证据归档 `.local/vertical-investigation-20261108/evidence/android-analysis-binding-retest-sources.zip`，SHA-256 `d218f312f9cdf34892a8fe03f462dcc75b4423effacf5bc53d54fc7283ca4526`；隔离 session、QA 根及账号副本已删除，签名校验材料单独保留。
+- **新机器续验（2026-11-08）：**按用户确认承接既有功能分支 `0bc961a5eb9116599d263f216ce8769f00afa07e`，使用 pnpm 11.7.0 和独立 User／应用根；正式配置、历史 Sol／Terra 记录与原始 capture 未改。隔离副本的四个入口及八个内部 Agent 经设置链保存为 ChatGPT Account／`gpt-6-luna`／Medium，Fast 和 Max 关闭。根请求、同步及后台委派均取得实际 RequestPlan；八个内部 Profile 的来源、匹配 Skill 和实际模型请求均有记录。独立 Verifier 的结构化来源绑定经一次人工纠正后在合成任务中验证，不代表领域调查已独立核验。按用户此前要求重复制设置时，隔离副本曾带入其他账号的配置元数据，未复制其他账号加密记录；验收后经备份、预览和验证，从副本原子移除其他 Provider 项，保留 ChatGPT 项，后续试验须记录清理后的配置 hash。
+- **Android 与切换：**本机设备对登记的 Android capture 完成原生回放及设备呈现。切换时复现关闭接口成功响应无 context 字段导致误判；主进程现串行核对 owning lease、回放及文件身份、原生关闭前后状态和进程世代，未确认时隔离。修复后同会话关闭 A 并实际尝试打开 B；B 的原生回执明确为 D3D12，设备不支持，随后重新准备并恢复 A。第二份兼容输入不可得，不能将失败恢复算成成功的 A→B→A。回执和设备图像见 `.local/vertical-investigation-20261108/evidence/android-retest-stage-a.json`、`android-retest-stage-b.json`、`android-retest-restoration.json`。
+- **委派终态续修与真实复验：**六个无领域材料的合成子任务中三项只返回正文，因缺结构化结果保持 partial；其父级还自行设置了小的调用次数和时限。现有终止反馈扩展到委派结果合同，并修订执行 Skill，用户或获批计划未明确限额时不自行设小额度；取消、真实 partial、继承限制及无进展仍有效。重新构建后，三个角色均完成结果登记，其中 Report Writer 先返回正文，收到同执行反馈后提交结构化结果；另两项未触发该反馈。该轮约 107.8 秒，父级输入 134079 token（含缓存读取 44800）、输出 2727 token，子级完整用量和费用未知。前后请求及任务回执见 `.local/vertical-investigation-20261108/evidence/luna-six-agent-matrix.json` 和 `luna-delegated-result-after-fix.json`；这是合成委派证据，不是 Mission 完成证明。
+- **知识、计划与投影：**第一次隔离副本遗漏了四张 Knowledge 图片，该轮不用于受控对照；补齐并校验后，短症状规划自主以短词检索、版本化读取知识，并将适用性转为候选预测及区分检查，尚未执行这些检查或读取图片。首版计划过度排除可逆因果实验，经一次人工反馈修订；修订版保存为待批准计划。规划期间自动审查拒绝读取项目外临时截图，模型提出受控图像导出路径，但该替代路径尚未执行。右栏投影原先每次进度刷新重扫 capture 字节，导致请求准备长时间排队；现读取已提交输入快照，实际打开和计划冻结仍分别校验身份。受影响测试及真实复验见 `.local/vertical-investigation-20261108/evidence/right-rail-replay-responsiveness.json`。
+- **前一阶段工程与未闭合范围：**Node 全量 392 文件／3597 项通过、4 项跳过，Node 棘轮为 lines 78.68%、functions 78.31%、branches 67.05%、statements 76.07%；Renderer 全量 200 文件／868 项通过，Renderer 棘轮为 65.20%、58.06%、56.31%、63.07%。当时 typecheck、lint（0 errors／2152 warnings）、完整 gates 和 build 通过；后续修复以其最终回执为准。完整调查对照、三个 Mission 的真实结论资格、长调查压缩与重启续跑、陌生 capture 和独立真值均未完成；不以工程或合成结果替代。
+- **短症状与方法提示的规划续验：**在同一 Android capture、入口事件／目标、知识文件、Agent、Luna Medium 和自动审核权限下串行建立独立 session，先后运行短提示、只补方法的提示和短提示复验，均未批准或执行计划。两次短提示都未单查对象词、未读取知识，并将可逆因果检查排除；方法提示读取了版本化知识，计划中包含适用性预测、条件性实验和独立核验。两轮实际模型 ID／档位／路由相同，但运行时模型快照身份不同，因此不能称为精确身份固定的对照。修订知识工具的空查询和空间浏览说明、Debugger 条件性实验方法后，短提示实际检索并读取了知识；首份新计划有一处支持预测与反证方向倒置，继续补充通用一致性方法后，下一份计划中审阅的候选未见该直接矛盾，并保留独立核验。该结果只覆盖规划，不证明实验、因果或泛化。实际请求、各轮人工准备／取消、时间范围、token 和费用未知见 `.local/vertical-investigation-20261108/evidence/controlled-prompt-planning.json`。
+- **模型快照时间戳续修：**隔离账号目录刷新前后，实际模型目录与路由版本不变，能力来源仅 24 组观察／到期时间更新，真实 RequestPlan 的模型快照和执行指纹却变化。现只从身份计算中排除来源新鲜度时间，保留来源版本、hash 和实际能力；原目录准入与历史记录不改。真实 Luna 前后各一次请求在再次刷新后得到相同执行身份；来源 hash 改变仍使快照变化的负路径由回归覆盖。修复前历史原生延续身份若与新身份不匹配，仍按原合同拒绝使用，未改写历史或增加兼容双读；这不是长调查重启恢复验收。
+- **相同请求身份下的规划差异：**随后一对短提示和方法提示的实际执行身份、预载 Skill、Android 输入及入口观察、知识与 Agent 文件和权限模式一致；完整配置文件 hash 不同，不能声称字节完全固定。该次短提示读取了 User Knowledge，方法提示限定项目空间检索后未读取仍可用的 User Knowledge。现对限定空间的空结果提示其他空间未被查询，不改变查询或权限；实际复验中模型直接在未限定空间检索并读取了知识，未触发新提示，其边界目前只由回归验证。规划中另观察到批量 Task 无法引用尚未生成的同批 ID，模型两次尝试失败后提交空依赖；现提示用返回的 ID 通过现有 task_update 建立依赖，测试确认快照保留该关系。以上均不代表真实调查、实验或泛化通过。
+- **获批 Debug 实际执行与恢复（2026-11-08）：**修订任务依赖提示后，短症状规划实际用返回的 Task ID 建立来源依赖和独立核验约束，用户批准冻结计划 `a574fcb5e666b984d9fccc3336e951d5201beacecd4df962bc93a98476a13e60`。重启后通过产品声明入口进入 General；恢复入口要求批准身份、正文 hash、声明及可见分支一致，不自动执行。规划回合曾在批准到达前由操作者停止，导致两个 Task 被取消；General 在后续回合显式续用原来源 Task，独立核验 Task 未启动。15 分 21 秒／界面 92 个动作后，原生像素历史调用丢失远程连接，主进程隔离 lease；模型保留候选区域、竞争解释和 Checkpoint 草稿，没有建立对象映射或因果结论。自动审查分别拒绝故障现场 `capture_recover` 和 `capture_restore`，模型没有继续探查隔离现场。操作者通过 Capture 先关闭 context 并确认旧 daemon 退出，随后用签名基线的显式恢复入口重新连接同一 Android 设备和输入；新 context/replay、原入口事件、设备呈现及 resolved 回执均已观察。恢复不补签故障前的实验。实际请求、审批、干预、用量（输入 3375182、输出 23320 token，费用未知）、失败及回执见 `.local/vertical-investigation-20261108/evidence/controlled-prompt-planning.json`。
+- **压缩与终态边界：**上述真实长回合发生自动压缩；摘要保留批准计划、输入与设备、证据引用、竞争解释、未执行检查、隔离与审批拒绝，压缩后模型实际读取摘要权威和先前制品。这只证明该次压缩的可观察连续性，尚不证明重启后的累计消费、期限或独立核验。模型提交 structured partial 后，终答前的恢复核验发现绑定失效并撤销声明；模型未按反馈重新调用 `turn_complete`，最终界面显示无进展错误。现将同一恢复资格检查提前至声明入口，并保留终答复核和 completed 的恢复要求；定向回归通过，修复后的真实故障续跑尚未验收。
+- **前一阶段工程门禁（2026-11-08）：**使用 pnpm 11.7.0，Node 全量 393 文件／3614 项通过、4 项跳过，棘轮 lines 78.74%、functions 78.39%、branches 67.15%、statements 76.14%；Renderer 全量 201 文件／872 项通过，棘轮分别为 65.22%、58.11%、56.35%、63.10%。当时 typecheck、lint（0 errors／2157 warnings）、完整 gates 和 build 通过；后续 session 清理和独立来源核验续修须重新验证。用户随后指定每次运行前删除旧隔离测试 session，保留唯一证据，并放弃同 session 重启验收；已对隔离会话、请求、Task、项目元数据和加密签名记录逐文件校验归档，不含账号授权。该工程结果不代替真实调查或设备验收。
+- **干净 session 短提示再规划：**按用户要求，经产品删除 17 个旧隔离 session，并清理归档后仍遗留的 12 个子执行快照目录与 22 个已结束运行序列文件；真实用户 session 未触碰。User／Project Memory 目录均为空，新请求只有本轮用户消息，PromptPlan 无 Memory；实际 RequestPlan 为 ChatGPT Account／`gpt-6-luna`／Medium、Fast 关闭。Debugger 在重新打开的同一 Android remote capture 上读取版本化 Knowledge 并建立两个 Task，但首份计划的独立来源仍是占位符：操作者要求修订同一 Task；第二次要求澄清可逆回放实验与禁止修改原始 capture／工程的边界。两次反馈均不提供原因或答案，但该规划不算完全自主对照。现有代码在计划冻结前核对独立来源 Task 必须存在且不同于审查任务，执行时继续验证成果版本；定向回归通过，新的计划门检查尚未经过真实模型复验。修订计划已依用户授权批准；原始请求及介入见 `.local/vertical-investigation-20261108/evidence/controlled-prompt-planning.json`。
+- **该计划的执行结果：**用户授权后由 General 在同一 Android remote 执行，实际请求为 Luna／Medium、Fast 与 Max 关闭，加载匹配的冻结 Skill。General 把工具返回的当前临时图片路径转录错误，自动审查拒绝越界读取；它发现了原生观察能力却未调用，随后以图像不可得为由提交 partial，未启动独立核验。该结论诚实保留未知，但提前停止了可行检查，不能计为 Debug 通过；结束时原入口和设备呈现仍可观察，关闭后归属 daemon 退出。本轮隔离项目根仍有上轮未被该模型读取的 PNG，因此现场不算完全干净；其字节与已归档图像一致，现已删除。对执行 Skill 补充通用图像获取与路径核验方法，不放宽权限或写入案例 ID；修订后的真实复验待新 session。产品删除该轮 session 后，session、Task、请求与 trace 文件均为空；唯一证据已逐项校验归档。执行约 207 秒、输入 1776223／输出 3729 token，费用未知。
+- **干净现场的短／方法提示对照（2026-11-08 至 09）：**各自使用新建、无 Memory 的隔离 session，同一 Android remote、capture 内容 hash、入口事件、知识文件、Luna Medium、权限与实际预载 Skill。短提示侧经两次不泄露答案的计划审阅后，General 在临时预览失效后成功导出并读取当前画面，但只搜索一批绘制就以尚未定位对象为由 partial；仍有可执行定位检查，属于过早停止。方法提示侧经一次计划审阅去除自设实验次数后，实际选择候选区域并追踪事件、资源及像素，期间同一中间纹理的不同事件两次导致原生远端 fatal／lease 隔离；每次受控恢复均重新准备同一输入与设备，最后回到入口。未建立目标 draw、因果实验或独立审查，结果仍 partial。两侧人工介入与工具故障不同、各仅一次，不能把差异全部归因于 Prompt；实际请求、来源、耗时、token、审批与费用未知见 `.local/vertical-investigation-20261108/evidence/controlled-prompt-planning.json`，原始材料分别归档于 `fresh-short-followup-session-sources.zip` 与 `method-control-session-sources.zip`。
+- **真实 Analysis 与 Optimize：**Analysis 首份计划排除只读结论的独立审查，经审阅补上绑定来源版本的 Verifier；General 只取得有限结构证据就 partial，来源 Task 受阻，Verifier 未执行。一次恢复被自动审查拒绝后，主进程提供实际位置差异，专用恢复成功；模型没有重新评估仍可做的资源追踪。Optimize 首份计划只在正文提到审查而未建立 Verifier Task，经审阅补齐；Android `FrameGPUDuration` 返回 `frame_timing_unavailable`，不能建立整帧基线、噪声或收益，未干预也未运行 Verifier。模型未尝试已发现的事件级计时，故完整 Optimize 仍 partial；两轮原始证据分别在 `android-analysis-session-sources.zip`、`android-optimizer-session-sources.zip`。
+- **独立事件级诊断与委派：**随后全新 session 的只读事件计时实际返回 419 条；这是一次采样，不证明排序稳定、整帧耗时或优化收益。真实 Verifier 的独立 Profile、`gpt-6-luna`／Medium、预载 Skill、来源 Task 执行版本及精确成果 hash 已核对；它只对获授的事件类别和层级给出有限审查，因未收到原始计时回执与生命周期回执而 partial。原始计时制品的 URI/hash 实际存在且父请求收到过，但父执行未补授同一审查 Task；该缺口不算独立核验通过。报告原文、父子请求和来源版本逐项校验归档于 `android-event-timing-session-sources.zip`。删除该隔离 session 后，父子请求快照、Task、trace 和 Memory 均为空，真实用户数据未删除。
+- **直接续修与当前设备边界：**针对上述实际失败，终态工具反馈区分未完成与真实阻塞；若 partial／blocked 声明先因入口位置不符被拒，而主进程随后确认已恢复，则反馈同一执行重新评估剩余任务，不自动重跑、不改变权限、消费或期限。Analyzer／Optimizer 方法明确独立审查的 Task 与来源绑定，共享方法区分只读导航和数据修改、以及既有原始证据补授；本轮方法修订后的完整真实复验尚未完成。最新新 session 在模型请求前 `remote.OpenCapture` 返回网络 I/O 失败，关闭后归属 daemon 退出。随后只读取得同一 Android 设备上 helper PID 2176 的 native crash：空指针 SIGSEGV，栈经过 Adreno Vulkan 图形管线创建与 RenderDoc 延迟编译。该 PID 的原生日志显示它先接受远端连接，再打开失败回执中的完全相同路径，约一秒后崩溃；完整 16062 字节来源读取前后大小、时间及 SHA-256 一致，当前本地 capture 的 hash 也与此前登记一致。这强烈支持该网络错误与 helper 崩溃相关，但尚未独立证明宿主连接与 PID 的完整绑定，也未区分驱动、输入或调用触发因素；远端文件名中的 hash 不单独证明故障时远端字节。当前安装 APK 与本机 RDC-Tool APK 的 SHA-256 相同，崩溃栈的 RenderDoc 库 Build ID 与当前包内库相同；Build ID 不是故障时完整字节比较。原生日志、筛选崩溃行和关联回执见 `.local/vertical-investigation-20261108/evidence/android-reopen-helper-native.log`、`android-reopen-native-crash.json`、`android-reopen-log-correlation.json`。本轮未重开 capture，不能把 ADB 在线或早先成功回放当作当前回放正常。用户已明确放弃同 session 重启验证；陌生 capture 与独立真值仍不可得。
+- **合成来源补授与执行准备（2026-11-09）：**隔离 Luna 复现了审查缺少原始来源、Profile 与 Task 要求不一致、附加 Skill 交集剥夺必要读取工具，以及已授权 URI 使用错误 hash 的不同失败。现在准备阶段检查实际 Profile／Skill／策略能否提交结构化结果和读取明确要求的来源；不相容时在子模型请求前返回具体冲突。已授权 URI 的 hash 错误返回 `ARTIFACT_HASH_MISMATCH`，未授权 URI 仍拒绝；活跃 direct Task 被误用于委派时提示保留父 Task 并创建子 Task。定向测试覆盖同一审查 Task 在补授后续用原来源版本、累计消费与期限；真实合成运行中曾向第二个 Verifier 补授来源，但没有形成可证明同一持久审查 Task 代次的回执。另一次模型给出的统计区间精度与独立计算不一致，定性结论可保留，精确数字须以实际计算核验。原始请求见 `offline-*-sources.zip`，均在 `.local/vertical-investigation-20261108/evidence/`，不证明领域调查通过。
+- **直接 Task 终答续跑与真实边界：**一次合成测试中，General 创建 direct Task 后没有委派，`turn_complete` 被拒后仍直接终答，宿主将任务记为受阻；约 85 秒、根请求输入 199940／输出 1332 token，并有一次人工选择模型提出的分析默认项。现对所有带 session 的回合在终答前检查本回合未结算 direct Task，在同一执行内反馈可继续工作或真实阻塞，沿用无进展、取消和既有限制。定向回归覆盖反馈与预算保持。修复后的新 session 以相同合成数据先派 Generator，再由 Verifier 仅审查汇总，按缺口向另一个 Verifier 补授原始来源并复算；界面耗时 9 分 03 秒，根请求输入 375523／输出 3258 token，三个子执行的已记录用量分别为 31109／1318、36511／2054、56799／2376 token；另有一个未完成请求快照无用量，费用未知。该轮无人工介入，但没有创建持久 Task，也未触发新的终答反馈，因此既不证明同一审查 Task 续跑，也不构成该修复的真实触发复验；两轮原始材料分别见 `offline-task-retest-final-sources.zip`、`offline-terminal-continuation-sources.zip`。
+- **同一审查 Task 的真实合成续验（2026-11-09）：**针对模型把重复的角色名称当成同一任务，明确要求需要连续性的委派传入同一持久 `taskId`。第一轮实际创建来源与审查 Task，Verifier 首轮 partial、补授后第二代 completed；两代绑定同一来源执行与 hash，工具调用从 2 延续到 5、期限不变。但来源 Task 实际由 General 直接执行，最终回答误称 Generator；该轮一次人工批准隔离项目写入，耗时 4 分 01 秒，根请求输入 529493／输出 4738 token，两次 Verifier 分别为 32473／1255、33710／1094，费用未知。随后要求指定角色对应 Task Profile：新一轮实际运行了 Generator，却把生成和审查误当成必须共用一个 Task，取消未执行的审查并 partial；耗时 2 分 02 秒，根请求 291226／2779、Generator 13478／975 token。再明确生成与独立审查分别绑定不同 Task、同一审查 Task 约束其多代后，第三轮实际 Generator 的第 1 代因 URI 笔误失败、第 2 代在原 Task 成功；Verifier 第 1 代只读生成结果并 partial，第 2 代补读原始来源后 completed，审查来源始终绑定生成第 2 代和同一 hash，工具消费 2→7、原期限不变。第二代真实出现 `ARTIFACT_HASH_MISMATCH`，修正后读取成功，没有放宽来源校验。第三轮无人工介入，耗时 3 分 46 秒，根请求 403432／4183，Generator 20521／770，两次 Verifier 分别为 24236／784、52885／928 token，费用未知。三轮各自使用新隔离 session 和空 Memory，来源与请求分别归档为 `offline-same-task-real-sources.zip`、`offline-agent-identity-sources.zip`、`offline-role-task-closure-sources.zip`；这只验证合成输入下的执行身份、补授与消费连续性，不证明 Android Mission 或泛化。收尾时 `adb devices -l` 曾退出 0 但无输出；后续只读 ADB 服务协议及客户端查询均返回原设备在线，不能以此证明原生回放正常。
+- **上一阶段工程验证（2026-11-09）：**pnpm 11.7.0，Node 全量 393 文件／3617 项通过、4 项既有跳过，棘轮 lines 78.75%、functions 78.39%、branches 67.18%、statements 76.16%；Renderer 全量 201 文件／872 项通过，棘轮依次为 65.22%、58.11%、56.35%、63.10%。typecheck、lint（0 errors／2156 warnings）、以 `0bc961a5eb9116599d263f216ce8769f00afa07e` 为历史比较基线的完整 gates 和 build 通过。Renderer 棘轮首次传参错误未形成有效检查，按脚本实际路径参数重跑通过；后续代码修改需以新的工程回执为准。
+- **续修后的工程验证（2026-11-09）：**使用 pnpm 11.7.0，Node 全量首次因四项旧 hash 错误码断言失败，修正断言并保留未授权拒绝后，重跑 394 文件／3625 项通过、4 项跳过；Node 棘轮 lines 78.82%、functions 78.45%、branches 67.23%、statements 76.22%。Renderer 全量 201 文件／872 项通过，棘轮分别为 65.22%、58.11%、56.35%、63.10%。typecheck、lint（0 errors／2155 warnings）、以 `0bc961a5eb9116599d263f216ce8769f00afa07e` 为比较基线的完整 gates 和 build 通过。Node 棘轮首次因未生成摘要未执行，按仓库脚本生成摘要后通过；后续同一 Task 与角色职责说明修订后，上述检查再次通过且覆盖率数值一致。工程结果不替代真实模型、设备和泛化验收。
+- **受控配置与新一轮 Debug 对照（2026-11-09）：**默认配置下重新打开曾出现原生延迟编译崩溃；依据本机 RenderDoc 的已有编译选项，仅在设备保存原配置和元数据后，将 `SingleThreadedCompilation` 设为 true 作可逆对照。该条件下 WhiteHair 两次从新 session 经 Android remote 打开并呈现；这不证明运行时实际走了该选项分支，也不证明默认配置的根因已修复。短提示规划经一次不泄露答案的修订后执行，仍有可用取图路径却 partial 早停；规划输入／输出 430246／5748 token，执行 1248501／2653 token。方法提示规划经三次方法及边界修订后，执行取得图像并追踪事件和资源，但一次上游 Pixel History 导致 remote 丢失、lease 隔离，未形成目标对象映射或因果结论；规划已记录 444947／11371 token（另有一次未完成请求用量未知）、执行 3246564／11602、压缩 145940／3955，费用均未知。两侧人工介入和工具故障不同，不能将差异全部归因于 Prompt；原始请求、计划、来源与输出分别归档为 `.local/vertical-investigation-20261108/evidence/android-single-thread-short-sources.zip`、`android-single-thread-method-sources.zip`。
+- **原生故障、受控恢复与压缩边界：**方法提示测试的 native crash 日志中，实际 helper PID 与当次打开回执一致；SIGSEGV 栈进入 RenderDoc Pixel History 与 Adreno Vulkan，但不能据此区分驱动、输入或调用的根因。原始片段 `android-single-thread-pixel-history-native.log` 的 SHA-256 为 `5b2a29ec3985dcf4cbfb58eff42b16efa9c16888698cc696710f8c11b0fa016d`。主进程按同输入、设备和权限受控重开，建立新的 native 身份及 epoch；终态按同一用户位置生成 resolved 回执。该次自动压缩后保留目标、候选、反证、来源和未做检查，根 Task 的累计调用数与原期限持续；不以此证明同 session 重启或领域结论成立。回执 hash、签名字段、来源和故障现场状态各有不同证明范围，此处未独立复核 HMAC。
+- **恢复反馈修复与真实 Analysis 复验：**`capture_restore` 现将主进程当次观察的签名入口基线、当前现场及一致性返回执行者；无需移动的 `changed:false` 和实际恢复的 `changed:true` 均返回比较结果，终态仍重新观察并生成独立 resolved 回执。新构建在全新 session 的 Android remote 上真实验证两条返回均为 `restored:true`，General 随后追踪阶段和资源；实际 Verifier 使用独立的 Luna Medium Profile 与匹配 Skill，读取获授的原始工具输出并提出限定及后续检查。最终仍为 partial：Evidence 的引用 hash 反复不匹配，正式 ready Report 未建立；来源 Task 供 Verifier 绑定的 `resultRef` 实际是恢复回执，而报告在审查后又发生修订，因此本轮不能证明最终报告版本被独立核验。规划约 168 秒、执行约 1945 秒（含操作者代行权限审批）；根规划 194146／2879、General 4776811／23907、压缩 120595／2162、Verifier 172079／4556 token，费用未知。原始材料见 `android-restore-analysis-sources.zip`，SHA-256 `29dc67e56dcc9ac84822f4fd5aeee56233681954bf273085bc10852698bfd691`。
+- **引用纠错与仍存边界：**针对该次实际失败，Task 结果引用错误提示明确要求实际待审成果和可核验的 session URI/hash，工具说明指出可使用已授权的 `read_file pinEvidence` 固定工作区文本；Evidence 数量或内容 hash 不匹配仍拒绝，并提示在现有权限下核对原始来源，不自动替换当前 hash。运行时能验证所选引用的字节、版本、来源执行及授权，不能仅凭 hash 判断它在语义上就是所需报告；这仍是本轮真实暴露的未闭合边界。
+- **真实模型合成复验（2026-11-09）：**新隔离空项目和 session、不带 Memory 或 Android 输入，General 在一次不泄露结果的隔离项目写入审批后，创建并回读统计报告，将完整回读制品作为来源 Task 结果；独立 Verifier 的实际 Profile、Skill、Luna Medium 请求及获授来源版本均匹配，实际读取后复算。来源制品记录的报告全文 hash 与终答时的文件 hash 一致。模型曾提交无效占位依赖，收到拒绝后用真实 Task ID 建立依赖；一次 JSON 层读取失败后继续完成审查。约 110 秒，General 输入／输出 262093／2091 token，Verifier 23700／389 token，费用未知。逐文件校验的请求和来源见 `.local/vertical-investigation-20261108/evidence/result-binding-synthetic-sources.zip`，SHA-256 `8ef7a7affdf2863bec44895582ffcccc90c2bf3f6763fd13bf32f3c028dca456`。这证明该次合成成果被对应版本审查，不证明语义误绑定已被运行时普遍排除，也不替代 Android 调查验收。
+- **短提示 Android 安全复验与 Task 结算续修：**新 session 使用相同短症状、Knowledge 和 Android remote，针对已发生的 native 故障将 RDC 工具设为逐次人工审批；一次计划修订仅补可逆实验方法与恢复边界。General 在原临时预览路径不存在、首次输出路径越界后，自行改用隔离项目内的 `rd.session.observe`，取得并实际读取最终图像，再做事件筛选及一次此前同一输出附近已有成功先例的像素历史；回执明确标记 binding degraded。随后仍在未完成上游映射和竞争检查时结算 partial，独立 Verifier 因完整来源依赖未满足而未启动，故根因与独立核验均未通过。计划约 317 秒、General 约 720 秒（含逐次代行审批）；规划输入／输出 380851／8435 token，执行 2080466／6112 token，费用未知。收窄的审批条件和人工介入使其不能作为此前对照的同权限复验。请求、计划、图像、回执和原始 Task 状态见 `.local/vertical-investigation-20261108/evidence/android-short-safe-retest-sources.zip`，SHA-256 `fe4ea01e283c5db0a324369354fbe79a4e19d43d0f28580e652ddf2af1cbbaee`。
+- **Task 结果不能静默丢弃：**上述真实回合先将来源执行结算为 blocked，随后不带状态提交 partial result；旧实现返回成功并把 Task 投影改成 partial，却没有保存该结果或引用到已结算执行。现要求 result 与 `status=completed` 或 `blocked` 同次提交给活跃 direct execution，其他组合明确拒绝且不更改状态；已结算结果不可覆盖，继续工作须重启同一 Task 并继承消费与期限。回归先复现错误，再验证拒绝、原结果不变和同一 Task 新代正确结算。新隔离合成任务明确要求 Luna 触发该错误：无状态 result 被拒绝，模型续用同一 Task 的第二代，消费从 2 累计至 6、原期限不变；第一代在错误调用前已保存 partial，第二代完成的是该合成测试。约 70 秒，输入／输出 134440／1070 token，费用未知；原始请求与状态见 `.local/vertical-investigation-20261108/evidence/settlement-feedback-synthetic-sources.zip`，SHA-256 `12fbc481d0e8f0cdcacbc263a61a4d058ca0134a96396b4245961ce914793fb3`。该修复不把 partial 当成完整前置任务，也不能替代模型继续可行调查或领域独立核验。
+- **此前工程复验（2026-11-09）：**使用 pnpm 11.7.0；Node 覆盖率 394 文件／3631 项通过、4 项跳过，Renderer 覆盖率 201 文件／872 项通过，两侧覆盖率棘轮通过。typecheck、lint（0 errors／2155 warnings）、以 `0bc961a5eb9116599d263f216ce8769f00afa07e` 为比较基线的完整 gates 及 build 通过。早期 Node 全量运行因系统临时目录权限和并发超时失败；切换本轮隔离 TEMP/TMP、限制 worker 后完整重跑通过。最后一项修复的首次 typecheck 因测试字面量类型失败，修正后重新运行通过；均未将失败记为通过。后续源码修改以新回执为准。工程结果不替代真实 Mission、设备或泛化验收。
+- **本机远程身份与直接合同修复（2026-11-09）：**同一 Android remote 的重复准备曾因 `rd.remote.ping` 回包不含 context 字段而被误判；现先后核对所属 context、remote、设备 serial 和 daemon／worker 世代，再检查 ping 的连接结果，实际产品复验成功。另一轮真实请求传入不存在的 Knowledge space ID，原实现静默返回零结果；现明确拒绝未知 ID 并列出可用 ID，不做别名或跨空间 fallback。规划回合内仍有 active direct Task 时提交计划会使该 Task 在批准后被结算为 blocked；现于审阅前要求它先据实结算，保留批准后才执行的任务为 pending。相关负路径有定向测试，最后一项在随后真实规划中未触发。回放准备证据见 `.local/vertical-investigation-20261108/evidence/android-prepared-ping-success-state.json`，部分结果保留与现场证据见 `android-short-knowledge-partial-preserved-sources.zip`。
+- **短症状长调查与复评边界（2026-11-09）：**新 session、无 Memory、Luna Medium、同一 Android remote 及 capture；规划无人工修改，执行中的高风险只读操作由操作者依据用户授权逐次代批。General 取得图像，追踪多个后处理及上游资源并恢复入口；未证明候选点属于目标材质／draw，未建立因果结论或独立审查。自动压缩输入包含冻结计划，但摘要遗漏其中未执行的知识检索义务；随后模型以 partial 终止，复评后承认可继续只读检查，却没有继续。复评保留了真实 partial，未伪报完成。规划约 245 秒、执行约 2860 秒（含逐次代批）；规划输入／输出 292680／4511，执行已记录 2525163／15184，压缩 130882／3155 token；另有两份未完成请求快照无用量，费用未知。原始材料见 `android-short-post-compaction-sources.zip`，SHA-256 `88c9842c6c93c3a04341e76cc4cb50aad089a1f4a7661f4a38600120defb099d`。恢复记录为产品产生的签名信封，未独立复核 HMAC；设备原配置与进程退出见 `android-short-post-compaction-device-restoration.json`。
+- **计划 Task 绑定缺口（2026-11-09）：**后续新空 session 的合成算术复验中，规划器创建了必需 Task，但仅在正文写其 ID，未传入 `requiredTaskIds`；因此冻结计划没有该 Task 的机器合同，执行 partial 时目标复评未触发。该次不证明反馈修订有效；规划约 62 秒、输入／输出 57491／1151 token，执行约 49 秒、254007／933 token，费用未知，操作者代行计划批准。原始材料见 `synthetic-unbound-plan-task-sources.zip`，SHA-256 `f018fd36086f20bdac286fa0b4a282962822866326924f30931a47ff1d8d5f51`。现有计划门对本规划回合新建且仍未完成的 Task 要求显式给出必需 ID 或空数组，不从正文猜测、也不自动把所有任务设为必需；对未完成目标的复评提示明确要求实际执行下一项可行检查，压缩提示和获批执行事实要求保留或重读原计划义务。其真实模型效果另行结算。
+- **绑定后的真实合成复评（2026-11-09）：**新空 session 用同一合成请求和 Luna Medium；规划器首次提交即传入必需 Task，用户授权下由操作者批准，故未现场触发新的缺绑定拒绝。General 按测试条件先结算 partial；实际请求收到修订后的复评提示，随后启动同一 Task 的第 2 代并完成算术，累计工具消费 3→8、原期限不变。一次错误的结果引用被拒后模型纠正。因 Analyzer 的 completed 门禁要求可解引用 MissionCheckpoint，而合成计划明确不建立领域记录，最终整体如实为 partial；没有放宽门禁。规划约 106 秒、输入／输出 99433／1321 token，执行约 135 秒、620632／2922 token，费用未知。请求与状态经逐文件校验归档于 `synthetic-bound-goal-reassessment-sources.zip`，SHA-256 `a04fdc4f2d777306ac91eb84928603d00eb31d7b0964176ebe8a84e6a31ce73a`。这验证该次合成续跑，不证明 Android 复评、压缩后计划重读或三个 Mission 已通过。
+- **新空 session 的 Android 短症状复验（2026-11-09）：**Luna Medium、无 Memory、同一知识版本和 WhiteHair Android remote；规划经两次不泄露原因的人工修订，冻结来源 direct Task 与独立 Verifier 依赖。执行时操作者逐次代批，只拒绝无明确用途的 shell 请求及此前在同一输入与设备上多次触发原生断连的纹理 Pixel History，未将代理拒绝归因于用户。General 读取实际图像、追踪若干候选像素和前序绘制、修正成果 URI/hash 并写入 draft Evidence；候选点尚未证明属于头发，未建立因果解释，来源 Task partial/blocked，Verifier 未执行。压缩摘要保留目标、竞争解释、待核验的 Knowledge 条件、失败边界和审查义务；模型重读冻结计划。压缩前后同一根账本工具消费从 52 增至 64、原期限不变，最终为 71；这是根账本，不把执行开始时的快照当成实时消费。目标复评真实发出后模型仍未继续其他检查；代理拒绝和可用替代路径未穷尽的影响保留，不能将结果归因于 Prompt 单一因素。规划约 503 秒、General 约 1921 秒，规划输入／输出 966152／8924，General 4690660／25788，压缩 128746／4005，权限审查 13220／364 token，费用未知。原始请求、计划、成果和实际状态经逐项校验归档于 `.local/vertical-investigation-20261108/evidence/android-final-short-sources.zip`，SHA-256 `f99b5385aedbaba212f47d9333bd059defeac72a7aed2f210b6a67d729d572a7`。
+- **终态恢复时序与新回执：**上述模型把运行中的 `terminalReceiptPending=true` 当作来源 Task 的阻塞条件之一；主进程随后实际重验并写入 resolved 回执。现明确工具描述及 Skill：当次观察 `restored:true` 后，回合内终态签名待生成本身不阻止其他获准工作，也不能伪称终态回执已存在；主进程提交前重新观察、签名，未确认恢复仍不能提交 completed。真实模型对这次说明修订的行为尚未复验。新回执用本轮专用加密 lifecycle key 和同源 Local State 独立 HMAC 验证匹配；加密签名材料不含 OAuth，归档 `android-final-signing-material.zip` SHA-256 `18c6140389d87151178eb2a05aeee8c8afdcdc5f42c1c3e7d8a1360845816a80`，核验与恢复回执见 `android-final-receipt-verification.json`。验签只证明回执与该密钥的签名一致，不单独证明设备来源或现场状态；界面、原生身份和设备配置各以各自回执核对。
+- **本轮签名材料清理失误：**清理隔离账号副本时，未先单独提取同一 secret store 中本轮生成的生命周期签名记录，该记录随隔离根删除。既有 `isolated-session-sources.zip` 的加密签名键可解密，但对最新 resolved 回执的 HMAC 不匹配；本机正式存储没有对应签名记录。最新原始签名信封及其 SHA-256 仍保留，但现有材料无法独立复核该回执的 HMAC；产品当时的恢复观察、字节完整性和来源认证不能互相替代。核对结果见 `.local/vertical-investigation-20261108/evidence/android-short-post-compaction-signature-review.json`，没有重签或改写回执；上述新回执的验签不能修复此旧回执的缺口。
+- **当前源码工程复验（2026-11-09）：**pnpm 11.7.0，Node 全量 395 个文件／3650 项通过、4 项跳过，覆盖率棘轮 lines 78.93%、functions 78.48%、branches 67.42%、statements 76.34%；Renderer 201 个文件／872 项通过，棘轮依次为 65.22%、58.11%、56.35%、63.10%。typecheck、lint（0 errors／2152 warnings）、以 `0bc961a5eb9116599d263f216ce8769f00afa07e` 为比较基线的完整 gates 和 build 均通过。覆盖率使用固定 pnpm、两 worker 和隔离 TEMP/TMP；日志位于 `.local/vertical-investigation-20261108/evidence/`。工程通过不代表 Android 因果、独立领域核验、重启或泛化通过。
+- **终态时序说明的定向复验与现场清理（2026-11-09）：**说明修订后，pnpm 11.7.0 的相关 3 文件／52 项、typecheck、lint（0 errors／2152 warnings）、完整 gates（比较基线 `0bc961a5eb9116599d263f216ce8769f00afa07e`）和 build 通过；此前全量 Node／Renderer 覆盖率对应说明修订前源码，未将其记成修订后的重跑。新 session 的唯一证据及签名材料校验归档后经产品删除，capture 界面为未打开，context 注册为空，自有 daemon／worker、QA／Electron 及签名校验进程退出，5127 无监听、桌面实例锁不存在。设备临时配置恢复为原 hash `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349` 且原属性一致，备份移除；原始 capture 前后 hash 一致。隔离账号副本与测试根按绝对路径、跟踪和链接边界核对后删除，ADB、正式用户数据、依赖和唯一证据保留。
+- **Android Analysis 短目标续验（2026-11-09）：**新 session、空 Memory、相同 Android remote 与知识材料，实际根请求和独立 Verifier 均为 ChatGPT Account／`gpt-6-luna`／Medium。规划首次遗漏机器 Task 绑定时被拒，模型自行补齐；计划未经人工修订，执行由操作者逐项代批只读操作。General 在 `restored:true` 后没有把终态签名待生成当作阻塞，完成来源 Task 并派发独立 Verifier，来源成果版本与 hash 实际绑定。Verifier 完成结构化审查，但 General 已取得的完整资源使用记录未授予审查者；该记录显示所述生产事件与呈现之间存在 208 个可解析写入事件。写入不单独证明完整像素覆盖，端点绑定和先后顺序也不足以证明直接值依赖；两项 Task 显示完成不等于 Analysis 领域结论通过。最终报告缺精确引用时完成声明被撤销，模型修正文案却未重新声明，主回合以无进展失败。规划约 114 秒、执行约 1844 秒（含代批），规划输入／输出 149134／3650、General 3845225／23440、Verifier 198146／3535 token，费用未知。原始请求、Task、产物和来源逐文件校验归档于 `.local/vertical-investigation-20261108/evidence/android-analysis-continuation-sources.zip`（SHA-256 `8b2730fe39f421f41cf3ced1b6cea88e7b12b535f47581bce619433561af324c`），使用记录及审查授权核对见 `android-analysis-continuation-audit.json`。
+- **该次直接修复与清理：**仅缺最终报告引用时保留原完成声明以便修正文案，期间若再执行工具则撤销声明；所有完成、成果和恢复检查仍在终答重新执行。资源版本、独立审查和来源 Skill 补充对中间写入、覆盖范围与已收集反证的处理；修订后的真实模型效果待复验。本次通过产品恢复入口并关闭 capture，resolved 回执使用该轮独立加密签名材料与同源 Local State 核验 HMAC 匹配；签名只证明与该密钥一致，现场和来源另以界面及身份回执核对。原始 capture hash 未变，设备临时配置及原属性恢复；context 登记为空，daemon／worker／helper、QA／Electron 已退出，端口和桌面锁释放。归档保留实际请求、控制参数、Agent 定义和 Knowledge 文件，但清理前遗漏隔离 User `config.json` 原文，不能据此复原其完整字节或宣称配置字节相同。归档校验后通过产品删除隔离 session，测试根与账号副本已清理；不以该次结果替代 Debug 因果、Optimizer、跨 capture 或泛化验收。
+- **该次修复工程复验：**pnpm 11.7.0，Node 全量 395 文件／3652 项通过、4 项跳过，棘轮 lines／functions／branches／statements 为 78.95／78.48／67.43／76.35%；Renderer 201 文件／872 项通过，棘轮为 65.22／58.11／56.35／63.10%。首次 Node 全量有一项旧断言仍要求引用缺失时撤销声明；按新合同修正并重跑全量通过，其他缺口和新增工具调用仍有负向测试。以 `0bc961a5eb9116599d263f216ce8769f00afa07e` 为基线的完整 gates 和 build 通过；日志见 `.local/vertical-investigation-20261108/evidence/answer-revision-*.log`。工程结果不证明修订后的真实模型行为。
+- **修订后新 session 真实复验：**同一 Android remote、短 Analysis 目标、空 Memory 和 Luna Medium；计划未人工修订，由操作者按既有授权批准，执行时两次代批事件查询与恢复。General 读取一次事件树并完整读取该次返回文本，原生来源本身标记截断；随后以资源关系尚未检查为由将来源 Task 标为 blocked。实际目标复评要求执行下一项获准检查，模型仍重复 partial，未查询 pipeline／资源、未启动 Verifier，故新资源版本方法和最终引用修复均未在该次触发。规划约 108 秒、执行约 183 秒（含代批），规划输入／输出 132704／1859，执行 608206／3275 token，费用未知。该次与前次行为不同且前次隔离配置原文缺失，不能作为严格因果对照。请求、完整本次隔离配置、来源及状态逐文件校验归档于 `.local/vertical-investigation-20261108/evidence/android-analysis-method-retest-sources.zip`，SHA-256 `59b3c597db7f21ba35ccc58d95989aed13be4b220582a89e53cf020beb2e8d6d`；回执 HMAC 匹配、设备原配置及 capture hash 复原，测试 session、QA、daemon／worker 和隔离账号副本已清理。自动无进展边界保持有效，不因模型重复 partial 宣称目标完成。
+- **测试条件纠偏（2026-11-09）：**隔离 Policy 曾把所有 `shell`／`rdc_probe` 强制设为人工审批，操作者逐项代批改变了自动审核条件。方法提示侧经三次不泄露答案的计划修订及 26 次工具代批后，General 查询资源使用历史并指出不能仅凭同一资源认定连续传值；按用户纠正停止，Verifier 尚未执行。规划 822931／9227、执行已记录 1480637／1532 input／output tokens，另有一次未完成请求用量未知；费用未知。该次来源归档 `.local/vertical-investigation-20261108/evidence/android-analysis-method-interrupted-sources.zip`，SHA-256 `5da3bacccf36a0c8f35dbe535d2066b68655b3229b182514c30e0dfc8e3129a3`。其审批条件和介入与短提示侧不同，不是严格对照。已通过隔离 Settings 删除该 Policy，正式配置未改；后续 User／Project Policy 与 Memory 均为空，保留 Knowledge 和产品 Auto-review。
+- **默认 Auto-review 短目标及事务失败：**新 session、相同 Android remote 和 Luna Medium，未经计划修订而批准后，General 自主查询阶段与资源，独立 Verifier 对绑定的精确成果及获授原始材料提出中间写入反证；General 查询使用历史并记录 Evidence／Challenge。实际审核为 20 次规则批准、3 次模型批准，无逐工具人工代批；规划 146074／1848、General 已记录 3605142／12255、Verifier 40029／2479、模型审核合计 36929／593 input／output tokens，另一次未完成请求用量及费用未知。随后替代 ClaimSet 的同一事务先校验旧来源，再将其 Evidence 置 stale 并改写 hash，却提交了仍引用旧 hash 的 ready 新记录；读取反复报 `INVESTIGATION_HASH_MISMATCH`，右栏标记 store degraded。操作者停止重复调用并恢复现场，不计为 Analysis 通过。原始请求、成果与实际配置逐文件校验归档于 `.local/vertical-investigation-20261108/evidence/android-analysis-default-review-sources.zip`，SHA-256 `adb61cc006783e2f9df1eaaa219f740a560e90c039ecfe999131ca624abf66f2`；resolved 回执 HMAC 与本轮生命周期密钥匹配，签名材料另存 `android-analysis-default-review-signing.zip`。该短目标不与人工审批的方法侧作因果对照。
+- **事务直接修复及工程验证：**在既有 Investigation 完整性层于提交前核对失效传播后的来源 hash；若本次更新自身改变来源则整笔拒绝并保留原版本，不静默替换 hash 或放宽 ready 条件。定向回归先确认旧实现错误提交，再验证冲突时旧正文／索引仍可读、保留逻辑 ID 的合法修订可成功；Investigation 7 文件／114 项通过。pnpm 11.7.0、两个 worker 的 Node 覆盖 395 文件／3653 项通过、4 项跳过，lines／functions／branches／statements 为 78.96／78.48／67.44／76.37%，Node 棘轮通过；此前 Renderer 全套及其棘轮不受本次 Node 修改影响。typecheck、lint（0 errors／2152 warnings）、指定 `0bc961a5eb9116599d263f216ce8769f00afa07e` 的完整 gates 和 build 通过。首次无限制并发 Node 覆盖有四项测试超时，降为两个 worker 后按原断言和时限重跑通过；首次 gates 因本轮 adb 包装器重定向误建空文件中断，核对归属并删除后重跑通过。日志见 `.local/vertical-investigation-20261108/evidence/transaction-fix-*.log`；真实复验另行结算。
+- **事务修复后真实 Analysis：**新 session、空 Memory、Android remote、Luna Medium 和默认 Auto-review；未经人工修订的计划按授权批准，工具审核为 30 次规则批准和 2 次模型批准，没有逐项人工代批。General 查询阶段和资源并将反证转为补证；独立 Verifier 多次读取明确授予的成果及原始材料，自动压缩后继续，并将中间写入的影响限定为待证，最终仍为 partial。所有局部 Task 已结算，但结果仍列出需要修订成果版本及处理 Challenge 的工作；General 未执行这些仍在范围内的后续步骤。本次未出现 store degraded，但也未触发原先导致冲突的 ready 替换，不能据此宣称该事务的真实触发路径已通过。规划 100834／2018、General 4622679／30113、Verifier 334986／11543、压缩 130385／4192、模型审核 28866／311 input／output tokens，另有一次未完成请求用量和费用未知。来源逐文件校验归档于 `.local/vertical-investigation-20261108/evidence/android-analysis-txn-fix-sources.zip`，SHA-256 `b5b27b8e9ffe598978b25097416af7ff786c8ea100ec3e65513d7bab9ea0b87d`；本轮 resolved 回执 HMAC 与独立保存的生命周期签名材料匹配。恢复入口、关闭 capture 和释放设备的事实另由运行状态及回执核对。
+- **来源与目标续跑直接修复：**上一轮真实 Verifier 的冻结授权包含 URI 和 hash，但子请求只提供 URI；现将主进程已经冻结的 URI／hash 对照随子请求发送，不增加来源授权。上一轮所有获批 Task 已结算后结果仍列有未决工作；现复用已有目标复评，在相同证据状态下提示一次检查是否仍有获准且有价值的动作，真实阻塞和准确 partial 仍可保留。两处均有针对触发行为及原消费、期限和授权边界的回归。首次 Node 全量发现前缀位置破坏了既有委派 JSON 的解析，调整为保留原 JSON 后重跑通过；pnpm 11.7.0，Node 395 文件／3654 项通过、4 项跳过，lines／functions／branches／statements 棘轮 78.96／78.49／67.45／76.36%；此前 Renderer 201 文件／872 项和对应棘轮不受本次 Node 修改影响。typecheck、lint（0 errors／2152 warnings）、指定 `0bc961a5eb9116599d263f216ce8769f00afa07e` 的完整 gates 和 build 通过。
+- **修订后新 session 的真实结果：**同一 Android remote、空 Memory、短 Analysis 目标和默认 Auto-review；计划未经人工修订并按授权批准，未逐项代批工具。General 采集代表事件及资源关系、恢复入口，最终准确交付 partial：独立 Verifier 两次委派都提交了同一个不存在的来源 URI，均在子执行开始前被拒绝。实际父请求中存在正确 URI，模型声称修正后仍重复错误；旧的未完成 Task 复评已出现，但没有产生有效重派。此轮未触发新修复的子请求 URI／hash 传递或所有 Task 结算后的未决目标分支，不能将定向工程回归当成真实行为通过。规划约 58 秒、General 约 409 秒；规划 154623／1740、General 2200092／10794、一次模型权限审核 14779／198 input／output tokens，费用未知。原始请求与来源归档 `.local/vertical-investigation-20261108/evidence/android-analysis-goal-source-retest-sources.zip`，SHA-256 `6b08c999c9cc3b8bb48f6cb02ab5099e24ee9804f2c059c56d7a6c5e034fcfc1`；resolved 回执使用本轮隔离生命周期密钥核验匹配。该次没有独立审查结果，也不能证明 Knowledge 转化、三个 Mission 或泛化通过。
+- **默认 Auto-review 的方法提示对照：**新隔离 session 使用相同 capture 字节、Android 设备、Agent／Skill、Knowledge 文件、Luna Medium 和入口位置，详细提示只补方法，没有提供事件、资源或答案。方法侧规划主动浏览和搜索 Knowledge，未找到匹配条目，并提出竞争性边界解释及区分检查；General 追踪了部分事件和资源，但一次查询不存在的事件返回 `runtime_error` 且无保全证明，主进程隔离 lease。自动审核拒绝了 `capture_recover` 和 `capture_restore`：隔离状态下保全未验证，前者也未被该冻结计划明确授权。模型以 partial 结束，独立 Verifier 未启动；随后按用户授权通过产品专用恢复入口核验并恢复同一签名基线，resolved 回执 HMAC 匹配，不能将事后恢复写成模型执行时已恢复或完成调查。方法侧规划约 117 秒、General 约 312 秒，规划 286364／4183、General 1416218／8617、两次模型审核合计 33823／434 input／output tokens，费用未知。与短侧相比，隔离项目重新登记导致 project ID 不同，设备预备有一次按产品回执的人工重试；配置仅账号目录时间戳不同，实际 General 模型快照一致，规划模型快照不同。两侧各一次且方法侧遇到原生失败，故只能报告观察差异，不能将结果单独归因于提示方法，也不证明 Knowledge 已转化为有效检查。来源及签名材料分别为 `.local/vertical-investigation-20261108/evidence/android-analysis-method-default-review-sources.zip`（SHA-256 `adac82f41bcf20c1ab999193fc0a52f2e2ec8019e7e3424b53030dd49af8afb5`）和 `android-analysis-method-default-review-signing.zip`。
+- **Android 第二输入续查（2026-11-10）：**分别在新隔离 session 以 Android remote 打开两份字节不同的公开 Vulkan fixture，原生诊断均报告桌面 NVIDIA 与设备 Adreno 的内存类型不兼容，没有产生可用回放图像；其中一份与另一候选 `hello_triangle.rdc` 字节相同。原产品 UI 诊断转录及关闭回执见 `.local/vertical-investigation-20261108/evidence/android-vkcube-validation-compatibility.json` 与 `android-vkcube-compatibility.json`，不是原始 native stdout；实际生命周期日志和 context 快照另存 `android-extra-fixture-lifecycle.zip`。两次关闭后归属 daemon 均退出；仍缺第二份兼容输入，不能据此宣称成功切换或泛化通过。
+- **隔离 session 清理续修：**上述第二次关闭 capture 后，产品删除 session 曾返回 Task 目录 `ENOTEMPTY`，随后检查目录为空，再次通过产品删除成功；具体写入者或文件系统原因没有证据。另以受控并发复现界面读取空 Task 时初始化目录，与删除交错会失败；现让空状态读取不创建文件，回归覆盖读取／删除交错、首写并发和非当前数据保留。Browser QA 的进度面板未创建空 Task 目录，空 session 的删除成功；另一个有 Task 的 session 首次删除仍报 `EPERM`，目录已为空后第二次删除成功。短暂重试没有解决该次实际失败，已撤回；两次目录删除失败的原因仍未证明。证据见 `.local/vertical-investigation-20261108/evidence/session-projection-cleanup-browser.json`、`android-vkcube-session-delete-error.json` 与 `luna-frozen-source-cleanup-error.json`。
+- **冻结来源的真实 Luna 委派续验：**新隔离 session、无 Memory、默认 Auto-review，不打开 capture；隔离账号记录与本机当前加密记录一致，修复隔离 `Local State` 不同源后实际请求成功。General 首次委派时来源 Task 尚未结算，子执行在准备阶段失败；它读取回执、结算来源并续用同一 Verifier Task，第二代独立读取获授的原始文件回读制品并正确复算。子请求实际包含主进程冻结的 URI／hash，执行准备的来源 Task 代次、hash、Verifier Profile 与匹配 Skill 均相符；父与子全部实际请求为 ChatGPT Account／`gpt-6-luna`／Medium。界面耗时约 85 秒，父请求 210123／1835、子请求 24094／440 input／output tokens，费用未知；未人工代批工具。完整请求、来源和两代回执逐文件校验归档于 `.local/vertical-investigation-20261108/evidence/luna-frozen-source-verifier-sources.zip`，SHA-256 `dfac288be174fc0c88583adce1cfa0c74eea3a608d7c24cceda3a3e8277ff415`。这是合成来源场景，不证明 Android Mission 或已结算目标复评的真实效果。
+- **缺失来源诊断与真实复验（2026-11-10）：**回看此前 Android 失败，General 把两个存在的 URI 片段拼成了第三个不存在的 URI；原同步返回只有通用失败，准确诊断藏在结果制品内。现在仅在主进程建立委派来源授权时确认 `ARTIFACT_NOT_FOUND`，把原诊断直接放进同步／后台失败结果；仍拒绝整次授权，不猜测、删除或替换引用，子执行自身的同名异常不能冒充主进程诊断。真实 Luna 合成测试的输入刻意要求首次委派包含缺失 URI；返回直接指出该 URI 和错误码，General 未读取失败制品即移除它，续用同一 Verifier Task，第二代读取获授原始来源并完成复算，原期限保持，消费继续累计。根／子均为 `chatgpt-account / gpt-6-luna / medium`，Fast 关闭、普通上下文，实际模型快照 ID 不同；约 104 秒，根输入／输出 194899／2677、子 32938／621 token，费用未知，无逐工具代批。原始请求、配置、两代执行及来源逐文件校验归档于 `.local/vertical-investigation-20261108/evidence/luna-missing-source-diagnostic-sources.zip`，SHA-256 `819c679112c797bb37cf8e3ed38512f0f0c4c4721ac7c5129108e4a5505d0308`。该注入测试不是自然 Android 复验或因果对照，不能证明模型不会再次拼错 URI。
+- **上一阶段工程验证（2026-11-10）：**当时源码使用 pnpm 11.7.0、两个 worker，Node 395 文件／3657 项通过、4 项跳过；lines／functions／branches／statements 棘轮为 78.95／78.49／67.45／76.36%。此前 Renderer 为 201 文件／872 项及其 65.22／58.11／56.35／63.10% 棘轮。typecheck、lint（0 errors／2152 warnings）、以 `0bc961a5eb9116599d263f216ce8769f00afa07e` 为基线的完整 gates 和 build 通过；后续源码以新验证为准，不以工程测试替代真实调查或设备结论。
+- **上一阶段现场清理：**隔离 session 及其父子请求、Task 和 Memory 已删除，唯一证据经逐文件校验归档；隔离 OAuth 副本及其临时备份已移除，加密签名记录与同源 Local State 保存在证据归档。自有 context、daemon、QA／Electron 已停止，5127 无监听、桌面实例锁不存在；测试根和 coverage 中间产物已按路径与链接边界清理，ADB 和原始 capture 保留。
+- **续修现场清理（2026-11-09）：**各轮合成 session 的唯一请求与来源记录已归档，经产品删除后父子请求、Task 和 Memory 文件为零；随后停止本轮 Browser QA。核对目标目录为本库内、无 Git 跟踪文件和链接后，删除隔离 OAuth 副本与 QA 根、工程临时目录和 coverage 中间产物。借用的 ADB 服务、正式配置、原始 capture、依赖和唯一证据保留；实际进程与锁以收尾复核为准。
+
+- **跨设备交接整理（2026-11-08）：**用户明确授权新建分支并上传，创建 `codex/vertical-investigation-convergence`。设计分析与批准 Plan 按原文复制到 `docs/product/rdc-agent-investigation-design-analysis.md` 和 `docs/workflows/vertical-investigation-plan.md`，复制时字节哈希一致；需求、澄清问答及 Plan 的已定选择合并为 `docs/workflows/vertical-investigation-continuation.md` 的后续需求 Prompt。最小工程结果及 69 份相关源码哈希写入 `docs/product/vertical-investigation-validation.json`，本次逐项核对一致；未上传原始模型会话、User space、Provider 登录、签名密钥、capture 或 `.local`。提交前检查通过，八个新增 Agent 文件只清除多余 EOF 空行；Agent runtime 门禁 9 文件／161 项通过，首次系统 TEMP rename EPERM 在收集前失败后，改用自有工作区临时根复验通过。工程／真实模型／Android／泛化的原边界保持，未新增模型或回放请求；提交与推送结果以 Git 远端实际 ref 为准。
+
+- **Android 当前连接复核（2026-11-07）：**原授权设备 `b54ed446` 当前 ADB 状态为 `device`；helper 版本仍为 148／`f6aff93bcbb823eb4a8fcea324e55cd54adbdcf9`，精确包名查询未返回 PID。本次仅核查连接和版本，未打开 capture、安装或修改设备；在线不能代替原生回放或首帧验收，旧远程连接丢失原因仍未知。沙箱内 ADB 因 socketpair 限制立即退出，经自动权限审查后使用仅 localhost:5038、仅该设备的临时前台服务完成查询，随后核对路径并停止自有服务，确认进程和监听端口退出。脱敏回执见 `.local/vertical-investigation/android-current-connection-evidence.json`。
+
+- **后续 Luna Medium 测试要求（2026-11-07）：**用户指定后续软件测试使用 GPT-6 Luna／Medium。隔离离线诊断调用当前生产目录合并、RequestPlanner 和 Responses 请求体构建／RequestPlan 应用函数，确认最终 `model: gpt-6-luna`、`reasoning.effort: medium`，Fast 显式关闭；不可用模型保持拒绝。连同现有目录、规划和 reasoning wire 回归，4 文件／56 项通过。首次系统 TEMP rename EPERM 发生在测试收集前，改用工作区自有 TEMP／TMP／TMPDIR 后通过，未修改产品安全策略。无网络请求或凭据读取，不冒充真实 Luna 响应或整体验收。七份相关源码哈希及结果见 `.local/vertical-investigation/luna-request-check-evidence.json`，SHA-256 `6e73bdc785c2a0de3301f17a2513d74417f1a3cc58d5900ac2ef0447c50d67b5`。临时诊断文件和工作区缓存已清理，历史 Sol／Terra 证据及正式 User Profile 保持原记录。
+
+- **批准计划完成审计（2026-11-07）：**现有 `tasks.md` 增加按批准计划 §2.1–2.7、§4–5 的证据映射，将实际实现、正负合同测试与真实验收分开列出。复核最终 Node 回执的 9 份源码、Renderer 回执的 53 份源码／测试及八份正式 User Agent 配置，哈希均一致；八个实际同步子执行各有匹配 Profile／Skill 来源及两次 Sol High 请求。进一步明确合成方法 fixture 的工程证明限于检索与 Capsule 内容保留，不等于真实模型根因区分；真实压缩结果仍只覆盖合成材料。审计未发现新的直接源码失败，不扩大修复，也不将 Android、真实短／详细 Prompt 对照、陌生案例泛化或受限归档核验标为完成。
+
+- **最终 Renderer 覆盖率补验（2026-11-07）：**核对现有回执后补跑最终工作树的独立 Renderer 全套：pnpm 11.7.0、Happy DOM、两个 worker，200 文件／868 项全部通过，94.36 秒。覆盖率汇总及 Renderer 棘轮通过：lines 65.20%、functions 58.06%、branches 56.31%、statements 63.07%；未与 Node 指标混用。53 份本轮 Renderer 源码／测试文件的哈希、命令和结果见 `.local/vertical-investigation/renderer-final-validation-evidence.json`，回执 SHA-256 `53e712708e41b03312d97846b381e4617d96da43bbca9269a3baa73e5ab49f2c`。这补齐最终源码的组件／状态自动验证，不替代 Browser、视觉、Android 或真实模型验收。测试进程退出后，核验绝对路径、Git 跟踪与链接边界，清理本轮 coverage、测试临时目录及原始测试输出，预清点 619 文件、逻辑长度 16527408 字节；不代表实测释放空间。
+
+- **范围和状态：**基线 `36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4`，在 main 工作树实施，未提交、推送或发布。四个顶层入口保留，八个内部 Agent 接入实际 Profile、默认 Skill 和独立配置；八份新 User Agent 经现有设置保存链写入，验收结束后复核文件哈希均与 `.local/vertical-investigation/agent-configuration-evidence.json` 一致，未覆盖原四份配置。原计划指定的这八份正式 User 配置仍为 `chatgpt-account / gpt-6.1-sol / high`；用户后续要求操作本软件使用 Terra Medium，本轮后续验收只修改隔离副本，并未改写正式配置。
+- **切换修复阶段工程验证：**当时源码以两个 worker 单独运行 `pnpm run test:coverage`，391 文件、3571 项通过，4 文件／4 项跳过；coverage summary 与 ratchet 为 lines 78.51%、functions 78.18%、branches 66.9%、statements 75.92%。此前并行执行覆盖率、门禁和构建时发生调查合同及嵌套套件超时；停止并行负载后，调查合同 19 项单独复测通过。两个 worker 和单 worker 的全量覆盖率随后各有一项设置合同检查超过默认 5 秒：检查本身输出 OK，单独开启覆盖率时耗时约 27.6 秒、未开启覆盖率时约 0.86 秒。该检查无性能断言，现只将其测试时限设为 60 秒，未更改断言或覆盖率阈值；调查合同中涉及多次 fsync 的另一项此前已单独设为 30 秒。沙箱重试因回环连接及链接权限失败，最终在本机重新执行通过。此前 Renderer 全套为 200 文件、865 项通过；完成声明续修的三个相关测试文件 77 项通过。该阶段 `typecheck`、`lint`、完整 `check:gates`、`build` 与 ratchet 均退出 0；lint 为 0 errors、2152 warnings。阶段结果及切换修复的源码哈希见 `.local/vertical-investigation/local-switch-validation-evidence.json`，此前超时摘要见 `engineering-validation-evidence.json`；后续结果见下方“Local 续验工程结果”和“搜索修复后工程验证”。自动测试和构建不等于设备或真实调查验收。
+- **历史债务对比：**此前完整 gates 的本地运行未指定 base-ref，因此知识和调查的历史单调性对比按设计跳过；随后以本轮基线 `36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4` 显式补跑，两项均通过。首次沙箱尝试中两个嵌套 Vitest 均退出 1，报告未包含所需用例，原因未确定；随后使用本机权限和隔离临时目录分别复验通过。完成声明续修后的完整 gates 同样显式指定该基线，两项对比均通过。
+- **真实本机长 Mission：未通过。** 使用两份公开 Local 测试抓帧，在隔离项目中以 ChatGPT Terra Medium 规划、执行和独立审查；55 份请求快照均为该模型／档位且 Fast 关闭。General 运行 25 分 06 秒，112 次工具调用实际启动、1 次跳过，其中 49 次操作经单次人工审批；另有计划审批，不是无人干预。规划／General 的 Provider 记录分别为输入 119338／4576904、输出 2631／17632 token，输入含缓存读取；子代理完整用量和实际费用不可得。未复制正式会话、私人知识、MCP 或 memory。
+- **本机调查证据与失败：**两次不同 replay 分别采集公开抓帧的事件、管线、资源、shader 和输出图；首次 Verifier 审查 partial，补授生命周期回执后第二代支持跨 replay 内容哈希绑定与宿主记录的位置恢复，但入口原生 context／focus 未独立核实。两 Task 完成，比较稿和 ready report 已生成；计划要求的类型化 Challenge 没有写入，审查挑战仅保留在子代理结果中。General 先补建 report 并声明 completed，终答引用了报告 ID 与裸摘要，却遗漏 `contentHash` 的 `sha256:` 前缀；门禁按合同拒绝，模型重复终答且未重新声明，回合以 `CONVERSATION_AGENT_LOOP_STALLED` 结束。失败后人工通过正式恢复入口解决待恢复记录；A 的 EID 14 与最终输出目标可见，隔离回放及自有 daemon／worker 已退出。最小原始资料、两次独审、请求和审批统计见 `.local/vertical-investigation/live-local-mission-first-run/`。回执由隔离密钥签名并在产品恢复流程中核验；密钥仅在为未完成续查保留的隔离会话中，证据归档不含密钥，清理密钥后不能再次独立验签。
+- **恢复提示续查：**中途 `position-restored` 回执中的输入、设备、EID、替换指纹和输出目标与基线一致，但该回执不关闭待恢复基线。当前源码仅在模型循环正常返回并通过完成校验后再复核并写终态 `resolved`；本轮循环失败，未到此路径。人工恢复入口后来写入同一基线的 `resolved`，正文位置匹配。回执对照及哈希见 `.local/vertical-investigation/tasks.md`；中途恢复不证明失败时现场仍未变化，提示符合未闭合基线合同。
+- **完成反馈续修与续验边界：**最终引用不匹配时，反馈现列出完整报告 ID、精确 `sha256:` 内容哈希，并说明已失效的 completed 声明须在修正后重新提交；精确引用和报告资格门禁未放宽。两组受影响测试 71 项及模拟 Provider 的循环联动 15 项通过；Node 全量以 4 worker 为 391 文件／3573 项通过、4 项跳过，ratchet lines 78.54%、functions 78.18%、branches 66.93%、statements 75.95%；typecheck、lint、完整 gates 和 build 通过。默认并行全量的 14 个事务超时、沙箱链接权限失败及汇总脚本首次参数错误均未冒充通过，复验过程见 `.local/vertical-investigation/live-local-mission-first-run/validation-evidence.json`。当时自动审批拒绝重新向 ChatGPT 发送隔离会话的计划、证据和公开抓帧派生结果，理由是续发载荷与目标未被认定为明确授权；随后用户明确授权并执行，结果见下条。Android 与泛化验收仍分别保持未通过。
+- **真实续验结果：**用户授权后按 `continuation-scope.json` 向 ChatGPT 续发隔离会话材料，General 补建两条 typed Challenge、检查点和草稿报告，以 `partial` 正常结束；首轮失败不因此改变。后续独立 Verifier 核对了修订后的 shader 文字与四份反汇编，未发现偏差；操作员提取的历史入口／恢复 context 与回执相容，但不能自行证明来源。应用读取归档副本得到的全文件 SHA-256 与声明一致，因长 JSONL 记录的固定文本视图截断，未完成提取件与原记录逐项比较或两段原文哈希复算，相关 Challenge 保持开放。自动审批拒绝启用隔离环境的本机解释器，理由是该配置扩大后续代码执行能力；未绕过拒绝。续验记录和三次独审的原始材料见 `.local/vertical-investigation/live-local-mission-continuation/`，清单 SHA-256 为 `5c0f0885dc58ed47ee4ef9d5e50f417006b1666fe604c298bddffd280a422cbe`。
+- **历史归档操作员续查：**固定脚本在应用外只读比较首轮归档与隔离副本，按调用 ID 唯一定位两条结果，核对完整 toolResult、调用元数据及原始文本 SHA-256，均与提取件一致；脚本同时写出分离文本和结果文件。随后应用独立审计两份文本的 8367／13316 字节，Verifier 逐页审阅脚本、审计结果、提取件和宿主回执。入口记录的资源焦点为空，恢复后查询为 `ResourceId::97`，后者晚于位置恢复回执约 17 秒，不能反推回执时刻焦点；来源及签名未认证，Challenge 继续开放，General 以 `partial` 终答。归档逐项比较是操作员执行，不冒充应用独立重算。此轮 22 个请求均为 Terra Medium，三处隔离报告编辑经单次人工批准；脚本、原文及复审材料见 `.local/vertical-investigation/history-context-audit/` 与其 `review/`，各自清单 SHA-256 为 `3b3d12b55376ecf1454edaa04be3b8e967bbeb10db292404fd96ff29d9a8c39f` 和 `4e3e54998e5bda930d1bd8f1ac248ba83b8f5ec67a7c3208c822d37fd6e14319`。
+- **生命周期回执操作员核验：**使用隔离 QA 保留的密钥在本机核验 baseline、position-restored、resolved 三份回执，HMAC 均通过；同一 turn、baseline 引用及入口／恢复后的原生身份与对应回执一致。密钥未输出或发送给模型；这不是第三方签名，不能认证未签名的会话归档，也不能证明回执时刻的资源焦点。应用和 Verifier 未独立执行该核验，因此历史 Challenge 的未决边界保持不变。脚本与脱敏结果位于 `.local/vertical-investigation/history-context-audit/`，单独清单 SHA-256 为 `5986bdab5bf4cf781237e64a76fa55e6c57e2579a2bf3b757b92c79aa80005c7`；核对路径、Git 跟踪、链接和进程后清理临时目录 2 文件、逻辑长度 936 字节，不代表实测释放空间。
+- **Analyzer 回评估：**按获批计划切回 Analyzer，读取比较报告、独立审查、三份回执及新增操作员材料；应用核对清单和文件哈希，但未读取密钥或自行重算 HMAC。Analyzer 保留历史来源及焦点的开放 Challenge，登记草稿报告 `invart-8f28a87c6fcc-1793970900022`（内容 SHA-256 `bc5e3aa8a6a018c0fa54c4d90fd529b475a360f74b53d9837fb5529db406b338`）和 ready 检查点，以 `partial` 正常终答。9 次请求均为 Terra Medium，输入 2387285、输出 5579 token，输入含缓存读取，实际费用不可得；未打开回放或执行脚本。原始回合及产物保留于 `.local/vertical-investigation/history-context-audit/mission-evaluation/`，20 项清单 SHA-256 为 `0187e58f4a22c3f27a4bd0b931a8f9e323617cb95c73c2ec30ed8c93e1573d0f`。本轮服务、归属进程和监听端口已退出，失效锁经产品获取／释放流程交还；隔离访问凭据副本已移除，签名记录保留。核对路径、Git 跟踪、链接和进程后清理临时目录及日志 20 文件、逻辑长度 4429378 字节，已消费的 bootstrap 文件另行移除；逻辑长度不代表实测释放空间。
+- **恢复范围核对：**Analyzer 复读获批计划、回执和 Challenge，确认计划指定原 capture、事件和输出目标，三份回执在这些字段上相符；资源焦点是更宽的历史状态，仍不能证明。它尝试提交范围限定的 ready 报告，完成门禁实际返回 `MISSION_COMPLETION_DENIED`，因为该报告关联的 `challenge-prior-entry-focus` 仍开放；随后将报告改为草稿并以 `partial` 正常终答，未关闭挑战或修改门禁。最终报告 `invart-d348e131186f-1793971571816` 的内容 SHA-256 为 `3cb9b6d48a0cfb65526b3103ff610009621d730768f46014311e0ac6750f7d56`。7 次请求均为 Terra Medium，输入 1985491、输出 5250 token，输入含缓存读取；实际费用不可得。原始回合、含拒绝记录的过程与产物见 `.local/vertical-investigation/history-context-audit/scope-check/`，12 项清单 SHA-256 为 `2795d03c4a88b76ce78c43b04fa5fbf61a6320cbc4658aaab886655b30972202`。未打开回放、执行代码或读取密钥；本轮服务退出、失效锁经产品流程交还，访问副本移除且签名记录保留。核对路径、Git 跟踪、链接和进程后清理临时目录及日志 20 文件、逻辑长度 4429474 字节，不代表实测释放空间。
+- **有界归档核验待授权方案：**`.local/vertical-investigation/history-context-audit/proposed-bounded-archive-check.py` 固定读取隔离项目内归档副本及两份提取件，验证归档哈希、调用唯一性、完整 toolResult、元数据和原文哈希；不读取签名密钥、不写输入文件。脚本 SHA-256 为 `49b4362ee362c49fb00d2ebdc0c62e8fdf67f82e7179b370e9e9896d189dd4c1`。操作员使用现有 RDC-Tool 随附 Python 试运行通过，脱敏记录 SHA-256 为 `6fe9c9d4f3ae82b9c78c48c21433057849b2ba448a46d0724862549bc197614d`；这不是应用内执行，解释器设置仍禁用。待授权方案是在隔离 QA 临时启用本机解释器，并逐次核对、批准同一代码后关闭；解释器进程继承当前用户权限和环境，并非操作系统沙箱，能访问其权限内文件及网络，脚本本身不访问网络。此步骤不能认证未签名归档来源、补证回执时刻焦点或替代 Android 验收。
+- **当前探测与 Local 状态续修：**小型只读 `rdc_probe` 结果原先未提供可委派的制品引用，现经现有制品配额和明确授权生成 URI／hash。真实复验另发现，直接打开 Local 抓帧时 UI 已就绪而 preparation 仍为 idle，导致获批调查入口拒绝；回归先失败后通过，主进程现在于文件验证和原生打开成功后与 replay 设备身份同时发布 Local ready。相关四文件 65 项通过。最终构建在隔离 Browser 中直接打开公开 `vkcube.rdc`，General 的真实 `context_status` 返回 EID 14、空焦点和 `session://tool-outputs/call_565b7e91a72142919023eef762b8e5d3.json`，哈希 `001e98b7307b66b04b4d197fd05da1703bda6cd9ced79582bbac7b278cf07a90`。Verifier 获明确授权并分页读取 22171 字节至末尾：封装报告未截断，内层结果未单独声明截断状态。General 的 completed 声明被原调查的 ready report 门禁拒绝，随后声明 `partial` 并终答；新 replay 不用于证明历史现场。实际请求记录为 Terra Medium。
+- **Local 续验工程结果：**当时 Node coverage 391 文件／3577 项通过、4 项跳过；ratchet lines 78.52%、functions 78.18%、branches 66.93%、statements 75.93%。typecheck、lint（0 errors／2152 warnings）、指定本轮基线的完整 gates 与包含 Local 修复的应用构建通过。首次定向测试在沙箱临时目录发生 EPERM，改用工作区临时目录后先复现预期失败，再于修复后通过；全量需要本机回环和链接权限。自动测试和本机真实探测均不替代 Android 或历史归档核验。验证及失败摘要见 `.local/vertical-investigation/continuation-validation-evidence.json`。
+- **长行搜索修复与真实复验：**General 曾对约 780647 字节的归档行搜索已知调用 ID，得到零命中且未标记截断；回归先复现该错误。现在超长行由受限 worker 匹配完整原行，返回的有界预览明确标注截断，并对超时和取消终止 worker。6 项定向测试通过；最终构建经隔离产品入口分别找到两个此前遗漏的调用 ID。四次请求均为 Terra Medium，输入 1219402（含缓存读取 305536）、输出 703 token。此结果只证明搜索定位与预览提示，不证明完整对象比较、原始来源或历史焦点；原调查完成门禁拒绝后仍以 `partial` 结束。真实请求和五项证据清单位于 `.local/vertical-investigation/grep-live-verification/`，清单 SHA-256 `f49c7ff7bad298f596a909661eb95672f8c85ff0b491d4b10f9a1d619193d74b`。隔离服务退出，临时账户访问副本移除；核验后清理本轮 QA 临时文件 20 个、逻辑长度 4457945 字节，不代表实测释放空间。
+- **搜索修复后工程验证：**Node coverage 391 文件／3581 项通过、4 项跳过；由覆盖率 JSON 汇总的 ratchet 为 lines 78.57%、functions 78.19%、branches 66.95%、statements 75.96%。V8 控制台显示的截断百分比略低，原始计数及两者均见回执。`typecheck`、`lint`（0 errors／2151 warnings）、`check:tool-system`、指定本轮基线的完整 `check:gates` 与 build 通过。gates 首次在沙箱临时目录重命名报 EPERM、未执行测试，改用工作区临时目录后通过；Node 全量在本机权限下覆盖回环与链接测试。结果与源码哈希见 `.local/vertical-investigation/grep-regression-validation.json`，SHA-256 `71afb23a6adf22323467a3581fd963071ad528549ee8976e0f92add67598c7f2`。
+- **独立真实 Mission 与入口位置偏差：未通过。** 使用同两份公开 Local 抓帧的新隔离项目，以 Terra Medium 规划和执行；General 实际采集并查看两张输出图，Verifier 提出三项挑战。执行入口签名基线为 EID 14 和最终输出，但 `runtime_context` 将打开时缓存的 `active_event_id=11` 连同身份返回；General 和 Verifier 均将其当作入口，General 在恢复 EID 14 后又观察 EID 11。终答前恢复校验拒绝，模型收到无具体位置的反馈后未调用恢复工具，回合以 `CONVERSATION_AGENT_LOOP_STALLED` 结束。人工通过产品恢复入口回到 EID 14 并关闭回放；原失败、回合、调查材料及生命周期回执保留于 `.local/vertical-investigation/clean-local-mission/failure-evidence/`，70 项清单 SHA-256 `004cda4fd4b2ee191019e5e9bbb00767db19ff4be067f62651a0d8b261bc1ebc`。签名密钥保留在隔离会话中，未归档或发送给模型；本结果不能替代 Android 和陌生案例验收。
+- **入口基线修复的工程验证：**`runtime_context` 不再向模型返回打开时原始快照；获批 owning General 可读取绑定同一 session／project／turn 的签名入口基线与回执引用，其他 scope、离线子执行、未初始化和空基线分别处理。恢复状态比较仍以主进程实际观察为准，终答失败反馈列出入口基线与当次现场并要求重新声明。定向 6 文件／145 项、Node coverage 391 文件／3588 项通过，4 项跳过；ratchet 为 lines 78.65%、functions 78.22%、branches 67%、statements 76.03%。typecheck、lint（0 errors／2151 warnings）、指定本轮基线的完整 gates、基线 secrets 检查和 build 通过。沙箱符号链接 EPERM 和一次并行启动的 esbuild Windows 运行时错误经本机串行复验通过；未放宽断言。详情及源码哈希见 `.local/vertical-investigation/restoration-regression-validation.json`，SHA-256 `0dbbd84df22ee2dd02a5c091b9eff8814f0f930f2d6a17b0ae3ec7727460ad3f`。真实 Mission 续验仍需另记结果。
+- **修复后的真实 Local Mission：通过限定范围的完整链路。** 同一提示、两份公开抓帧和独立干净项目中，Analyzer 规划、人工批准、General 执行与两次独立 Verifier 均完成；General 历时 19 分 45 秒，82 次工具调用中 21 次逐项人工批准，另有计划审批，不称无人干预。全部 68 份规划／执行／子执行请求快照均为 ChatGPT Terra Medium、Fast 关闭；合计输入 4405650 token（其中缓存读取 2835712）、输出 19469，实际费用不可得。General 在一次证据哈希格式错误后修正，并在完成门禁提示缺少 ready 报告后补建报告，再正常终答。最终 ready 报告 `invart-8b40ad539714-1793978568496` 的内容 SHA-256 为 `0354ff6b5ce0ad9144da29d7e5dc922b29a70f99d5f747dd97f83d3417326f58`；实际报告和比较稿区分事件结构、图像定性观察与未验证项。第二份身份由第二次 Verifier 补核；未对齐帧时刻、输入字节或恢复前后像素，不声称图像等价、因果或物理显示通过。
+- **本机入口与清理回执：**真实模型看到的 `runtime_context` 不含打开时 `raw`，入口基线为 EID 14。General 切换到第二份抓帧后恢复，再因补读 Shader 临时移动到 EID 11 并再次恢复；终态 `resolved` 指向原基线，界面最终显示第一份抓帧 EID 14／最终输出，随后经产品关闭回放。操作员使用隔离密钥核验 baseline、切换、两次恢复和 resolved 五份回执 HMAC 与位置关联均通过；这不是第三方签名，也不是应用或 Verifier 独立验签。117 项最小证据清单位于 `.local/vertical-investigation/restoration-live-project/evidence/`，清单 SHA-256 `2e0e6adcced9c26d9b35bcea5d200df52b38fe9e6e0990147108a7ca7af98e8d`；原失败的 70 项清单另保留。QA 已停止，归属 daemon 登记为空、相关 PID 与 5127／56606 监听未发现，失效守护锁经产品获取／释放流程交还；临时访问副本移除，隔离签名记录保留。四份正式来源及八份 User Agent 哈希复核不变。本轮已按绝对路径、跟踪状态、链接和进程核对清理测试与 QA 临时资源 854 文件、逻辑长度 45402809 字节；逻辑长度不代表实测释放空间。隔离会话原始请求和签名记录为仍待解决的历史来源核验保留，不视为临时垃圾。
+- **单 capture 恢复范围的真实失败及修复：**真实 Optimizer 首轮对公开 `vkcube.rdc` 形成的计划正文要求恢复现场，但机器合同没有 `captureScope`；获批 General 的只读查询将现场从 EID 14 移至 11，随后 `capture_restore` 因缺少获批范围返回 `RDC_CAPTURE_SCOPE_DENIED`，无法建立签名入口基线。操作者拒绝用直接设置事件替代受控恢复；结果为 `partial`，产品随后关闭回放。两组各 16 次帧计时、一次独立审查及未恢复事实保留于 `.local/vertical-investigation/optimizer-live-project/evidence/`，73 项清单 SHA-256 `62da21eed368eb47ce9713ef45edd29edb9d122c16c51bb1b0ab72b667ecc3b0`。该次没有 A-B-A、画质比较或可验证收益。修复后，获批 Mission 缺少 scope 时仍可执行离线和目录查询，但任何原生 live 操作及 live lease 委派均先返回 `APPROVED_CAPTURE_SCOPE_REQUIRED`；计划工具说明和执行 Skill 明确单 capture 也要冻结输入、设备与目标，历史计划不补写。三组新增回归先失败后通过，相关 7 文件共 164 项通过；沙箱的链接权限错误经本机权限重跑通过，未降低约束。
+- **单 capture 修复后的真实复验：**新隔离项目使用同一公开样本和原提示，Optimizer 自动生成含正确 input ID、内容 SHA-256 和 local 设备的 `captureScope`，操作者审阅并批准计划。General 取得 EID 14／最终输出 `ResourceId::256` 的签名入口基线，测量及读取 EID 11 后调用 `capture_restore` 成功；位置回执记录 11→14，正常终答后主进程写入引用原基线的 `resolved`。操作员用隔离签名记录核验 baseline、intent、position-restored、resolved 四份 HMAC 及其同回合／引用关系，恢复和终态观察均与基线一致；这不是第三方签名或 Verifier 自行验签。页面随后由产品入口关闭，登记为空，归属 daemon／worker 已退出。两组各 16 次整帧回放计时各有 3 次长尾；独立 Verifier 核对 14 份授权材料并保留长尾原因、画质和收益未知。因基准设置未知，ready WorldState 被拒；General 的 completed 声明因无 ready report 被拒，随后记录 `partial`、草稿报告及 checkpoint，正常终答，没有实验或收益结论。全部 46 次请求为 Terra Medium／Fast 关闭，输入 2558515 token（含缓存读取 1597056）、输出 14274；计划、质量选择和 23 项 General 操作经人工批准，费用不可得。84 项证据见 `.local/vertical-investigation/capture-scope-live-retest/evidence/`，清单 SHA-256 `90767b124aaf57a69aa95fa07ad96d3850004dea58d4407a85f99804a76fe51c`。此结果限于本机公开样本，不替代 Android、多设备或陌生案例验收。
+- **单 capture 修复后的完整工程验证：**使用 pnpm 11.7.0，在本机权限及工作区临时目录下以两个 worker 运行完整 Node coverage：391 文件／3591 项通过，4 文件／4 项跳过；汇总后的 ratchet 为 lines 78.62%、functions 78.22%、branches 67%、statements 76.01%。`typecheck`、`lint`（0 errors／2151 warnings）、完整 `check:gates` 和 `build` 通过，最终 `out/main/index.js` SHA-256 为 `754d964eeebf2185ba0a1043e23a955c26111e1bc9196adfd0c2eb74975f9218`。第一遍 gates 因变量名错误跳过知识与调查历史对比，第二遍显式设置 `RDC_SYSTEM_DEBT_BASE_REF=36306dbd3d5ca1f6663bcedda43ba6e25a0d0ba4` 后完整通过，同时 secrets 基线检查通过。命令结果及受影响源码哈希见 `.local/vertical-investigation/scope-final-validation-evidence.json`，SHA-256 `1a60e980f8db51ea904bc07b22ddd617d4e218559e25d20bc6819835093b2fb6`。工程通过不代表 Android 或泛化验收通过。
+- **本轮复验资源收口：**四组相关证据清单共 344 项逐一校验长度和 SHA-256；八份正式 User Agent 配置及四份 canonical 来源哈希未变。隔离访问凭据副本已移除，签名记录保留；产品关闭回放后登记为空，归属 daemon／worker 与本轮 QA、守护进程均已退出，5127／56606 无监听，canonical `instance.lock` 不存在。核验绝对路径、无跟踪文件、无链接和活跃归属进程后，清理本轮 coverage、测试缓存、QA 临时目录及启动文件，预清点共 1993 个文件、逻辑长度 58576588 字节；另移除本轮临时工作检查点 1 个文件、6566 字节。逻辑长度不代表实测释放空间。隔离历史会话、原始请求和签名记录保留供未决归档核验；两次 Optimizer 的小型公开样本项目及其原路径保留，便于复核和续接各自的 `partial` 状态。正式会话当前 capture 未在本轮复核，未触碰真实 capture 或其他用户资源。
+- **隔离归档核验准备受限：**用户给予继续授权后，复核有界脚本和三份输入的 SHA-256 均未变。无模型凭据、解释器禁用的隔离 QA 已启动；本地临时引导页被 Browser Use URL 策略拒绝，允许协议仅为 `http:`／`https:`，且拒绝明确禁止通过间接方式或其他浏览器入口绕过。产品未打开，未启用解释器、调用模型或操作 capture；该浏览器拒绝与此前启用解释器的自动审批拒绝分别保留。经进程归属核验停止本轮 QA 和守护，5127 无监听、canonical 锁不存在，隔离解释器仍禁用且仅保留签名记录。核验后清理本轮临时目录及引导文件，预清点 31 文件、逻辑长度 6571748 字节，不代表实测释放空间；历史归档的应用内独立核验仍未完成。
+- **搜索续验收尾：**八份相关证据清单共 318 项逐项核对长度与 SHA-256 均一致；四份 canonical 来源和八份正式 User Agent 配置哈希未变。隔离解释器禁用，secret 存储仅留签名记录；自有 QA／测试进程、5127／56606 监听与桌面锁均未发现。核对路径、Git 跟踪和链接后移除本轮 coverage 与测试临时目录 1925 文件、逻辑长度 43207699 字节；逻辑长度不等于实测释放空间。
+- **方法合同续查：**首轮 General 查询过 Challenge schema，随后修改比较稿但未登记 Challenge。当前完成门禁检查已登记且与报告相关的开放 Challenge，不从计划自然语言自动生成结构化门禁。现明确只读审查只返回文字质疑而获批计划要求 typed Challenge 时由 General 核对目标和来源后登记，缺材料须保留缺口；无质疑时不杜撰记录。另将 Analyzer 手册中分别打开两份 capture、分别使用 owning session 的旧步骤改为当前同一 session 的获批切换与恢复合同。Skill 门禁 16 项、`RdcProbeTool` 19 项、typecheck、lint（0 errors／2152 warnings）及指定本轮基线的 Investigation 门禁通过；本轮验证临时目录已清理。此方法修正后的真实续验已补建 Challenge；首轮失败仍保留。
+- **本轮资源状态：**隔离 QA 及回放进程已退出，5127 无监听，桌面锁经产品获取／释放流程交还；四份 canonical 来源哈希未变，首轮归档 89 个文件的长度和 SHA-256 复核一致。核验路径、跟踪状态、链接及进程后清除本轮 coverage 和测试临时根共 761 文件、逻辑长度 38314227 字节；另清除独立本机探测的 33 文件、逻辑长度 34828 字节，脱敏回执见 `.local/vertical-investigation/local-fixture-probe-evidence.json`。逻辑长度不代表实测释放空间。本次进一步核对边界后清理 coverage、测试缓存、隔离临时目录和本轮日志／状态文件，共 1957 文件、逻辑长度 47481753 字节，不代表实测释放空间。 历史复审后另清理 20 文件、逻辑长度 4429353 字节；回放登记为空，本轮进程已退出，桌面锁已交还。隔离 QA 的临时账户访问凭据及备份已删除；历史归档核验仍受阻，暂保留同一会话状态、原始请求来源、隔离生命周期签名记录和 Local State 供后续处理。
+- **实际模型和知识：**隔离副本复制正式配置、加密存储所需的 `Local State` 和授权后可正常调用；副本仅保留访问凭据，不保留刷新凭据或其他 Provider 凭据。八个内部 Profile 的同步真实执行和一个后台 Verifier 实际请求均记录了 Profile、预载 Skill、模型、档位和输出；这批请求发生在用户变更要求前，使用 Sol High。真实 Knowledge 验收搜索并读取版本化文本，实际把两张图片送入模型，输出与独立查看的图片相符；历史案例机制仍是有条件的参考。脱敏回执见 `.local/vertical-investigation/model-execution-evidence.json`。用户在 11:44:33 要求 Terra Medium；11:44:38 正在运行的旧回合又发起一次 Sol Low 请求，记录没有完成用量，随后停止。此后实际请求均为 Terra Medium，计数及时间见同一回执。
+- **压缩与持续执行：**隔离设置将压缩阈值设为 50%；三轮合成上下文使用真实 Terra Medium 请求，自动压缩前 250389 token、压缩后 125727 token，压缩调用的 Provider 用量为输入 125470、输出 458 token。压缩后模型保留两个未证实的竞争解释、各自削弱条件、旧否定的适用范围及条件变化后重查，并区分受阻与排除。四个请求合计输入 537758、输出 684 token；原始来源、SHA-256、摘要与回答保留于 `.local/vertical-investigation/compaction-source.json` 和 `compaction-runtime-evidence.json`。这是合成文本连续性验证，不证明真实长调查的压缩保真或泛化。
+- **真实模型的 Mission 结果：**短症状离线 Debugger 的来源任务和独立 Verifier 经人工引导分别以原预算根完成第二代执行，审查绑定来源成果的精确哈希；Verifier 提出七项建议，后续补充未再独立复审。最终因缺少正式 ready report 被完成门拒绝，模型未继续处理，最终停止于 `CONVERSATION_AGENT_LOOP_STALLED`；整个 Mission 未通过。Analyzer 在合成材料上给出有边界的概念分析，但缺少可解析 WorldState/Checkpoint，声明部分完成。修复前的合成 Optimizer 给出候选、画质风险及 A-B-A 验证，但缺少可解引用的 MissionCheckpoint，完成声明先被记录，终态被拒后模型停滞。修复后同一合成情景中，`turn_complete(completed)` 当场返回缺 checkpoint 的错误；模型尝试建立 WorldState，因无实测基准而被合同拒绝，随后声明部分完成并说明未知项。复验实际发出 9 个 Terra Medium 请求，合计输入 267105、输出 3628 token；这不证明真实优化或完整 Mission 通过。四个回执依次为 `.local/vertical-investigation/mission-runtime-evidence.json`、`analyzer-runtime-evidence.json`、`optimizer-runtime-evidence.json`、`mission-readiness-evidence.json`。Debugger 记录 69 个请求、其中 68 个有完成时间，用量合计输入 4118397、输出 19397 token；不同模型档位与人工介入在回执中分别列出，费用不可得。真实 capture 的短／详细 Prompt 对照、真实长 Mission 和陌生案例泛化仍未验收。
+- **Debugger 离线续验：**使用同一短症状输入，在新建隔离空项目中回答三项事实问题为未知、审阅并批准模型生成的离线计划；批准后未再发送人工续跑或纠错。General 自主保存 `unknown` 的草稿 WorldState 和草稿 checkpoint，随后直接声明 `partial` 并交付条件性排查建议，没有宣称根因或实测修复。此运行没有尝试 `completed`，因此没有实际触发缺 ready report 的声明前拒绝；也没有独立审查或设备操作。此次计划不要求独立审查且无已登记 capture，旧案例有独立审查要求及未打开的已登记 capture，两次不是受控前后对照。实际 10 次请求均为 Terra Medium，输入 325289、输出 3900 token，首请求至终答约 2 分 51 秒（含人工回答及计划审阅）；费用不可得。计划、带哈希的状态／checkpoint、完成声明和结果见 `.local/vertical-investigation/debugger-readiness-evidence.json`，不将其计为真实 Mission、设备或泛化通过。
+- **直接修复与界面：**真实回放暴露原生致命观察错误被投影为可重试图片错误，现按冻结 lease 身份隔离并保留原始诊断；普通图片失败仍可重试。真实审查暴露来源 Task 缺少结构化结果后不可恢复，现于结算前校验，并允许该历史缺口在原预算根下开启新执行代次；不同历史根仍不能合并。无进展诊断区分未完成条件与重复工具调用。Mission 完成声明先检查当时可判定的 checkpoint 和 ready report，最终答复仍复核报告引用与领域合同；界面称其为声明，不提前显示目标完成。真实交接暴露同模型切回目标 Agent 时旧记忆档位覆盖刚批准的选择；组件回归先复现再通过，修复后另一实际批准交接的 UI 与 RequestPlan 均显示 Terra Medium。隔离 Browser 另检查 12 个 Agent、真实子执行、Knowledge 交互、浅色窄屏、键盘焦点和深色；正式 Knowledge 主题未批量改写。
+- **完成声明续修：**针对旧的“声明先成功、最终门禁再拒绝”失败，进一步复现了 ready report 状态不允许完成、相关 Challenge 未解决、Optimizer 缺少合格实验时声明前仍会放行。修复后声明前与终答复用同一份报告资格检查；报告自身不合格时可检查其他报告，但存储或意外错误直接上报；终答仍校验实际引用的报告及当前状态。修复前 3 项声明断言和 2 项异常传播断言失败，修复后三个相关测试文件共 77 项通过，包含实际 `turn_complete` 工具返回 Challenge 错误且未记录 completed 的用例。本次没有发起真实模型请求，不能将其记为 Debugger 真实模型复验。
+- **本机双 capture 续验：**使用 RDC-Tool 两份公开测试样本、Local 回放和无凭据的本机模拟 Provider，经产品界面批准同一计划并交接 General。修复前切换被中止，正式恢复入口随后重新打开原样本并回到 EID 14。带调用来源的独立复现显示：切换时状态短暂同时包含旧输入 ID 和新内容哈希；右栏构建触发项目输入核对，将其误判为内容变化并停止在途回合。该调用栈证明续验复现的原因，不能反推首次失败的实际调用栈。现将 ID 与哈希在同一次状态发布中更新，真实内容变化仍保留停止保护；重叠刷新回归先失败后通过，相关 4 个测试文件共 75 项通过。修复后的同一批准会话成功切换至第二份样本 EID 21，再恢复第一份样本 EID 14 和原输出目标；记录包含 baseline、两次 intent／daemon-stopped／transition 及 resolved，界面显示两次画面。诊断与修复后脱敏来源分别见 `.local/vertical-investigation/local-switch-cause-evidence.json`、`local-switch-fixed-evidence.json`；产品在隔离签名密钥存在时生成并解决回执，密钥不随证据保留。这是本机工程验收，不证明 Android、真实模型或陌生案例泛化通过。
+- **本机续验收尾：**隔离回放已关闭，两次切换涉及的 daemon／worker 均核验退出；本轮 Browser、模拟 Provider 和锁守护进程退出，5127／56606 无监听，canonical 实例锁不存在。核对四份保留证据的 SHA-256 后，删除本轮隔离验收目录和 coverage：共 1000 个文件、逻辑长度 45504723 字节；删除前确认目标位于工作区、无 Git 跟踪文件、无链接和活跃归属进程。逻辑长度不代表实测磁盘可用空间变化。正式会话的当前 capture 未复核。
+- **Android 未通过：**用户只能提供 BlackHair。此前该 capture 的 helper 在 Adreno 管线创建栈发生 SIGSEGV；本轮一次受控重试成功完成连接、打开和事件读取，但 EID 2653 的首帧观察返回 `replay_fatal_error: Connection lost to remote server`，现有回执不能确定连接丢失的原因，也未记录本次设备安装 APK 的哈希。现场经产品入口关闭后，归属 daemon/worker、forward 和 helper 已核验退出；原有共享 ADB 未停止。11 月 4 日的历史设备回执曾在同一 capture 和设备上呈现 EID 2236；历史实际加载的宿主 DLL／PYD 哈希与本轮 worker 记录的磁盘文件哈希一致，本轮未独立枚举加载模块。历史安装 APK 内 Android 库的 Build ID 与 11 月 5 日打开阶段崩溃栈相同。历史显式重连只证明无活动 capture 的 remote handle 就绪，不是回放恢复；历史成功、不同事件和当前连接丢失不能证明共同根因或本轮通过。旧失败、本次回执和只读对照分别见 `.local/vertical-investigation/android-failure-evidence.json`、`android-resume-evidence.json`、`android-historical-comparison.json`。本轮没有第二份 Android 兼容输入，也没有 Android 同会话切换、恢复、Pixel History 或图像成功回执。
+- **Android 错误状态来源：**只读核对失败回执中记录的 RenderDoc 内嵌提交 `f6aff93bcbb823eb4a8fcea324e55cd54adbdcf9`：`ReplayProxy::FatalErrorCheck` 在代理已出错但尚无具体 fatal status 时可返回通用 `RemoteServerConnectionLost`；同一源码中读写错误、预期响应包不匹配等也可使代理进入错误状态。故该错误文本本身不能区分远端返回的状态、通用回退或具体传输原因，更不能据此认定 USB、ADB 或设备崩溃。该次宿主进程的实际加载模块未独立核验。旧 QA 启动时设置过隔离 TEMP/TMP，现该目录已清理；失败时 worker 的实际环境和宿主日志路径未记录，不能断言日志当时位于该目录。源码 blob、行号和限制见 `.local/vertical-investigation/android-proxy-status-evidence.json`；本次未重开 capture 或操作设备。
+- **Android 只读日志续查：**11 月 6 日 13:40 使用非默认端口的单设备临时 ADB 前台服务，只读 `crash`、`system`、`main` 缓冲区及 RenderDoc 包的 exit-info；没有重开 capture 或更改设备安装。故障发生于 11:21:50，同一 helper PID 26968 在 exit-info 中记录于 11:26:52 以 `USER REQUESTED / FORCE STOP` 退出，与此前失败后该 PID 仍存活的观察一致。`crash` 缓冲区未见故障窗口记录，`system` 窗口未命中所筛选的 ADB／USB／helper 退出线索；`main` 缓冲区最早记录为 13:28，无法回看当时内容，其原因未知。采集时手机与主机时钟一致，故障时的时钟偏差未独立确认。以上限制了“当时 helper 已崩溃”的解释，仍不能确定断连原因；回执见 `.local/vertical-investigation/android-transport-forensics.json`。临时 ADB 的 PID 和端口已核验退出，未停止其他 ADB 服务。
+- **Android 安装身份续查：**13:44 通过同样隔离的单设备 ADB，只读计算设备当前安装的 RenderDoc APK SHA256，得到 `36df7cff5d0b70f15606632cf54dd36b5a4ab0335acd7e9eaa0fb23b43615f66`，与 11 月 4 日历史成功时的安装回执一致；哈希前后文件大小和修改时间一致。包管理器记录 versionCode 148、versionName `f6aff93bcbb823eb4a8fcea324e55cd54adbdcf9`，最后更新时间为 11 月 4 日 11:38:49，早于本次故障。该哈希在故障后采集，包管理器时间不能独立排除带外修改，也不能证明故障时进程加载的字节或断连原因。回执见 `.local/vertical-investigation/android-installed-apk-evidence.json`；临时 ADB 已退出，没有拉取、安装或修改 APK。
+- **Android 原生日志续查：**依 helper 内嵌提交的默认目录，找到进程 26968 在故障分钟生成的 21320 字节日志；设备端读取的源文件 SHA256 为 `6907639a430dd8522ac5497f5efc3f0bcfb3179af552377384e16b0e5a9b0289`。筛选尾部记录中，helper 在 11:22:25 记录关闭来自 127.0.0.1 的活动连接并准备新连接；主机报告观察失败的时间为 11:21:50，此前回执中另一 ADB 服务开始时间为 11:22:24。内嵌提交对应的源码在记录关闭之前先销毁 proxy、关闭 driver 并清理临时文件；二进制与该源码的完整一致性、事件时手机与主机的时钟偏差及 ADB 原服务退出时间均未独立证明，因此这些时间不能确定初始断线时刻或原因。仅保留筛选出的两条结构化记录，未复制完整日志；哈希在筛选读取前取得，未能做读取后复核。回执见 `.local/vertical-investigation/android-native-log-evidence.json`。采集期间临时 ADB 前台服务意外退出，随后一次客户端请求自动启动了新的 5038 服务；已核对归属和无其他客户端后停止该服务，没有停止其他项目的共享 ADB，也没有重开 capture。
+- **Android 完整原生日志：**只读取得上述 21320 字节完整来源，设备读取前后大小、修改时间和 SHA256 一致，收到的字节也与该哈希一致。187 行中有 185 条 Log、2 条 Warning，未记录 Error 或 Fatal；两条 Warning 分别描述 shaderInt64 和多重采样图像能力，日志没有将它们与断连关联。11:21:40 的初始化记录之后，下一条是 11:22:25 的连接关闭记录，不能据此确定初始断线时刻或原因。完整来源和结构化回执保留于 `.local/vertical-investigation/android-native-log-source.log`、`android-native-log-full-evidence.json`。仅绑定该设备的临时 5038 ADB 进程已退出，收尾时 5037、5038 均无监听。
+- **宿主退出记录：**只读检查 11:08:57—11:22:25 的 Windows 事件：当前 Application 日志在该区间没有返回 1000／1001／1002 事件；Security 和 Sysmon 当前最早记录分别从 13:42 和 12:49 开始，未覆盖故障时段。三者均为循环日志；原因和历史审计配置未经确认，因此不能据此判断原 ADB 进程为何退出或是否导致断连。回执见 `.local/vertical-investigation/android-host-event-evidence.json`。
+- **本地端点与停止续验：**无凭据的隔离 Browser QA 使用本机流式夹具时，首次设置地址为 `127.0.0.1:56606`，但实际 RequestPlan 错用目录默认端口 `11434` 并失败；先新增回归复现，再修正可编辑、用户自管的本地服务默认路由，保留非可编辑供应商、云端协议和模板的原规则。最终构建的 RequestPlan 使用 `56606`，页面显示流式内容后点击停止，UI 和持久记录均为 `stopped`，夹具在发出 26 个片段后观察到客户端关闭。夹具的工具能力为隔离环境注入的模拟数据，该次没有真实模型或外网请求，也不能证明真实 Provider 的远端取消行为。自动审批未批准使用复制凭据发送该验证请求，理由是当时完整外发内容尚未确定；未绕过审批。请求快照、测试会话与夹具事件分别保留在 `.local/vertical-investigation/local-route-before-request.json`、`local-route-after-request.json`、`local-stop-conversation.jsonl`、`local-stop-fixture-events.json`。
+- **真实 Provider 请求预审边界：**现存停止测试快照为 Ollama 本地夹具，不是 ChatGPT 实际请求，含三个测试消息、32 个工具定义和脱敏字段。当前实现先生成脱敏 RequestEnvelope，再由 Responses provider 根据当前上下文和 RequestPlan 构造请求体；运行时通知、续跑和权限事实可能改变内容，不能将该本地快照当作未来请求的精确载荷。上次自动审批拒绝的是使用复制凭据发起真实停止测试，理由为完整外发内容当时未固定；后续须先固定并核对实际发送范围，再按审批结果执行，不能绕过该拒绝。本次没有发送请求或复制凭据。
+- **存量与资源：**历史冻结请求、签名证据、正式 Knowledge、原始 capture 与真实会话没有重写；无法可信补齐新 Profile 来源的旧执行保留为历史诊断，两个缺 Investigation 合同的历史计划需重审。隔离 QA 退出后 5127、56606 无监听，canonical `instance.lock` 不存在，桌面启动权已交还；隔离 capture 已关闭，正式会话当前 capture 未在本轮复核。本轮 QA 副本、临时测试目录及 coverage 已在核对绝对路径、Git 跟踪、链接和进程后删除；前两次清理的文件逻辑长度分别为 107375270 字节和 51508663 字节，Debugger 续验另清理 113 个文件、逻辑长度 9000509 字节；本地停止续验的 QA 清理 65 个文件、逻辑长度 1096606 字节，随后覆盖率和测试临时目录清理 766 个文件、逻辑长度 36695397 字节；完成声明续修再清理 755 个文件、逻辑长度 36270594 字节；异常传播修复再清理 756 个文件、逻辑长度 36646704 字节。上述逻辑长度均不等于实测磁盘空间增量。当前构建、依赖及最小脱敏回执保留。完成声明续修收尾时另发现一份来自另一套 Android SDK 的 ADB 正在监听 5037，本续修未启动或停止它，具体归属未确认。异常传播修复收尾时上述端口均未观察到监听；另有独立 Cursor agent 进程引用本仓库，未干预，本次修复的三个源码／测试文件哈希与验证回执一致。
 
 ## 全方位收敛 W6 收口（2026-11-03）
 
@@ -4455,3 +5158,204 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - **计量与验证：**本轮 3 次模型请求共 344 tokens（292 input + 52 output）。批量只准备并取消，未派发整个清单。Node 3470 passed / 4 skipped，typecheck、lint（0 errors）、覆盖率 ratchet、gates、正式构建通过。首次 coverage 的临时目录祖先路径受 sandbox 限制，使用工作区 TEMP/TMP 和有限 worker 重跑通过。逐项脱敏回执见 `.local/provider-capability/followup-receipt.json`。
 - **界面与清理：**真实 Settings 触发 Terra 默认与 Fast，Grok 4.3 显示不可用及目录缺席原因。最终档位文案用真实翻译函数覆盖英文和中文，Renderer 全量 856 项通过后新增两项文案回归通过。Composer 有过滤与投影测试证据，真实 Browser 启动页无活跃 Composer，未完成该入口的现场复核。隔离 Browser 冒烟的 bootstrap、同源、授权和 IPC 断言通过，脚本在 Windows 自动删除隔离 profile 时遇到 EPERM；已在核对路径后删除该 profile、coverage、脚本和日志。QA 进程已停止，端口关闭，canonical 启动锁不存在。
 - **Fast 回执更正：**上述现场界面曾显示「本次按标准档处理」。Codex 维护者说明 ChatGPT 登录的 Codex 路由中，终态 `service_tier=default` 无法可靠判定 Fast 实际状态，因此现已改为显示服务端回报及实际 Fast 状态未确认。公开 API 的档位说明和订阅路由分别适用。来源 https://github.com/openai/codex/issues/14204
+
+### 2026-11-14：M1 启动前实机预检阻塞
+- `e38b8019` 在 ADB 设备列表中在线；通过隔离产品实例选择测试工程、`WhiteHair.rdc` 和 Android 设备后，设备连接失败，capture 未打开，画面对照未执行。
+- 产品原文：`RDC_CLI_FAILED: adb_device_invalid_response: Selected Android device query returned an invalid state`；命令为 `D:\Projects\RDX\RDC-Tool\binaries\windows\x64\adb\adb.exe -s e38b8019 get-state`，`returncode: 0`、`stdout: ""`、`stderr: ""`。
+- 人工介入仅为预检选择；设备 RenderDoc 配置未调整。调查未启动，模型 token 为 0；预检及准备约 7 分钟。
+
+### 2026-11-14：M1 解锁后启动前实机预检通过
+- `e38b8019` 在线且亮屏，隔离实例通过 Android remote 打开 `WhiteHair.rdc`，EID 3029 显示 `Device display synchronized`；设备实拍与产品预览一致。证据：`.local/vertical-investigation-20261108/evidence/m1-20261114-{device,replay}-preflight.png`。
+- 预检前备份并校验设备原始 RenderDoc 配置，临时将 `SingleThreadedCompilation` 设为 `true`；本轮结束后已恢复原字节与属性。仅进行预检选择，未调用模型。
+
+### 2026-11-14：M1 第一轮，停在锚定
+- Android remote 的新隔离会话以“角色头发发白”启动；首次未满足步骤为锚定：仅有 `candidate` Evidence，未将原生区域与 draw 确证对应，也无锚点 Claim。
+- Trace 显示 General 已收到像素历史与 draw 覆盖交叉核验方法，但未执行这些检查即耗尽 50 次 Provider 请求；上限来自隔离 User Space 的 General `max-turns: 50`，不是计划正文、工具调用数或期限。
+- 全轮 80 次工具调用：读方法 8、知识 5、取图读图 7、事件／管线／Shader 24、写记录 2、其他 34。直接原因按 3.3 判为工具返回层：像素历史只附查询终点的绑定等级，缺少历史写入事件的绑定；单点复验见下。
+- 修复：RDC-Tool `22f2518` 返回各写入事件的 shader／输出目标绑定和各自的真实状态，保留查询终点的原始降级；产品长结果摘要保留写入事件与绑定状态。
+- 监工输入：短症状、跳过超出已知事实的澄清、原样批准计划并执行；停止后经产品恢复入口位置。恢复回执 `rdc-lifecycle-5d682a13-38eb-4863-b120-7fc6866feccb.json`；设备临时单线程编译配置的原字节及属性已恢复。
+- 规划 2分57秒、执行 5分32秒；68 次模型请求，input 4351376／output 8237 token（input 含缓存读取 1673984）。本地证据 `.local/vertical-investigation-20261108/evidence/m1-20261114-round-01-sources.zip`，SHA-256 `47099d16fd8dae6fff11d5ea2dd6b8f0ea9d39f8dcfcb3f68f6e7a6caefd3e79`。
+- 旁支：`rdc-tool-shell/references/tools.md` 读取返回 ENOENT；隔离的 General 用户配置可调用列表未列 verifier。两项均未查修。
+- 条件更正：隔离 User Space 带了旧 Agent 覆盖，未满足内置配置要求；本轮停点不计入连续三轮。
+
+### 2026-11-14：M1 第一轮锚定检查的单次诊断复验
+- 用户授权独立诊断会话输入操作与参数；同一 Android capture 的候选点经产品路径恰好调用一次 `rd.texture.get_pixel_history`，返回成功及一条历史记录，`binding_truth_level=binding_degraded`，不能单靠该结果确证对象归属。
+- 第一轮 Trace 显示模型读完 `pixel-forensics` 后转查候选 draw 的 shader／资源，未选择像素历史而耗尽预算；单点复验的绑定信息降级，再次复现与定位见下。
+- 前后产品画面均为 EID 3029 且设备显示同步；关闭回放后归属 daemon／worker／helper 已退出。设备配置先备份、临时启用单线程编译，结束后原字节及属性恢复。
+- General 使用 ChatGPT Account／gpt-6-luna／Medium，10 次请求，耗时 1分10秒，input 194097／output 1750 token。本地证据 `.local/vertical-investigation-20261108/evidence/m1-20261114-diagnostic-sources.zip`，SHA-256 `dfbeeca1f9256482bff244907917e8e76f8a1cf5fb438d6a180aad3abfdc2d57`。
+
+### 2026-11-14：M1 锚定检查绑定降级的单次复验
+- 用户要求再次经产品路径复现；新隔离会话在同一 Android capture 和相同参数下调用一次 `rd.texture.get_pixel_history`，返回一条历史，`binding_truth_level=binding_degraded`，原因含 `binding_unavailable`、`event_bound_pipeline_state_partial`、`summary_degraded`。
+- 监工输入指定操作和参数；前后均为 EID 3029、设备显示同步，结束后归属 daemon、worker、helper 已退出。设备配置先备份并临时启用单线程编译，结束后原字节及属性已恢复。
+- General 使用 ChatGPT Account／gpt-6-luna／Medium，耗时 1分17秒，input 173971／output 1764 token；原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_18650d0a9397/session-artifacts/tool-outputs/call_964285f0c5004c51854fdd3135f74c7d.json`，SHA-256 `1b1b6cebcc44604683fab338e2ab47882e9841d99eb57df67a74a2d18b691bd7`。
+- 证据位置更正：2026-11-15 收口时该隔离会话路径已不存在，现有归档未找到这份单独复验返回；首次诊断归档仍保留。
+
+### 2026-11-14：M1 第二轮，重复断连停在锚定
+- Snapdragon 865／Android remote，新隔离会话仅输入“角色头发发白”，原样批准计划；capture 打开且产品预览与设备一致。模型自行执行到上游 Pixel History，未建立区域到发丝 draw 的交叉验证记录，首个未满足步骤仍为锚定。
+- 同一设备、capture、单线程配置、资源 `ResourceId::208592` 和事件 1716 下再次发生远程连接丢失；本次坐标 `(690,70)`，11-09 现场为 `(681,78)`。错误原文：`RDC_CLI_FAILED: replay_fatal_error: Native replay fatal error: Connection lost to remote server`，lease quarantined。按更新后的 3.5，有替代路径时继续。
+- 本轮真实工具回执 `call_783b7940f8b54da2b09e1f0e57605c74.json` 显示请求终点绑定仍为 degraded、写入事件 1779 的绑定为 verified，证明第一轮工具返回修复已进入产品真实路径。
+- 监工在回合结束后用产品入口恢复位置，再关闭回放；恢复回执 `rdc-lifecycle-50261541-ed0b-45ef-bda9-183aa43875db.json`，EID 3029。自有 daemon／worker／helper 和设备转发已释放；设备配置原字节及属性已恢复。
+- 规划约 1分40秒、执行 10分42秒；47 次 Provider 请求，input 3666625／output 17515 token（input 含缓存读取 865280）。失败原始返回 `.local/m1-20261114/user-data/state/sessions/proj_fc23ca9a3dae/sess_f22b378108f1/session-artifacts/tool-outputs/call_608fb687e8e04a76a9df1f0ae31f5a91.json`，SHA-256 `3fa80be1e12b4bb050d2771913652695a0a724d60ba28e004d1bb14167f06112`。
+- 按 3.6 取设备现场一次：22:41:26 `renderdoccmd` 发生 SIGSEGV／SEGV_MAPERR，栈含 `VulkanColorAndStencilCallback::ReplayDraw`、`PreDraw` 和 `VulkanReplay::PixelHistory`；本地 `.local/vertical-investigation-20261108/evidence/m1-20261114-device-crash-logcat.txt`，SHA-256 `027bdf2eb7082cde65e02af752d0645a3dba9e82c785e9bdd75e6d53f474e45b`。
+- 条件更正：隔离 User Space 带了旧 Agent 覆盖，本轮不计入连续三轮；清除覆盖后在 Settings 的 Agents 页逐一确认 4 个入口及 8 个内部 Agent 均显示“内置”。
+- 证据位置更正：2026-11-15 收口时该隔离会话路径已不存在，现有归档未找到本轮 `call_608fb687e8e04a76a9df1f0ae31f5a91.json`；设备崩溃日志和 3.6 对照归档仍保留。
+
+### 2026-11-14：M1 Pixel History 回放故障对照
+- 同一资源改到 EID 1248，单次 Pixel History 仍断连并隔离 lease；同一 EID 1716 换目标资源后单次调用成功，历史写入及绑定均有返回。原始返回分别为 `call_94f2b30c80594451aa7413d48aef0962.json`、`call_889627a92f304c499fc2da2535ab5428.json`。
+- 原资源实际只有一个 mip、一个 sample；sample 1 经 `rd.texture.get_data` 单次校验返回 `validation_error: Invalid texture subresource`，无有效的第三个子资源可供 Pixel History 对照。原始返回 `call_0c0d9c6696b34a7aa7c9f4c1b7c8253c.json`。
+- 当前 capture 的原生创建记录显示 usage 23、mip 1、sample 1；资源使用记录显示输入附件与颜色目标在同一事件同时使用。结合本轮设备栈和 11-08 Vulkan 校验现场，故障位于 RenderDoc Vulkan Pixel History／设备驱动的回放路径，无法将单一触发原因归为驱动。创建与使用原始返回 `call_4ab3d522ed3747e4858d2ff545c3e758.json`、`call_6b01cebebe6f4e698c36089e40bd2aa2.json`。
+- 监工输入三项对照及只读创建／使用查询；最终恢复到 EID 3029、设备画面同步后关闭回放，ADB 转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复；原始返回和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261114-pixel-history-diagnostic.zip`，SHA-256 `1be9bf8019b0ba8ed2659147d00fe8f3952fe2327b8f1c8ef18868c292a6a378`。
+- General 使用 ChatGPT Account／gpt-6-luna／Medium，诊断约 10 分钟，input 595113／output 4345 token（input 含缓存读取 190592）；该诊断不是调查轮。
+- 第三轮准备更正：用户明确“Memory 关闭”指隔离环境不使用已有 Memory，目录为空即可；隔离 User Space 和测试工程的 Memory 目录均为空，内置工具可保留。此前因此判定阻塞不成立，继续第三轮。
+- 旁支：内置 Verifier 的模型列表为空；子 Agent 启动要求自身编译后的模型路由。该问题尚未经过本轮调查触发，未查修。
+
+### 2026-11-15：M1 第三轮，停在锚定
+- 骁龙 865／Android remote，新隔离会话只输入“角色头发发白”；十二个 Agent 来源均为内置，用户及项目 Memory 目录为空，Knowledge 与用户目录的 6 个文件哈希一致。设备在线、抓帧打开，画面与设备一致。
+- Debugger 提问整体或局部白化，监工按 2.2 选择“不知道”，原样批准计划；General 追踪候选点至后处理输入并写入 draft Evidence，但未把候选区域与实际头发 draw 交叉验证，首个未满足步骤为锚定。3.3 单点复验成功，直接原因归为方法文本：未明确要求沿合成输入继续查询写入事件。
+- General 主动恢复入口事件 3029、capture 和设备，签名回执 `rdc-lifecycle-99af6399-9418-49ed-b885-cf8e2de5f169.json`；关闭回放后 ADB 转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复。
+- 规划约 7 分 24 秒、执行约 10 分 08 秒；规划 13 次、General 47 次 Provider 请求，另有 2 次自动审查请求；General 回报 input 3819616／output 13904 token（input 含缓存读取 913280）。原始会话、Trace、Task 与回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-03-sources.zip`，SHA-256 `c6c45dbd8583e986b974d9334e58382ba4c23d20d509aaa0e76fd09295121c91`。
+
+### 2026-11-15：M1 第三轮锚定的单次工具复验
+- 按 3.3 在独立隔离会话复验上游纹理的 Pixel History；首次因 General 把 RDC 操作当作独立工具搜索而未发起调用，监工指出产品的 `rdc-tool-shell` 入口后仅调用一次，返回写入事件 1716、写入绑定 `binding_verified`、`history_bindings_status=complete`。
+- 该资源、坐标和事件已由第三轮实际查询得到，General 当时没有选择其像素历史；本次没有调用已禁止的崩溃参数。原始返回 `call_60412085ca294128bf52411f16f84713.json`，SHA-256 `8abeeb023d322555075a61657b7bc8508050cd865ddb281f942a19fa1f49733e`。
+- 前后产品画面均恢复 EID 3029 且设备显示同步，关闭回放后转发已释放；设备配置先备份、临时单线程编译，结束后原字节及属性已恢复。两回合约 1 分 41 秒，共 13 次 Provider 请求，第二回合 input 111631／output 1126 token。原始会话与 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-03-tool-check.zip`，SHA-256 `1207bd83f689d7455688c5f0bf7ed1e2a24cd65e133fb8452d7254fad923a693`。
+
+### 2026-11-15：M1 第四轮，停在锚定
+- 骁龙 865／Android remote，新隔离会话只输入“角色头发发白”；十二个 Agent 来源均为内置，隔离用户及项目 Memory 目录为空，Knowledge 保持原样。设备在线、抓帧打开，画面与设备一致。
+- Debugger 两个问题超出已知事实，监工均选“不知道”，原样批准计划。General 取得上游像素历史和候选 draw 覆盖，但未把候选区域与头发 draw 交叉验证，首个未满足步骤仍为锚定；3.3 复验见下，直接原因在方法文本：未明确把历史中通过的片元与该事件绑定输出上的覆盖检查连起来。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-c1554f41-e6f6-4ac1-85e8-7a3ad7afe358.json`；关闭回放后转发已释放。设备配置先备份、临时单线程编译，结束后原字节及属性已恢复。
+- 规划约 4 分 44 秒、执行约 13 分 13 秒；规划 20 次、General 54 次 Provider 请求，General 回报 input 4547299／output 19130 token（input 含缓存读取 1150208）。会话、Trace、Task 与回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-04-sources.zip`，SHA-256 `a0f0a768476f12be1f0bf83025005166549e4156402e4fc9db9c157b7284fd86`。
+- 旁支：规划期间 `task_create` 和 `plan_artifact` 各失败一次，产品随后自行提交计划；未另查修。
+
+### 2026-11-15：M1 第四轮锚定检查的三项复验
+- 依次对本轮候选 draw 的实际绑定输出、已确认写入的末端事件、像素历史中通过的场景事件各调用一次 Drawcall overlay；前两张分别为黑图和全屏覆盖，第三张显示头发轮廓，三次工具均成功。第三项原始返回 `call_e466f237f37c42b8b3653e8720ed1dd7.json`，SHA-256 `4587f541ee20b70a23d8b6a43806bd64c230b257404b2a01d1f9cab4da0bacdd`。
+- 监工输入各次操作和参数；复验前误选另一抓帧并在传输期间中止，释放本机进程及转发后改选 `WhiteHair.rdc`。复验后回到事件 3029、设备画面同步；关闭回放并释放转发，设备配置原字节及属性已恢复。
+- 三回合模型执行约 86 秒、12 次 Provider 请求，input 294883／output 1518 token；原始返回、图片和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-04-tool-check.zip`，SHA-256 `c9cad8140fbfedc221be0c36ac0d9bc0800af998b51a30646b3616714ae0c99f`。
+
+### 2026-11-15：M1 第五轮，停在锚定
+- 骁龙 865／Android remote，新隔离会话只输入“角色头发发白”；十二个 Agent 来源均为内置，用户及项目 Memory 目录为空，Knowledge 与用户目录 6 个文件哈希一致。设备在线、抓帧打开，画面与设备一致。
+- 监工原样批准计划；General 三次询问预期颜色或区域，均回答“不知道”。产品追踪至上游并生成候选 Evidence，但因覆盖图画布和原生纹理尺寸不同、缺少映射信息，未建立原生区域与头发 draw 的交叉锚定；首个未满足步骤为锚定。3.3 单点复验确认直接原因在工具返回层，见下。
+- 修复：RDC-Tool 的覆盖图返回原生尺寸、有效缩放、画布内容矩形与翻转状态；尺寸不可得时明确标记不可用，并同步操作契约。
+- 本轮产品路径触发已知 Pixel History 不支持条件，返回 `pixel_history_unsupported_input_attachment`，主进程确认原事件已恢复且 lease 保留；无远程断连。最终恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-265fe4d2-84cf-4175-8133-a22e1c883e03.json`；关闭回放后转发已释放，设备配置原字节及属性已恢复。
+- 规划约 1 分 52 秒、执行约 39 分 34 秒；规划 15 次、General 119 次 Provider 请求，另有 3 次压缩和 7 次自动审查；General 回报 input 8907523／output 65305 token（input 含缓存读取 3736576）。原始会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-05-sources.zip`，SHA-256 `6a4280a76992e45e78a7a595e08f5dcbc9e23cb70ca4daef15e38263cf81b204`。
+
+### 2026-11-15：M1 第五轮覆盖图映射的单次复验
+- 按 3.3 在独立会话重放本轮覆盖图检查一次：画布为 1920×1080，原生纹理为 1520×700；工具返回 `scale=0`，缺少原生纹理尺寸、有效缩放和画布内容矩形。原始返回 `call_aa71339af23144a9a8763668a51186c0.json`，SHA-256 `b80c0f7298d1030e40a9edf025b64f7866b47a12ddd55028c225703bf90af391`。
+- 监工仅输入该项复验操作和参数；回放前后为事件 3029 且设备画面同步，关闭后转发释放，设备配置原字节及属性已恢复。模型执行约 37 秒、6 次 Provider 请求，input 123093／output 658 token；原始返回、图片和 Trace 归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-05-tool-check.zip`，SHA-256 `a2adf5daf448ea737113bd94e820bd7c43696d398a3f137deec09d700ae11149`。
+
+### 2026-11-15：M1 第六轮启动前设备不可用
+- ADB 显示 `e38b8019` 在线、亮屏且未锁屏；隔离实例已确认十二个 Agent 均为内置，并选择 `WhiteHair.rdc` 与 Android 设备，但产品连接显示“设备不可用”，capture 未打开，未启动调查。
+- 产品原文：`RDC_CLI_FAILED: adb_device_invalid_response: Selected Android device query returned an invalid state`；`D:\Projects\RDX\RDC-Tool\binaries\windows\x64\adb\adb.exe -s e38b8019 get-state` 返回 `returncode: 0`、`stdout: ""`、`stderr: ""`。按 3.5 设备不可用停下，未重试。
+- 启动前先备份并临时启用单线程编译；本轮结束已恢复设备配置原字节及属性，ADB 转发已释放。监工未输入症状或调用模型，token 为 0。
+- 空预检会话归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-06-preflight-session.zip`，SHA-256 `446d4f9362a30ca7b7b970ee35677d3cc05d8584e0308f562881b15c406d1e65`；产品错误原文如上。
+- 按计划更新后的定义，系统 ADB 在线而产品连接失败属于产品连接层缺陷；M1 改回执行中，先重启 ADB 并经产品重试。
+
+### 2026-11-15：M1 第六轮，停在锚定
+- 重启 ADB 后产品首次重试即连接；骁龙 865／Android remote、新隔离会话、十二个 Agent 均为内置、Memory 为空、Knowledge 保持原样，`WhiteHair.rdc` 画面与设备一致。按用户最新指定使用 ChatGPT Account／GPT-6.1 Sol／Medium。
+- 监工只输入短症状，对超出已知事实的澄清选一次“不知道”，原样批准并执行计划。General 写入 `cross-validated` Evidence，但未写区域到 draw 的 Claim；首个未满足步骤为锚定。Trace 中两份预载方法将 `observed_fact` Claim 写成可选，直接原因是方法文本。
+- General 在输入附件 Pixel History 不可用后使用事件前后值和 draw 覆盖继续；另一次 shader 调试导致远程断连，产品重开同一 capture 后继续。可逆实验完成并撤销；独立 verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支记录。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-a3bede59-7902-4c62-8615-563adf480377.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 18 秒、执行约 23 分 1 秒；规划 8 次、General 62 次 Provider 请求，另有 5 次自动审查；General input 9631428／output 24514 token（input 含缓存读取 2019456）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-06-sources.zip`，SHA-256 `a6ff110dc2acfedb59b9fdc3bf7c745e5376adfb06818ba8af68b828d7060764`。
+
+### 2026-11-15：M1 第七轮，停在锚定
+- 骁龙 865／Android remote，十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样；新会话使用 GPT-6.1 Sol／Medium，capture 已打开且画面与设备一致。
+- 监工只输入短症状，对超出已知事实的澄清选一次“不知道”，原样批准并执行计划。General 写了 `cross-validated` Evidence，却没有区域到 draw 的 Claim，首个未满足步骤仍为锚定。
+- Trace 确认 General 实际收到上轮方法修改，写完锚点 Evidence 后直接转写假设，并表示没有正常参考而无法确认 First Bad Event；锚点 Claim 指令混在 Agreement 段中且未明确与 First Bad Event 分离，直接原因归方法文本层。
+- Pixel History 不可用后模型使用前后值与覆盖继续；shader 调试在不同于第六轮的像素坐标上断连，产品重开 capture 后继续并完成可逆实验。verifier 仍因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-8c897419-1f7e-45c8-a2ce-79596a01eccf.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 2 分 59 秒、执行约 28 分 17 秒；规划 7 次、General 108 次 Provider 请求，另有 8 次自动审查；General input 15702127／output 28822 token（input 含缓存读取 5356032）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-07-sources.zip`，SHA-256 `b509c37d6f90c1c04c93f212e1653cfe4dd5892e1a1ec68515cd29aa9a109bd5`。
+
+### 2026-11-15：M1 第八轮，停在首次异常
+- 骁龙 865／Android remote，新会话使用 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，capture 已打开且画面与设备一致。
+- 监工只输入短症状，对正常颜色选“不知道”，原样批准并执行计划。规划读取了第六轮在测试工程写出的结果文件并将其标为旧线索；General 在当前 capture 重做了锚点与对照。两份跨轮结果文本原样归档 `.local/vertical-investigation-20261108/evidence/m1-project-test-results.zip`。
+- 本轮写出 `cross-validated` Evidence 和区域到 draw 的 `observed_fact` Claim，锚定通过；只确认 EID 1248 为最早已抽查的对象输出边界，未证明异常最早出现事件，首个未满足步骤前移到首次异常。
+- Trace 中预载方法要求先写预期结果，没有说明正常参考未知时如何沿同一 capture 追踪症状首次出现；直接原因归方法文本层。已有签名实验完成并回滚，verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-7ffa3844-dfe3-4f8a-8d42-2a7d9c790453.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 45 秒、执行约 25 分 22 秒；规划 9 次、General 92 次 Provider 请求，另有 7 次自动审查；General input 13112467／output 25344 token（input 含缓存读取 6329344）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-08-sources.zip`，SHA-256 `dd6f70a0e34935b2f632586357fac0220021c1951bcdd61a73ae9c7de16ed5e9`。
+
+### 2026-11-15：M1 第九轮，停在首次异常
+- 预检时系统 ADB 在线而产品返回 `adb_device_invalid_response`；重启 ADB 后产品首次重试连接成功。骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium，十二个 Agent 内置、Memory 为空、Knowledge 保持原样，回放画面与设备一致。
+- 监工只输入短症状，对超出已知事实的澄清选一次“不知道”，原样批准并执行计划。锚定 Evidence 与 `observed_fact` Claim 已写；记录明确 EID 1242→1248 只是对象写入边界，未确立 First Bad Event，首个停点仍为首次异常。
+- Trace 显示计划安排了沿资源链回溯、事件搜索及目标／对照前后值，General 实际执行后 shader 调试返回 `replay_fatal_error`。设备栈 `.local/vertical-investigation-20261108/evidence/m1-round09-shader-debug-logcat.txt` 显示 shader 调试进入 Pixel History 并在 Adreno Vulkan 驱动崩溃。
+- 第三轮前已按 3.6 对同资源换事件、同事件换目标及换 mip／sample 各试一次；较早事件也断连。直接原因属工具／回放层：shader 调试未复用 Pixel History 已知冲突检查，原检查还错误地按查询事件截断用法。产品重开 capture 后完成可逆实验；verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-1edc4c74-0123-491c-a26b-a7e41421b69d.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 6 秒、执行约 27 分 45 秒；规划 8 次、General 108 次 Provider 请求，另有 7 次自动审查；General input 16669362／output 26716 token（input 含缓存读取 4370432）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-09-sources.zip`，SHA-256 `1a2190a2ce2d4ea109bd92f6b0c4f479776e481150bfafe8053723bf0a701b32`。
+
+### 2026-11-15：M1 第十轮，停在首次异常
+- 骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，capture 已打开且回放画面与设备一致。
+- 监工只输入短症状，对范围和正常参考两个澄清均答“不知道”，原样批准并执行计划。模型写出 `cross-validated` 锚点 Evidence 和区域到 draw 的 `observed_fact` Claim，但明确未证明首次异常，首个停点仍为首次异常。
+- 模型读取了目标资源更早的候选写入列表，却只对后半段事件做区域配对；实际收到的方法要求追踪首次出现并记录覆盖，却未指明检查更早候选写入，直接原因归方法文本层。
+- 目标 Pixel History 返回 `pixel_history_unsupported_input_attachment`，主进程核验恢复后保留租约；模型使用区域前后读数和覆盖继续，完成并回滚签名实验。verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-19a5bac5-a328-46c2-8b3c-08eaf71f3df7.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 10 秒、执行约 20 分 35 秒；规划 9 次、General 85 次 Provider 请求，另有 4 次自动审查；General input 11153388／output 21047 token（input 含缓存读取 3802880）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-10-sources.zip`，SHA-256 `1a8d56e27b825c5538e48df315cf92fa4ade8949ea32913eb3cd196bb318822a`；工程导出另存 `m1-round10-project-outputs.zip`。
+
+### 2026-11-15：M1 第十一轮，停在首次异常
+- 骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，capture 已打开且回放画面与设备一致。
+- 监工只输入短症状，对正常颜色及范围的澄清答“不知道”，原样批准并执行计划。模型写出交叉锚点 Evidence 和区域到 draw 的 `observed_fact` Claim，但明确未确立 First Bad Event，首个停点仍为首次异常。
+- Trace 确认模型收到上轮方法修改，搜索较早绘制并读取更早事件；它因缺正常颜色参考而未把可观察的症状出现记录为首次异常。方法未明确区分症状首次出现与预期正确性，直接原因归方法文本层。
+- 目标 Pixel History 标明不可用，模型经前后读数和覆盖继续，并完成及回滚签名实验；verifier 因 `MODEL_ROUTE_REQUIRED` 未启动，作为旁支保留。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-24274a08-6699-4f81-9364-0a6ee58b176c.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 5 秒、执行约 25 分 19 秒；规划 8 次、General 99 次 Provider 请求，另有 5 次自动审查；General input 14221762／output 26713 token（input 含缓存读取 5819392）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-11-sources.zip`，SHA-256 `0ab8466fbea431bd342eefaab2621cfdb6cb69ad33240bfd2a7152dac2bbc944`；工程导出另存 `m1-round11-project-outputs.zip`。
+
+### 2026-11-15：M1 第十二轮，停在区分
+- 骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，capture 已打开且回放画面与设备一致。
+- 监工只输入短症状，对正常颜色及范围的澄清答“不知道”，原样批准并执行计划。模型记录交叉锚点和 EID 1242→1248 的区域前后读数与 `observed_fact` Claim；首个未满足步骤为区分：竞争假设的记录缺少实验后的逐项最终裁决。
+- 已完成并回滚有五份回执的精度改动实验和语义不变重编译对照；模型记录了有范围的因果 Claim。独立 verifier 在读取证据前返回 `MODEL_ROUTE_REQUIRED`，后续整合任务等待该审查；直接原因在运行时模型路由，修复需要模型路由，且已满 12 轮，按 3.5 停止。
+- 目标 Pixel History 与 shader 调试均返回 `pixel_history_unsupported_input_attachment`，主进程核验恢复并保留 lease，模型改用事件前后值和 draw 覆盖；原始 shader 调试返回 `call_16f28bb01ca941cdb578a5b399ed2f5d.json`。
+- 产品恢复入口 capture、设备及事件 3029，终态回执 `rdc-lifecycle-41916a04-945b-48c7-b26c-8144c5f9e84a.json`；关闭回放后转发释放，设备临时单线程编译配置的原字节及属性已恢复。
+- 规划约 3 分 49 秒、执行约 54 分 29 秒；规划 9 次、General 151 次 Provider 请求，另有 1 次压缩和 19 次自动审查；General input 25238162／output 46895 token（input 含缓存读取 7351680）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-12-sources.zip`，SHA-256 `ed68393634a2bed2cbb91a3eb97860b87795c7301858b27b6a2c891a381b6aec`；工程导出另存 `m1-round12-project-outputs.zip`。
+
+### 2026-11-15：M1 用户指定补跑（第十三轮），停在首次异常
+- 骁龙 865／Android remote，新会话 GPT-6.1 Sol／Medium；十二个 Agent 来源均为内置，隔离 Memory 为空、Knowledge 保持原样，抓帧已打开且回放画面与设备一致。
+- 监工仅输入短症状，对正常颜色及范围的澄清答“不知道”，原样批准并执行计划。模型写出交叉锚点 Evidence 与区域到 draw 的 Claim，但明确只证明 EID 1242→1248 的抽样亮色边界，未排除全部更早写入，首个未满足步骤为首次异常。
+- 监工判断直接原因在方法文本：模型实际收到检查更早写入的指引，只在 EID 1176、1216、1242 等处抽样；指引未明确要求覆盖并排除全部更早候选写入。此前已满 12 轮，本次为用户指定补跑，按 3.5 停止。
+- 内置 verifier 两次实际使用 ChatGPT Account／GPT-6.1 Sol／Medium；首次因证据授权缺口返回 partial，General 补充授权后第二次完成审查，两条 Challenge 更新为 resolved。两次完成声明曾因缺 Checkpoint／报告被拒，补齐后最终声明为 completed。
+- 目标 Pixel History 返回 `pixel_history_unsupported_input_attachment`，主进程核验恢复并保留 lease，模型使用事件前后值与覆盖继续。可逆精度实验五份回执齐全并回滚，产品终态回执 `rdc-lifecycle-765d6638-2c6c-43f9-8aa9-8d708606656f.json` 回到入口 capture 与 EID 3029；关闭回放后转发释放，设备配置原字节及属性已恢复。
+- 规划约 5 分 06 秒、执行约 35 分 15 秒；规划 7 次、General 97 次、两次 verifier 共 25 次及自动审查 4 次 Provider 请求，共 input 14958155／output 49109 token（input 含缓存读取 4842240）。会话、子 Agent Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m1-20261115-round-13-sources.zip`，SHA-256 `67a8148ccbd68a2850fe43560d736fbfcb9531e2fcccbbd56c5ac1e0e230ce18`；工程导出另存 `m1-round13-project-outputs.zip`。
+- 2026-11-15 M1 第十三轮 verifier 授权旁查（只读）：审查 Task 有 `independentOfTaskIds`；首次委派输入的闭包提示新增 24 个引用、未列 `Not granted`；锚定与 IR 两份 Evidence 的 `claimIds` 均为空且未显式授予，导致其记录和相应读数、覆盖图、IR 原始材料未进入首次授权；补授后复审完成。证据为上述第十三轮源归档中的首次委派输入、Task、结果及两条 Challenge。
+- 2026-11-15 M2 启动前核对：隔离实例 Settings 中十二个 Agent 来源均为内置；Verifier 的 GPT-6.1 Sol 路由显示可用，其他十一个显示未选择模型。系统 ADB 仅有 `e38b8019`（`kona`），骁龙 8 Gen 1 未在线，按计划 3.5 阻塞；未新建调查会话或调整设备配置。
+- 2026-11-15 M2 再次启动前核对：隔离实例 Settings 的十二个 Agent 均为内置，GPT-6.1 Sol 路由均显示可用，默认档位为 Medium；用户解锁手机并重新开启 USB 调试后，Windows 可见手机与通用 WinUSB ADB 接口，系统 ADB 在重启及独立 libusb 复核后仍无设备，产品设备列表仅有本地；未新建调查会话或调整设备配置，M2 仍阻塞。
+- 2026-11-15 M2 设备接入：备份原 Windows 设备参数后，为该手机现有 Microsoft WinUSB 接口注册 ADB 标识并只重启该接口；用户在手机允许 USB 调试，ADB 显示 `b54ed446` 在线、`SM8475`，用户确认骁龙 8+ Gen 1 可用于 M2。用户放入的 `HairBlack_Mobile.rdc` 的 SHA-256 与账本登记的发黑 capture 一致。
+- 2026-11-15 M2 首轮前连接：按用户要求保留旧会话并新建 `sess_511eb886ad60`；产品发现并选择 `RMX3551` 后返回 `RDC_CLI_FAILED: remote_install_unconfirmed: Android installation could not be verified within the connection budget`，重启 ADB 并经产品重试后仍未确认。设备存在 11 月 12 日创建、包名未知且未提交的活动安装会话 `78666123`，原始活动会话输出保存在 `.local/m2-adb-interface-20261115/package-active-install.txt`；该会话未修改，回放未打开，无转发残留，按 3.5 因需用户决定而阻塞。
+- 2026-11-15 M2 设备安装清理：用户授权仅取消 `78666123`；执行 `adb shell pm install-abandon` 后 Android 返回 `SecurityException: Caller has no access to session 78666123`，该系统安装器持有的会话仍未提交且存在。原始返回保存在 `.local/m2-adb-interface-20261115/package-abandon-78666123.txt`，未扩大设备权限。
+- 2026-11-15 M2 连接与配置缺失：用户重启手机后活动安装会话为空；产品准备匹配服务时卸载原 RenderDocCmd，用户完成手机系统扫描后新服务已安装（versionCode 149），但原 `/sdcard/Android/media/org.renderdoc.renderdoccmd.arm64/files/renderdoc.conf` 已不存在。监工此前只记录原文件 SHA-256 `d235f48e90e4e8e486b5719dba0d2da28928eca9eff6059011cbbe613ea27466` 和属性，未保存文件副本；已查找设备及本机候选，未找到哈希一致的副本。回放未打开、无转发残留，等待用户决定恢复方式。
+- 2026-11-15 M2 继续：用户确认没有原配置备份，允许重新生成默认配置并保留旧测试会话；手机在线、活动安装会话为空，沿用尚未发起调查的 M2 空白会话。
+- 2026-11-15 M2 首轮预检：RenderDocCmd 生成的默认配置 SHA-256 为 `6a0ecaa762d1bba2ee80d0bdb201cc584195f11f66d0a1412322ef0b6834b349`，已保存副本；用户关闭手机系统提示后，产品连接 `RMX3551` 并打开发黑 capture，EID 2653 的产品预览与手机画面一致且显示设备画面已同步，手机画面保存在 `.local/m2-adb-interface-20261115/device-replay.png`；未临时调整设备配置。
+
+### 2026-11-15：M2 第一轮，待用户确认
+- 骁龙 8+ Gen 1／Android remote，十二个 Agent 内置、GPT-6.1 Sol／Medium，隔离 Memory 为空、Knowledge 保持原样；用户授权保留旧会话。监工仅输入短症状、对超出已知事实的澄清答“不知道”，原样批准并执行计划。
+- EID 2065 头发覆盖与前后区域读数、竞争解释和 `exp-hair732` 可恢复 A-B-A 实验支持头部局部结论；五份签名回执齐全，verifier 完成独立核验，两条 Challenge resolved、一条对不再使用的 645 视觉锚点降域为 wont_fix，当前无 open Challenge。
+- 按 2.3 实质判断交付并保留疑点：EID 2059→2065 两侧均偏暗，未确立异常首次出现边界；肩部仍黑，产品最终声明为 `partial` 而非 completed。历史线索经当前 capture 实验验证，结论只覆盖头部局部。
+- 旁支：首个 verifier 因三项原始材料授权缺口建议总体 `partial`；补授后两项解决，一项随 645 视觉主张降域。补授 645 小图的一次委派另返回 `ARTIFACT_NOT_FOUND`；最终限定版核验完成，这些问题未成为本轮停点。
+- 交付门禁：General 模型配置将 `tools` 改为 YAML 行内数组后，旧门禁仍按多行文本匹配导致误报；门禁改用运行时严格解析器核对 `knowledge` token，完整门禁通过。
+- 终态回执 `rdc-lifecycle-204dab9b-d48c-496c-bd9e-2d13b6cef2b0.json` 确认恢复入口 capture、设备及 EID 2653；关闭回放后 ADB 转发为空，用户授权生成的默认配置哈希与调查前一致，未作临时配置调整。
+- 规划约 4 分 13 秒、执行约 45 分 42 秒；规划 8 次、General 102 次、verifier 32 次及自动审查 5 次 Provider 请求，共 input 20788132／output 60240 token（input 含缓存读取 5992192）。会话、Trace、Task、回执和最小工程输出归档 `.local/vertical-investigation-20261108/evidence/m2-20261115-round-01-sources.zip`，SHA-256 `93fd0fed5f4f8e950d0cb1b2b3bb4d779c8c659b740334097da35a3b60c2a2ef`。
+
+- 2026-11-15 M3 首轮预检：基线 `6c6e80835c6245e74c5efe8afc552029ad170786`；十二个 Agent 均为内置且 GPT-6.1 Sol 可用，隔离 Memory 与项目知识目录为空。隔离知识副本与真实库逐文件一致，仅有发白 `AIRD-20260207-0001` 和发黑 `AIRD-20260207-0002` 两张卡片，未发现眼部白点材料，移除 0 张；真实知识库未改动。
+- PC 本机已打开眼部 capture，产品显示“部分就绪”，诊断为 `Final Present does not identify exactly one swap-buffer resource`，入口 EID 147 暂无可用画面；M2 测试会话已在归档校验后删除，用户此前要求保留的 M1 会话仍保留。
+
+### 2026-11-15：M3 第一轮，部分结果待用户判断
+- PC 本机、新会话、GPT-6.1 Sol／Medium；监工仅输入短症状，对位置及正常外观的澄清答“不知道”，原样批准并执行计划。
+- 首个未闭合步骤为锚定：模型观察到候选点由 EID 2720 写入，但未证明该点与最终白点的精确映射；未完成首次异常、竞争解释区分、因果实验和独立核验。
+- 两次 `rd.texture.get_region_values` 分别在不同事件和资源返回 `Unsupported texture component type: B8G8R8A8_TYPELESS`，两次租约均被隔离；来源任务声明 `partial`，最终声明为 `blocked`，未按相同条件重试或开始下一轮。
+- 模型内 `capture_restore` 返回 `RDC_SWITCH_BINDING_CHANGED`；终答后监工通过产品“恢复原位置”回到同一 capture／本机／EID 147，签名回执 `rdc-lifecycle-404aadab-1611-46e8-a104-1b3b15c74e5c.json`，随后关闭回放并停止本轮进程。
+- 规划约 3 分 41 秒、执行约 27 分 59 秒；规划 8 次、General 78 次、子 Agent 10 次及自动审查 2 次 Provider 请求，共 input 10250239／output 33456 token（input 含缓存读取 1916160）。会话、Trace、Task、回执和阶段性报告归档 `.local/vertical-investigation-20261108/evidence/m3-20261115-round-01-sources.zip`，SHA-256 `f74e8f7c5edecb6e5071c1ff9744566f73f3d68451b61327d1e9252fe88189f9`。
+- 2026-11-16 M3 第一轮单点复验：独立会话经产品在 EID 2720 对 `ResourceId::2051270` 执行一次原区域读取，复现 `Unsupported texture component type: B8G8R8A8_TYPELESS`；主进程因无状态恢复凭据隔离 lease，之后通过产品关闭回放。原始返回 `.local/vertical-investigation-20261108/evidence/m3-round01-typeless-product-reproduction.json`，SHA-256 `f39d960ba36459fecbc43e85c7ec126145f21e5d5894bbdace2f69af058ffec6`；无人工介入。
+
+### 2026-11-16：M3 第二轮，继续调查
+- PC 本机、新会话；十二个 Agent 来源均为内置，ChatGPT Account／GPT-6.1 Sol／Medium 可用，Fast、Max 关闭。隔离 Memory 为空；模型读取了测试工程内第一轮报告及旧图，询问位置时监工答“不知道”，原样批准计划。
+- 产品成功按 `B8G8R8A8_UNORM` 视图读取 `B8G8R8A8_TYPELESS` 区域；调查记录以像素历史、区域前后读数及 draw 覆盖交叉定位泪腺候选区域，并保留最终画面经后处理映射的限制。
+- 独立审查提出四项 Challenge，General 补证后将其关闭并取得复审；目标片元 debug 输出与 Pixel History 不一致、目标输入／lane 未核实；capture 无可编译 shader 源，未执行可恢复因果实验，按 2.3 不能交付，继续按 3.3 查因果停点。
+- 产品接受 `turn_complete` 的 `partial`；随后显示模型请求失败，技术信息为 `PROVIDER_STREAM_MISSING_FINAL_ANSWER`，请求轨迹中保存了模型的 final_answer；未据此认定账号或额度不可用。第一轮 `RDC_SWITCH_BINDING_CHANGED` 本轮未见再次发生。
+- 现场恢复回执 `rdc-lifecycle-90ee1335-328f-43f5-a256-080282234ca5.json` 确认同一 capture／本机／入口 EID 147、replacement 0；随后监工通过产品关闭回放并停止本轮进程。
+- 会话、Task、模型请求、Trace 和回执归档 `.local/vertical-investigation-20261108/evidence/m3-20261116-round-02-sources.zip`，SHA-256 `da719ce1357c0ef045faf5787c7c32a01f9b49c72d88360f72b6fc308503486e`；测试工程产物另存 `m3-20261116-round-02-project-output.zip`，SHA-256 `566b18bdbca1edf4def2bba631ac215e2856200f4777672db5e11c39830a705a`。
+- 2026-11-16 M3 第二轮复验一：监工经独立产品会话各执行一次原像素历史和同一 primitive 的 debug、continue、`_OUT` 读取及 finish，复现历史 shader-out 与终态 debug 输出不一致；恢复入口 EID 147 后关闭回放。原始返回归档 `m3-round02-debug-product-reproduction.zip`，SHA-256 `35ea1bb3af76a075107ae576ec6e52c35deb12fbd3588fd31200de15edbec76c`。
+- 2026-11-16 M3 第二轮复验二：同一独立产品会话重开 capture，各执行一次 debug、continue、`_IN` 读取及 finish，原始返回 `variables=[]、truncated=false`；恢复入口 EID 147 后关闭回放。原始返回归档 `m3-round02-input-product-reproduction.zip`，SHA-256 `8a26500856918ee08684b1813c4ed55fea8e12a80b5ba70d1e962218bbcc795c`。
+
+### 2026-11-16：M3 第三轮，停在因果
+- PC 本机、新会话；十二个 Agent 均为内置，GPT-6.1 Sol／Medium，Fast、Max 关闭，隔离 Memory 为空。监工只输入短症状，对超出已知事实的澄清答“不知道”，原样批准计划；模型把工程中前轮报告作为线索，并在当前 capture 上复核。
+- 产品读回修复后的 `_IN`：7 个成员、`variable_origin=trace_input`、未截断；泪腺 draw 覆盖与事件前后读数支持限定场景点，最终白点采样链仍有疑点。
+- 产品声明 `partial`，没有 Experiment 或五份因果回执，尚不满足交付条件；按 3.3 复验后判定目标管线状态干预超出现有权限，见下。产品自动审核拒绝运行计算脚本，理由为审核材料中的脚本内容被截断、无法确定完整命令和主机影响；模型将相关精确数值降级为未独立复算估计。
+- 终态回执 `rdc-lifecycle-14346da4-683e-4030-be11-9479081c8cd3.json` 确认同一 capture／本机／入口 EID 147、replacement 0；监工随后关闭回放并停止本轮进程。
+- 规划约 3 分 25 秒、执行约 52 分 25 秒；General 回报 input 12577362／output 56446 token（input 含缓存读取 2698752）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m3-20261116-round-03-sources.zip`，SHA-256 `792dd2b014df455971009ddd5a93762362ba81cac2e5cd833f8e681aef5bcbb4`；工程增量产物归档 `m3-20261116-round-03-project-output-delta.zip`，SHA-256 `93893763b325a8b7593e6f091256d87f043e4a0c9187f8453a6da94cf88aa2e8`，与第二轮工程产物合用。
+- 2026-11-16 M3 第三轮因果复验：独立会话经产品冻结目录核对 129 项，允许效果不含单 draw shading-rate 状态写入；目标 `rd.shader.get_source` 一次有效查询返回 `source_available=false`、`can_build=false`、`can_replace=false`。监工最初误给大写 `PS`，主进程校验拒绝且未触达回放；更正为小写 `ps` 后查询一次。新增该管线状态干预需扩大产品允许的效果及相应恢复／回执边界，按 3.5 阻塞；未将源码缺失当作 capture 不可用。诊断回到 EID 147 后关闭回放；原始返回、Trace 与会话归档 `m3-round03-intervention-product-recheck.zip`，SHA-256 `4ceeb59f18923e7bbd0c95b63b291f6fa8f82eeaae5dbfabe77cbb01a44e23c5`。

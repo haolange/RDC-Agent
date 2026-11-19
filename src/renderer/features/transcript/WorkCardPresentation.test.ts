@@ -93,7 +93,7 @@ const documentText = JSON.stringify({ capsule: {
   stopConditions: ['Original stop'], acceptedFacts: [{ statement: 'Original fact', qualification: 'Qualified', sourceRefs: ['source'] }],
   hypotheses: ['Hypothesis'], challengeRefs: ['challenge'], inputArtifactRefs: ['input'],
   negativePaths: [{ path: 'Exclude write', reason: 'Immutable', applicableWhen: 'Always', recheckWhen: 'Never' }],
-  requiredSkillIds: ['skill'], profile: 'general', model: 'model', reasoningLevel: 'low', domainExtensions: {},
+  requiredSkillIds: ['skill'], profile: 'general', domainExtensions: {},
   budget: { maxToolCalls: 0, maxWallTimeMs: 0, maxSubagents: 0 },
 }, completionRequirements: ['deliverable'] });
 
@@ -141,10 +141,12 @@ it('keeps original fields reachable while hiding secondary groups initially and 
   expect(closed.match(/Original task/g)).toHaveLength(1);
   expect(closed).toContain('chat.subagentBudgetChildren:0');
   const opened = render(true);
-  for (const text of ['Original fact', 'Qualified', 'source', 'Hypothesis', 'challenge', 'input', 'Exclude write', 'Immutable', 'Always', 'Never', 'skill', 'model', 'low', 'deliverable']) {
+  for (const text of ['Original fact', 'Qualified', 'source', 'Hypothesis', 'challenge', 'input', 'Exclude write', 'Immutable', 'Always', 'Never', 'skill', 'general', 'deliverable']) {
     expect(opened).toContain(text);
   }
   expect(opened).not.toContain('chat.subagentFieldDomain');
+  expect(opened).not.toContain('chat.subagentFieldModel');
+  expect(opened).not.toContain('chat.subagentFieldReasoning');
   const document = new DOMParser().parseFromString(opened, 'text/html');
   expect(document.querySelectorAll('.work-document-surface')).toHaveLength(0);
   expect(document.querySelector('.work-process-subagent-task-document')?.textContent).toContain('Original output');

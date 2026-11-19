@@ -182,6 +182,11 @@ describe('TurnCoordinator', () => {
 });
 
 describe('SubagentBudget', () => {
+  it('preserves the existing default delegation depth without a small child count limit', () => {
+    expect(DEFAULT_SUBAGENT_BUDGET.maxDepth).toBe(3);
+    expect(DEFAULT_SUBAGENT_BUDGET.maxChildren).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
   it('enforces maxDepth / maxChildren', () => {
     const state = createSubagentBudgetState({ ...DEFAULT_SUBAGENT_BUDGET, maxDepth: 2, maxChildren: 1 });
     assertSubagentBudgetAllowsChild(state);

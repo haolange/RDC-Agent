@@ -27,7 +27,8 @@ it('projects visible loop and tool status while excluding hidden reasoning and c
     thinking: { kind: 'raw', source: 'unknown', visibility: 'hidden', text: 'secret thought' },
   }, 1));
   expect(state.trace.blocks).toHaveLength(0);
-  state = projectDelegatedEvent(state, event('delta', 'assistant.delta', { text: 'Checking config.' }, 2));
+  state = projectDelegatedEvent(state, event('delta', 'assistant.delta', { text: 'Checking config.',
+    providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 } }, 2));
   state = projectDelegatedEvent(state, event('requested', 'tool.requested', {
     toolCall: { id: 'read', name: 'read_file', arguments: { path: 'config', password: 'private' } },
   }, 3));
@@ -35,10 +36,32 @@ it('projects visible loop and tool status while excluding hidden reasoning and c
     toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done' } },
   }, 4));
   const block = state.trace.blocks[0];
-  expect(block?.result?.text).toContain('Checking config.');
+  expect(block?.outputItems?.[0].text).toContain('Checking config.');
+  expect(block?.result?.text).toBeUndefined();
   expect(block?.thinking).toBeUndefined();
   expect(block?.toolCalls[0]).toMatchObject({ id: 'read', toolName: 'read_file', status: 'complete' });
   expect(block?.toolCalls[0]?.argsPreview).not.toContain('private');
+});
+
+it('keeps child text identities, task snapshots and tools in first-visible order', () => {
+  let state = createDelegatedProjectionState();
+  const ref = (index: number) => ({ protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index });
+  state = projectDelegatedEvent(state, event('text', 'assistant.delta', { text: 'Checking', providerOutputRef: ref(0) }, 1));
+  state = projectDelegatedEvent(state, event('task', 'task.created', {
+    taskId: 'task', title: 'Inspect', status: 'pending',
+  }, 2));
+  state = projectDelegatedEvent(state, event('requested', 'tool.requested', {
+    toolCall: { id: 'read', name: 'read_file', arguments: {} },
+  }, 3));
+  state = projectDelegatedEvent(state, event('started', 'tool.started', { toolCallId: 'read', toolName: 'read_file' }, 4));
+  state = projectDelegatedEvent(state, event('second', 'assistant.delta', {
+    text: 'Details', phase: 'commentary', providerOutputRef: ref(1),
+  }, 5));
+  const loop = state.trace.blocks.find((block) => block.kind === 'llm_turn')!;
+  const task = state.trace.blocks.find((block) => block.kind === 'task_snapshot')!;
+  expect(loop.outputItems?.map((item) => item.phase)).toEqual(['commentary', 'commentary']);
+  expect([loop.outputItems![0].displayOrder, task.displayOrder, loop.toolCalls[0].displayOrder,
+    loop.outputItems![1].displayOrder]).toEqual([1, 2, 3, 4]);
 });
 
 it('places tool Hook events on their exact call and keeps unowned diagnostics in order', () => {

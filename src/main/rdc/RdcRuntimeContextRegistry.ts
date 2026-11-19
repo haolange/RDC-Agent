@@ -23,6 +23,8 @@ export interface RdcContextLease {
   ownerTurnId?: string;
   parentVersion?: number;
   quarantineReason?: string;
+  /** Main-observed native failure used to bound one same-condition recovery attempt. */
+  quarantineCause?: { operation: string; argsFingerprint: string; code: string };
 }
 
 export interface GrantDelegatedLeaseInput {
@@ -107,6 +109,7 @@ export function getRdcContextLease(sessionId: string | null | undefined): RdcCon
   return {
     ...lease,
     runtimeContext: cloneRuntimeContext(lease.runtimeContext),
+    ...(lease.quarantineCause ? { quarantineCause: { ...lease.quarantineCause } } : {}),
   };
 }
 
@@ -227,7 +230,7 @@ export function revokeDelegatedLease(childSessionId: string, options?: { operati
   if (!trimmed) return false;
   const lease = leasesBySession.get(trimmed);
   if (lease?.delegatedFrom && (options?.operationStopped !== true || lease.quarantineReason)) {
-    quarantineRdcContext(lease.delegatedFrom, undefined, lease.quarantineReason ?? 'Delegated operation exit was not confirmed.');
+    quarantineRdcContext(lease.delegatedFrom, undefined, lease.quarantineReason ?? 'Delegated operation exit was not confirmed.', lease.quarantineCause);
   }
   for (const [parent, child] of delegatedChildByParent) {
     if (child === trimmed) {
@@ -260,8 +263,11 @@ export function listRdcContextLeaseSessionIds(): string[] {
 }
 
 /** Preserve an uncertain binding for inspection, while refusing further execution or delegation. */
-export function quarantineRdcContext(sessionId: string, expectedVersion: number | undefined, reason: string): void {
+export function quarantineRdcContext(sessionId: string, expectedVersion: number | undefined, reason: string,
+  cause?: RdcContextLease['quarantineCause']): void {
   const lease = leasesBySession.get(sessionId);
   if (!lease || (expectedVersion !== undefined && lease.version !== expectedVersion)) return;
   lease.quarantineReason = reason;
+  // A later cleanup error must not replace the first observed native failure.
+  if (!lease.quarantineCause && cause) lease.quarantineCause = { ...cause };
 }

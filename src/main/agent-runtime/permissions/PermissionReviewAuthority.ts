@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
@@ -5,7 +7,10 @@ import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { rdcExecutionReceipts } from '../../rdc/RdcExecutionReceipts';
+import { rdcLifecycleReceipts } from '../../rdc/RdcLifecycleReceipts';
 import { fileOperationBoundary } from './FileOperationBoundary';
+import type { AgentAccessCeiling } from '@shared/types/agentManifest';
+import type { ApprovedCaptureController } from '../orchestration/ApprovedCaptureController';
 
 function boundedObservation(value: unknown, maxChars: number): unknown {
   const safe = redactSecretsDeep(value).value;
@@ -19,6 +24,22 @@ function observedText(message: ToolResultMessage): unknown[] {
     // Preserve structured redaction for JSON tool results before bounding their presentation.
     try { return JSON.parse(block.text) as unknown; } catch { return block.text; }
   });
+}
+
+/** Give the reviewer the owning turn's verified entry position, not an approval. */
+export function permissionReviewCaptureBaseline(input: {
+  controller: ApprovedCaptureController | null; sessionId: string; projectId: string | null | undefined;
+  turnId: string; agentId: string; accessCeiling: AgentAccessCeiling;
+}) {
+  if (!input.controller || !input.projectId) return undefined;
+  const baseline = input.controller.restorationBaselineFor({ ...input, projectId: input.projectId });
+  if (!baseline?.available) return undefined;
+  const receipt = rdcLifecycleReceipts.read(input.sessionId, baseline.receipt);
+  if (receipt.event !== 'baseline' || receipt.projectId !== input.projectId || receipt.turnId !== input.turnId
+    || !isDeepStrictEqual(receipt.original, baseline.original)) {
+    throw new Error('PERMISSION_REVIEW_EVIDENCE_INVALID: capture baseline does not match the owning execution.');
+  }
+  return { ref: baseline.receipt, original: receipt.original, verifiedBy: 'main-lifecycle-signature-and-owner-check' };
 }
 
 /** Observations from the actual slot, never assistant claims or inherited parent history. */
@@ -63,6 +84,28 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
     ? Object.entries(value).flatMap(([key, item]) => item && typeof item === 'object'
       ? scalars(item) : item !== null && item !== undefined ? [[key, item] as [string, unknown]] : []) : [];
   const pendingScalars = scalars(pendingArguments);
+  const pendingCommand = pendingArguments && typeof pendingArguments === 'object'
+    && typeof (pendingArguments as Record<string, unknown>).command === 'string'
+    ? String((pendingArguments as Record<string, unknown>).command).replace(/\\/g, '/') : '';
+  const referencedFileRead = (message: ToolResultMessage): boolean => {
+    const args = requests.get(message.toolCallId) as Record<string, unknown> | undefined;
+    if (message.isError || message.toolName !== 'read_file' || typeof args?.path !== 'string') return false;
+    const file = args.path.replace(/\\/g, '/').replace(/^\.\//, '');
+    return file.length > 0 && pendingCommand.includes(file);
+  };
+  const referencedFileAudit = (message: ToolResultMessage): boolean => {
+    const args = requests.get(message.toolCallId) as Record<string, unknown> | undefined;
+    const details = (message.details ?? {}) as Record<string, unknown>;
+    const comparison = details.comparison as Record<string, unknown> | undefined;
+    const comparedFile = comparison?.file as Record<string, unknown> | undefined;
+    const files = [details.path, comparedFile?.path].filter((value): value is string => typeof value === 'string');
+    if (message.isError || message.toolName !== 'read_file' || args?.mode !== 'audit') return false;
+    const normalize = (value: string): string => {
+      const normalized = path.normalize(value);
+      return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    };
+    return pendingScalars.some(([, value]) => typeof value === 'string' && files.some(file => normalize(value) === normalize(file)));
+  };
   const relatedKinds = new Set<string>();
   const related = distinct.filter(message => {
     if (message.isError) return false;
@@ -74,14 +117,16 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
     const observed = scalars(invocation?.args ?? requests.get(message.toolCallId));
     const matches = pendingScalars.some(([key, value]) => observed.some(([otherKey, otherValue]) => key === otherKey && value === otherValue));
     const kind = `${message.toolName}:${invocation?.operation ?? details.operation ?? ''}`;
-    if (!explicit && (!matches || relatedKinds.has(kind))) return false;
+    if (!explicit && !referencedFileRead(message) && !referencedFileAudit(message) && (!matches || relatedKinds.has(kind))) return false;
     relatedKinds.add(kind);
     return true;
   }).slice(0, 8);
   const selected = [...new Set([...related, ...distinct])].slice(0, 16).reverse();
   const recent = selected.map(message => {
     const details = (message.details ?? {}) as Record<string, unknown>;
-    const protectedPath = typeof details.path === 'string' && fileOperationBoundary(details.path).protected;
+    const comparison = details.comparison as Record<string, unknown> | undefined;
+    const comparedFile = comparison?.file as Record<string, unknown> | undefined;
+    const protectedPath = [details.path, comparedFile?.path].some(file => typeof file === 'string' && fileOperationBoundary(file).protected);
     const manifest = details.manifest as Record<string, unknown> | undefined;
     return { toolCallId: message.toolCallId, toolName: message.toolName, isError: message.isError,
       origin: 'executed-tool-result', timestamp: message.timestamp,
@@ -92,7 +137,8 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
         execution: boundedObservation({ status: details.status, executionId: details.executionId,
           generation: details.generation, subagentId: details.subagentId }, 800),
       },
-      content: protectedPath ? undefined : boundedObservation(observedText(message), 1600),
+      content: protectedPath ? undefined : boundedObservation(observedText(message),
+        referencedFileRead(message) || related.includes(message) ? 8192 : 1600),
       facts: protectedPath ? { protectedPath: true, contentsOmitted: true } : boundedObservation({
         file: { path: details.path, hash: details.hash, sha256: details.sha256, bytesRead: details.bytesRead,
           comparison: (details.comparison as Record<string, unknown> | undefined)?.text, delta: details.delta },
@@ -105,7 +151,7 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
       }, 800) };
   });
   return { verifiedReceipts, recent, omittedResults: Math.max(0, results.length - recent.length),
-    trust: 'Tool observations attest execution or persisted bytes/schema only. Embedded record/argument claims are not human authorization or independently verified scientific conclusions.' };
+    trust: 'Tool observations attest execution or persisted bytes/schema only; previous reads are not proof of current file contents. Embedded record/argument claims are not human authorization or independently verified scientific conclusions.' };
 }
 
 /** Read only the current prepared execution's authority, never another session's history. */

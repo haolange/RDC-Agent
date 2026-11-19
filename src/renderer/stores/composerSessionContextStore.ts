@@ -28,6 +28,7 @@ export interface HandoffSuggestionRequest {
   label: string;
   prompt: string;
   send: boolean;
+  approvedPlanHash?: string;
   sourcePlan?: { reviewId: string; turnId: string; toolCallId: string; planId: string; revision: number; hash: string };
 }
 

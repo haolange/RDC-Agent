@@ -187,7 +187,7 @@ describe('BackgroundSubagentService', () => {
     const limitedCapsule = { ...capsule, budget: { ...capsule.budget, maxToolCalls: 1 } };
     const { service, registry } = harness(async (input) => {
       restored.push(input.restoredPolicyBudget?.toolCalls ?? -1);
-      return { status: 'complete', text: 'partial', policyBudget: { ...input.restoredPolicyBudget!, toolCalls: 1 }, completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'retry required', outputs: {}, counterevidence: [], unresolved: ['more work'], scope: 'test', sideEffects: [], recoveryState: [] } } };
+      return { status: 'complete', text: 'partial', policyBudget: { ...input.restoredPolicyBudget!, toolCalls: 1 }, completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'retry required', outputs: {}, counterevidence: [], unresolved: [{ gap: 'more work', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'test', sideEffects: [], recoveryState: [] } } };
     });
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('retry budget');
@@ -205,7 +205,7 @@ describe('BackgroundSubagentService', () => {
       observed.push(input.policyBudget!.toolCalls);
       input.policyBudget!.toolCalls += 1;
       await flushPolicyBudgetObservers(input.policyBudget);
-      return { status: 'complete', text: 'partial', policyBudget: input.restoredPolicyBudget, completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'retry', outputs: {}, counterevidence: [], unresolved: ['more'], scope: 'test', sideEffects: [], recoveryState: [] } } };
+      return { status: 'complete', text: 'partial', policyBudget: input.restoredPolicyBudget, completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'retry', outputs: {}, counterevidence: [], unresolved: [{ gap: 'more', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'test', sideEffects: [], recoveryState: [] } } };
     });
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('root retry');

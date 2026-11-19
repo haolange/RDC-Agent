@@ -45,8 +45,8 @@ sequenceDiagram
   IPC->>Session: openProjectInput or preview
   alt Local Replay Device
     Session->>Runtime: rd.capture.open_file + rd.capture.open_replay
-  else Android Replay Device
-    Session->>Runtime: rd.remote.connect then capture operations
+  else Android Replay Device (connected earlier by device:prepare)
+    Session->>Runtime: reuse owning context: rd.capture.open_file + rd.capture.open_replay(options.remote_id)
   end
   Runtime->>Shell: fixed operation + args + frozen CLI settings
   Shell->>CLI: configured shell command
@@ -57,9 +57,11 @@ sequenceDiagram
   IPC-->>UI: context:changed and opened capture state
 ```
 
+turn 冻结、lease/quarantine、`rdc_probe`、`capture_select / restore / recover` 等 RDC 操作契约见 [`rdc-runtime.md`](rdc-runtime.md)。
+
 RDC installation details remain under `settings.tooling.rdcCli`. The main session boundary constructs the fixed native operation names and arguments, and freezes CLI settings for each turn; renderer and preload never construct lifecycle commands.
 
-Local Open invokes `rd.capture.open_file` followed by `rd.capture.open_replay`. Remote Open first invokes `rd.remote.connect`, then passes its returned `remote_id` to the replay operation. Failures expose structured diagnostics (`message`, optional `classification` / `fix_hint`) rather than truncated CLI stderr alone.
+Local Open invokes `rd.capture.open_file` followed by `rd.capture.open_replay`. `rd.remote.connect` 在选择 Android Replay Device 时由 `device:prepare` 执行；Remote Open 复用该连接所属的 context，依次调用 `rd.capture.open_file` 与 `rd.capture.open_replay`，并以 `options.remote_id` 绑定已准备好的连接，返回的 `remote_id` 必须与所选连接一致。 Failures expose structured diagnostics (`message`, optional `classification` / `fix_hint`) rather than truncated CLI stderr alone.
 
 ## Trace Projection
 
@@ -68,7 +70,7 @@ sequenceDiagram
   participant Conversation as ConversationService
   participant Trace as TraceService
   participant IPC as trace IPC
-  participant UI as AgentRunView / SessionRightRail
+  participant UI as ConversationThread / SessionRightRail
 
   Conversation->>Trace: publish conversation/tool/action events
   UI->>IPC: trace:getProjection

@@ -22,6 +22,7 @@ import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools
 import type { TurnPreparationService } from './TurnPreparationService';
 import type { AgentProfileTurnOptions, PreparedAgentTurnContext } from './orchestratorTypes';
 import { newDelegationBudgetExhausted } from './DelegationAdmission';
+import { DelegationConfigurationError } from './DelegationConfigurationError';
 
 export function resolveProfileToolAllowlist(
   allowlist: string[],
@@ -99,11 +100,15 @@ export class ProfileTurnPreparation {
           requestedTemperature: input.temperature,
         });
     if (!planning.ok) {
-      throw new Error(`${planning.code}: ${planning.message}`);
+      const message = `${planning.code}: ${planning.message}`;
+      if (input.frozenDelegationCapsule) throw new DelegationConfigurationError(planning.code, message);
+      throw new Error(message);
     }
     const effectiveModel = resolveEffectiveModel(input.providerId, input.modelId, settings);
     if (!effectiveModel) {
-      throw new Error(`MODEL_UNAVAILABLE: ${input.providerId}/${input.modelId}`);
+      const message = `MODEL_UNAVAILABLE: ${input.providerId}/${input.modelId}`;
+      if (input.frozenDelegationCapsule) throw new DelegationConfigurationError('MODEL_UNAVAILABLE', message);
+      throw new Error(message);
     }
     const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(

@@ -1,6 +1,7 @@
 import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeLaneHit } from '@shared/types/knowledge';
 import { cn } from '../../../../lib/cn';
 import { Badge } from '../../../../ui/Badge';
+import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
@@ -133,9 +134,14 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
             key={hit.cardId}
             hit={hit}
             active={state.selectedCardId === hit.cardId}
-            onSelect={() => void state.selectCard(hit.spaceId, hit.relativePath, hit.cardId)}
+            onSelect={() => void state.selectCard(hit.spaceId, hit.relativePath, hit.cardId, hit.contentHash)}
           />
         ))}
+        {!loading && state.viewMode === 'cards' && state.page.nextOffset !== undefined ? (
+          <Button variant="ghost" size="sm" onClick={() => void state.loadMore()} disabled={state.loadingMore}>
+            {state.loadingMore ? t('knowledgeCenter.loading') : t('knowledgeCenter.loadMore')}
+          </Button>
+        ) : null}
         {!loading && state.viewMode === 'candidates' && inbox && !reason && (
           <>
             {inbox.candidates.length > 0 ? (

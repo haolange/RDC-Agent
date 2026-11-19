@@ -6,9 +6,10 @@ const orchestrator = vi.hoisted(() => ({
   releaseProviderRuntimeCredentials: vi.fn(),
   backgroundSubagents: { beforeParentProviderRequestMessages: vi.fn(() => []) },
 }));
+const storage = vi.hoisted(() => ({ updateSession: vi.fn(), updateRun: vi.fn(), commitConversationTerminal: vi.fn() }));
 
 vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({ agentOrchestrator: orchestrator }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { updateSession: vi.fn(), updateRun: vi.fn() } }));
+vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: storage }));
 vi.mock('./ConversationAttachmentMaterializer', () => ({ hydrateFrozenUserContent: vi.fn(async () => 'inspect') }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('./approvedPlanExit', () => ({ verifyApprovedPlanExit: (_session: string, _turn: string, approved: unknown) => Boolean(approved) }));
@@ -21,7 +22,7 @@ function message(role: 'user' | 'assistant', status: ConversationMessage['status
 
 const messageOf = (event: ConversationStreamEvent | undefined): ConversationMessage | undefined => (event as { message?: ConversationMessage } | undefined)?.message;
 
-function runTurn(): { events: ConversationStreamEvent[]; done: Promise<void> } {
+function runTurn(withApprovedExecution = false): { events: ConversationStreamEvent[]; done: Promise<void> } {
   const events: ConversationStreamEvent[] = [];
   const host: ConversationTurnRunnerHost = {
     persistConversationSnapshot: () => null,
@@ -34,7 +35,7 @@ function runTurn(): { events: ConversationStreamEvent[]; done: Promise<void> } {
     ephemeralTraceSessionId: (turnId) => `conversation-${turnId}`,
   };
   const input = {
-    context: { session: null, projectId: null, currentRun: null },
+    context: { session: withApprovedExecution ? { sessionId: 'session' } : null, projectId: null, currentRun: null },
     requestedProfileId: 'general',
     requestedAgentId: 'general',
     rawMessage: 'inspect',
@@ -47,7 +48,9 @@ function runTurn(): { events: ConversationStreamEvent[]; done: Promise<void> } {
     preparedPrompt: { projectRootPath: null, promptPlan: { systemPrompt: '' }, visibleTurnIds: [] },
     preparedTurn: {
       effectiveModel: {}, frozenUserContent: 'inspect', attachmentManifest: null,
-      runtime: { effectivePlan: { fingerprint: 'frozen-plan', profileHandoffs: [] }, mcpLease: null, credentialHandle: null },
+      runtime: { effectivePlan: { fingerprint: 'frozen-plan', profileHandoffs: [] }, mcpLease: null, credentialHandle: null,
+        ...(withApprovedExecution ? { approvedExecution: { offer: { offerId: '11111111-1111-4111-8111-111111111111',
+          plan: { uri: 'session://plans/frozen.md', hash: 'a'.repeat(64) } } } } : {}) },
     },
   } as unknown as CompleteProfileTurnInput;
   return { events, done: completeProfileTurn(host, input) };
@@ -87,6 +90,22 @@ describe('completeProfileTurn kernel cancellation', () => {
     const { events, done } = runTurn();
     await done;
     expect(messageOf(events.at(-1))).toMatchObject({ status: 'complete', content: 'Canonical final' });
+  });
+
+  it.each(['completed', 'partial'] as const)('commits the approved execution receipt only for %s', async disposition => {
+    storage.commitConversationTerminal.mockClear();
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
+      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete', completionDeclaration: { disposition, evidenceRefs: [] },
+        completionReceipt: { turnId: 'turn-1', runtimePlanFingerprint: 'frozen-plan', finalAnswerText: 'Final' } });
+    });
+    const { done } = runTurn(true);
+    await done;
+    const contextEntry = storage.commitConversationTerminal.mock.calls[0]?.[4];
+    expect(contextEntry).toBeDefined();
+    if (disposition === 'completed') expect(contextEntry.approvedExecutionCompletion).toEqual({
+      offerId: '11111111-1111-4111-8111-111111111111', planUri: 'session://plans/frozen.md', planHash: 'a'.repeat(64),
+    });
+    else expect(contextEntry.approvedExecutionCompletion).toBeUndefined();
   });
 
   it('preserves a Mission contract failure as failure', async () => {

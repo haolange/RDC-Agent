@@ -419,12 +419,13 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
 
   ipcMain.handle('session:applyDeclaredHandoff', async (_event, ...rawArgs: unknown[]) => {
     try {
-      const [id, agent, label] = parseIpcArgs(SessionApplyDeclaredHandoffArgsSchema, rawArgs, {
+      const [id, agent, label, expectedPlanHash] = parseIpcArgs(SessionApplyDeclaredHandoffArgsSchema, rawArgs, {
         label: 'session:applyDeclaredHandoff',
         maxBytes: 4 * 1024,
+        padTo: 4,
       });
       requireActiveSessionOwner(state, id);
-      return applyDeclaredHandoff({ sessionId: id, agent, label });
+      return applyDeclaredHandoff({ sessionId: id, agent, label, expectedPlanHash });
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }

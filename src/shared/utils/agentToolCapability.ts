@@ -11,7 +11,8 @@ export type AgentToolCallingEvidence = CapabilityState['state'];
 
 export type AgentToolEligibility =
   | 'executable'
-  | 'unknown'
+  | 'availability-unknown'
+  | 'tools-unknown'
   | 'unsupported'
   | 'unavailable'
   | 'disabled'
@@ -42,11 +43,11 @@ export function classifyAgentToolEligibility(
 ): AgentToolEligibility {
   if (model.enabled === false) return 'disabled';
   if (model.availability === 'unavailable') return 'unavailable';
-  if (model.availability !== 'available') return 'unknown';
+  if (model.availability !== 'available') return 'availability-unknown';
   if (model.selection?.pickerVisibility === 'internal') return 'internal';
   if (!hasImplementedStructuredToolAdapter(model.route?.protocol)) return 'no-adapter';
   if (model.toolCalling?.state === 'unsupported') return 'unsupported';
-  if (model.toolCalling?.state !== 'supported') return 'unknown';
+  if (model.toolCalling?.state !== 'supported') return 'tools-unknown';
   return 'executable';
 }
 
@@ -84,7 +85,14 @@ export function describeAgentToolIneligibility(
       technicalMessage: `MODEL_TOOLS_UNSUPPORTED: ${route} toolCalling.state is unsupported.`,
     };
   }
-  if (eligibility === 'unknown') {
+  if (eligibility === 'availability-unknown') {
+    return {
+      technicalCode: 'MODEL_AVAILABILITY_UNVERIFIED',
+      userMessage: `当前账号与 provider route 中模型 ${route} 的可用性尚未确认。请刷新模型目录后重试。`,
+      technicalMessage: `MODEL_AVAILABILITY_UNVERIFIED: ${route} account availability is unknown.`,
+    };
+  }
+  if (eligibility === 'tools-unknown') {
     return {
       technicalCode: 'MODEL_TOOLS_UNVERIFIED',
       userMessage: `当前模型 ${route} 的 provider route 尚未证实 native tool calling，因此未纳入 Agent 可执行模型。请改选同一 provider 下已验证支持工具的模型。`,

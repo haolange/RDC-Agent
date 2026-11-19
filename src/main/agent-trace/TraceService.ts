@@ -49,7 +49,11 @@ export function findCanonicalFinalAnswer(
   let finalAnswer: string | null = null;
   const visit = (blocks: ConversationWorkBlock[] | undefined) => {
     for (const block of blocks ?? []) {
-      const resultText = block.result?.text?.trim();
+      const resultText = block.outputItems?.length
+        ? block.result?.stopReason === 'end_turn'
+          ? block.outputItems.filter((item) => item.phase === 'final_answer').map((item) => item.text).join('').trim()
+          : ''
+        : block.result?.text?.trim();
       if (block.result?.outputPhase === 'final_answer' && resultText) {
         finalAnswer = resultText;
       }

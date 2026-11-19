@@ -204,7 +204,7 @@ describe('AgentOrchestrator prepared turn context', () => {
     });
     expect(result.initialMessages).toEqual([]);
     expect(result.runtime.credentialHandle).toBe('credential-1');
-    expect(result.runtime.promptPlan.systemPrompt).toContain('prepared turn: 25');
+    expect(result.runtime.promptPlan.systemPrompt).toContain('prepared turn: not configured');
     expect(result.runtime.promptPlan.segments.at(-1)?.id).toBe('runtime:execution-limits');
     expect(baseInput.promptPlan.segments).toEqual([]);
     expect(result.runtime.effectivePlan.promptPlanFingerprint).toBe(createHash('sha256')

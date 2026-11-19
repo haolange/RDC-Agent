@@ -31,7 +31,7 @@ export function useComposerEffortControl(options: {
 }) {
   const { open, disabled, menuRef, popupRef } = options;
   const { t } = useI18n();
-  const { turnControls, capability, capabilityState, retryCapability, updateTurnControls } = useComposerTurnControls();
+  const { turnControls, agentReasoning, capability, capabilityState, retryCapability, updateTurnControls } = useComposerTurnControls();
   const [dragRatio, setDragRatio] = useState<number | null>(null);
   const [snapLevel, setSnapLevel] = useState<ReasoningSelection | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -82,11 +82,16 @@ export function useComposerEffortControl(options: {
     if (pointerFrameRef.current) window.cancelAnimationFrame(pointerFrameRef.current);
   }, []);
 
-  const effortLabel = t(reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[selectedLevel]);
+  const reasoningUnavailable = Boolean(capability && capabilityReady && (selectedLevel !== turnControls.reasoningLevel
+    || (reasoningControl?.kind === 'unknown' && agentReasoning === turnControls.reasoningLevel)));
+  const effortLabel = reasoningUnavailable
+    ? t('composer.effort.reasoningUnavailable', { level: t(EFFORT_LABEL_KEYS[turnControls.reasoningLevel]) })
+    : t(reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[selectedLevel]);
   const tooltipLabel = t(reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[displayLevel]);
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
-  const capabilityStateDetail = capabilityState.status === 'unavailable' || capabilityState.status === 'error'
+  const capabilityStateDetail = reasoningUnavailable ? t('composer.effort.reasoningUnavailableHint')
+    : capabilityState.status === 'unavailable' || capabilityState.status === 'error'
     ? capabilityState.message : statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
   const { maxContextStatusLabel, fastModelStatusLabel } = buildEffortCapabilityStatusLabels({
     capability,

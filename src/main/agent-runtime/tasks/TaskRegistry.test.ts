@@ -20,7 +20,12 @@ it('preserves active ownership on a pending request and carries consumption into
   await expect(registry.updateTask(task.id, { status: 'pending' })).rejects.toThrow('active execution');
   expect(await registry.getTask(task.id)).toMatchObject({ status: 'in_progress', currentExecutionId: direct.id });
   expect(await registry.getExecution(direct.id)).toMatchObject({ status: 'running', generation: 1 });
-  await expect(registry.startExecution(task.id, { mode: 'subagent' })).rejects.toThrow('in-progress');
+  await expect(registry.startExecution(task.id, { mode: 'subagent' })).rejects.toThrow('create a child Task with parentTaskId');
+  const nestedTask = await registry.createTask('Separate independent review', { parentTaskId: task.id });
+  const nestedExecution = await registry.startExecution(nestedTask.id, { mode: 'subagent', parentExecutionId: direct.id });
+  await registry.settleExecution(nestedExecution.id, { status: 'completed', expectedGeneration: nestedExecution.generation,
+    result: { disposition: 'completed', summary: 'Independent review complete.', outputs: {} } });
+  expect((await registry.getExecution(direct.id))?.status).toBe('running');
   await registry.settleExecution(direct.id, {
     status: 'partial', expectedGeneration: direct.generation,
     result: { disposition: 'partial', summary: 'Direct execution was claimed before delegation; review was not performed.', outputs: {}, missingRequirements: ['review'] },
@@ -306,7 +311,7 @@ describe('TaskRegistry', () => {
     const settlement = { status: 'completed' as const, expectedGeneration: execution.generation, result: { disposition: 'completed' as const, summary: 'Done', outputs: {} } };
     const first = await registry.settleExecution(execution.id, settlement);
     await expect(registry.settleExecution(execution.id, settlement)).resolves.toEqual(first);
-    await expect(registry.settleExecution(execution.id, { ...settlement, result: { ...settlement.result, summary: 'Changed' } })).rejects.toThrow(/different terminal result/);
+    await expect(registry.settleExecution(execution.id, { ...settlement, result: { ...settlement.result, summary: 'Changed' } })).rejects.toThrow(/different terminal result.*start a new execution of the same Task/);
     await expect(registry.updateExecutionStatus(execution.id, 'running', execution.generation)).rejects.toThrow(/cannot return/);
   });
 
@@ -478,7 +483,7 @@ describe('TaskRegistry', () => {
     });
     expect(await registry.canStart(downstream.id)).toBe(true);
     await expect(registry.updateTask(upstream.id, { completionRequirements: ['new-artifact'] }))
-      .rejects.toThrow(/semantics are immutable/);
+      .rejects.toThrow('Completed Task definitions cannot change');
     expect(await registry.canStart(downstream.id)).toBe(true);
   });
 

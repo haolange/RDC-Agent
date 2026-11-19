@@ -37,6 +37,7 @@ import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
 import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
+import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
@@ -119,6 +120,7 @@ export async function completeProfileTurn(
     executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
     completionReceipt?: TurnCompletionReceipt;
+    completionDeclaration?: import('../agent-runtime/orchestration/TurnCoordinator').TurnCompletionDeclaration | null;
   } | null } = { value: null };
   let approvedPlanExit = false;
   /** Set when the kernel reports cancellation (timeout or parent abort) without a session Stop. */
@@ -260,6 +262,7 @@ export async function completeProfileTurn(
   };
 
   const commitThinkingTrace = (workTrace: ConversationWorkTrace) => {
+    assistantMessage = { ...assistantMessage, workTrace };
     streamScheduler?.queueTrace({ workTrace });
   };
 
@@ -278,8 +281,6 @@ export async function completeProfileTurn(
   let loopHasTools = false;
   let pendingNewLoop = false;
   let currentLoopOutputPhase: ConversationLoopOutputPhase | undefined;
-  /** Once true for this turn, process commentary must not stream into the answer bubble. */
-  let turnHasProcessEvidence = false;
   /** After ask_user pause, subsequent assistant content must not reuse the ask commentary loop. */
   let turnHadAskPause = false;
   const pendingContinuation: ConversationLoopContinuationState = {
@@ -288,14 +289,10 @@ export async function completeProfileTurn(
     planReview: false,
     handoff: false,
   };
-  const markProcessEvidence = () => {
-    turnHasProcessEvidence = true;
-  };
   const markLoopCommentary = () => {
     // Commentary evidence is monotonic within a loop. Final-answer phase is
     // assigned only by assistant.completed after the stop reason is known.
     currentLoopOutputPhase = 'commentary';
-    markProcessEvidence();
   };
   const hasPendingContinuation = () => (
     pendingContinuation.approval
@@ -305,30 +302,6 @@ export async function completeProfileTurn(
   );
   const resolveStreamingOutputPhase = (): ConversationLoopOutputPhase | undefined => {
     return currentLoopOutputPhase;
-  };
-  const syncVisibleResponseForStreaming = () => {
-    const phase = resolveStreamingOutputPhase();
-    const thinkingInFlight = currentLoopThinkingStatus === 'streaming';
-    // Stream into the bubble only for clear finals — never while thinking/tools/ask are active.
-    if (
-      phase === 'final_answer'
-      && !thinkingInFlight
-      && !loopHasTools
-      && !hasPendingContinuation()
-    ) {
-      visibleResponse = currentLoopText;
-    } else if (
-      phase === undefined
-      && !turnHasProcessEvidence
-      && !loopHasTools
-      && !currentLoopThinking
-      && !hasPendingContinuation()
-      && !turnHadAskPause
-    ) {
-      visibleResponse = currentLoopText;
-    } else if (visibleResponse) {
-      visibleResponse = '';
-    }
   };
   let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
   let llmDiagnostic: ConversationMessageDiagnostic | null = null;
@@ -345,7 +318,6 @@ export async function completeProfileTurn(
   Object.defineProperty(turnStreamState, 'loopSeq', { get: () => loopSeq, set: (value) => { loopSeq = value; } });
   Object.defineProperty(turnStreamState, 'pendingNewLoop', { get: () => pendingNewLoop, set: (value) => { pendingNewLoop = value; } });
   Object.defineProperty(turnStreamState, 'currentLoopOutputPhase', { get: () => currentLoopOutputPhase, set: (value) => { currentLoopOutputPhase = value; } });
-  Object.defineProperty(turnStreamState, 'turnHasProcessEvidence', { get: () => turnHasProcessEvidence, set: (value) => { turnHasProcessEvidence = value; } });
   Object.defineProperty(turnStreamState, 'turnHadAskPause', { get: () => turnHadAskPause, set: (value) => { turnHadAskPause = value; } });
   Object.defineProperty(turnStreamState, 'assistantMessage', { get: () => assistantMessage, set: (value) => { assistantMessage = value; } });
   Object.defineProperty(turnStreamState, 'errorViewModel', { get: () => errorViewModel, set: (value) => { errorViewModel = value; } });
@@ -450,14 +422,15 @@ export async function completeProfileTurn(
               executionIdentity: result.executionIdentity,
               status: result.status,
               completionReceipt: result.completionReceipt,
+              completionDeclaration: result.completionDeclaration,
             };
             approvedPlanExit = result.status === 'complete' && verifyApprovedPlanExit(sessionId, assistantMessage.turnId, result.approvedPlan);
           },
           onEvent: createAgentEventHandler({
             host, sessionId, input, agentLabel, turnStreamState,
             commitAssistantMessage, commitVisibleAssistantText, commitThinkingTrace,
-            beginAssistantContentLoop, markProcessEvidence, markLoopCommentary,
-            currentLoopId, resolveStreamingOutputPhase, syncVisibleResponseForStreaming,
+            beginAssistantContentLoop, markLoopCommentary,
+            currentLoopId, resolveStreamingOutputPhase,
             seenCompactionSummaries, showWorkTrace, withWorkTrace, recordProviderOutputRefs,
             currentLoopOptions, pendingContinuation,
             hasPendingContinuation: () => Boolean(hasPendingContinuation()),
@@ -467,10 +440,12 @@ export async function completeProfileTurn(
 
       const receipt = terminalContext.value?.completionReceipt;
       if (terminalContext.value?.status !== 'complete' || !receipt
-        || receipt.turnId !== assistantMessage.turnId
-        || receipt.runtimePlanFingerprint !== input.preparedTurn.runtime.effectivePlan.fingerprint) {
+        || receipt.turnId !== assistantMessage.turnId) {
         throw new Error('TURN_COMPLETION_RECEIPT_INVALID: the owning Agent turn did not confirm completion.');
       }
+      assertTurnRuntimeEpochs({ sessionId, turnId: assistantMessage.turnId,
+        initialFingerprint: input.preparedTurn.runtime.effectivePlan.fingerprint, receipt,
+        offer: input.preparedTurn.runtime.approvedExecution?.offer });
       canonicalOutput = { finalAnswerText: receipt.finalAnswerText };
       if (!approvedPlanExit) requireCanonicalFinalAnswer(canonicalOutput);
     } catch (error) {
@@ -527,7 +502,7 @@ export async function completeProfileTurn(
     ? llmDiagnostic.code === 'CONVERSATION_LLM_ROUTE_MISSING'
       ? 'Model route unavailable; configuration diagnostic returned.'
       : llmDiagnostic.code === 'CONVERSATION_AGENT_LOOP_STALLED'
-        ? 'Agent loop stopped after three identical tool rounds.'
+        ? 'Agent loop stopped after no progress.'
         : llmDiagnostic.code === 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
           ? 'Agent loop stopped at the configured turn limit.'
           : llmDiagnostic.code === 'CONVERSATION_TASK_COMPLETION_DENIED'
@@ -641,6 +616,16 @@ export async function completeProfileTurn(
           messages: capturedContext.messages,
           createdAt: input.userMessage.createdAt,
           completedAt: assistantMessage.updatedAt ?? nowMs(),
+          ...(terminalStatus === 'complete' && capturedContext.status === 'complete'
+            && terminalContext.value?.completionDeclaration?.disposition === 'completed'
+            && input.preparedTurn.runtime.approvedExecution ? {
+              approvedExecutionCompletion: {
+                ...(input.preparedTurn.runtime.approvedExecution.offer.offerId
+                  ? { offerId: input.preparedTurn.runtime.approvedExecution.offer.offerId } : {}),
+                planUri: input.preparedTurn.runtime.approvedExecution.offer.plan.uri,
+                planHash: input.preparedTurn.runtime.approvedExecution.offer.plan.hash,
+              },
+            } : {}),
         });
         storageAdapter.commitConversationTerminal(
           sessionId,

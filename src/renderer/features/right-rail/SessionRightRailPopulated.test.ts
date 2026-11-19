@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   replay: null as CaptureReplayState | null,
   previewUrl: null as string | null,
   reload: vi.fn(), receive: vi.fn(),
+  recovery: null as import('@shared/types/captureReplay').CaptureRecoveryStatus | null,
+  restoreRecovery: vi.fn(async () => null),
 }));
 vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value: typeof state) => unknown) => select(state) }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (value: { currentSession: { sessionId: string; projectId: string } }) => unknown) => select({ currentSession: { sessionId: 'session', projectId: 'project' } }) }));
@@ -22,6 +24,7 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, langua
 // Mock data/lifecycle boundaries; render the actual rail, artifact preview, CapturePanel,
 // CaptureWorkspace, replay controls, status chips and callouts throughout these samples.
 vi.mock('./useCaptureReplay', () => ({ useCaptureReplay: () => ({ state: state.replay, selection: null, error: null, reload: state.reload, receive: state.receive }) }));
+vi.mock('./useCaptureRecovery', () => ({ useCaptureRecovery: () => ({ status: state.recovery, error: null, restore: state.restoreRecovery }) }));
 vi.mock('./useCapturePreview', () => ({ useCapturePreview: (_scope: unknown, source: { imagePath?: string | null }) => ({ url: source.imagePath ? state.previewUrl : null, loading: false, error: false }) }));
 vi.mock('./investigationPreviewActions', () => ({ readInvestigationArtifact: vi.fn(async () => ({ ok: false, status: 'error', error: 'Artifact storage unavailable' })) }));
 
@@ -59,11 +62,27 @@ function replay(): CaptureReplayState {
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  state.tracePresentation = presentation(); state.replay = replay(); state.previewUrl = null;
+  state.tracePresentation = presentation(); state.replay = replay(); state.previewUrl = null; state.recovery = null;
   vi.clearAllMocks();
 });
 
 describe('populated session rail', () => {
+  it('shows the saved position and requires an explicit unlocked restore action', async () => {
+    state.recovery = { pendingCount: 1, original: { inputId: 'input', fileName: 'Scene.rdc', deviceId: 'local', eventId: 21 } };
+    state.replay = { ...replay(), interactionLock: 'agent_running' };
+    const host = document.createElement('div'); const root = createRoot(host);
+    const button = () => [...host.querySelectorAll('button')].find(entry => entry.textContent === 'control.replay.recoveryAction');
+    try {
+      await act(async () => root.render(createElement(SessionRightRail)));
+      expect(host.textContent).toContain('Scene.rdc · local · EID 21');
+      expect(button()?.disabled).toBe(true); expect(state.restoreRecovery).not.toHaveBeenCalled();
+      state.replay = { ...replay(), interactionLock: null, revision: 2 };
+      await act(async () => root.render(createElement(SessionRightRail)));
+      expect(button()?.disabled).toBe(false);
+      await act(async () => button()!.click());
+      expect(state.restoreRecovery).toHaveBeenCalledExactlyOnceWith(1);
+    } finally { act(() => root.unmount()); }
+  });
   it('blocks Open and target switching while installation is unknown but preserves explicit verification', async () => {
     state.replay = { ...replay(), inputId: null, contextId: null, phase: 'error', preparation: {
       targetDeviceId: 'remote', phase: 'failed', issue: { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Installation still pending', recovery: 'retry', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } },

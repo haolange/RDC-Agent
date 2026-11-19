@@ -34,14 +34,16 @@ export const DelegationTaskDocument: React.FC<{ text: string; factsOpen: boolean
         <p>{t('chat.subagentApplicable')}: {item.applicableWhen}</p><p>{t('chat.subagentRecheck')}: {item.recheckWhen}</p></li>)}</ul>],
     [t('chat.subagentFieldSkills'), task.requiredSkillIds.length > 0 && <TextList items={task.requiredSkillIds} />],
     [t('chat.subagentFieldProfile'), task.profile],
-    [t('chat.subagentFieldModel'), task.model],
-    [t('chat.subagentFieldReasoning'), task.reasoningLevel],
     [t('chat.subagentFieldDomain'), task.domainExtensions && Object.values(task.domainExtensions).some(values => Object.keys(values).length > 0) && <TextList items={Object.entries(task.domainExtensions).flatMap(([domain, values]) => Object.entries(values).map(([key, value]) => `${domain} · ${key}: ${String(value)}`))} />],
     [t('chat.subagentCompletionRequirements'), completionRequirements.length > 0 && <TextList items={completionRequirements} />],
   ];
   const renderSections = (sections: [string, React.ReactNode][]) => sections.filter(([, content]) => !!content).map(([label, content]) =>
     <section key={label}><h4>{label}</h4>{content}</section>);
-  const budget = `${t('chat.subagentBudgetTools', { count: task.budget.maxToolCalls })} · ${t('chat.subagentBudgetTime', { count: task.budget.maxWallTimeMs / 1000 })}${task.budget.maxSubagents !== undefined ? ` · ${t('chat.subagentBudgetChildren', { count: task.budget.maxSubagents })}` : ''}`;
+  const budget = [
+    task.budget.maxToolCalls !== undefined ? t('chat.subagentBudgetTools', { count: task.budget.maxToolCalls }) : '',
+    task.budget.maxWallTimeMs !== undefined ? t('chat.subagentBudgetTime', { count: task.budget.maxWallTimeMs / 1000 }) : '',
+    task.budget.maxSubagents !== undefined ? t('chat.subagentBudgetChildren', { count: task.budget.maxSubagents }) : '',
+  ].filter(Boolean).join(' · ') || t('chat.subagentBudgetNotConfigured');
   return <div className="work-delegation-document">
     <div className="work-process-subagent-task-document">
       <MessageMarkdown content={task.task || task.goal} />

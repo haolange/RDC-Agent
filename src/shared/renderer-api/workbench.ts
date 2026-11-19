@@ -56,9 +56,9 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
         : transport.invoke(INVOKE.session.setModelOverride, id, modelOverride)
     ),
     setAgentId: (id, agentId) => transport.invoke(INVOKE.session.setAgentId, id, agentId),
-    applyDeclaredHandoff: (id, agent, label) => (
-      transport.invoke(INVOKE.session.applyDeclaredHandoff, id, agent, label)
-    ),
+    applyDeclaredHandoff: (id, agent, label, expectedPlanHash) => expectedPlanHash
+      ? transport.invoke(INVOKE.session.applyDeclaredHandoff, id, agent, label, expectedPlanHash)
+      : transport.invoke(INVOKE.session.applyDeclaredHandoff, id, agent, label),
   };
 }
 
@@ -75,6 +75,8 @@ export function createCaptureApi(transport: RendererApiTransport): CaptureApi {
     getReplaySelection: (scope) => transport.invoke(INVOKE.capture.getReplaySelection, scope),
     readLivePreview: (scope) => transport.invoke(INVOKE.capture.readLivePreview, scope),
     getReplayState: (scope) => transport.invoke(INVOKE.capture.getReplayState, scope),
+    getRecovery: (scope) => transport.invoke(INVOKE.capture.getRecovery, scope),
+    restorePrevious: (scope) => transport.invoke(INVOKE.capture.restorePrevious, scope),
     applyReplayEvent: (request) => transport.invoke(INVOKE.capture.applyReplayEvent, request),
     refreshFrame: (scope) => transport.invoke(INVOKE.capture.refreshFrame, scope),
     list: (scope) => transport.invoke(INVOKE.capture.list, scope),

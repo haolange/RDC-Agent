@@ -53,7 +53,7 @@ export function ownedRdcDaemonRegistryPath(appStateRoot?: string): string {
 }
 
 export function listAppDaemonContextsInIntermediateRoot(intermediateRoot: string): string[] {
-  const directory = path.join(intermediateRoot, 'runtime', 'rdc_cli');
+  const directory = path.join(intermediateRoot, 'runtime', 'rdc_tool_cli');
   if (!fs.existsSync(directory)) return [];
   return fs.readdirSync(directory)
     .flatMap((name) => {
@@ -122,7 +122,7 @@ export async function harvestOwnedRdcDaemons(
       if (record.ownerPid !== process.pid && record.ownerPid > 0 && alive(record.ownerPid)) {
         throw new Error(`RDC_OWNERSHIP_BUSY: owner ${record.ownerPid} is still alive.`);
       }
-      const stateFile = path.join(record.intermediateRoot, 'runtime', 'rdc_cli', `daemon_state_${record.contextId}.json`);
+      const stateFile = path.join(record.intermediateRoot, 'runtime', 'rdc_tool_cli', `daemon_state_${record.contextId}.json`);
       const dead = [record.ownerPid, record.daemonPid, record.workerPid].every(pid => pid <= 0 || !alive(pid));
       // A dead owner, no native processes and no endpoint state need no CLI mutation.
       if (!dead || fs.existsSync(stateFile)) await stopOwnedDaemon(record, options);
@@ -201,7 +201,7 @@ function killVerifiedOwnedPids(
   const remaining: number[] = [];
   for (const [pid, expected] of [
     [record.daemonPid, 'rdc_tool.daemon.server'],
-    [record.workerPid, 'rdc.runtime_worker'],
+    [record.workerPid, 'rdc_tool.runtime.worker_main'],
   ] as const) {
     if (pid <= 0) continue;
     const commandLine = readCommandLine(pid);

@@ -18,6 +18,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(repoRoot, 'src/main/index.ts'),
+          grepRegexWorker: resolve(repoRoot, 'src/main/workers/grepRegexWorker.ts'),
           turnPreparationWorker: resolve(repoRoot, 'src/main/workers/turnPreparationWorker.ts'),
         },
       },

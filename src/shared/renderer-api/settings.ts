@@ -54,7 +54,9 @@ export function createLlmApi(transport: RendererApiTransport): LlmApi {
     getProbeBatch: () => transport.invoke(INVOKE.llm.getProbeBatch),
     testModelCapability: (request) => transport.invoke(INVOKE.llm.testModelCapability, request),
     connectProvider: (request) => transport.invoke(INVOKE.llm.connectProvider, request),
-    refreshProviderModels: (providerId) => transport.invoke(INVOKE.llm.refreshProviderModels, providerId),
+    refreshProviderModels: (providerId, scope) => scope
+      ? transport.invoke(INVOKE.llm.refreshProviderModels, providerId, scope)
+      : transport.invoke(INVOKE.llm.refreshProviderModels, providerId),
     disconnectProvider: (providerId) => transport.invoke(INVOKE.llm.disconnectProvider, providerId),
     startProviderAccountLogin: (request) => transport.invoke(INVOKE.llm.startProviderAccountLogin, request),
     getProviderAccountStatus: (providerId) => transport.invoke(INVOKE.llm.getProviderAccountStatus, providerId),

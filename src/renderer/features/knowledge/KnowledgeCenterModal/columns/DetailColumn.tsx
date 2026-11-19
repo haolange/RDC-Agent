@@ -8,7 +8,7 @@ import { Icon } from '../../../../ui/Icon';
 import { Panel } from '../../../../ui/Panel';
 import { useI18n } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
-import { detailToRecord } from '../knowledgeCenterModel';
+import { detailToRecord, type KnowledgeWriteAction } from '../knowledgeCenterModel';
 import { CaseChapterContent } from '../parts/CaseChapterContent';
 import { KnowledgeCardImages } from '../parts/KnowledgeCardImages';
 import { KnowledgeMarkdown } from '../parts/KnowledgeMarkdown';
@@ -16,6 +16,7 @@ import '../parts/KnowledgeDetail.css';
 import { CardBadges } from '../parts/CardBadges';
 import { CardMetaGrid } from '../parts/CardMetaGrid';
 import { ConflictCompare } from '../parts/ConflictCompare';
+import { KnowledgeReadPanel } from '../parts/KnowledgeReadPanel';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 
@@ -40,6 +41,10 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
   const isCandidateView = state.viewMode === 'candidates';
   const space = card ? state.spaces.find((entry) => entry.spaceId === card.spaceId) : undefined;
   const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : (space?.label ?? card?.spaceId ?? '');
+  const openWrite = async (action: KnowledgeWriteAction) => {
+    const complete = await state.ensureFullCard();
+    if (complete) await write.openFor(action, detailToRecord(complete));
+  };
 
   return (
     <Panel className="knowledge-center-content" data-testid="knowledge-center-detail-column">
@@ -115,7 +120,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 />
               </div>
             ) : null}
-            {card.type === 'case' && (
+            {!state.reading && card.type === 'case' && (
               <nav className="knowledge-center-chapters" data-testid="knowledge-center-chapters">
                 {KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim()).map((chapter) => (
                   <a key={chapter} href={`#knowledge-chapter-${chapter}`}>{t(CHAPTER_LABEL_KEYS[chapter])}</a>
@@ -129,7 +134,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
             )}
             <div className="knowledge-center-markdown">
               {card.images?.length ? <KnowledgeCardImages spaceId={card.spaceId} images={card.images} /> : null}
-              {card.type === 'case' && card.chapters
+              {state.reading ? <KnowledgeReadPanel key={card.cardId} reading={state.reading} onRead={state.readSelection} busy={state.readingBusy} /> : card.type === 'case' && card.chapters
                 ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim()).map((chapter) => (
                   <section className="knowledge-case-section" key={chapter} id={`knowledge-chapter-${chapter}`}>
                     <h3>{t(CHAPTER_LABEL_KEYS[chapter])}</h3>
@@ -138,7 +143,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                       : <p className="knowledge-center-missing">{t('knowledgeCenter.chaptersMissing')}</p>}
                   </section>
                 ))
-                : <KnowledgeMarkdown content={card.content} spaceId={card.spaceId} />}
+                : <KnowledgeMarkdown content={card.body} spaceId={card.spaceId} />}
             </div>
           </article>
         )}
@@ -148,7 +153,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
         <div className="knowledge-center-actions" data-testid="knowledge-center-actions">
           {isDraft ? (
             <>
-              <Button variant="primary" disabled={!candidateHasSession || candidateBusy || Boolean(card.missingAssets?.length)} onClick={onCreateCandidate} data-testid="knowledge-center-create-candidate">
+              <Button variant="primary" disabled={!candidateHasSession || candidateBusy || state.readingBusy || Boolean(card.missingAssets?.length)} onClick={onCreateCandidate} data-testid="knowledge-center-create-candidate">
                 {t('knowledgeCenter.createCandidate')}
               </Button>
               {!candidateHasSession ? <p className="knowledge-import-hint">{t('knowledgeCenter.sessionRequired')}</p> : null}
@@ -157,19 +162,20 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
             </>
           ) : (
             <>
-              <Button variant="secondary" onClick={() => void write.openFor('promote-verified', detailToRecord(card))}>
+              <Button variant="secondary" disabled={state.readingBusy} onClick={() => void openWrite('promote-verified')}>
                 {t('knowledgeCenter.promoteVerified')}
               </Button>
-              <Button variant="secondary" onClick={() => void write.openFor('promote-promoted', detailToRecord(card))}>
+              <Button variant="secondary" disabled={state.readingBusy} onClick={() => void openWrite('promote-promoted')}>
                 {t('knowledgeCenter.promotePromoted')}
               </Button>
-              <Button variant="danger" onClick={() => void write.openFor('retire', detailToRecord(card))}>
+              <Button variant="danger" disabled={state.readingBusy} onClick={() => void openWrite('retire')}>
                 {t('knowledgeCenter.retire')}
               </Button>
               <Button
                 variant="primary"
+                disabled={state.readingBusy}
                 data-testid="knowledge-center-primary-write"
-                onClick={() => void write.openFor(isCandidateView ? 'persist-draft' : 'save', detailToRecord(card))}
+                onClick={() => void openWrite(isCandidateView ? 'persist-draft' : 'save')}
               >
                 {isCandidateView ? t('knowledgeCenter.saveAsDraft') : t('knowledgeCenter.save')}
               </Button>

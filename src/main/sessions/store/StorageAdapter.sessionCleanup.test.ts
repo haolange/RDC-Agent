@@ -1,12 +1,13 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
 import { prepareTerminalAppend } from './ConversationTerminalAppend';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-cleanup-'));
+afterAll(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 
 vi.mock('electron', () => ({
   app: { getPath: () => process.cwd() },
@@ -129,25 +130,74 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     const runId = run.runId;
 
     const taskDir = path.join(paths.tasksPath, session.sessionId);
+    const childTaskDir = path.join(paths.tasksPath, `${session.sessionId}__subagent__child`);
+    const nestedTaskDir = path.join(paths.tasksPath, `${session.sessionId}__subagent__child__subagent__nested`);
+    const unrelatedTaskDir = path.join(paths.tasksPath, `${session.sessionId}__subagent_other`);
     const llmDir = path.join(paths.llmCallsPath, session.sessionId);
+    const childLlmDir = path.join(paths.llmCallsPath, `${session.sessionId}--subagent--child`);
+    const nestedLlmDir = path.join(paths.llmCallsPath, `${session.sessionId}--subagent--child--subagent--nested`);
+    const unrelatedLlmDir = path.join(paths.llmCallsPath, `${session.sessionId}--subagent-other`);
     const runFile = path.join(paths.tracesPath, 'runs', `${runId}.json`);
     const eventFile = path.join(paths.tracesPath, 'events', `${runId}.jsonl`);
+    const sequenceFile = path.join(paths.tracesPath, 'events', `${runId}.seq.lock`);
     fs.mkdirSync(taskDir, { recursive: true });
+    fs.mkdirSync(childTaskDir, { recursive: true });
+    fs.mkdirSync(nestedTaskDir, { recursive: true });
+    fs.mkdirSync(unrelatedTaskDir, { recursive: true });
     fs.mkdirSync(llmDir, { recursive: true });
+    fs.mkdirSync(childLlmDir, { recursive: true });
+    fs.mkdirSync(nestedLlmDir, { recursive: true });
+    fs.mkdirSync(unrelatedLlmDir, { recursive: true });
     fs.mkdirSync(path.dirname(runFile), { recursive: true });
     fs.mkdirSync(path.dirname(eventFile), { recursive: true });
     fs.writeFileSync(path.join(taskDir, 'task.json'), '{}', 'utf8');
+    fs.writeFileSync(path.join(childTaskDir, 'task.json'), '{}', 'utf8');
+    fs.writeFileSync(path.join(nestedTaskDir, 'task.json'), '{}', 'utf8');
+    fs.writeFileSync(path.join(unrelatedTaskDir, 'task.json'), '{}', 'utf8');
     fs.writeFileSync(path.join(llmDir, 'snap.json'), '{}', 'utf8');
+    fs.writeFileSync(path.join(childLlmDir, 'snap.json'), '{}', 'utf8');
+    fs.writeFileSync(path.join(nestedLlmDir, 'snap.json'), '{}', 'utf8');
+    fs.writeFileSync(path.join(unrelatedLlmDir, 'snap.json'), '{}', 'utf8');
     fs.writeFileSync(runFile, '{}', 'utf8');
     fs.writeFileSync(eventFile, '', 'utf8');
+    fs.writeFileSync(sequenceFile, '1', 'utf8');
 
     storageAdapter.removeSession(session.sessionId);
 
     expect(fs.existsSync(session.sessionPath)).toBe(false);
     expect(fs.existsSync(taskDir)).toBe(false);
+    expect(fs.existsSync(childTaskDir)).toBe(false);
+    expect(fs.existsSync(nestedTaskDir)).toBe(false);
+    expect(fs.existsSync(unrelatedTaskDir)).toBe(true);
     expect(fs.existsSync(llmDir)).toBe(false);
+    expect(fs.existsSync(childLlmDir)).toBe(false);
+    expect(fs.existsSync(nestedLlmDir)).toBe(false);
+    expect(fs.existsSync(unrelatedLlmDir)).toBe(true);
     expect(fs.existsSync(runFile)).toBe(false);
     expect(fs.existsSync(eventFile)).toBe(false);
+    expect(fs.existsSync(sequenceFile)).toBe(false);
+  });
+
+  it('rejects a linked child Task scope before deleting the owning Task scope', async () => {
+    const { appPathService } = await import('../../runtime/AppPathService');
+    const { removeSessionTasks } = await import('../../agent-runtime/tasks/sessionTaskStore');
+    const base = appPathService.getAppStatePaths().tasksPath;
+    const own = path.join(base, 'sess_linked_scope');
+    const target = path.join(tempRoot, 'foreign-task-data');
+    const link = path.join(base, 'sess_linked_scope__subagent__child');
+    fs.mkdirSync(own, { recursive: true });
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, 'keep.txt'), 'untouched');
+    fs.symlinkSync(target, link, 'junction');
+    try {
+      expect(() => removeSessionTasks('sess_linked_scope')).toThrow('TASK_SCOPE_NOT_DIRECTORY');
+      expect(fs.existsSync(own)).toBe(true);
+      expect(fs.readFileSync(path.join(target, 'keep.txt'), 'utf8')).toBe('untouched');
+    } finally {
+      fs.unlinkSync(link);
+      fs.rmSync(own, { recursive: true, force: true });
+      fs.rmSync(target, { recursive: true, force: true });
+    }
   });
 
   it('keeps a new session invisible until its prepared turn is atomically committed', async () => {

@@ -114,6 +114,9 @@ export const EvidencePackSchema: ZodType<EvidencePack> = z.object({
   items: z.array(EvidenceRecordShape),
 }).strict();
 
+const EvidenceWriteShape = EvidenceRecordShape.omit({ contentHashes: true });
+const EvidencePackWriteShape = z.object({ items: z.array(EvidenceWriteShape) }).strict();
+
 const ClaimScopeSchema = z.object({
   capture: optionalNonEmpty,
   eventId: optionalNonEmpty,
@@ -131,6 +134,9 @@ const CompactProvenanceSchema = z.object({
   sourceEpistemicStatus: z.enum(EPISTEMIC_STATUSES),
   sourceVerificationLevel: z.enum(VERIFICATION_LEVELS),
 }).strict();
+
+const projectionKindHelp = 'Required: use null for an original Claim; compact, report, and view denote projections of existing Claims.';
+const compactProvenanceHelp = 'Required: use null for an original Claim; a projection, including a report Claim, needs a non-empty array of source Claim fields.';
 
 const ClaimRecordShape = z.object({
   claimId: nonEmpty,
@@ -159,8 +165,8 @@ const ClaimRecordShape = z.object({
     reason: nonEmpty,
     challengeId: optionalNonEmpty,
   }).strict().optional(),
-  projectionKind: z.enum(CLAIM_PROJECTION_KINDS).nullable(),
-  compactProvenance: z.array(CompactProvenanceSchema).nullable(),
+  projectionKind: z.enum(CLAIM_PROJECTION_KINDS, { error: projectionKindHelp }).nullable().describe(projectionKindHelp),
+  compactProvenance: z.array(CompactProvenanceSchema, { error: compactProvenanceHelp }).nullable().describe(compactProvenanceHelp),
 }).strict().superRefine((claim, ctx) => {
   if (isCausalOrCounterfactualClaim(claim) && !claim.experimentId) {
     ctx.addIssue({
@@ -173,7 +179,7 @@ const ClaimRecordShape = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['compactProvenance'],
-      message: 'projected Claim requires non-empty compactProvenance',
+      message: 'projected Claim requires non-empty compactProvenance; an original Claim uses null for both projectionKind and compactProvenance',
     });
   }
 });
@@ -279,15 +285,15 @@ export const InvestigationReportSchema: ZodType<InvestigationReport> = z.object(
   title: nonEmpty,
   mission: z.enum(INVESTIGATION_MISSIONS),
   summary: nonEmpty,
-  claims: z.array(ClaimRecordShape),
-  evidenceIds: z.array(nonEmpty),
+  claims: z.array(ClaimRecordShape).describe('A ready report needs projected conclusion Claims with source provenance. Current ClaimSet items are valid sources; an empty array cannot qualify a ready report.'),
+  evidenceIds: z.array(nonEmpty).describe('Logical EvidenceRecord.evidenceId values, including EvidencePack item IDs; not Investigation artifactId values.'),
   experimentIds: z.array(nonEmpty),
   reportContract: z.object({
     conclusion: nonEmpty,
     evidence: nonEmpty,
     verification: nonEmpty,
     limitations: nonEmpty,
-    status: nonEmpty,
+    status: nonEmpty.describe('For Mission completed, use exactly verified, conclusive or complete (case-insensitive). Other text cannot satisfy the completion gate.'),
     links: nonEmpty,
     artifactIds: z.array(nonEmpty).min(1),
     candidateStatus: z.enum(REPORT_CANDIDATE_STATUSES),
@@ -345,11 +351,27 @@ const RECORD_SCHEMAS: Record<string, ZodType<unknown>> = {
   InvestigationReport: InvestigationReportSchema,
 };
 
-/** The input shape enforced by parseInvestigationRecord, exposed one kind at a time. */
+/** The write shape exposed to callers; persisted records retain their canonical read shape. */
 export function getInvestigationRecordJsonSchema(recordType: string): Record<string, unknown> {
-  const schema = RECORD_SCHEMAS[recordType];
+  const schema = recordType === 'EvidenceRecord' ? EvidenceWriteShape
+    : recordType === 'EvidencePack' ? EvidencePackWriteShape : RECORD_SCHEMAS[recordType];
   if (!schema) throw new Error(`unknown recordType ${recordType}`);
   return z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as Record<string, unknown>;
+}
+
+/** Derive the stored duplicate from the caller's single set of hash-bound references. */
+export function parseInvestigationWriteRecord(recordType: string, value: unknown): unknown {
+  if (recordType === 'EvidenceRecord') {
+    const input = EvidenceWriteShape.parse(value);
+    return EvidenceRecordSchema.parse({ ...input, contentHashes: input.artifactRefs.map(ref => ref.expectedHash) });
+  }
+  if (recordType === 'EvidencePack') {
+    const input = EvidencePackWriteShape.parse(value);
+    return EvidencePackSchema.parse({ items: input.items.map(item => ({
+      ...item, contentHashes: item.artifactRefs.map(ref => ref.expectedHash),
+    })) });
+  }
+  return parseInvestigationRecord(recordType, value);
 }
 
 export function parseInvestigationRecord(recordType: string, value: unknown): unknown {

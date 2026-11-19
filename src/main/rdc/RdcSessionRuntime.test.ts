@@ -177,16 +177,29 @@ const remoteBinding = () => freezeRdcTurnBinding({ enabled: true, command: 'rdc'
   { name: 'rd.remote.inspect_installation', scope: 'global', effects: [], input_schema: { properties: { device_serial: { type: 'string' } } } },
 ]);
 function remoteNative() {
+  let captureOpen = false; let replayOpen = false;
+  const processIdentity = { status: 'available', daemon: { pid: 4242, start_generation: 'windows-filetime:1' },
+    worker: { pid: 4243, start_generation: 'windows-filetime:2' } };
   nativeStop.mockImplementation(async (command: string, args: string[]) => {
     const context = args[args.lastIndexOf('--daemon-context') + 1]; const operation = args[0];
     const parsed = command === 'call' ? JSON.parse(args[args.indexOf('--args-json') + 1]) : {};
+    if (operation === 'rd.capture.open_file') captureOpen = true;
+    if (operation === 'rd.capture.open_replay') replayOpen = true;
+    if (operation === 'rd.capture.close_replay') replayOpen = false;
+    if (operation === 'rd.capture.close_file') captureOpen = false;
     const data = command === 'daemon' && operation === 'start' ? { context_id: context, owner_pid: process.pid, state: { context_id: context, pid: 4242 } }
       : command === 'daemon' ? { context_id: context, stopped: true }
         : operation === 'rd.remote.connect' ? { context_id: context, remote_id: 'remote', server_info: { bootstrap: { package_name: 'helper' } } }
+          : operation === 'rd.remote.ping' ? { latency_ms: 1, detail: { connected: true, remote_id: 'remote', transport: 'adb_android' } }
           : operation === 'rd.capture.open_file' ? { context_id: context, capture_file_id: 'file' }
             : operation === 'rd.capture.open_replay' ? { context_id: context, session_id: 'replay', capture_file_id: 'file', remote_id: parsed.options.remote_id }
+              : operation === 'rd.session.get_context' ? { context_id: context, current_session_id: replayOpen ? 'replay' : '', process_identity: processIdentity,
+                remote: { state: 'live_handle', remote_id: 'remote', origin_context_id: context, context_locality: 'strict', device_serial: remoteDevice.serial },
+                runtime: { session_id: replayOpen ? 'replay' : '', capture_file_id: captureOpen ? 'file' : '', active_event_id: 1 },
+                sessions: replayOpen ? [{ session_id: 'replay', capture_file_id: 'file', shader_replacements: [] }] : [] }
               : { context_id: context, alive: true };
-    return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: command === 'daemon' ? 'rdc_tool.daemon.' + operation : operation, data }) };
+    return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: command === 'daemon' ? 'rdc_tool.daemon.' + operation : operation,
+      data, ...(['rd.session.get_context', 'rd.remote.ping'].includes(operation) ? { meta: { process_identity: processIdentity } } : {}) }) };
   });
 }
 describe('selected remote before opening a capture', () => {
@@ -244,14 +257,99 @@ describe('selected remote before opening a capture', () => {
     expect(operations).toContain('rd.capture.close_replay');
     await runtime.clearOpenedCaptureForSession(scope); expect(getRdcContextLease('session')).toBeNull();
   });
-  it('revalidates an idempotent prepared selection with ping rather than starting again', async () => {
+  it('accepts native close acknowledgements without a context only after verifying the owning state', async () => {
+    remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+    await runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding });
+    const native = nativeStop.getMockImplementation()!;
+    nativeStop.mockImplementation(async (command: string, args: string[], options: unknown) => {
+      const result = await native(command, args, options);
+      return ['rd.capture.close_replay', 'rd.capture.close_file'].includes(args[0])
+        ? { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: args[0], data: {} }) } : result;
+    });
+    await expect(runtime.openProjectInput({ ...request, inputId: 'another', replayDevice: remoteDevice }, { binding }))
+      .resolves.toMatchObject({ inputId: 'another' });
+    await runtime.clearOpenedCaptureForSession(scope);
+  });
+  it('quarantines an uncertain replay close instead of keeping its lease usable', async () => {
+    remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+    await runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding });
+    const native = nativeStop.getMockImplementation()!; let closed = false;
+    nativeStop.mockImplementation(async (command: string, args: string[], options: unknown) => {
+      const result = await native(command, args, options);
+      if (args[0] === 'rd.capture.close_replay') { closed = true; return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: args[0], data: {} }) }; }
+      if (args[0] !== 'rd.session.get_context' || !closed) return result;
+      const payload = JSON.parse(result.stdout); payload.data.context_id = 'foreign';
+      return { ...result, stdout: JSON.stringify(payload) };
+    });
+    await expect(runtime.openProjectInput({ ...request, inputId: 'another', replayDevice: remoteDevice }, { binding }))
+      .rejects.toThrow('CONTEXT_MISMATCH');
+    expect(getRdcContextLease('session')?.quarantineReason).toBeTruthy();
+    expect(runtime.snapshotOpenedCaptureForSession(scope)?.status).toBe('error');
+    expect(nativeStop.mock.calls.some(call => call[1][0] === 'rd.capture.close_file')).toBe(false);
+    await runtime.clearOpenedCaptureForSession(scope);
+  });
+  it('does not close the replay while a replacement remains active', async () => {
+    remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+    await runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding });
+    const native = nativeStop.getMockImplementation()!;
+    nativeStop.mockImplementation(async (command: string, args: string[], options: unknown) => {
+      const result = await native(command, args, options);
+      if (args[0] !== 'rd.session.get_context') return result;
+      const payload = JSON.parse(result.stdout); payload.data.sessions[0].shader_replacements = [{ replacement_id: 'active' }];
+      return { ...result, stdout: JSON.stringify(payload) };
+    });
+    await expect(runtime.openProjectInput({ ...request, inputId: 'another', replayDevice: remoteDevice }, { binding }))
+      .rejects.toThrow('REPLACEMENTS_ACTIVE');
+    expect(nativeStop.mock.calls.some(call => call[1][0] === 'rd.capture.close_replay')).toBe(false);
+    expect(getRdcContextLease('session')?.quarantineReason).toBeUndefined();
+    await runtime.clearOpenedCaptureForSession(scope);
+  });
+  it('revalidates the native ping without a context field against the owning remote and process', async () => {
     remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
     await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
     await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
     expect(nativeStop.mock.calls.filter(call => call[1][0] === 'rd.remote.connect')).toHaveLength(1);
     expect(nativeStop.mock.calls.some(call => call[1][0] === 'rd.remote.ping')).toBe(true);
+    const operations = nativeStop.mock.calls.map(call => call[1][0]);
+    const ping = operations.indexOf('rd.remote.ping');
+    expect(operations[ping - 1]).toBe('rd.session.get_context');
+    expect(operations[ping + 1]).toBe('rd.session.get_context');
     await runtime.clearOpenedCaptureForSession(scope);
   });
+  it.each(['foreign context', 'foreign remote', 'foreign device', 'foreign ping', 'foreign ping context', 'changed ping process', 'changed final process'])(
+    'rejects %s when revalidating an already prepared device', async scenario => {
+      remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
+      await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
+      const native = nativeStop.getMockImplementation()!; let contextReads = 0;
+      nativeStop.mockImplementation(async (command: string, args: string[], options: unknown) => {
+        const result = await native(command, args, options);
+        const payload = JSON.parse(result.stdout);
+        if (args[0] === 'rd.session.get_context') {
+          contextReads++;
+          if (scenario === 'foreign context') payload.data.context_id = 'other-context';
+          if (scenario === 'foreign remote') payload.data.remote.remote_id = 'other-remote';
+          if (scenario === 'foreign device') payload.data.remote.device_serial = 'other-device';
+          if (scenario === 'changed final process' && contextReads === 2) {
+            payload.meta.process_identity.worker.start_generation = 'windows-filetime:3';
+            payload.data.process_identity.worker.start_generation = 'windows-filetime:3';
+          }
+        }
+        if (args[0] === 'rd.remote.ping') {
+          if (scenario === 'foreign ping') payload.data.detail.remote_id = 'other-remote';
+          if (scenario === 'foreign ping context') payload.data.context_id = 'other-context';
+          if (scenario === 'changed ping process') payload.meta.process_identity.worker.start_generation = 'windows-filetime:3';
+        }
+        return { ...result, stdout: JSON.stringify(payload) };
+      });
+      await expect(runtime.prepareReplayDevice(scope, remoteDevice, { binding })).rejects.toThrow(/IDENTITY_MISMATCH|CONTEXT_MISMATCH/);
+      expect(runtime.snapshotOpenedCaptureForSession(scope)).toBeNull();
+      nativeStop.mockImplementation(native);
+      await runtime.clearOpenedCaptureForSession(scope);
+    },
+  );
   it('withdraws the closed replay lease if file release fails, retaining context ownership until cleanup', async () => {
     remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
     await runtime.prepareReplayDevice(scope, remoteDevice, { binding });

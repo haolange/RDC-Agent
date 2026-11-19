@@ -12,6 +12,8 @@ export const getOpenedCaptureState = (scope: CaptureScope) => api().capture.getO
 export const getContextSnapshot = (scope: CaptureScope) => api().context.get(scope);
 export const getTraceProjection = (sessionId: string) => api().trace.getProjection(sessionId);
 export const getReplayState = (scope: CaptureScope) => api().capture.getReplayState(scope);
+export const getCaptureRecovery = (scope: CaptureScope) => api().capture.getRecovery(scope);
+export const restorePreviousCapture = (scope: CaptureReplayBindingRequest) => api().capture.restorePrevious(scope);
 export const getReplaySelection = (scope: CaptureScope) => api().capture.getReplaySelection(scope);
 export const applyReplayEvent = (request: CaptureReplayApplyRequest) => api().capture.applyReplayEvent(request);
 export const refreshReplayFrame = (scope: CaptureReplayBindingRequest) => api().capture.refreshFrame(scope);

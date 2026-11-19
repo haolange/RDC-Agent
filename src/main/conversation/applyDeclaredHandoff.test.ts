@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   resolveEnabled: vi.fn(),
   dispatchHooks: vi.fn(async () => true),
   compatibility: vi.fn(),
+  history: vi.fn(),
 }));
 
 vi.mock('../sessions/store/StorageAdapter', () => ({
@@ -17,6 +18,7 @@ vi.mock('../sessions/store/StorageAdapter', () => ({
     readSession: mocks.readSession,
     getProjectById: mocks.getProjectById,
     updateSession: mocks.updateSession,
+    readConversationHistory: mocks.history,
     executionOffers: {
       write: mocks.offerWrite,
       read: mocks.offerRead,
@@ -74,6 +76,26 @@ describe('applyDeclaredHandoff', () => {
         : { id: 'debugger', handoffs: [declared] }
     ));
     mocks.dispatchHooks.mockResolvedValue(true);
+    mocks.history.mockReturnValue([]);
+  });
+
+  it('refuses a recovered action after its approval changed or a later request was accepted', async () => {
+    const input = { sessionId: 'sess', agent: 'general', label: declared.label, expectedPlanHash: 'a'.repeat(64) };
+    mocks.planRead.mockReturnValueOnce({ status: 'approved', approvedHash: 'b'.repeat(64), updatedAt: 1234 });
+    expect(await applyDeclaredHandoff(input)).toMatchObject({ success: false, error: expect.stringContaining('APPROVAL_CHANGED') });
+    mocks.history.mockReturnValue([{ role: 'user', createdAt: 1234 }]);
+    expect(await applyDeclaredHandoff(input)).toMatchObject({ success: false, error: expect.stringContaining('APPROVAL_CHANGED') });
+    expect(mocks.updateSession).not.toHaveBeenCalled(); expect(mocks.offerWrite).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the approved handoff after the asynchronous before-handoff hook', async () => {
+    mocks.dispatchHooks.mockImplementationOnce(async () => {
+      mocks.planRead.mockReturnValue({ status: 'approved', approvedHash: 'b'.repeat(64), updatedAt: 1235 });
+      return true;
+    });
+    expect(await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label, expectedPlanHash: 'a'.repeat(64) }))
+      .toMatchObject({ success: false, error: expect.stringContaining('APPROVAL_CHANGED') });
+    expect(mocks.updateSession).not.toHaveBeenCalled(); expect(mocks.offerWrite).not.toHaveBeenCalled();
   });
 
   it('persists the target agent while preserving the original approval time', async () => {
@@ -122,6 +144,7 @@ describe('applyDeclaredHandoff', () => {
     await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
     expect(mocks.offerWrite).toHaveBeenCalledTimes(2);
     for (const [, offer] of mocks.offerWrite.mock.calls) expect(offer.approvedAt).toBe(1234);
+    expect(mocks.offerWrite.mock.calls[0][1].offerId).not.toBe(mocks.offerWrite.mock.calls[1][1].offerId);
   });
 
   it.each([null, 9876])('uses the approved decision time even when the offer time is %s', async (offerTime) => {

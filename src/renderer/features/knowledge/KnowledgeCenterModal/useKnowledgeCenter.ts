@@ -9,10 +9,12 @@ import {
   createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, toggleSetValue,
   type KnowledgeViewMode,
 } from './knowledgeCenterModel';
-import { buildKnowledgeCenterQueryRequest, includeSelectedSpaceId, nextSelectedSpaceIds, runKnowledgeCenterQuery, SEARCH_DEBOUNCE_MS } from './knowledgeCenterQuery';
+import { buildKnowledgeCenterQueryRequest, includeSelectedSpaceId, nextSelectedSpaceIds, SEARCH_DEBOUNCE_MS } from './knowledgeCenterQuery';
 import { useKnowledgeSelection } from './useKnowledgeSelection';
 import { useKnowledgeViewport } from './useKnowledgeViewport';
 import { useKnowledgeFilters } from './useKnowledgeFilters';
+import { useKnowledgeLoadMore } from './useKnowledgeLoadMore';
+import { useKnowledgeQueryRunner } from './useKnowledgeQueryRunner';
 
 export function useKnowledgeCenter(open: boolean) {
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
@@ -28,6 +30,7 @@ export function useKnowledgeCenter(open: boolean) {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [hits, setHits] = useState<KnowledgeLaneHit[]>([]);
+  const [page, setPage] = useState<{ revision?: string; total?: number; nextOffset?: number }>({});
   const [pack, setPack] = useState<KnowledgePack | null>(null);
   const [packQueryKey, setPackQueryKey] = useState<string | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(false);
@@ -64,31 +67,15 @@ export function useKnowledgeCenter(open: boolean) {
     lifecycle: lifecycles,
     lanes,
   }), [debouncedSearch, lanes, lifecycles, selectedSpaceIds, types]);
-  const refreshQuery = useCallback(async () => {
-    const seq = querySeq.current.next();
-    setLoadingQuery(true);
-    try {
-      const next = await runKnowledgeCenterQuery({
-        viewMode,
-        queryRequest,
-        query: (request) => window.electronAPI.knowledge.query(request),
-        compile: (request) => window.electronAPI.knowledge.compile(request),
-        isCurrent: () => querySeq.current.isCurrent(seq),
-      });
-      if (!next || !querySeq.current.isCurrent(seq)) return;
-      setHits(next.hits);
-      setPack(next.pack);
-      setPackQueryKey(knowledgeQueryKey(queryRequest));
-    } catch (err) {
-      if (!querySeq.current.isCurrent(seq)) return;
-      setError(knowledgeErrorMessage(err));
-    } finally {
-      if (querySeq.current.isCurrent(seq)) setLoadingQuery(false);
-    }
-  }, [queryRequest, viewMode]);
+  const runQuery = useKnowledgeQueryRunner({ querySeq, setLoadingQuery, setPage, setHits, setPack, setPackQueryKey, setError });
+  const refreshQuery = useCallback(async () => { await runQuery(viewMode, queryRequest); }, [queryRequest, runQuery, viewMode]);
+
+  const { loadingMore, loadMore, resetLoadingMore } = useKnowledgeLoadMore({
+    querySeq, queryRequest, page, setHits, setPage, setError,
+  });
 
   const showDetail = useCallback(() => { if (narrow) setNarrowPane('detail'); }, [narrow, setNarrowPane]);
-  const { selectedCardId, selectedCard, loadingDetail, clearCardSelection,
+  const { selectedCardId, selectedCard, reading, readingBusy, readSelection, ensureFullCard, loadingDetail, clearCardSelection,
     selectedConflict, conflictCards, selectConflict, clearConflict, selectCard, selectRecord } =
     useKnowledgeSelection({ open, queryKey: knowledgeQueryKey(queryRequest), hits, pack,
       onShowDetail: showDetail, setError });
@@ -123,6 +110,7 @@ export function useKnowledgeCenter(open: boolean) {
       setLoadingQuery(false);
       setRebuilding(false);
       setHits([]);
+      setPage({}); resetLoadingMore();
       setPack(null);
       setPackQueryKey(null);
       setSearchQuery('');
@@ -137,7 +125,7 @@ export function useKnowledgeCenter(open: boolean) {
     const rebuild = rebuildSeq.current;
     void refreshOverview();
     return () => { overview.next(); rebuild.next(); };
-  }, [clearCardSelection, clearConflict, open, refreshOverview, setNarrowPane]);
+  }, [clearCardSelection, clearConflict, open, refreshOverview, resetLoadingMore, setNarrowPane]);
 
   useEffect(() => {
     if (!open) return;
@@ -162,33 +150,15 @@ export function useKnowledgeCenter(open: boolean) {
     };
     await refreshOverview();
     setSelectedSpaceIds((current) => includeSelectedSpaceId(current, card.spaceId));
-    const seq = querySeq.current.next();
-    setLoadingQuery(true);
-    try {
-      const next = await runKnowledgeCenterQuery({
-        viewMode: 'cards',
-        queryRequest: revealRequest,
-        query: (request) => window.electronAPI.knowledge.query(request),
-        compile: (request) => window.electronAPI.knowledge.compile(request),
-        isCurrent: () => querySeq.current.isCurrent(seq),
-      });
-      if (!next || !querySeq.current.isCurrent(seq)) return;
-      setHits(next.hits);
-      setPack(next.pack);
-      setPackQueryKey(knowledgeQueryKey(revealRequest));
-      await selectCard(card.spaceId, card.relativePath, card.cardId);
-      if (narrow) setNarrowPane('detail');
-    } catch (err) {
-      if (querySeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(err));
-    } finally {
-      if (querySeq.current.isCurrent(seq)) setLoadingQuery(false);
-    }
-  }, [clearConflict, narrow, queryRequest, refreshOverview, selectCard, setNarrowPane]);
+    if (!await runQuery('cards', revealRequest)) return;
+    await selectCard(card.spaceId, card.relativePath, card.cardId);
+    if (narrow) setNarrowPane('detail');
+  }, [clearConflict, narrow, queryRequest, refreshOverview, runQuery, selectCard, setNarrowPane]);
 
   return {
     sessionId, viewMode, setViewMode: changeViewMode, narrow, narrowPane, setNarrowPane, spaces, index,
     selectedSpaceIds, types, lifecycles, lanes, allLanes: KNOWLEDGE_RETRIEVAL_LANES,
-    searchQuery, setSearchQuery, hits, pack, packQueryKey, selectedCardId, selectedCard, loadingOverview,
+    searchQuery, setSearchQuery, hits, page, loadingMore, loadMore, pack, packQueryKey, selectedCardId, selectedCard, reading, readingBusy, readSelection, ensureFullCard, loadingOverview,
     loadingQuery, loadingDetail, rebuilding, error, setError, toggleSpace, toggleType,
     toggleLifecycle, toggleLane, selectCard, selectRecord, rebuildIndex, refreshOverview, refreshQuery, queryRequest,
     selectedConflict, conflictCards, selectConflict, openRelatedCard, revealImportedCard,

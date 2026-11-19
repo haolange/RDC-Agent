@@ -24,13 +24,13 @@ export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summar
           {row.detailLines.length > 0 ? (
             <details className="work-process-disclosure">
               <summary className="work-process-summary-line">
-                <span className="work-process-step-summary">{title}</span>
+                <span className="work-process-step-summary" data-work-node-prose>{title}</span>
                 <span className="work-process-row-caret" aria-hidden="true" />
               </summary>
               <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
             </details>
           ) : (
-            <p className="work-process-step-summary">{title}</p>
+            <p className="work-process-step-summary" data-work-node-prose>{title}</p>
           )}
           {row.duration ? <span className="work-process-summary-duration">{row.duration}</span> : null}
         </div>
@@ -79,13 +79,13 @@ export const DiagnosticRow: React.FC<{
       {row.detailLines.length > 0 ? (
         <details className="work-process-disclosure" open={row.status === 'error'}>
           <summary className="work-process-summary-line">
-            <span className="work-process-diagnostic-message">{row.message}</span>
+            <span className="work-process-diagnostic-message" data-work-node-prose>{row.message}</span>
             <span className="work-process-row-caret" aria-hidden="true" />
           </summary>
           <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
         </details>
       ) : (
-        <div className="work-process-diagnostic-message">{row.message}</div>
+        <div className="work-process-diagnostic-message" data-work-node-prose>{row.message}</div>
       )}
     </div>
   </li>
@@ -124,6 +124,7 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
           <button
             type="button"
             className="work-process-user-input-header"
+            data-work-node-heading
             aria-controls={transcriptId}
             aria-expanded={expanded}
             onClick={toggleDisclosure}
@@ -188,7 +189,7 @@ export const ApprovalRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'appro
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         <div className="work-process-approval">
-          <div className="work-process-tool-summary work-process-tool-summary-static">{summaryLine}</div>
+          <div className="work-process-tool-summary work-process-tool-summary-static" data-work-node-heading>{summaryLine}</div>
         </div>
       </div>
     </li>

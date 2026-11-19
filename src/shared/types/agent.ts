@@ -38,6 +38,11 @@ export interface AgentMessage {
 }
 
 export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['general', 'debugger', 'analyzer', 'optimizer'];
+export const INTERNAL_BUILTIN_AGENT_IDS = [
+  'generator', 'verifier', 'knowledge-scout', 'report-writer',
+  'shader-analyst', 'pass-analyst', 'resource-analyst', 'pixel-analyst',
+] as const;
+export const BUILTIN_AGENT_IDS: readonly string[] = [...TOP_LEVEL_AGENT_IDS, ...INTERNAL_BUILTIN_AGENT_IDS];
 export const SAFE_AGENT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 export const DEFAULT_AGENT_ID: AgentId = 'general';
 

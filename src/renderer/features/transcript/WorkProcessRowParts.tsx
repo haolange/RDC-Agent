@@ -14,6 +14,8 @@ import {
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { usePlanReader } from './PlanReaderHost';
 import { Button } from '../../ui/Button';
+import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { isTrackActivity } from './workProcessTrack';
 
 const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }> = ({ plan }) => {
   const { t } = useI18n();
@@ -77,7 +79,8 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
           <WorkCardHeader onClick={toggleExpanded} expanded={canExpand ? expanded : undefined}
             disabled={!canExpand} tooltip={durationTitleFull} duration={row.duration}
             icon={<WorkProcessIcon icon={row.icon} className="work-process-tool-card-icon" />}
-            title={verbLabel} status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
+            title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{verbLabel}</ActiveSignalText>}
+            status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
 
           {(!isBackgroundWait || expanded) ? <CardBody row={row} /> : null}
 

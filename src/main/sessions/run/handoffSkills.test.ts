@@ -5,11 +5,13 @@ import { approvedExecutionOfferForAgent, executionOfferRequiredSkillIds } from '
 const mocks = vi.hoisted(() => ({
   offerRead: vi.fn(),
   planRead: vi.fn(),
+  journalRead: vi.fn(),
 }));
 
 vi.mock('../store/StorageAdapter', () => ({
   storageAdapter: {
     executionOffers: { read: mocks.offerRead },
+    readSessionContextJournal: mocks.journalRead,
   },
 }));
 vi.mock('./PlanReviewStateStore', () => ({
@@ -31,6 +33,7 @@ describe('executionOfferRequiredSkillIds', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.offerRead.mockReturnValue(offer);
+    mocks.journalRead.mockReturnValue([]);
     mocks.planRead.mockReturnValue({
       status: 'approved',
       approvedHash: 'a'.repeat(64),
@@ -89,5 +92,17 @@ describe('executionOfferRequiredSkillIds', () => {
     mocks.offerRead.mockReturnValue(overwritten);
     expect(approvedExecutionOfferForAgent('sess', 'general')?.approvedAt).toBe(1);
     expect(overwritten.approvedAt).toBe(9999);
+  });
+
+  it('stops applying a completed offer but permits an explicit new handoff of the same plan', () => {
+    const oldId = '11111111-1111-4111-8111-111111111111';
+    const newId = '22222222-2222-4222-8222-222222222222';
+    mocks.offerRead.mockReturnValue({ ...offer, offerId: oldId });
+    mocks.journalRead.mockReturnValue([{ status: 'complete', approvedExecutionCompletion: {
+      offerId: oldId, planUri: offer.plan.uri, planHash: offer.plan.hash,
+    } }]);
+    expect(approvedExecutionOfferForAgent('sess', 'general')).toBeNull();
+    mocks.offerRead.mockReturnValue({ ...offer, offerId: newId });
+    expect(approvedExecutionOfferForAgent('sess', 'general')?.offerId).toBe(newId);
   });
 });

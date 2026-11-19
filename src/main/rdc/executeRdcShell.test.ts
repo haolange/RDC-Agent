@@ -1,5 +1,10 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
+import { artifactizeToolResult } from '../agent-runtime/tools/ToolResultArtifactizer';
+import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { RdcOperationDefinition } from '@shared/types/tool';
@@ -27,8 +32,12 @@ const lease = { contextId: 'owned-context', version: 7, ownerProjectId: 'project
 const input = { operation: 'rd.perf.get_event_durations', args: {}, experimentId: 'experiment' };
 const processIdentity = { status: 'available', daemon: { pid: 31, start_generation: 'windows-filetime:100' },
   worker: { pid: 32, start_generation: 'windows-filetime:200' } };
+const editEntrySnapshot = { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.session.get_context',
+  meta: { process_identity: processIdentity }, data: { context_id: lease.contextId, current_session_id: 'native-replay',
+    runtime: { active_event_id: 11 }, sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) };
 beforeEach(() => {
   vi.clearAllMocks();
+  mock.execute.mockReset();
   mock.lease.mockReturnValue(lease);
   mock.retainedLease.mockReturnValue(null);
   mock.execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: input.operation,
@@ -83,6 +92,43 @@ it.each(['replay_fatal_error', 'replay_health_unavailable'])(
   },
 );
 describe('structured RDC shell', () => {
+  it('delivers native disassembly target guidance in the model-visible failure', async () => {
+    const query: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_disassembly', namespace: 'shader',
+      effects: [], evidence_kind: null, input_schema: { type: 'object', properties: {
+        session_id: { type: 'string' }, target: { type: 'string' },
+      }, required: ['session_id'], additionalProperties: false } };
+    const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+    const nativeDetails = { session_id: 'native-replay', requested_target: 'DXIL', available_targets: ['DXBC/DXIL'],
+      failure_stage: 'validate_target', failure_reason: 'target_unavailable', effects_attempted: false, context_preserved: true };
+    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+      result_kind: query.name, ok: false, error: { code: 'shader_disassembly_unavailable', category: 'validation',
+        message: 'Requested disassembly target is unavailable: DXIL', details: nativeDetails } }) });
+    const failure = await executeRdcShell({ operation: query.name, args: { target: 'DXIL' } }, 'target-miss', undefined, bound)
+      .catch(error => error);
+    const delivered = JSON.parse(failure.deliveryResult.content[0].text);
+    expect(delivered.nativeFailure.details).toEqual(nativeDetails);
+    expect(delivered.mainValidation).toEqual({ preservationVerified: true, leaseState: 'retained' });
+
+    const largeDetails = { ...nativeDetails, available_targets: Array.from({ length: 2400 }, (_, index) => `native-target-${index}`) };
+    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+      result_kind: query.name, ok: false, error: { code: 'shader_disassembly_unavailable', category: 'validation',
+        message: 'Requested disassembly target is unavailable: DXIL', details: largeDetails } }) });
+    const largeFailure = await executeRdcShell({ operation: query.name, args: { target: 'DXIL' } }, 'large-target-miss', undefined, bound)
+      .catch(error => error);
+    const sessionPath = mkdtempSync(path.join(tmpdir(), 'rdc-native-details-'));
+    try {
+      writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+      const resolver = new SessionArtifactResolver({ resolveSessionPath: () => sessionPath });
+      const result = artifactizeToolResult({ sessionId: 'session', toolCallId: 'large-target-miss', toolName: 'shell',
+        result: largeFailure.deliveryResult, resolver, pinBelowThreshold: true });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({ text: expect.stringContaining('artifact_read') });
+      const ref = result.details as { ref: string; hash: string };
+      const stored = JSON.parse(resolver.read('session', ref.ref, { expectedHash: ref.hash }).text!);
+      const envelope = JSON.parse(stored.chunks.join(''));
+      expect(JSON.parse(envelope.content[0].text).nativeFailure.details).toEqual(largeDetails);
+    } finally { rmSync(sessionPath, { recursive: true, force: true }); }
+  });
   it('keeps owner startup diagnostics and quarantines the frozen lease without executing or retrying the requested read', async () => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_source', namespace: 'shader', evidence_kind: null };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
@@ -103,7 +149,7 @@ describe('structured RDC shell', () => {
     expect(mock.execute).toHaveBeenCalledOnce();
     expect(mock.execute.mock.calls[0]?.[1]?.[0]).toBe('rd.session.get_context');
     expect(mock.quarantine).toHaveBeenCalledOnce();
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.any(String));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.any(String), expect.objectContaining({ operation: query.name, code: 'daemon_owner_unavailable' }));
     expect(mock.write).not.toHaveBeenCalled(); expect(mock.observe).not.toHaveBeenCalled();
   });
   it('records the failed native preflight rather than claiming the requested shader call ran', async () => {
@@ -126,7 +172,9 @@ describe('structured RDC shell', () => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_source', namespace: 'shader', evidence_kind: null };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
     mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.session.get_context',
-      data: { context_id: 'owned-context', current_session_id: 'native-replay', runtime: { active_event_id: 11 } } }) });
+      meta: { process_identity: processIdentity },
+      data: { context_id: 'owned-context', current_session_id: 'native-replay', runtime: { active_event_id: 11 },
+        sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
     mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
       result_kind: query.name, ok: false, error: { code: 'shader_binding_lookup_failed', category: 'runtime', message: 'Stage unbound',
         details: { failure_stage: 'resolve_binding', failure_reason: 'stage_unbound', replay_state_restored: true,
@@ -207,38 +255,40 @@ describe('structured RDC shell', () => {
     mock.execute.mockResolvedValue(result);
     await expect(executeRdcShell(input, 'call', undefined, context)).rejects.toThrow();
     expect(mock.write).not.toHaveBeenCalled();
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'), expect.objectContaining({ operation: input.operation }));
   });
-  it.each(['shader_patch_op_unsupported_for_encoding', 'shader_patch_diff_failed'])('keeps the owning lease usable after canonical %s before shader replacement', async code => {
+  it.each(['shader_patch_op_unsupported_for_encoding', 'shader_patch_diff_failed'])('quarantines %s when only replacement was ruled out', async code => {
     const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
       effects: ['shader_replacement', 'replay_position', 'artifact_write'], evidence_kind: 'intervention' };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [replacement], lease) };
-    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+    mock.execute.mockResolvedValueOnce(editEntrySnapshot).mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
       result_kind: replacement.name, ok: false, error: { code,
         category: 'validation', message: 'Source encoding is not safely editable',
         details: { replacement_attempted: false, context_preserved: true } } }) });
     await expect(executeRdcShell({ operation: replacement.name, args: {}, experimentId: 'exp' }, 'edit', undefined, bound))
       .rejects.toThrow(code);
-    expect(mock.quarantine).not.toHaveBeenCalled();
+    expect(mock.quarantine).toHaveBeenCalledOnce();
     expect(mock.write).not.toHaveBeenCalled();
-    const discovery = await executeRdcShell({ discovery: { kind: 'describe', operation: replacement.name } }, 'next', undefined, bound);
-    expect(discovery.details).toMatchObject({ exitCode: 0 });
-    expect(mock.execute).toHaveBeenCalledTimes(1);
+    mock.lease.mockReturnValue(null);
+    await expect(executeRdcShell({ discovery: { kind: 'describe', operation: replacement.name } }, 'next', undefined, bound))
+      .rejects.toThrow();
+    expect(mock.execute).toHaveBeenCalledTimes(2);
   });
-  it('permits a native query after a rejected diff without signing an intervention or restarting the replay', async () => {
+  it('permits a native query after a proven pre-effect rejection without signing an intervention', async () => {
     const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
       effects: ['shader_replacement', 'replay_position'], evidence_kind: 'intervention' };
     const query: RdcOperationDefinition = { ...definition, name: 'rd.event.get_active', namespace: 'event', effects: [], evidence_kind: null };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [replacement, query], lease) };
-    mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
+    mock.execute.mockResolvedValueOnce(editEntrySnapshot).mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
       result_kind: replacement.name, ok: false, error: { code: 'shader_patch_diff_failed', category: 'validation',
-        message: 'Diff removal does not match', details: { failure_stage: 'apply_patch', replacement_attempted: false, context_preserved: true } } }) });
+        message: 'Diff removal does not match', details: { failure_stage: 'validate_request',
+          effects_attempted: false, context_preserved: true } } }) });
     await expect(executeRdcShell({ operation: replacement.name, args: {}, experimentId: 'exp' }, 'bad-diff', undefined, bound))
       .rejects.toThrow('shader_patch_diff_failed');
     mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: query.name,
       data: { session_id: 'native-replay', active_event_id: 1248 } }) });
     await expect(executeRdcShell({ operation: query.name, args: {} }, 'read', undefined, bound)).resolves.toBeDefined();
-    expect(mock.execute).toHaveBeenCalledTimes(2);
+    expect(mock.execute).toHaveBeenCalledTimes(3);
     expect(mock.quarantine).not.toHaveBeenCalled();
     expect(mock.write).not.toHaveBeenCalled();
     expect(mock.observe).not.toHaveBeenCalled();
@@ -253,7 +303,7 @@ describe('structured RDC shell', () => {
       replacement: { replacement_id: 'not-applied', status: 'noop', resolved_event_id: 7,
         original_shader_id: 'ResourceId::9', original_shader_hash: hash, applied_to_shader_hash: hash,
         compile: { build_input: { status: 'unavailable', reason: 'No successful shader build and replacement observed.' } } } };
-    mock.execute.mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ schema_version: '3.0.0',
+    mock.execute.mockResolvedValueOnce(editEntrySnapshot).mockResolvedValueOnce({ exitCode: 0, stdout: JSON.stringify({ schema_version: '3.0.0',
       ok: true, result_kind: replacement.name, meta: { process_identity: processIdentity }, data }) });
     const result = await executeRdcShell({ operation: replacement.name, args: {}, experimentId: 'noop-exp' }, 'noop', undefined, bound);
     expect(JSON.parse(result.content[0].type === 'text' ? result.content[0].text : '')).toMatchObject({ result: { data },
@@ -285,6 +335,7 @@ describe('structured RDC shell', () => {
       if (failure === 'lease') mock.lease.mockReturnValueOnce(lease).mockReturnValueOnce(lease).mockReturnValueOnce({ ...lease, version: 8 });
       if (failure === 'observe') mock.observe.mockRejectedValueOnce(new Error('observation failed'));
       const controller = new AbortController();
+      mock.execute.mockResolvedValueOnce(editEntrySnapshot);
       mock.execute.mockImplementationOnce(async () => {
         if (failure === 'cancel') controller.abort();
         return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: replacement.name, data }) };
@@ -343,7 +394,7 @@ describe('structured RDC shell', () => {
       expect(mock.quarantine).not.toHaveBeenCalled();
     },
   );
-  it.each(['missing-proof', 'unknown-code', 'post-effect', 'capture-drift'])(
+  it.each(['missing-proof', 'capture-drift'])(
     'quarantines unqualified stage capability rejection: %s', async variant => {
       const query: RdcOperationDefinition = { ...definition, name: 'rd.pipeline.get_stage_state', namespace: 'pipeline',
         effects: ['replay_position'], evidence_kind: null };
@@ -406,7 +457,7 @@ describe('structured RDC shell', () => {
   it.each([
     { category: 'validation', proof: true, safe: true },
     { category: 'validation', proof: false, safe: false },
-    { category: 'runtime', proof: true, safe: false },
+    { category: 'runtime', proof: true, safe: true },
     { category: 'runtime', proof: false, safe: false },
   ])('qualifies a resource details miss: category=$category proof=$proof', async ({ category, proof, safe }) => {
     const query: RdcOperationDefinition = { ...definition, name: 'rd.resource.get_details', namespace: 'resource',
@@ -450,9 +501,9 @@ describe('structured RDC shell', () => {
       mainValidation: { preservationVerified: false, leaseState: 'quarantined' }, nativeFailure: { proof: {} },
     } });
     expect(failure.deliveryResult.details.nativeFailure.proof).not.toHaveProperty('context_preserved');
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'), expect.any(Object));
   });
-  it('quarantines when a no-replacement error cannot be tied to the unchanged owning lease', async () => {
+  it('quarantines when a no-effect proof cannot be tied to the unchanged owning lease', async () => {
     const replacement: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
       effects: ['shader_replacement', 'replay_position'], evidence_kind: 'intervention' };
     const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [replacement], lease) };
@@ -460,9 +511,9 @@ describe('structured RDC shell', () => {
     mock.execute.mockResolvedValueOnce({ exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
       result_kind: replacement.name, ok: false, error: { code: 'shader_patch_op_unsupported_for_encoding',
         category: 'validation', message: 'Source encoding is not safely editable',
-        details: { replacement_attempted: false, context_preserved: true } } }) });
+        details: { effects_attempted: false, context_preserved: true } } }) });
     await expect(executeRdcShell({ operation: replacement.name, args: {} }, 'edit', undefined, bound)).rejects.toThrow();
-    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'));
+    expect(mock.quarantine).toHaveBeenCalledWith('session', 7, expect.stringContaining('uncertain'), expect.any(Object));
   });
   it('does not issue a receipt if cancelled or ownership changes while running', async () => {
     const controller = new AbortController();
@@ -613,8 +664,9 @@ it.each([11, 12])('verifies temporary replay restoration against context, after=
     effects: ['replay_position_temporary'], evidence_kind: null };
   const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
   const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
-    result_kind: 'rd.session.get_context', data: { context_id: lease.contextId,
-      current_session_id: 'native-replay', runtime: { active_event_id: event } } }) });
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
   mock.execute.mockReset();
   mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 0,
     stdout: JSON.stringify({ ok: true, result_kind: query.name, data: {
@@ -642,8 +694,9 @@ it.each([
     effects: ['replay_position', 'artifact_write'], evidence_kind: null };
   const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [screenshot], lease) };
   const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
-    result_kind: 'rd.session.get_context', data: { context_id: lease.contextId,
-      current_session_id: 'native-replay', runtime: { active_event_id: event } } }) });
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
   mock.execute.mockReset();
   mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
     stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: screenshot.name, ok: false,
@@ -669,8 +722,9 @@ it.each([
     effects: ['replay_position'], evidence_kind: null };
   const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [source], lease) };
   const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
-    result_kind: 'rd.session.get_context', data: { context_id: lease.contextId,
-      current_session_id: 'native-replay', runtime: { active_event_id: event } } }) });
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
   mock.execute.mockReset();
   mock.execute.mockResolvedValueOnce(snapshot(1248)).mockResolvedValueOnce({ exitCode: 1,
     stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: source.name, ok: false,
@@ -684,6 +738,113 @@ it.each([
   expect(mock.quarantine).toHaveBeenCalledTimes(quarantined ? 1 : 0);
   expect(mock.write).not.toHaveBeenCalled();
   expect(mock.execute).toHaveBeenCalledTimes(proofEvent === 1248 ? 3 : 2);
+});
+
+it.each(['process', 'replacement', 'missing-identity'])('quarantines restored-event proof when %s changed', async drift => {
+  const source: RdcOperationDefinition = { ...definition, name: 'rd.shader.get_source', namespace: 'shader',
+    effects: ['replay_position'], evidence_kind: null };
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [source], lease) };
+  const snapshot = (after: boolean) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context',
+    meta: { process_identity: after && drift === 'missing-identity' ? { status: 'unavailable' }
+      : after && drift === 'process' ? { ...processIdentity, worker: { ...processIdentity.worker, pid: 99 } } : processIdentity },
+    data: { context_id: lease.contextId, current_session_id: 'native-replay', runtime: { active_event_id: 11 },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture',
+        shader_replacements: after && drift === 'replacement' ? [{ replacement_id: 'changed' }] : [] }] } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(false)).mockResolvedValueOnce({ exitCode: 1,
+    stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: source.name, ok: false,
+      error: { code: 'shader_binding_lookup_failed', category: 'runtime', message: 'No PS',
+        details: { context_id: lease.contextId, session_id: 'native-replay',
+          failure_stage: 'resolve_binding', failure_reason: 'stage_unbound',
+          replay_state_restored: true, restored_event_id: 11 } } }) }).mockResolvedValueOnce(snapshot(true));
+  const failure = await executeRdcShell({ operation: source.name, args: {} }, 'source', undefined, bound).catch(error => error);
+  expect(failure.deliveryResult.details.mainValidation).toEqual({ preservationVerified: false, leaseState: 'quarantined' });
+  expect(mock.quarantine).toHaveBeenCalledOnce();
+  expect(mock.write).not.toHaveBeenCalled();
+});
+
+it.each([
+  { attempted: false, after: 11, retained: true },
+  { attempted: false, after: 19, retained: false },
+  { attempted: true, after: 11, retained: false },
+])('retains an unsupported shader edit only after validating restoration: %j', async ({ attempted, after, retained }) => {
+  const edit: RdcOperationDefinition = { ...definition, name: 'rd.shader.edit_and_replace', namespace: 'shader',
+    effects: ['replay_position', 'shader_replacement'], evidence_kind: null };
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [edit], lease) };
+  const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
+    stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: edit.name, ok: false,
+      error: { code: 'shader_patch_op_unsupported_for_encoding', category: 'validation', message: 'Unsupported encoding',
+        details: { context_id: lease.contextId, session_id: 'native-replay', failure_stage: 'validate_edit_plan',
+          failure_reason: 'source_encoding_not_safely_replaceable', replacement_attempted: attempted,
+          replay_state_restored: true, restored_event_id: 11 } } }) }).mockResolvedValueOnce(snapshot(after));
+  const failure = await executeRdcShell({ operation: edit.name, args: {} }, 'edit', undefined, bound).catch(error => error);
+  expect(failure.deliveryResult.details.mainValidation).toEqual({
+    preservationVerified: retained, leaseState: retained ? 'retained' : 'quarantined',
+  });
+  expect(mock.quarantine).toHaveBeenCalledTimes(retained ? 0 : 1);
+  expect(mock.write).not.toHaveBeenCalled();
+});
+
+it.each([
+  { name: 'rd.texture.get_pixel_history', namespace: 'texture', after: 11 },
+  { name: 'rd.texture.get_pixel_history', namespace: 'texture', after: 19 },
+  { name: 'rd.shader.debug_start', namespace: 'shader', after: 11 },
+  { name: 'rd.shader.debug_start', namespace: 'shader', after: 19 },
+])('retains an unavailable Pixel History lease only after verifying restored event: %j', async ({ name, namespace, after }) => {
+  const query: RdcOperationDefinition = { ...definition, name, namespace,
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' } },
+      required: ['session_id'], additionalProperties: false }, effects: ['replay_position'], evidence_kind: null };
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+  const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
+    stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: query.name, ok: false,
+      error: { code: 'pixel_history_unsupported_input_attachment', category: 'capability', message: 'Unavailable',
+        details: { context_id: lease.contextId, session_id: 'native-replay', failure_stage: 'validate_input_attachment',
+          replay_state_restored: true, restored_event_id: 11 } } })
+  }).mockResolvedValueOnce(snapshot(after));
+  const failure = await executeRdcShell({ operation: query.name, args: {} }, 'history', undefined, bound).catch(error => error);
+  expect(failure.deliveryResult.details).toMatchObject({
+    nativeFailure: { code: 'pixel_history_unsupported_input_attachment', category: 'capability' },
+    mainValidation: { preservationVerified: after === 11, leaseState: after === 11 ? 'retained' : 'quarantined' },
+  });
+  expect(mock.quarantine).toHaveBeenCalledTimes(after === 11 ? 0 : 1);
+});
+
+it.each([
+  ...['get_data', 'get_region_values', 'get_histogram', 'compute_stats', 'diff'].map(name =>
+    ({ name: `rd.texture.${name}`, code: 'texture_readback_decode_failed', category: 'validation', after: 11, retained: true })),
+  { name: 'rd.texture.get_region_values', code: 'texture_readback_decode_failed', category: 'validation', after: 19, retained: false },
+  { name: 'rd.texture.get_region_values', code: 'replay_fatal_error', category: 'runtime', after: 11, retained: false },
+])('retains a failed texture read only after verified replay restoration: %j', async ({ name, code, category, after, retained }) => {
+  const query: RdcOperationDefinition = { ...definition, name,
+    namespace: 'texture', evidence_kind: null };
+  const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [query], lease) };
+  const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
+  mock.execute.mockReset();
+  mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
+    stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: query.name, ok: false,
+      error: { code, category, message: 'Texture read failed', details: { context_id: lease.contextId,
+        session_id: 'native-replay', failure_stage: 'decode_texture_readback',
+        replay_state_restored: true, restored_event_id: 11, ...(code === 'replay_fatal_error' ? { recovery_required: true } : {}) } } })
+  }).mockResolvedValueOnce(snapshot(after));
+  const failure = await executeRdcShell({ operation: query.name, args: {} }, 'region', undefined, bound).catch(error => error);
+  expect(failure.deliveryResult.details.mainValidation).toEqual({
+    preservationVerified: retained, leaseState: retained ? 'retained' : 'quarantined',
+  });
+  expect(mock.quarantine).toHaveBeenCalledTimes(retained ? 0 : 1);
 });
 
 it.each([false, true])('retains the lease after stale-debug rejection only with no native effects: %s', async (effectsAttempted) => {
@@ -712,8 +873,9 @@ it.each([
       required: ['session_id'], additionalProperties: false }, effects: ['replay_position'], evidence_kind: null };
   const bound = { ...context, rdcBinding: freezeRdcTurnBinding(context.rdcBinding!.cli, [buffer], lease) };
   const snapshot = (event: number) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true,
-    result_kind: 'rd.session.get_context', data: { context_id: lease.contextId,
-      current_session_id: 'native-replay', runtime: { active_event_id: event } } }) });
+    result_kind: 'rd.session.get_context', meta: { process_identity: processIdentity }, data: { context_id: lease.contextId,
+      current_session_id: 'native-replay', runtime: { active_event_id: event },
+      sessions: [{ session_id: 'native-replay', capture_file_id: 'native-capture', shader_replacements: [] }] } }) });
   mock.execute.mockReset();
   mock.execute.mockResolvedValueOnce(snapshot(11)).mockResolvedValueOnce({ exitCode: 1,
     stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: buffer.name, ok: false,

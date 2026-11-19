@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * Coverage ratchet — only-up gate for lines/functions/branches/statements.
+ * Coverage floor — fails only when lines/functions/branches/statements fall below a fixed floor.
+ * The floor sits a few points under real coverage so it flags large regressions (deleted tests,
+ * big untested code) and never pushes anyone to add tests for the number. Do not raise it to
+ * track current coverage.
  *
  * Reads vitest json-summary at coverage/coverage-summary.json and compares
  * against scripts/fidelity/coverage-ratchet.json.

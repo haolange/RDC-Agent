@@ -16,12 +16,12 @@ const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 describe('background SubagentRunner provider fixture', () => {
-  it('forwards only the Capsule explicit model through the detached runner adapter', async () => {
+  it('forwards the selected profile through the detached runner adapter', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'background-model-')); roots.push(root);
-    let receivedModel: string | undefined;
+    let receivedProfile: string | undefined;
     const parentEvents: string[] = [];
     const fakeRunner = { runSubagent: vi.fn(async (input: Parameters<SubagentRunner['runSubagent']>[0]) => {
-      receivedModel = input.model;
+      receivedProfile = input.targetProfile;
       for (const type of ['approval.requested', 'approval.answered'] as const) {
         input.parentOnEvent?.({ id: type, type, timestamp: Date.now(), sessionId: 'parent', agentId: 'general', payload: { approvalId: 'approval', title: 'Approve', status: 'approved' } });
       }
@@ -34,10 +34,10 @@ describe('background SubagentRunner provider fixture', () => {
     });
     await service.query('parent', 'missing');
     const task = await registry.createTask('model fixture');
-    const capsule = { goal: 'inspect', task: 'inspect', scope: 'fixture', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [], outputRequirements: 'typed result', stopConditions: [], requiredSkillIds: [], budget: { maxToolCalls: 2, maxWallTimeMs: 10_000 }, model: 'openai:gpt-5.6-luna' } satisfies DelegationCapsule;
+    const capsule = { goal: 'inspect', task: 'inspect', scope: 'fixture', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [], outputRequirements: 'typed result', stopConditions: [], requiredSkillIds: [], budget: { maxToolCalls: 2, maxWallTimeMs: 10_000 } } satisfies DelegationCapsule;
     const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'parent', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule, parentOnEvent: (event) => { parentEvents.push(event.type); } });
     await service.join(execution.id);
-    expect(receivedModel).toBe('openai:gpt-5.6-luna');
+    expect(receivedProfile).toBe('general');
     expect(parentEvents).toEqual(['approval.requested', 'approval.answered']);
   });
 

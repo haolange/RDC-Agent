@@ -30,6 +30,8 @@ import {
 import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
 import { preparePlanTaskRequirements } from '../tasks/TaskExecutionRequirements';
+import { prepareInvestigationPlan } from '../../sessions/run/prepareInvestigationPlan';
+import { rdcSessionService } from '../../sessions';
 import { assertDeclaredHandoffForPlan } from '../../conversation/applyDeclaredHandoff';
 import { authorizeToolPermission, ToolPermissionDenied } from '../permissions/ToolPermissionAuthorization';
 import { isToolDeniedByPolicy } from '../permissions/PolicyCompiler';
@@ -44,13 +46,14 @@ import { normalizeToolName } from './RuntimeToolPolicy';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import { reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
+import { APPROVED_CAPTURE_SCOPE_REQUIRED, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import { countSubagentCalls, isAgentToolCallConcurrencySafe } from '../agent/toolConcurrency';
 import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
 import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
+import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 export interface ToolExecutorFactoryDeps {
   slots: AgentSlotRegistry;
@@ -256,6 +259,20 @@ export class ToolExecutorFactory {
           };
         }
         const validatedToolCall: ToolCall = { ...toolCall, arguments: validatedArgs };
+        const activeTurn = this.deps.getActiveTurn(runtimeContext?.sessionId ?? sessionId);
+        const captureControl = activeTurn?.captureControl;
+        const needsLiveCapture = normalizedName === 'shell' && validatedArgs.rdc !== undefined
+          || normalizedName === 'rdc_probe' && !['enumerate', 'doctor', 'version'].includes(String(validatedArgs.action));
+        const rdc = validatedArgs.rdc;
+        const invokesRdcOperation = normalizedName === 'shell' && rdc !== null && typeof rdc === 'object'
+          && !Array.isArray(rdc) && 'operation' in rdc;
+        if (activeTurn?.requiresApprovedCaptureScope && (invokesRdcOperation || normalizedName === 'rdc_probe' && needsLiveCapture)) {
+          return denyTool(APPROVED_CAPTURE_SCOPE_REQUIRED);
+        }
+        if (captureControl && needsLiveCapture) {
+          try { captureControl.assertLiveAccess(); }
+          catch (error) { return denyTool(error instanceof Error ? error.message : String(error)); }
+        }
         if (normalizedName === 'ask_user') {
           return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal, onExecutionStart);
         }
@@ -273,9 +290,11 @@ export class ToolExecutorFactory {
         }
         const knowledgeReadRoots = plan?.knowledgeReadRoots ?? [];
         const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
+        const executionPlan = this.deps.getActiveTurn(executorSessionId)?.runtimePlan ?? plan;
         const toolContext: ToolExecutionContext = {
           successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
-          rdcBinding: plan ? getRdcTurnBinding(plan) : undefined,
+          rdcBinding: executionPlan ? getRdcTurnBinding(executionPlan) : undefined,
+          captureControl: this.deps.getActiveTurn(executorSessionId)?.captureControl ?? undefined,
           agentId,
           accessCeiling: plan?.accessCeiling,
           turnId: runtimeContext?.turnId,
@@ -293,6 +312,10 @@ export class ToolExecutorFactory {
           if (!current.ok) return this.createPolicyLimitToolResult(toolCall, agentId, current.limit);
         }
         try {
+          let executionAnnounced = false;
+          const announceExecution = (state: RuntimePermissionState) => {
+            if (!executionAnnounced) { executionAnnounced = true; onExecutionStart?.(state); }
+          };
           if (!permissionConstraints) return denyTool('PERMISSION_CONSTRAINTS_MISSING: a prepared runtime plan is required.');
           const beforeExecute = async () => {
             const beforeHooks = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
@@ -311,7 +334,7 @@ export class ToolExecutorFactory {
               ...(permissionDecision.temporaryPathRoots ?? []),
               ...(injectKnowledgeRoots ? knowledgeReadRoots : []),
             ],
-            (scopedContext) => { onExecutionStart?.(permissionState); return tool.execute(
+            (scopedContext) => { announceExecution(permissionState); return tool.execute(
               toolCall.id,
               validatedArgs,
               signal,
@@ -348,11 +371,20 @@ export class ToolExecutorFactory {
               } : undefined,
               reviewer: runtimeContext?.reviewPermission, executionBudget: policyBudget, assertLive,
             }, snapshot, approvalSignal),
-            withResource: (operation) => tool.spec?.orchestration === true
-              ? operation()
-              : isAgentToolCallConcurrencySafe(tool, validatedToolCall)
-                ? toolResourceArbiter.runShared(resourceKey, signal, operation)
-                : toolResourceArbiter.runExclusive(resourceKey, signal, operation),
+            withResource: async (operation, permissionState) => {
+              // The affected child may itself be waiting for this resource. Join it
+              // after authorization but before taking the recovery's exclusive lock.
+              if (normalizedName === 'rdc_probe' && validatedArgs.action === 'capture_recover'
+                && toolContext.captureControl && toolContext.agentId === 'general' && toolContext.accessCeiling === 'full'
+                && toolContext.turnId && toolContext.sessionId && toolContext.projectId) {
+                announceExecution(permissionState);
+                await toolContext.captureControl.prepareRecovery(permissionState.revision, signal);
+              }
+              return tool.spec?.orchestration === true ? operation()
+                : isAgentToolCallConcurrencySafe(tool, validatedToolCall)
+                  ? toolResourceArbiter.runShared(resourceKey, signal, operation)
+                  : toolResourceArbiter.runExclusive(resourceKey, signal, operation);
+            },
             execute: executeToolEffect,
           });
           await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
@@ -378,7 +410,8 @@ export class ToolExecutorFactory {
                 result,
                 pinBelowThreshold: (normalizedName === 'read_file' && (validatedToolCall.arguments.mode === 'audit'
                   || validatedToolCall.arguments.pinEvidence === true))
-                  || normalizedName === 'runtime_context' || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
+                  || normalizedName === 'runtime_context' || (normalizedName === 'rdc_probe' && validatedArgs.action === 'probe')
+                  || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
                   && typeof result.details === 'object' && result.details !== null
                   && 'operation' in result.details && typeof result.details.operation === 'string'
                   && (result.details.operation.startsWith('rd.')
@@ -492,21 +525,49 @@ export class ToolExecutorFactory {
         throw new Error('PLAN_REVIEW_NO_HANDOFF: plan_artifact requires a declared continue handoff on this profile.');
       }
       const turnHandle = this.deps.getActiveTurn(sessionId);
-      if (turnHandle) turnHandle.approvedPlan = null;
+      if (turnHandle) {
+        if (turnHandle.turnId !== runtimeContext.turnId) throw new Error('PLAN_TURN_CHANGED: the planning turn is no longer active.');
+        const unfinished = await listUnfinishedDirectTasks({ sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation });
+        if (unfinished.length) {
+          throw new Error(`PLAN_DIRECT_TASKS_UNSETTLED: Plan approval ends this planning turn, but direct Tasks are still active: ${unfinished.map(item => item.taskId).join(', ')}. Settle each with its actual result before submitting the plan. Do not claim that approval has already happened; keep work that begins after approval pending, and do not make it depend on a blocked planning task merely waiting for approval.`);
+        }
+      }
       const requiredTaskIds = args.requiredTaskIds;
-      if (getDelegatedTaskScope(sessionId) && (requiredTaskIds !== undefined || args.taskRevisions !== undefined)) {
+      const delegatedScope = getDelegatedTaskScope(sessionId);
+      if (delegatedScope && (requiredTaskIds !== undefined || args.taskRevisions !== undefined)) {
         throw new Error('TASK_SCOPE_DENIED: approved Task bindings and revisions belong to the owning planner session, not a delegated Capsule.');
       }
       if (requiredTaskIds !== undefined && (!Array.isArray(requiredTaskIds) || requiredTaskIds.length > 128
         || requiredTaskIds.some(id => typeof id !== 'string' || !id.trim()) || new Set(requiredTaskIds).size !== requiredTaskIds.length)) {
         throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: requiredTaskIds must be distinct existing Task ids.');
       }
+      if (turnHandle && !delegatedScope && requiredTaskIds === undefined) {
+        const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+        const turnRef = `turn:${turnHandle.turnId}:generation:${turnHandle.generation}`;
+        const unsettled = (await registry.listTasks()).filter(task => task.creationTurnRef === turnRef
+          && (task.status === 'pending' || task.status === 'blocked'));
+        if (unsettled.length) {
+          throw new Error(`PLAN_TASK_BINDINGS_UNDECLARED: This planning turn created unfinished Tasks: ${unsettled.map(task => task.id).join(', ')}. Explicitly set requiredTaskIds to the existing Tasks required by this plan, or [] if none are required. Task names or IDs in Markdown do not freeze their requirements.`);
+        }
+      }
       const registry = Array.isArray(requiredTaskIds) && requiredTaskIds.length ? new TaskRegistry(createSessionTaskStore(sessionId)) : null;
       if (args.taskRevisions !== undefined && !registry) throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: taskRevisions requires requiredTaskIds.');
       const taskRequirements = registry ? await preparePlanTaskRequirements(registry, requiredTaskIds as string[], args.taskRevisions) : [];
+      const sourcePlan = runtimeContext.effectivePlan;
+      if (args.captureScope !== undefined && (!sourcePlan || sourcePlan.completionContract !== 'investigation-report')) {
+        throw new Error('PLAN_CAPTURE_SCOPE_INVALID: capture scope requires an investigation plan.');
+      }
+      const investigation = sourcePlan?.completionContract === 'investigation-report' && sourcePlan.investigationMission
+        ? await prepareInvestigationPlan({ mission: sourcePlan.investigationMission, sessionId,
+          projectId: runtimeContext.projectId ?? sourcePlan.projectId, captureScope: args.captureScope,
+          host: { sessionProjectId: id => storageAdapter.sessions.readSession(id)?.projectId ?? null,
+            project: id => storageAdapter.getProjectById(id),
+            replayState: (owner, projectId) => rdcSessionService.snapshotReplayForSession({ sessionId: owner, projectId }) } })
+        : null;
       for (const handoff of handoffOptions) assertDeclaredHandoffForPlan({ sourceAgentId: agentId,
         projectRoot: runtimeContext.projectRootPath ?? runtimeContext.effectivePlan?.projectRootPath ?? null, handoff, tasks: taskRequirements });
-      const markdown = composePlanMarkdown({ title, summary, content, taskRequirements });
+      const markdown = composePlanMarkdown({ title, summary, content, taskRequirements, investigation });
+      if (turnHandle) turnHandle.approvedPlan = null;
       onExecutionStart?.();
       const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
       const revision = planReviewStateStore.beginRevision(sessionId, runtimeContext.turnId);

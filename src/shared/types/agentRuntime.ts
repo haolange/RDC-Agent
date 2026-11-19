@@ -49,6 +49,7 @@ export interface AgentRouteCapability {
 export type AgentEventType =
   | 'run.started'
   | 'assistant.delta'
+  | 'assistant.text_end'
   | 'assistant.thinking_delta'
   | 'assistant.thinking_end'
   | 'assistant.completed'
@@ -82,6 +83,7 @@ export interface AgentRunStartedPayload extends AgentEventBasePayload {
 
 export interface AgentAssistantDeltaPayload extends AgentEventBasePayload {
   text: string;
+  phase?: 'commentary' | 'final_answer';
   providerOutputRef: ProviderOutputRef;
 }
 
@@ -92,6 +94,7 @@ export interface AgentAssistantThinkingPayload extends AgentEventBasePayload {
 
 export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
   text: string;
+  textItems?: Array<{ text: string; phase?: 'commentary' | 'final_answer'; providerOutputRef: ProviderOutputRef }>;
   thinking?: ThinkingArtifact[];
   providerOutputRefs?: ProviderOutputRef[];
   stopReason?: ConversationLoopStopReason;

@@ -9,6 +9,7 @@ import {
   type AgentManifestDraft,
 } from '@shared/types/agentManifest';
 import type { useI18n } from '../../../../i18n';
+import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 import { Select } from '../../../../ui/Select';
 import { SettingsField } from '../parts';
 
@@ -20,6 +21,15 @@ export const AgentContractFields: React.FC<{
   t: Translate;
 }> = ({ agent, onChange, t }) => (
   <div className="settings-agent-route-grid">
+    <SettingsField label={t('settings.agentReasoningLevel')}>
+      <Select
+        ariaLabel={t('settings.agentReasoningLevel')}
+        dataTestId="settings-agent-reasoning-level"
+        value={agent.reasoningLevel ?? ''}
+        onChange={(value) => onChange({ reasoningLevel: value ? value as ReasoningSelection : undefined })}
+        options={[{ value: '', label: t('settings.agentReasoningDefault') }, ...REASONING_SELECTIONS.map((value) => ({ value, label: value }))]}
+      />
+    </SettingsField>
     <SettingsField label={t('settings.agentAccessCeiling')}>
       <Select
         ariaLabel={t('settings.agentAccessCeiling')}

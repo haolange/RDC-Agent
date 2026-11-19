@@ -14,6 +14,7 @@ import { traceProjectionRefreshService } from '../../agent-trace/TraceProjection
 import { randomUUID } from 'node:crypto';
 import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, ConversationAnswerPlanReviewRequest, ConversationAnswerPlanReviewResult } from '@shared/types/planReview';
 import { resolveRecoverablePlan } from '../../sessions/run/planReviewRecovery';
+import { resolveApprovedHandoff } from '../../sessions/run/approvedHandoffRecovery';
 
 interface PendingPlanReviewRequest {
   reviewId: string;
@@ -82,8 +83,9 @@ export class AgentPlanReviewRequestService {
   }
 
   private project(sessionId: string, review: PlanReviewContext | null, recoverable: PlanReadRequest | null,
-    error?: string, decision?: PlanReviewProjection['decision']): PlanReviewProjection {
-    const data = { sessionId, review, recoverable, ...(error ? { error } : {}), ...(decision ? { decision } : {}) };
+    error?: string, decision?: PlanReviewProjection['decision'], approvedHandoff?: PlanReviewProjection['approvedHandoff']): PlanReviewProjection {
+    const data = { sessionId, review, recoverable, ...(error ? { error } : {}), ...(decision ? { decision } : {}),
+      ...(approvedHandoff ? { approvedHandoff } : {}) };
     const previous = this.heads.get(sessionId);
     if (previous && JSON.stringify({ ...previous, projectionVersion: 0 }) === JSON.stringify({ ...data, projectionVersion: 0 })) return previous;
     const next = { ...data, projectionVersion: ++this.version };
@@ -102,7 +104,11 @@ export class AgentPlanReviewRequestService {
         return this.project(sessionId, this.context(live), null);
       }
       const source = resolveRecoverablePlan(sessionId, this.store);
-      if (!source) return this.heads.get(sessionId)?.decision ? this.heads.get(sessionId)! : this.project(sessionId, null, null);
+      if (!source) {
+        if (this.heads.get(sessionId)?.decision) return this.heads.get(sessionId)!;
+        const handoff = this.busy(sessionId) ? null : resolveApprovedHandoff(sessionId, this.store.read(sessionId));
+        return this.project(sessionId, null, null, undefined, undefined, handoff ?? undefined);
+      }
       if (source.state.status === 'cancelled') return this.project(sessionId, null, source.reference);
       if (this.busy(sessionId)) return this.project(sessionId, null, null);
       return this.restore(sessionId, source);

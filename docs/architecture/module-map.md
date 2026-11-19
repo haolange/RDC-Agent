@@ -4,10 +4,19 @@
 | --- | --- | --- | --- | --- | --- |
 | Agentic Trace | `src/main/agent-trace/*`, `src/main/agent-runtime/orchestration/TraceStateStore.ts` | `AgentRunPresentation`, `TraceEvent`, `TraceNode`, `ProgressTask`, `TraceArtifactRecord`, `TraceContextRecord` | `trace:getProjection`, `trace:projectionChanged` | `features/right-rail/SessionRightRail`, Work Process transcript | typecheck, fidelity, browser-session smoke |
 | Agent workbench | `src/main/agent-runtime/orchestration/AgentOrchestrator.ts`, `src/main/settings/agent-manifests/AgentManifestService.ts`, `src/main/agent-runtime/*` | `.agent.md`, `AgentId`, `AgentManifestDefinition`, `WorkflowState`, `BUILTIN_AGENT_TOOL_IDS` / tool tokens | `conversation:*`, `session:applyDeclaredHandoff`, `workflow:stop`, `workflow:getState` | Composer, `features/transcript`, Settings > Agents, `features/right-rail` | typecheck, settings-agents, tool-system, browser smoke |
-| RDC runtime boundary | `src/main/rdc/RdcCliInvokerService.ts`, `ShellInvocationService.ts`, `src/main/rdc/RdcSessionRuntime.ts` | `RdcRuntimeContext`, `OpenedCaptureState`, `RdcTurnBinding` | `capture:openProjectInput`, `context:get`, `capture:refreshFrame`, `tool:verifyInstallation` | Settings > Tools, capture library, session context, Activity | typecheck, shell/browser smoke |
+| RDC runtime boundary | `src/main/rdc/RdcCliInvokerService.ts`, `src/main/tools/ShellInvocationService.ts`, `src/main/rdc/RdcSessionRuntime.ts` | `RdcRuntimeContext`, `OpenedCaptureState`, `RdcTurnBinding` | `capture:openProjectInput`, `context:get`, `capture:refreshFrame`, `tool:verifyInstallation` | Settings > Tools, capture library, session context, Activity | typecheck, shell/browser smoke |
 | Settings/provider system | `src/main/settings/settings-core`, `provider-catalog`, `provider-auth`, `agent-manifests` | `AppSettings`, provider catalog, routes, `ToolingSettings` | settings IPC | Settings modal | typecheck, provider-system tests |
 | Sessions/captures | `src/main/sessions/store`, `sessions/run`, `sessions/artifacts`, `src/main/rdc/captures` | `SessionRecord` (`schemaVersion: '1'`, 旧文件 fail-closed), `RunSummary`, `OpenedCaptureState` | project/session/capture IPC | project tree, capture library, opened capture panels | typecheck, shell smoke |
 | Scoped resources | `src/main/runtime/ScopedRuntimeService.ts` | Agent/Skill/MCP/Hook/policy documents | `rdc-runtime:*` | Settings resource editors | typecheck, scoped-resources |
+| RDC 操作协调与恢复 | `src/main/rdc/RdcOperationCoordinator.ts`, `RdcOperationPolicy.ts`, `RdcOperationCatalog.ts`, `RdcCaptureRecovery.ts`, `RdcTurnBindings.ts`, `OwnedRdcDaemonRegistry.ts`, `RdcRemoteConnection.ts` | `RdcTurnBinding`, 操作回执 | 经 `shell.rdc` / `rdc_probe` 与 capture IPC | Capture 卡、session context | typecheck, shell smoke（契约见 `rdc-runtime.md`） |
+| Investigation | `src/main/investigation/*`（`InvestigationArtifactService`, `InvestigationTools`） | Investigation Artifact / manifest 记录 | `investigation:list` 等 | Right Rail Artifacts | typecheck, investigation tests |
+| Knowledge | `src/main/knowledge/*` | Knowledge candidate / index / export | knowledge IPC | `features/knowledge` | typecheck, knowledge tests |
+| Hooks | `src/main/hooks/*`（`HookEngine`, `hookTrustStore`） | Hook 文档与 trust fingerprint | `rdc-runtime:*` | Settings > Hooks | typecheck, scoped-resources |
+| Conversation | `src/main/conversation/*`（`ConversationService`, `ConversationTurnRunner`, `ConversationWorkTrace`） | `ConversationWorkTrace`, 附件与分支 | `conversation:*` | `features/composer`, `features/transcript` | typecheck, agent-runtime, work-process |
+| Permissions | `src/main/agent-runtime/permissions/*`（`AgentPermissionPolicy`, `PolicyCompiler`） | 权限模式与 policy | `conversation:answerToolApproval` 等 | 审批卡、Settings > Policy | typecheck, 见 `contracts/permissions.md` |
+| Tasks | `src/main/agent-runtime/tasks/*`（`TaskRegistry`, `TaskTools`, `taskProjection`） | `ProgressTask` | `task_*` 工具、trace 投影 | Right Rail Progress、Tasks 卡 | typecheck, agent-runtime |
+| Provider adapters | `src/main/agent-runtime/providers/*` | `RequestPlan`, `EffectiveModel` | 无直接 IPC | 无 | typecheck, provider-system tests（见 `provider-architecture.md`） |
+| Browser app bridge | `src/main/browserAppBridge/*` | `src/shared/renderer-api/` manifest | localhost HTTP/SSE | Browser 路径同一 renderer | `bridgeSecurity.test.ts`（见 `browser-qa-surface.md`） |
 | Reports/evidence | `src/main/reports/*` | `ArtifactRecord`, `ActionEvent`, diagnostics | `evidence:getChain`, `evidence:eventAdded` | Activity, artifacts, trace cards | typecheck |
 
 Rules:
@@ -19,21 +28,11 @@ Rules:
 
 ## Renderer 职责地图
 
-`app/WorkbenchShell` 组装 feature 与 shell，底栏字段只传给 `SidebarFooter`。`app/bootstrap` 按事件族拆开：shell 初始化、会话表面、catalog、项目输入、会话恢复，由 `useAppBootstrap` 按这个顺序调用。`app/bootstrap/useIpcEventBridge` 单点安装、释放 conversation、session、capture 和 shell 订阅，投影身份检查仍位于原业务边界。Command Palette 的快捷键与业务动作由 app controller 拥有，pattern 仅接收状态与回调。
+renderer 按 `app/`、`features/`（composer、transcript、right-rail、sidebar、terminal、settings、knowledge、onboarding、captures）、`patterns/`、`ui/`、`lib/` 分层；feature 的局部边界见各 feature 的 README。组件级职责、视觉与交互规则见 `docs/ui/`：
 
-| 产品区域 | Canonical 入口与职责 | 状态与验证 |
-| --- | --- | --- |
-| Composer | `features/composer/Composer` 编排；`ComposerEditor` 书写区、`ComposerFooter` 底栏、`ComposerPendingRequest` 待处理请求；专属样式按 shell/editor/toolbar/controls/requests/motion 归属 | `useComposer` 保持发送与草稿协调；request selector 保持审批优先级；IME、菜单、生命周期和请求测试就近维护 |
-| Transcript | `features/transcript/index` 组装消息；`workProcessTracePresentation` 负责轨迹，`workProcessBlockProjection` 编排 block，模型回合和独立块分别在 `workProcessLlmProjection` / `workProcessStandaloneProjection`；`workProcessToolContent` 按 artifact、shell、skill、catalog、file、web、generic 分发，共享清洗在 `workProcessToolContentShared`；CSS 按实际消息部件拆分 | main-owned transcript 为权威；解析为纯函数；滚动与虚拟列表测试覆盖定位、离底与内容尺寸变化 |
-| Right Rail | `features/right-rail/RightRail` → `SessionRightRail` → 各卡；Capture 保持专属交互 | `session-projection` / `right-rail` 门禁；五卡次序和空态不变 |
-| Sidebar / Terminal | feature 入口与专属 hooks 负责业务。项目选择按选项目、选会话、重命名分文件，快照在 `projectSelectionContext`。就近维护布局、行操作、输出、输入及状态样式 | 继续使用既有 project/session、terminal store，shell 只负责 drawer 与 resize |
-| Settings / Knowledge / Onboarding | 各 feature 入口负责导航与页面；编辑任务复用 TaskDialog | 维持单一查询/选择事实源；异步失效、未保存离开、弹层焦点与教程生命周期就近验证 |
-| Context / Material | `patterns/ContextBreakdownPopover`、`MaterialContextEditor` / `Viewer` 负责展示；Material 使用共享 TaskDialog | Context 展开值和写入回调由 Composer owner 提供；pattern 不写业务 store |
+- [`docs/ui/README.md`](../ui/README.md)：UI 文档入口。
+- [`docs/ui/workbench-and-transcript.md`](../ui/workbench-and-transcript.md)：Workbench、Composer、Transcript 与 Work Process。
+- [`docs/ui/design-system.md`](../ui/design-system.md)：基础组件、patterns 与主题。
+- [`docs/ui/knowledge-center.md`](../ui/knowledge-center.md)：Knowledge Center。
 
-各 feature README 说明局部边界。`pnpm run test:coverage:renderer` 单独输出 renderer 覆盖统计；它不替代真实工作台验收，也不改变 main/shared coverage ratchet。全局 CSS 不承载 feature/pattern 专属选择器；AST 分层门禁检查静态导入、重导出、动态导入与 pattern store 写入。
-
-### UI 组件与内部活文档
-
-`renderer/ui` 持有基础输入、选择、披露、菜单、弹层与反馈；`renderer/lib/anchoredSurface` 持有共享视口几何。`patterns` 复用基础组件组织跨页面内容，业务写入继续经调用方回调。SettingsField/资源列表编辑器、Composer Effort/Max、Transcript 历史轨道与计划、Right Rail 投影留在各自领域。
-
-`designs/rdc-agent-design-system` 作为独立开发入口导入上述生产组件与主题编译逻辑；不被 renderer 产品入口导入、不进入发行包，不以示例状态代替应用验收。
+renderer 只通过 preload API 访问 main；AST 分层门禁检查静态导入、重导出、动态导入与 pattern store 写入。

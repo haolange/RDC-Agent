@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
-import { createElement } from 'react';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { SubagentRow } from './SubagentRow';
+import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 
-const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false }));
+const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false,
+  configurationError: false, workOpen: false, finalOpen: false, projectedFinal: false }));
 const task = 'Use glob to inspect the project root.';
 const body = JSON.stringify({ capsule: {
   task, goal: task, scope: '', outputRequirements: '', stopConditions: [], acceptedFacts: [], hypotheses: [],
@@ -17,16 +20,22 @@ vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ 
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (selector: (state: unknown) => unknown) =>
   selector({ settings: { agents: { definitions: [] } } }) }));
 vi.mock('./useSubagentDisclosure', () => ({ useSubagentDisclosure: () => ({
-  expanded: state.expanded, workOpen: false, finalOpen: false, detailsOpen: false,
+  expanded: state.expanded, workOpen: state.workOpen, finalOpen: state.finalOpen, detailsOpen: false,
   factsOpen: false, constraintsOpen: false, toggle: () => {}, openCard: () => {},
 }) }));
 vi.mock('./useDelegationTrace', () => ({ useDelegationTrace: () => ({
-  page: { header: state.headerLoading || state.headerMissing ? null : { task, profile: 'general', status: 'complete', mode: 'wait', startedAt: 1,
-    completedAt: 1000, taskAvailable: true }, steps: [], total: 0, revision: 1 },
+  page: { header: state.headerLoading || state.headerMissing ? null : { task, profile: 'general', status: state.configurationError ? 'failed' : 'complete', mode: 'wait', startedAt: 1,
+    ...(state.configurationError ? { configurationError: 'MODEL_UNAVAILABLE', error: 'Model unavailable' } : {}),
+    completedAt: 1000, taskAvailable: true, finalAvailable: state.projectedFinal },
+    steps: state.projectedFinal ? [{ id: 'loop', revision: 1, block: { id: 'loop', kind: 'llm_turn', title: 'Loop',
+      status: 'complete', startedAt: 1, toolCalls: [], outputItems: [{ providerOutputRef: {
+        protocol: 'test', providerBlockKey: 'text', contentIndex: 0 }, text: 'Final child reply',
+        phase: 'final_answer', status: 'complete', displayOrder: 1 }] } }] : [], total: state.projectedFinal ? 1 : 0, revision: 1 },
   loading: false, headerLoading: state.headerLoading, hasEarlier: false, loadEarlier: async () => {}, retry: () => {},
 }) }));
 vi.mock('./useDelegationContent', () => ({ useDelegationContent: (input: { kind: string; available: boolean }) => ({
-  text: input.available && input.kind === 'task' && !state.taskLoading && !state.taskError ? body : '',
+  text: input.available && input.kind === 'final' ? 'Final child reply'
+    : input.available && input.kind === 'task' && !state.taskLoading && !state.taskError ? body : '',
   hasMore: false, loading: state.taskLoading, error: state.taskError,
   loadMore: async () => {}, retry: () => {},
 }) }));
@@ -75,6 +84,42 @@ it('presents the frozen task once in each card state and unmounts the preview on
   expect(pending.body.textContent).not.toContain('chat.subagentNoActions');
   expect(pending.body.textContent).not.toContain('chat.subagentNoFinal');
   state.headerLoading = false;
+});
+
+it('shows a child final once while preserving both disclosure controls', () => {
+  state.expanded = true; state.workOpen = true; state.finalOpen = true; state.projectedFinal = true;
+  try {
+    const open = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })), 'text/html');
+    expect(open.body.textContent?.split('Final child reply')).toHaveLength(2);
+    expect(open.body.textContent).toContain('chat.subagentFinalShownAbove');
+    state.workOpen = false;
+    const folded = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })), 'text/html');
+    expect(folded.body.textContent?.split('Final child reply')).toHaveLength(2);
+    expect(folded.body.textContent).not.toContain('chat.subagentFinalShownAbove');
+  } finally { state.expanded = false; state.workOpen = false; state.finalOpen = false; state.projectedFinal = false; }
+});
+
+it('offers the exact Agent settings for trusted configuration failures', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  state.expanded = true;
+  state.configurationError = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(createElement(SubagentRow, { row, sessionId: 'config' })));
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Model unavailable');
+    const button = [...host.querySelectorAll('button')].find((element) => element.textContent === 'chat.subagentOpenAgentSettings');
+    expect(button).toBeDefined();
+    await act(async () => button!.click());
+    expect(useSettingsNavigationStore.getState().agentRequest?.agentId).toBe('general');
+    state.configurationError = false;
+    await act(async () => root.render(createElement(SubagentRow, { row, sessionId: 'config' })));
+    expect([...host.querySelectorAll('button')].some((element) => element.textContent === 'chat.subagentOpenAgentSettings')).toBe(false);
+  } finally {
+    await act(async () => root.unmount()); host.remove();
+    useSettingsNavigationStore.getState().clearAgentRequest(); vi.unstubAllGlobals();
+    state.expanded = false; state.configurationError = false;
+  }
 });
 
 it('shows the parent receipt and task when admission fails before a child trace exists', () => {

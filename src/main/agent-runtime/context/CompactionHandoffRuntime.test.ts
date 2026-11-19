@@ -22,6 +22,8 @@ it('uses no tools, preserves the frozen cancellation and route, and records meas
   const result = message('stop'); providerResult(result); const signal = new AbortController().signal;
   await expect(executeCompactionHandoff({ ...input, signal })).resolves.toEqual(result);
   expect(mock.stream).toHaveBeenCalledWith('frozen-route', expect.objectContaining({ tools: [] }), expect.objectContaining({ requestPlan: input.plan, credentialHandle: 'opaque', signal, maxTokens: 4096, promptCache: expect.objectContaining({ enabled: false }) }));
+  expect(mock.stream.mock.calls[0][1].systemPrompt).toContain('Preserve unfinished obligations from an approved plan');
+  expect(mock.stream.mock.calls[0][1].systemPrompt).toContain('omission is not completion');
   expect(mock.write).toHaveBeenCalledOnce();
 });
 it('rejects cancellation after the provider returned, without publishing a result', async () => {

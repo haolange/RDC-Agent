@@ -4,6 +4,14 @@ import { deriveChildPolicyBudget } from './DelegationBudget';
 import { consumeReservedSubagentSlot, createPolicyBudgetState, reserveDispatchBudget } from './TurnCoordinator';
 
 const root = () => createPolicyBudgetState({ maxToolCalls: 100, maxSubagents: 10, maxChildDepth: 3, maxWallTimeMs: 10000 });
+
+it('uses the remaining parent limits when no child budget is declared', () => {
+  const parent = root(); parent.toolCalls = 30;
+  const child = deriveChildPolicyBudget(parent, {});
+  expect(child.maxToolCalls).toBe(70);
+  expect(child.maxSubagents).toBe(10);
+  expect(child.wallStartedAt + child.maxWallTimeMs).toBe(parent.wallStartedAt + parent.maxWallTimeMs);
+});
 describe('delegated local budget with shared accounting', () => {
   it('enforces the child one-call ceiling without narrowing the parent', () => {
     const parent = root();

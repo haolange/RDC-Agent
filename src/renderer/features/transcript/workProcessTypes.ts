@@ -116,6 +116,28 @@ export interface WorkProcessUserInputItem {
 
 export type WorkProcessRow =
   | {
+    type: 'thinking';
+    id: string;
+    status: WorkProcessRowStatus;
+    duration: string;
+    preview: string;
+    label: string;
+    kind?: ThinkingArtifact['kind'];
+    source?: string;
+    visibility?: ThinkingArtifact['visibility'];
+    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
+    expandable: boolean;
+    openByDefault: boolean;
+  }
+  | {
+    type: 'output';
+    id: string;
+    status: WorkProcessRowStatus;
+    duration: string;
+    text: string;
+    phase?: ConversationLoopOutputPhase;
+  }
+  | {
     type: 'summary';
     id: string;
     status: WorkProcessRowStatus;
@@ -260,6 +282,8 @@ export type WorkProcessRow =
     thinkingExpandable: boolean;
     /** Policy hint: expand while loop is live; fold after settle. UI may sticky-override. */
     thinkingOpenByDefault: boolean;
+    /** Activity of task lifecycle calls represented by their snapshots rather than separate tool rows. */
+    hasActiveTools?: boolean;
     stepCount: number;
     duration: string;
     defaultOpen: boolean;

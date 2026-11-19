@@ -118,9 +118,14 @@ export function translateCoreToSharedAgentEvent(
       if (ev.type === 'text_delta') {
         return buildSharedAgentEvent(
           'assistant.delta',
-          { text: ev.delta, providerOutputRef: { ...ev.providerOutputRef } },
+          { text: ev.delta, phase: ev.phase, providerOutputRef: { ...ev.providerOutputRef } },
           context,
         );
+      }
+      if (ev.type === 'text_end') {
+        return buildSharedAgentEvent('assistant.text_end', {
+          text: ev.content, phase: ev.phase, providerOutputRef: { ...ev.providerOutputRef },
+        }, context);
       }
       if (ev.type === 'thinking_delta') {
         return buildSharedAgentEvent(
@@ -163,6 +168,8 @@ export function translateCoreToSharedAgentEvent(
           'assistant.completed',
           {
             text,
+            textItems: event.message.content.flatMap((block) => block.type === 'text' && block.providerOutputRef
+              ? [{ text: block.text, phase: block.phase, providerOutputRef: { ...block.providerOutputRef } }] : []),
             thinking: thinking.length > 0 ? thinking : undefined,
             providerOutputRefs: extractAssistantTextOutputRefs(event.message.content),
             stopReason: mapCoreStopReasonToShared(event.message.stopReason),

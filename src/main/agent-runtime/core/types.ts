@@ -27,6 +27,7 @@ export type ThinkingArtifactSource = import('@shared/types/reasoning').ThinkingA
 export interface TextContent {
   type: 'text';
   text: string;
+  phase?: 'commentary' | 'final_answer';
   providerOutputRef?: ProviderOutputRef;
 }
 
@@ -270,8 +271,8 @@ export interface Model {
 export type AssistantMessageEvent =
   | { type: 'start'; partial: AssistantMessage }
   | { type: 'text_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'text_delta'; contentIndex: number; delta: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'text_end'; contentIndex: number; content: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'text_delta'; contentIndex: number; delta: string; phase?: TextContent['phase']; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'text_end'; contentIndex: number; content: string; phase?: TextContent['phase']; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
   | { type: 'thinking_start'; contentIndex: number; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
   | { type: 'thinking_delta'; contentIndex: number; delta: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
   | { type: 'thinking_end'; contentIndex: number; content: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }

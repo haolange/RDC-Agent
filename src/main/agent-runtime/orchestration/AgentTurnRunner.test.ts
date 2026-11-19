@@ -46,6 +46,7 @@ import { createSubagentBudgetState, turnCoordinator, type SubagentBudgetState } 
 function createRunner(): AgentTurnRunner {
   return new AgentTurnRunner({
     validateCompletion: () => undefined,
+    validateCompletionReadiness: () => undefined,
     slots: {} as AgentSlotRegistry,
     mcp: {} as McpConnectionCoordinator,
     deferredActivation: {
@@ -114,11 +115,9 @@ describe('AgentTurnRunner', () => {
     expect(() => resolveAgentMaxTurns(0, 12)).toThrow(/POLICY_MAX_TURNS_ZERO/);
   });
 
-  it('resolveMaxTurns uses a single default when profile maxTurns is omitted', () => {
-    expect(resolveAgentMaxTurns(80)).toBe(25);
-    expect(resolveAgentMaxTurns(80)).toBe(25);
-    expect(resolveAgentMaxTurns()).toBe(25);
-    expect(resolveAgentMaxTurns()).toBe(25);
+  it('resolveMaxTurns applies an explicit policy without inventing a default', () => {
+    expect(resolveAgentMaxTurns(80)).toBe(80);
+    expect(resolveAgentMaxTurns()).toBeUndefined();
   });
 
   it('resolveMaxTurns uses profile maxTurns for any id, including custom edit', () => {

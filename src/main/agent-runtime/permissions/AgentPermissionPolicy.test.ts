@@ -83,6 +83,21 @@ const deleteFileTool: AgentTool = {
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
+it('classifies replay lifecycle separately from read-only probe queries', () => {
+  const service = new AgentPermissionPolicyService();
+  const tool: AgentTool = { ...readFileTool, name: 'rdc_probe' };
+  const decision = (action: string, mode: AgentPermissionMode, ceiling: 'full' | 'read-only', policy = {}) => service.evaluate({
+    ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
+    tool, toolCall: { type: 'toolCall', id: 'probe', name: 'rdc_probe', arguments: { action } },
+    accessCeiling: ceiling, compiledPolicy: compilePolicyFromRestrictive(policy),
+  });
+  expect(decision('probe', 'auto-review', 'read-only').action).toBe('allow');
+  expect(decision('capture_select', 'full-access', 'read-only').action).toBe('deny');
+  expect(decision('capture_select', 'auto-review', 'full').action).toBe('auto_review');
+  expect(decision('capture_select', 'full-access', 'full').action).toBe('allow');
+  expect(decision('capture_select', 'full-access', 'full', { approval: 'mutation' }).action).toBe('ask_user');
+});
+
 function makeReadFileToolCall(path: string): ToolCall {
   return {
     type: 'toolCall',

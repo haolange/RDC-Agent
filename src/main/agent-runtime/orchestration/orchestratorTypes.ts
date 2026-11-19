@@ -124,6 +124,11 @@ export interface PreparedAgentRuntime {
   credentialHandle: string;
   promptCache: CompiledPromptCache;
   effectivePlan: EffectiveRuntimePlan;
+  /** The approved, hash-verified plan for this execution, if present. */
+  approvedExecution?: {
+    offer: import('@shared/types/executionOffer').ExecutionOffer;
+    investigation: import('@shared/types/planInvestigation').InvestigationPlanContract | null;
+  } | null;
 }
 
 export interface PreparedAgentTurnContext {

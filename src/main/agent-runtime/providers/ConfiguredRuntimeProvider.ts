@@ -189,6 +189,7 @@ function createProviderStrategy(
         baseUrl: provider.baseUrl,
         headers: { ...connectionHeaders, ...accountHeaders },
         ...(requestAuthorizer ? { authorization: 'none', requestAuthorizer } : {}),
+        ...(provider.authMode === 'local' ? { allowAnonymous: true } : {}),
       });
     case 'azure-openai-chat':
       return new OpenAICompatibleProvider({
@@ -223,6 +224,7 @@ function createProviderStrategy(
         baseUrl: provider.baseUrl,
         accountId: provider.accountId,
         headers: { ...connectionHeaders, ...accountHeaders },
+        ...(provider.authMode === 'local' ? { allowAnonymous: true } : {}),
         ...(requestAuthorizer ? { requestAuthorizer } : {}),
       });
     case 'gitlab-duo':

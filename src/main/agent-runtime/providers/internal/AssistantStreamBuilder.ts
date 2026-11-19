@@ -21,7 +21,7 @@ import {
 type BlockKind = 'text' | 'thinking' | 'tool_call';
 
 type Block =
-  | { kind: 'text'; ref: ProviderOutputRef; text: string; closed: boolean }
+  | { kind: 'text'; ref: ProviderOutputRef; text: string; phase?: TextContent['phase']; closed: boolean }
   | { kind: 'thinking'; ref: ProviderOutputRef; thinking: ThinkingContent; closed: boolean }
   | {
       kind: 'tool_call';
@@ -105,11 +105,12 @@ export class AssistantStreamBuilder {
     this.stream.push({ type: 'start', partial: this.snapshot('stop') });
   }
 
-  startText(ref: ProviderOutputRef): void {
+  startText(ref: ProviderOutputRef, phase?: TextContent['phase']): void {
     this.claim(ref, 'text', {
       kind: 'text',
       ref,
       text: '',
+      phase,
       closed: false,
     });
     this.stream.push({
@@ -128,6 +129,7 @@ export class AssistantStreamBuilder {
       type: 'text_delta',
       contentIndex: ref.contentIndex,
       delta,
+      phase: block.phase,
       providerOutputRef: { ...ref },
       partial: this.snapshot('stop'),
     });
@@ -136,6 +138,12 @@ export class AssistantStreamBuilder {
   endText(ref: ProviderOutputRef): void {
     const block = this.requireOpenBlock(ref, 'text', 'end');
     this.closeBlock(block);
+  }
+
+  updateTextPhase(ref: ProviderOutputRef, phase: NonNullable<TextContent['phase']>): void {
+    const block = this.requireOpenBlock(ref, 'text', 'update');
+    if (block.phase && block.phase !== phase) throw new Error(`Provider changed text phase for ${ref.providerBlockKey}.`);
+    block.phase = phase;
   }
 
   startThinking(ref: ProviderOutputRef, input: ThinkingContentInput = {}): void {
@@ -384,6 +392,7 @@ export class AssistantStreamBuilder {
         type: 'text_end',
         contentIndex: block.ref.contentIndex,
         content: block.text,
+        phase: block.phase,
         providerOutputRef: { ...block.ref },
         partial: this.snapshot('stop'),
       });
@@ -425,6 +434,7 @@ export class AssistantStreamBuilder {
         const item: TextContent = {
           type: 'text',
           text: block.text,
+          ...(block.phase ? { phase: block.phase } : {}),
           providerOutputRef: { ...block.ref },
         };
         content.push(item);

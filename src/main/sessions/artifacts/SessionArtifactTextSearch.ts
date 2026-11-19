@@ -17,6 +17,9 @@ export function searchArtifactText(text: string, query: string, cursor: Cursor, 
   }
   const matches: Match[] = [];
   const matchLimit = Math.min(limit, ARTIFACT_TEXT_SEARCH_MAX_MATCHES);
+  // Keep useful surrounding data for long, single-line structured results while
+  // leaving room for JSON escaping, metadata, and small caller byte limits.
+  const followingContext = Math.max(80, Math.min(1024, Math.floor((maxBytes - 1024) / 6)));
   let totalMatches = 0;
   let afterCursor = 0;
   let next: Cursor | undefined;
@@ -28,7 +31,7 @@ export function searchArtifactText(text: string, query: string, cursor: Cursor, 
         afterCursor += 1;
         if (matches.length < matchLimit) {
           let start = Math.max(0, column - 40);
-          let end = Math.min(line.length, column + query.length + 80);
+          let end = Math.min(line.length, column + query.length + followingContext);
           if (/[\uDC00-\uDFFF]/.test(line[start] ?? '')) start -= 1;
           if (/[\uDC00-\uDFFF]/.test(line[end] ?? '')) end -= 1;
           matches.push({ line: index + 1, column, excerpt: line.slice(start, end), excerptColumn: start });

@@ -9,11 +9,11 @@ Use this skill during Debugger execution. Do not invent a new kind, Profile, or 
 
 ## First Bad Event
 
-Shape: one `EvidenceRecord` (`kind: evidence`) plus an optional companion `ClaimRecord` (`claimKind: observed_fact`).
+Shape: one `EvidenceRecord` (`kind: evidence`) and a companion `ClaimRecord` (`claimKind: observed_fact`).
 
-1. Name expected result, observed result, and the earliest event or pixel region where they diverge.
-2. Collect the observation through the Settings-configured RDC-Tool CLI (`$rdc-tool-shell`) and `$pixel-forensics` / `$capture-facts`. Read `$pixel-forensics` before interpreting per-fragment color, alpha or test flags; native history fields can be reconstructed or format-limited rather than complete blend inputs.
-3. Persist the WorldState for the observed state before its Evidence, following `$artifact-provenance` record dependencies; raw observations may be collected first. Do not bind fresh observations to a historical WorldState merely to make the reference resolve. Then write Evidence before any companion Claim: `mission: debugger`, `epistemicStatus: observed`, `region.kind` in `{event, pixel}`, `contentHashes` matching artifact bytes, `worldStateId` resolvable. Unknown fields remain honest under the schema; a draft does not assert safety or completed future observations.
+1. Find the first proven regional symptom via same-capture target/control and prior writes, even without reference; record appearance and coverage, not assumed correctness.
+2. Collect observations with `$rdc-tool-shell`, `$pixel-forensics` and `$capture-facts`. Read `$pixel-forensics` before interpreting per-fragment values or test flags: native history may be reconstructed or format-limited.
+3. Persist the WorldState for the observed state before its Evidence, following `$artifact-provenance` record dependencies; raw observations may be collected first. Do not bind fresh observations to a historical WorldState merely to make the reference resolve. Then write Evidence before any companion Claim: `mission: debugger`, `epistemicStatus: observed`, `region.kind` in `{event, pixel}`, `artifactRefs` with their actual content hashes, and a resolvable `worldStateId`. Unknown fields remain honest under the schema; a draft does not assert safety or completed future observations.
 4. The companion Claim may repeat the event id in `scope.eventId`. It stays `observed_fact`. It must not set `declaresCounterfactual` or a causal `experimentId`.
 
 A prose guess is not a First Bad Event. Do not mark `ready` without provenance (`$artifact-provenance`).
@@ -22,9 +22,9 @@ A prose guess is not a First Bad Event. Do not mark `ready` without provenance (
 
 Shape: one `ClaimSet` (`kind: claim_set`) of competing `hypothesis` Claims.
 
-1. Check whether the approved plan records a bounded Knowledge retrieval. If it does not, search by the observed symptom and capture scope before writing the matrix; read relevant hits and their applicability or record the empty/failed result. Treat historical cases only as leads to test against this capture. Write at least two mutually distinguishable hypotheses. Each item is a `ClaimRecord` with `claimKind: hypothesis`, `epistemic: inferred`, `experimentId: null`, and a non-empty `scope`.
+1. Check the plan's bounded Knowledge retrieval. If absent or over-constrained, search separate short object, symptom or domain terms; read relevant hits or record empty/failed searches. Map leads to testable features and applicability conditions matched, unknown or contradicted here; they are not current evidence. Keep distinguishable hypotheses; one suffices if evidence excludes the rest. Each is a `ClaimRecord` with `claimKind: hypothesis`, `epistemic: inferred`, `experimentId: null`, and non-empty `scope`.
 2. Link rivals with `supports` / `contradicts` using resolvable `claimId`s. Keep evidence-backed, distinguishable alternative explanations visible until checked; do not invent a driver-blame hypothesis.
-3. Name the smallest check that would confirm one row and reject another. That check becomes a Task subject later; do not write the matrix into `TaskRecord`.
+3. Name the smallest distinguishing check with consistent supporting and disconfirming predictions. When intervention or matching trace is unavailable, inspect each path's required bindings and parameters before deferring: an observed disabled prerequisite can exclude that path; enablement alone does not prove contribution. Matching a prediction supports, not proves; retain uncertainty if outcomes do not distinguish rows. The check becomes a Task subject, not the matrix.
 
 Do not promote a matrix row to `causal_conclusion` here.
 

@@ -4,13 +4,13 @@ import os from 'os';
 import path from 'path';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { AgentMessage, AssistantMessage } from '../core/types';
-const mocks = vi.hoisted(() => ({ hook: vi.fn(), save: vi.fn(), verify: vi.fn(), state: vi.fn(), generate: vi.fn(), write: vi.fn(), read: vi.fn(), list: vi.fn(), resolve: vi.fn(), journal: vi.fn(), archive: vi.fn(), project: vi.fn() }));
+const mocks = vi.hoisted(() => ({ hook: vi.fn(), save: vi.fn(), verify: vi.fn(), state: vi.fn(), generate: vi.fn(), assemble: vi.fn(), message: vi.fn(), write: vi.fn(), read: vi.fn(), list: vi.fn(), resolve: vi.fn(), journal: vi.fn(), archive: vi.fn(), project: vi.fn() }));
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: mocks.hook }));
 vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSession: () => ({ projectId: 'project' }), readSessionContextJournal: mocks.journal } }));
 vi.mock('../../settings/settings-core/projectRegistryLookup', () => ({ lookupProjectById: () => ({ rootPath: 'project-root' }) }));
 vi.mock('../../sessions/store/CompactionAuthoritySource', () => ({ saveCompactionAuthoritySource: mocks.save, verifyCompactionAuthoritySource: mocks.verify, readCompactionAuthorityState: mocks.state, readCompactionAuthorityJournal: mocks.archive, projectCompactionJournalMessages: mocks.project }));
 vi.mock('./CompactionHandoffService', () => ({ generateCompactionSections: mocks.generate }));
-vi.mock('./StructuredHandoffBuilder', () => ({ serializeHandoffSourceTranscript: () => 'originals', assembleDerivedContextView: () => ({}), createStructuredHandoffMessage: () => ({ role: 'user', content: 'retained state', timestamp: 1 }) }));
+vi.mock('./StructuredHandoffBuilder', () => ({ serializeHandoffSourceTranscript: () => 'originals', assembleDerivedContextView: mocks.assemble, createStructuredHandoffMessage: mocks.message }));
 vi.mock('../../sessions/artifacts/DelegatedArtifactAccess', () => ({ delegatedArtifactOwner: () => 'owner', grantDelegatedOutput: vi.fn() }));
 vi.mock('../../sessions/artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver: { write: mocks.write, read: mocks.read, list: mocks.list, resolve: mocks.resolve } }));
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
@@ -25,8 +25,10 @@ const create = (providerId = 'provider', snapshotId = 'snapshot-a', routeRevisio
 });
 beforeEach(() => {
   vi.resetAllMocks(); mocks.hook.mockResolvedValue(true); mocks.state.mockResolvedValue('authority');
-  mocks.save.mockResolvedValue({ uri: 'session://tool-outputs/source.json', hash: 'source-hash', context: '{}', stateHash: hashScopedResource('authority') });
-  mocks.generate.mockResolvedValue({ criticalContext: [], usage: { inputTokens: 500, outputTokens: 30 } });
+  mocks.save.mockResolvedValue({ uri: 'session://tool-outputs/source.json', hash: 'source-hash', context: '{}', stateHash: hashScopedResource('authority'), artifactRefs: [] });
+  mocks.generate.mockResolvedValue({ objective: 'goal', constraints: [], progress: { done: [], inProgress: [], blocked: [] }, decisions: [], failedAttempts: [], nextSteps: [], criticalContext: [], usage: { inputTokens: 500, outputTokens: 30 } });
+  mocks.assemble.mockReturnValue({});
+  mocks.message.mockReturnValue({ role: 'user', content: 'retained state', timestamp: 1 });
   mocks.write.mockReturnValue({ hash: 'window-hash' });
   mocks.list.mockReturnValue([]);
   mocks.journal.mockReturnValue([]);
@@ -118,6 +120,42 @@ it('preserves execution ownership and publishes after persistence and source ver
   expect(mocks.write).toHaveBeenCalledWith('owner', 'session://tool-outputs/source-window.json', expect.any(String), expect.any(Object));
   expect(mocks.verify.mock.invocationCallOrder[0]).toBeLessThan(mocks.write.mock.invocationCallOrder[0]);
   expect(mocks.hook).toHaveBeenLastCalledWith('context.after-compact', expect.objectContaining({ sessionId: 'child', payload: expect.objectContaining({ applied: true, sourceHash: 'source-hash' }) }));
+});
+it('uses the verified source references when installing a model-generated checkpoint', async () => {
+  const uri = 'session://plans/approved.md';
+  const correct = 'a'.repeat(64);
+  const mistaken = 'b'.repeat(64);
+  mocks.save.mockResolvedValue({ uri: 'session://tool-outputs/source.json', hash: 'source-hash', context: '{}', stateHash: hashScopedResource('authority'), artifactRefs: [{ uri, hash: correct }] });
+  mocks.generate.mockResolvedValue({ objective: 'goal', constraints: [`Plan ${uri}, SHA-256 ${mistaken}`],
+    progress: { done: [], inProgress: [], blocked: [] }, decisions: [], failedAttempts: [], nextSteps: [], criticalContext: [],
+    usage: { inputTokens: 500, outputTokens: 30 } });
+  await create().prepare(messages);
+  const sections = mocks.assemble.mock.calls[0][1].sections;
+  expect(sections.constraints[0]).toContain(`authorized source sha256:${correct}`);
+  expect(sections.constraints[0]).not.toContain(mistaken);
+  expect(mocks.verify).toHaveBeenCalled();
+});
+it('installs and persists the corrected reference in the actual derived handoff', async () => {
+  const actual = await vi.importActual<typeof import('./StructuredHandoffBuilder')>('./StructuredHandoffBuilder');
+  mocks.assemble.mockImplementation(actual.assembleDerivedContextView);
+  mocks.message.mockImplementation(actual.createStructuredHandoffMessage);
+  const uri = 'session://plans/approved.md';
+  const correct = 'a'.repeat(64);
+  const mistaken = 'b'.repeat(64);
+  mocks.save.mockResolvedValue({ uri: 'session://tool-outputs/source.json', hash: 'source-hash', context: '{}', stateHash: hashScopedResource('authority'), artifactRefs: [{ uri, hash: correct }] });
+  mocks.generate.mockResolvedValue({ objective: 'goal', constraints: [`Plan ${uri}, SHA-256 ${mistaken}`],
+    progress: { done: [], inProgress: [], blocked: [] }, decisions: [], failedAttempts: [], nextSteps: [], criticalContext: [],
+    usage: { inputTokens: 500, outputTokens: 30 } });
+  const window = createExecutionContextWindow({ sessionId: 'child', provider: { id: 'provider' } as never,
+    model: { modelId: 'model' } as never, plan: {} as never, credentialHandle: 'opaque', tokenLimit: 1_000,
+    estimate: values => values.reduce((n, value) => n + JSON.stringify(value.content).length, 0) });
+  const result = await window.prepare(messages);
+  const handoff = String(result.messages[0].content);
+  expect(handoff).toContain(`authorized source sha256:${correct}`);
+  expect(handoff).not.toContain(mistaken);
+  const saved = mocks.write.mock.calls.find(call => String(call[1]).endsWith('-window.json'))!;
+  expect(JSON.parse(String(saved[2])).message.content).toBe(handoff);
+  expect(mocks.verify.mock.invocationCallOrder[0]).toBeLessThan(mocks.write.mock.invocationCallOrder[0]);
 });
 it('discards the candidate if authoritative execution state changes during generation', async () => {
   mocks.state.mockResolvedValue('revised authority');

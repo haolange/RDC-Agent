@@ -6,6 +6,7 @@ import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraf
 import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS, HANDOFF_SURFACES } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
+import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 
 export interface ManifestParseOk {
   ok: true;
@@ -148,6 +149,9 @@ export function parseAgentMarkdownStrict(
     if (record['completion-contract'] !== undefined && !AGENT_COMPLETION_CONTRACTS.includes(record['completion-contract'] as AgentCompletionContract)) {
       return { ok: false, reason: 'completion-contract must be final-answer or investigation-report.' };
     }
+    if (record['reasoning-level'] !== undefined && !REASONING_SELECTIONS.includes(record['reasoning-level'] as ReasoningSelection)) {
+      return { ok: false, reason: 'reasoning-level must be a supported reasoning selection.' };
+    }
     if (record.showContinueOn !== undefined) {
       return { ok: false, reason: 'showContinueOn was removed; declare handoff surface instead.' };
     }
@@ -162,6 +166,7 @@ export function parseAgentMarkdownStrict(
         argumentHint: typeof record['argument-hint'] === 'string' ? record['argument-hint'].trim() : '',
         target: typeof record.target === 'string' && record.target.trim() ? record.target.trim() : 'rdc-agent',
         models,
+        ...(record['reasoning-level'] !== undefined ? { reasoningLevel: record['reasoning-level'] as ReasoningSelection } : {}),
         icon: isAgentIconPreset(record.icon) ? record.icon : 'message-orbit',
         accent: normalizeAgentAccent(record.accent, COMPOSE_ACCENT_FALLBACK),
         disableModelInvocation,
@@ -198,6 +203,7 @@ export function serializeAgentMarkdown(definition: AgentManifestDraft): string {
     'argument-hint': definition.argumentHint,
     target: definition.target || 'rdc-agent',
     model: definition.models,
+    ...(definition.reasoningLevel ? { 'reasoning-level': definition.reasoningLevel } : {}),
     icon: isAgentIconPreset(definition.icon) ? definition.icon : 'message-orbit',
     accent: normalizeAgentAccent(definition.accent, COMPOSE_ACCENT_FALLBACK),
     'disable-model-invocation': definition.disableModelInvocation,

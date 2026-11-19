@@ -1,9 +1,10 @@
-import type { ReplayDeviceEntry, AndroidBootstrapMetadata } from '@shared/types/device';
-import type { RdcTurnBinding } from './RdcTurnBindings';
+import { createHash } from 'node:crypto';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
+import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import { parseRemoteBootstrap } from './captures/replayDeviceParse';
-import { createHash } from 'node:crypto';
+import type { RdcTurnBinding } from './RdcTurnBindings';
+import type { ReplayDeviceEntry, AndroidBootstrapMetadata } from '@shared/types/device';
 
 export interface RdcRemoteConnection {
   deviceId: string;
@@ -80,4 +81,47 @@ export async function connectSessionReplayDevice(device: ReplayDeviceEntry, cont
   const remoteId = payload.data.remote_id;
   if (typeof remoteId !== 'string' || !remoteId.trim()) throw new Error('RDC_CLI_PROTOCOL: remote_id is required.');
   return { deviceId: device.id, serial: device.serial, contextId, remoteId, bootstrap: parseRemoteBootstrap(payload.data) };
+}
+
+/** Ping lacks a context field; bind it to the same native remote and process before and after. */
+export async function revalidateSessionReplayDevice(connection: RdcRemoteConnection,
+  binding: RdcTurnBinding, signal?: AbortSignal): Promise<void> {
+  const { contextId, remoteId, serial } = connection;
+  const invoke = async (operation: string, args: Record<string, unknown>) => {
+    signal?.throwIfAborted();
+    const result = await rdcCliInvokerService.executeCLI('call', [
+      operation, '--args-json', JSON.stringify(args), '--daemon-context', contextId,
+    ], { contextId, settings: binding.cli, abortSignal: signal });
+    signal?.throwIfAborted();
+    const payload = parseRdcNativeResult(result, undefined, operation);
+    if (payload.data.context_id !== undefined && payload.data.context_id !== contextId) {
+      throw new Error('RDC_CONTEXT_MISMATCH: native response does not belong to the owning daemon context.');
+    }
+    return payload;
+  };
+  const processOf = (payload: Awaited<ReturnType<typeof invoke>>) => {
+    const process = parseRdcProcessIdentity((payload.meta as Record<string, unknown> | undefined)?.process_identity);
+    if (payload.data.process_identity && JSON.stringify(parseRdcProcessIdentity(payload.data.process_identity)) !== JSON.stringify(process)) {
+      throw new Error('RDC_PROCESS_IDENTITY_MISMATCH: native process identities disagree.');
+    }
+    return JSON.stringify(process);
+  };
+  const readContext = async () => {
+    const payload = await invoke('rd.session.get_context', {});
+    const remote = payload.data.remote as Record<string, unknown> | undefined;
+    if (payload.data.context_id !== contextId || remote?.state !== 'live_handle' || remote.remote_id !== remoteId
+      || remote.origin_context_id !== contextId || remote.context_locality !== 'strict' || remote.device_serial !== serial) {
+      throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: prepared remote is not bound to the owning context and device.');
+    }
+    return processOf(payload);
+  };
+  const process = await readContext();
+  const ping = await invoke('rd.remote.ping', { remote_id: remoteId });
+  const detail = ping.data.detail as Record<string, unknown> | undefined;
+  if (detail?.remote_id !== remoteId || detail.connected !== true) {
+    throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: ping did not confirm the prepared remote.');
+  }
+  if (processOf(ping) !== process || await readContext() !== process) {
+    throw new Error('RDC_PROCESS_IDENTITY_MISMATCH: prepared remote process changed during verification.');
+  }
 }

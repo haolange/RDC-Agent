@@ -26,7 +26,7 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({
   agentManifestService: {
     getEffectiveProfiles: () => [
-      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { agentId: 'ask', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
+      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: ['shell'], skills: [], mcpServers: [], handoffs: [], agents: ['general'], reasoningLevel: 'low', compiledRoute: { agentId: 'ask', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
       { id: 'debugger', enabled: true, instructions: 'Debugger profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { agentId: 'debugger', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
       { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['debugger'], compiledRoute: { agentId: 'general', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
     ],
@@ -52,8 +52,9 @@ import { TaskRegistry, type TaskRecord } from '../tasks';
 import { createSessionTaskStore } from '../tasks/sessionTaskStore';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { SubagentRunner } from './SubagentRunner';
-import type { AgentProfileTurnOptions } from './orchestratorTypes';
+import { DelegationConfigurationError } from './DelegationConfigurationError';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
@@ -504,33 +505,22 @@ describe('SubagentRunner', () => {
       .rejects.toThrow(/SUBAGENT_DELEGATE_DENIED/);
   });
 
-  it.each(['not-canonical', 'chatgpt-account/gpt-6-luna'])('rejects invalid model %s before dispatch and explains canonical routing', async (model) => {
-    const start = vi.spyOn(delegationTraceStore, 'start').mockImplementation(() => {});
-    const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => {});
+  it.each([{ model: 'openai:gpt-5.6-sol' }, { reasoningLevel: 'low' }])('rejects parent-provided model controls in the Capsule', async (override) => {
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     const runner = new SubagentRunner({
       sendProfileMessage,
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
     });
-    const result = await runner.runSubagent({
-      parentAgentId: 'debugger',
-      parentToolCallId: 'parent-tool',
-      targetProfile: 'ask',
-      capsule: testCapsule(),
-      model,
-      parentSessionId: 'owner',
-    });
-    expect(result.status).toBe('failed');
-    expect(result.text).toMatch(/MODEL_INVALID.*providerId:modelId.*colon separator/);
+    const [tool] = runner.createSubagentTools('debugger', 'owner');
+    const result = await tool.execute('parent-tool', { ...testCapsule(), ...override });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('DELEGATION_CAPSULE_INVALID') });
     expect(sendProfileMessage).not.toHaveBeenCalled();
-    expect(start).toHaveBeenCalledWith('owner', expect.objectContaining({ parentToolCallId: 'parent-tool', status: 'running' }));
-    expect(finish).toHaveBeenCalledWith('owner', 'parent-tool', expect.any(String), 'failed', expect.stringMatching(/MODEL_INVALID/));
-    start.mockRestore();
-    finish.mockRestore();
   });
 
   it('rejects a child without an explicit model or configured profile route before dispatch', async () => {
+    const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
     const profiles = vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValueOnce([
       { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: [] },
     ] as never);
@@ -546,14 +536,47 @@ describe('SubagentRunner', () => {
         capsule: testCapsule(), parentSessionId: 'owner',
       });
       expect(result.status).toBe('failed');
-      expect(result.text).toMatch(/MODEL_ROUTE_REQUIRED.*capsule\.model/);
+      expect(result.text).toMatch(/MODEL_ROUTE_REQUIRED.*Settings/);
+      expect(finish).toHaveBeenCalledWith('owner', 'parent-tool', expect.any(String), 'failed', expect.any(String), 'MODEL_ROUTE_REQUIRED');
       expect(sendProfileMessage).not.toHaveBeenCalled();
     } finally {
       profiles.mockRestore();
+      finish.mockRestore();
     }
   });
 
-  it('forwards a resolved model override and does not inherit a parent session override', async () => {
+  it('projects an unavailable Agent as a configuration failure without dispatch', async () => {
+    const profiles = vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValueOnce([]);
+    const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
+    const sendProfileMessage = vi.fn(async () => 'should-not-run');
+    try {
+      const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
+      const result = await runner.runSubagent({ parentAgentId: 'debugger', parentToolCallId: 'missing-agent',
+        targetProfile: 'general', capsule: testCapsule(), parentSessionId: 'owner' });
+      expect(result.status).toBe('failed');
+      expect(finish).toHaveBeenCalledWith('owner', 'missing-agent', expect.any(String), 'failed',
+        'AGENT_PROFILE_UNAVAILABLE: general', 'AGENT_PROFILE_UNAVAILABLE');
+      expect(sendProfileMessage).not.toHaveBeenCalled();
+    } finally { profiles.mockRestore(); finish.mockRestore(); }
+  });
+
+  it.each([
+    { error: new DelegationConfigurationError('MODEL_UNAVAILABLE', 'MODEL_UNAVAILABLE: route'), expected: 'MODEL_UNAVAILABLE' },
+    { error: new DelegationConfigurationError('DELEGATION_REASONING_UNSUPPORTED', 'unsupported'), expected: 'DELEGATION_REASONING_UNSUPPORTED' },
+    { error: new Error('MODEL_UNAVAILABLE: arbitrary execution error'), expected: undefined },
+  ])('projects only trusted preparation failures as configuration errors', async ({ error, expected }) => {
+    const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
+    try {
+      const runner = new SubagentRunner({ sendProfileMessage: async () => { throw error; },
+        systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
+      const result = await runner.runSubagent({ parentAgentId: 'debugger', parentToolCallId: 'typed-error',
+        targetProfile: 'general', capsule: testCapsule(), parentSessionId: 'owner' });
+      expect(result.status).toBe('failed');
+      expect(finish).toHaveBeenCalledWith('owner', 'typed-error', expect.any(String), 'failed', error.message, expected);
+    } finally { finish.mockRestore(); }
+  });
+
+  it('uses the selected Agent model and reasoning without inheriting the parent override', async () => {
     const sendProfileMessage = vi.fn(async () => 'child done');
     const runner = new SubagentRunner({
       sendProfileMessage,
@@ -564,9 +587,8 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      capsule: { ...testCapsule(), reasoningLevel: 'low' },
+      capsule: testCapsule(),
       parentSessionId: 'parent',
-      model: 'openai:gpt-5.6-sol',
     });
     expect(sendProfileMessage).toHaveBeenCalledWith(
       'ask',
@@ -582,6 +604,23 @@ describe('SubagentRunner', () => {
         frozenDelegationCapsule: expect.objectContaining({}),
       }),
     );
+  });
+
+  it('does not delegate the live lease from an approved Mission without a frozen capture scope', async () => {
+    clearRdcContextLeases();
+    setRdcRuntimeContextForSession('parent', { contextId: 'ctx-live', runtimeOwner: 'local', ownerLeaseId: 'lease:live',
+      backend: 'local', updatedAt: Date.now(), captureId: 'cap-live' } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
+    const sendProfileMessage = vi.fn(async () => 'should-not-run');
+    const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
+    const parentTurn = { turnId: 'turn-parent', requiresApprovedCaptureScope: true,
+      subagentBudget: createSubagentBudgetState(), registerProducer: () => () => undefined,
+      generation: 1, isLive: () => true, eventSink: { sessionId: 'parent' } } as unknown as TurnHandle;
+    try {
+      await expect(runner.runSubagent({ parentAgentId: 'general', parentToolCallId: 'parent-tool', targetProfile: 'ask',
+        capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
+        parentSessionId: 'parent', projectId: 'proj-1', parentTurn })).rejects.toThrow('APPROVED_CAPTURE_SCOPE_REQUIRED');
+      expect(sendProfileMessage).not.toHaveBeenCalled();
+    } finally { clearRdcContextLeases(); }
   });
 
   it('grants a delegated lease before the child turn and revokes it after', async () => {

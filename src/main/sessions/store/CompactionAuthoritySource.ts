@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { sessionArtifactResolver } from '../artifacts/SessionArtifactResolver';
 import { TaskRegistry } from '../../agent-runtime/tasks/TaskRegistry';
+import { collectOpenInvestigationWork } from '../../investigation/openInvestigationWork';
 import type { TaskExecutionRecord, TaskRecord } from '../../agent-runtime/tasks/TaskContracts';
 import { createSessionTaskStore } from '../../agent-runtime/tasks/sessionTaskStore';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
@@ -89,9 +90,13 @@ export function readCompactionAuthorityJournal(sessionId: string, uri: string, e
 /** Keep the complete state in the source artifact while bounding what enters the model prompt. */
 function compactAuthorityState(state: AuthorityState, archiveUri: string, stateHash: string): Record<string, unknown> {
   const active = (status: TaskRecord['status']): boolean => status === 'pending' || status === 'in_progress' || status === 'blocked';
+  const openWork = collectOpenInvestigationWork(state.investigation.map(item => ({
+    kind: item.manifest.kind, status: item.manifest.status, createdAt: item.manifest.createdAt, record: item.record })));
   return {
     authorityArchive: archiveUri,
     authorityStateHash: stateHash,
+    // Content, not only an index entry: a summary must not drop recorded but unperformed checks.
+    ...(openWork ? { openInvestigationWork: openWork } : {}),
     authorityStateOmittedFromPrompt: true,
     tasks: state.tasks.map(task => ({
       id: task.id, subject: task.subject, status: task.status, parentTaskId: task.parentTaskId,
@@ -208,7 +213,7 @@ export async function readCompactionAuthorityState(sessionId: string): Promise<s
   });
   return JSON.stringify({ tasks: taskRecords, executions, artifactRefs, investigation });
 }
-export async function saveCompactionAuthoritySource(sessionId: string, journalMessages: Message[]): Promise<{ uri: string; hash: string; context: string; stateHash: string; parts: Array<{ uri: string; hash: string }>; journalPrefix?: { uri: string; hash: string; count: number } }> {
+export async function saveCompactionAuthoritySource(sessionId: string, journalMessages: Message[]): Promise<{ uri: string; hash: string; context: string; stateHash: string; artifactRefs: AuthorityState['artifactRefs']; parts: Array<{ uri: string; hash: string }>; journalPrefix?: { uri: string; hash: string; count: number } }> {
   const owner = delegatedArtifactOwner(sessionId) ?? sessionId;
   const authorityContext = await readCompactionAuthorityState(sessionId);
   const uri = `session://tool-outputs/compaction-authority/${generateShortId()}.json`;
@@ -266,7 +271,7 @@ export async function saveCompactionAuthoritySource(sessionId: string, journalMe
     ? (parts.push(write(uri.replace('.json', `-part-${parts.length}.json`), JSON.stringify({ chunks: group }, null, 2))), { encoding: 'json-chunk-parts', reconstruction: 'Read each part by URI/hash in order, join all chunks without separators, then parse JSON.', parts })
     : { encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks };
   const saved = write(uri, JSON.stringify(body, null, 2));
-  return { ...saved, context, stateHash, parts: [...parts, ...media.map(({ uri, hash }) => ({ uri, hash }))], journalPrefix };
+  return { ...saved, context, stateHash, artifactRefs: fullState.artifactRefs, parts: [...parts, ...media.map(({ uri, hash }) => ({ uri, hash }))], journalPrefix };
 }
 export function verifyCompactionAuthoritySource(sessionId: string, ref: { uri: string; hash: string; parts?: Array<{ uri: string; hash: string }>; journalPrefix?: { uri: string; hash: string; count: number } }): void {
   const owner = delegatedArtifactOwner(sessionId) ?? sessionId;

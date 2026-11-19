@@ -26,7 +26,7 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
     const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, timeoutMs: 30000, workingDirectory: root!,
       command: path.join(root!, 'binaries/windows/x64/python/python.exe'),
       argsPrefix: [path.join(root!, 'cli/run_cli.py')],
-      env: { RDC_TOOL_ROOT: root!, RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
+      env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
     const processes: Array<Record<string, unknown>> = [];
     const stageResults: Array<{ exitCode: number; envelope: Record<string, unknown> }> = [];
     const receipt: Record<string, unknown> = { toolsRoot: root, capture, inputSha256: inputHash, contextId, sessionId };
@@ -103,7 +103,14 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         turnId: 'read-turn', projectRootPath: directory, workspaceRoot: directory,
         rdcBinding: freezeRdcTurnBinding(settings, catalog.tools, frozenLease) };
       const before = processes.length;
-      await executeRdcShell({ discovery: { kind: 'describe', operation: 'rd.resource.list_all' } }, 'discovery', undefined, context);
+      const guideSnapshot = JSON.parse(readFileSync(path.join(process.cwd(), 'scripts/fidelity/rdc-tool-guide-catalog.json'), 'utf8')) as { fingerprint: string; tool_count: number };
+      expect(catalog.fingerprint).toBe(guideSnapshot.fingerprint);
+      expect(catalog.tools).toHaveLength(guideSnapshot.tool_count);
+      const listed = await executeRdcShell({ discovery: { kind: 'list', limit: 10 } }, 'discovery-list', undefined, context);
+      const described = await executeRdcShell({ discovery: { kind: 'describe', operation: 'rd.resource.list_all' } }, 'discovery-describe', undefined, context);
+      const discoveryPayload = (result: typeof listed) => JSON.parse((result.content[0] as { text: string }).text) as { fingerprint: string; data: Record<string, unknown> };
+      expect(discoveryPayload(listed)).toMatchObject({ fingerprint: guideSnapshot.fingerprint, data: { total: guideSnapshot.tool_count } });
+      expect(discoveryPayload(described)).toMatchObject({ fingerprint: guideSnapshot.fingerprint, data: { name: 'rd.resource.list_all' } });
       expect(processes).toHaveLength(before);
       const results = [];
       for (const kind of ['texture', 'buffer']) {
@@ -118,7 +125,7 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         'unsupported-stage', undefined, context).catch((error: unknown) => error);
       expect(rejected).toBeInstanceOf(RdcNativeFailure);
       expect((rejected as RdcNativeFailure).deliveryResult).toMatchObject({ isError: true, details: {
-        nativeFailure: { code: 'shader_stage_unsupported', category: 'capability',
+        nativeFailure: { code: 'shader_stage_unsupported', category: 'validation',
           proof: { effects_attempted: false, context_preserved: true } },
         mainValidation: { preservationVerified: true, leaseState: 'retained' },
       } });
@@ -137,7 +144,7 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         result_kind: 'rd.pipeline.get_stage_state', data: { stage_state: { stage: 'PS' }, resolved_event_id: original.eventId } } });
       expect(stageResults).toHaveLength(2);
       expect(stageResults[0]).toMatchObject({ exitCode: 1, envelope: { ok: false, error: {
-        code: 'shader_stage_unsupported', category: 'capability', details: {
+        code: 'shader_stage_unsupported', category: 'validation', details: {
           failure_stage: 'validate_stage', effects_attempted: false, context_preserved: true } } } });
       for (const stage of stageResults) expect(parseRdcProcessIdentity(
         (stage.envelope.meta as Record<string, unknown>).process_identity)).toEqual(original.processIdentity);

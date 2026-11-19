@@ -8,6 +8,7 @@ import {
 import type { AgentTool, AgentToolResult } from '../agent-runtime/agent/AgentTool';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { getInvestigationRecordJsonSchema } from './investigationRecordSchemas';
+import { recordKeyOf } from './investigationRecordKeys';
 import {
   investigationArtifactService,
   type InvestigationArtifactService,
@@ -106,8 +107,12 @@ function createInvestigationSchemaTool(): AgentTool {
       const recordSchema = getInvestigationRecordJsonSchema(entry.recordType);
       const nextStep = 'Schema only. To retrieve an existing record, use tool_search query=investigation_read; to enumerate records, use tool_search query=investigation_list; to save a record, use tool_search query=investigation_write. Repeating this call does not retrieve record content.';
       const recordIdPolicy = entry.kind === 'claim_set'
-        ? 'ClaimSet.items are new ClaimRecord definitions, not references to previously written claim records. Each claimId must be unique across the session. To cite an existing Claim, use a resolvable claimId in supports or contradicts instead of repeating it in items. Version an existing ClaimSet only through supersedes.'
-        : undefined;
+        ? 'ClaimSet.items define ClaimRecords, not references to previously written claims. New claimIds must be unique; when versioning through supersedes, retain the IDs of continuing claims. Current items can be sources for report projections.'
+        : entry.kind === 'report'
+          ? 'A ready report projects existing ClaimRecords, including members of a current ClaimSet. Read the source ClaimSet and preserve each source claimId, epistemic and verification in compactProvenance.'
+          : entry.kind === 'evidence' || entry.kind === 'evidence_pack'
+            ? 'Write each artifactRefs URI and expectedHash once. The service derives stored contentHashes; omit that derived field even when copying a previously read record.'
+          : undefined;
       return textResult(
         JSON.stringify({ kind: entry.kind, recordType: entry.recordType, nextStep, recordIdPolicy, schema: recordSchema }),
         { ok: true, kind: entry.kind, recordType: entry.recordType, nextStep, recordIdPolicy, schema: recordSchema },
@@ -238,8 +243,9 @@ function createInvestigationWriteTool(
         }
         const result = deps.service.writeRecord(owner ?? sessionId, input);
         if (owner && sessionId) grantDelegatedOutput(sessionId, result.contentUri, result.contentHash);
+        const recordKey = recordKeyOf(result.manifest.kind, result.record);
         return textResult(
-          `${result.manifest.artifactId}\t${result.manifest.kind}\t${result.manifest.status}\t${result.contentHash}`,
+          `${result.manifest.artifactId}\t${result.manifest.kind}\t${result.manifest.status}\t${result.contentHash}${recordKey ? `\trecordKey=${recordKey}` : ''}`,
           { ok: true, ...result },
         );
       } catch (error) {
@@ -256,7 +262,7 @@ function createInvestigationListTool(
   return {
     name: 'investigation_list',
     label: 'List Investigation Artifacts',
-    description: 'List session-owned rdc.investigation.v1 manifests with contentUri and contentHash. Use kind/status "any" (or omit a filter) to include every value; invalid filters fail instead of looking like an empty session. To delegate a record for child investigation_read, place its exact contentUri in the Capsule read refs; an artifactId in scope does not grant access. Does not invent a graph.',
+    description: 'List session-owned rdc.investigation.v1 artifact manifests with contentUri and contentHash. Kind filters select artifact kinds, not records embedded in a ClaimSet. Use kind/status "any" (or omit a filter) to include every value; invalid filters fail instead of looking like an empty session. To delegate a record for child investigation_read, place its exact contentUri in the Capsule read refs; an artifactId in scope does not grant access. Does not invent a graph.',
     parameters: {
       type: 'object',
       properties: {
@@ -276,17 +282,24 @@ function createInvestigationListTool(
     async execute(_id, args) {
       try {
         const owner = delegatedArtifactOwner(sessionId);
+        const kind = parseListFilter(args.kind, 'kind');
+        const status = parseListFilter(args.status, 'status');
         const items = deps.service.list(owner ?? sessionId, {
-          kind: parseListFilter(args.kind, 'kind'),
-          status: parseListFilter(args.status, 'status'),
+          kind,
+          status,
         }).filter(item => {
           if (!owner || !sessionId) return true;
           const result = deps.service.readRecord(owner, item.artifactId);
           try { resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash); return true; } catch { return false; }
         });
         const lines = items.map((item) => JSON.stringify({ artifactId: item.artifactId, kind: item.kind, status: item.status, recordKey: item.recordKey, contentUri: item.contentUri, contentHash: item.contentHash, supersedes: item.supersedes ?? null }));
+        const summary = lines.length > 0 ? `artifacts\t${items.length}\n${lines.join('\n')}`
+          : kind || status ? 'No Investigation artifacts match the requested filters.' : 'No Investigation artifacts in this session.';
+        const claimSetNote = kind === 'claim'
+          ? '\nThis filter lists standalone Claim artifacts only. Current ClaimSet items are also ClaimRecord sources; list and read an accessible claim_set to use its members.'
+          : '';
         return textResult(
-          lines.length > 0 ? `artifacts\t${items.length}\n${lines.join('\n')}` : 'No Investigation artifacts in this session.',
+          summary + claimSetNote,
           { ok: true, count: items.length, artifacts: items },
         );
       } catch (error) {

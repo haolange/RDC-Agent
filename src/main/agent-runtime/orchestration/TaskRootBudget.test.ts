@@ -50,7 +50,7 @@ describe('Task root budget binding', () => {
       toolCalls: 2, subagents: 0, maxToolCalls: 8, maxSubagents: 3,
       maxChildDepth: 3, deadlineAt: live.wallStartedAt + 60_000, startedAt: live.wallStartedAt,
     });
-    await expect(bindTaskRootBudget(registry, 'owner', live, 'root-b')).rejects.toThrow(/REBIND_DENIED/);
+    await expect(bindTaskRootBudget(registry, 'owner', live, 'root-b')).rejects.toThrow(/new turn.*existing root/);
     expect((await registry.getRootBudget('root-a'))?.toolCalls).toBe(0);
   });
 });

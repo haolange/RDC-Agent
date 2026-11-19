@@ -8,7 +8,7 @@ export const WorkCardHeader: React.FC<{
 }> = ({ icon, title, status, duration, expanded, disabled, onClick, controls, tooltip, preview, trailingPreview }) => (
   <button type="button" className={`work-card-trigger${preview ? ' has-preview' : ''}`}
     onClick={onClick} aria-expanded={expanded} aria-controls={controls} disabled={disabled} title={tooltip}>
-    <span className="work-process-tool-card-header">
+    <span className="work-process-tool-card-header" data-work-node-heading>
       <span className="work-process-tool-card-title">{icon}<span className="work-process-tool-card-verb">{title}</span></span>
       <span className="work-process-tool-card-meta">
         {status}{duration ? <span>{duration}</span> : null}

@@ -38,7 +38,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
     const testRoot = path.resolve(path.dirname(python!), '../../../../intermediate/tool-convergence-tests/agent');
     mkdirSync(testRoot, { recursive: true });
     const directory = mkdtempSync(path.join(testRoot, 'native-receipts-'));
-    const nativeEnv = isolatedRdcTools(directory, python!);
+    const nativeEnv = isolatedRdcTools(directory);
     const capture = path.join(directory, 'fixture-copy.rdc');
     copyFileSync(fixture!, capture);
     const before = hash(fixture!);

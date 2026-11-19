@@ -1,5 +1,30 @@
+import { redactCredentialLikeText } from '../runtime/secretRedaction';
 import type { CLIResult } from '@shared/types/tool';
 import type { AgentToolResult } from '../agent-runtime/agent/AgentTool';
+
+/** Preserve native diagnostics while keeping credentials and private owner paths out of model results. */
+export function modelVisibleRdcFailureDetails(details: Record<string, unknown>): { value: Record<string, unknown>; redacted: boolean } {
+  let redacted = false;
+  const visit = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      const safe = redactCredentialLikeText(value);
+      if (safe !== value) redacted = true;
+      return safe;
+    }
+    if (Array.isArray(value)) return value.map(visit);
+    if (value === null || typeof value !== 'object') return value;
+    const result: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (/(?:password|secret|token|authorization|credential|api[_-]?key|cookie)|^(?:private|state)_path$/i.test(key)) {
+        redacted = true;
+      } else {
+        result[key] = visit(child);
+      }
+    }
+    return result;
+  };
+  return { value: visit(details) as Record<string, unknown>, redacted };
+}
 
 export interface RdcNativeEnvelope {
   ok: true;
@@ -13,10 +38,10 @@ export class RdcNativeFailure extends Error {
   /** Bound only after the owning execution path finishes its existing safety checks. */
   deliveryResult?: AgentToolResult;
   constructor(message: string, readonly resultKind: string | null,
-    readonly replacementNotAttempted: boolean, readonly effectsNotAttempted: boolean,
+    readonly effectsNotAttempted: boolean,
     readonly nativeError: { code: string; category: string | null; exitCode: number; details?: Record<string, unknown> },
     readonly screenshotTargetRestoration: { contextId: string; sessionId: string; eventId: number } | null = null,
-    readonly shaderInspectionRestoration: { contextId: string; sessionId: string; eventId: number } | null = null) {
+    readonly inspectionRestoration: { contextId: string; sessionId: string; eventId: number } | null = null) {
     super(message);
     this.name = 'RdcNativeFailure';
   }
@@ -54,30 +79,31 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
       const resultKind = typeof envelope.result_kind === 'string' ? envelope.result_kind : null;
       const canonicalFailure = envelope.schema_version === '3.0.0' && result.exitCode !== 0
         && resultKind !== null && resultKind === expectedKind;
-      const canonicalValidation = canonicalFailure && failure.category === 'validation';
-      const pipelineStageRejection = canonicalFailure && failure.category === 'capability'
-        && failure.code === 'shader_stage_unsupported' && details?.failure_stage === 'validate_stage'
-        && ['rd.pipeline.get_shader', 'rd.pipeline.get_stage_state',
-          'rd.pipeline.get_constant_buffers', 'rd.pipeline.get_resource_bindings'].includes(resultKind!);
-      const replacementNotAttempted = canonicalValidation
-        && details?.replacement_attempted === false && details?.context_preserved === true;
-      const effectsNotAttempted = (canonicalValidation || pipelineStageRejection)
+      const effectsNotAttempted = canonicalFailure && details?.recovery_required !== true
         && details?.effects_attempted === false && details?.context_preserved === true;
-      const screenshotTargetRestoration = envelope.schema_version === '3.0.0' && result.exitCode !== 0
-        && resultKind === 'rd.export.screenshot' && resultKind === expectedKind
-        && failure.category === 'runtime' && details?.failure_stage === 'resolve_visual_target'
+      const screenshotTargetRestoration = canonicalFailure && details?.recovery_required !== true
+        && resultKind === 'rd.export.screenshot' && details?.failure_stage === 'resolve_visual_target'
         && details?.replay_state_restored === true && details?.artifact_write_attempted === false
         && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
         && Number.isSafeInteger(details?.restored_event_id) && Number(details?.restored_event_id) > 0
         ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) } : null;
-      const knownShaderInspectionFailure = (resultKind === 'rd.shader.get_source'
-        && failure.code === 'shader_binding_lookup_failed' && details?.failure_stage === 'resolve_binding'
+      const knownInspectionFailure = ((resultKind === 'rd.shader.get_source'
+        && details?.failure_stage === 'resolve_binding'
         && ['stage_unbound', 'shader_id_not_bound'].includes(String(details?.failure_reason)))
-        || (resultKind === 'rd.shader.get_constant_buffer_contents' && failure.code === 'constant_buffer_data_unavailable'
+        || (resultKind === 'rd.shader.get_constant_buffer_contents'
           && details?.failure_stage === 'decode_constant_buffer'
-          && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details?.failure_reason)));
-      const shaderInspectionRestoration = envelope.schema_version === '3.0.0' && result.exitCode !== 0
-        && resultKind === expectedKind && failure.category === 'runtime' && knownShaderInspectionFailure
+          && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details?.failure_reason))))
+        || (['rd.texture.get_data', 'rd.texture.get_region_values', 'rd.texture.get_histogram',
+          'rd.texture.compute_stats', 'rd.texture.diff'].includes(resultKind!)
+          && details?.failure_stage === 'decode_texture_readback')
+        || (['rd.texture.get_pixel_history', 'rd.shader.debug_start'].includes(resultKind!)
+          && details?.failure_stage === 'validate_input_attachment')
+        || (resultKind === 'rd.shader.edit_and_replace'
+          && failure.code === 'shader_patch_op_unsupported_for_encoding'
+          && details?.failure_stage === 'validate_edit_plan'
+          && details?.failure_reason === 'source_encoding_not_safely_replaceable'
+          && details?.replacement_attempted === false);
+      const inspectionRestoration = canonicalFailure && details?.recovery_required !== true && knownInspectionFailure
         && details?.replay_state_restored === true
         && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
         && Number.isSafeInteger(details?.restored_event_id) && Number(details?.restored_event_id) > 0
@@ -92,9 +118,9 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
         }) : [];
       const guidance = ownerGuidance.length ? ` (${ownerGuidance.join('; ')})` : '';
       throw new RdcNativeFailure(`RDC_CLI_FAILED: ${failure.code}: ${failure.message}${suffix}${guidance}`,
-        resultKind, replacementNotAttempted, effectsNotAttempted,
+        resultKind, effectsNotAttempted,
         { code: failure.code, category: typeof failure.category === 'string' ? failure.category : null, exitCode: result.exitCode, ...(details ? { details } : {}) },
-        screenshotTargetRestoration, shaderInspectionRestoration);
+        screenshotTargetRestoration, inspectionRestoration);
     }
   }
   if (result.exitCode !== 0) throw new Error('RDC_CLI_FAILED: native rdc exited with code ' + result.exitCode);

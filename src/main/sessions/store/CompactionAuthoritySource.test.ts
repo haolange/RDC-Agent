@@ -1,17 +1,35 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { investigationMethodCapsule, investigationMethodCases } from '../../testing/fixtures/investigationMethodCases';
 const io = vi.hoisted(() => ({ write: vi.fn(), read: vi.fn(), resolve: vi.fn(), list: vi.fn((): string[] => []) }));
 const authority = vi.hoisted(() => ({ tasks: [] as unknown[], executions: [] as unknown[], investigation: [] as Array<{ manifest: { artifactId: string }; record: unknown; contentUri: string; contentHash: string }> }));
 vi.mock('../artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver: io }));
 vi.mock('../../agent-runtime/tasks/sessionTaskStore', () => ({ createSessionTaskStore: () => ({ withLock: async (_key: string, action: () => Promise<unknown>) => action(), listTasks: async () => authority.tasks, listExecutions: async () => authority.executions }) }));
 vi.mock('../../investigation/InvestigationArtifactService', () => ({ investigationArtifactService: { readAllRecords: () => authority.investigation.map(item => ({ ...item, manifest: item.manifest })) } }));
-import { projectCompactionJournalMessages, readCompactionAuthorityJournal, saveCompactionAuthoritySource, verifyCompactionAuthoritySource } from './CompactionAuthoritySource';
 import { serializeHandoffSourceTranscript } from '../../agent-runtime/context/StructuredHandoffBuilder';
+import { registerDelegatedTaskScope } from '../../agent-runtime/tasks/DelegatedTaskScopes';
+import { grantDelegatedArtifactAccess } from '../artifacts/DelegatedArtifactAccess';
+import { projectCompactionJournalMessages, readCompactionAuthorityJournal, saveCompactionAuthoritySource, verifyCompactionAuthoritySource } from './CompactionAuthoritySource';
 beforeEach(() => { vi.clearAllMocks(); authority.tasks = []; authority.executions = []; authority.investigation = []; io.list.mockReturnValue([]); io.write.mockReturnValue({ hash: 'a'.repeat(64) }); io.read.mockReturnValue({ hash: 'a'.repeat(64) }); });
 describe('authoritative compaction checkpoint', () => {
+  it('archives competing synthetic cases and conditional negatives as recoverable source material', async () => {
+    const source = { cases: investigationMethodCases, capsule: investigationMethodCapsule };
+    const messages = [{ role: 'user' as const, content: JSON.stringify(source), timestamp: 1 }];
+    const saved = await saveCompactionAuthoritySource('session', messages);
+    const envelope = JSON.parse(io.write.mock.calls.at(-1)![2] as string);
+    const archive = JSON.parse(envelope.chunks.join(''));
+    const recovered = JSON.parse(archive.journalMessages[0].content);
+    expect(recovered).toEqual(source);
+    expect(recovered.capsule.hypotheses).toHaveLength(2);
+    expect(recovered.capsule.negativePaths[0].recheckWhen).toBe('capture or transfer settings change');
+    expect(recovered.capsule.stopConditions[0]).toContain('replay identity is unverified');
+    expect(() => verifyCompactionAuthoritySource('session', saved)).not.toThrow();
+    expect(io.read).toHaveBeenCalledWith('session', saved.uri, { expectedHash: saved.hash, limit: 1 });
+  });
+
   it('preserves critical long-message tails and writes bounded lines that can be paged', async () => {
     const text = 'x'.repeat(50000) + ' critical-tail: hypothesis only, recheck when capture changes';
     const messages = [{ role: 'user' as const, content: text, timestamp: 1 }];
@@ -28,6 +46,21 @@ describe('authoritative compaction checkpoint', () => {
     await expect(saveCompactionAuthoritySource('session', [])).rejects.toThrow(/disk full/);
     io.read.mockImplementationOnce(() => { throw new Error('hash mismatch'); });
     await expect(saveCompactionAuthoritySource('session', [])).rejects.toThrow(/hash mismatch/);
+  });
+  it('returns only the delegated execution\'s granted references for compaction', async () => {
+    const child = 'owner::subagent::scope';
+    const allowed = 'session://tool-outputs/granted.json';
+    const releaseGrant = grantDelegatedArtifactAccess(child, 'session', [allowed], io);
+    const releaseScope = registerDelegatedTaskScope(child, { ownerSessionId: 'session', rootTaskId: 'task-root' });
+    io.list.mockReturnValue(['session://tool-outputs/private.json']);
+    try {
+      const saved = await saveCompactionAuthoritySource(child, []);
+      expect(saved.artifactRefs).toEqual([{ uri: allowed, hash: 'a'.repeat(64) }]);
+      expect(JSON.stringify(saved)).not.toContain('private.json');
+    } finally {
+      releaseScope();
+      releaseGrant();
+    }
   });
   it('keeps an oversized task failure in the archived source while bounding the model context', async () => {
     const failure = 'signed replay recovery failed; '.repeat(4_000);
@@ -51,7 +84,7 @@ describe('authoritative compaction checkpoint', () => {
   it('indexes a long-running investigation without placing record bodies in the model input', async () => {
     authority.tasks = Array.from({ length: 24 }, (_, index) => ({
       id: `task-${index}`, subject: `Investigation step ${index}`, description: 'Current requirement '.repeat(20),
-      status: index === 23 ? 'pending' : 'completed', executionIds: [`execution-${index}`],
+      status: index === 23 ? 'pending' : 'completed', blockedBy: [], blocks: [], executionIds: [`execution-${index}`],
       completionRequirements: ['verify source identity'],
     }));
     authority.executions = Array.from({ length: 25 }, (_, index) => ({
@@ -79,7 +112,7 @@ describe('authoritative compaction checkpoint', () => {
   it('keeps a growing authority index recoverable when its compact listing exceeds the prompt cap', async () => {
     authority.tasks = Array.from({ length: 42 }, (_, index) => ({
       id: `task-${index}`, subject: `Investigation step ${index}`, status: index === 41 ? 'in_progress' : 'completed',
-      description: 'Inspect the current source', completionRequirements: ['verify replay identity'],
+      description: 'Inspect the current source', blockedBy: [], blocks: [], completionRequirements: ['verify replay identity'],
       executionIds: [`execution-${index}`],
     }));
     authority.executions = Array.from({ length: 42 }, (_, index) => ({
@@ -99,6 +132,7 @@ describe('authoritative compaction checkpoint', () => {
     expect(context.authorityArchive).toBe(saved.uri);
     expect(context.indexCoverage.complete).toBe(false);
     expect(context.indexCoverage.artifactRefs.total).toBe(420);
+    expect(saved.artifactRefs).toHaveLength(420);
     expect(context.indexCoverage.investigation.total).toBe(150);
     expect(context.tasks.some((task: { id: string }) => task.id === 'task-41')).toBe(true);
     const envelope = JSON.parse(io.write.mock.calls.at(-1)![2] as string);
@@ -106,6 +140,29 @@ describe('authoritative compaction checkpoint', () => {
     expect(original.fullAuthorityState.artifactRefs).toHaveLength(420);
     expect(original.fullAuthorityState.investigation).toHaveLength(150);
     expect(original.fullAuthorityState.investigation[149].record.body).toBe('original evidence 149');
+  });
+
+  it('keeps recorded open checks and Challenge follow-ups as content even when the record index is trimmed', async () => {
+    const record = (artifactId: string, kind: string, status: string, createdAt: string, body: unknown) => ({
+      manifest: { artifactId, kind, status, title: artifactId, createdAt,
+        sourceRefs: Array.from({ length: 5 }, (_, source) => ({ uri: `session://tool-outputs/${artifactId}-${source}.json`, hash: 'c'.repeat(64) })) }, record: body,
+      contentUri: `session://investigation/records/${artifactId}.json`, contentHash: 'e'.repeat(64) });
+    authority.investigation = [
+      ...Array.from({ length: 150 }, (_, index) => record(`ev-${index}`, 'evidence', 'draft', '2026-11-10T00:00:00Z', { body: 'x'.repeat(400) })),
+      record('cp-old', 'checkpoint', 'superseded', '2026-11-11T09:00:00Z', { checkpointId: 'cp-old', unresolvedFrontier: 'stale frontier' }),
+      record('cp-1', 'checkpoint', 'ready', '2026-11-11T08:00:00Z', { checkpointId: 'cp-1', unresolvedFrontier: 'Compare the draw-call overlay with the candidate rectangle.' }),
+      record('ch-1', 'challenge', 'ready', '2026-11-11T08:30:00Z', { challengeId: 'ch-1', targetRef: { type: 'claim', id: 'anchor' },
+        statement: 'Anchor unproven.', requiredFollowUp: 'Read native values around the candidate.', status: 'open' }),
+      record('ch-2', 'challenge', 'ready', '2026-11-11T08:31:00Z', { challengeId: 'ch-2', targetRef: { type: 'claim', id: 'old' }, statement: 'Done.', status: 'resolved' }),
+    ];
+    io.list.mockReturnValue(Array.from({ length: 420 }, (_, index) => `session://tool-outputs/result-${index}.json`));
+    const context = JSON.parse((await saveCompactionAuthoritySource('session', [])).context);
+    expect(context.indexCoverage.complete).toBe(false);
+    expect(context.openInvestigationWork).toEqual({
+      frontier: { checkpointId: 'cp-1', text: 'Compare the draw-call overlay with the candidate rectangle.' },
+      challenges: [{ challengeId: 'ch-1', target: 'claim anchor', followUp: 'Read native values around the candidate.' }],
+      omittedChallenges: 0,
+    });
   });
 });
 

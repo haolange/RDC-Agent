@@ -103,6 +103,8 @@ export interface OpenAICompatibleProviderOptions {
   headers?: Record<string, string>;
   /** Some compatible surfaces (for example Azure) use a non-Bearer API-key header. */
   authorization?: 'bearer' | 'none';
+  /** Explicitly configured local runtimes may accept requests without credentials. */
+  allowAnonymous?: boolean;
   query?: Record<string, string>;
   /** Body-aware authorization, used by transports such as AWS SigV4. */
   requestAuthorizer?: ProviderRequestAuthorizer;
@@ -114,6 +116,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
   private readonly defaultApiKey: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
   private readonly authorization: 'bearer' | 'none';
+  private readonly allowAnonymous: boolean;
   private readonly query: Record<string, string>;
   private readonly requestAuthorizer: ProviderRequestAuthorizer | undefined;
 
@@ -122,6 +125,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...(options.headers ?? {}) };
     this.authorization = options.authorization ?? 'bearer';
+    this.allowAnonymous = options.allowAnonymous === true;
     this.query = { ...(options.query ?? {}) };
     this.requestAuthorizer = options.requestAuthorizer;
   }
@@ -160,7 +164,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     try {
       builder.start();
 
-      if (!apiKey && !this.requestAuthorizer) {
+      if (!this.allowAnonymous && !apiKey && !this.requestAuthorizer) {
         throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for OpenAI-compatible provider');
       }
 

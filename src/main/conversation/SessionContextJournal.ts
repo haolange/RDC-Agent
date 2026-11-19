@@ -26,6 +26,8 @@ export interface SessionContextTurnEntry {
   messages: Message[];
   createdAt: number;
   completedAt: number;
+  /** Main-validated completed execution, committed atomically with this turn. */
+  approvedExecutionCompletion?: { offerId?: string; planUri: string; planHash: string };
 }
 
 export interface SessionContextArtifactDecision {

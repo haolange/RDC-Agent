@@ -15,11 +15,11 @@ export interface ReplayLiveWriteTarget {
   generation: number;
 }
 
-async function call(owner: RdcRuntimeContext, operation: string, args: Record<string, unknown>, frozenCli?: RdcCliInvokerSettings) {
+async function call(owner: RdcRuntimeContext, operation: string, args: Record<string, unknown>, frozenCli?: RdcCliInvokerSettings, signal?: AbortSignal) {
   const settings = structuredClone(frozenCli ?? settingsService.getAll().tooling.rdcCli);
   const result = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('call', [operation, '--args-json',
     JSON.stringify(args), '--daemon-context', owner.contextId,
-  ], { contextId: owner.contextId, settings }), owner.contextId);
+  ], { contextId: owner.contextId, settings, abortSignal: signal }), owner.contextId);
   if (result.result_kind !== operation || result.data.session_id !== owner.replaySessionId) throw new Error('RDC_OBSERVATION_IDENTITY_MISMATCH');
   return result.data;
 }
@@ -38,11 +38,12 @@ export async function observeReplay(
   args: Record<string, unknown>,
   frozenCli?: RdcCliInvokerSettings,
   live?: ReplayLiveWriteTarget,
+  signal?: AbortSignal,
 ): Promise<Partial<CaptureReplayState>> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-replay-'));
   try {
     const imagePath = path.join(directory, 'frame.png');
-    const data = await call(owner, 'rd.session.observe', { ...args, out_path: imagePath }, frozenCli);
+    const data = await call(owner, 'rd.session.observe', { ...args, out_path: imagePath }, frozenCli, signal);
     if (!Number.isSafeInteger(data.event_id) || Number(data.event_id) < 0) throw new Error('RDC_OBSERVATION_EVENT_INVALID');
     const eventId = data.event_id as number;
     const display = data.display_parameters as Record<string, unknown> | null;

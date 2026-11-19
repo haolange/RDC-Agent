@@ -163,6 +163,12 @@ describe('recorded RDC requests', () => {
     expect(read.mock.calls[1][2]).toMatchObject({ expectedHash: hash, offset: 1, column: 50 });
     expect(JSON.parse(write.mock.calls[0][2]).sources).toHaveLength(2);
   });
+  it('does not reconstruct an uncommitted request, but can attest it after the journal contains it', () => {
+    readEntries.mockReturnValueOnce([]).mockReturnValueOnce([entry()]);
+    expect(() => materializeRecordedRdcRequest(context, uri, hash, deps)).toThrow('active-turn requests are not committed until the turn ends');
+    expect(write).not.toHaveBeenCalled();
+    expect(materializeRecordedRdcRequest(context, uri, hash, deps).qualification).toBe('recorded-model-request-only');
+  });
   it.each(['missing', 'conflict', 'operation', 'sensitive', 'owner', 'non-native', 'invalid-json', 'stuck-page'])(
     'rejects %s without publishing a witness', mode => {
       if (mode === 'missing') readEntries.mockReturnValue([]);

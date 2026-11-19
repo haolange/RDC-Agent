@@ -28,8 +28,18 @@ function copyBuiltinRuntime(): string {
 }
 
 describe('builtin profile contracts', () => {
-  it('accepts the four builtin agents and four root skills', () => {
+  it('accepts the four entry Agents, eight internal Agents and their required skills', () => {
     expect(() => assertBuiltinProfileContracts(repoRoot)).not.toThrow();
+  });
+
+  it('rejects an internal Agent that can invoke a live replay tool', () => {
+    const root = copyBuiltinRuntime();
+    const file = path.join(root, 'resources', 'agent-runtime', 'agents', 'verifier.agent.md');
+    const source = readFileSync(file, 'utf8');
+    const mutated = source.replace('  - artifact_read\n', '  - artifact_read\n  - rdc_probe\n');
+    expect(mutated).not.toBe(source);
+    writeFileSync(file, mutated, 'utf8');
+    expect(() => assertBuiltinProfileContracts(root)).toThrow(/verifier tools must not include rdc_probe/);
   });
 
   it('fails when a mission profile gains write tools or drops its coordinator skill', () => {
@@ -42,11 +52,11 @@ describe('builtin profile contracts', () => {
     expect(() => assertBuiltinProfileContracts(root)).toThrow(/debugger tools must not include write|must arm debugger-coordinator/);
   });
 
-  it('fails when the builtin General loop ceiling drifts from 200', () => {
+  it('fails when builtin General imposes a default loop ceiling', () => {
     const root = copyBuiltinRuntime();
     const generalPath = path.join(root, 'resources', 'agent-runtime', 'agents', 'general.agent.md');
-    writeFileSync(generalPath, readFileSync(generalPath, 'utf8').replace('max-turns: 200\n', 'max-turns: 50\n'), 'utf8');
-    expect(() => assertBuiltinProfileContracts(root)).toThrow(/General max-turns must be 200/);
+    writeFileSync(generalPath, readFileSync(generalPath, 'utf8').replace('enabled: true\n', 'enabled: true\nmax-turns: 50\n'), 'utf8');
+    expect(() => assertBuiltinProfileContracts(root)).toThrow(/must not impose a default/);
   });
 
   it('fails closed on unknown tool tokens and malformed handoffs via the runtime parser', () => {

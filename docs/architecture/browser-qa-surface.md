@@ -7,11 +7,11 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
 | Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap → HttpOnly `rdcBridgeToken` cookie（同源 `/app`）；explicit Bearer for programmatic clients |
 
-Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consume it once to mint the bridge cookie, then redirect to clean `/app` **on the same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。Only `RDC_AGENT_BROWSER_QA=1` starts this surface; missing, repeated, or invalid bootstrap returns 401. JSON bodies are capped at 1 MiB，唯一例外是 `conversation:stageAttachments`（经 `x-rdc-invoke-channel` 与 payload.channel 一致校验后上限 96 MiB），用于 Browser QA 的 bytes 拖放/粘贴/隐藏 file input。
+唯一入口：launcher 记录一次性 `GET /qa?qaBootstrap=...`，消费一次后签发 bridge cookie，并重定向到**同一 bridge origin** 上的干净 `/app`。 In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。仅 `RDC_AGENT_BROWSER_QA=1` 启动该 surface；bootstrap 缺失、重复或无效返回 401。 JSON body 上限 1 MiB，唯一例外是 `conversation:stageAttachments`（经 `x-rdc-invoke-channel` 与 payload.channel 一致校验后上限 96 MiB），用于 Browser QA 的 bytes 拖放/粘贴/隐藏 file input。
 
 ## 单轨接口
 
-- `browser-dev` 只将文档入口 `/app` / `/app/` 映射到 Vite 根；`/app/App.tsx` 等真实模块路径保持原样。Vite 开发期 CSS HMR 经 `devStyles.ts` 写入 constructable stylesheet，保留 `style-src 'self'` 与 `style-src-attr 'none'`，不放宽为 inline 样式。
+- `browser-dev` 只将文档入口 `/app` / `/app/` 映射到 Vite 根；`/app/App.tsx` 等真实模块路径保持原样。Vite 开发期 CSS HMR 经 `src/renderer/platform/devStyles.ts` 写入 constructable stylesheet，保留 `style-src 'self'` 与 `style-src-attr 'none'`，不放宽为 inline 样式。
 
 - `src/shared/renderer-api/` 是唯一 `ElectronAPI` 工厂与 channel manifest；Desktop 和 Browser 各自只实现 transport。
 - manifest 中的全部 invoke channel 必须存在 main handler；启动时 `assertRendererIpcParity` fail-closed 校验。
@@ -39,20 +39,20 @@ Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consu
 
 上述 Browser 能力仍受 main-owned Zod、PermissionPolicy、approval token、MCP trust、`safeStorage`、session ownership 与 shell policy 约束；parity 不等于绕过权限。`command:execute`、`settings:set`、`rdc-runtime:trustMcp`、`rdc-runtime:revokeMcp` 仅在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时开放，否则 fail-closed。
 
-隔离模型验收若经用户授权复制加密 Provider 凭据，须一并复制同源 Electron `Local State` 到隔离 userData；只复制凭据文件会使 `safeStorage` 解密失败。通过产品实际模型请求确认可用性，不能以“已配置”代替；结束后从隔离副本清除两者，不触碰原件。
+隔离 QA 若经用户授权复制加密 Provider 凭据，须连同同源 Electron `Local State` 一起复制，否则 `safeStorage` 无法解密；可用性以真实模型请求确认，结束后清除隔离副本，不触碰原件。
 
 ## 状态与实例
 
 Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时默认使用经过校验的临时 `os.tmpdir()/rdc-agent/qa-*` userData，并在 `will-quit` 清理；显式路径或 canonical 开关才会共享真实数据。进入该 disposable 分支时，主进程同时把 `RDC_AGENT_HOME` 指到同一目录下的 `.rdc-agent`，使 provider 配置与 `userData/secrets` 落在同一隔离边界；launcher 会先清掉继承来的 `RDC_AGENT_HOME`，避免读到或写回真实 `~/.rdc-agent`。只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才落真实 `~/.rdc-agent`。两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。涉及真实本机数据的验收必须显式指定 userData。
 
-锁恢复不得只将存活 PID 当成原 owner 身份。Windows 在 PID 存活且锁时间有效时，通过系统进程出生时间核验：当前进程晚于锁记录出生才证明 PID 已复用，可由正式启动路径回收旧锁；不向该进程发送终止信号。出生时间不可读、时间无效或无法排除原 owner 时保持拒绝，权限错误不当作进程已死。锁格式和用户数据保持不变。
+`instance.lock` 回收不能只凭 PID 存活判断 owner：Windows 通过进程出生时间核验 PID 复用，出生时间不可读或无法排除原 owner 时保持拒绝，也不向该进程发送终止信号。
 
 ## 验证
 
 - 外观对照须匹配主题预设、字号、语言、Composer Markdown 开关及当前 Agent；disposable 默认偏好不能代表正常用户配置。需要复现正常外观时，仅将 appearance 字段复制到自有隔离配置，记录来源与差异，不复制凭据或会话，也不改变产品默认值。普通输入与 Markdown 编辑/预览是同一 Composer 的现有设置，不是 Browser/Desktop 分叉；原生窗口缩放仍需单独验收。
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
-- Manual: run start:agent-browser, copy the complete one-time `/qa?qaBootstrap=...` URL from the latest log, and verify real Settings/Project/Session/usage, language persistence, and parity. Check high-risk channels both without and with `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; use explicit canonical userData only for an authorized real-data flow.
+- 手动：运行 `start:agent-browser`，从最新日志复制完整的一次性 `/qa?qaBootstrap=...` URL，核对真实 Settings / Project / Session / usage、语言持久化与 parity；高风险 channel 分别在未设置与设置 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时检查；仅在获授权的真实数据流程中显式使用 canonical userData。
 
 ## 原生交互性能观察
 

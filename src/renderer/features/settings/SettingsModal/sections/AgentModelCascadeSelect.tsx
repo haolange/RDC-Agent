@@ -40,9 +40,11 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
-  const selected = options.find((option) => option.canonicalId === value && option.configured);
+  const selected = options.find((option) => option.canonicalId === value
+    && (option.configured || option.status === 'provider-unavailable'));
   const inheriting = Boolean(inherit) && !value;
   const invalidSelection = isAgentModelSelectionInvalid(value, options);
+  const providerUnavailable = selected?.status === 'provider-unavailable';
   const groups = useMemo(() => buildAgentModelGroups(options, query), [options, query]);
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -66,7 +68,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
 
   const triggerPrimary = inheriting
     ? inherit?.label
-    : invalidSelection ? t('composer.model.unavailable') : selected ? selected.modelLabel : t('settings.selectModelPlaceholder');
+    : selected ? selected.modelLabel : invalidSelection ? t('composer.model.unavailable') : t('settings.selectModelPlaceholder');
   const triggerSecondary = inheriting
     ? null
     : selected ? selected.canonicalId : t('settings.selectProviderPlaceholder');
@@ -193,7 +195,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       </Popover>
       {invalidSelection ? (
         <small className="settings-model-cascade-invalid" data-testid="settings-agent-model-invalid">
-          {t('settings.routeReasonModelInvalid')}: {value}
+          {providerUnavailable ? t('settings.routeReasonProviderUnavailable') : `${t('settings.routeReasonModelInvalid')}: ${value}`}
         </small>
       ) : null}
     </div>

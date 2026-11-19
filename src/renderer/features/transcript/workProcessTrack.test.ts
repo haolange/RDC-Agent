@@ -59,7 +59,7 @@ it('does not aggregate eight completed calls while a hidden ninth declaration st
 });
 it('finds the first visible event through silent model turns without changing order', () => {
   const rows = [section('a', []), section('b', [tool('first'), tool('second')]), section('c', [tool('third')])];
-  expect(firstTrackEvent(rows)).toBe('first');
+  expect(firstTrackEvent(rows)).toBe('b');
   expect(rows[1].visibleSteps.map(row => row.id)).toEqual(['first', 'second']);
   expect(firstTrackEvent([section('narrative', [tool('first')], 'Start here')])).toBe('narrative');
   expect(firstTrackEvent([])).toBeUndefined();
@@ -80,13 +80,13 @@ it('keeps started details stable during streaming and excludes future calls whil
   expect(row?.type === 'section' && JSON.stringify(row.steps[0])).toContain('actual.txt');
   expect(row?.type === 'section' && row.steps[1].duration).toBe('');
 });
-it('suppresses silent-section nodes and retains later narration and the first tool', () => {
+it('gives silent tool sections a node without giving each tool another node', () => {
   const rows: WorkProcessRow[] = [section('silent', [tool('first')]), tool('first'), tool('second'), section('new', [], 'Next step')];
   const html = renderToStaticMarkup(createElement(WorkProcessTrackContext.Provider, {
-    value: 'first', children: rows.map(row => createElement(WorkProcessRailIcon, { key: row.id, row })),
+    value: 'silent', children: rows.map(row => createElement(WorkProcessRailIcon, { key: row.id, row })),
   }));
   const document = new DOMParser().parseFromString(html, 'text/html');
-  expect(document.querySelector('[data-work-anchor="silent"]')).toBeNull();
+  expect(document.querySelector('[data-work-anchor="silent"]')).not.toBeNull();
   expect(document.querySelectorAll('[data-work-node="structure"]')).toHaveLength(2);
   expect(document.querySelector('[data-work-anchor="second"] [class*="marker"]')).toBeNull();
 });
@@ -97,4 +97,47 @@ it('counts real parallel execution despite another child error and excludes appr
   expect(isTrackActivity({ ...section('settled-thinking', []), thinkingStatus: 'complete' })).toBe(false);
   expect(isTrackActivity({ ...section('stream', []), proseStreaming: true })).toBe(true);
   expect(isTrackActivity({ ...section('thinking', []), thinkingStatus: 'streaming' })).toBe(true);
+  expect(isTrackActivity(section('tools', [tool('running', 'running')]))).toBe(true);
+  expect(isTrackActivity(section('approval', [wait]))).toBe(false);
+});
+
+it('interleaves task snapshots and tools by first visible order even with equal timestamps', () => {
+  const presentation = buildWorkProcessPresentation({ status: 'running', updatedAt: 5, blocks: [
+    { id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1, toolCalls: [
+      { id: 'read', toolName: 'read_file', status: 'complete', startedAt: 5, executionStartedAt: 5, displayOrder: 2 },
+      { id: 'shell', toolName: 'shell', status: 'running', startedAt: 5, executionStartedAt: 5, displayOrder: 4 },
+    ] },
+    { id: 'created', parentLoopId: 'loop', displayOrder: 1, kind: 'task_snapshot', title: 'Tasks', status: 'complete',
+      startedAt: 5, toolCalls: [], taskSnapshot: { change: 'created', completed: 0, total: 0, items: [] } },
+    { id: 'updated', parentLoopId: 'loop', displayOrder: 3, kind: 'task_snapshot', title: 'Tasks', status: 'complete',
+      startedAt: 5, toolCalls: [], taskSnapshot: { change: 'updated', completed: 0, total: 0, items: [] } },
+  ] }, t);
+  const row = presentation.rows[0] as Extract<WorkProcessRow, { type: 'section' }>;
+  expect(row.visibleSteps.map((step) => step.id)).toEqual(['created', 'read', 'updated', 'shell']);
+});
+
+it('keeps a question between its earlier text and later tool in the owning group', () => {
+  const presentation = buildWorkProcessPresentation({ status: 'running', updatedAt: 5, blocks: [
+    { id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
+      outputItems: [{ providerOutputRef: { protocol: 'test', providerBlockKey: 'text', contentIndex: 0 },
+        text: 'Before', phase: 'commentary', status: 'complete', displayOrder: 1 }],
+      toolCalls: [{ id: 'read', toolName: 'read_file', status: 'complete', startedAt: 2, displayOrder: 3 }] },
+    { id: 'question', kind: 'user_input', parentLoopId: 'loop', title: 'Question', status: 'running', startedAt: 2,
+      toolCalls: [{ id: 'ask', toolName: 'ask_user', status: 'running', startedAt: 2, displayOrder: 2,
+        userInputQuestions: [{ questionId: 'q', prompt: 'Proceed?', options: [], allowFreeform: true }] }] },
+  ] }, t);
+  const row = presentation.rows[0] as Extract<WorkProcessRow, { type: 'section' }>;
+  expect(row.visibleSteps.map((step) => step.id)).toEqual(['loop:output:0', 'ask', 'read']);
+  expect(isTrackActivity(row)).toBe(false);
+});
+
+it('keeps the group active while a hidden task lifecycle tool is executing', () => {
+  const row = buildWorkProcessPresentation({ status: 'running', updatedAt: 2, blocks: [
+    { id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
+      toolCalls: [{ id: 'create', toolName: 'task_create', status: 'running', startedAt: 1, executionStartedAt: 1 }] },
+    { id: 'snapshot', kind: 'task_snapshot', parentLoopId: 'loop', title: 'Tasks', status: 'complete', startedAt: 2,
+      toolCalls: [], taskSnapshot: { change: 'created', completed: 0, total: 0, items: [] } },
+  ] }, t).rows[0] as Extract<WorkProcessRow, { type: 'section' }>;
+  expect(row.visibleSteps.map((step) => step.id)).toEqual(['snapshot']);
+  expect(isTrackActivity(row)).toBe(true);
 });

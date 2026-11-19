@@ -2,7 +2,7 @@
 
 # Debugger RDC 工具参考
 
-Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49bec3027a0ed6d7`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `a615f313d0f5f8fd27d627e40cf49e3a5d7eebba35c5b4b56452f50c79dc5c13`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -23,7 +23,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `include_drawcalls` | 否 | boolean |
 | `projection` | 否 | object |
 
-**结果解释：** ok (bool); data (dict): {root, pagination}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {root, pagination}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -47,7 +47,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `session_id` | 是 | string; session_id (str)<2>event_id (int) |
 | `event_id` | 否 | integer; min=0 |
 
-**结果解释：** Returns parent_chain, nullable marker_path and depth_output; ResourceId is local to this capture.; ok (bool); data (dict): {action}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** Returns parent_chain, nullable marker_path and depth_output; ResourceId is local to this capture.; ok (bool); data (dict): {action}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -71,7 +71,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 是 | integer; min=0; event_id (int) |
 
-**结果解释：** ok (bool); data (dict): {parent_chain}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {parent_chain}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -147,7 +147,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `scope` | 否 | string; scope (str, 可选, 默认 'all'): 对比范围，可选值 'all', 'shaders', 'bindings', 'raster', 'om', 'ia' |
 | `include_unchanged` | 否 | boolean; include_unchanged (bool, 可选, 默认 false) |
 
-**结果解释：** ok (bool); data (dict): {diff}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {diff}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -172,7 +172,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `event_id` | 是 | integer; min=0; event_id (int) |
 | `resolve_symbols` | 否 | boolean; resolve_symbols (bool, 可选, 默认 false) |
 
-**结果解释：** ok (bool); data (dict): {callstack}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {callstack}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -196,7 +196,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 是 | integer; min=0; event_id (int) |
 
-**结果解释：** ok (bool); data (dict): {usage}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {usage}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -236,14 +236,14 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 
 ## `rd.event.set_active`
 
-设置当前 active event；成功后 runtime 与 context snapshot 必须同步到同一个 resolved event，失败时保持旧状态不变。
+设置当前 active event；成功后 runtime 与 context snapshot 必须同步到同一个 resolved event；无法证明保全的失败须隔离回放。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 是 | integer; min=0; event_id (int) |
 
-**结果解释：** ok (bool); data (dict): {active_event_id}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {active_event_id}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -270,7 +270,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `detail` | 否 | string; enum=summary,full |
 | `sections` | 否 | array; Only request these state sections; omitted selects all. |
 
-**结果解释：** Shader hash is SHA-256 of recorded shader rawBytes, or null when unavailable; debug_name is the native non-autogenerated shader resource debug name or null; resource_name retains the native display name including autogenerated names; debug_source_files lists actual debug source filenames separately. Neither is derived from ResourceId.; data: resolved_event_id, pipeline_state. Full indexed viewports/scissors, blend options and complete front/back stencil. Blend factors/operations and depth compare use native RenderDoc enum names (for example SrcAlpha, InvSrcAlpha, GreaterEqual); unlabelled values are reported as unknown(raw) without guessing. API-specific sections carry api, status and native data; failed reads are not empty states.
+**结果解释：** Shader hash is SHA-256 of recorded shader rawBytes, or null when unavailable; debug_name is the native non-autogenerated shader resource debug name or null; resource_name retains the native display name including autogenerated names; debug_source_files lists actual debug source filenames separately. Neither is derived from ResourceId.; data: resolved_event_id, pipeline_state. Full indexed viewports/scissors, blend options and complete front/back stencil. Blend factors/operations and depth compare use native RenderDoc enum names (for example SrcAlpha, InvSrcAlpha, GreaterEqual); unlabelled values are reported as unknown(raw) without guessing. API-specific sections carry api, status and native data; failed reads are not empty states.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -296,7 +296,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `max_bytes` | 否 | integer; min=0 |
 
-**结果解释：** ok (bool); data (dict): {stage_state}; artifacts (list); error (dict\|null): unknown stages return validation/invalid_shader_stage; RT or a missing native stage enum returns capability/shader_stage_unsupported. Stage rejection precedes replay access and includes effects_attempted=false, context_preserved=true, failure_stage=validate_stage.; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {stage_state}; artifacts (list); error (dict\|null): invalid_shader_stage and shader_stage_unsupported are validation errors when the no-effect and entry-state proof succeeds; otherwise they are runtime failures without that proof.; meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -320,7 +320,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {vertex_buffers}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {vertex_buffers}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -344,7 +344,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {index_buffer}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {index_buffer}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -370,7 +370,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `type` | 否 | string; enum=SRV,UAV,CBV,Sampler |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {bindings}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {bindings}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -400,7 +400,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `flatten` | 否 | boolean |
 | `slot` | 否 | integer; min=0 |
 
-**结果解释：** ok (bool); data (dict): {constant_buffers}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) input_coverage说明required_bytes、binding_bytes、byte_budget、permitted_bytes及complete_range_permitted；这不是原始字节回执。decode_status明确decoded/unavailable/raw_fallback，decode_input_bytes是传给解码器的长度。raw_fallback.byte_size为实际返回字节；truncated表示块读取不全，preview_bytes/preview_truncated另外限定hex_preview交付范围。预算不足、未绑定输入或未知范围不能解释成已观测零。
+**结果解释：** ok (bool); data (dict): {constant_buffers}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) input_coverage说明required_bytes、binding_bytes、byte_budget、permitted_bytes及complete_range_permitted；这不是原始字节回执。decode_status明确decoded/unavailable/raw_fallback，decode_input_bytes是传给解码器的长度。raw_fallback.byte_size为实际返回字节；truncated表示块读取不全，preview_bytes/preview_truncated另外限定hex_preview交付范围。预算不足、未绑定输入或未知范围不能解释成已观测零。; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -425,7 +425,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `stage` | 是 | string; Case-insensitive VS/HS/DS/GS/PS/CS/MS/AS. Pixel shader is PS. RT is recognized but unsupported; stage names are validated before replay access with structured errors. |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {shader}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {shader}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -476,7 +476,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `resource_id` | 是 | string; Exact resource ID: decimal or ResourceId::<decimal>; integer precision is preserved. |
 | `include_initialization` | 否 | boolean; Recorded initialization chunks and parent/derived resources; not a creation call-stack claim. |
 
-**结果解释：** ok (bool); data (dict): {details}; artifacts (list); error (dict\|null): Completed inventory miss is validation/resource_not_found with effects_attempted=false and context_preserved=true; native inventory failures carry no such proof.; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {details}; artifacts (list); error (dict\|null): Completed inventory miss is resource_not_found; it is validation with effects_attempted=false and context_preserved=true only when entry-state preservation and no effects are proven, otherwise runtime. Native inventory failures carry no such proof.; meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -532,7 +532,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `state` | 否 | string; enum=current,capture_initial; Recorded frame-initial contents or current/requested event; reads restore the original replay event. |
 | `representation` | 否 | string; enum=numeric,raw; Numeric NPZ or original packed raw bytes (.bin); raw supports depth/compressed formats without numeric decoding. |
 
-**结果解释：** data: resource identity, byte_size, state, resolved_event_id, restored_event_id, replay_state_restored=true, initial_provenance; base64 when requested (1 MiB limit, no automatic artifact), otherwise explicit output/artifact. Initial provenance unavailable, failed/incomplete read and restoration failure are distinct errors. Restoration failure requires closing and reopening the session.
+**结果解释：** data: resource identity, byte_size, state, resolved_event_id, restored_event_id, replay_state_restored=true, initial_provenance; base64 when requested (1 MiB limit, no automatic artifact), otherwise explicit output/artifact. Initial provenance unavailable, failed/incomplete read and restoration failure are distinct errors. Restoration failure requires closing and reopening the session.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -564,7 +564,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `as_type` | 否 | string; as_type (str, 可选, 默认 'float'): 返回值类型，可选 'float', 'uint', 'int' |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {value}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {value}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -595,7 +595,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `as_type` | 否 | string; as_type (str, 可选, 默认 'float') |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {values, values_status, inline_value_limit, values_path, stats, resolved_event_id, texture_id, target_metadata}; values 为 stride/as_type 后完整嵌套数值数组，最多256标量；values_status=complete；超限为values=null/omitted_limit，不截断或伪造空列表。完整同数组仍导出NPZ到values_path。stats反映同一采样数组，含shape/dtype/stride、总体与逐rgba通道有限值min/max/mean和nan/inf_count；通道指解码数组分量，不证明纹理存在物理alpha。非有限值使用NaN/Infinity/-Infinity字符串，不转成0。; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {values, values_status, inline_value_limit, values_path, stats, resolved_event_id, texture_id, target_metadata}; values 为 stride/as_type 后完整嵌套数值数组，最多256标量；values_status=complete；超限为values=null/omitted_limit，不截断或伪造空列表。完整同数组仍导出NPZ到values_path。stats反映同一采样数组，含shape/dtype/stride、总体与逐rgba通道有限值min/max/mean和nan/inf_count；TYPELESS 按查询事件绑定的唯一 view 格式解码；没有唯一 view 时保留原始无符号整数并在 stats 标注，忽略 as_type。确定性解码失败在恢复原事件后返回 texture_readback_decode_failed。通道指解码数组分量，不证明纹理存在物理alpha。非有限值使用NaN/Infinity/-Infinity字符串，不转成0。; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -628,7 +628,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `target` | 否 | object |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {history, resolved_event_id, texture_id, target_metadata, binding_truth_level, evidence_truth_level}. Each history item includes pre_mod, shader_out and post_mod with native validity, format-aware color_rgba, depth and stencil. Non-finite color channels are null and listed in non_finite_channels; missing or invalid values are explicit. pre_mod is unavailable for non-first fragments. shader_out maps RenderDoc PixelModification.shaderOut: native fragment shader output, not a shader-input trace. Its depth is copied from ModificationValue.depth. Native validity does not establish bit-exact equality to input FragCoord.z, original invocation correspondence, or a numerical error bound; these require separate backend-specific qualification. Depth-test flag reconstruction or quantization must not be treated as an error bound on shader_out.depth.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {history, history_bindings, history_bindings_status, resolved_event_id, texture_id, target_metadata, binding_truth_level, evidence_truth_level}. When include_shaders is true, history_bindings contains shader and output-target bindings or an explicit error per writer event; top-level binding truth applies to resolved_event_id. Each history item preserves native validity, format-aware color_rgba, depth and stencil. TYPELESS uses the unique view bound at the requested event; without one, value_interpretation=raw_unsigned_integer and interpretation_note explicitly marks the raw values. Non-finite channels are null and listed in non_finite_channels; missing or invalid values are explicit. pre_mod is unavailable for non-first fragments. shader_out is native fragment output, not shader input; depth is ModificationValue.depth. Validity does not prove bit-exact FragCoord.z, invocation correspondence, or a numerical error bound; reconstructed depth-test flags and quantization do not supply that bound. Vulkan images used as both input and output attachments without input-attachment usage at any capture event return pixel_history_unsupported_input_attachment after replay position restoration.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -660,7 +660,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `sample` | 否 | integer; min=0 |
 
-**结果解释：** ok (bool); data (dict): {histogram, bin_edges}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {histogram, bin_edges}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -689,7 +689,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `stride` | 否 | integer; stride (int, 可选, 默认 1) |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** data: {stats: {min,max,mean,nan_count,inf_count,channels}, resolved_event_id,texture_id,target_metadata}. Channel min/max exclude non-finite samples; all-nonfinite channels have null min/max. Unsupported packed/compressed formats fail explicitly.
+**结果解释：** data: {stats: {min,max,mean,nan_count,inf_count,channels}, resolved_event_id,texture_id,target_metadata}. Channel min/max exclude non-finite samples; all-nonfinite channels have null min/max. Unsupported packed/compressed formats fail explicitly.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -721,7 +721,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `flip_y` | 否 | boolean |
 | `include_alpha` | 否 | boolean |
 
-**结果解释：** ok (bool); data (dict): {image_path}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {image_path, image_mapping}. image_mapping reports native source_size, effective_scale, image-space content_rect and flip_y, or an unavailable reason when dimensions are missing.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -749,7 +749,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `metric` | 否 | array; metric (list[str], 可选): 指标列表，可选 ['max_abs', 'mse', 'psnr'] |
 | `event_id` | 否 | integer; min=0 |
 
-**结果解释：** data: {diff: {mse,max_abs,psnr,identical,psnr_peak,psnr_status},event_a,event_b}. Identical samples return psnr=null and psnr_status=infinite. Mismatched shapes or non-finite samples fail. No files are created.
+**结果解释：** data: {diff: {mse,max_abs,psnr,identical,psnr_peak,psnr_status},event_a,event_b}. Identical samples return psnr=null and psnr_status=infinite. Mismatched shapes or non-finite samples fail. No files are created.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -779,7 +779,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `state` | 否 | string; enum=current,capture_initial; Recorded frame-initial contents or current/requested event; reads restore the original replay event. |
 | `event_id` | 否 | integer; min=1; Current-state event to read; mutually exclusive with capture_initial. |
 
-**结果解释：** data: resource identity, byte_size, state, resolved_event_id, restored_event_id, replay_state_restored=true, initial_provenance; base64 when requested (1 MiB limit, no automatic artifact), otherwise explicit output/artifact. Initial provenance unavailable, failed/incomplete read and restoration failure are distinct errors. Restoration failure requires closing and reopening the session.
+**结果解释：** data: resource identity, byte_size, state, resolved_event_id, restored_event_id, replay_state_restored=true, initial_provenance; base64 when requested (1 MiB limit, no automatic artifact), otherwise explicit output/artifact. Initial provenance unavailable, failed/incomplete read and restoration failure are distinct errors. Restoration failure requires closing and reopening the session.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -837,7 +837,7 @@ Current catalog fingerprint: `3709e5a6f793c04d795c90e1e7898b2fd4580f6ef602950e49
 | `size` | 否 | integer; min=0; size (int, 可选) |
 | `max_results` | 否 | integer; max_results (int, 可选, 默认 256) |
 
-**结果解释：** ok (bool); data (dict): {matches}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {matches}; artifacts (list); error (dict\|null): Invalid query flags, range bounds or regex are rejected before replay access. validation with failure_stage=validate_query, effects_attempted=false and context_preserved=true requires no native effects and unchanged replay, event, replacements and affected records; otherwise runtime without that proof.; meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -867,7 +867,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `first_index` | 否 | integer; min=0; max=4294967295; First native post-transform index ordinal (elements, not bytes); default 0 when index_count is supplied. |
 | `index_count` | 否 | integer; min=1; max=4096; Explicit native index window length; requires stage=vs and explicit max_vertices between 1 and 256. |
 
-**结果解释：** vertex_rows retain raw bytes and nullable typed position. attributes explicitly reports position/normal/uv present or unsupported; outputs exposes verified D3D11/12 stream-zero float signature packing and Vulkan VS per-vertex stream-zero float32 std430 packing, checked against native stride. Vulkan layout reports API/stage, explicit location, system_value, variable_name, native component_mask (null if unavailable), scalar_type, byte_offset and components; a mask is not a proved raster component/interpolation mapping; per-row keys are location:N or builtin:Name. Ambiguous/missing locations, non-leading Position, unsupported types/rates/streams/stages and stride mismatch remain unsupported. Incomplete readback is an error; nonfinite values are null. These are vertex outputs, not raster interpolation, primitive coverage or fragment operands; TEXCOORD is never guessed to be normal. source=post_transform; no input values are substituted. No attribute layout is guessed. truncated is null when an unbounded native buffer view prevents proving total size.; ok (bool); data (dict): {mesh_data}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) Index-window mode reads only native MeshFormat resource objects, never arbitrary ID lookup or input substitution. index_window includes original index bytes, native index byte offset/stride, element ordinals, base_vertex, index-to-output-row mapping and nullable finite native view bounds. vertex_rows retain absolute output vertex_index and source_byte_offset; raw bytes and typed outputs refer to those rows. Unique referenced rows are bounded by max_vertices (1..256), with combined index/vertex readback at most 1 MiB; short reads fail without zero filling or prefix fallback. complete refers only to the requested index window; truncated remains true for a partial draw or incomplete vertex mapping. Primitive-restart matches are explicitly restart_candidate with null vertex_index and vertex_mapping_complete=false; they do not establish raster primitive association. Non-indexed windows use explicit implicit row ordinals and no index bytes. Native topology_name/base_vertex/allow_restart/restart_index are reported without inferring pixel coverage. Invalid window arguments are rejected before replay access with effects_attempted=false/context_preserved=true; native or post-effect read failures do not carry that proof.
+**结果解释：** vertex_rows retain raw bytes and nullable typed position. attributes explicitly reports position/normal/uv present or unsupported; outputs exposes verified D3D11/12 stream-zero float signature packing and Vulkan VS per-vertex stream-zero float32 std430 packing, checked against native stride. Vulkan layout reports API/stage, explicit location, system_value, variable_name, native component_mask (null if unavailable), scalar_type, byte_offset and components; a mask is not a proved raster component/interpolation mapping; per-row keys are location:N or builtin:Name. Ambiguous/missing locations, non-leading Position, unsupported types/rates/streams/stages and stride mismatch remain unsupported. Incomplete readback is an error; nonfinite values are null. These are vertex outputs, not raster interpolation, primitive coverage or fragment operands; TEXCOORD is never guessed to be normal. source=post_transform; no input values are substituted. No attribute layout is guessed. truncated is null when an unbounded native buffer view prevents proving total size.; ok (bool); data (dict): {mesh_data}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) Index-window mode reads only native MeshFormat resource objects, never arbitrary ID lookup or input substitution. index_window includes original index bytes, native index byte offset/stride, element ordinals, base_vertex, index-to-output-row mapping and nullable finite native view bounds. vertex_rows retain absolute output vertex_index and source_byte_offset; raw bytes and typed outputs refer to those rows. Unique referenced rows are bounded by max_vertices (1..256), with combined index/vertex readback at most 1 MiB; short reads fail without zero filling or prefix fallback. complete refers only to the requested index window; truncated remains true for a partial draw or incomplete vertex mapping. Primitive-restart matches are explicitly restart_candidate with null vertex_index and vertex_mapping_complete=false; they do not establish raster primitive association. Non-indexed windows use explicit implicit row ordinals and no index bytes. Native topology_name/base_vertex/allow_restart/restart_index are reported without inferring pixel coverage. Invalid window arguments are rejected before replay access with effects_attempted=false/context_preserved=true; native or post-effect read failures do not carry that proof.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -921,7 +921,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 否 | integer; min=0; event_id (int, 可选); instance (integer, default 0); max_vertices (integer, default 128; 0 reads full draw) |
 
-**结果解释：** ok (bool); data (dict): {mesh_config: {event_id, topology, bindings, vertex_input}}; vertex_input includes source=vs_input, vertex_rows with draw/vertex indices and typed semantic values, attributes position/normal/uv status, layout, index_binding, truncated. Values are shader inputs in original coordinate space; packed normal encoding is not interpreted as a geometric normal; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {mesh_config: {event_id, topology, bindings, vertex_input}}; vertex_input includes source=vs_input, vertex_rows with draw/vertex indices and typed semantic values, attributes position/normal/uv status, layout, index_binding, truncated. Values are shader inputs in original coordinate space; packed normal encoding is not interpreted as a geometric normal; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -948,7 +948,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
 
-**结果解释：** ok (bool); data (dict): {source, files[{filename, contents}], source_available, source_encoding, entry_point, compile_flags, source_debug_information, fallback_tool?, fallback_args?, edit_plan, failure_stage?, failure_reason?, shader_id, stage, resolved_event_id}; files preserve native order and captured text without reading host paths. source is the first (entry) file contents; source-level debugging availability is independent. Unknown source encoding, source entry and compile flags remain null. When entry source contents are unavailable, returns ok=true with source_available=false and a format-aware fallback. SPIR-V may recommend `rd.shader.get_disassembly` with target='SPIR-V ASM' and source_encoding='spirvasm'; the current edit_plan describes absent source, so inspect the fallback result before editing. DXIL/DXBC recommends read-only disassembly and/or `rd.shader.extract_binary` instead of treating disassembly text as replacement source. Missing native metadata reports shader_source_metadata_unavailable; native read failure reports shader_source_lookup_failed instead of successful source absence. Neither path reads files from the host filesystem.; artifacts (list); error (dict\|null): invalid_shader_stage is rejected before any replay effect, with effects_attempted=false and context_preserved=true. An unbound shader at the requested event returns shader_binding_lookup_failed; the original replay event is restored and reported as replay_state_restored/restored_event_id only after native restoration succeeds. A failed restoration reports shader_inspection_recovery_failed and requires controlled recovery.; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {source, files[{filename, contents}], source_available, source_encoding, entry_point, compile_flags, source_debug_information, fallback_tool?, fallback_args?, edit_plan, failure_stage?, failure_reason?, shader_id, stage, resolved_event_id}. files preserve native order and text; source is the first entry; no host files are read. Source debugging is independent; unknown encoding, entry or flags are null. If source is unavailable, ok=true, source_available=false and fallback is format-aware: SPIR-V may offer `rd.shader.get_disassembly` target='SPIR-V ASM', source_encoding='spirvasm'; DXIL may offer target='DXIL ASM', source_encoding='dxilasm'; inspect its edit_plan. Native DXIL/DXBC disassembly is read-only; `rd.shader.extract_binary` returns the container. edit_plan.full_source_replacement separately reports support for supplied HLSL/GLSL; it does not imply editable disassembly or matching semantics. Missing metadata: shader_source_metadata_unavailable; native read failure: shader_source_lookup_failed.; artifacts (list); error (dict\|null): invalid_shader_stage is rejected before replay with effects_attempted=false and context_preserved=true. An unbound shader returns shader_binding_lookup_failed; replay_state_restored/restored_event_id are reported only after native restoration succeeds; failure returns shader_inspection_recovery_failed.; meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -971,11 +971,12 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 |---|---:|---|
 | `session_id` | 是 | string; session_id (str) |
 | `shader_id` | 否 | string; shader_id (str) |
-| `target` | 否 | string; auto（默认）或当前 replay 支持的精确 disassembly target；raw SPIR-V ASM 用 SPIR-V ASM |
+| `target` | 否 | string; auto（默认）或当前 replay 支持的精确 disassembly target；raw 用 SPIR-V ASM 或 DXIL ASM |
+| `source_encoding` | 否 | string; raw source encoding: spirvasm or dxilasm |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
 
-**结果解释：** ok (bool); data (dict): {disassembly, target, source_encoding, is_raw_spirv_asm, source_hash, shader_id, resolved_event_id, edit_plan, available_targets, available_targets_status, available_targets_error}; available_targets 是原生 GetDisassemblyTargets(true) 的结果；status=complete（包括合法空列表）、unavailable（查询失败，error 保留原因）或 unsupported（原生接口缺失）。该列表不隐含 GPU ISA 支持，也不包含 Tool 独立提供的 raw ASM fallback；实际返回 target/is_raw_spirv_asm/edit_plan 分别说明当前视图及可编辑性。; `edit_plan` describes shader_format, input_kind, can_edit_text, can_build, can_replace, requires_toolchain, build_input_kind, allowed_edit_inputs, allowed_ops, recommended_next_tool, and blocked_reason. allowed_edit_inputs lists independent input forms (full source_text, diff_text, or structured ops); allowed_ops only names supported structured ops and does not restrict source_text or diff_text edits. The default RenderDoc SPIR-V view is read-only; request target='SPIR-V ASM' and inspect that result edit_plan before attempting replacement. DXIL/DXBC disassembly is read-only unless edit_plan reports a buildable source path.; artifacts (list); error (dict\|null): 绑定失败显式返回 `shader_binding_lookup_failed` / `shader_stage_mismatch`；当请求 target 不存在或源码不可取时，显式返回 `shader_disassembly_unavailable` 并带 `failure_stage` / `failure_reason`；未知 target 在应用 replay event 前拒绝，返回 available_targets 与 effects_attempted=false / context_preserved=true; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {disassembly, target, source_encoding, is_raw_spirv_asm, source_hash, shader_id, resolved_event_id, edit_plan, available_targets, available_targets_status, available_targets_error}; available_targets 是原生 GetDisassemblyTargets(true) 的结果；status=complete（包括合法空列表）、unavailable（查询失败，error 保留原因）或 unsupported（原生接口缺失）。该列表不隐含 GPU ISA 支持，也不包含 Tool 独立提供的 raw ASM fallback；实际返回 target/is_raw_spirv_asm/edit_plan 分别说明当前视图及可编辑性。; `edit_plan` describes shader_format, input_kind, can_edit_text, can_build, can_replace, requires_toolchain, build_input_kind, allowed_edit_inputs, allowed_ops, recommended_next_tool, and blocked_reason. allowed_edit_inputs lists independent input forms (full source_text, diff_text, or structured ops); allowed_ops only names supported structured ops and does not restrict source_text or diff_text edits. The default RenderDoc SPIR-V view is read-only; request target='SPIR-V ASM' and inspect that result edit_plan before attempting replacement. Native DXIL/DXBC disassembly is read-only; target='DXIL ASM' is editable DXIL LLVM IR.; artifacts (list); error (dict\|null): 绑定失败显式返回 `shader_binding_lookup_failed` / `shader_stage_mismatch`；当请求 target 不存在或源码不可取时，显式返回 `shader_disassembly_unavailable` 并带 `failure_stage` / `failure_reason`；未知 target 在应用 replay event 前拒绝，返回 available_targets 与 effects_attempted=false / context_preserved=true; meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1004,7 +1005,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `include_constant_blocks` | 否 | boolean; include_constant_blocks (bool, 可选, 默认 true) |
 | `context_id` | 否 | string; context_id (str, optional): choose the context to use; defaults to the current daemon context |
 
-**结果解释：** ok (bool); data (dict): {reflection, shader_id, resolved_event_id}; reflection.debug_info 包含原生 debuggable、source_debug_information 与 status，原生字段缺席时返回 null，不能据此声称可调试; artifacts (list); error (dict\|null): 绑定失败显式返回 `shader_binding_lookup_failed` / `shader_stage_mismatch` / `shader_reflection_unavailable`，不再把所有失败折叠成 `shader_not_bound`; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {reflection, shader_id, resolved_event_id}; reflection.debug_info 包含原生 debuggable、source_debug_information 与 status，原生字段缺席时返回 null，不能据此声称可调试; artifacts (list); error (dict\|null): 绑定失败显式返回 `shader_binding_lookup_failed` / `shader_stage_mismatch` / `shader_reflection_unavailable`，不再把所有失败折叠成 `shader_not_bound`; meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1030,7 +1031,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as |
 
-**结果解释：** ok (bool); data (dict): {mapping}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {mapping}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1057,7 +1058,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as |
 
-**结果解释：** ok (bool); data (dict): {layout}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {layout}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1087,7 +1088,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `shader_id` | 否 | string |
 
-**结果解释：** ok (bool); data (dict): {cbuffer}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) input_coverage说明required_bytes、binding_bytes、byte_budget、permitted_bytes及complete_range_permitted；这不是原始字节回执。decode_status明确decoded/unavailable/raw_fallback，decode_input_bytes是传给解码器的长度。raw_fallback.byte_size为实际返回字节；truncated表示块读取不全，preview_bytes/preview_truncated另外限定hex_preview交付范围。预算不足、未绑定输入或未知范围不能解释成已观测零。
+**结果解释：** ok (bool); data (dict): {cbuffer}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选) input_coverage说明required_bytes、binding_bytes、byte_budget、permitted_bytes及complete_range_permitted；这不是原始字节回执。decode_status明确decoded/unavailable/raw_fallback，decode_input_bytes是传给解码器的长度。raw_fallback.byte_size为实际返回字节；truncated表示块读取不全，preview_bytes/preview_truncated另外限定hex_preview交付范围。预算不足、未绑定输入或未知范围不能解释成已观测零。; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1113,7 +1114,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as |
 
-**结果解释：** ok (bool); data (dict): {entry_points}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {entry_points}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1138,7 +1139,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `severity_min` | 否 | string; severity_min (str, 可选, 默认 'info'): `'debug' |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): tool-specific payload; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): tool-specific payload; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1167,7 +1168,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `stage` | 否 | string; enum=vs,hs,ds,gs,ps,cs,ms,as |
 | `as_base64` | 否 | boolean |
 
-**结果解释：** ok (bool); data (dict): tool-specific payload; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): tool-specific payload; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1185,7 +1186,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 
 ## `rd.shader.compile`
 
-通过当前 replay controller 的 BuildTargetShader 独立构建 shader，不替换资源；raw SPIR-V ASM 在二进制后端复用 spirv-as 装配。返回原生构建 ID 与明确区分的构建输入/读回制品。
+通过当前 replay controller 的 BuildTargetShader 独立构建 shader，不替换资源；raw SPIR-V ASM 使用 spirv-as，DXIL ASM 使用 DXC 装配并校验签名。返回原生构建 ID 与明确区分的构建输入/读回制品。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
@@ -1194,7 +1195,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `stage` | 是 | string; enum=vs,hs,ds,gs,ps,cs,ms,as; Use canonical shader stage: vs, hs, ds, gs, ps, cs, ms, or as. Pixel shader is ps. |
 | `entry` | 是 | string; entry (str) |
 | `target` | 是 | string; target (str): e.g. 'vs_6_6'/'ps_6_6' or 'spirv1.6' |
-| `source_encoding` | 否 | string; source_encoding (str, 可选): hlsl/glsl/spirvasm; DXIL/DXBC text is not accepted as source |
+| `source_encoding` | 否 | string; source_encoding (str, 可选): hlsl/glsl/spirvasm/dxilasm; native DXIL/DXBC text is not accepted as source |
 | `defines` | 否 | object; defines (dict, 可选) |
 | `include_dirs` | 否 | array; include_dirs (list[str], 可选) |
 | `additional_args` | 否 | array; additional_args (list[str], 可选) |
@@ -1202,7 +1203,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `session_id` | 是 | string |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {session_id, shader_id, entry, target, stage, source_kind, resolved_source_path, include_dirs, source_encoding, build_encoding, build_input, supported_source_encodings, runtime_replacement_supported, runtime_replacement_reason, messages, compiler_messages, edit_plan, saved_path?, artifact_path?, byte_size?, artifact_kind?}; artifacts (list); error (dict\|null): compile validation/build failures include source_kind, resolved_source_path, include_dirs, entry, target, and failure_stage. Unsupported source encoding returns shader_compile_encoding_unsupported. Prebuild rejection/assembly failure returns effects_attempted=false, context_preserved=true; native build failures do not. Assembled SPIR-V artifact_kind is assembled-spirv-build-input, not device code. DXIL/DXBC captured disassembly text is not accepted as editable source.; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {session_id, shader_id, entry, target, stage, source_kind, resolved_source_path, include_dirs, source_encoding, build_encoding, build_input, supported_source_encodings, runtime_replacement_supported, runtime_replacement_reason, messages, compiler_messages, edit_plan, saved_path?, artifact_path?, byte_size?, artifact_kind?}; artifacts (list); error (dict\|null): compile validation/build failures include source_kind, resolved_source_path, include_dirs, entry, target, and failure_stage. Unsupported source encoding returns shader_compile_encoding_unsupported. Prebuild rejection/assembly failure returns effects_attempted=false, context_preserved=true; native build failures do not. Assembled SPIR-V and validated DXIL artifacts are build inputs, not device code. Native DXIL/DXBC disassembly remains read-only.; meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **影响：** `replay_position`, `artifact_write`。
 
@@ -1231,11 +1232,11 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `source_path` | 否 | string; source_path (str, 可选): full replacement source file path |
 | `entry` | 否 | string; entry (str, required for full HLSL/GLSL replacement unless reflection provides it) |
 | `target` | 否 | string; target (str, required for full HLSL/GLSL replacement, e.g. ps_6_6) |
-| `source_encoding` | 否 | string; source_encoding (str, 可选, e.g. hlsl/glsl/spirvasm) |
+| `source_encoding` | 否 | string; source_encoding (str, 可选, e.g. hlsl/glsl/spirvasm/dxilasm) |
 | `diff_text` | 否 | string; diff_text (str, 可选) |
 | `emit_patch_artifacts` | 否 | boolean; emit_patch_artifacts (bool, 可选) |
 | `output_dir` | 否 | string; output_dir (str, 可选) |
-| `expected_source_hash` | 否 | string; SHA-256 of the currently bound original shader source before applying this patch, not the replacement source_text/source_path file hash. A mismatch rejects before compilation or replacement. |
+| `expected_source_hash` | 否 | string; SHA-256 of the currently bound original shader source before applying this patch, not the replacement source_text/source_path file hash. Required for DXIL ASM; a mismatch rejects before compilation or replacement. |
 | `include_dirs` | 否 | array |
 | `intent` | 否 | string |
 | `max_diff_ops` | 否 | integer; min=0 |
@@ -1243,7 +1244,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `replacement_id` | 否 | string |
 | `source_target` | 否 | string |
 
-**结果解释：** ok (bool); data (dict): {replacement_id, status='applied'\|'noop', resolved_event_id, messages, edit_plan, replacement{edit_plan, compile{encoding, disassembly_target, entry_point, compile_flags, build_input}, artifacts{source_before, source_after, patch_diff, build_input}}}; build_input (dict): exact bytes passed to BuildTargetShader, linked to original_shader_id and returned target_shader_id; status=available includes sha256, byte_size, encoding, byte_kind, and spirv_header. A binary SPIR-V input exposes the observed header id_bound when valid; source text does not imply compiled output or a bound. device_binary_observed=false: this is submitted build input, not device ISA or native shader readback. No-op has unavailable build input; failed builds do not report an applied target.; artifacts (list): when emit_patch_artifacts=true or output_dir is provided, includes before/after/diff text and exact build-input bytes when a build occurred (.spv for SPIR-V modules, .txt for source text); no artifact request causes no extra persistence; error (dict\|null): DXIL/DXBC disassembly remains read-only (captured_source_editable=false), but user-provided HLSL/GLSL full replacement can compile then ReplaceResource when runtime_full_replace_supported=true. Build failures do not call ReplaceResource. Replace failures include replacement_attempted, cleanup_attempted, context_preserved, failure_stage, and failure_reason.; meta (dict); projections (dict, optional)
+**结果解释：** ok (bool); data (dict): {replacement_id, status='applied'\|'noop', resolved_event_id, messages, edit_plan, replacement{edit_plan, compile{encoding, disassembly_target, entry_point, compile_flags, build_input}, artifacts{source_before, source_after, patch_diff, build_input}}}; build_input (dict): exact bytes passed to BuildTargetShader, linked to original_shader_id and returned target_shader_id; status=available includes sha256, byte_size, encoding, byte_kind, and spirv_header. A binary SPIR-V input exposes the observed header id_bound when valid; source text does not imply compiled output or a bound. device_binary_observed=false: this is submitted build input, not device ISA or native shader readback. No-op has unavailable build input; failed builds do not report an applied target.; artifacts (list): when emit_patch_artifacts=true or output_dir is provided, includes before/after/diff text and exact build-input bytes when a build occurred (.spv for SPIR-V modules, .txt for source text); no artifact request causes no extra persistence; error (dict\|null): native DXIL/DXBC disassembly remains read-only; DXIL ASM accepts source_text/diff_text with expected_source_hash and no structured ops. User-provided HLSL/GLSL full replacement can compile then ReplaceResource when runtime_full_replace_supported=true. Build failures do not call ReplaceResource. Replace failures include replacement_attempted, cleanup_attempted, context_preserved, failure_stage, and failure_reason.; meta (dict); projections (dict, optional); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1269,7 +1270,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): {replacements}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {replacements}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1294,7 +1295,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `replacement_id` | 是 | string; replacement_id (str) |
 | `event_id` | 否 | integer; min=0; Replay event; omitted uses the owning session current event. |
 
-**结果解释：** ok (bool); data (dict): tool-specific payload; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): tool-specific payload; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1442,7 +1443,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 
 ## `rd.debug.get_variables`
 
-读取当前调试步的累积原生变量快照；按 before/after 更新，不只返回最后一条变化。值保留原生类型/数值视图，结构成员可限定展开深度。
+读取原生 trace 输入和当前调试步的累积可变变量；输入标记 variable_origin=trace_input，可变变量按 before/after 更新。值保留原生类型/数值视图，结构成员可限定展开深度。D3D12 请求粗着色时附带 debug_qualification，说明实际调用位置与有效速率未知。
 
 | 参数 | 必需 | 约束 |
 |---|---:|---|
@@ -1452,7 +1453,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `expand_depth` | 否 | integer; expand_depth (int, 可选, 默认 2) |
 | `max_variables` | 否 | integer; max_variables (int, 可选, 默认 2048) |
 
-**结果解释：** ok (bool); data (dict): {variables}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {variables, debug_qualification?}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1636,7 +1637,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `include_alpha` | 否 | boolean; include_alpha (bool, 可选, 默认 true) |
 | `overlay` | 否 | string; overlay (str, 可选): 'None'\|'Drawcall'\|'Wireframe'\|'Overdraw' |
 
-**结果解释：** ok (bool); data (dict): single export returns {artifact_path, saved_path, image_path, meta, resolved_event_id, selected_formats, requested_formats, recommended_formats, name_info, texture_format, chosen_output_slot, texture_id, target_source, binding_truth_level, visual_truth_level, evidence_truth_level, summary_degraded_reasons}; multi-format export returns {exports, saved_paths, image_paths, resolved_event_id, selected_formats, requested_formats, recommended_formats, name_info, texture_format, chosen_output_slot, texture_id, target_source, binding_truth_level, visual_truth_level, evidence_truth_level, summary_degraded_reasons}; artifacts (list); error (dict\|null): target-resolution failure restores the prior event where possible and reports failure_stage, replay_state_restored, restored_event_id and artifact_write_attempted in error.details; missing or failed restoration does not prove replay safety; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): single export returns {artifact_path, saved_path, image_path, meta, resolved_event_id, selected_formats, requested_formats, recommended_formats, name_info, texture_format, chosen_output_slot, texture_id, target_source, binding_truth_level, visual_truth_level, evidence_truth_level, summary_degraded_reasons}; multi-format export returns {exports, saved_paths, image_paths, resolved_event_id, selected_formats, requested_formats, recommended_formats, name_info, texture_format, chosen_output_slot, texture_id, target_source, binding_truth_level, visual_truth_level, evidence_truth_level, summary_degraded_reasons}; artifacts (list); error (dict\|null): target-resolution failure restores the prior event where possible and reports failure_stage, replay_state_restored, restored_event_id and artifact_write_attempted in error.details; missing or failed restoration does not prove replay safety; meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1668,7 +1669,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `remap` | 否 | object; 显示映射；原生 SaveTexture 导出须省略 |
 | `flip_y` | 否 | boolean; 显示翻转；原生 SaveTexture 导出须省略，显式 false 也触发显示渲染 |
 
-**结果解释：** ok (bool); data (dict): {artifact_path, saved_path, meta, selected_formats, requested_formats, recommended_formats, name_info, texture_format}; native PNG/JPG meta includes export_method=SaveTexture and image_width/image_height read from the saved file; multi-format export returns {exports, saved_paths, selected_formats, requested_formats, recommended_formats}. Explicit HDR/EXR/DDS requests never silently downgrade to PNG; unavailable encoders return ok=false with format_encoder_unavailable/format_not_supported, requested_formats, supported_formats, recommended_formats, actual_format, and downgrade_allowed=false.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {artifact_path, saved_path, meta, selected_formats, requested_formats, recommended_formats, name_info, texture_format}; native PNG/JPG meta includes export_method=SaveTexture and image_width/image_height read from the saved file; multi-format export returns {exports, saved_paths, selected_formats, requested_formats, recommended_formats}. Explicit HDR/EXR/DDS requests never silently downgrade to PNG; unavailable encoders return ok=false with format_encoder_unavailable/format_not_supported, requested_formats, supported_formats, recommended_formats, actual_format, and downgrade_allowed=false.; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1697,7 +1698,7 @@ Export post-VS positions or explicit VS input position/normal/UV as Wavefront OB
 | `include_attributes` | 否 | boolean |
 | `space` | 否 | string; enum=postvs,vs_input |
 
-**结果解释：** JSON declares exported attributes. VS input with include_attributes=true exports v/vt/vn with matching face indices; postvs is positions only.; data: {saved_path,export_format,space,include_attributes,resolved_event_id,vertex_count,primitive_count}. Unsupported geometry produces mesh_export_unsupported; no placeholder file is written.
+**结果解释：** JSON declares exported attributes. VS input with include_attributes=true exports v/vt/vn with matching face indices; postvs is positions only.; data: {saved_path,export_format,space,include_attributes,resolved_event_id,vertex_count,primitive_count}. Unsupported geometry produces mesh_export_unsupported; no placeholder file is written.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1723,12 +1724,12 @@ Export post-VS positions or explicit VS input position/normal/UV as Wavefront OB
 | `session_id` | 是 | string; session_id (str) |
 | `event_id` | 否 | integer; min=0; event_id (int, 可选) |
 | `output_dir` | 是 | string; output_dir (str) |
-| `disassembly_target` | 否 | string; auto（默认）或精确反汇编 target；raw 可装配文件用 SPIR-V ASM，不静默替换 target |
+| `disassembly_target` | 否 | string; auto（默认）或精确反汇编 target；raw 可装配文件用 SPIR-V ASM 或 DXIL ASM，不静默替换 target |
 | `include_binaries` | 否 | boolean; include_binaries (bool, 可选, 默认 true) |
 | `include_reflection` | 否 | boolean; include_reflection (bool, 可选, 默认 true) |
 | `include_disassembly` | 否 | boolean; include_disassembly (bool, 可选, 默认 true) |
 
-**结果解释：** ok (bool); data (dict): {output_dir, bundle_path, resolved_event_id, disassembly_target, complete, failures}; bundle 的 disassembly export 包含实际 target、source_encoding、is_raw_spirv_asm、source_hash、edit_plan 及精确 UTF-8 文件 hash/大小；显式 target 不匹配时标记 unavailable/complete=false，不保存替代展示文本。; artifacts (list); error (dict\|null): 当请求 event 没有可绑定 shader 时，显式返回 `shader_bundle_empty`; meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {output_dir, bundle_path, resolved_event_id, disassembly_target, complete, failures}; bundle 的 disassembly export 包含实际 target、source_encoding、is_raw_spirv_asm、source_hash、edit_plan 及精确 UTF-8 文件 hash/大小；显式 target 不匹配时标记 unavailable/complete=false，不保存替代展示文本。; artifacts (list); error (dict\|null): 当请求 event 没有可绑定 shader 时，显式返回 `shader_bundle_empty`; meta (dict); projections (dict, 可选); Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1843,7 +1844,7 @@ Read captured calls associated with an action or explicit chunk indices.
 | `child_offset` | 否 | integer; min=0 |
 | `value_offset` | 否 | integer; min=0 |
 
-**结果解释：** data: typed calls, total, offset, next_offset, node_budget_exhausted. Exactly one event_id/chunk_indices; child and character omissions explicit. Buffers referenced without automatic export. Invalid event/chunk and missing structured data fail. Each node includes object_path; continue a single chunk using next_child_offset or next_value_offset.
+**结果解释：** data: typed calls, total, offset, next_offset, node_budget_exhausted. Exactly one event_id/chunk_indices; child and character omissions explicit. Buffers referenced without automatic export. Invalid event/chunk and missing structured data fail. Each node includes object_path; continue a single chunk using next_child_offset or next_value_offset.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** Requires an owning live handle.
 
@@ -1871,7 +1872,7 @@ Read descriptor-store ranges including entries not accessed by the current actio
 | `count` | 否 | integer; min=1; max=1024 |
 | `type` | 否 | string; enum=resource,sampler |
 
-**结果解释：** data: descriptor_store_id, resolved_event_id, indexed descriptors and logical locations, total, next_first. Empty slots retained; invalid ranges and incomplete reads fail.
+**结果解释：** data: descriptor_store_id, resolved_event_id, indexed descriptors and logical locations, total, next_first. Empty slots retained; invalid ranges and incomplete reads fail.; Missing-event rejection includes failure_stage=validate_event, effects_attempted=false and context_preserved=true with category validation only when no native effects were attempted and the entry replay, event, replacements and affected records are unchanged; otherwise category runtime and no such proof.
 
 **前置条件：** Requires an owning live handle.
 

@@ -7,7 +7,7 @@ import { assertRdcDiscovery, RdcShellInputSchema, type RdcShellInput } from './R
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { assertRdcContextLeaseOwnership, quarantineRdcContext } from './RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
-import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
+import { modelVisibleRdcFailureDetails, parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
@@ -120,6 +120,10 @@ export async function executeRdcShell(
   }
   const startedAt = Date.now();
   let lastInvocation: ReturnType<typeof rdcInvocationRecord> | undefined;
+  let lastReplayState: { process: ReturnType<typeof parseRdcProcessIdentity>; replacements: string } | null = null;
+  const verifyTruncatedBufferRead = input.operation === 'rd.pipeline.get_constant_buffers'
+    && args.include_contents === true && definition.effects.length === 1 && definition.effects[0] === 'replay_position';
+  let truncatedBufferRead = false;
   const readReplayEvent = async (): Promise<number> => {
       lastInvocation = rdcInvocationRecord('rd.session.get_context', {});
       const response = await rdcCliInvokerService.executeCLI('call', [
@@ -131,18 +135,35 @@ export async function executeRdcShell(
         || !Number.isSafeInteger(runtime?.active_event_id) || Number(runtime?.active_event_id) < 0) {
         throw new Error('RDC_CLI_PROTOCOL: cannot verify temporary replay identity and position.');
       }
+      lastReplayState = null;
+      const sessions = snapshot.data.sessions;
+      const selected = Array.isArray(sessions) ? sessions.find(item => item && typeof item === 'object'
+        && item.session_id === replaySessionId) as Record<string, unknown> | undefined : undefined;
+      if (selected && selected.capture_file_id === frozenCaptureId && Array.isArray(selected.shader_replacements)) {
+        try {
+          lastReplayState = { process: parseRdcProcessIdentity((snapshot.meta as Record<string, unknown> | undefined)?.process_identity),
+            replacements: rdcDigest(selected.shader_replacements) };
+        } catch { /* Missing native identity cannot prove restoration. */ }
+      }
       return Number(runtime!.active_event_id);
   };
   let originalEvent: number | undefined;
+  let originalReplayState: typeof lastReplayState = null;
   try {
     const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
-    originalEvent = temporaryReplayRead || input.operation === 'rd.export.screenshot'
+    originalEvent = temporaryReplayRead || verifyTruncatedBufferRead || input.operation === 'rd.export.screenshot'
       || input.operation === 'rd.shader.get_source' || input.operation === 'rd.shader.get_constant_buffer_contents'
+      || input.operation === 'rd.texture.get_pixel_history'
+      || ['rd.texture.get_data', 'rd.texture.get_region_values', 'rd.texture.get_histogram',
+        'rd.texture.compute_stats', 'rd.texture.diff'].includes(input.operation)
+      || input.operation === 'rd.shader.debug_start' || input.operation === 'rd.shader.edit_and_replace'
       ? await readReplayEvent() : undefined;
+    originalReplayState = lastReplayState;
     lastInvocation = rdcInvocationRecord(input.operation, args);
     const result = await rdcCliInvokerService.executeCLI('call', [
       input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId,
     ], { abortSignal: signal, contextId: lease.contextId, settings: cli });
+    truncatedBufferRead = verifyTruncatedBufferRead && result.exitCode === 0 && result.stdoutTruncated === true;
     signal?.throwIfAborted();
     const payload = parseRdcNativeResult(result, undefined, input.operation);
     if (payload.result_kind !== input.operation
@@ -191,8 +212,7 @@ export async function executeRdcShell(
     const failedInvocation = lastInvocation;
     let nativeStateVerifiedSafe = false;
     if (error instanceof RdcNativeFailure && error.resultKind === input.operation
-      && (error.effectsNotAttempted || (error.replacementNotAttempted
-        && definition.effects.includes('shader_replacement') && !definition.effects.includes('replay_position_temporary')))
+      && error.effectsNotAttempted
       && !signal?.aborted) {
       try {
         const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
@@ -204,45 +224,68 @@ export async function executeRdcShell(
     if (!nativeStateVerifiedSafe && error instanceof RdcNativeFailure && input.operation === 'rd.export.screenshot'
       && originalEvent !== undefined && originalEvent > 0 && error.screenshotTargetRestoration?.eventId === originalEvent
       && error.screenshotTargetRestoration.contextId === lease.contextId
-      && error.screenshotTargetRestoration.sessionId === replaySessionId && !signal?.aborted) {
+      && error.screenshotTargetRestoration.sessionId === replaySessionId && originalReplayState && !signal?.aborted) {
       try {
         const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
         nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
           && current.runtimeContext.replaySessionId === replaySessionId
           && current.runtimeContext.captureFileId === frozenCaptureId
-          && await readReplayEvent() === originalEvent;
+          && await readReplayEvent() === originalEvent && lastReplayState !== null
+          && rdcDigest(lastReplayState) === rdcDigest(originalReplayState);
       } catch { /* An unverified restoration remains quarantined. */ }
     }
     if (!nativeStateVerifiedSafe && error instanceof RdcNativeFailure
-      && originalEvent !== undefined && originalEvent > 0 && error.shaderInspectionRestoration?.eventId === originalEvent
-      && error.shaderInspectionRestoration.contextId === lease.contextId
-      && error.shaderInspectionRestoration.sessionId === replaySessionId && !signal?.aborted) {
+      && originalEvent !== undefined && originalEvent > 0 && error.inspectionRestoration?.eventId === originalEvent
+      && error.inspectionRestoration.contextId === lease.contextId
+      && error.inspectionRestoration.sessionId === replaySessionId && originalReplayState && !signal?.aborted) {
       try {
         const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
         nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
           && current.runtimeContext.replaySessionId === replaySessionId
           && current.runtimeContext.captureFileId === frozenCaptureId
-          && await readReplayEvent() === originalEvent;
+          && await readReplayEvent() === originalEvent && lastReplayState !== null
+          && rdcDigest(lastReplayState) === rdcDigest(originalReplayState);
       } catch { /* An unverified restoration remains quarantined. */ }
     }
+    if (!nativeStateVerifiedSafe && truncatedBufferRead && originalReplayState && !signal?.aborted) {
+      try {
+        const event = await readReplayEvent();
+        const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
+        nativeStateVerifiedSafe = current?.version === lease.version && current.contextId === lease.contextId
+          && current.runtimeContext.replaySessionId === replaySessionId && current.runtimeContext.captureFileId === frozenCaptureId
+          && lastReplayState !== null && rdcDigest(lastReplayState) === rdcDigest(originalReplayState)
+          && (event === originalEvent || event === args.event_id);
+        if (nativeStateVerifiedSafe) {
+          const { rdcSessionService } = await import('../sessions');
+          await rdcSessionService.observeAgentOperation({ sessionId, projectId }, input.operation, toolCallId, cli, true);
+          const observed = assertRdcContextLeaseOwnership({ sessionId, projectId });
+          nativeStateVerifiedSafe = !signal?.aborted && observed?.version === lease.version && observed.contextId === lease.contextId;
+          if (nativeStateVerifiedSafe && error instanceof Error) error.message += ` Replay verified at event ${event}; select a reflection slot.`;
+        }
+      } catch { nativeStateVerifiedSafe = false; }
+    }
     if (!nativeStateVerifiedSafe) {
-      quarantineRdcContext(sessionId, lease.version, 'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.');
+      const reportedCode = error instanceof RdcNativeFailure ? error.nativeError.code
+        : error instanceof Error ? (/^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] ?? error.name) : 'unknown';
+      const code = /^[A-Za-z][A-Za-z0-9_]{0,127}$/u.test(reportedCode) ? reportedCode : 'unknown';
+      quarantineRdcContext(sessionId, lease.version, 'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.',
+        signal?.aborted ? undefined : { operation: input.operation, argsFingerprint: rdcDigest(input.args), code });
     }
     if (error instanceof RdcNativeFailure) {
-      // Deliver the qualified outcome, not arbitrary private native details or
-      // binary stdout. A native claim alone never asserts a usable owning lease.
+      // Native details remain distinct from main-qualified proof and lease state.
       const proof: Record<string, unknown> = {};
       if (nativeStateVerifiedSafe) {
         if (error.effectsNotAttempted) Object.assign(proof, { effects_attempted: false, context_preserved: true });
-        if (error.replacementNotAttempted) Object.assign(proof, { replacement_attempted: false, context_preserved: true });
-        const restored = error.screenshotTargetRestoration ?? error.shaderInspectionRestoration;
+        const restored = error.screenshotTargetRestoration ?? error.inspectionRestoration;
         if (restored) Object.assign(proof, { replay_state_restored: true, restored_event_id: restored.eventId });
       }
+      const nativeDetails = error.nativeError.details && modelVisibleRdcFailureDetails(error.nativeError.details);
       const details = {
         ok: false, source: 'main-qualified-native-failure',
         operation: input.operation, exitCode: error.nativeError.exitCode,
         nativeFailure: { code: error.nativeError.code, category: error.nativeError.category,
-          resultKind: error.resultKind, message: error.message, proof },
+          resultKind: error.resultKind, message: error.message, proof,
+          ...(nativeDetails ? { details: nativeDetails.value, ...(nativeDetails.redacted ? { detailsRedacted: true } : {}) } : {}) },
         mainValidation: { preservationVerified: nativeStateVerifiedSafe,
           leaseState: nativeStateVerifiedSafe ? 'retained' : 'quarantined' },
         rdcExecutionIdentity: { productSessionId: sessionId, contextId: lease.contextId,

@@ -1,5 +1,5 @@
 import { agentDescription } from '../../../../lib/agentDescription';
-import React, { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
+import React, { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
@@ -14,6 +14,7 @@ import { AgentListItem } from './AgentListItem';
 import { AgentManifestEditor, type AgentProvenanceScope } from './AgentManifestEditor';
 import { uniqueResourceId } from './uniqueResourceId';
 import { useScopedSkillSelection } from '../useScopedSkillSelection';
+import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type AgentScope = 'user' | 'project';
@@ -21,6 +22,7 @@ type AgentScope = 'user' | 'project';
 interface AgentsSettingsProps {
   settings: AppSettings;
   agentManifestDrafts: AgentManifestDraft[];
+  agentManifestContextReady: boolean;
   onAgentManifestDraftsChange: Dispatch<SetStateAction<AgentManifestDraft[]>>;
   onRetrySaveAgentManifests: () => void | Promise<unknown>;
   onImportAgentManifest: () => void | Promise<void>;
@@ -84,6 +86,7 @@ export const createNewAgent = (
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   settings,
   agentManifestDrafts,
+  agentManifestContextReady,
   onAgentManifestDraftsChange,
   onRetrySaveAgentManifests,
   onImportAgentManifest,
@@ -95,15 +98,30 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   t,
 }) => {
   const [scope, setScope] = useState<AgentScope>('user');
+  const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
+  const clearAgentRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
+  const [missingAgentId, setMissingAgentId] = useState<string | null>(null);
   const skills = useScopedSkillSelection(scope);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const activeDrafts = visibleDrafts(agentManifestDrafts);
   const scopedDrafts = useMemo(() => activeDrafts.filter((draft) => draftScope(draft) === scope), [activeDrafts, scope]);
   const [selectedAgentId, setSelectedAgentId] = useState(scopedDrafts[0]?.id ?? '');
   const [pendingDelete, setPendingDelete] = useState<AgentManifestDraft | null>(null);
-  const selectedAgent = scopedDrafts.find((agent) => agent.id === selectedAgentId) ?? scopedDrafts[0] ?? null;
+  const selectedAgent = missingAgentId ? null : scopedDrafts.find((agent) => agent.id === selectedAgentId) ?? scopedDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
   const diagnostics = settings.agents.diagnostics ?? [];
+  useEffect(() => {
+    if (!agentRequest || !agentManifestContextReady) return;
+    const target = activeDrafts.find((draft) => draft.id === agentRequest.agentId);
+    if (target) {
+      setScope(draftScope(target));
+      setSelectedAgentId(target.id);
+      setMissingAgentId(null);
+    } else {
+      setMissingAgentId(agentRequest.agentId);
+    }
+    clearAgentRequest(agentRequest.sequence);
+  }, [activeDrafts, agentManifestContextReady, agentRequest, clearAgentRequest]);
   const provenanceScope: AgentProvenanceScope | null = selectedAgent
     ? settings.agents.definitions.find((definition) => definition.id === selectedAgent.id)?.provenance?.scope ?? null
     : null;
@@ -117,6 +135,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
   const addAgent = () => {
     if (scope === 'project' && !currentProjectId) return;
+    setMissingAgentId(null);
     onAgentManifestDraftsChange((current) => {
       const next = createNewAgent(current, t, scope, currentProjectId);
       setSelectedAgentId(next.id);
@@ -159,7 +178,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       <div className="settings-manifest-toolbar settings-manifest-page-toolbar" data-testid="settings-agents-toolbar">
         <SettingsScopeBar
           scope={scope}
-          onScopeChange={setScope}
+          onScopeChange={(next) => { clearAgentRequest(); setMissingAgentId(null); setScope(next); }}
           canProject={canProject}
           userLabel={t('settings.scopeUser')}
           projectLabel={t('settings.scopeProject')}
@@ -175,6 +194,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       </div>
 
       <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics} t={t} />
+      {missingAgentId ? <p role="alert">{t('settings.agentNavigationNotFound', { id: missingAgentId })}</p> : null}
       <div className="settings-manifest-layout">
         <div className="settings-manifest-list-column">
           <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
@@ -206,7 +226,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                   ? agentDescription(settings.agents.definitions.find(definition => definition.id === agent.id), t) : agent.description}
                 icon={agent.icon}
                 selected={agent.id === selectedId}
-                onSelect={() => setSelectedAgentId(agent.id)}
+                onSelect={() => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agent.id); }}
               />
             ))}
           </div>

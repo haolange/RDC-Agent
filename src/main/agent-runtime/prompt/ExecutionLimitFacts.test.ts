@@ -11,15 +11,15 @@ const base: PromptPlan = {
 
 describe('frozen execution limit facts', () => {
   it.each([
-    [undefined, undefined, 25], [undefined, 50, 50], [900, 50, 50], [8, 50, 8],
+    [undefined, undefined, undefined], [undefined, 50, 50], [900, 50, 50], [8, 50, 8],
     [Number.MAX_SAFE_INTEGER, 12, 12], [Infinity, 12, 12],
   ] as const)('uses the executable resolver for policy %s and profile %s', (policyMaxTurns, profileMaxTurns, expected) => {
     const plan = applyExecutionLimitFacts(base, { policyMaxTurns, profileMaxTurns });
     expect(resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns)).toBe(expected);
-    expect(plan.systemPrompt).toContain(`prepared turn: ${expected}`);
+    expect(plan.systemPrompt).toContain(`prepared turn: ${expected ?? 'not configured'}`);
     expect(plan.systemPrompt).toContain('not a remaining balance or a tool-call budget');
     expect(plan.systemPrompt).toContain('compaction must be accounted for separately');
-    expect(plan.systemPrompt).toContain('runaway-loop safety stop, not a planning budget');
+    expect(plan.systemPrompt).toContain('safety stop, not a planning budget');
     expect(plan.systemPrompt).toContain('through task_get');
   });
 

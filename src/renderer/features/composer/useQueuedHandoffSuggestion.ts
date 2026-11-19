@@ -16,6 +16,7 @@ interface Delivery {
 function current(request: HandoffSuggestionRequest): boolean {
   if (useComposerSessionContextStore.getState().handoffSuggestionRequest !== request
     || useProjectStore.getState().currentSession?.sessionId !== request.sessionId) return false;
+  if (request.approvedPlanHash) return usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash === request.approvedPlanHash;
   if (!request.sourcePlan) return true;
   return isCurrentPlanReview({ sessionId: request.sessionId, reviewId: request.sourcePlan.reviewId }, 'approve');
 }
@@ -47,7 +48,7 @@ export function useQueuedHandoffSuggestion(input: {
     if (!request || request.phase === 'confirming' || request.sessionId !== input.sessionId || !current(request)) { setReady(null); return; }
     let mounted = true;
     const live = () => mounted && current(request);
-    void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label, live).then(result => {
+    void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label, live, request.approvedPlanHash ?? request.sourcePlan?.hash).then(result => {
       if (!live()) return;
       if (!result.ok) throw new Error(result.error || 'Agent switch failed.');
       const prompt = result.suggestion?.prompt || request.prompt;

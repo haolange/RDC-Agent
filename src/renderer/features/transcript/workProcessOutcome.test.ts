@@ -1,7 +1,12 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { translate } from '../../i18n/messages';
 const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createToolRowForPresentation } from './workProcessToolRows';
+import { ToolOutcomeSummary } from './ToolOutcomeSummary';
+
+vi.mock('../../i18n', () => ({ useI18n: () => ({ t }) }));
 
 const project = (toolName: string, args: unknown, details: unknown, status: 'complete' | 'error' | 'skipped' = 'complete') => {
   const resultPreview = JSON.stringify({ content: [{ type: 'text', text: 'invart-internal\tsha256:receipt' }], details });
@@ -27,6 +32,16 @@ describe('semantic tool summaries', () => {
   });
   it.each(['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'])('keeps completion disposition %s independent of tool success', disposition => {
     expect(project('turn_complete', { disposition }, undefined).outcome).toEqual({ type: 'completion', disposition });
+  });
+  it('lists the structured remaining work recorded with a completion declaration', () => {
+    const item = { gap: 'Which draw covers the candidate region', attempted: 'Pixel history at two points', blocker: 'external', resumeWhen: 'The device reconnects' };
+    const row = project('turn_complete', { disposition: 'partial' }, { disposition: 'partial', unresolved: [item, { gap: 'malformed', blocker: 'none' }] });
+    expect(row.outcome).toEqual({ type: 'completion', disposition: 'partial', unresolved: [item] });
+    const html = renderToStaticMarkup(createElement(ToolOutcomeSummary, { outcome: row.outcome! }));
+    expect(html).toContain('Which draw covers the candidate region');
+    expect(html).toContain(t('chat.toolOutcomeBlocker.external'));
+    expect(html).toContain(t('chat.toolOutcomeItemDetail', { attempted: item.attempted, resumeWhen: item.resumeWhen }));
+    expect(html).not.toContain('malformed');
   });
   it('preserves the full search count instead of counting sampled names', () => {
     expect(project('tool_search', {}, { total: 20, matches: [{ name: 'subagent' }, { name: 'background_join' }] }).outcome)

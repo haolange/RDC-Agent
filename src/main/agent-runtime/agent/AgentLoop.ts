@@ -42,6 +42,8 @@ import {
   RUNTIME_NO_PROGRESS_INSTRUCTION,
 } from './LoopProgressGuard';
 import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
+import { appendRuntimeContinuation, RuntimeContinuationGuard } from './RuntimeContinuation';
+import { recoveryStartMessage } from './RecoveryDiagnosticText';
 
 export type TransformContextResult = AgentMessage[] | CompressResult;
 
@@ -93,6 +95,10 @@ export interface AgentLoopConfig {
   onResponse?: (requestId: string | undefined, message: AssistantMessage) => Promise<void> | void;
   resolvePermissionState?: () => RuntimePermissionState;
   beforeRequestMessages?: () => Promise<{ messages: Message[]; mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }>;
+  /** Runtime-owned incomplete obligation, or undefined when this response may end. */
+  beforeTerminalResponse?: (message: AssistantMessage) => Promise<string | undefined>;
+  onLoopBudget?: (remaining: number, limit: number) => void;
+  resolvePromptPlan?: () => Pick<import('@shared/types/rdcRuntime').PromptPlan, 'systemPrompt' | 'segments'>;
 }
 
 /** Agent 上下文（messages 可在 loop 内增长；tools 经 runtime revision COW）。 */
@@ -222,9 +228,11 @@ async function runAgentLoop(
   stream: EventStream<AgentEvent, Message[]>,
 ): Promise<void> {
   const newMessages: Message[] = [];
-  const maxTurns = config.maxTurns ?? 100;
+  const maxTurns = config.maxTurns ?? Infinity;
   const progressGuard = new LoopProgressGuard();
   let runtimeNoProgressInstruction: string | undefined;
+  let runtimeContinuationInstruction: string | undefined;
+  const continuationGuard = new RuntimeContinuationGuard();
 
   // 桥接外部 abort 信号到 stream
   const onExternalAbort = (): void => {
@@ -288,6 +296,7 @@ async function runAgentLoop(
 
       // 5. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
       const remainingTurns = maxTurns - state.turn + 1;
+      config.onLoopBudget?.(remainingTurns, maxTurns);
       const turnBudgetInstruction = remainingTurns <= 5
         ? [
           `<runtime_turn_budget remaining="${remainingTurns}" limit="${maxTurns}">`,
@@ -303,6 +312,8 @@ async function runAgentLoop(
         .filter((instruction): instruction is string => Boolean(instruction))
         .join('\n\n') || undefined;
       runtimeNoProgressInstruction = undefined;
+      const continuationInstruction = runtimeContinuationInstruction;
+      runtimeContinuationInstruction = undefined;
       const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
         context,
         config,
@@ -310,6 +321,7 @@ async function runAgentLoop(
         stream,
         ephemeralInstruction,
         remainingTurns > 1,
+        continuationInstruction,
       );
       newMessages.push(assistantMessage);
 
@@ -324,6 +336,14 @@ async function runAgentLoop(
       // 7. 非 toolUse 停止 → terminal
       if (assistantMessage.stopReason !== 'toolUse') {
         stream.push({ type: 'turn_end', turn: state.turn, message: assistantMessage });
+        const continuation = await continuationGuard.next({ reason: assistantMessage.stopReason, isDone: stream.isDone,
+          remaining: remainingTurns, turn: state.turn, maxTurns,
+          check: config.beforeTerminalResponse ? () => config.beforeTerminalResponse!(assistantMessage) : undefined });
+        if (continuation) {
+          runtimeContinuationInstruction = continuation;
+          state = { pending: [], turn: state.turn, transition: 'next_turn' };
+          continue;
+        }
         break;
       }
 
@@ -334,6 +354,7 @@ async function runAgentLoop(
         stream,
         config.maxToolConcurrency,
       );
+      continuationGuard.reset();
       for (const result of toolResults.results) {
         context.messages.push(result);
         newMessages.push(result);
@@ -392,21 +413,6 @@ function recoveryDiagnosticCode(action: RecoveryAction): string {
   return `error_recovery_${action.type}`;
 }
 
-function recoveryStartMessage(action: RecoveryAction, attempt: number): string {
-  switch (action.type) {
-    case 'retry':
-      return `provider 错误，正在重试（第 ${attempt} 次）`;
-    case 'reactive_compact':
-      return '上下文过长，正在压缩历史消息';
-    case 'switch_model':
-      return '服务过载，正在切换备用模型';
-    case 'continue_prompt':
-      return '输出被截断，正在续写';
-    default:
-      return '';
-  }
-}
-
 function emitRecoveryDiagnostic(
   stream: EventStream<AgentEvent, Message[]>,
   action: RecoveryAction,
@@ -442,6 +448,7 @@ async function streamAssistantResponseWithRecovery(
   stream: EventStream<AgentEvent, Message[]>,
   ephemeralInstruction?: string,
   allowToolUse = true,
+  continuationInstruction?: string,
 ): Promise<{ message: AssistantMessage }> {
   const recovery = config.errorRecovery;
   const CIRCUIT_BREAKER_LIMIT = 3;
@@ -471,6 +478,7 @@ async function streamAssistantResponseWithRecovery(
         stream,
         ephemeralInstruction,
         allowToolUse,
+        continuationInstruction,
       );
       // 成功时重置断路器
       consecutiveCompactionFailures = 0;
@@ -619,6 +627,7 @@ async function streamAssistantResponse(
   stream: EventStream<AgentEvent, Message[]>,
   ephemeralInstruction?: string,
   allowToolUse = true,
+  continuationInstruction?: string,
 ): Promise<AssistantMessage> {
   // 1. 可选的上下文变换（压缩 / 剪裁）
   let messages: AgentMessage[] = context.messages;
@@ -641,7 +650,8 @@ async function streamAssistantResponse(
   const llmMessages = config.convertToLlm(messages);
   let resolvedMaxTokens = config.streamOptions.maxTokens;
   if (config.resolveMaxTokens) {
-    const dynamicMaxTokens = config.resolveMaxTokens(llmMessages);
+    const budgetMessages = continuationInstruction ? [...llmMessages, { role: 'user' as const, content: continuationInstruction, timestamp: Date.now() }] : llmMessages;
+    const dynamicMaxTokens = config.resolveMaxTokens(budgetMessages);
     if (dynamicMaxTokens == null || dynamicMaxTokens <= 0) {
       throw new Error(
         'CONTEXT_CANNOT_FIT: remaining context window cannot admit any output tokens.',
@@ -651,12 +661,14 @@ async function streamAssistantResponse(
   }
 
   // 3. 构建 LLM Context（tools 优先读 runtime.current，支持 deferred COW revision）
-  const llmContext: Context = {
-    systemPrompt: context.systemPrompt,
-    systemPromptSegments: context.systemPromptSegments,
+  const currentPrompt = config.resolvePromptPlan?.();
+  let llmContext: Context = {
+    systemPrompt: currentPrompt?.systemPrompt ?? context.systemPrompt,
+    systemPromptSegments: currentPrompt?.segments ?? context.systemPromptSegments,
     messages: llmMessages,
     tools: allowToolUse ? context.runtime?.current.activeTools ?? context.tools : [],
   };
+  if (continuationInstruction) llmContext = appendRuntimeContinuation(llmContext, continuationInstruction);
 
   // 4. 解析 API key（优先动态获取）
   const dynamicKey = config.getApiKey

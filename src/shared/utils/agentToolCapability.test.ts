@@ -29,7 +29,7 @@ describe('agentToolCapability', () => {
     expect(classifyAgentToolEligibility({
       ...executable,
       toolCalling: { state: 'unknown' },
-    })).toBe('unknown');
+    })).toBe('tools-unknown');
     expect(isAgentToolExecutableModel({
       ...executable,
       toolCalling: { state: 'unknown' },
@@ -51,13 +51,13 @@ describe('agentToolCapability', () => {
   it('does not treat picker-visible unknown or unsupported models as Agent-executable', () => {
     expect(toolCallingEvidenceOf('unknown')).toBe('unknown');
     expect(toolCallingEvidenceOf(undefined)).toBe('unknown');
-    expect(isAgentToolExecutableModel({
+    expect(classifyAgentToolEligibility({
       enabled: true,
       availability: 'unknown',
       selection: { pickerVisibility: 'primary' },
       toolCalling: { state: 'supported' },
       route: { protocol: 'AnthropicMessages' },
-    })).toBe(false);
+    })).toBe('availability-unknown');
     expect(isAgentToolExecutableModel({
       enabled: true,
       availability: 'unknown',
@@ -68,11 +68,13 @@ describe('agentToolCapability', () => {
   });
 
   it('keeps unknown and unsupported user-facing diagnostics distinct', () => {
-    expect(describeAgentToolIneligibility('unknown', 'cline-pass', 'kimi').userMessage)
+    expect(describeAgentToolIneligibility('tools-unknown', 'cline-pass', 'kimi').userMessage)
       .toContain('尚未证实');
-    expect(describeAgentToolIneligibility('unknown', 'cline-pass', 'kimi').userMessage)
+    expect(describeAgentToolIneligibility('tools-unknown', 'cline-pass', 'kimi').userMessage)
       .not.toContain('明确不支持');
     expect(describeAgentToolIneligibility('unsupported', 'cline-pass', 'kimi').userMessage)
       .toContain('明确不支持');
+    expect(describeAgentToolIneligibility('availability-unknown', 'cline-pass', 'kimi').technicalCode)
+      .toBe('MODEL_AVAILABILITY_UNVERIFIED');
   });
 });

@@ -50,13 +50,22 @@ const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
 ];
 
 /** Read-only configuration status derived from the enabled flag, model route, and required tool grant. */
-function configStatus(agent: AgentManifestDraft, settings: AppSettings, t: Translate): { label: string; tone: 'success' | 'warning' | 'error' | 'primary' } {
+export function configStatus(agent: AgentManifestDraft, settings: AppSettings, t: Translate): { label: string; tone: 'success' | 'warning' | 'error' | 'primary' } {
   if (!agent.enabled) return { label: t('settings.disabled'), tone: 'primary' };
   const modelId = agent.models[0] ?? '';
   if (!modelId) return { label: t('settings.agentStatusNoModel'), tone: 'warning' };
   const option = settings.agents.modelOptions.find((entry) => entry.canonicalId === modelId);
   if (!option) return { label: t('settings.routeReasonModelInvalid'), tone: 'error' };
+  if (option.status === 'provider-unavailable') {
+    const state = option.providerIssue === 'unconfigured' ? t('settings.agentStatusProviderUnconfigured')
+      : option.providerIssue === 'failed' ? t('settings.agentStatusProviderFailed')
+        : t('settings.routeReasonProviderUnavailable');
+    return { label: option.disabledReason
+      ? t('settings.agentStatusProviderDetail', { state, detail: option.disabledReason }) : state, tone: 'warning' };
+  }
   if (option.status !== 'ready') return { label: option.disabledReason ?? t('settings.modelUnavailable'), tone: 'warning' };
+  if (agent.reasoningLevel && !option.reasoningSelections) return { label: t('settings.agentStatusReasoningUnverified'), tone: 'warning' };
+  if (agent.reasoningLevel && !option.reasoningSelections?.includes(agent.reasoningLevel)) return { label: t('settings.agentStatusReasoningUnsupported'), tone: 'error' };
   if (agent.tools.length === 0) return { label: t('settings.agentStatusNoTools'), tone: 'warning' };
   return { label: t('settings.agentStatusAvailable'), tone: 'success' };
 }

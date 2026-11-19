@@ -180,6 +180,8 @@ export interface ConversationToolCall {
   approval?: ConversationToolApproval;
   /** Scheduler start, separate from the earlier model declaration timestamp. */
   executionStartedAt?: number;
+  /** First visible event order within this trace; updates retain the original position. */
+  displayOrder?: number;
   startedAt: number;
   completedAt?: number;
 }
@@ -210,6 +212,15 @@ export interface ConversationLoopResult {
   toolCallIds: string[];
 }
 
+/** One provider text item, retained at its first visible position throughout the turn. */
+export interface ConversationOutputItem {
+  providerOutputRef: ProviderOutputRef;
+  text: string;
+  phase?: ConversationLoopOutputPhase;
+  status: 'streaming' | 'complete';
+  displayOrder: number;
+}
+
 export interface ConversationWorkBlock {
   id: string;
   kind: ConversationWorkBlockKind;
@@ -218,6 +229,9 @@ export interface ConversationWorkBlock {
   status: ConversationWorkBlockStatus;
   /** One live snapshot per turn; canonical order and derived status come from main-side projection. */
   taskSnapshot?: ConversationTaskSnapshot;
+  /** Owning model turn and first visible event order for a task snapshot. */
+  parentLoopId?: string;
+  displayOrder?: number;
   compactionStats?: ConversationCompactionStats;
   /** Non-loop summary text; LLM turn output lives in result and never contains provider thinking text. */
   summary?: string;
@@ -225,9 +239,12 @@ export interface ConversationWorkBlock {
   diagnosticSeverity?: ConversationDiagnosticSeverity;
   thinking?: ThinkingArtifact;
   thinkingStatus?: ConversationThinkingStatus;
+  /** First visible thinking event in the same sequence as tool calls and output items. */
+  thinkingDisplayOrder?: number;
   /** llm_turn only: how provider reasoning was delivered for this loop. */
   reasoningState?: ConversationReasoningState;
   result?: ConversationLoopResult;
+  outputItems?: ConversationOutputItem[];
   toolCalls: ConversationToolCall[];
   startedAt: number;
   completedAt?: number;

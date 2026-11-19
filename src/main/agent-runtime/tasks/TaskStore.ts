@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { orderTasks } from './taskProjection';
-import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
 import {
   TASK_SCHEMA_VERSION,
   type TaskExecutionMessage,
@@ -29,6 +29,8 @@ export interface TaskStoreCommit {
 
 export interface TaskStore {
   readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>;
+  verifyReviewArtifact?: (uri: string, hash: string) => Promise<boolean>;
+  verifyRuntimeEpoch?: (epoch: TaskRuntimeEpoch, preparation: TaskExecutionPreparation) => Promise<boolean>;
   loadTask(id: string): Promise<TaskRecord | null>;
   saveTask(task: TaskRecord): Promise<void>;
   listTasks(): Promise<TaskRecord[]>;
@@ -51,7 +53,12 @@ export class FileTaskStore implements TaskStore {
   private readonly root: string;
   private readonly statePath: string;
 
-  constructor(tasksDir: string, readonly readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>) {
+  constructor(
+    tasksDir: string,
+    readonly readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>,
+    readonly verifyReviewArtifact?: (uri: string, hash: string) => Promise<boolean>,
+    readonly verifyRuntimeEpoch?: (epoch: TaskRuntimeEpoch, preparation: TaskExecutionPreparation) => Promise<boolean>,
+  ) {
     this.root = path.resolve(tasksDir);
     this.statePath = path.join(this.root, 'task-state.json');
   }
@@ -132,8 +139,30 @@ export class FileTaskStore implements TaskStore {
   }
 
   private async readState(): Promise<TaskStateDocument> {
-    await this.ensureInitialized();
-    return this.readStateFile();
+    const pending = initializations.get(this.root);
+    if (pending) await pending;
+    try {
+      return await this.readStateFile();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    let entries: string[];
+    try {
+      entries = await fs.readdir(this.root);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return emptyState();
+      throw error;
+    }
+    // A first writer may have started while the missing state was being read.
+    const current = initializations.get(this.root);
+    if (current && current !== pending) {
+      await current;
+      return this.readStateFile();
+    }
+    if (entries.length) {
+      throw new Error('TASK_STORAGE_REQUIRES_CONVERSION: nonempty task storage has no current task-state.json; original files were preserved.');
+    }
+    return emptyState();
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -284,6 +313,15 @@ function validateState(state: TaskStateDocument): void {
   }
   for (const [id, execution] of Object.entries(state.executions)) {
     if (execution.preparation !== undefined) TaskExecutionPreparationSchema.parse(execution.preparation);
+    if (execution.runtimeEpochs !== undefined) {
+      if (!Array.isArray(execution.runtimeEpochs) || !execution.preparation) throw new Error(`Malformed runtime epochs: ${id}.`);
+      let previous = execution.preparation.runtimeFingerprint;
+      for (const epoch of execution.runtimeEpochs) {
+        TaskRuntimeEpochSchema.parse(epoch);
+        if (epoch.previousFingerprint !== previous || epoch.runtimeFingerprint === previous) throw new Error(`Broken runtime epoch chain: ${id}.`);
+        previous = epoch.runtimeFingerprint;
+      }
+    }
     if (execution.independentSources !== undefined) {
       if (!Array.isArray(execution.independentSources)) throw new Error(`Malformed independent source binding: ${id}.`);
       execution.independentSources.forEach(source => TaskIndependentSourceSchema.parse(source));

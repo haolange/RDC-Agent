@@ -2,6 +2,7 @@
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
 
+import { UNRESOLVED_BLOCKERS, parseUnresolvedItems } from '@shared/types/unresolvedWork';
 import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import type { AgentRole } from '@shared/types/agent';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
@@ -19,6 +20,7 @@ import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../
 import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../sessions';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
@@ -35,7 +37,8 @@ import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
-import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { listActiveDelegations, listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { completionBudgetEvidence } from './CompletionBudgetEvidence';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
@@ -90,21 +93,28 @@ export class RuntimeToolAssembly {
     return {
       name: 'turn_complete',
       label: 'Complete Turn',
-      description: 'Declare structured turn completion. Use only when the requested work is complete, partial, blocked, cancelled, or paused by budget.',
+      description: 'Declare structured turn completion. For partial or blocked work, identify the remaining checks and the actual reason they cannot proceed now; an unknown or unfinished result alone is not a blocker. Continue useful, authorized checks when possible. Preserve genuine cancellation, limits, failures, and no-progress stops.',
       parameters: {
         type: 'object',
         required: ['disposition'],
         properties: {
           disposition: { type: 'string', enum: ['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'] },
           evidenceRefs: {
-            type: 'array', items: { type: 'object', required: ['uri', 'hash'], properties: { uri: { type: 'string' }, hash: { type: 'string' } } },
+            type: 'array', description: 'Exact URI and hash of artifacts supporting this declaration; use the values returned by the artifact tools.',
+            items: { type: 'object', required: ['uri', 'hash'], properties: { uri: { type: 'string' }, hash: { type: 'string' } } },
           },
           result: {
             type: 'object', required: ['summary', 'outputs', 'counterevidence', 'unresolved', 'scope', 'sideEffects', 'recoveryState'], additionalProperties: false,
             properties: {
               summary: { type: 'string', maxLength: 4000 }, outputs: { type: 'object', description: 'Named string outputs matching the Task completion requirements. Serialize structured values as strings.' },
               counterevidence: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
-              unresolved: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
+              unresolved: { type: 'array', maxItems: 32, description: 'One item per remaining piece of work. An item with no real blocker is work to continue now, not a reason to stop; use not_required only for work outside what the goal needs.',
+                items: { type: 'object', required: ['gap', 'attempted', 'blocker', 'resumeWhen'], additionalProperties: false, properties: {
+                  gap: { type: 'string', maxLength: 1000, description: 'What remains unknown or undone.' },
+                  attempted: { type: 'string', maxLength: 1000, description: 'What was tried, including failed attempts, or that nothing was tried and why.' },
+                  blocker: { type: 'string', enum: [...UNRESOLVED_BLOCKERS], description: 'What prevents it now: capability, permission, budget (limit or deadline), strategy (outside the approved strategy or scope), external (input, device or condition outside this session), or not_required.' },
+                  resumeWhen: { type: 'string', maxLength: 1000, description: 'The concrete condition under which it can proceed.' },
+                } } },
               scope: { type: 'string', maxLength: 4000 }, sideEffects: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
               recoveryState: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
             },
@@ -124,13 +134,16 @@ export class RuntimeToolAssembly {
             && typeof (ref as Record<string, unknown>).hash === 'string'
         ));
         if (turnHandle) {
-          const rawResult = args.result as TurnCompletionDeclaration['result'] | undefined;
-          if (rawResult && Object.values(rawResult.outputs ?? {}).some((value) => typeof value !== 'string')) {
+          const supplied = args.result as (Omit<NonNullable<TurnCompletionDeclaration['result']>, 'unresolved'> & { unresolved?: unknown }) | undefined;
+          if (supplied && Object.values(supplied.outputs ?? {}).some((value) => typeof value !== 'string')) {
             throw new Error('TURN_COMPLETION_INVALID: result.outputs values must be strings.');
           }
+          const rawResult = supplied ? { ...supplied, unresolved: parseUnresolvedItems(supplied.unresolved ?? []) } : undefined;
           const declaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
           await validate?.(declaration);
           turnHandle.completionDeclaration = declaration;
+          return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }],
+            details: { disposition, unresolved: declaration.result?.unresolved ?? [] } };
         }
         return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }] };
       },
@@ -141,7 +154,7 @@ export class RuntimeToolAssembly {
     return {
       name: 'runtime_context',
       label: 'Runtime Context',
-      description: 'Read this execution\'s session, scope, working directory, and live permission mode and revision. When this turn owns a capture lease, the rdc field adds the verified replay identity, captureContentSha256, artifact capacity, and frozen CLI deadline controls. Offline children omit rdc. Capacity is a point-in-time snapshot, not a future reservation. CLI timeout covers one invocation, not the whole operation or guaranteed native exit.',
+      description: 'Read this execution\'s session, scope, working directory, and live permission mode and revision. The owning session can see registered capture IDs and its selected device for a plan. When it owns a capture lease, rdc contains replay identity, captureContentSha256, artifact capacity, and frozen CLI deadline controls. An approved owning General turn may also see captureRestoration, its signed frozen entry baseline, which is not the live replay position. Use rdc_probe for current observations. Offline children omit rdc and the baseline. Capacity is a point-in-time snapshot, not a future reservation.',
       pollable: true,
       parameters: {
         type: 'object',
@@ -164,6 +177,20 @@ export class RuntimeToolAssembly {
         if (executionContext?.excludeRdcLeaseTools) {
           return { content: [{ type: 'text' as const, text: JSON.stringify(identity, null, 2) }], details: { available: true } };
         }
+        const baseline = executionContext?.sessionId === sessionId && executionContext?.projectId === projectId
+          ? executionContext?.captureControl?.restorationBaselineFor(executionContext) : null;
+        const captureRestoration = baseline ? { captureRestoration: baseline } : {};
+        const ownedProject = sessionId && projectId && !isSubagentScopeId(sessionId)
+          && storageAdapter.sessions.readSession(sessionId)?.projectId === projectId
+          ? storageAdapter.getProjectById(projectId) : null;
+        const state = ownedProject && sessionId && projectId
+          ? rdcSessionService.snapshotReplayForSession({ sessionId, projectId }) : null;
+        const capturePlanning = ownedProject ? {
+          inputs: ownedProject.inputs.map(input => ({ inputId: input.inputId, fileName: input.fileName,
+            contentSha256: input.contentSha256 ?? null, source: input.source })),
+          deviceId: state?.replayDeviceId ?? state?.preparation.targetDeviceId ?? null,
+          devicePreparation: state?.preparation.phase ?? 'idle',
+        } : null;
         const lease = assertRdcContextLeaseOwnership({
           sessionId,
           projectId,
@@ -179,7 +206,7 @@ export class RuntimeToolAssembly {
               ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
               : 'RDC replay identity requires an owning sessionId (no global fallback).';
           return {
-            content: [{ type: 'text', text: JSON.stringify({ ...identity, rdc: { available: false, requiresRecovery, note } }, null, 2) }],
+            content: [{ type: 'text', text: JSON.stringify({ ...identity, capturePlanning, ...captureRestoration, rdc: { available: false, requiresRecovery, note } }, null, 2) }],
             details: { available: false, requiresRecovery },
           };
         }
@@ -194,8 +221,9 @@ export class RuntimeToolAssembly {
           && opened.contextId === runtimeContext.contextId && opened.captureFileId === runtimeContext.captureFileId
           && opened.replaySessionId === runtimeContext.replaySessionId && /^[a-f0-9]{64}$/.test(binding?.captureHash ?? '')
           ? binding!.captureHash : null;
+        const { raw: _openTimePayload, ...runtimeIdentity } = runtimeContext;
         return {
-          content: [{ type: 'text', text: JSON.stringify({ ...identity, rdc: { ...runtimeContext, captureContentSha256,
+          content: [{ type: 'text', text: JSON.stringify({ ...identity, capturePlanning, ...captureRestoration, rdc: { ...runtimeIdentity, captureContentSha256,
             hostControls: ownerSessionId && projectId ? readRdcHostControls({ sessionId: ownerSessionId,
               projectId, contextId: runtimeContext.contextId, leaseVersion: lease.version }, executionContext) : null,
           } }, null, 2) }],
@@ -267,13 +295,13 @@ export class RuntimeToolAssembly {
   }
 
   createPlanArtifactTool(sessionId?: string | null): AgentTool<
-    { title?: string; summary?: string[]; content?: string; requiredTaskIds?: string[]; taskRevisions?: unknown[] },
+    { title?: string; summary?: string[]; content?: string; requiredTaskIds?: string[]; taskRevisions?: unknown[]; captureScope?: unknown },
     { sessionId: string | null }
   > {
     return {
       name: 'plan_artifact',
       label: 'Submit Plan for Review',
-      description: 'Submit the current session plan for in-loop human review. Title, a 1-4 item summary, and Markdown content are required. The runtime writes session://plans/plan.md and pauses until the user approves or rejects. Approval freezes the plan; the user clicks a declared continue action to proceed.',
+      description: 'Submit the current session plan for in-loop human review. Title, a 1-4 item summary, and Markdown content are required. Settle current direct Tasks with their actual results first; approval ends the planning turn. Keep post-approval work pending rather than starting it during planning. The runtime writes session://plans/plan.md and pauses until the user approves or rejects. Approval freezes the plan; the user clicks a declared continue action to proceed.',
       parameters: {
         type: 'object',
         required: ['title', 'summary', 'content'],
@@ -287,7 +315,11 @@ export class RuntimeToolAssembly {
             description: 'One to four concise summary lines. Do not put the full plan here.',
           },
           content: { type: 'string', description: 'Markdown plan body. Use ## headings for sections.' },
-          requiredTaskIds: { type: 'array', maxItems: 128, items: { type: 'string', minLength: 1 }, description: 'Existing owning-session Tasks required by this plan; canonical owner planner only, not delegated Capsules. Main freezes goals, output keys, dependencies and executionRequirements into the reviewed hash. Bind mandatory direct, isolated-analysis and independent-review work. Later in-scope detail Tasks remain possible; do not place task contracts in Markdown or metadata.' },
+          requiredTaskIds: { type: 'array', maxItems: 128, items: { type: 'string', minLength: 1 }, description: 'Existing owning-session Tasks required by this plan; canonical owner planner only, not delegated Capsules. If this planning turn created unfinished Tasks, explicitly supply the required IDs or [] when none are required. Main freezes goals, output keys, dependencies and executionRequirements into the reviewed hash. Bind mandatory direct, isolated-analysis and independent-review work. Later in-scope detail Tasks remain possible; do not place task contracts in Markdown or metadata.' },
+          captureScope: { type: 'object', additionalProperties: false, required: ['inputIds', 'deviceId', 'comparisonGoal'], description: 'For any planned live RDC work, including a single current capture and its recovery or restoration, list the intended registered project input IDs, the already selected replay device ID, and the investigation goal. Read these IDs from runtime_context.capturePlanning. The host verifies and freezes their content hashes for user review. Offline-only plans may omit this field.', properties: {
+            inputIds: { type: 'array', minItems: 1, maxItems: 32, items: { type: 'string', minLength: 1 } },
+            deviceId: { type: 'string', minLength: 1 }, comparisonGoal: { type: 'string', minLength: 1, maxLength: 4000 },
+          } },
           taskRevisions: { type: 'array', maxItems: 128, description: 'Explicit proposed changes to existing required Tasks, installed only after user approval. Preserve history, consumed budgets and deadlines; stop/join active work first. Completed Tasks cannot reopen.', items: {
             type: 'object', additionalProperties: false, required: ['taskId', 'expectedRevision'], properties: {
               taskId: { type: 'string' }, expectedRevision: { type: 'integer', minimum: 1 },
@@ -636,12 +668,23 @@ export class RuntimeToolAssembly {
           generation: turnHandle.generation,
         });
         if (unfinished.length > 0) {
-          throw new Error(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${unfinished.map((item) => item.taskId).join(', ')}.`);
+          throw new Error(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${unfinished.map((item) => item.taskId).join(', ')}. If useful work remains executable, keep its Task in progress and continue; mark it blocked only for a concrete reason that prevents further work, not merely because the result is unknown or unfinished.`);
         }
       }
       const scope = sessionId ? getDelegatedTaskScope(sessionId) : null;
-      if (sessionId && !scope && declaration.disposition === 'completed') {
+      if (sessionId && !scope && turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'completed') {
         await new TaskRegistry(createSessionTaskStore(sessionId)).assertApprovedTasksCompleted();
+      }
+      if (turnHandle?.requiresApprovedGoalClosure && ['partial', 'blocked', 'budget_paused'].includes(declaration.disposition)
+        && (!declaration.result?.summary?.trim() || !declaration.result.unresolved.some(item => item.blocker !== 'not_required'))) {
+        throw new Error('TURN_COMPLETION_INVALID: partial, blocked and budget-paused goals require a summary and at least one unresolved item whose blocker prevents the work now (capability, permission, budget, strategy or external). If nothing blocks a remaining item, continue it instead of stopping.');
+      }
+      if (turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'budget_paused' && !completionBudgetEvidence(turnHandle)) {
+        throw new Error('TURN_COMPLETION_INVALID: no current root budget limit has been observed.');
+      }
+      if (sessionId && turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'completed') {
+        const active = await listActiveDelegations(sessionId);
+        if (active.length) throw new Error(`TASK_COMPLETION_DENIED: Join active delegated executions before completing the approved goal: ${active.map(item => item.id).join(', ')}.`);
       }
       if (scope && declaration.disposition === 'completed') {
         const task = await new TaskRegistry(createSessionTaskStore(scope.ownerSessionId)).getTask(scope.rootTaskId);
@@ -649,6 +692,7 @@ export class RuntimeToolAssembly {
         const missing = task.completionRequirements.filter(key => !declaration.result?.outputs[key]);
         if (missing.length) throw new Error(`TURN_COMPLETION_INVALID: result.outputs must contain these exact Task keys: ${JSON.stringify(missing)}. Correct the structured result before completing.`);
       }
+      await turnHandle?.validateCompletionReadiness?.(declaration);
     });
     availableTools.set(turnCompletionTool.name, turnCompletionTool);
     const runtimeContextTool = this.createRuntimeContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);

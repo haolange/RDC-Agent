@@ -1,12 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { createKnowledgeTools } from './KnowledgeTools';
 import { createDisposableCandidateService, KnowledgeCandidateService } from './KnowledgeCandidateService';
 import { KnowledgeCompileService } from './KnowledgeCompileService';
 import { KnowledgeQueryService } from './KnowledgeQueryService';
+import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import type { KnowledgeQueryResult } from './knowledgeLanes';
 
 const card: KnowledgeCardRecord = {
@@ -72,9 +72,40 @@ describe('KnowledgeTools', () => {
     const spacesResult = await byName.knowledge_browse.execute('c1', {});
     expect(spacesResult.isError).toBeFalsy();
     expect(spacesResult.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('user') });
+    expect(spacesResult.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('spaceId') });
     const cardsResult = await byName.knowledge_browse.execute('c2', { spaceId: 'user' });
     expect(query.listCards).toHaveBeenCalledWith('user');
     expect(cardsResult.details).toMatchObject({ spaceId: 'user', count: 1 });
+  });
+
+  it('explains the scope of an empty text search without changing or repeating the query', async () => {
+    const { byName, query } = createTools();
+    vi.mocked(query.query).mockResolvedValueOnce({ hits: [], lanes: [], total: 0, revision: 'current' });
+    const result = await byName.knowledge_search.execute('empty', { query: 'object symptom', spaceIds: ['user'] });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('individual terms') });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('current query and filters') });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('other spaces were not searched') });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('omit spaceIds') });
+    expect(result.details).toMatchObject({ count: 0, revision: 'current', cardIds: [], hits: [] });
+    expect(query.query).toHaveBeenCalledTimes(1);
+    expect(query.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'object symptom', spaceIds: ['user'] }));
+  });
+
+  it('does not claim spaces were excluded when the search did not restrict them', async () => {
+    const { byName, query } = createTools();
+    vi.mocked(query.query).mockResolvedValueOnce({ hits: [], lanes: [], total: 0, revision: 'current' });
+    const result = await byName.knowledge_search.execute('unscoped', { query: 'object symptom' });
+    expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('other spaces were not searched') });
+    expect(query.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not describe an empty later page as an empty search', async () => {
+    const { byName, query } = createTools();
+    vi.mocked(query.query).mockResolvedValueOnce({ hits: [], lanes: [], total: 1, revision: 'current' });
+    const result = await byName.knowledge_search.execute('page', { query: 'object symptom', offset: 20 });
+    expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('individual terms') });
+    expect(result.details).toMatchObject({ count: 1, revision: 'current' });
   });
 
   it('searches and compiles sourced packs from markdown-first lanes', async () => {
@@ -90,9 +121,21 @@ describe('KnowledgeTools', () => {
 
   it('reads one card by space and path', async () => {
     const { byName, query } = createTools();
-    const result = await byName.knowledge_read.execute('c5', { spaceId: 'user', relativePath: 'facts/sample.md' });
+    const result = await byName.knowledge_read.execute('c5', { spaceId: 'user', relativePath: 'facts/sample.md', contentHash: 'a'.repeat(64) });
     expect(query.getCard).toHaveBeenCalledWith('user', 'facts/sample.md');
     expect(result.details).toMatchObject({ cardId: 'user:facts/sample.md', contentHash: 'a'.repeat(64), images: [] });
+  });
+
+  it('passes scope and versioned paging through search and reads an exact card section', async () => {
+    const { byName, query } = createTools();
+    await byName.knowledge_search.execute('search', { query: 'sample', scope: { api: 'Vulkan' }, asOf: 42, offset: 20, limit: 10, expectedRevision: 'revision' });
+    expect(query.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'sample', scope: { api: 'Vulkan' }, asOf: 42, offset: 20, limit: 10, expectedRevision: 'revision' }));
+    vi.mocked(query.getCard).mockResolvedValueOnce({ ...card, content: '# Main\n\n## Evidence\nsource\n\n## Other\nother', contentHash: 'a'.repeat(64) });
+    const result = await byName.knowledge_read.execute('read', { spaceId: 'user', relativePath: card.relativePath, mode: 'section', heading: 'Evidence', contentHash: 'a'.repeat(64) });
+    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('## Evidence\nsource') });
+    expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('## Other') });
+    const changed = await byName.knowledge_read.execute('read-stale', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'b'.repeat(64) });
+    expect(changed.isError).toBe(true);
   });
 
   it('lists knowledge-root image paths and roles from knowledge_read', async () => {
@@ -100,9 +143,10 @@ describe('KnowledgeTools', () => {
     vi.mocked(query.getCard).mockResolvedValueOnce({
       ...card,
       content: card.body,
+      contentHash: 'a'.repeat(64),
       images: [{ relativePath: 'cases/sample/observed.png', role: 'observed' }],
     });
-    const result = await byName.knowledge_read.execute('c5b', { spaceId: 'user', relativePath: 'facts/sample.md' });
+    const result = await byName.knowledge_read.execute('c5b', { spaceId: 'user', relativePath: 'facts/sample.md', contentHash: 'a'.repeat(64) });
     const text = String(result.content[0] && 'text' in result.content[0] ? result.content[0].text : '');
     expect(text).toContain('cases/sample/observed.png');
     expect(text).toContain('observed');
@@ -117,14 +161,14 @@ describe('KnowledgeTools', () => {
     const imagePath = path.join(knowledge, 'reference.png'); writeFileSync(imagePath, 'small image fixture');
     const { byName, query } = createTools(createDisposableCandidateService(path.join(root, 'candidates')));
     vi.mocked(query.listSpaces).mockReturnValue([{ spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge }]);
-    vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body,
+    vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body, contentHash: 'a'.repeat(64),
       images: [{ relativePath: 'reference.png', role: 'reference' }] });
     const context = { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', knowledgeReadRoots: [knowledge] };
     try {
-      const result = await byName.knowledge_read.execute('image-ref', { spaceId: 'user', relativePath: card.relativePath }, undefined, undefined, context);
+      const result = await byName.knowledge_read.execute('image-ref', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) }, undefined, undefined, context);
       expect(result.details).toMatchObject({ images: [{ relativePath: 'reference.png', role: 'reference', readImageArgs: { path: imagePath } }] });
       expect(result.content[0]).toMatchObject({ text: expect.stringContaining(JSON.stringify({ path: imagePath })) });
-      const denied = await byName.knowledge_read.execute('no-image-scope', { spaceId: 'user', relativePath: card.relativePath },
+      const denied = await byName.knowledge_read.execute('no-image-scope', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) },
         undefined, undefined, { ...context, knowledgeReadRoots: [] });
       expect(denied.details).toMatchObject({ images: [{ readError: 'KNOWLEDGE_IMAGE_READ_SCOPE_UNAVAILABLE' }] });
       expect(JSON.stringify(denied)).not.toContain(imagePath.replace(/\\/g, '\\\\'));
@@ -139,10 +183,10 @@ describe('KnowledgeTools', () => {
       symlinkSync(outside, path.join(knowledge, 'linked'), 'junction');
       const { byName, query } = createTools(createDisposableCandidateService(path.join(root, 'candidates')));
       vi.mocked(query.listSpaces).mockReturnValue([{ spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge }]);
-      vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body,
+      vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body, contentHash: 'a'.repeat(64),
         images: [{ relativePath: declared === 'absolute' ? path.join(outside, 'private.png') : declared, role: 'reference' }] });
       try {
-        const result = await byName.knowledge_read.execute('invalid-image', { spaceId: 'user', relativePath: card.relativePath },
+        const result = await byName.knowledge_read.execute('invalid-image', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) },
           undefined, undefined, { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', knowledgeReadRoots: [knowledge] });
         expect(result.details).toMatchObject({ images: [{ readError: 'KNOWLEDGE_IMAGE_PATH_UNAVAILABLE' }] });
         expect(JSON.stringify(result)).not.toContain('readImageArgs');

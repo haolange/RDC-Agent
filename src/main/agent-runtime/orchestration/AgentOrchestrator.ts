@@ -1,5 +1,5 @@
 import { agentAccessCeiling } from '@shared/types/agentManifest';
-import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
+import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../../investigation/missionCompletionContract';
 /**
  * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
  * turn runner, subagent runner, and prompt-plan helpers.
@@ -59,6 +59,7 @@ import {
   type TurnHandle,
 } from './AgentOrchestrator.deps';
 import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
+import { DelegationConfigurationError } from './DelegationConfigurationError';
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
   private readonly slots = new AgentSlotRegistry();
@@ -120,6 +121,7 @@ export class AgentOrchestrator {
 
     this.turnRunner = new AgentTurnRunner({
       validateCompletion: enforceMissionTurnCompletion,
+      validateCompletionReadiness: enforceMissionTurnReadiness,
       slots: this.slots,
       mcp: this.mcp,
       deferredActivation: this.deferredActivation,
@@ -266,6 +268,7 @@ export class AgentOrchestrator {
             modelId: routeModelId,
             settings,
             controls: {
+              ...(effectiveProfile.reasoningLevel ? { reasoningLevel: effectiveProfile.reasoningLevel } : {}),
               ...(sessionControls ?? {}),
               ...(options?.turnControls ?? {}),
               ...(options?.reasoning
@@ -278,11 +281,21 @@ export class AgentOrchestrator {
               options?.projectRootPath ?? null,
             ),
           });
-      if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
-      if (options?.frozenDelegationCapsule?.reasoningLevel && planning.plan.reasoningWire.selection !== options.frozenDelegationCapsule.reasoningLevel) throw new Error('DELEGATION_REASONING_UNSUPPORTED: selected route cannot honor the requested reasoning level.');
+      if (!planning.ok) {
+        const message = `${planning.code}: ${planning.message}`;
+        if (options?.frozenDelegationCapsule) throw new DelegationConfigurationError(planning.code, message);
+        throw new Error(message);
+      }
+      if (options?.frozenDelegationCapsule && effectiveProfile.reasoningLevel && planning.plan.reasoningWire.selection !== effectiveProfile.reasoningLevel) {
+        throw new DelegationConfigurationError('DELEGATION_REASONING_UNSUPPORTED', 'DELEGATION_REASONING_UNSUPPORTED: selected route cannot honor the Agent reasoning level.');
+      }
       const capability = preparedTurn?.effectiveModel
         ?? resolveEffectiveModel(routeProviderId, routeModelId, settings);
-      if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`);
+      if (!capability) {
+        const message = `MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`;
+        if (options?.frozenDelegationCapsule) throw new DelegationConfigurationError('MODEL_UNAVAILABLE', message);
+        throw new Error(message);
+      }
       const activeContextWindow = planning.plan.contextWindowTokens;
       let promptPlan = options?.promptPlan ?? this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,

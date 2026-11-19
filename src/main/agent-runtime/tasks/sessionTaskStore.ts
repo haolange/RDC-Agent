@@ -7,10 +7,12 @@
  * runtime binding. A purely ephemeral child without a Task owner uses memory.
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
+import { childScopePrefix, isTransientScopeId } from '@shared/utils/executionScope';
 import { appPathService } from '../../runtime/AppPathService';
-import { isTransientScopeId } from '@shared/utils/executionScope';
 import { FileTaskStore, MemoryTaskStore, type TaskStore } from './TaskStore';
+import { verifyTaskReviewArtifact } from './TaskReviewArtifact';
 
 /** 将 sessionId 归一化为文件系统安全的目录名。 */
 function safeSegment(sessionId: string): string {
@@ -22,11 +24,35 @@ export function resolveSessionTasksDir(sessionId: string): string {
   return path.join(appPathService.getAppStatePaths().tasksPath, safeSegment(sessionId));
 }
 
+/** Remove only the deleted session's own and nested child Task scopes. */
+export function removeSessionTasks(sessionId: string): void {
+  const base = appPathService.getAppStatePaths().tasksPath;
+  if (!fs.existsSync(base)) return;
+  const own = safeSegment(sessionId);
+  const childPrefix = safeSegment(childScopePrefix(sessionId));
+  const entries = fs.readdirSync(base, { withFileTypes: true })
+    .filter(entry => entry.name === own || entry.name.startsWith(childPrefix));
+  if (entries.some(entry => !entry.isDirectory())) throw new Error('TASK_SCOPE_NOT_DIRECTORY');
+  for (const entry of entries) fs.rmSync(path.join(base, entry.name), { recursive: true, force: true });
+}
+
 /** 创建会话级 FileTaskStore（写入方与投影读取方共用同一路径规则）。 */
 export function createSessionTaskStore(sessionId: string): FileTaskStore {
   return new FileTaskStore(resolveSessionTasksDir(sessionId), async () => {
     const { readApprovedPlanTasks } = await import('../../sessions/run/ApprovedPlanTasks');
     return readApprovedPlanTasks(sessionId);
+  }, async (uri, hash) => {
+    const { sessionArtifactResolver } = await import('../../sessions/artifacts/SessionArtifactResolver');
+    const { investigationArtifactService } = await import('../../investigation/InvestigationArtifactService');
+    return verifyTaskReviewArtifact(sessionId, uri, hash, sessionArtifactResolver, investigationArtifactService);
+  }, async (epoch, preparation) => {
+    try {
+      const { rdcLifecycleReceipts } = await import('../../rdc/RdcLifecycleReceipts');
+      const receipt = rdcLifecycleReceipts.read(sessionId, epoch.receipt);
+      return receipt.event === 'transition' && receipt.sessionId === preparation.sessionId && receipt.turnId === preparation.turnId
+        && receipt.previousFingerprint === epoch.previousFingerprint && receipt.runtimeFingerprint === epoch.runtimeFingerprint
+        && receipt.recordedAt === epoch.recordedAt;
+    } catch { return false; }
   });
 }
 

@@ -13,14 +13,6 @@ const cli = {
 };
 
 describe('withRdcHostRuntimeEnv', () => {
-  it('binds native dependencies to the selected installation instead of an inherited root', () => {
-    vi.stubEnv('RDC_TOOL_ROOT', 'C:\\other-installation');
-    const root = path.resolve('selected-tools');
-    try {
-      const result = withRdcHostRuntimeEnv({ ...cli, command: path.join(root, 'binaries/windows/x64/python/python.exe'), argsPrefix: [path.join(root, 'cli/run_cli.py')], workingDirectory: root });
-      expect(result.env.RDC_TOOL_ROOT).toBe(root);
-    } finally { vi.unstubAllEnvs(); }
-  });
   it('injects the user-scope intermediate root when Settings env omits it', () => {
     const resolved = withRdcHostRuntimeEnv(cli);
     const expected = appPathService.getUserRdcPaths().rdcIntermediateRoot;
@@ -37,5 +29,16 @@ describe('withRdcHostRuntimeEnv', () => {
       env: { [RDC_INTERMEDIATE_ROOT_ENV]: override },
     });
     expect(resolved.env[RDC_INTERMEDIATE_ROOT_ENV]).toBe(override);
+  });
+
+  it('forwards the DXC host directory while preserving the Settings override', () => {
+    vi.stubEnv('RDC_TOOL_DXC_TOOLS_PATH', 'host-dxc');
+    try {
+      expect(withRdcHostRuntimeEnv(cli).env.RDC_TOOL_DXC_TOOLS_PATH).toBe('host-dxc');
+      expect(withRdcHostRuntimeEnv({ ...cli, env: { RDC_TOOL_DXC_TOOLS_PATH: 'settings-dxc' } })
+        .env.RDC_TOOL_DXC_TOOLS_PATH).toBe('settings-dxc');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
