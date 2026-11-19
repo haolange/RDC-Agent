@@ -5,40 +5,28 @@ description: Enforce ready provenance and cite investigation artifacts only by i
 
 # Artifact Provenance
 
-Use this skill when creating, promoting, or citing `rdc.investigation.v1` artifacts.
+写入、升级或引用 `rdc.investigation.v1` 记录时用这份方法：先按依赖顺序持久化，再满足 ready 的三个条件；委派审查时，把审查需要的材料按精确引用交出去。
 
-## Resolve record dependencies before writing
+## 按依赖顺序写
 
-Observation collection and typed-record persistence have different orders. Collect raw tool output first, then persist a schema-valid WorldState for the state actually observed before writing Evidence that binds to its `worldStateId`. This reference must resolve even for draft Evidence. A draft WorldState may preserve unknown or unmeasured fields using the current schema; it must not invent safety, exclusivity, measurements, zero values, or completed future states merely to satisfy required fields. An old WorldState is not a substitute for the current state: keep historical lineage in source references, rather than binding fresh observations to an unrelated historical state to pass validation.
+1. 原始工具输出可以先采集。写 Evidence 前，先持久化与实际观察状态相符的 WorldState，Evidence 再绑定它的 `worldStateId`；draft 也一样要能解析。WorldState 可以如实留下未知或未测量的字段，不为凑必填项编造安全性、排他性、读数或零值，也不把新观察挂到无关的旧 WorldState 上。
+2. "Evidence 先于派生 Claim"，不是先于它的 WorldState。
+3. Experiment 引用的 WorldState 和 hypothesis Claim 要先持久化。设计阶段的 variant／restored 锚点写成合法的"未测量"，实际观察要有各自按时写入的版本。schema 表示不了某个锚点时，在计划门解决，不写虚构的前向引用或占位回执。计划要求的设计记录要在正式签名阶段之前写成功。
+4. 能解析的引用不等于状态等价，也不足以让记录 ready。
 
-Check the required-reference graph while planning. Persist prerequisite WorldStates and hypothesis Claims before an Experiment that references their logical IDs. A designed Experiment's future-state anchors must be explicit, schema-valid unknown/unmeasured plans, not observed variant/restored results; actual observations require their own correctly timed versions. If the schema cannot represent a needed anchor, resolve that strategy conflict through the normal plan gate before intervention. Never use fabricated forward references or placeholder execution receipts. All design records required by the plan must persist successfully before formal signed baseline/intervention stages.
+## ready 的三个条件
 
-"Evidence first" means before a derived Claim, not before its required WorldState. A resolvable reference alone does not establish state equivalence or qualify a record as ready.
+1. `sourceRefs.length >= 1`，每项是 `{ artifactId, expectedHash }`，每个 `artifactId` 都能解析。
+2. 每个 `expectedHash` 等于来源当前的 sha256；本记录的 `contentHash` 等于 `contentRef` 字节的 sha256。
+3. `kind` 经闭集 Kind Registry 解析到 `recordType + schema`，正文通过该 schema。
 
-`ready` is legal only when all three hold:
+用 `session://` 或 `investigation_read`／`investigation_list` 返回的身份引用，不编造 hash。正文变了而 hash 没变的记录是 `stale`；版本更新把旧版标 `superseded`。调查记录不写进 Task、Profile 或消息。
 
-1. `sourceRefs.length >= 1`, each `{ artifactId, expectedHash }`, and every `artifactId` resolves.
-2. Each `expectedHash` matches the source's current sha256; this artifact's `contentHash` equals the sha256 of `contentRef` bytes.
-3. `kind` resolves through the closed Kind Registry to `recordType + schema`, and the body passes that schema.
+## 委派审查时交出哪些材料
 
-Cite with `session://` or `investigation_read` / `investigation_list`. Changing body bytes without changing hash makes the artifact `stale`. Version updates must mark the old artifact `superseded`.
-
-## Prepare the exact material closure before delegation
-
-A tool-result JSON wrapper and the image bytes referenced inside it are separate artifacts. For visual review, put each required image's exact URI from `Image evidence` and its hash in the Capsule, together with needed wrappers and records. Granting a wrapper never grants its referenced images, paths, or other artifacts. For an independent review Task the runtime adds the records and artifacts that the granted records cite; hand-grant only leaves no record cites, such as images referenced inside a wrapper.
-
-Small text reads normally stay inline. When a reviewer needs a small original diff or text window, request `read_file` with `pinEvidence: true`, read its returned durable URI/hash, and explicitly grant that reference. This persists the actual returned window, not unread file content. `totalLines` and the whole-file hash are identities, not proof that every line was delivered: inspect displayed range, truncation and continuation, then cover all required pages. Hash/equality statistics and bounded changed spans do not replace a complete diff. Budget the remaining pages and raw image reads before starting the review; preserve prior consumption and incomplete frontiers on correction.
-
-For a Task that produces a report or another workspace text result, pin and grant the actual result content for independent review; a restoration receipt or an underlying observation is supporting evidence, not a substitute for the result. Review applies to the exact granted version. If the result changes afterwards, identify the new version and obtain the required review for that version; do not describe the earlier review as covering it.
-
-Successful `rdc_probe` read-only queries also return a durable evidence URI/hash, including small results. Grant the exact reference to an offline reviewer and preserve the recorded identity and `truncated` status; the artifact contains only what the query actually returned and is not a signed lifecycle receipt.
-
-The review closure must include relevant observations already collected that could limit or contradict the claim, not only its supporting endpoints. For a direct resource-value edge, grant the available intervening usage history and its coverage alongside the endpoint evidence; if it is incomplete or cannot be granted, disclose the exact gap instead of presenting the edge as independently verified.
-
-If a historical native RDC output omits requested arguments after context compaction, the owning root General may read its exact URI/hash with `artifact_read.includeRecordedRequest=true`. The host matches its toolCallId in the committed owning session journal and returns a separate request-provenance URI/hash. The active turn is not committed until it ends, so repeating this lookup within that turn cannot recover its own request. Read and explicitly grant an available reference to an independent reviewer; the original output grant does not include it. Children cannot query the journal. Missing/conflicting requests stay unavailable; do not re-execute a native operation to reconstruct history. Recorded model requests are not resolved native defaults, signed execution receipts, or current replay evidence. New native outputs include main-validated CLI argument metadata and a fingerprint; sensitive argument keys are explicitly omitted.
-
-Do not invent hashes. Do not mark `ready` on unresolved refs, kind mismatch, or schema failure. Do not store investigation records on Tasks, Profiles, or Messages.
-
-For a coverage audit, root General may instead use `includeRecordedOperationIndex=true` on a hash-bound native output anchor (mutually exclusive with the single-request flag). Read the returned independent index URI/hash. It enumerates committed structured shell.rdc requests for that anchor's operation, not all native executions: check coverage gaps, excluded active turn, anchor presence and recorded errors, then independently verify outcome refs. Legacy/unstructured shell, other tools, UI lifecycle calls and uncommitted interrupted segments remain outside coverage. Do not infer an unused experiment allowance from this index or fill unmeasured fields. Reviewers need a new explicit index grant and cannot enumerate the journal themselves.
-
-Index rows also preserve malformed argument shapes and recorded errors. `request` is the original recorded structured request; `argumentsShape` is only a shape label, not parameter/permission validation. Missing args remain missing. A recorded failed request is not a native execution. Same-call-id conflicts or sensitive argument keys reject the index rather than silently omitting rows.
+- 工具结果的 JSON 包装和它引用的图像是不同的制品。视觉审查要把所需图像的精确 URI 与 hash 放进 Capsule；授予包装不会连带授予图像。独立审查 Task 会由运行时补授被授记录所引用的记录和制品，只需手动授予没有被任何记录引用的叶子材料。
+- 审查者要看小段原文或差异时，用 `read_file` 的 `pinEvidence: true` 取回持久的 URI/hash 再授予；它只保存实际返回的窗口。`totalLines` 和整文件 hash 是身份，不证明每一行都已交付，按显示范围、截断和续读覆盖所需的全部页。
+- 产出报告或其他文本结果的 Task，审查对象是那份结果本身：钉住并授予它。审查只覆盖被授的那个版本，结果变了就要对新版本再审。
+- 成功的 `rdc_probe` 只读查询也返回持久的证据 URI/hash，授予时保留它记录的身份和 `truncated` 状态；它不是签名回执。
+- 审查材料要包括可能限制或反驳这条主张的已有观察，不只是支持它的两端。资源值的直接依赖要附上可用的中间 usage 历史及其覆盖范围；给不全就写明缺口。
+- 压缩后某条历史原生输出缺了请求参数时，owning 的 General 可以对它的 URI/hash 用 `artifact_read.includeRecordedRequest=true` 取回记录的请求；做覆盖审计时用 `includeRecordedOperationIndex=true` 取回该操作的已提交请求索引。两者都只覆盖已提交的结构化请求，不是签名回执或当前回放证据；审查者需要另行授予，不能自己查询。记录不到的保持不可得，不为补历史重新执行原生操作。
