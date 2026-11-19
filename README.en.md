@@ -83,7 +83,7 @@ These are not three isolated chat personas. They share the same agent loop, proj
 - Work Process reflects actual execution and provider reasoning semantics. It does not fabricate hidden chain-of-thought or treat model self-report as evidence.
 - Local replay and Android presentation depend on the installed RDC / RenderDoc environment and the target GPU. A connected device is not a promise that every capture replays everywhere.
 
-The release surface is **Windows-only**. RDC-Agent does not bundle your captures, provider keys, or RenderDoc installation. Configure the RDC-Tool CLI, provider / model, and device environment yourself.
+The release surface is **Windows-only**; the source runs on Windows and Linux (x64) (host differences: [`docs/architecture/host-platform.md`](docs/architecture/host-platform.md)). RDC-Agent does not bundle your captures, provider keys, or RenderDoc installation. Configure the RDC-Tool CLI, provider / model, and device environment yourself.
 
 ## Download and first use
 
@@ -91,11 +91,11 @@ Windows releases provide an NSIS installer (`*-setup.exe`) and a portable zip. E
 
 The four-step guide appears on first launch and can be reopened from the titlebar question mark. Configure your own provider/API key and model in Settings, then create a Project and import a capture. Official Agents, Skills and Hooks are bundled under `resources/agent-runtime` and are not copied into user space.
 
-Download the independent [RDC-Tool release](https://github.com/haolange/RDC-Tool/releases), extract it, then use Settings → Tools → Detect installation / Select folder → Verify and apply. Select the `rdc-tool` root containing its bundled Python and CLI, not the Python executable. Detection checks the configured location and `%LOCALAPPDATA%/Programs/rdc-tool`; installing into PATH is optional. General use can start without RDC. Code Interpreter remains a separate environment.
+Download the independent [RDC-Tool release](https://github.com/haolange/RDC-Tool/releases), extract it, then use Settings → Tools → Detect installation / Select folder → Verify and apply. Select the `rdc-tool` root containing its bundled Python and CLI, not the Python executable. Detection checks the configured location, plus `%LOCALAPPDATA%/Programs/rdc-tool` on Windows; on Linux select the extracted root. Installing into PATH is optional. General use can start without RDC. Code Interpreter remains a separate environment.
 
 ## Source development
 
-Requirements: Windows, Node.js `>=22.13.0`, pnpm `11.7.0`, and an RDC-Tool CLI that can be configured from Settings.
+Requirements: Windows or Linux (x64), Node.js `>=22.13.0`, pnpm `11.7.0`, and an RDC-Tool CLI that can be configured from Settings. Saving provider keys on Linux needs an unlocked system keyring (GNOME Keyring or KWallet).
 
 ```powershell
 pnpm install

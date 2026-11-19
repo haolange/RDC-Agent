@@ -18,6 +18,7 @@
 | Provider adapters | `src/main/agent-runtime/providers/*` | `RequestPlan`, `EffectiveModel` | 无直接 IPC | 无 | typecheck, provider-system tests（见 `provider-architecture.md`） |
 | Browser app bridge | `src/main/browserAppBridge/*` | `src/shared/renderer-api/` manifest | localhost HTTP/SSE | Browser 路径同一 renderer | `bridgeSecurity.test.ts`（见 `browser-qa-surface.md`） |
 | Reports/evidence | `src/main/reports/*` | `ArtifactRecord`, `ActionEvent`, diagnostics | `evidence:getChain`, `evidence:eventAdded` | Activity, artifacts, trace cards | typecheck |
+| Host platform | `src/main/platform/*`（`host`、`paths`、`process`、`shell`、`secrets`、`rdcLayout`） | 无跨层类型 | 无 IPC；渲染层平台信息只经 `src/preload/index.ts` | `createRendererApi` 的 `isMac` / `isWindows` / `isLinux` | `check:host-platform`、`src/main/platform/*.test.ts`（见 `host-platform.md`） |
 
 Rules:
 

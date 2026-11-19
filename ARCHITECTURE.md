@@ -6,7 +6,7 @@
 
 RDC-Agent 是通用 agent workbench，并一等公民支持 RenderDoc `.rdc`。它是日常 agent 工作台，完成阅读、规划、编辑、搜索、工具调用、handoff、memory 与 subagent 编排，同时保留 capture 打开、replay 上下文、RDC 原生操作、诊断与 RenderDoc 调查等垂直能力。
 
-**发布面是 Windows-only。** `electron-builder.json` 只保留 `win`；POSIX launcher wrapper（`.sh`）仅供 Ubuntu CI 的 node 面准备。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；唯一例外是显式 `RDC_AGENT_RELEASE_CHANNEL=prerelease`、package 带预发布后缀且 tag（如有）与该版本完全一致，只能发布为明确披露未签名的 GitHub prerelease。本地 `pnpm run pack` 不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。发行候选同时提供 Windows zip 与 NSIS。
+**发布面是 Windows-only。** `electron-builder.json` 只保留 `win`。**运行面是 Windows 与 Linux（x64）**：宿主相关行为只在 `src/main/platform`（[`docs/architecture/host-platform.md`](docs/architecture/host-platform.md)），由 ESLint 宿主平台门禁约束；POSIX launcher wrapper（`.sh`）用于 Linux 源码运行与 Ubuntu CI 准备。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；唯一例外是显式 `RDC_AGENT_RELEASE_CHANNEL=prerelease`、package 带预发布后缀且 tag（如有）与该版本完全一致，只能发布为明确披露未签名的 GitHub prerelease。本地 `pnpm run pack` 不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。发行候选同时提供 Windows zip 与 NSIS。
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）fail-closed 剔除。用户附件 vision-input（读图）属 agent chat 能力，与生成 media 无关。
 
@@ -22,7 +22,7 @@ Agent loop 不把“耗尽 turns”或“重复相同工具轮次”当作完成
 
 上手指南是四步图文操作教程，首次 bootstrap 后展示，标题栏问号可重开。每页解释操作入口、动作与完成预期；本地教学图与 HTML 双语标注分离，标明示意而非当前配置。桌面左文右图、窄屏上图下文，沿用 TaskDialog 与固定底部导航。关闭/完成只确认已阅读，标记写 Electron 应用状态目录；不创建 Project、不保存 Provider、不执行模型请求。Builtin 直接读取随应用打包的文件，不写 user seed。
 
-Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。主进程从根目录派生同安装捆绑 Python 与 CLI，验证 catalog 后由 Settings 边界保存。检测只读已配置位置和 Tools 默认 `%LOCALAPPDATA%/Programs/rdc-tool`；用户确认前不执行候选。根目录不是第二份持久配置。失败保留原配置；未配置 RDC 不阻塞 General。
+Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。主进程按宿主布局（`src/main/platform/rdcLayout.ts`，与 RDC-Tool `HOST_LAYOUTS` 一致）从根目录派生同安装捆绑 Python 与 CLI，安装根由捆绑 Python 路径去掉布局后缀得到，验证 catalog 后由 Settings 边界保存。检测只读已配置位置，Windows 另读安装器默认 `%LOCALAPPDATA%/Programs/rdc-tool`，Linux 只检查已配置或选择的根目录；用户确认前不执行候选。根目录不是第二份持久配置。失败保留原配置；未配置 RDC 不阻塞 General。
 
 ## Architecture Principles
 
@@ -122,7 +122,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - `docs/contracts/` — [`runtime-kernel.md`](docs/contracts/runtime-kernel.md)（Agent loop、Prompt/Request、Reasoning、Tools、Session、Model capability）、[`session-projection.md`](docs/contracts/session-projection.md)（Active Session Projection、IPC gate、Composer 恢复、Stop/Rewrite monotonic）、[`permissions.md`](docs/contracts/permissions.md)（Permission mode、Sandbox、CSP、IPC Zod、Bridge、Secret、RDC lease、MCP trust、Shell）、[`failure-model.md`](docs/contracts/failure-model.md)（Security / Integrity / Availability）
 - `docs/product/` — [`scoped-runtime-resources.md`](docs/product/scoped-runtime-resources.md)（Scope、Profiles、Skills、Hooks、Memory、Project Instructions）、[`RenderDoc Agent 完整设计书.md`](<docs/product/RenderDoc Agent 完整设计书.md>)（RenderDoc 领域目标；第 0 章为已定裁决）、[`acceptance-ledger.md`](docs/product/acceptance-ledger.md)（验收账本：真实运行证据）、[`README.md`](docs/product/README.md)（其余产品文档入口）
 - `docs/ui/` — [`workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md)（Workbench 轨、Work Process、Composer、Markdown）、[`design-system.md`](docs/ui/design-system.md)（Token、按钮、颜色、组件规则、Appearance 双体系）、[`work-process-checklist.md`](docs/ui/work-process-checklist.md)、[`appearance-checklist.md`](docs/ui/appearance-checklist.md)、[`knowledge-center.md`](docs/ui/knowledge-center.md)
-- `docs/architecture/` — [`README.md`](docs/architecture/README.md)（模块地图与数据流入口）、[`browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)（Browser QA 与桌面 channel 矩阵，debug-only）、[`rdc-runtime.md`](docs/architecture/rdc-runtime.md)（RDC 操作契约、lease、回放身份）
+- `docs/architecture/` — [`README.md`](docs/architecture/README.md)（模块地图与数据流入口）、[`browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)（Browser QA 与桌面 channel 矩阵，debug-only）、[`rdc-runtime.md`](docs/architecture/rdc-runtime.md)（RDC 操作契约、lease、回放身份）、[`host-platform.md`](docs/architecture/host-platform.md)（宿主平台模块、能力契约、门禁、Linux 密钥策略）
 - `docs/workflows/` — [`README.md`](docs/workflows/README.md)；当前执行计划为 [`vertical-investigation-convergence.md`](docs/workflows/vertical-investigation-convergence.md)
 
 ### Renderer 架构
@@ -139,7 +139,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 
 ## Verification Gate（摘要）
 
-文件行数由 ESLint `max-lines` 执行（`AgentOrchestrator.ts` < 800，main 单文件 ≤ 900）。CI 定义在 `.github/workflows/ci.yml`，覆盖 hygiene、typecheck、lint、test、coverage、`check:architecture`、各 `check:*` 门禁、`check:contracts`、build、browser-smoke、desktop-smoke 与双 OS launcher/pack。本地验证命令与完成标准见 `AGENTS.md` §5。`check:coverage-ratchet` 是固定底线（基线 `scripts/fidelity/coverage-ratchet.json`），只在大幅回退时失败。UI/工作流验收用 disposable `pnpm run start:agent-browser` 实例，流程见 `AGENTS.md`。
+文件行数由 ESLint `max-lines` 执行（`AgentOrchestrator.ts` < 800，main 单文件 ≤ 900）。CI 定义在 `.github/workflows/ci.yml`，覆盖 hygiene、typecheck、lint、test、coverage、`check:architecture`、各 `check:*` 门禁、`check:contracts`、build、browser-smoke、desktop-smoke、Windows 单元测试（`windows-unit`）、Linux Browser QA smoke（`linux-smoke`）与双 OS launcher/pack。本地验证命令与完成标准见 `AGENTS.md` §5。`check:coverage-ratchet` 是固定底线（基线 `scripts/fidelity/coverage-ratchet.json`），只在大幅回退时失败。UI/工作流验收用 disposable `pnpm run start:agent-browser` 实例，流程见 `AGENTS.md`。
 
 **Provider 失败诊断保真**（契约见 [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md)「provider 失败诊断保真」）：`ProviderEmptyStreamError`（`PROVIDER_STREAM_EMPTY`）不合成 HTTP 502；`ErrorRecovery` 的 `empty_stream` 最多 1 次重试，真实 5xx 为 `server_error`（3 次），503 为 `overloaded`，401 立即 abort；`AgentRecoveryAbortError` 必带 cause 与结构化字段；`createTurnFailedDiagnostic` 保留 `CONVERSATION_LLM_REQUEST_FAILED` 并按 auth / quota-rate / 5xx / empty_stream / network 分类文案。Work Process Active Signal 与诊断行对齐见 `check:work-process` + [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md)。
 

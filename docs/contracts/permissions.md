@@ -65,7 +65,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 ## Secret Isolation
 
-- `safeStorage` 不可用 → fail-closed（不得明文落盘）。
+- `safeStorage` 不可用 → fail-closed（不得明文落盘）。Linux 上没有系统钥匙环时的 `basic_text` 后端（以及尚未选定的 `unknown`）视为不可用，见 [`../architecture/host-platform.md`](../architecture/host-platform.md)。
 - 对外查询仅 `{ hasSecret, maskedPreview? }`；不得返回明文。
 - 损坏条目 quarantine；文件权限 0600/ACL。
 - Credential 仅进入主进程 opaque lease，不进 manifest / Route / RequestPlan / IPC / Trace。
@@ -166,7 +166,7 @@ plan:* 以当前查看 session + planId/revision/URI/hash 定位持久历史 too
 
 文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDC 返回 RDC_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
 
-Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
+Agent 只绑定同安装捆绑 Python（按宿主布局，见 docs/architecture/host-platform.md）的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
 
 
 ### 自动审查展示
