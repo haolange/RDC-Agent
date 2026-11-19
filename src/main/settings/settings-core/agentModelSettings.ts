@@ -1,9 +1,7 @@
-import type { AgentModelBinding, AgentModelSettings } from '@shared/types/settings';
 import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import { isSafeAgentProfileId } from '@shared/types/agent';
-
-export const EMPTY_AGENT_MODEL_SETTINGS: AgentModelSettings = Object.freeze({ default: {}, byAgent: {} }) as AgentModelSettings;
+import type { AgentModelBinding, AgentModelSettings } from '@shared/types/settings';
 
 function sanitizeBinding(raw: unknown, fixes: string[], label: string): AgentModelBinding {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};

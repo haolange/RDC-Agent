@@ -1,7 +1,7 @@
 import YAML from 'yaml';
-import type { AgentModelBinding } from '@shared/types/settings';
 import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import type { AgentModelBinding } from '@shared/types/settings';
 
 export interface AgentModelFieldMigrationPlan {
   binding: AgentModelBinding;

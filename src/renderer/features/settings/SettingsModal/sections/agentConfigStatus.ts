@@ -1,6 +1,6 @@
+import { canonicalAgentModelId, resolveAgentModel } from '@shared/utils/agentModelRoute';
 import type { AgentManifestDefinition, AgentManifestDraft, AgentModelOption } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
-import { canonicalAgentModelId, resolveAgentModel } from '@shared/utils/agentModelRoute';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];

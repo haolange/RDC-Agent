@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { diffLines } from '@shared/utils/lineDiff';
 import type {
   AgentBuiltinComparison,
   AgentManifestDiagnostic,
@@ -7,7 +8,6 @@ import type {
   AgentOverrideFileRequest,
 } from '@shared/types/agentManifest';
 import type { AgentModelBinding, AgentModelSettings, AppSettings } from '@shared/types/settings';
-import { diffLines } from '@shared/utils/lineDiff';
 import type { useI18n } from '../../../../i18n';
 import type { AgentBuiltinDiffState } from './AgentBuiltinDiffDialog';
 import type { AgentOverrideFileAction } from './AgentModelMigrationDialog';

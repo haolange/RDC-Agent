@@ -1,17 +1,17 @@
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { appPathService } from '../../runtime/AppPathService';
+import { agentManifestService } from '../agent-manifests/AgentManifestService';
+import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict } from '../agent-manifests/agentManifestParse';
+import { planAgentModelFieldMigration } from '../agent-manifests/agentModelFieldMigration';
+import { resolveRegisteredProjectRoot, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
+import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
 import type {
   AgentBuiltinComparison,
   AgentDefinitionCommitQuery,
   AgentModelMigrationPreview,
   AgentOverrideFileRequest,
 } from '@shared/types/agentManifest';
-import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
-import { appPathService } from '../../runtime/AppPathService';
-import { agentManifestService } from '../agent-manifests/AgentManifestService';
-import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict } from '../agent-manifests/agentManifestParse';
-import { planAgentModelFieldMigration } from '../agent-manifests/agentModelFieldMigration';
-import { resolveRegisteredProjectRoot, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
 
 interface SettingsAccess {
   getAll(): AppSettings;

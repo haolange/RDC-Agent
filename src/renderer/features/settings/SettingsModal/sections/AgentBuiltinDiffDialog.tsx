@@ -1,10 +1,10 @@
-import type { DiffLine } from '@shared/utils/lineDiff';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { DiffBlock } from '../../../../ui/DiffBlock';
 import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
+import type { useI18n } from '../../../../i18n';
+import type { DiffLine } from '@shared/utils/lineDiff';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

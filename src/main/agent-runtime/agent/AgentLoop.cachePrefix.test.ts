@@ -1,13 +1,13 @@
 import { expect, it } from 'vitest';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type { AssistantMessage, AssistantMessageEvent, Context, Model, ToolResultMessage } from '../core/types';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
 import { __testing as responses } from '../providers/OpenAIResponsesProvider';
 import { promptCacheHeaders } from '../providers/promptCacheWire';
 import { agentLoop, type AgentContext } from './AgentLoop';
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, ToolResultMessage } from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 const model: Model = { id: 'gpt-test', name: 'GPT test', provider: 'chatgpt-account', api: 'openai-responses',
   contextWindow: 400_000, maxTokens: 8_000, reasoning: false, vision: false };

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import type { AgentModelMigrationPreview, AgentModelOption } from '@shared/types/agentManifest';
-import type { AgentModelBinding } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { modelOptionLabel } from './agentConfigStatus';
+import type { useI18n } from '../../../../i18n';
+import type { AgentModelBinding } from '@shared/types/settings';
+import type { AgentModelMigrationPreview, AgentModelOption } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

@@ -1,7 +1,7 @@
-import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { InlineError } from '../../../../ui/InlineError';
 import { AgentModelBindingFields } from './AgentModelBindingFields';
+import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
