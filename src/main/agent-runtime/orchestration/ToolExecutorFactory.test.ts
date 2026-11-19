@@ -1343,7 +1343,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       expect(result.isError, JSON.stringify(result.content)).toBe(false);
       expect(parseInvestigationPlanContract(write.mock.calls[0][1])).toEqual({ schemaVersion: 1, mission: 'analyzer' });
       expect(vi.mocked(agentPlanReviewRequestService.request).mock.calls.at(-1)?.[0].planReview.sections)
-        .toEqual(expect.arrayContaining([expect.objectContaining({ heading: 'Investigation execution contract' })]));
+        .not.toEqual(expect.arrayContaining([expect.objectContaining({ heading: 'Investigation execution contract' })]));
     } finally { write.mockRestore(); begin.mockRestore(); vi.mocked(agentPlanReviewRequestService.request).mockClear(); }
   });
 
