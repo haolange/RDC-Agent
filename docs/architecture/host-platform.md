@@ -87,4 +87,10 @@ Linux 上 Electron `safeStorage.isEncryptionAvailable()` 在没有系统钥匙�
 
 ## Linux 上的 CPU 回放
 
-调查结果见验收账本。
+没有 GPU 的 Linux 机器可以用 Mesa 的 lavapipe（CPU 实现的 Vulkan 驱动）回放 Vulkan capture，前提是 capture 也在 lavapipe 上录制。[实机验证（lavapipe）]
+
+- 同驱动 capture 可以回放：RDC-Tool 的 Linux 候选在 lavapipe 上打开 lavapipe 自录的 vkcube capture，事件树、像素值、Pixel History、SPIR-V 反汇编、最终输出图像与 SPIR-V 替换的 A-B-A 均通过；RDC-Agent 经 Settings 验证并应用该安装后，在本地设备上打开同一 capture 并切换事件，两次都有画面。录制方法见 RDC-Tool `docs/tool-convergence-tasks.md` 的阻塞表。
+- 跨厂商 capture 不能回放：仓库里的 `vkcube.rdc` 录自 NVIDIA，lavapipe 以内存类型不匹配明确拒绝。这是 Vulkan capture 的可移植性限制，不是产品缺陷。
+- 早先记录的"lavapipe 上回放崩溃"是 RDC-Tool 在 POSIX 上预加载 `librenderdoc.so`，使 RenderDoc 按捕获目标初始化；Linux 布局改为 `lib/librenderdoc.so` 后由 binding 的 RUNPATH 加载，已修复。
+
+细节与数字见验收账本 2026-11-19 的 Linux 冒烟条目。

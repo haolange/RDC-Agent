@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## 2026-11-19：Linux 运行面冒烟与 lavapipe 回放（云端，无 GPU）
+
+- 环境：云端 Linux 容器，无 GPU、无设备、无模型账号；Xvfb、Mesa lavapipe。产品为当前分支 `claude/inspiring-carson-rkhfje` 构建，以 Browser QA 无头启动（root 容器需 `ELECTRON_DISABLE_SANDBOX=1`），一次性隔离 userData。
+- RDC-Tool Linux 候选：未修改的 fork `haolange/renderdoc@dde8822` 构建的 `librenderdoc.so` 与 binding，原生回执与仓库回执合并后 doctor 报告 `linux-x64`、`android-arm32`、`android-arm64` 均 verified（回执 sha256 `31e03135722f…`），catalog 129 项、指纹 `a615f313d0f5…`。Android helper APK 经 Git LFS 取得；adb 与 SPIRV-Tools 仅本次冒烟使用 Ubuntu 包（adb 34.0.4、SPIRV-Tools v2025.1），清单中已注明，不是发行输入。
+- 产品经 Settings → 工具 → RDC-Tool 检测到已配置的根、验证并应用：「已验证并应用: 1.1.2 · 129 个操作」。
+- 经产品接口建项目与会话，引用 lavapipe 自录的 `lavapipe_vkcube_frame1503.rdc`（sha256 `d138f0645298…`），在本地设备打开：约 5.0 s 进入 `ready`，6 个事件，停在最终事件 14 并有画面；切换到事件 11 后 `appliedEventId=11`、有画面、无错误。
+- 正常退出（SIGTERM）后 RDC 守护进程与 worker 均退出，无残留；`instance.lock` 写入 Linux 出生标识（平台模块提交 `6347d36`）。
+- 跨厂商：仓库 `vkcube.rdc`（NVIDIA 录制）在 lavapipe 上以内存类型不匹配被拒绝，属 Vulkan capture 不可移植，不作为缺陷。
+- 未覆盖：Windows 上的行为回归（交接单 B 的 M1）、Android 远端、模型调用。两 OS CI 结果见后续条目。
+
 ## 2026-11-19：M3 第十四轮，可恢复实验待用户确认
 
 - 隔离会话 `sess_60d672e14cde`／眼部 capture／local／入口 E147；Settings 确认十二个 Agent 均为内置且模型可用，GPT-6.1 Sol／Medium、自动审查，Memory 和覆盖为空，Knowledge 无眼部案例。
