@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -74,6 +75,46 @@ jobs:
       # runner. Keep this OS-bound surface single-file to avoid concurrent
       # Electron framework extraction into the same node_modules tree.
       - run: pnpm exec vitest run --no-file-parallelism src/main/runtime src/main/agent-runtime/tools/primitives
+
+  windows-unit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --project node
+
+  linux-smoke:
+    runs-on: ubuntu-latest
+    env:
+      RDC_AGENT_SMOKE_START: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      - name: Prepare through POSIX wrapper
+        shell: bash
+        run: sh scripts/start-rdc-agent.sh --prepare-only
+      # Ubuntu 24.04 restricts unprivileged user namespaces, which the Electron sandbox needs.
+      - name: Allow the Electron sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Browser QA smoke on Linux
+        run: xvfb-run -a pnpm run smoke:agent-browser
 
   launcher-fresh-checkout:
     strategy:
