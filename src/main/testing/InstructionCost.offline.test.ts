@@ -50,10 +50,18 @@ function plan(version: 'before' | 'after', id: string, extra: string[] = []) {
 }
 
 
+/** The methods the Debugger execution handoff actually preloads into General. */
+function debuggerExecutionSkills(): string[] {
+  const file = 'resources/agent-runtime/agents/debugger.agent.md';
+  const profile = parseAgentMarkdownStrict(readFileSync(file, 'utf8'), path.resolve(file), 'debugger', '2026-09-09', true);
+  if (!profile.ok) throw new Error(profile.reason);
+  return profile.definition.handoffs?.find((handoff) => handoff.agent === 'general')?.requiredSkillIds ?? [];
+}
+
 describe('offline complete PromptPlan comparison', () => {
   it('measures identical task settings with HEAD core/profile/catalog/methods versus working tree, no provider', { timeout: 30000 }, () => {
     headSources.clear(); headSkillFiles = undefined;
-    baselineHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    baselineHead = execFileSync('git', ['rev-parse', process.env.RDC_AGENT_OFFLINE_COST_BASE ?? 'HEAD'], { encoding: 'utf8' }).trim();
     const root = mkdtempSync(path.join(tmpdir(), 'rdc-prompt-cost-'));
     mkdirSync(path.join(root, 'prompts'));
     for (const file of ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md']) writeFileSync(path.join(root, 'prompts', file), source('resources/agent-runtime/prompts/' + file, 'before'));
@@ -61,7 +69,7 @@ describe('offline complete PromptPlan comparison', () => {
     try {
       const cases = [ { task: '聊天问答', id: 'general', extra: [] }, { task: '轻量 coding', id: 'general', extra: [] },
         { task: 'Debugger 规划', id: 'debugger', extra: [] }, { task: 'Analyzer 规划', id: 'analyzer', extra: [] }, { task: 'Optimizer 规划', id: 'optimizer', extra: [] },
-        { task: 'General 调查执行', id: 'general', extra: ['renderdoc-execution', 'debugger-causal-method', 'rdc-tool-shell'] } ];
+        { task: 'General 调查执行', id: 'general', extra: debuggerExecutionSkills() } ];
       const rows = cases.map(test => {
         rootSpy.mockReturnValue(root); const before = plan('before', test.id, test.extra);
         rootSpy.mockReturnValue(path.resolve('resources/agent-runtime')); const after = plan('after', test.id, test.extra);
@@ -74,10 +82,10 @@ describe('offline complete PromptPlan comparison', () => {
           expect(resident).toContain('Declare completed only after its required work, independent review, relevant challenges and recovery are closed');
           expect(resident).not.toContain('Do not declare the investigation complete');
         }
-        return { ...test, beforeChars: before.systemPrompt.length, afterChars: after.systemPrompt.length, deltaChars: after.systemPrompt.length - before.systemPrompt.length,
+        return { ...test, beforeBytes: Buffer.byteLength(before.systemPrompt), afterBytes: Buffer.byteLength(after.systemPrompt), beforeChars: before.systemPrompt.length, afterChars: after.systemPrompt.length, deltaChars: after.systemPrompt.length - before.systemPrompt.length,
           beforeEstimatedTokens: before.totalTokenEstimate, afterEstimatedTokens: after.totalTokenEstimate, segments: after.segments.map(segment => ({ id: segment.id, chars: segment.content.length })) };
       });
-      const report = { baseline: baselineHead, note: 'HEAD is historical baseline, not the start of this phase. Full system PromptPlan with identical tools and empty external context; estimates are not billed tokens. No LLM requests.', rows };
+      const report = { baseline: baselineHead, note: 'The baseline is HEAD unless RDC_AGENT_OFFLINE_COST_BASE names another commit. Full system PromptPlan with identical tools and empty external context; estimates are not billed tokens. No LLM requests.', rows };
       console.info(JSON.stringify(report));
       if (process.env.RDC_AGENT_OFFLINE_COST_OUTPUT) writeFileSync(process.env.RDC_AGENT_OFFLINE_COST_OUTPUT, JSON.stringify(report, null, 2));
     } finally { rootSpy.mockRestore(); rmSync(root, { recursive: true, force: true }); }
