@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveAgentWriteTargetFromDraft } from '@shared/types/agentManifest';
-import { createNewAgent } from './AgentsSettings';
+import { createNewAgent } from './agentDraftFactory';
 
 const t = ((key: string) => key) as Parameters<typeof createNewAgent>[1];
 

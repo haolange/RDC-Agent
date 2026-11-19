@@ -6,7 +6,9 @@ import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraf
 import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS, HANDOFF_SURFACES } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
-import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
+
+/** A manifest still declares a field that moved to Settings → Agents; the file is not applied until migrated. */
+export const AGENT_MANIFEST_FIELD_MOVED = 'AGENT_MANIFEST_FIELD_MOVED';
 
 export interface ManifestParseOk {
   ok: true;
@@ -69,8 +71,8 @@ const readHandoffsStrict = (value: unknown): AgentHandoffDefinition[] | string =
     if (candidate.surface !== undefined && !HANDOFF_SURFACES.includes(candidate.surface as HandoffSurface)) {
       return `handoffs[${index}].surface must be turn-end, plan-gate, or hidden.`;
     }
-    if (candidate.model !== undefined && (typeof candidate.model !== 'string' || !candidate.model.trim())) {
-      return `handoffs[${index}].model must be a non-empty string when present.`;
+    if (candidate.model !== undefined) {
+      return `${AGENT_MANIFEST_FIELD_MOVED}: handoffs[${index}].model moved to Settings → Agents.`;
     }
     const requiredSkillIds = readStringArray(candidate.requiredSkillIds);
     if (requiredSkillIds === null) {
@@ -88,7 +90,6 @@ const readHandoffsStrict = (value: unknown): AgentHandoffDefinition[] | string =
     }
     if (typeof candidate.send === 'boolean') handoff.send = candidate.send;
     if (typeof candidate.surface === 'string') handoff.surface = candidate.surface as HandoffSurface;
-    if (typeof candidate.model === 'string' && candidate.model.trim()) handoff.model = candidate.model.trim();
     if (requiredSkillIds.length > 0) handoff.requiredSkillIds = requiredSkillIds;
     if (requiredToolIds.length > 0) handoff.requiredToolIds = requiredToolIds;
     handoffs.push(handoff);
@@ -119,12 +120,17 @@ export function parseAgentMarkdownStrict(
     const skills = readStringArray(record.skills);
     const mcpServers = readStringArray(record['mcp-servers']);
     const agents = readStringArray(record.agents);
-    const models = readStringArray(record.model);
+    if (record.model !== undefined || record['reasoning-level'] !== undefined) {
+      return { ok: false, reason: `${AGENT_MANIFEST_FIELD_MOVED}: model and reasoning-level are set in Settings → Agents; migrate this file or delete it.` };
+    }
+    if (record['based-on'] !== undefined && (typeof record['based-on'] !== 'string' || !/^[0-9a-f]{64}$/u.test(record['based-on']))) {
+      return { ok: false, reason: 'based-on must be the 64-hex sourceHash of the builtin profile it was copied from.' };
+    }
     const enabled = readBoolean(record.enabled, true);
     const userInvocable = readBoolean(record['user-invocable'], true);
     const disableModelInvocation = readBoolean(record['disable-model-invocation'], false);
-    if (!tools || !skills || !mcpServers || !agents || !models) {
-      return { ok: false, reason: 'tools/skills/mcp-servers/agents/model must be string arrays when present.' };
+    if (!tools || !skills || !mcpServers || !agents) {
+      return { ok: false, reason: 'tools/skills/mcp-servers/agents must be string arrays when present.' };
     }
     if (enabled === null || userInvocable === null || disableModelInvocation === null) {
       return { ok: false, reason: 'enabled/user-invocable/disable-model-invocation must be booleans when present.' };
@@ -149,9 +155,6 @@ export function parseAgentMarkdownStrict(
     if (record['completion-contract'] !== undefined && !AGENT_COMPLETION_CONTRACTS.includes(record['completion-contract'] as AgentCompletionContract)) {
       return { ok: false, reason: 'completion-contract must be final-answer or investigation-report.' };
     }
-    if (record['reasoning-level'] !== undefined && !REASONING_SELECTIONS.includes(record['reasoning-level'] as ReasoningSelection)) {
-      return { ok: false, reason: 'reasoning-level must be a supported reasoning selection.' };
-    }
     if (record.showContinueOn !== undefined) {
       return { ok: false, reason: 'showContinueOn was removed; declare handoff surface instead.' };
     }
@@ -165,8 +168,7 @@ export function parseAgentMarkdownStrict(
         description: typeof record.description === 'string' ? record.description.trim() : '',
         argumentHint: typeof record['argument-hint'] === 'string' ? record['argument-hint'].trim() : '',
         target: typeof record.target === 'string' && record.target.trim() ? record.target.trim() : 'rdc-agent',
-        models,
-        ...(record['reasoning-level'] !== undefined ? { reasoningLevel: record['reasoning-level'] as ReasoningSelection } : {}),
+        ...(typeof record['based-on'] === 'string' ? { basedOn: record['based-on'] } : {}),
         icon: isAgentIconPreset(record.icon) ? record.icon : 'message-orbit',
         accent: normalizeAgentAccent(record.accent, COMPOSE_ACCENT_FALLBACK),
         disableModelInvocation,
@@ -202,8 +204,7 @@ export function serializeAgentMarkdown(definition: AgentManifestDraft): string {
     description: definition.description,
     'argument-hint': definition.argumentHint,
     target: definition.target || 'rdc-agent',
-    model: definition.models,
-    ...(definition.reasoningLevel ? { 'reasoning-level': definition.reasoningLevel } : {}),
+    ...(definition.basedOn ? { 'based-on': definition.basedOn } : {}),
     icon: isAgentIconPreset(definition.icon) ? definition.icon : 'message-orbit',
     accent: normalizeAgentAccent(definition.accent, COMPOSE_ACCENT_FALLBACK),
     'disable-model-invocation': definition.disableModelInvocation,

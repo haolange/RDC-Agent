@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
+import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
@@ -14,7 +14,6 @@ interface AgentHandoffEditorProps {
   selfId: string;
   handoffs: AgentHandoffDefinition[];
   definitions: AgentManifestDefinition[];
-  modelOptions: AgentModelOption[];
   forceShowRequired: boolean;
   onChange: (handoffs: AgentHandoffDefinition[]) => void;
   t: Translate;
@@ -42,7 +41,6 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
   selfId,
   handoffs,
   definitions,
-  modelOptions,
   forceShowRequired,
   onChange,
   t,
@@ -62,7 +60,7 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
       .sort((first, second) => first.name.localeCompare(second.name)),
     [definitions, selfId],
   );
-  const issues = validateAgentHandoffs(handoffs, { selfId, definitions, modelOptions });
+  const issues = validateAgentHandoffs(handoffs, { selfId, definitions });
 
   useEffect(() => {
     const pending = pendingFocusRef.current;
@@ -112,7 +110,6 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
                 handoff={handoff}
                 issues={issues.filter((issue) => issue.index === index)}
                 targets={targets}
-                modelOptions={modelOptions}
                 forceShowRequired={forceShowRequired}
                 isFirst={index === 0}
                 isLast={index === handoffs.length - 1}

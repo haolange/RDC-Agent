@@ -50,6 +50,8 @@ describe('settingsModalActions project scope save', () => {
       saveAgentDefinition,
       currentProjectId: 'proj_demo',
       t: (key: string) => key,
+      replaceSettings: vi.fn(),
+      rebaseAgentDrafts: vi.fn(),
     });
 
     await actions.handleSaveAgentManifests({
@@ -76,7 +78,6 @@ describe('settingsModalActions project scope save', () => {
       description: 'builtin',
       argumentHint: '',
       target: 'rdc-agent',
-      models: [],
       icon: 'nodes',
       accent: '#33d1ff',
       disableModelInvocation: false,
@@ -117,6 +118,8 @@ describe('settingsModalActions project scope save', () => {
       saveAgentDefinition,
       currentProjectId: 'proj_demo',
       t: (key: string) => key,
+      replaceSettings: vi.fn(),
+      rebaseAgentDrafts: vi.fn(),
     });
 
     await actions.handleSaveAgentManifests({
@@ -156,6 +159,8 @@ describe('settingsModalActions project scope save', () => {
       saveAgentDefinition,
       currentProjectId: 'proj_demo',
       t: (key: string) => key,
+      replaceSettings: vi.fn(),
+      rebaseAgentDrafts: vi.fn(),
       blockSubmit: () => 'blocked',
       blockProjectedSubmit: () => null,
     });

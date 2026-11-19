@@ -16,7 +16,6 @@ export const zhComposer = {
   'composer.effort.levelOff': '关闭',
   'composer.effort.reasoningUnavailable': '{level}（不可用）',
   'composer.effort.reasoningUnavailableHint': '此模型不支持该智能体的推理档位，或支持情况尚未确认。请选择受支持的档位，或修改智能体设置。',
-  'composer.effort.capabilitySyncing': '正在更新模型…',
   'composer.effort.capabilityRefreshing': '正在刷新模型能力…',
   'composer.effort.capabilityUnconfigured': '未配置模型',
   'composer.effort.capabilityUnavailable': '模型能力不可用',

@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     },
   },
   profile: { nickname: 'RDC Operator', avatarPath: '' },
+  agentModels: { default: {}, byAgent: {} },
   tooling: {
     rdcCli: {
       enabled: false,

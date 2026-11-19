@@ -3,8 +3,6 @@ name: Analyzer
 description: Planning Orchestrator that maximizes explainability of an unknown rendering system.
 argument-hint: System, capture, or behavior to explain
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: waveform-gauge
 accent: "#8d8bff"
 disable-model-invocation: false

@@ -20,8 +20,8 @@ interface AgentModelCascadeSelectProps {
   options: AgentModelOption[];
   onChange: (value: string) => void;
   /**
-   * Handoff-only: offers "use the target Agent's model" as the first entry. An empty value
-   * means inherit. Never set for an Agent's own route, where a model is always explicit.
+   * Offers "use the default model" as the first entry for one Agent; an empty value means
+   * the Agent falls back to the default. Not set when editing the default itself.
    */
   inherit?: { label: string; description: string };
   t: Translate;

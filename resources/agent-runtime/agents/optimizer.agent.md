@@ -3,8 +3,6 @@ name: Optimizer
 description: Planning Orchestrator that minimizes cost while preserving correctness, quality, and scope.
 argument-hint: Cost, constraints, and required correctness
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: spark-tuning
 accent: "#4ee3a0"
 disable-model-invocation: false

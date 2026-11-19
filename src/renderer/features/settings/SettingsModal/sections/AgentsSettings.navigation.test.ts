@@ -2,7 +2,8 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { AgentsSettings, createNewAgent } from './AgentsSettings';
+import { AgentsSettings } from './AgentsSettings';
+import { createNewAgent } from './agentDraftFactory';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 
 vi.mock('../useScopedSkillSelection', () => ({ useScopedSkillSelection: () => ({}) }));
@@ -15,7 +16,7 @@ const t = ((key: string, params?: Record<string, string>) => `${key}${params?.id
 const first = createNewAgent([], t, 'user', 'project-a');
 const target = { ...createNewAgent([first], t, 'project', 'project-a'), id: 'target' };
 const other = { ...createNewAgent([first, target], t, 'project', 'project-a'), id: 'other' };
-const settings = { agents: { definitions: [], diagnostics: [] } } as never;
+const settings = { agents: { definitions: [], diagnostics: [], modelOptions: [] }, agentModels: { default: {}, byAgent: {} } } as never;
 
 it('waits for drafts, opens the target scope once, and reports a missing target without selecting another', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -25,7 +26,8 @@ it('waits for drafts, opens the target scope once, and reports a missing target 
     agentManifestDrafts: ready ? [first, target, other] : [], agentManifestContextReady: ready,
     onAgentManifestDraftsChange: () => undefined, onRetrySaveAgentManifests: () => undefined,
     onImportAgentManifest: () => undefined, agentManifestSaveState: 'idle', agentManifestSaveMessage: '',
-    canProject: true, currentProjectId: 'project-a', t }));
+    canProject: true, currentProjectId: 'project-a', t,
+    onAgentModelsChange: vi.fn(async () => undefined), onPreviewAgentModelMigration: vi.fn(), onCommitAgentOverrideFile: vi.fn(), onLoadAgentBuiltinComparison: vi.fn() }));
   try {
     useSettingsNavigationStore.getState().openAgent('target');
     await act(async () => render(false));

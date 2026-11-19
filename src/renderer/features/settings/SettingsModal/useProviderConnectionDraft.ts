@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
 import type { ProviderConnectionDraft } from './types';
 import {
@@ -8,7 +8,7 @@ import {
   isConnectionDraftComplete,
   projectConnectionProvider,
 } from './providerConnectionState';
-import { cloneProvider, cloneRoute } from './utils';
+import { cloneProvider } from './utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -16,7 +16,6 @@ export interface UseProviderConnectionDraftOptions {
   open: boolean;
   providerDrafts: LlmProviderEntry[];
   setProviderDrafts: Dispatch<SetStateAction<LlmProviderEntry[]>>;
-  setAgentRouteDrafts: Dispatch<SetStateAction<LlmAgentRoute[]>>;
   selectedProviderId: string | null;
   setSelectedProviderId: Dispatch<SetStateAction<string | null>>;
   connectionDraft: ProviderConnectionDraft | null;
@@ -29,7 +28,6 @@ export const useProviderConnectionDraft = ({
   open,
   providerDrafts,
   setProviderDrafts,
-  setAgentRouteDrafts,
   selectedProviderId,
   setSelectedProviderId,
   connectionDraft,
@@ -46,7 +44,6 @@ export const useProviderConnectionDraft = ({
     const nextSettings = await reloadSettings();
     const nextProviders = nextSettings.llm.providers.map(cloneProvider);
     setProviderDrafts(nextProviders);
-    setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
     setSelectedProviderId(
       preferredProviderId && nextProviders.some((provider) => provider.id === preferredProviderId)
         ? preferredProviderId
@@ -81,7 +78,6 @@ export const useProviderConnectionDraft = ({
           }
           const nextProviders = nextSettings.llm.providers.map(cloneProvider);
           setProviderDrafts(nextProviders);
-          setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
           setSelectedProviderId(
             nextProviders.some((provider) => provider.id === connectionDraft.providerId)
               ? connectionDraft.providerId
@@ -116,7 +112,6 @@ export const useProviderConnectionDraft = ({
     connectionProvider?.authMode,
     open,
     reloadSettings,
-    setAgentRouteDrafts,
     setConnectionDraft,
     setProviderDrafts,
     setSelectedProviderId,

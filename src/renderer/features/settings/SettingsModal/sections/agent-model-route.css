@@ -74,7 +74,16 @@
 .settings-agent-route-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: start;
   gap: var(--space-4);
+}
+
+.settings-agent-status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
 @container settings-panel (max-width: 48rem) {
@@ -82,4 +91,83 @@
   .settings-model-route-row {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Default model: what every Agent without its own setting runs with. */
+.settings-agent-defaults {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 2fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+  flex: 0 0 auto;
+}
+
+.settings-agent-defaults-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.settings-agent-defaults-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--token-text-heading);
+}
+
+.settings-agent-defaults-copy .settings-help-text {
+  margin: 0;
+}
+
+.settings-agent-defaults > .ui-inline-error {
+  grid-column: 2;
+}
+
+@container settings-panel (max-width: 48rem) {
+  .settings-agent-defaults {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-agent-defaults > .ui-inline-error {
+    grid-column: 1;
+  }
+}
+
+/* Override-file migration: what moves to Settings and what is kept as a backup. */
+.settings-agent-migration-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.settings-agent-migration-facts dt {
+  color: var(--token-text-caption);
+}
+
+.settings-agent-migration-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--token-text-body);
+}
+
+.settings-agent-migration-facts code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.settings-agent-migration-facts ul {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+}
+
+.settings-agent-builtin-diff-dialog .ui-diff {
+  --ui-diff-max-height: min(56vh, 32rem);
 }

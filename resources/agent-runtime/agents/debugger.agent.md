@@ -3,8 +3,6 @@ name: Debugger
 description: Planning Orchestrator that minimizes root-cause uncertainty for incorrect rendering results.
 argument-hint: Wrong result, capture, and expected behavior
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: crosshair-bug
 accent: "#33d1ff"
 disable-model-invocation: false

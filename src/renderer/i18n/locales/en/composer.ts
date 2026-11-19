@@ -16,7 +16,6 @@ export const enComposer = {
   'composer.effort.levelOff': 'Off',
   'composer.effort.reasoningUnavailable': '{level} (unavailable)',
   'composer.effort.reasoningUnavailableHint': 'The Agent reasoning level is unavailable or unverified for this model. Choose a supported level or update Agent settings.',
-  'composer.effort.capabilitySyncing': 'Updating model…',
   'composer.effort.capabilityRefreshing': 'Refreshing capability…',
   'composer.effort.capabilityUnconfigured': 'No model configured',
   'composer.effort.capabilityUnavailable': 'Capability unavailable',

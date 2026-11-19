@@ -15,9 +15,12 @@ import { agentManifestService } from './AgentManifestService';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
 const roots: string[] = [];
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
+afterEach(async () => {
+  agentManifestService.bindAgentModelSettings(() => ({ default: {}, byAgent: {} }));
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
 
-function customDraft(id: string, model: string): AgentManifestDraft {
+function customDraft(id: string): AgentManifestDraft {
   return {
     id,
     fileName: `${id}.agent.md`,
@@ -25,7 +28,6 @@ function customDraft(id: string, model: string): AgentManifestDraft {
     description: 'custom',
     argumentHint: '',
     target: 'rdc-agent',
-    models: [model],
     icon: 'message-orbit',
     accent: '#33d1ff',
     disableModelInvocation: false,
@@ -65,10 +67,10 @@ describe('AgentManifestService save/delete effective commit', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-reserved-'));
     roots.push(root);
     const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
-    await expect(agentManifestService.saveDefinition(paths, customDraft('plan', 'openai:test'), { scope: 'user' }))
+    await expect(agentManifestService.saveDefinition(paths, customDraft('plan'), { scope: 'user' }))
       .rejects.toThrow(/AGENT_ID_RESERVED_HISTORICAL/);
     expect(fs.existsSync(paths.agentsPath)).toBe(false);
-    expect(agentManifestService.routesFromDefinitions([], [customDraft('edit', 'openai:test')])).not.toContainEqual(
+    expect(agentManifestService.routesFromDefinitions([], [customDraft('edit')])).not.toContainEqual(
       expect.objectContaining({ agentId: 'edit' }),
     );
   });
@@ -77,26 +79,24 @@ describe('AgentManifestService save/delete effective commit', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-save-meta-'));
     roots.push(root);
     const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
+    // The route comes from Settings → Agents; a manifest save keeps it.
+    agentManifestService.bindAgentModelSettings(() => ({ default: { model: 'openai:gpt-test' }, byAgent: {} }));
     const first = await agentManifestService.saveDefinition(
       paths,
-      customDraft('custom-writer', 'openai:gpt-test'),
+      customDraft('custom-writer'),
       { scope: 'user' },
     );
     assertEffectiveSaveShape(first.definition);
-    expect(first.definition.compiledRoute).toEqual({
-      agentId: 'custom-writer',
-      providerId: 'openai',
-      modelId: 'gpt-test',
-    });
+    expect(first.definition.compiledRoute).toEqual({ agentId: 'custom-writer', providerId: 'openai', modelId: 'gpt-test' });
     expect(first.definition.provenance.scope).toBe('user');
 
     await expect(agentManifestService.saveDefinition(
       paths,
-      { ...customDraft('custom-writer', 'openai:gpt-test-2'), sourceHash: first.definition.provenance.sourceHash },
+      { ...customDraft('custom-writer'), instructions: 'Second revision.', sourceHash: first.definition.provenance.sourceHash },
       { scope: 'user', sourceHash: first.definition.provenance.sourceHash },
     )).resolves.toMatchObject({
       definition: {
-        compiledRoute: { agentId: 'custom-writer', providerId: 'openai', modelId: 'gpt-test-2' },
+        instructions: 'Second revision.',
         provenance: { scope: 'user', sourceHash: expect.any(String) },
       },
     });
@@ -111,14 +111,14 @@ describe('AgentManifestService save/delete effective commit', () => {
     const paths = { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDC.md') };
     await agentManifestService.saveDefinition(
       paths,
-      customDraft('general', 'openai:project-general'),
+      customDraft('general'),
       { scope: 'project', projectRoot },
     );
     expect(fs.existsSync(path.join(projectAgents, 'general.agent.md'))).toBe(true);
 
     const deleted = await agentManifestService.saveDefinition(
       paths,
-      { ...customDraft('general', 'openai:project-general'), delete: true },
+      { ...customDraft('general'), delete: true },
       { scope: 'project', projectRoot },
     );
     expect(fs.existsSync(path.join(projectAgents, 'general.agent.md'))).toBe(false);
@@ -135,10 +135,10 @@ describe('AgentManifestService save/delete effective commit', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-delete-gone-'));
     roots.push(root);
     const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
-    await agentManifestService.saveDefinition(paths, customDraft('only-mine', 'openai:a'), { scope: 'user' });
+    await agentManifestService.saveDefinition(paths, customDraft('only-mine'), { scope: 'user' });
     const deleted = await agentManifestService.saveDefinition(
       paths,
-      { ...customDraft('only-mine', 'openai:a'), delete: true },
+      { ...customDraft('only-mine'), delete: true },
       { scope: 'user' },
     );
     expect(deleted.definition).toBeNull();

@@ -17,7 +17,7 @@ it.each(['en', 'zh-CN'] as const)('keeps source identity and exact copy data, in
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const onClose = vi.fn();
   const t = ((key: Parameters<typeof translate>[1], args?: Parameters<typeof translate>[2]) => translate(language, key, args));
-  const render = async (diagnostics = issues) => act(async () => root.render(createElement(AgentManifestDiagnostics, { open: true, onClose, diagnostics, t })));
+  const render = async (diagnostics = issues) => act(async () => root.render(createElement(AgentManifestDiagnostics, { open: true, onClose, diagnostics, onMigrate: vi.fn(), onDeleteOverride: vi.fn(), t })));
   try {
     bridge.copyText.mockResolvedValue(true); await render();
     const dialog = document.querySelector('[data-testid="settings-agent-diagnostics-dialog"]')!;
@@ -33,5 +33,23 @@ it.each(['en', 'zh-CN'] as const)('keeps source identity and exact copy data, in
     expect(dialog.textContent).toContain(translate(language, 'settings.agentDiagnosticsCopyFailed')); expect(onClose).not.toHaveBeenCalled();
     await render([]); expect(document.querySelector('[data-testid="settings-agent-diagnostics-dialog"]')).not.toBeNull();
     expect(action('settings.agentDiagnosticsCopyAll').disabled).toBe(true);
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
+it('offers migrate and delete only for an override that still declares model fields', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const moved: AgentManifestDiagnostic = { code: 'AGENT_MANIFEST_FIELD_MOVED', severity: 'error', scope: 'user', agentId: 'general',
+    sourcePath: 'C:/user/agents/general.agent.md', message: 'model and reasoning-level are set in Settings → Agents.' };
+  const onMigrate = vi.fn(); const onDeleteOverride = vi.fn();
+  const t = ((key: Parameters<typeof translate>[1], args?: Parameters<typeof translate>[2]) => translate('en', key, args));
+  try {
+    await act(async () => root.render(createElement(AgentManifestDiagnostics, {
+      open: true, onClose: vi.fn(), diagnostics: [moved, issues[1]], onMigrate, onDeleteOverride, t })));
+    expect(document.querySelectorAll('[data-testid="settings-agent-diagnostic-migrate"]')).toHaveLength(1);
+    await act(async () => document.querySelector<HTMLButtonElement>('[data-testid="settings-agent-diagnostic-migrate"]')!.click());
+    await act(async () => document.querySelector<HTMLButtonElement>('[data-testid="settings-agent-diagnostic-delete"]')!.click());
+    expect(onMigrate).toHaveBeenCalledWith(moved);
+    expect(onDeleteOverride).toHaveBeenCalledWith(moved);
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

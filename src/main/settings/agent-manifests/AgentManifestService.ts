@@ -10,17 +10,18 @@ import type {
   AgentManifestSettings,
   AgentManifestWriteScope,
   AgentModelOption,
+  AgentBuiltinComparison,
 } from '@shared/types/agentManifest';
-import type { AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
 import { AGENT_ROLES } from '@shared/constants/agents';
-import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
-import { parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
+import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { isReservedAgentId } from '../settings-core/reservedAgentIds';
 
 const toSlug = (value: string): string => {
@@ -132,7 +133,6 @@ const loadManifestCandidates = (
             description: '',
             argumentHint: '',
             target: 'rdc-agent',
-            models: [],
             icon: 'message-orbit',
             accent: '#33d1ff',
             disableModelInvocation: false,
@@ -172,6 +172,13 @@ const loadManifestCandidates = (
 };
 
 export class AgentManifestService {
+  private readAgentModels: () => AgentModelSettings = () => ({ default: {}, byAgent: {} });
+
+  /** Settings owns which model each Agent uses; manifests never carry it. */
+  bindAgentModelSettings(read: () => AgentModelSettings): void {
+    this.readAgentModels = read;
+  }
+
   private getAgentsDirectory(paths: Pick<AppRuntimePaths, 'agentsPath'>): string {
     return paths.agentsPath;
   }
@@ -224,23 +231,44 @@ export class AgentManifestService {
     for (const entry of resolved.diagnostics) {
       const candidate = candidates.find(value => value.sourcePath === entry.sourcePath);
       if (!candidate) throw new Error('AGENT_DIAGNOSTIC_SOURCE_MISSING');
-      diagnostics.push({ ...entry, scope: candidate.scope, agentId: candidate.id, sourcePath: candidate.sourcePath });
+      const movedPrefix = `${AGENT_MANIFEST_FIELD_MOVED}: `;
+      const moved = entry.code === 'resource.invalid' && entry.message.startsWith(movedPrefix);
+      diagnostics.push({
+        ...entry,
+        ...(moved ? { code: AGENT_MANIFEST_FIELD_MOVED, message: entry.message.slice(movedPrefix.length) } : {}),
+        scope: candidate.scope,
+        agentId: candidate.id,
+        sourcePath: candidate.sourcePath,
+      });
     }
     const uniqueDiagnostics = [...new Map(diagnostics.map(issue => {
       const normalized = path.resolve(issue.sourcePath);
       const source = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
       return [JSON.stringify([source, issue.code, issue.message]), issue] as const;
     })).values()].sort((a, b) => a.scope.localeCompare(b.scope) || a.sourcePath.localeCompare(b.sourcePath) || a.code.localeCompare(b.code));
-    const profiles = resolved.resources.map((resource) => ({
-      ...resource.value,
-      builtin: resource.provenance.scope === 'builtin',
-      effectiveStatus: resource.effectiveStatus,
-      provenance: {
-        ...resource.provenance,
-        sourceHash: hashManifestFile(resource.provenance.sourcePath),
-      },
-      compiledRoute: this.routeFromDefinition(resource.value),
-    }));
+    const builtinHashes = new Map(candidates.filter((candidate) => candidate.scope === 'builtin')
+      .map((candidate) => [candidate.id, hashManifestFile(candidate.sourcePath)] as const));
+    const agentModels = this.readAgentModels();
+    const profiles = resolved.resources.map((resource) => {
+      const model = resolveAgentModel(resource.value.id, agentModels);
+      const builtinSourceHash = resource.provenance.scope === 'builtin' ? undefined : builtinHashes.get(resource.value.id);
+      return {
+        ...resource.value,
+        builtin: resource.provenance.scope === 'builtin',
+        effectiveStatus: resource.effectiveStatus,
+        provenance: {
+          ...resource.provenance,
+          sourceHash: hashManifestFile(resource.provenance.sourcePath),
+        },
+        compiledRoute: { agentId: resource.value.id, providerId: model.route?.providerId ?? '', modelId: model.route?.modelId ?? '' },
+        ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
+        modelSource: model.source,
+        ...(builtinSourceHash ? { builtinUpdate: {
+          builtinSourceHash,
+          status: !resource.value.basedOn ? 'unknown-base' as const : resource.value.basedOn === builtinSourceHash ? 'current' as const : 'updated' as const,
+        } } : {}),
+      };
+    });
     return { profiles, diagnostics: uniqueDiagnostics };
   }
 
@@ -258,7 +286,7 @@ export class AgentManifestService {
     return {
       directoryPath: this.getAgentsDirectory(paths),
       definitions,
-      modelOptions: this.getModelOptions(providers, definitions, routes, catalogs),
+      modelOptions: this.getModelOptions(providers, routes, catalogs),
       globalInstructions: this.readGlobalInstructions(paths),
       diagnostics,
     };
@@ -311,9 +339,8 @@ export class AgentManifestService {
     if (options.sourceHash && current && current.provenance.sourceHash !== options.sourceHash) {
       throw new Error('AGENT_MANIFEST_SOURCE_HASH_CONFLICT: the effective profile changed since the editor loaded.');
     }
-    if (current?.provenance.scope === 'builtin' && options.scope === 'project' && !draft.delete) {
-      // copy-on-write to project is allowed
-    }
+    // A copy of the current builtin records which builtin version it was taken from.
+    const basedOn = draft.basedOn ?? (current?.provenance.scope === 'builtin' ? current.provenance.sourceHash : undefined);
     const resolutionRoot = options.scope === 'project' ? options.projectRoot : undefined;
     if (draft.delete) {
       if (current?.provenance.scope === 'builtin' && options.scope === 'user') {
@@ -327,7 +354,7 @@ export class AgentManifestService {
     }
 
     const parsed = parseAgentMarkdownStrict(
-      serializeAgentMarkdown({ ...draft, id: agentId, fileName }),
+      serializeAgentMarkdown({ ...draft, id: agentId, fileName, ...(basedOn ? { basedOn } : {}) }),
       filePath,
       agentId,
       new Date().toISOString(),
@@ -340,6 +367,7 @@ export class AgentManifestService {
       ...draft,
       id: agentId,
       fileName,
+      ...(basedOn ? { basedOn } : {}),
     });
     const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
@@ -401,11 +429,48 @@ export class AgentManifestService {
     return parsed.ok ? parsed.definition : null;
   }
 
-  routeFromDefinition(definition: Pick<AgentManifestDraft, 'id' | 'models'>): LlmAgentRoute {
-    const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
-    return model
-      ? { agentId: definition.id, providerId: model.providerId, modelId: model.modelId }
-      : { agentId: definition.id, providerId: '', modelId: '' };
+  /**
+   * The override file behind a current diagnostic with `code`. The renderer only names a path;
+   * main accepts it only when its own snapshot reports that diagnostic for that file.
+   */
+  resolveDiagnosedOverride(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    sourcePath: string,
+    code: string,
+    projectRoot?: string,
+  ): { agentId: string; scope: AgentManifestWriteScope; sourcePath: string; sourceHash: string } {
+    const target = path.resolve(sourcePath);
+    const diagnostic = this.resolveEffectiveSnapshot(paths, projectRoot).diagnostics.find((issue) => (
+      issue.code === code && issue.scope !== 'builtin' && path.resolve(issue.sourcePath) === target
+    ));
+    if (!diagnostic || diagnostic.scope === 'builtin') {
+      throw new Error(`AGENT_OVERRIDE_NOT_DIAGNOSED: ${sourcePath} has no current ${code} diagnostic.`);
+    }
+    return { agentId: diagnostic.agentId, scope: diagnostic.scope, sourcePath: target, sourceHash: hashManifestFile(target) };
+  }
+
+  /** The current builtin and the effective user/project override of one Agent. */
+  readBuiltinComparison(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    agentId: string,
+    projectRoot?: string,
+  ): AgentBuiltinComparison {
+    const profile = this.resolveEffectiveSnapshot(paths, projectRoot).profiles.find((entry) => entry.id === agentId);
+    const builtinPath = path.join(appPathService.getBuiltinAgentsPath(), `${agentId}.agent.md`);
+    if (!profile || profile.provenance.scope === 'builtin' || !profile.builtinUpdate || !fs.existsSync(builtinPath)) {
+      throw new Error(`AGENT_BUILTIN_COMPARISON_UNAVAILABLE: ${agentId} does not override a builtin profile.`);
+    }
+    return {
+      agentId,
+      builtinContent: fs.readFileSync(builtinPath, 'utf8'),
+      overrideContent: fs.readFileSync(profile.provenance.sourcePath, 'utf8'),
+    };
+  }
+
+  /** The route an Agent resolves to from Settings → Agents; empty when no model is configured. */
+  routeForAgent(agentId: string): LlmAgentRoute {
+    const model = resolveAgentModel(agentId, this.readAgentModels()).route;
+    return { agentId, providerId: model?.providerId ?? '', modelId: model?.modelId ?? '' };
   }
 
   async importFile(
@@ -455,7 +520,7 @@ export class AgentManifestService {
       routeAgentIds.add(definition.id);
       // Preserve the explicit canonical route. EffectiveCatalog is the only
       // authority that may accept or reject the model at execution time.
-      routeMap.set(definition.id, this.routeFromDefinition(definition));
+      routeMap.set(definition.id, this.routeForAgent(definition.id));
     }
     return Array.from(routeAgentIds).map((agentId) => routeMap.get(agentId) ?? {
       agentId,
@@ -472,7 +537,7 @@ export class AgentManifestService {
   ): AgentManifestSettings {
     return {
       ...settings,
-      modelOptions: this.getModelOptions(providers, settings.definitions, routes, catalogs),
+      modelOptions: this.getModelOptions(providers, routes, catalogs),
     };
   }
 
@@ -495,12 +560,12 @@ export class AgentManifestService {
 
   private getModelOptions(
     providers: LlmProviderEntry[],
-    definitions: Array<Pick<AgentManifestDefinition, 'models'>>,
     routes: LlmAgentRoute[],
     catalogs: EffectiveCatalogSnapshot[],
   ): AgentModelOption[] {
+    const agentModels = this.readAgentModels();
     const referenced = new Set([
-      ...definitions.flatMap((definition) => definition.models),
+      ...[agentModels.default, ...Object.values(agentModels.byAgent)].map((binding) => binding.model ?? '').filter(Boolean),
       ...routes.map((route) => canonicalAgentModelId(route.providerId, route.modelId)).filter(Boolean),
     ]);
     const options: AgentModelOption[] = [];

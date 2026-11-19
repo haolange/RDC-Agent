@@ -398,6 +398,10 @@ export interface ElectronAPI {
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
     getAgentDefinitionCommit: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<AgentDefinitionCommitSnapshot | null>;
+    previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
+    applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
+    deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
+    getAgentBuiltinComparison: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<import('./agentManifest').AgentBuiltinComparison>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
     getModelsOverride: () => Promise<ModelsOverride>;

@@ -8,7 +8,6 @@ describe('app settings browser parity', () => {
       settings: DEFAULT_SETTINGS,
       hydrated: false,
       systemTheme: 'dark',
-      agentRouteSyncById: {},
     });
     vi.unstubAllGlobals();
   });

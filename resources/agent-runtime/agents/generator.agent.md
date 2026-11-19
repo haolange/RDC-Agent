@@ -3,8 +3,6 @@ name: Generator
 description: Develop evidence-based explanations, competing hypotheses and candidate checks within the assigned investigation.
 argument-hint: Task and evidence
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false

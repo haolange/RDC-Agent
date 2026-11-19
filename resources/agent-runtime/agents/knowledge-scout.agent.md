@@ -3,8 +3,6 @@ name: Knowledge Scout
 description: Find relevant knowledge, compare scope and contrary material, and identify applicable checks with versioned sources.
 argument-hint: Task and evidence
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false

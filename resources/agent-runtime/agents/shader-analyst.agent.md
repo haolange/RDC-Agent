@@ -3,8 +3,6 @@ name: Shader Analyst
 description: Analyze authorized shader source, IR and dataflow and qualify reconstructed and inferred conclusions.
 argument-hint: Task and evidence
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false

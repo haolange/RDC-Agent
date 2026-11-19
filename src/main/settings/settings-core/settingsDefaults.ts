@@ -1,4 +1,5 @@
 import type {
+  AgentModelSettings,
   AppRuntimePaths,
   AgentPermissionMode,
   AgentPermissionSettings,
@@ -47,6 +48,7 @@ export interface PersistedSettingsPayload {
     permissions?: Partial<AgentPermissionSettings>;
     context?: Partial<{ compactionThresholdPercent: number }>;
   };
+  agentModels?: AgentModelSettings;
 }
 
 export const LEFT_DEFAULTS = {
@@ -160,6 +162,7 @@ export function createDefaultPersistedSettings(): PersistedSettingsPayload {
     profile: DEFAULT_PROFILE,
     tooling: DEFAULT_TOOLING,
     agentRuntime: DEFAULT_AGENT_RUNTIME,
+    agentModels: { default: {}, byAgent: {} },
     llm: {
       providers: [],
     },

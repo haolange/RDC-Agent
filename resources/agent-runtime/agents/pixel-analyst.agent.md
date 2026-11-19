@@ -3,8 +3,6 @@ name: Pixel Analyst
 description: Analyze authorized image and pixel evidence and preserve sampling, mapping and quality limitations.
 argument-hint: Task and evidence
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false

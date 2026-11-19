@@ -1,4 +1,5 @@
 import type {
+  AgentModelSettings,
   AppSettings,
   AppSettingsPatch,
   LlmProviderEntry,
@@ -6,14 +7,16 @@ import type {
 import type {
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
+  AgentManifestDefinition,
   AgentManifestDraft,
+  AgentOverrideFileRequest,
 } from '@shared/types/agentManifest';
 import { resolveAgentWriteTargetFromDraft, toAgentManifestEditorDraft } from '@shared/types/agentManifest';
 import { applyAgentDefinitionSaveResults, selectSubmittableAgentManifestDrafts } from './agentManifestAutosaveState';
 import type { useI18n } from '../../../i18n';
 import type { useProviderConnection } from './useProviderConnection';
 import type { useSettingsModalState } from './useSettingsModalState';
-import { cloneRoute, getErrorMessage } from './utils';
+import { getErrorMessage } from './utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type ModalState = ReturnType<typeof useSettingsModalState>;
@@ -29,6 +32,9 @@ interface SettingsModalActionsOptions {
   t: Translate;
   blockSubmit?: (draft: AgentManifestDraft) => string | null;
   blockProjectedSubmit?: (projectedDrafts: AgentManifestDraft[]) => string | null;
+  replaceSettings: (settings: AppSettings) => void;
+  /** Makes definitions main committed outside autosave the autosave baseline. */
+  rebaseAgentDrafts: (definitions: AgentManifestDefinition[]) => void;
 }
 
 export interface AgentManifestSaveBatch {
@@ -46,7 +52,18 @@ export function createSettingsModalActions({
   t,
   blockSubmit,
   blockProjectedSubmit,
+  replaceSettings,
+  rebaseAgentDrafts,
 }: SettingsModalActionsOptions) {
+  /** Settings main committed outside autosave (import, migration) replace the store and the Agent drafts. */
+  const adoptAgentSettings = (nextSettings: AppSettings) => {
+    replaceSettings(nextSettings);
+    rebaseAgentDrafts(nextSettings.agents.definitions);
+    modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => (
+      toAgentManifestEditorDraft(definition, currentProjectId)
+    )));
+  };
+
   const handleAvatarSelect = async () => {
     const avatarPath = await window.electronAPI?.appShell.selectAvatar();
     if (!avatarPath) return;
@@ -141,16 +158,41 @@ export function createSettingsModalActions({
     modalState.setAgentManifestSaveMessage('');
     try {
       const nextSettings = await window.electronAPI.settings.importAgentManifest(filePath);
-      modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => (
-        toAgentManifestEditorDraft(definition, currentProjectId)
-      )));
-      modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
+      adoptAgentSettings(nextSettings);
       modalState.setAgentManifestSaveState('saved');
       modalState.setAgentManifestSaveMessage(t('settings.agentManifestImported'));
     } catch (error) {
       modalState.setAgentManifestSaveState('error');
       modalState.setAgentManifestSaveMessage(getErrorMessage(error, t('settings.agentManifestSaveFailed')));
     }
+  };
+
+  /** Model choices live in Settings, so they commit immediately rather than through manifest autosave. */
+  const handleAgentModelsChange = async (agentModels: AgentModelSettings): Promise<void> => {
+    await patchSettings({ agentModels });
+  };
+
+  const previewAgentModelMigration = (sourcePath: string) => (
+    window.electronAPI.settings.previewAgentModelMigration(sourcePath)
+  );
+
+  const handleCommitAgentOverrideFile = async (
+    action: 'migrate' | 'delete',
+    request: AgentOverrideFileRequest,
+  ): Promise<void> => {
+    const nextSettings = action === 'migrate'
+      ? await window.electronAPI.settings.applyAgentModelMigration(request)
+      : await window.electronAPI.settings.deleteAgentOverrideFile(request);
+    adoptAgentSettings(nextSettings);
+  };
+
+  const loadAgentBuiltinComparison = (draft: AgentManifestDraft) => {
+    const write = resolveAgentWriteTargetFromDraft(draft, currentProjectId);
+    return window.electronAPI.settings.getAgentBuiltinComparison({
+      agentId: draft.id,
+      scope: write.scope,
+      ...(write.projectId ? { projectId: write.projectId } : {}),
+    });
   };
 
   const handleSaveToolsConfig = async () => {
@@ -182,6 +224,10 @@ export function createSettingsModalActions({
     handleDisconnectProvider,
     handleSaveAgentManifests,
     handleImportAgentManifest,
+    handleAgentModelsChange,
+    previewAgentModelMigration,
+    handleCommitAgentOverrideFile,
+    loadAgentBuiltinComparison,
     handleSaveToolsConfig,
     handleSavePersonalization,
   };

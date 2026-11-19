@@ -3,8 +3,6 @@ name: Pass Analyst
 description: Analyze authorized pass, pipeline and execution relationships and identify unresolved dependencies.
 argument-hint: Task and evidence
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false

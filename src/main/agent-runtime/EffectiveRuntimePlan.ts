@@ -21,7 +21,6 @@ export interface FrozenHandoffDefinition {
   prompt: string;
   send?: boolean;
   surface?: 'turn-end' | 'plan-gate' | 'hidden';
-  model?: string;
   requiredSkillIds?: readonly string[];
   requiredToolIds?: readonly string[];
 }
@@ -193,7 +192,6 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     prompt: handoff.prompt,
     ...(handoff.send !== undefined ? { send: handoff.send } : {}),
     ...(handoff.surface !== undefined ? { surface: handoff.surface } : {}),
-    ...(handoff.model !== undefined ? { model: handoff.model } : {}),
     ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
       ? { requiredSkillIds: Object.freeze([...handoff.requiredSkillIds]) }
       : {}),

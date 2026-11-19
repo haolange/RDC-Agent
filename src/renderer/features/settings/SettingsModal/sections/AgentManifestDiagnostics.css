@@ -9,3 +9,4 @@
 .agent-diagnostics-scope { color: var(--token-text-caption); font-size: var(--text-xs); }
 .agent-diagnostics-path, .agent-diagnostics-item code { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .agent-diagnostics-path { color: var(--token-text-caption); }
+.agent-diagnostics-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }

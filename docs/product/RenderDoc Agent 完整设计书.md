@@ -44,7 +44,7 @@
 | 交接 | Mission 规划，用户批准计划并点击执行后才进入 General。需要重规划时，General 就地交付缺口与 Checkpoint，由用户切回原 Mission。没有自动交接；runtime 不按身份、深度或正文开下一轮 |
 | 身份 | 四个用户入口：General、Debugger、Analyzer、Optimizer。八个内部 Agent：generator、verifier、knowledge-scout、report-writer、shader-analyst、pass-analyst、resource-analyst、pixel-analyst。其余领域职责由 Skill 承载，按任务需要调用 |
 | 规划身份的能力 | Mission 只读：通过受控的只读探测访问 RDC，不运行 shell 或解释器，只可委派 knowledge-scout。Live RDC 的操作与实验只由 General 执行 |
-| 模型 | 模型与推理档位归各 Agent 配置。子执行读取目标 Agent 的配置，不继承父对话的选择；配置不可用时明确失败 |
+| 模型 | 模型与推理档位在 Settings → Agents 设置：一个默认值，每个 Agent 可逐项覆盖；项目不能指定。子执行按目标 Agent 解析，不继承父对话的选择；未设置或不可用时明确失败 |
 | 完成状态 | completed／partial／blocked／cancelled／budget_paused。多个解释无法区分时是 partial，逐项写明未能区分的解释及所需信息 |
 | 请求上限 | 不以固定默认总轮数收口，由目标与核验闭环决定继续和完成。用户显式限制、期限、取消和无进展检测始终有效；续跑、压缩、恢复和重新委派沿用累计消费与原期限 |
 | 检索 | 不使用 Embedding 或 Semantic 通道。Markdown 原文是唯一来源，六条检索通道：Identity／Path、Scope／Metadata、Lexical、Structural、Relation／Graph、Temporal／Version |

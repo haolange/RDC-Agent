@@ -1,4 +1,4 @@
-import type { AppLanguage, LlmProviderId } from './settings';
+import type { AgentModelBinding, AppLanguage, LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 import type { ModelCost } from '../provider-catalog/modelManifestSchema';
 import type { ReasoningSelection } from './modelCapability';
@@ -30,7 +30,6 @@ export interface AgentHandoffDefinition {
   send?: boolean;
   /** Omitted means `turn-end`. */
   surface?: HandoffSurface;
-  model?: string;
   /** Skills the receiving turn must actually preload after this handoff. */
   requiredSkillIds?: string[];
   /** Deferred tools the receiving turn pre-activates (within its own frozen tool set). */
@@ -67,9 +66,14 @@ export interface AgentManifestDefinition {
   description: string;
   argumentHint: string;
   target: string;
-  models: string[];
-  /** Agent's default reasoning selection; user-turn controls can override it. */
+  /** Resolved from Settings → Agents (this Agent's setting, else the default); never read from the file. */
   reasoningLevel?: ReasoningSelection;
+  /** Where the resolved model comes from: this Agent's own setting, the default, or nothing configured. */
+  modelSource?: 'agent' | 'default' | 'none';
+  /** Builtin sourceHash this override was copied from; written by Settings copy-on-write. */
+  basedOn?: string;
+  /** For a user/project override of a builtin id: whether the builtin changed since the override was copied. */
+  builtinUpdate?: { builtinSourceHash: string; status: 'current' | 'updated' | 'unknown-base' };
   icon: ModeIconKey;
   /** Compose accent (#RRGGBB). Drives composer shell glow and Effort slider. */
   accent: string;
@@ -107,7 +111,7 @@ export interface AgentManifestProvenance {
 
 export interface AgentManifestDraft extends Omit<
   AgentManifestDefinition,
-  'filePath' | 'builtin' | 'updatedAt' | 'provenance' | 'compiledRoute'
+  'filePath' | 'builtin' | 'updatedAt' | 'provenance' | 'compiledRoute' | 'reasoningLevel' | 'modelSource' | 'builtinUpdate'
 > {
   delete?: boolean;
   writeScope?: AgentManifestWriteScope;
@@ -152,6 +156,33 @@ export interface AgentManifestSettings {
 }
 
 export type AgentManifestWriteScope = 'user' | 'project';
+
+/** An override file the user acts on from the diagnostics list; the hash pins the content they reviewed. */
+export interface AgentOverrideFileRequest {
+  sourcePath: string;
+  sourceHash: string;
+}
+
+/** What migrating a manifest that still declares model fields will change. */
+export interface AgentModelMigrationPreview extends AgentOverrideFileRequest {
+  agentId: string;
+  scope: AgentManifestWriteScope;
+  /** Written to Settings → Agents for this Agent, replacing `currentBinding`. */
+  binding: AgentModelBinding;
+  currentBinding: AgentModelBinding;
+  /** Per-handoff models have no replacement: the target Agent's own setting applies. */
+  droppedHandoffModels: Array<{ label: string; agent: string; model: string }>;
+  /** Declared values that are not a canonical model id or a supported reasoning level. */
+  ignoredValues: string[];
+  backupPath: string;
+}
+
+/** Current builtin and override text of one Agent, for the builtin-update comparison. */
+export interface AgentBuiltinComparison {
+  agentId: string;
+  builtinContent: string;
+  overrideContent: string;
+}
 
 export interface AgentDefinitionCommitQuery {
   agentId: string;
@@ -205,6 +236,9 @@ export function toAgentManifestEditorDraft(
     updatedAt: _updatedAt,
     provenance: _provenance,
     compiledRoute: _compiledRoute,
+    reasoningLevel: _reasoningLevel,
+    modelSource: _modelSource,
+    builtinUpdate: _builtinUpdate,
     ...rest
   } = definition;
   const write = resolveAgentWriteTarget(definition, currentProjectId);

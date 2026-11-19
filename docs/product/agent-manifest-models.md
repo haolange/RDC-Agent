@@ -1,6 +1,6 @@
 # Agent Manifest 与模型选择
 
-RDC-Agent 以 `.agent.md` 作为 agent 行为配置的唯一产品入口。Settings UI 读取和写入同一组文件，因此用户可以通过 GUI 或 Markdown 配置 agent。
+RDC-Agent 以 `.agent.md` 作为 agent 行为配置的唯一产品入口。Settings UI 读取和写入同一组文件，因此用户可以通过 GUI 或 Markdown 配置 agent。每个 Agent 用哪个模型和推理档位不在 `.agent.md` 里，而在 Settings → Agents（见「模型选择」）。
 
 ## Manifest 位置
 
@@ -24,7 +24,7 @@ Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 - `description`
 - `argument-hint`
 - `target`
-- `model`
+- `based-on`（复制内置时由 Settings 写入的内置 sourceHash，64 位十六进制；用于「内置已更新」提示，手写覆盖可省略）
 - `icon`（图标预设）
 - `accent`（`#RRGGBB`；驱动 Composer 边框流光、边缘泛光与 Effort 滑条色；Settings → Agents 可编辑）
 - `enabled`
@@ -38,6 +38,8 @@ Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 
 已移除字段（禁止恢复）：`harness` 与 lean/standard 厚度档位。Skill 发现只有 Progressive Skill Index。
 
+已移到 Settings 的字段：`model`、`reasoning-level`、handoff 的 `model`。声明任一字段的文件判无效（`AGENT_MANIFEST_FIELD_MOVED`），按 `builtin < user < project` 回落下层并显示诊断；Agents 页对该诊断提供【迁移】（预览 → 备份为 `<文件>.bak` → 把模型与档位写入 `agentModels.byAgent[id]` 并去掉字段 → 原子替换）与【删除覆盖】。handoff 的模型没有替代字段，目标 Agent 用自己的设置。
+
 `handoffs` support:
 
 - `label`（基础名称；与 agent 共同构成声明交接身份）
@@ -46,7 +48,6 @@ Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 - `prompt`
 - `send`
 - `surface`（`turn-end` | `plan-gate` | `hidden`；省略等于 `turn-end`。`turn-end` 在回合结束后和计划门出现，`plan-gate` 只在计划门出现，`hidden` 不出现。Settings 省略默认值）
-- `model`
 - `requiredSkillIds`（批准后由接收回合 prepareTurn 实际预载；不能授权工具）
 - `requiredToolIds`（接收回合在自己的天花板和冻结工具集内预先激活这些 id）
 
@@ -58,7 +59,11 @@ Profile 还可声明通用字段 `access-ceiling`（`read-only` | `workspace-wri
 
 Composer 与 orchestrator 的切换列表来自 `enabled && userInvocable` 为真的 `.agent.md` 定义。
 
-Agent 的 `model` 是会话未显式选择时的初始模型配置，空列表合法；没有可执行路由时 Composer 提示选择模型，不静默选择目录中的其它模型。Composer / 计划卡的模型和 Effort、Fast、Max 保存在会话 `modelOverride + turnControls`，首次建会话前使用 Composer 草稿，不写回 Agent 文件。进入计划审批不切换到交接目标的默认模型；批准前将继承的当前模型与参数落地到同一会话。
+## 模型选择
+
+模型只存用户设置 `~/.rdc-agent/config.json` 的 `agentModels`（schema 8 可选段）：`default` 是默认模型与推理档位，`byAgent[agentId]` 可只设模型或只设档位，缺的字段逐项取默认。项目不能指定模型。子执行按目标 Agent 解析，不继承父会话。Settings 改动立即生效于下一次请求。
+
+这是会话未显式选择时的初始模型；都未设置时 Composer 提示选择模型，不静默选择目录中的其它模型。Composer / 计划卡的模型和 Effort、Fast、Max 保存在会话 `modelOverride + turnControls`，首次建会话前使用 Composer 草稿，不写回 Agent 文件。进入计划审批不切换到交接目标的默认模型；批准前将继承的当前模型与参数落地到同一会话。
 
 ## Tool Tokens
 

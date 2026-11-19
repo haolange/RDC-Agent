@@ -54,7 +54,6 @@ function agentDraft(overrides) {
     description: overrides.description ?? 'Custom profile used by settings regression checks.',
     argumentHint: overrides.argumentHint ?? 'Describe the task for this custom profile',
     target: 'rdc-agent',
-    models: overrides.models ?? [],
     icon: overrides.icon ?? 'spark',
     accent: overrides.accent ?? '#33d1ff',
     disableModelInvocation: false,
@@ -71,13 +70,12 @@ function agentDraft(overrides) {
 }
 
 function writeCustomManifest(filePath, options = {}) {
-  const modelLine = options.model ? `model:\n  - ${options.model}\n` : 'model: []\n';
   fs.writeFileSync(filePath, `---
 name: ${options.name ?? 'Custom Browser Use Agent'}
 description: ${options.description ?? 'A custom user-invocable profile for regression checks.'}
 argument-hint: Describe the custom browser-use task
 target: rdc-agent
-${modelLine}icon: spark
+icon: spark
 accent: "#33d1ff"
 disable-model-invocation: false
 user-invocable: true
@@ -284,8 +282,8 @@ async function main() {
     path.join(repoRoot, 'src/renderer/features/composer/useTurnControls.ts'),
     'utf8',
   );
-  assert(capabilityHook.includes("status: 'syncing-route'"), 'Composer capability resolution should wait for the committed Agent route revision.');
-  assert(capabilityHook.includes('routeCommitKey'), 'Composer capability resolution should re-run on Agent route commits even when route text is unchanged.');
+  assert(!capabilityHook.includes('syncing-route') && !capabilityHook.includes('routeSyncState'),
+    'Agent routes come from Settings → Agents; manifest saves never move them, so the Composer keeps no route-sync state.');
   const catalogCapability = readSrcFile(path.join(repoRoot, 'src/renderer/lib/capabilityResolution.ts'), 'utf8');
   assert(capabilityHook.includes('resolveCatalogCapability') && catalogCapability.includes('validateCapabilityResolution(expected, model)'), 'Capability mismatches should terminate as unavailable instead of loading forever.');
   assert(catalogCapability.includes("status: 'error'"), 'Capability request failures should have an explicit error state.');
@@ -390,11 +388,16 @@ async function main() {
     const instructionsPath = path.join(tempRoot, 'RDC.md');
     fs.mkdirSync(agentsPath, { recursive: true });
     const customManifestPath = path.join(agentsPath, `${customAgentId}.agent.md`);
-    writeCustomManifest(customManifestPath, {
-      model: canonicalAgentModelId('ollama', 'llama3'),
-    });
+    writeCustomManifest(customManifestPath);
 
     const manifestService = new AgentManifestService();
+    manifestService.bindAgentModelSettings(() => ({
+      default: {},
+      byAgent: {
+        [customAgentId]: { model: canonicalAgentModelId('ollama', 'llama3') },
+        'custom-invalid-route-agent': { model: canonicalAgentModelId('ollama', 'missing-model') },
+      },
+    }));
     const manifestSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
     const customDefinition = manifestSettings.definitions.find((definition) => definition.id === customAgentId);
     assert(customDefinition, 'Agent manifest settings should load a safe custom .agent.md profile.');
@@ -404,7 +407,7 @@ async function main() {
 
     const routeSettings = manifestService.routesFromDefinitions(validRoutes, manifestSettings.definitions);
     const customRoute = routeSettings.find((entry) => entry.agentId === customAgentId);
-    assert(customRoute?.providerId === 'ollama' && customRoute.modelId === 'llama3', 'Custom manifest model should derive a valid route.');
+    assert(customRoute?.providerId === 'ollama' && customRoute.modelId === 'llama3', 'A custom Agent route must come from its Settings → Agents model.');
     for (const agentId of AGENT_ROLES) {
       assert(routeSettings.some((entry) => entry.agentId === agentId), `Routes should retain built-in Agent route ${agentId}.`);
     }
@@ -415,7 +418,6 @@ async function main() {
       await manifestService.saveDefinition({ agentsPath, instructionsPath }, agentDraft({
         id: savedAgentId,
         fileName: 'wrong-file-name.agent.md',
-        models: [canonicalAgentModelId('ollama', 'llama3')],
       }));
     } catch (error) {
       mismatchRejected = String(error instanceof Error ? error.message : error).includes('AGENT_MANIFEST_FILENAME_MISMATCH');
@@ -426,7 +428,6 @@ async function main() {
     await manifestService.saveDefinition({ agentsPath, instructionsPath }, agentDraft({
       id: savedAgentId,
       fileName: `${savedAgentId}.agent.md`,
-      models: [canonicalAgentModelId('ollama', 'llama3')],
     }));
     manifestService.saveGlobalInstructions({ instructionsPath }, 'global custom instructions');
     assert(fs.existsSync(path.join(agentsPath, `${savedAgentId}.agent.md`)), 'Saving a custom profile should write a safe id-based file name.');
@@ -434,22 +435,23 @@ async function main() {
     assert(savedSettings.definitions.some((definition) => definition.id === savedAgentId), 'Saved custom profile should reload by custom id.');
 
     const invalidRouteSettings = manifestService.routesFromDefinitions([], [
-      agentDraft({
-        id: 'custom-invalid-route-agent',
-        models: [canonicalAgentModelId('ollama', 'missing-model')],
-      }),
+      agentDraft({ id: 'custom-invalid-route-agent' }),
     ]);
     const invalidRoute = invalidRouteSettings.find((entry) => entry.agentId === 'custom-invalid-route-agent');
     assert(
       invalidRoute?.providerId === 'ollama' && invalidRoute.modelId === 'missing-model',
-      'Manifest save must preserve an explicit route; EffectiveCatalog rejects unavailable models at execution time.',
+      'Settings must preserve an explicit route; EffectiveCatalog rejects unavailable models at execution time.',
     );
 
     const importPath = path.join(tempRoot, 'custom-imported-agent.agent.md');
-    writeCustomManifest(importPath, {
-      name: 'Custom Imported Agent',
-      model: canonicalAgentModelId('ollama', 'llama3'),
-    });
+    writeCustomManifest(importPath, { name: 'Custom Imported Agent' });
+
+    const movedFieldPath = path.join(agentsPath, 'custom-moved-field-agent.agent.md');
+    fs.writeFileSync(movedFieldPath, fs.readFileSync(importPath, 'utf8').replace('icon: spark', 'model: [ollama:llama3]\nicon: spark'));
+    const movedFieldSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
+    assert(movedFieldSettings.diagnostics.some((issue) => issue.code === 'AGENT_MANIFEST_FIELD_MOVED' && issue.sourcePath === movedFieldPath),
+      'A manifest that still declares a model must stay inactive with a migratable diagnostic.');
+    fs.rmSync(movedFieldPath);
     const imported = await manifestService.importFile({ agentsPath, instructionsPath }, importPath);
     assert(imported.id === 'custom-imported-agent', 'Import should accept safe non-built-in .agent.md profiles.');
 

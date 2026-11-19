@@ -6,7 +6,6 @@ import type {
 } from '@shared/types/agentManifest';
 import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 import type { AppSettings, LlmAgentRoute } from '@shared/types/settings';
-import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 
 export interface AgentDefinitionRollback {
   definition: AgentManifestDefinition | null;
@@ -69,12 +68,8 @@ export function beginAgentDefinitionSave(settings: AppSettings, request: AgentDe
   const agentId = request.draft.id;
   const existing = settings.agents.definitions.find((entry) => entry.id === agentId) ?? null;
   const previousRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId) ?? null;
-  const parsedModel = request.draft.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
-  const optimisticRoute = request.draft.delete
-    ? null
-    : parsedModel
-      ? { agentId, providerId: parsedModel.providerId, modelId: parsedModel.modelId }
-      : { agentId, providerId: '', modelId: '' };
+  // The route comes from Settings → Agents, not the manifest; a saved definition keeps it.
+  const optimisticRoute = request.draft.delete ? null : previousRoute;
   const optimisticDefinition = request.draft.delete || !existing
     ? null
     : { ...existing, ...request.draft } as AgentManifestDefinition;

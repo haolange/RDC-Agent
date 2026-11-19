@@ -3,8 +3,6 @@ name: Report Writer
 description: Organize eligible claims and evidence without upgrading their qualification or concealing limitations.
 argument-hint: Task and evidence
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false

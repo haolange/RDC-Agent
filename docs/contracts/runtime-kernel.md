@@ -362,7 +362,7 @@ Small/Big Loop、专业委派和补证方向由实际加载的 Skill 与模型�
 
 超阈值的原生 RDC `shell` 回执保留完整 session artifact 引用和文件 hash；模型可见摘要从同一主进程校验后的结果提取四项 execution identity、原生 result kind/ok/trace。Pixel History 另投影目标、事件、历史/片元/通过/有效 shader 数量和少量通过的 primitive ID。摘要仅是可追溯的事实索引，不替代完整 payload；身份不一致时显式报错，不生成看似可信的正常摘要。
 
-Capsule 的 `profile` 选择 Agent 身份，不提供自由 `model` / `reasoningLevel`。子执行从目标 Agent 配置解析模型和推理档位，不继承父会话覆盖；缺失或不可用时明确失败，不回退父模型。`sourceRefs`、`challengeRefs`、`inputArtifactRefs` 只接受已有受控 URI；自然语言质疑属于 hypotheses/negativePaths。工具搜索无匹配只证明当前筛选无匹配。
+Capsule 的 `profile` 选择 Agent 身份，不提供自由 `model` / `reasoningLevel`。子执行按目标 Agent 从 Settings → Agents 解析模型和推理档位（本 Agent 设置优先，其余字段取默认），不继承父会话覆盖；缺失或不可用时明确失败，不回退父模型。`sourceRefs`、`challengeRefs`、`inputArtifactRefs` 只接受已有受控 URI；自然语言质疑属于 hypotheses/negativePaths。工具搜索无匹配只证明当前筛选无匹配。
 
 压缩先验证原始来源，再持久保存候选，检查取消后原子安装窗口，安装后才发布 after-compact。此前 Provider response ID 不进入新窗口，以免 stateful adapter 绕过可移植续做状态；后续新响应仍可按已验证路由正常续接。签名/加密 reasoning 不进入可读摘要，原始用户历史不删除。原始文本与权威状态无法放入专用调用安全预算时暂停并保留原内容；未声称无限长度或无损压缩。
 

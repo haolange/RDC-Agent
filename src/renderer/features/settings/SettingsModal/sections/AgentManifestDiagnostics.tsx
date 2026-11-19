@@ -9,8 +9,15 @@ import type { AgentManifestDiagnostic } from '@shared/types/agentManifest';
 import './AgentManifestDiagnostics.css';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-export function AgentManifestDiagnostics({ open, onClose, diagnostics, t }: {
-  open: boolean; onClose: () => void; diagnostics: AgentManifestDiagnostic[]; t: Translate;
+
+/** Main reports an override that still declares model fields with this code; it can be migrated. */
+const FIELD_MOVED = 'AGENT_MANIFEST_FIELD_MOVED';
+
+export function AgentManifestDiagnostics({ open, onClose, diagnostics, onMigrate, onDeleteOverride, t }: {
+  open: boolean; onClose: () => void; diagnostics: AgentManifestDiagnostic[];
+  onMigrate: (issue: AgentManifestDiagnostic) => void;
+  onDeleteOverride: (issue: AgentManifestDiagnostic) => void;
+  t: Translate;
 }) {
   const { copyText } = useClipboardBridge();
   const [copying, setCopying] = useState(false);
@@ -43,7 +50,17 @@ export function AgentManifestDiagnostics({ open, onClose, diagnostics, t }: {
             <Button variant="ghost" size="sm" disabled={copying} onClick={() => void copy([issue])}>{t('settings.agentDiagnosticsCopyOne')}</Button>
           </div>
           <p className="agent-diagnostics-path">{issue.sourcePath}</p>
-          <p>{t('settings.agentDiagnosticsInvalid')}</p>
+          <p>{t(issue.code === FIELD_MOVED ? 'settings.agentDiagnosticsFieldMoved' : 'settings.agentDiagnosticsInvalid')}</p>
+          {issue.code === FIELD_MOVED ? (
+            <div className="agent-diagnostics-actions">
+              <Button variant="secondary" size="sm" onClick={() => onMigrate(issue)} data-testid="settings-agent-diagnostic-migrate">
+                {t('settings.agentModelMigrationOpen')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => onDeleteOverride(issue)} data-testid="settings-agent-diagnostic-delete">
+                {t('settings.agentOverrideDeleteOpen')}
+              </Button>
+            </div>
+          ) : null}
           <Details summary={t('settings.agentDiagnosticsDetails')}>
             <code>{issue.code}</code>
             <p>{issue.message}</p>

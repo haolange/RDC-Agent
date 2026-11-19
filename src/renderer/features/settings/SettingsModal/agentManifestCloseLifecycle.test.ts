@@ -11,7 +11,7 @@ import type { AgentManifestSaveBatch } from './settingsModalActions';
 
 const definition = (scope: 'project' | 'user'): AgentManifestDefinition => ({
   id: 'general', fileName: 'general.agent.md', filePath: '/general.agent.md', name: 'General',
-  description: '', argumentHint: '', target: 'rdc-agent', models: [], icon: 'spark', accent: '#33d1ff',
+  description: '', argumentHint: '', target: 'rdc-agent', icon: 'spark', accent: '#33d1ff',
   disableModelInvocation: false, userInvocable: true, tools: [], skills: [], mcpServers: [], agents: [],
   handoffs: [], metadata: {}, instructions: 'original', builtin: false, enabled: true,
   provenance: { scope, sourcePath: '/general.agent.md', sourceHash: 'original-hash' },

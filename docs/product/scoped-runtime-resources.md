@@ -31,11 +31,11 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 首次上手说明不会复制官方资源或创建指令文件。已阅读标记属于 Electron 应用状态；用户/项目资源仅承载各自自定义内容。官方 Agent 文件直接位于 `resources/agent-runtime/agents/*.agent.md`。
 
-四个默认入口是 `general`、`debugger`、`analyzer`、`optimizer`；另有八个默认内部 Agent（详见 ARCHITECTURE 裁决 A）。官方文件与 user/project 资源经同一优先级合成 effective snapshot；内部 Agent 默认不作为顶层入口。每个 Agent 的模型、推理档位与默认 Skill 随其配置解析，子执行不继承父回合模型覆盖。历史非法 ID 继续诊断 `AGENT_ID_RESERVED_HISTORICAL`；资源读取不改写用户文件。
+四个默认入口是 `general`、`debugger`、`analyzer`、`optimizer`；另有八个默认内部 Agent（详见 ARCHITECTURE 裁决 A）。官方文件与 user/project 资源经同一优先级合成 effective snapshot；内部 Agent 默认不作为顶层入口。每个 Agent 的默认 Skill 随其配置解析；模型与推理档位由 Settings → Agents 按 Agent 解析（项目不能指定），子执行不继承父回合模型覆盖。历史非法 ID 继续诊断 `AGENT_ID_RESERVED_HISTORICAL`；资源读取不改写用户文件。
 
 Agent 配置诊断使用单一结构化契约 `AgentManifestDiagnostic`：`code / severity / scope / agentId / sourcePath / message`。无效候选由资源解析器报告，主进程汇总时按规范化绝对来源路径、代码和原因去重；同一文件的不同原因保持独立。运行前检查按 Agent ID 与作用域定位，不解析英文文案或文件名子串。Settings 列表仅显示唯一问题数量，现有 TaskDialog 承载 User / Project 来源、完整路径与“这份配置未生效”的说明，原始原因按需展开；不推测替代定义。详情正文可滚动、框选和复制单条/全部，刷新为零条时不自动关闭已打开的详情。
 
-User 覆盖保持整资源替换。人工整理旧覆盖时，以当前内置定义为基准保留有效的模型绑定和显式执行上限，严格校验候选并防止并发覆盖；不引入字段继承、旧字段别名、启动写入或自动迁移器。
+User 覆盖保持整资源替换。复制内置时写入 `based-on`（内置 sourceHash），内置变化后 Agents 页提示「内置已更新」并给出对比与恢复内置；手写覆盖没有基线时显示「覆盖内置（基线未知）」。仍声明模型字段的覆盖判无效并回落下层，迁移只在用户触发时执行（预览 → 备份 → 写入设置并去字段 → 原子替换）；不引入字段继承、旧字段别名、启动写入或自动迁移器。
 
 自定义 Profile 新建时工具权限为空；运行时按 `AGENT_TOOLS_EMPTY` 拒绝零工具配置。Settings 的配置状态必须同时检查模型路由与至少一项工具授权，零工具时提示用户到「工具权限」选择能力，不显示「可用」。
 

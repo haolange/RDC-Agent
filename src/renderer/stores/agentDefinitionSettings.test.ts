@@ -8,7 +8,8 @@ import {
   settleAgentDefinitionSave,
 } from './agentDefinitionSettings';
 
-const definition = (modelId: string): AgentManifestDefinition => ({
+/** Revisions differ by instructions; the route belongs to Settings and must not move on a save. */
+const definition = (label: string): AgentManifestDefinition => ({
   id: 'ask',
   fileName: 'ask.agent.md',
   filePath: 'C:/agents/ask.agent.md',
@@ -16,9 +17,8 @@ const definition = (modelId: string): AgentManifestDefinition => ({
   description: '',
   argumentHint: '',
   target: 'rdc-agent',
-  models: [modelId],
   icon: 'message-orbit',
-    accent: '#33d1ff',
+  accent: '#33d1ff',
   disableModelInvocation: false,
   userInvocable: true,
   tools: [],
@@ -27,18 +27,18 @@ const definition = (modelId: string): AgentManifestDefinition => ({
   agents: [],
   handoffs: [],
   metadata: {},
-  instructions: '',
+  instructions: label,
   builtin: false,
   enabled: true,
 });
 
-const draft = (modelId: string): AgentManifestDraft => {
-  const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...value } = definition(modelId);
+const draft = (label: string): AgentManifestDraft => {
+  const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...value } = definition(label);
   return value;
 };
 
 describe('agent definition optimistic settings projection', () => {
-  it('keeps only the newest A to B to C revision authoritative', () => {
+  it('keeps only the newest A to B to C revision authoritative without moving the Settings route', () => {
     const base = structuredClone(DEFAULT_SETTINGS);
     base.agents.definitions = [definition('provider:a')];
     base.llm.agentRoutes = [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }];
@@ -50,7 +50,8 @@ describe('agent definition optimistic settings projection', () => {
     expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 101)).toBe(false);
     expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 102)).toBe(false);
     expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 103)).toBe(true);
-    expect(c.settings.llm.agentRoutes).toContainEqual({ agentId: 'ask', providerId: 'provider', modelId: 'c' });
+    expect(c.settings.agents.definitions[0].instructions).toBe('provider:c');
+    expect(c.settings.llm.agentRoutes).toEqual([{ agentId: 'ask', providerId: 'provider', modelId: 'a' }]);
   });
 
   it('settles or rolls back only the scoped agent route', () => {
@@ -71,14 +72,14 @@ describe('agent definition optimistic settings projection', () => {
         route: { agentId: 'ask', providerId: 'provider', modelId: 'b' },
       },
     });
-    expect(settled.agents.definitions[0].models).toEqual(['provider:b']);
+    expect(settled.agents.definitions[0].instructions).toBe('provider:b');
     expect(rollbackAgentDefinitionSave(settled, 'ask', {
       clientRevision: 200,
       commitHash: 'commit-a',
       definition: pending.rollback.definition,
       route: pending.rollback.route,
     })).toMatchObject({
-      agents: { definitions: [{ models: ['provider:a'] }] },
+      agents: { definitions: [{ instructions: 'provider:a' }] },
       llm: { agentRoutes: [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }] },
     });
   });
@@ -96,7 +97,6 @@ describe('agent definition optimistic settings projection', () => {
       ...definition(''),
       id: 'general',
       fileName: 'general.agent.md',
-      models: [],
       builtin: true,
       provenance: { scope: 'builtin', sourcePath: 'builtin/general.agent.md', sourceHash: 'builtin-hash' },
       compiledRoute: { agentId: 'general', providerId: '', modelId: '' },

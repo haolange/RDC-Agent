@@ -91,6 +91,14 @@ export const SettingsGetAgentDefinitionCommitArgsSchema = z.tuple([
   }).strict().superRefine(projectScopeIdRefine),
 ]);
 
+const agentOverrideFileRequest = z.object({
+  sourcePath: z.string().min(1).max(4096),
+  sourceHash: z.string().regex(/^[0-9a-f]{64}$/u),
+}).strict();
+
+export const SettingsPreviewAgentModelMigrationArgsSchema = z.tuple([z.string().min(1).max(4096)]);
+export const SettingsAgentOverrideFileArgsSchema = z.tuple([agentOverrideFileRequest]);
+
 export const SettingsSaveAgentDefinitionArgsSchema = z.tuple([
   z.object({
     draft: z.record(z.string().max(200), z.unknown()),

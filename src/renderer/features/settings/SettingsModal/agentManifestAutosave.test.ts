@@ -10,16 +10,15 @@ import {
 } from './agentManifestAutosaveState';
 import { findProjectedHandoffTargetConflicts, persistAgentHandoff, validateAgentHandoffs } from './sections/agentHandoffValidation';
 
-const draft = (id: string, model: string): AgentManifestDraft => ({
+const draft = (id: string): AgentManifestDraft => ({
   id,
   fileName: `${id}.agent.md`,
   name: id,
   description: '',
   argumentHint: '',
   target: 'rdc-agent',
-  models: [model],
   icon: 'spark',
-    accent: '#33d1ff',
+  accent: '#33d1ff',
   disableModelInvocation: false,
   userInvocable: true,
   tools: [],
@@ -34,14 +33,14 @@ const draft = (id: string, model: string): AgentManifestDraft => ({
 
 describe('agent manifest scoped autosave helpers', () => {
   it('detects translation-only changes and preserves them across unrelated autosaves', () => {
-    const saved = { ...draft('custom', 'deepseek/a'), handoffs: [{ label: 'Go', agent: 'general', prompt: 'Run' }] };
+    const saved = { ...draft('custom'), handoffs: [{ label: 'Go', agent: 'general', prompt: 'Run' }] };
     const edited = { ...saved, handoffs: [{ ...saved.handoffs[0], labelTranslations: { 'zh-CN': '执行' } }] };
     expect(getChangedAgentManifestDrafts([edited], [saved])).toEqual([edited]);
     expect(JSON.parse(serializeAgentManifestDraft({ ...edited, description: 'Edited' })).handoffs[0])
       .toMatchObject({ label: 'Go', labelTranslations: { 'zh-CN': '执行' } });
   });
   it('ignores runtime-only fields and detects only persisted changes', () => {
-    const saved = draft('ask', 'deepseek/a');
+    const saved = draft('ask');
     const runtimeDecorated = {
       ...saved,
       filePath: 'C:/runtime/ask.agent.md',
@@ -50,15 +49,15 @@ describe('agent manifest scoped autosave helpers', () => {
     } as AgentManifestDraft;
     expect(serializeAgentManifestDraft(runtimeDecorated)).toBe(serializeAgentManifestDraft(saved));
     expect(getChangedAgentManifestDrafts([runtimeDecorated], [saved])).toEqual([]);
-    expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, models: ['deepseek/c'] }], [saved]))
-      .toEqual([expect.objectContaining({ models: ['deepseek/c'] })]);
+    expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, instructions: 'Changed.' }], [saved]))
+      .toEqual([expect.objectContaining({ instructions: 'Changed.' })]);
     expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, accent: '#ff6a00' }], [saved]))
       .toEqual([expect.objectContaining({ accent: '#ff6a00' })]);
   });
 
   it('rolls back only the failed agent and preserves unrelated optimistic edits', () => {
-    const saved = [draft('ask', 'deepseek/a'), draft('edit', 'deepseek/a')];
-    const failed = { ...saved[0], models: ['deepseek/b'] };
+    const saved = [draft('ask'), draft('edit')];
+    const failed = { ...saved[0], instructions: 'Failed edit.' };
     const unrelated = { ...saved[1], name: 'Edited locally' };
     expect(rollbackAgentManifestDrafts([failed, unrelated], [failed], saved)).toEqual([
       saved[0],
@@ -68,7 +67,7 @@ describe('agent manifest scoped autosave helpers', () => {
 
   it('replaces a deleted project general draft with the restored builtin and does not resubmit delete', () => {
     const projectDraft: AgentManifestDraft = {
-      ...draft('general', 'openai:project'),
+      ...draft('general'),
       delete: true,
       enabled: false,
       writeScope: 'project',
@@ -83,7 +82,6 @@ describe('agent manifest scoped autosave helpers', () => {
       description: 'builtin',
       argumentHint: '',
       target: 'rdc-agent',
-      models: [],
       icon: 'nodes',
       accent: '#33d1ff',
       disableModelInvocation: false,
@@ -119,7 +117,7 @@ describe('agent manifest scoped autosave helpers', () => {
   });
 
   it('removes a draft only when every scope is gone', () => {
-    const doomed = { ...draft('only-mine', 'openai:a'), delete: true };
+    const doomed = { ...draft('only-mine'), delete: true };
     const result: AgentDefinitionSaveResult = {
       clientRevision: 1,
       status: 'committed',
@@ -128,14 +126,14 @@ describe('agent manifest scoped autosave helpers', () => {
       route: null,
       lastSuccessful: null,
     };
-    expect(applyAgentDefinitionSaveResults([doomed, draft('keep', 'openai:b')], [doomed], [result])).toEqual([
+    expect(applyAgentDefinitionSaveResults([doomed, draft('keep')], [doomed], [result])).toEqual([
       expect.objectContaining({ id: 'keep' }),
     ]);
   });
 
   it('blockSubmit intercepts without calling save', () => {
     const onSave = vi.fn();
-    const saved = draft('general', 'openai:a');
+    const saved = draft('general');
     const current = {
       ...saved,
       handoffs: [{ label: 'WIP', agent: '', prompt: '' }],
@@ -145,7 +143,6 @@ describe('agent manifest scoped autosave helpers', () => {
       const issues = validateAgentHandoffs(entry.handoffs, {
         selfId: entry.id,
         definitions: [],
-        modelOptions: [],
       });
       return issues.length === 0 ? null : `blocked:${issues.length}`;
     });
@@ -156,7 +153,7 @@ describe('agent manifest scoped autosave helpers', () => {
   });
 
   it('serializes a cleared send flag without send:false', () => {
-    const saved = draft('general', 'openai:a');
+    const saved = draft('general');
     const withSend = {
       ...saved,
       handoffs: [persistAgentHandoff({
@@ -191,10 +188,10 @@ describe('agent manifest scoped autosave helpers', () => {
   it('blocks disabling a target that another agent still hands off to and does not call save', () => {
     const onSave = vi.fn();
     const agentA = {
-      ...draft('general', 'openai:a'),
+      ...draft('general'),
       handoffs: [{ label: 'To debugger', agent: 'debugger', prompt: 'Investigate.' }],
     };
-    const agentB = draft('debugger', 'openai:b');
+    const agentB = draft('debugger');
     const saved = [agentA, agentB];
     const current = [agentA, { ...agentB, enabled: false }];
     const changed = getChangedAgentManifestDrafts(current, saved);
@@ -204,7 +201,6 @@ describe('agent manifest scoped autosave helpers', () => {
         const issues = validateAgentHandoffs(entry.handoffs, {
           selfId: entry.id,
           definitions: current,
-          modelOptions: [],
         });
         return issues.length === 0 ? null : `blocked:${issues.length}`;
       },
@@ -223,7 +219,7 @@ describe('agent manifest scoped autosave helpers', () => {
   });
 
   it('does not rollback a later illegal handoff when an in-flight legal save fails', async () => {
-    const saved = draft('general', 'openai:a');
+    const saved = draft('general');
     const legal = { ...saved, name: 'Renamed' };
     const illegal = {
       ...legal,

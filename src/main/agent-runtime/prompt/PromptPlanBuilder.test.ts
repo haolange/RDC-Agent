@@ -20,7 +20,7 @@ describe('PromptPlanBuilder', () => {
   it('builds a provenance-carrying plan without memory injection or hardcoded capabilities', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: ['debug'], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: ['debug'], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const skillPath = path.join(process.cwd(), 'resources', 'agent-runtime', 'skills', 'debug', 'SKILL.md');
     const input: import('./PromptPlanBuilder').PromptPlanInput = {
@@ -108,7 +108,7 @@ describe('PromptPlanBuilder', () => {
   it('describes Ask Tasks as read-only and tool_search no-match as authoritative', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_list', 'task_get', 'tool_search'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_list', 'task_get', 'tool_search'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const plan = new PromptPlanBuilder().build({
       profile,
@@ -133,7 +133,7 @@ describe('PromptPlanBuilder', () => {
   it.each([false, true])('describes task execution ownership with effective subagent=%s', async (includeSubagent) => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'edit', fileName: 'edit.agent.md', filePath: 'C:/User/.rdc-agent/agents/edit.agent.md', name: 'Edit', description: 'Edit files', argumentHint: '', target: 'rdc-agent', models: [], icon: 'pencil-edit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_stop'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Execute.', builtin: false, enabled: true,
+      id: 'edit', fileName: 'edit.agent.md', filePath: 'C:/User/.rdc-agent/agents/edit.agent.md', name: 'Edit', description: 'Edit files', argumentHint: '', target: 'rdc-agent', icon: 'pencil-edit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_stop'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Execute.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const plan = new PromptPlanBuilder().build({
       profile,
@@ -160,7 +160,7 @@ describe('PromptPlanBuilder', () => {
   it('projects no effective Tasks tools when the selected route cannot execute structured tools', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'plan', fileName: 'plan.agent.md', filePath: 'C:/User/.rdc-agent/agents/plan.agent.md', name: 'Plan', description: 'Plan work', argumentHint: '', target: 'rdc-agent', models: [], icon: 'route-plan', accent: '#8d8bff', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_list'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Plan from evidence.', builtin: false, enabled: true,
+      id: 'plan', fileName: 'plan.agent.md', filePath: 'C:/User/.rdc-agent/agents/plan.agent.md', name: 'Plan', description: 'Plan work', argumentHint: '', target: 'rdc-agent', icon: 'route-plan', accent: '#8d8bff', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_list'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Plan from evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const plan = new PromptPlanBuilder().build({
       profile,
@@ -185,7 +185,7 @@ describe('PromptPlanBuilder', () => {
   it('includes the skill catalog for large and small windows when non-empty', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const baseProfile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const buildWith = (contextWindowTokens?: number) => new PromptPlanBuilder().build({
       profile: baseProfile,

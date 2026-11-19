@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useI18n } from '../../../i18n';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogSnapshot } from './types';
 import { createSettingsModalActions } from './settingsModalActions';
@@ -40,12 +40,15 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setChromeTheme = useAppSettingsStore((state) => state.setChromeTheme);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
+  const replaceSettings = useAppSettingsStore((state) => state.replaceSettings);
   const saveProvider = useAppSettingsStore((state) => state.saveProvider);
   const saveAgentDefinition = useAppSettingsStore((state) => state.saveAgentDefinition);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
   const currentProjectId = useProjectStore((state) => state.currentProject?.projectId ?? null);
 
   const modalState = useSettingsModalState(open, settings, currentProjectId);
+  // Bound after autosave is created below; adopting settings rebases its saved baseline.
+  const rebaseAgentDraftsRef = useRef<(definitions: AgentManifestDefinition[]) => void>(() => {});
   const [providerCatalogSnapshot, setProviderCatalogSnapshot] = useState<ProviderCatalogSnapshot>(EMPTY_PROVIDER_CATALOG_SNAPSHOT);
 
   useEffect(() => {
@@ -72,7 +75,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     settings,
     providerDrafts: modalState.providerDrafts,
     setProviderDrafts: modalState.setProviderDrafts,
-    setAgentRouteDrafts: modalState.setAgentRouteDrafts,
     selectedProviderId: modalState.selectedProviderId,
     setSelectedProviderId: modalState.setSelectedProviderId,
     connectionDraft: modalState.connectionDraft,
@@ -116,7 +118,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     const issues = validateAgentHandoffs(draft.handoffs, {
       selfId: draft.id,
       definitions: modalState.agentManifestAutosaveDrafts.filter((entry) => !entry.delete),
-      modelOptions: settings.agents.modelOptions,
     });
     return issues.length === 0 ? null : t('settings.agentHandoffBlocked', { count: issues.length });
   };
@@ -136,6 +137,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     t,
     blockSubmit,
     blockProjectedSubmit,
+    replaceSettings,
+    rebaseAgentDrafts: (definitions) => rebaseAgentDraftsRef.current(definitions),
   });
   const agentManifestAutosave = useAgentManifestAutosave({
     open: open && modalState.agentManifestContextReady,
@@ -158,6 +161,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     savedMessage: t('settings.agentManifestSaved'),
     failedMessage: t('settings.agentManifestSaveFailed'),
   });
+
+  useEffect(() => { rebaseAgentDraftsRef.current = agentManifestAutosave.rebase; });
 
   const dirty = useSettingsDirty(settings, {
     tools: {

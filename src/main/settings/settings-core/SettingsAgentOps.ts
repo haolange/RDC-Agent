@@ -56,7 +56,7 @@ export class SettingsAgentOps {
       const refreshed = {
         ...cached,
         definition,
-        route: agentManifestService.routeFromDefinition(definition),
+        route: agentManifestService.routeForAgent(definition.id),
       };
       this.agentDefinitionCommits.set(laneKey, refreshed);
       return refreshed;
@@ -65,7 +65,7 @@ export class SettingsAgentOps {
       clientRevision: 0,
       commitHash,
       definition,
-      route: agentManifestService.routeFromDefinition(definition),
+      route: agentManifestService.routeForAgent(definition.id),
     };
     this.agentDefinitionCommits.set(laneKey, snapshot);
     return snapshot;
@@ -175,8 +175,7 @@ export class SettingsAgentOps {
           clientRevision: request.clientRevision,
           commitHash: commit.commitHash,
           definition: commit.definition,
-          route: commit.definition?.compiledRoute
-            ?? (commit.definition ? agentManifestService.routeFromDefinition(commit.definition) : null),
+          route: commit.definition?.compiledRoute ?? (commit.definition ? agentManifestService.routeForAgent(commit.definition.id) : null),
         };
         this.agentDefinitionCommits.set(laneKey, snapshot);
         return this.saveResult(request, 'committed', snapshot);

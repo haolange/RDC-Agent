@@ -3,8 +3,6 @@ name: Verifier
 description: Independently review authorized evidence and claims; report coverage, limits and challenges.
 argument-hint: Describe the assigned task and authorized evidence
 target: rdc-agent
-model: ["chatgpt-account:gpt-6.1-sol"]
-reasoning-level: medium
 icon: nodes
 accent: "#33d1ff"
 disable-model-invocation: false
