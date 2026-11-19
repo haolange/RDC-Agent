@@ -228,7 +228,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     const service = new AgentRuntimeConfigService();
     const metadata = service.listSkillMetadata();
     const ids = metadata.map((skill) => skill.id).sort();
-    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(22);
+    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(23);
     expect(GENERAL_SKILL_IDS).toHaveLength(9);
     expect([...CANONICAL_SKILL_IDS].sort()).toEqual(ids);
     expect(new Set(ids).size).toBe(ids.length);

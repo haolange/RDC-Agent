@@ -14,6 +14,7 @@ completion-contract: investigation-report
 enabled: true
 tools: [read, search, web, askUser, task, planArtifact, memory, runtimeContext, rdc_probe, subagent, tool_search, skill, knowledge, investigation]
 skills:
+  - investigation-planning
   - debugger-coordinator
 mcp-servers: []
 agents:

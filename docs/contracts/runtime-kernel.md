@@ -252,7 +252,7 @@ RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）
 
 ## 通用 Harness 与声明续跑
 
-General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
+General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 共用 investigation-planning 的计划结构，按规模填写：正文写给用户读，执行引用放进 `plan_artifact` 的结构化字段或正文末尾的 `## Execution references`，标题、摘要与正文里的内部引用由 `plan_artifact` 以 `PLAN_BODY_INTERNAL_REFERENCE` 拒绝；Knowledge 相似性仅是检查线索。
 
 Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。批准写入 execution offer；prepareTurn 仅当 hash 与 target 匹配时预载声明 Skill。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。 Mission 额度耗尽但未完成时可通过 `budget_paused` 结束 turn，绝不提升领域报告状态；准入条件见「Task 执行、消息与资源生命周期」中 `turn_complete` 一节。
 

@@ -289,7 +289,7 @@ main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组
 
 ## Plan 与 generation
 
-General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
+General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 共用 investigation-planning 的计划结构，按规模填写：正文写给用户读，执行引用放进 `plan_artifact` 的结构化字段或正文末尾的 `## Execution references`，标题、摘要与正文里的内部引用由 `plan_artifact` 以 `PLAN_BODY_INTERNAL_REFERENCE` 拒绝；Knowledge 相似性仅是检查线索。
 
 独立审查结论、父级记录更新与最终接受是不同责任：通过现有 Task 与 Investigation 版本化交付，不建立额外结算状态机。工具正文投影已存的版本关系而不扩展读取授权。审批主进程来源/故障元数据仅解释结果，不改变授权或领域证明。
 
