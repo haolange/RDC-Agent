@@ -13,7 +13,7 @@ Debugger 执行时用这份方法把三件事写进调查记录：首次异常�
 
 1. 用同一 capture 里的目标区与控制区、以及更早的写入，找到最早出现症状的区域；没有参考图也可以做。记录外观和覆盖范围，不预设什么是正确的。
 2. 观察取自 $rdc-tool-shell、$pixel-forensics 和 $capture-facts。解释逐片元数值或测试标志前先读 $pixel-forensics：原生历史可能是重建的，也可能受格式限制。
-3. 先持久化与观察状态相符的 WorldState，再写 Evidence（依赖顺序见 $artifact-provenance）；原始观察可以先采集，但不把新观察挂到历史 WorldState 上凑引用。Evidence 写 `mission: debugger`、`epistemicStatus: observed`、`region.kind` 取 `event` 或 `pixel`、`artifactRefs` 带实际内容 hash、`worldStateId` 可解析。未知的字段如实留空。
+3. 按 $artifact-provenance 的顺序先写 WorldState，再写 Evidence：`mission: debugger`、`epistemicStatus: observed`、`region.kind` 取 `event` 或 `pixel`、`artifactRefs` 带实际内容 hash、`worldStateId` 可解析。
 4. 配套 Claim 可以在 `scope.eventId` 里重复事件号，保持 `observed_fact`，不设 `declaresCounterfactual`，不带因果的 `experimentId`。
 
 ## Hypothesis Matrix
@@ -30,7 +30,7 @@ Debugger 执行时用这份方法把三件事写进调查记录：首次异常�
 
 形状：一条合格的 Experiment，加一条 `causal_conclusion`（或 `declaresCounterfactual: true`）的 Claim。
 
-1. 针对已持久化的矩阵行（`hypothesisClaimId`）设计实验，`intervention.type` 不能是 `none`。持久化设计前，所需的 WorldState 引用都要能解析；将来的 variant／restored 锚点如实标为未测量。
+1. 针对已持久化的矩阵行（`hypothesisClaimId`）设计实验，`intervention.type` 不能是 `none`；引用的写入顺序见 $artifact-provenance。
 2. 经配置的 RDC-Tool CLI 执行干预，记录指标和前后对比图。
 3. Rollback 写 `executed === true`、`baselineRestored === true`，`verifyEvidenceIds` 至少一条且可解析；状态为 `recorded` 或 `rolled_back`。
 4. 然后写引用该 `experimentId` 的因果 Claim。根因 Claim 填七元组 `rootCause`：Trigger、Fault Location、Failure Mechanism、Propagation、Manifestation、Scope、Counterfactual Evidence。
