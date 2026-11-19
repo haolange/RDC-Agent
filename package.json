@@ -30,6 +30,7 @@
     "fidelity:extract": "node scripts/extract-fidelity-contract.mjs && node scripts/extract-shared-exports.mjs",
     "check:fidelity": "node scripts/check-fidelity.mjs",
     "check:design-tokens": "node scripts/check-design-tokens.mjs",
+    "check:request-cache-profile": "node --test scripts/request-cache-profile.test.mjs",
     "check:renderer-structure": "node --test scripts/renderer-source-analysis.test.mjs && node scripts/check-renderer-structure.mjs",
     "check:shared-exports": "node scripts/check-shared-exports.mjs",
     "typecheck": "tsc --noEmit",
