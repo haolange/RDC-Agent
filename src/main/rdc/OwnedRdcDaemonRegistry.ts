@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { resolveRdcInstallation } from './RdcInstallationService';
+import { installationRootOfPython, resolveRdcInstallation } from './RdcInstallationService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
@@ -175,7 +175,7 @@ async function stopOwnedDaemon(
     return;
   }
   const binding = path.isAbsolute(command)
-    ? resolveRdcInstallation({ root: path.resolve(path.dirname(command), '..', '..', '..', '..'), timeoutMs: current.timeoutMs, env: current.env })
+    ? resolveRdcInstallation({ root: installationRootOfPython(command), timeoutMs: current.timeoutMs, env: current.env })
     : current;
   const settings = withRdcHostRuntimeEnv({
     ...binding,

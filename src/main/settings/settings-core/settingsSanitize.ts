@@ -1,5 +1,4 @@
 import path from 'path';
-import { assertRdcCliBinding } from '@shared/utils/rdcCliBinding';
 import {
   DEFAULT_CONTEXT_COMPACTION_PERCENT,
 } from '@shared/types/modelCapability';
@@ -13,6 +12,7 @@ import {
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 import { expandHomePath } from '../../platform/paths';
+import { assertRdcCliBinding } from '../../rdc/rdcCliBinding';
 import {
   DEFAULT_AGENT_RUNTIME,
   DEFAULT_LAYOUT,

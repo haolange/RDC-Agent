@@ -235,7 +235,7 @@ export const enSettings = {
   'settings.rdcOperations': 'operations',
   'settings.rdcCliIntermediateRoot': 'Runtime root',
   'settings.rdcCliEnvHint': 'One NAME=value per line. When RDC_TOOL_INTERMEDIATE_ROOT is unset, the desktop uses rdc-tool-intermediate under the user resource root.',
-  'settings.rdcVerifyHint': 'Requires bundled python.exe and cli/run_cli.py from the same installation.',
+  'settings.rdcVerifyHint': 'Requires the bundled Python and cli/run_cli.py from the same installation.',
   'settings.rdcCliInvoker': 'Local RenderDoc Toolchain',
   'settings.rdcCliEnabled': 'Enable local RenderDoc toolchain',
   'settings.rdcCliCommand': 'Executable',

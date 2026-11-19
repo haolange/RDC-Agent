@@ -1,5 +1,5 @@
 import { parseRdcNativeResult } from './RdcNativeProtocol';
-import { assertRdcCliBinding } from '@shared/utils/rdcCliBinding';
+import { assertRdcCliBinding } from './rdcCliBinding';
 import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOperations } from './RdcOperationCatalog';
 import fs from 'fs';
 import path from 'path';
@@ -16,6 +16,8 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { shellInvocationService, type ShellInvocationService } from '../tools/ShellInvocationService';
+import { samePath } from '../platform/paths';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
 import { resolveRdcBatchInvocation } from './resolveRdcBatchInvocation';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 
@@ -57,15 +59,15 @@ export class RdcCliInvokerService {
       return 'RDC-Tool CLI command is not configured.';
     }
     const command = settings.command.trim();
-    try { assertRdcCliBinding(settings); } catch (error) { return (error as Error).message; }
+    let root: string;
+    try { root = path.resolve(assertRdcCliBinding(settings)); } catch (error) { return (error as Error).message; }
     if ((path.isAbsolute(command) || command.includes(path.sep) || command.includes('/')) && !fs.existsSync(command)) {
       return `RDC-Tool CLI command not found: ${command}`;
     }
-    const root = path.resolve(path.dirname(command), '..', '..', '..', '..');
     const entry = path.resolve(settings.workingDirectory || root, settings.argsPrefix[0]);
     if (!fs.existsSync(entry)) return `RDC_BINDING_INVALID: CLI entry not found: ${entry}`;
-    if (fs.realpathSync(command).toLowerCase() !== path.join(fs.realpathSync(root), 'binaries', 'windows', 'x64', 'python', 'python.exe').toLowerCase()
-      || fs.realpathSync(entry).toLowerCase() !== path.join(fs.realpathSync(root), 'cli', 'run_cli.py').toLowerCase()) {
+    const installed = rdcInstallationFiles(fs.realpathSync(root));
+    if (!samePath(fs.realpathSync(command), installed.python) || !samePath(fs.realpathSync(entry), installed.entry)) {
       return 'RDC_BINDING_INVALID: Python and CLI must resolve inside the same installation.';
     }
     return undefined;
@@ -158,7 +160,7 @@ export class RdcCliInvokerService {
       globalArgs.push('--owner-pid', String(process.pid));
     }
 
-    const root = path.resolve(path.dirname(settings.command), '..', '..', '..', '..');
+    const root = path.resolve(assertRdcCliBinding(settings));
     return [
       path.resolve(settings.workingDirectory || root, settings.argsPrefix[0]),
       '--json',

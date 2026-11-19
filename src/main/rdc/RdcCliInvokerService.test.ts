@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
 
 vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
@@ -51,13 +52,13 @@ it('tags context-scoped action invocation ownership separately from native argv'
 import { operationFingerprint, RDC_APPLICATION_OPERATIONS } from './RdcOperationCatalog';
 const roots = [0, 1].map(() => fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-binding-test-')));
 for (const root of roots) {
-  fs.mkdirSync(path.join(root, 'binaries/windows/x64/python'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'cli'));
-  fs.writeFileSync(path.join(root, 'binaries/windows/x64/python/python.exe'), 'fixture');
-  fs.writeFileSync(path.join(root, 'cli/run_cli.py'), 'fixture');
+  for (const file of [rdcInstallationFiles(root).python, rdcInstallationFiles(root).entry]) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'fixture');
+  }
 }
 afterAll(() => roots.forEach(root => fs.rmSync(root, { recursive: true, force: true })));
-const cli = { enabled: true, command: path.join(roots[0], 'binaries/windows/x64/python/python.exe'), argsPrefix: [path.join(roots[0], 'cli/run_cli.py')], workingDirectory: '', env: {}, timeoutMs: 30000 };
+const cli = { enabled: true, command: rdcInstallationFiles(roots[0]).python, argsPrefix: [rdcInstallationFiles(roots[0]).entry], workingDirectory: '', env: {}, timeoutMs: 30000 };
 const operation = { name: 'rd.event.get_action_tree', namespace: 'event', description: 'Read events',
   input_schema: { type: 'object', additionalProperties: false, properties: {} }, scope: 'replay', effects: [], evidence_kind: null, path_inputs: [] };
 const reply = (kind: string, data: unknown) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true, schema_version: '3.0.0', result_kind: kind, data }), stderr: '', duration_ms: 1 });
@@ -97,7 +98,7 @@ describe('configured CLI contract gate', () => {
   it('keys catalog by executable, prefix, environment and working directory', async () => {
     const service = new RdcCliInvokerService(); const execute = vi.spyOn(service, 'executeCLI').mockImplementation(async command => command === 'version' ? versionReply() : catalogReply());
     const first = await service.loadCatalog(cli);
-    for (const other of [{ ...cli, command: path.join(roots[1], 'binaries/windows/x64/python/python.exe'), argsPrefix: [path.join(roots[1], 'cli/run_cli.py')] }, { ...cli, argsPrefix: ['cli/run_cli.py'] }, { ...cli, env: { X: 'B' } }, { ...cli, workingDirectory: roots[0] }]) {
+    for (const other of [{ ...cli, command: rdcInstallationFiles(roots[1]).python, argsPrefix: [rdcInstallationFiles(roots[1]).entry] }, { ...cli, argsPrefix: ['cli/run_cli.py'] }, { ...cli, env: { X: 'B' } }, { ...cli, workingDirectory: roots[0] }]) {
       expect(await service.loadCatalog(other)).not.toBe(first);
     }
     expect(await service.loadCatalog(cli)).toBe(first); expect(execute).toHaveBeenCalledTimes(10);

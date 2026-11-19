@@ -1,23 +1,32 @@
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
+import { resolvedPathKey, samePath } from '../platform/paths';
+import { rdcDefaultInstallationRoots, rdcHostLayout, rdcInstallationFiles, rdcRootFromPython } from '../platform/rdcLayout';
+import { assertRdcCliBinding } from './rdcCliBinding';
 import type { RdcInstallationCandidate, RdcInstallationRequest } from '@shared/types/rdcInstallation';
-import { assertRdcCliBinding } from '@shared/utils/rdcCliBinding';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 /** Only derives a root from the current binding; never guesses a retired layout. */
 export function configuredInstallationRoot(settings: RdcCliInvokerSettings): string | null {
-  try { assertRdcCliBinding(settings); } catch { return null; }
-  return path.resolve(path.dirname(settings.command), '..', '..', '..', '..');
+  try { return path.resolve(assertRdcCliBinding(settings)); } catch { return null; }
+}
+
+/** Installation root of a recorded bundled Python path for this host layout. */
+export function installationRootOfPython(command: string): string {
+  const layout = rdcHostLayout();
+  const root = rdcRootFromPython(command, layout);
+  if (!root) {
+    throw new Error(`RDC_INSTALLATION_INVALID: ${command} is not the bundled ${layout.runtimeDir}/${layout.pythonExecutable} of an installation.`);
+  }
+  return path.resolve(root);
 }
 
 export function resolveRdcInstallation(request: RdcInstallationRequest): RdcCliInvokerSettings {
   if (!path.isAbsolute(request.root)) throw new Error('RDC_INSTALLATION_INVALID: select an absolute installation folder.');
   const root = fs.realpathSync(request.root);
-  const command = path.join(root, 'binaries', 'windows', 'x64', 'python', 'python.exe');
-  const entry = path.join(root, 'cli', 'run_cli.py');
+  const { python: command, entry } = rdcInstallationFiles(root);
   for (const file of [command, entry]) {
-    if (!fs.statSync(file).isFile() || fs.realpathSync(file).toLowerCase() !== file.toLowerCase()) {
+    if (!fs.statSync(file).isFile() || !samePath(fs.realpathSync(file), file)) {
       throw new Error('RDC_INSTALLATION_INVALID: Python and CLI must be regular files in the same installation.');
     }
   }
@@ -32,14 +41,13 @@ export function resolveRdcInstallation(request: RdcInstallationRequest): RdcCliI
 /** Discovery reads files only. The explicit verification action is the first execution. */
 export function detectRdcInstallations(settings: RdcCliInvokerSettings): RdcInstallationCandidate[] {
   const configured = configuredInstallationRoot(settings);
-  const local = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
   const candidates: RdcInstallationCandidate[] = [
     ...(configured ? [{ root: configured, source: 'configured' as const }] : []),
-    { root: path.join(local, 'Programs', 'rdc-tool'), source: 'default' },
+    ...rdcDefaultInstallationRoots().map((root) => ({ root, source: 'default' as const })),
   ];
   const seen = new Set<string>();
   return candidates.filter(({ root, source }) => {
-    const key = root.toLowerCase();
+    const key = resolvedPathKey(root);
     if (seen.has(key)) return false;
     seen.add(key);
     return source === 'configured' || fs.existsSync(root);

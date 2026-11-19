@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
+import { installationRootOfPython } from './RdcInstallationService';
 
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({
@@ -108,8 +110,7 @@ describe('OwnedRdcDaemonRegistry', () => {
 
   it('uses the recorded installation as a whole rather than the current CLI entry', async () => {
     const root = makeRoot(); const registryPath = path.join(root, 'owned-rdc-daemons.json');
-    const command = path.join(root, 'binaries/windows/x64/python/python.exe');
-    const entry = path.join(root, 'cli/run_cli.py');
+    const { python: command, entry } = rdcInstallationFiles(root);
     for (const file of [command, entry]) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, 'fixture'); }
     rememberOwnedRdcDaemon({ contextId, command, intermediateRoot: root, ownerPid: process.pid, ownerBirth: '', daemonPid: 0, daemonBirth: '', workerPid: 0, workerBirth: '', startedAt: 1 }, { registryPath });
     const execute = vi.fn(async (verb: string) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: verb === 'context' ? 'rdc_tool.context.clear' : 'rdc_tool.daemon.stop', data: { context_id: contextId, stopped: true } }), stderr: '', duration_ms: 1 }));
@@ -175,7 +176,7 @@ describe('OwnedRdcDaemonRegistry', () => {
     const registryPath = path.join(root, 'owned-rdc-daemons.json');
     const intermediateRoot = path.join(root, 'rdc-tool-intermediate');
     const python = process.env.RDC_NATIVE_PYTHON!;
-    const installation = path.resolve(path.dirname(python), '../../../..');
+    const installation = installationRootOfPython(python);
     const worker = spawn(python, ['-m', 'rdc_tool.runtime.worker_main', '--context-id', contextId], {
       cwd: installation,
       windowsHide: true,

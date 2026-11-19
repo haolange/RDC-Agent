@@ -46,7 +46,7 @@ export const enOnboarding = {
   'onboarding.rdc.title': 'RDC tools',
   'onboarding.rdc.headline': 'Download. Extract. Select.',
   'onboarding.rdc.body': 'RDC-Tool includes Python. Skip this step for everyday chat and general tasks.',
-  'onboarding.rdc.first': 'Download the official Windows x64 zip and extract it completely.',
+  'onboarding.rdc.first': 'Download the official RDC-Tool package for this system and extract it completely.',
   'onboarding.rdc.second': 'Settings → Tools: detect an installation or select the extracted rdc-tool folder, not an exe.',
   'onboarding.rdc.third': 'Select Verify and apply. Once verified, open an imported capture.',
   'onboarding.rdc.firstLabel': 'Download Tools zip',

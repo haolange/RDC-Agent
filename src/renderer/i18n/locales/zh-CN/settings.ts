@@ -502,7 +502,7 @@ export const zhSettings = {
   'settings.rdcOperations': '个操作',
   'settings.rdcCliIntermediateRoot': 'Runtime 根',
   'settings.rdcCliEnvHint': '每行填写一项 NAME=value。未写 RDC_TOOL_INTERMEDIATE_ROOT 时，桌面使用用户资源根下的 rdc-tool-intermediate。',
-  'settings.rdcVerifyHint': '需配置同安装的捆绑 python.exe 与 cli/run_cli.py。',
+  'settings.rdcVerifyHint': '需配置同安装的捆绑 Python 与 cli/run_cli.py。',
   'settings.rdcCliInvoker': '本地 RenderDoc 工具链',
   'settings.rdcCliEnabled': '启用本地 RenderDoc 工具链',
   'settings.rdcCliCommand': '可执行文件',
