@@ -81,3 +81,6 @@
   color: var(--token-text-body);
   font-size: var(--text-sm);
 }
+
+.plan-review-panel__appendix { margin-top: var(--space-4); }
+.plan-review-panel__appendix > summary { color: var(--token-text-muted); }
