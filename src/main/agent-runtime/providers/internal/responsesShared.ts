@@ -338,7 +338,7 @@ export function buildResponsesRequestBody(
     } : {}),
   };
   if (!deepSeekResponses && options.promptCache?.enabled
-    && options.promptCache.keyCarrier === 'prompt-cache-key'
+    && (options.promptCache.keyCarrier === 'prompt-cache-key' || options.promptCache.keyCarrier === 'session-id-and-prompt-cache-key')
     && options.promptCache.requestKey) {
     body.prompt_cache_key = options.promptCache.requestKey;
   }

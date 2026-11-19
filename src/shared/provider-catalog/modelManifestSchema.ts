@@ -229,6 +229,8 @@ export const ProviderCacheContractSchema = z.object({
   keyCarrier: z.enum([
     'none',
     'prompt-cache-key',
+    // One key per execution scope, sent as prompt_cache_key and as the session-id header.
+    'session-id-and-prompt-cache-key',
     'provider-managed',
     'unknown',
   ]),

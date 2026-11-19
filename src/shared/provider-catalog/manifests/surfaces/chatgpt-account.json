@@ -150,6 +150,16 @@
           "compatibilityGroup": "chatgpt-account:OpenAIResponses",
           "continuation": "exact-execution"
         },
+        "cache": {
+          "mode": "implicit-prefix",
+          "keyCarrier": "session-id-and-prompt-cache-key",
+          "breakpointCarrier": "provider-managed",
+          "telemetry": [
+            "cached-input-tokens"
+          ],
+          "ttl": "provider-managed",
+          "evidence": "https://github.com/openai/codex/blob/main/codex-rs/core/src/client.rs"
+        },
         "compatibilityGroup": "chatgpt-account:OpenAIResponses"
       }
     }

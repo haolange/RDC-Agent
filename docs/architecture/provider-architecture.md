@@ -247,19 +247,15 @@ Effective Catalog 的模型事实来自三层合并（优先级递增）：
 
 ## Prompt Cache 契约（Cache Retention）
 
-`src/main/agent-runtime/providers/promptCacheWire.ts` 定义统一缓存抽象：
+缓存行为由 manifest 的 `ProviderCacheContract` 声明，`PromptCacheCompiler` 在回合准备时编译一次，适配器按编译结果发送：
 
-```text
-CacheRetention = 'none' | 'short' | 'long'
-```
+| `keyCarrier` | 键的来源 | 发送方式 |
+| --- | --- | --- |
+| `prompt-cache-key` | 稳定 prompt 前缀与工具集的指纹 | 请求体 `prompt_cache_key` |
+| `session-id-and-prompt-cache-key` | 执行范围（根会话或委派的子执行），派生为稳定、不透明的 UUID 形状键，与工具集无关 | 请求体 `prompt_cache_key`，同时作为 `session-id` 请求头（`promptCacheWire.promptCacheHeaders`）；ChatGPT 账号路由按 Codex 客户端的做法由该头推导缓存亲和 |
+| 其余 | — | 不发送键；`mode` 为 `none`／`unknown` 时缓存关闭 |
 
-由 manifest `ProviderCacheContract.ttl` 经 `resolveCacheRetention()` 派生：
-
-| TTL 声明 | CacheRetention | Anthropic wire | OpenAI wire |
-| --- | --- | --- | --- |
-| `none` | `none` | 无 cache_control | 无 cache 字段 |
-| `five-minutes` / `thirty-minutes` / `provider-managed` / `unknown` | `short` | `{ type: 'ephemeral' }` | `prompt_cache_key` |
-| `one-hour` / `twenty-four-hours` | `long` | `{ type: 'ephemeral', ttl: '1h' }` | `prompt_cache_key` + `prompt_cache_retention: '24h'` |
+Anthropic 的 `cache_control` 由断点模式决定（automatic 在顶层，explicit 落在 stable system block）。回合内 instructions 保持冻结：只作用于单次请求的宿主事实（运行时续跑提示、无进展提示、余量提醒）作为不落盘的尾消息追加在请求末尾，压缩窗口只覆盖持久历史。
 
 Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partitionSystemPrompt()` 将 PromptPlan segments 按 stable/volatile 分割，stable 前缀锚定缓存断点；不匹配时 fail-closed（`PROMPT_PLAN_CONTEXT_MISMATCH`）。
 

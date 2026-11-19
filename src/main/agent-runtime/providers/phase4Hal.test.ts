@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  resolveCacheRetention,
-  anthropicCacheControlForRetention,
-  openAICacheWireForRetention,
-} from './promptCacheWire';
-import {
   normalizeCacheUsage,
   finalizeProviderUsage,
   splitAnthropicCacheWrite,
@@ -18,88 +13,6 @@ import type {
   ProviderAuth,
 } from '../../settings/settings-core/CredentialStoreInterface';
 import openrouterManifest from '@shared/provider-catalog/manifests/surfaces/openrouter.json';
-
-// =====================================================================
-// 1. Cache retention resolution
-// =====================================================================
-
-describe('resolveCacheRetention', () => {
-  it('maps "none" TTL to "none" retention', () => {
-    expect(resolveCacheRetention('none')).toBe('none');
-  });
-
-  it('maps "five-minutes" TTL to "short" retention', () => {
-    expect(resolveCacheRetention('five-minutes')).toBe('short');
-  });
-
-  it('maps "thirty-minutes" TTL to "short" retention', () => {
-    expect(resolveCacheRetention('thirty-minutes')).toBe('short');
-  });
-
-  it('maps "one-hour" TTL to "long" retention', () => {
-    expect(resolveCacheRetention('one-hour')).toBe('long');
-  });
-
-  it('maps "twenty-four-hours" TTL to "long" retention', () => {
-    expect(resolveCacheRetention('twenty-four-hours')).toBe('long');
-  });
-
-  it('maps "provider-managed" TTL to "short" retention', () => {
-    expect(resolveCacheRetention('provider-managed')).toBe('short');
-  });
-
-  it('maps "unknown" TTL to "short" retention', () => {
-    expect(resolveCacheRetention('unknown')).toBe('short');
-  });
-});
-
-// =====================================================================
-// 2. Anthropic cache control wire format
-// =====================================================================
-
-describe('anthropicCacheControlForRetention', () => {
-  it('returns undefined for "none" retention (no cache marker)', () => {
-    expect(anthropicCacheControlForRetention('none')).toBeUndefined();
-  });
-
-  it('returns ephemeral without TTL for "short" retention', () => {
-    const wire = anthropicCacheControlForRetention('short');
-    expect(wire).toEqual({ type: 'ephemeral' });
-    expect(wire!.ttl).toBeUndefined();
-  });
-
-  it('returns ephemeral with 1h TTL for "long" retention', () => {
-    const wire = anthropicCacheControlForRetention('long');
-    expect(wire).toEqual({ type: 'ephemeral', ttl: '1h' });
-  });
-});
-
-// =====================================================================
-// 3. OpenAI cache wire format
-// =====================================================================
-
-describe('openAICacheWireForRetention', () => {
-  it('returns empty object for "none" retention', () => {
-    expect(openAICacheWireForRetention('none')).toEqual({});
-    expect(openAICacheWireForRetention('none', 'some-key')).toEqual({});
-  });
-
-  it('returns prompt cache key for "short" retention', () => {
-    const wire = openAICacheWireForRetention('short', 'rdc:abc123');
-    expect(wire).toEqual({ promptCacheKey: 'rdc:abc123' });
-    expect(wire.promptCacheRetention).toBeUndefined();
-  });
-
-  it('returns key + 24h retention for "long" retention', () => {
-    const wire = openAICacheWireForRetention('long', 'rdc:xyz');
-    expect(wire).toEqual({ promptCacheKey: 'rdc:xyz', promptCacheRetention: '24h' });
-  });
-
-  it('omits key when not provided', () => {
-    const wire = openAICacheWireForRetention('long');
-    expect(wire).toEqual({ promptCacheRetention: '24h' });
-  });
-});
 
 // =====================================================================
 // 4. normalizeCacheUsage with cacheWriteLongTokens
