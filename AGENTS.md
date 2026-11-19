@@ -215,7 +215,7 @@ Session 右栏是 Progress / Artifacts / Outputs / Context / Capture 单轨，�
 
 `resources/agent-runtime/` 下的 Profile、Skill 和 prompt 决定产品里的 Agent 怎样调查，改它们时：
 
-- **证据等级用短标签表达**。产品内 Agent 仍须区分 Observed、Derived、Inferred、Replay-Validated 等等级，不把推测写成事实；但要求它用标签标注，不在报告正文里反复写限定语。
+- **证据等级用短标签表达**。产品内 Agent 用设计书 7.3 的验证等级（Observed、Reconstructed、Differential-Supported、Replay-Counterfactual）和未验证的 Inferred、Unresolved 标注结论，不把推测写成事实；报告第一句给出证据支持的最强结论并带一个标签，未知项单独成段，不在正文里反复写限定语。
 - **写正向主线，不堆禁令**。说明下一步怎样判断和行动。权限、身份、消费和来源已由代码强制的约束，不在方法文本里复述。
 - **只减不增**。改动后净字节数不增加；要加一句，先删掉等量的旧内容。
 - **不写案例**。方法文本、代码和知识里不出现具体案例的对象、事件、资源编号或原因。

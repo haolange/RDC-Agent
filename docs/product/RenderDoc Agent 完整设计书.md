@@ -976,7 +976,7 @@ Mission 读取 Checkpoint，重新检索 Knowledge
 
 `partial`、`blocked`、`budget_paused` 必须逐项列出未决工作：缺口是什么、试过什么、被什么阻止、什么条件下可以恢复。
 
-`completed` 的条件：必需覆盖完成；结论达到所声明的验证等级；没有开放的 Challenge；交付写清结论、证据、验证覆盖与未决项；正式报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer；已写 Mission Checkpoint；回放现场已恢复到进入时的位置。
+`completed` 的条件：必需覆盖完成；结论达到所声明的验证等级；没有开放的 Challenge（Challenge 只记录阻止结论按现措辞成立的缺口，不影响结论成立的审查备注进入交付的未知项）；交付写清结论、证据、验证覆盖与未决项；正式报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer；已写 Mission Checkpoint；回放现场已恢复到进入时的位置。
 
 四种"完成"不等价：
 
@@ -3837,17 +3837,18 @@ Visual Design Skill 只能改变：
 
 ## 14.4 报告可信度标识
 
-每个关键结论带一个短标签，正文不再重复限定语：一条结论一个标签，不写成段的免责说明。
+每个关键结论带一个短标签，正文不再重复限定语：一条结论一个标签，不写成段的免责说明。标签直接用 7.3 的 Verification Level，与结论所依 Claim 的 `verification` 一致：
 
 ```text
 Observed
-Derived
-Inferred
-Replay-Validated
-Unresolved
+Reconstructed
+Differential-Supported
+Replay-Counterfactual
 ```
 
-标签与 Verification Level（7.3）的对应：Observed = Observed；Derived = Reconstructed；Replay-Validated = Differential-Supported 或 Replay-Counterfactual（因果结论须为后者）；Inferred 与 Unresolved 没有对应的验证等级，由 Claim 类型与 Confidence 表达。
+这是产品自身能达到的四档，因果结论须为 Replay-Counterfactual。未经验证的陈述标 Inferred 或 Unresolved，由 Claim 类型与 Confidence 表达。
+
+报告和就地交付的第一句写证据支持的最强结论并带标签，随后是证据；未知项与未覆盖的范围单独成段，放在结论之后。不影响结论成立的审查备注写进未知项，不改结论的措辞。
 
 Optimizer 必须明确：
 
