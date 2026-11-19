@@ -78,9 +78,8 @@ describe('offline complete PromptPlan comparison', () => {
         if (test.id === 'general' && !test.extra.length) {
           const resident = after.segments.filter(segment => ['core-contract', 'agent-profile', 'preloaded-skill'].includes(segment.kind)).map(segment => segment.content).join('\n');
           expect(resident).not.toMatch(/RDC|RenderDoc|Checkpoint/);
-          expect(resident).toContain('When executing an approved Mission plan');
-          expect(resident).toContain('Declare completed only after its required work, independent review, relevant challenges and recovery are closed');
-          expect(resident).not.toContain('Do not declare the investigation complete');
+          expect(resident).toContain('执行获批的 Mission 计划时');
+          expect(resident).toContain('必需的工作、独立审查、相关 Challenge 和现场恢复都闭合后才声明 completed');
         }
         return { ...test, beforeBytes: Buffer.byteLength(before.systemPrompt), afterBytes: Buffer.byteLength(after.systemPrompt), beforeChars: before.systemPrompt.length, afterChars: after.systemPrompt.length, deltaChars: after.systemPrompt.length - before.systemPrompt.length,
           beforeEstimatedTokens: before.totalTokenEstimate, afterEstimatedTokens: after.totalTokenEstimate, segments: after.segments.map(segment => ({ id: segment.id, chars: segment.content.length })) };
