@@ -1,6 +1,4 @@
-import type { Context, StopReason } from '../core/types';
-import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { charsToTokens } from '@shared/utils/tokens';
+import type { StopReason } from '../core/types';
 import { AgentLoopTerminationError } from './LoopProgressGuard';
 
 /** Stop a repeated terminal response that cannot change the same obligation. */
@@ -17,17 +15,4 @@ export class RuntimeContinuationGuard {
   }
 
   reset(): void { this.previous = undefined; }
-}
-
-/** Add a host-authored fact to one request without adding a user message or changing history. */
-export function appendRuntimeContinuation(context: Context, content: string): Context {
-  return {
-    ...context,
-    systemPrompt: [context.systemPrompt, content].filter(Boolean).join('\n\n'),
-    systemPromptSegments: [...(context.systemPromptSegments ?? []), {
-      id: 'runtime:continuation', kind: 'runtime-fact', scope: 'runtime', sourcePath: 'runtime://continuation',
-      sourceHash: hashScopedResource(content), precedence: Number.MAX_SAFE_INTEGER - 1,
-      content, stability: 'volatile', tokenEstimate: charsToTokens(content.length),
-    }],
-  };
 }
