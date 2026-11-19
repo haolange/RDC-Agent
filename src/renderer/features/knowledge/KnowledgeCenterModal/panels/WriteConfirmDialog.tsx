@@ -1,4 +1,5 @@
 import { Details } from '../../../../ui/Details';
+import { DiffBlock } from '../../../../ui/DiffBlock';
 import { Button } from '../../../../ui/Button';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { InlineError } from '../../../../ui/InlineError';
@@ -7,7 +8,6 @@ import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
 import { ConflictRow } from '../parts/ConflictRow';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
-import { WriteConfirmDiff } from './WriteConfirmDiff';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 
 interface WriteConfirmDialogProps {
@@ -82,7 +82,7 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
 
       <section className="knowledge-write-section">
         <h3 className="knowledge-write-section-title">{t('knowledgeCenter.confirmDiff')}</h3>
-        <WriteConfirmDiff lines={write.diff} />
+        <DiffBlock lines={write.diff} beforeLabel={t('knowledgeCenter.diffBefore')} afterLabel={t('knowledgeCenter.diffAfter')} dataTestId="knowledge-center-confirm-diff" />
       </section>
 
       {hasContradicts ? (
