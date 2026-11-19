@@ -87,7 +87,7 @@ Linux 上 Electron `safeStorage.isEncryptionAvailable()` 在没有系统钥匙�
 
 ## CI
 
-`build`（ubuntu）运行 node 与 renderer 两个测试项目，即 Linux 单元测试；`windows-unit` 在 windows-latest 运行 node 项目；`linux-smoke` 经 POSIX launcher 准备后在 `xvfb-run` 下运行 Browser QA smoke；`macos-shell` 保留 runtime / shell 子集（macOS 读不到 birth，相关身份为 unknown）。
+`build`（ubuntu）运行 node 与 renderer 两个测试项目，即 Linux 单元测试；`windows-unit` 在 windows-latest 经 Windows launcher 准备（与其它 Windows job 相同，补装 pnpm 不执行的 Electron 运行时）后运行 node 项目；`linux-smoke` 经 POSIX launcher 准备后在 `xvfb-run` 下运行 Browser QA smoke；`macos-shell` 保留 runtime / shell 子集（macOS 读不到 birth，相关身份为 unknown）。
 
 `windows-unit` 把测试进程的 TEMP/TMP/TMPDIR 指到 runner 自有的长路径临时目录：runner 默认 TEMP 是 8.3 短路径，realpath 会展开它，路径身份断言因此不成立，这不是产品缺陷，也不放宽产品路径检查。手动触发（`workflow_dispatch`）没有 PR base 和上一次 head，门禁的比较基线取分支与默认分支的 merge-base。
 
