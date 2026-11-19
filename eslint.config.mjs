@@ -8,6 +8,25 @@ const electronApiRestriction = {
   message: 'window.electronAPI stays in platform, bootstrap, hooks, stores, app, settings, and feature data modules.',
 };
 
+// Host platform gate (docs/architecture/host-platform.md): only src/main/platform reads the
+// host OS, and only src/preload/index.ts exposes it to the renderer. PowerShell or cmd command
+// text checked by shellHardDeny is command content, not a host check, so the literal ban names
+// the host utilities themselves rather than any text that mentions them.
+const hostPlatformMessage = 'Host-specific behavior lives in src/main/platform; use currentHost() or a platform capability.';
+const hostEnvNames = '/^(APPDATA|LOCALAPPDATA|USERPROFILE|SystemRoot)$/';
+export const hostPlatformRestrictions = [
+  "MemberExpression[object.name='process'][property.name=/^(platform|arch)$/]",
+  "MemberExpression[object.name='process'][property.value=/^(platform|arch)$/]",
+  "CallExpression[callee.object.name='os'][callee.property.name=/^(platform|arch)$/]",
+  "ImportDeclaration[source.value=/^(node:)?os$/] > ImportSpecifier[imported.name=/^(platform|arch)$/]",
+  `MemberExpression[property.name=${hostEnvNames}]`,
+  `MemberExpression[property.value=${hostEnvNames}]`,
+  `VariableDeclarator[init.property.name='env'] > ObjectPattern > Property[key.name=${hostEnvNames}]`,
+  'Literal[value=/^(taskkill(\\.exe)?|powershell\\.exe)$/i]',
+  'Literal[value=/Get-CimInstance/i]',
+  'TemplateElement[value.raw=/Get-CimInstance/i]',
+].map((selector) => ({ selector, message: hostPlatformMessage }));
+
 export default [
   {
     ignores: ['out/**', 'release/**', 'node_modules/**', 'coverage/**', 'dist/**'],
@@ -49,6 +68,11 @@ export default [
     files: ['src/main/**/*.ts'],
     ignores: ['src/main/**/*.test.ts', 'src/main/**/*.d.ts', 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'],
     rules: { 'max-lines': ['error', { max: 900, skipBlankLines: false, skipComments: false }] },
+  },
+  {
+    files: ['src/main/**/*.ts', 'src/shared/**/*.ts', 'src/preload/**/*.ts'],
+    ignores: ['src/main/platform/**', 'src/preload/index.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions] },
   },
   {
     files: ['src/main/agent-runtime/orchestration/AgentOrchestrator.ts'],

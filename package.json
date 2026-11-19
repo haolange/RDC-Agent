@@ -50,6 +50,7 @@
     "check:settings-agents": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"settings agents\"",
     "check:i18n": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"i18n catalogs\"",
     "check:appearance": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"appearance theme\"",
+    "check:host-platform": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"host platform gate\"",
     "check:session-projection": "node scripts/check-session-projection.mjs",
     "check:right-rail": "node scripts/check-right-rail.mjs",
     "check:knowledge-system": "node scripts/check-knowledge-system.mjs",

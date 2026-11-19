@@ -5,6 +5,7 @@ import YAML from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CANONICAL_HOOK_EVENTS } from '@shared/types/rdcRuntime';
 import { directoryLinkType } from '../platform/paths';
+import { currentHost } from '../platform/host';
 import { HookEngine } from './HookEngine';
 import { CURRENT_HOOK_TRUST_SCHEMA_VERSION } from './hookTrustStore';
 
@@ -232,10 +233,10 @@ describe('HookEngine trust fingerprint', () => {
     const dirB = path.join(root, 'bin-b');
     fs.mkdirSync(dirA, { recursive: true });
     fs.mkdirSync(dirB, { recursive: true });
-    const toolName = process.platform === 'win32' ? 'rdc-hook-probe.cmd' : 'rdc-hook-probe';
-    fs.writeFileSync(path.join(dirA, toolName), process.platform === 'win32' ? '@echo a\r\n' : '#!/bin/sh\necho a\n');
-    fs.writeFileSync(path.join(dirB, toolName), process.platform === 'win32' ? '@echo b\r\n' : '#!/bin/sh\necho b\n');
-    if (process.platform !== 'win32') {
+    const toolName = currentHost().isWindows ? 'rdc-hook-probe.cmd' : 'rdc-hook-probe';
+    fs.writeFileSync(path.join(dirA, toolName), currentHost().isWindows ? '@echo a\r\n' : '#!/bin/sh\necho a\n');
+    fs.writeFileSync(path.join(dirB, toolName), currentHost().isWindows ? '@echo b\r\n' : '#!/bin/sh\necho b\n');
+    if (!currentHost().isWindows) {
       fs.chmodSync(path.join(dirA, toolName), 0o755);
       fs.chmodSync(path.join(dirB, toolName), 0o755);
     }
@@ -303,10 +304,10 @@ describe('HookEngine trust fingerprint', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
     const hooks = path.join(project, '.rdc-agent', 'hooks');
-    const toolA = path.join(root, process.platform === 'win32' ? 'tool-a.cmd' : 'tool-a');
-    const toolB = path.join(root, process.platform === 'win32' ? 'tool-b.cmd' : 'tool-b');
-    fs.writeFileSync(toolA, process.platform === 'win32' ? '@echo a\r\n' : '#!/bin/sh\necho a\n');
-    fs.writeFileSync(toolB, process.platform === 'win32' ? '@echo b\r\n' : '#!/bin/sh\necho b\n');
+    const toolA = path.join(root, currentHost().isWindows ? 'tool-a.cmd' : 'tool-a');
+    const toolB = path.join(root, currentHost().isWindows ? 'tool-b.cmd' : 'tool-b');
+    fs.writeFileSync(toolA, currentHost().isWindows ? '@echo a\r\n' : '#!/bin/sh\necho a\n');
+    fs.writeFileSync(toolB, currentHost().isWindows ? '@echo b\r\n' : '#!/bin/sh\necho b\n');
     writeHook(hooks, 'check', {
       event: 'agent.after-handoff',
       command: toolA,

@@ -36,4 +36,8 @@ describe('behavior gates', () => {
   it('appearance theme', async () => {
     await runCheck('scripts/check-appearance.mjs');
   });
+
+  it('host platform gate', async () => {
+    await runCheck('scripts/check-host-platform-gate.mjs');
+  }, 60_000);
 });
