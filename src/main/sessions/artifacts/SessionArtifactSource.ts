@@ -1,5 +1,6 @@
 ﻿import fs from 'fs';
 import path from 'path';
+import { resolvedPathKey } from '../../platform/paths';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 import { artifactStore } from '../../reports/ArtifactStore';
 import { storageAdapter } from '../store/StorageAdapter';
@@ -46,11 +47,6 @@ const fileMetadata = (filePath: string): Pick<SessionArtifactSource, 'exists' | 
   }
 };
 
-export const normalizeArtifactPath = (filePath: string): string => {
-  const resolved = path.resolve(filePath);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-};
-
 const categorizeOutput = (input: { kind?: string; mimeType?: string; filePath: string }): TraceArtifactRecord['source'] => {
   const extension = path.extname(input.filePath).toLowerCase();
   if (input.mimeType?.startsWith('image/') || input.kind === 'screenshot') return 'image';
@@ -67,7 +63,7 @@ export const dedupeSessionArtifactSources = (sources: SessionArtifactSource[]): 
   const seen = new Set<string>();
   return sources.filter((source) => {
     if (source.kind === 'attachment') return true;
-    const key = normalizeArtifactPath(source.filePath);
+    const key = resolvedPathKey(source.filePath);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -79,7 +75,7 @@ const add = (items: SessionArtifactSource[], seen: Set<string>, item: SessionArt
     items.push(item);
     return;
   }
-  const key = normalizeArtifactPath(item.filePath);
+  const key = resolvedPathKey(item.filePath);
   if (seen.has(key)) return;
   seen.add(key);
   items.push(item);

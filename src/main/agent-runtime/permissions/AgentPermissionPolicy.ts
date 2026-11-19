@@ -1,4 +1,5 @@
 import * as os from 'os';
+import { expandHomePath } from '../../platform/paths';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
 import * as path from 'path';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
@@ -145,21 +146,12 @@ function normalizeToolName(name: string): string {
   return name.trim().toLowerCase().replace(/[.-]/g, '_');
 }
 
-function expandPath(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed === '~') return os.homedir();
-  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
-    return path.resolve(os.homedir(), trimmed.slice(2));
-  }
-  return trimmed.replace(/^%USERPROFILE%/i, os.homedir());
-}
-
 function resolveConfiguredRoot(value: string): string {
-  return path.resolve(expandPath(value));
+  return path.resolve(expandHomePath(value));
 }
 
 function resolveToolTarget(value: string, workspaceRoot: string): string {
-  const expanded = expandPath(value);
+  const expanded = expandHomePath(value);
   return path.isAbsolute(expanded)
     ? path.resolve(expanded)
     : path.resolve(workspaceRoot, expanded);
@@ -181,7 +173,7 @@ function extractStringArg(toolCall: ToolCall, key: string): string {
 }
 
 function inferPathTargetFromGlobPattern(pattern: string): string {
-  const expanded = expandPath(pattern);
+  const expanded = expandHomePath(pattern);
   if (!path.isAbsolute(expanded)) return '';
   const wildcardIndex = expanded.search(/[*?{[]/);
   if (wildcardIndex < 0) return expanded;

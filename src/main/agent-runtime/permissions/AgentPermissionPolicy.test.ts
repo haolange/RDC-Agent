@@ -2,6 +2,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { directoryLinkType } from '../../platform/paths';
 import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
@@ -742,8 +743,8 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     const memoryLink = path.join(knowledge, 'to-memory');
     const agentsLink = path.join(knowledge, 'to-agents');
     try {
-      await symlink(memory, memoryLink, process.platform === 'win32' ? 'junction' : 'dir');
-      await symlink(agents, agentsLink, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(memory, memoryLink, directoryLinkType());
+      await symlink(agents, agentsLink, directoryLinkType());
     } catch {
       await rm(tmp, { recursive: true, force: true });
       return;

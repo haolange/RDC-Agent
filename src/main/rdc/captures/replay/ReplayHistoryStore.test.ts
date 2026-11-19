@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { directoryLinkType } from '../../../platform/paths';
 
 vi.mock('electron', () => ({ app: {} }));
 import { ReplayHistoryStore } from './ReplayHistoryStore';
@@ -90,7 +91,7 @@ describe('ReplayHistoryStore', () => {
     roots.push(outside);
     await fs.writeFile(path.join(outside, 'keep.txt'), 'protected');
     await fs.mkdir(path.join(scope.projectRoot, '.rdc-agent'));
-    await fs.symlink(outside, path.join(scope.projectRoot, '.rdc-agent', 'replay'), process.platform === 'win32' ? 'junction' : 'dir');
+    await fs.symlink(outside, path.join(scope.projectRoot, '.rdc-agent', 'replay'), directoryLinkType());
     const store = new ReplayHistoryStore({ codec });
     await expect(store.append(scope, fact)).rejects.toThrow('REPLAY_UNSAFE_LINK');
     await expect(store.clearSession(scope.projectRoot, scope.sessionId)).rejects.toThrow('REPLAY_UNSAFE_LINK');

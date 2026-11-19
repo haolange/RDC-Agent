@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile, truncate, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { directoryLinkType } from '../../../platform/paths';
 import { readFileTool } from './ReadFileTool';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
@@ -117,7 +118,7 @@ describe('hash-bound read_file audit', () => {
     const outside = await mkdtemp(path.join(os.tmpdir(), 'rdc-file-audit-outside-'));
     roots.push(outside);
     await writeFile(path.join(outside, 'secret.bin'), 'secret');
-    await symlink(outside, path.join(root, 'link'), process.platform === 'win32' ? 'junction' : 'dir');
+    await symlink(outside, path.join(root, 'link'), directoryLinkType());
     await expect(audit({ path: 'a.bin', mode: 'audit', expectedHash: hash('left'),
       compareWith: { path: 'link/secret.bin', expectedHash: hash('secret') } }, context)).rejects.toThrow();
   });

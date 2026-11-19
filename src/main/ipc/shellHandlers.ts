@@ -5,6 +5,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, typ
 
 import { appPathService } from '../runtime/AppPathService';
 import { acknowledgeGettingStarted, hasSeenGettingStarted } from '../runtime/GettingStartedState';
+import { samePath } from '../platform/paths';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema, SaveFileArgsSchema } from './validation/commonIpcSchemas';
 import {
@@ -26,14 +27,6 @@ function getAvatarMimeType(filePath: string): string | null {
   return AVATAR_MIME_BY_EXTENSION[path.extname(filePath).toLowerCase()] ?? null;
 }
 
-function isSameFilePath(left: string, right: string): boolean {
-  const normalizedLeft = path.resolve(left);
-  const normalizedRight = path.resolve(right);
-  return process.platform === 'win32'
-    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
-    : normalizedLeft === normalizedRight;
-}
-
 function copyAvatarToWorkspace(sourcePath: string): string | null {
   const mimeType = getAvatarMimeType(sourcePath);
   if (!mimeType || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
@@ -46,7 +39,7 @@ function copyAvatarToWorkspace(sourcePath: string): string | null {
   const avatarPath = path.join(avatarDir, `profile-avatar${extension}`);
 
   fs.mkdirSync(avatarDir, { recursive: true });
-  if (!isSameFilePath(sourcePath, avatarPath)) {
+  if (!samePath(sourcePath, avatarPath)) {
     fs.copyFileSync(sourcePath, avatarPath);
   }
 

@@ -4,6 +4,25 @@ import {
   DEFAULT_CONTEXT_COMPACTION_PERCENT,
 } from '@shared/types/modelCapability';
 import { sanitizeCompactionThresholdPercent } from '@shared/utils/contextBudget';
+import {
+  APP_DEFAULT_WINDOW_HEIGHT,
+  APP_DEFAULT_WINDOW_WIDTH,
+  APP_MIN_WINDOW_HEIGHT,
+  APP_MIN_WINDOW_WIDTH,
+  TERMINAL_MAX_HEIGHT,
+  TERMINAL_MIN_HEIGHT,
+} from '@shared/constants/layout';
+import { expandHomePath } from '../../platform/paths';
+import {
+  DEFAULT_AGENT_RUNTIME,
+  DEFAULT_LAYOUT,
+  DEFAULT_CODE_INTERPRETER,
+  DEFAULT_RDC_CLI_INVOKER,
+  DEFAULT_SHELL_TOOLING,
+  LEFT_DEFAULTS,
+  RIGHT_DEFAULTS,
+  VALID_PERMISSION_MODES,
+} from './settingsDefaults';
 import type {
   AgentPermissionSettings,
   AgentRuntimeContextSettings,
@@ -16,24 +35,6 @@ import type {
   ToolingSettings,
   WindowLayoutPreference,
 } from '@shared/types/settings';
-import {
-  APP_DEFAULT_WINDOW_HEIGHT,
-  APP_DEFAULT_WINDOW_WIDTH,
-  APP_MIN_WINDOW_HEIGHT,
-  APP_MIN_WINDOW_WIDTH,
-  TERMINAL_MAX_HEIGHT,
-  TERMINAL_MIN_HEIGHT,
-} from '@shared/constants/layout';
-import {
-  DEFAULT_AGENT_RUNTIME,
-  DEFAULT_LAYOUT,
-  DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDC_CLI_INVOKER,
-  DEFAULT_SHELL_TOOLING,
-  LEFT_DEFAULTS,
-  RIGHT_DEFAULTS,
-  VALID_PERMISSION_MODES,
-} from './settingsDefaults';
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -125,17 +126,6 @@ export function sanitizeToolingSettings(value: unknown): ToolingSettings {
     codeInterpreter: sanitizeCodeInterpreterSettings(candidate.codeInterpreter),
     shell: sanitizeAgentShellSettings(candidate.shell),
   };
-}
-
-function expandHomePath(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return trimmed;
-  if (trimmed === '~') return process.env.USERPROFILE || process.env.HOME || trimmed;
-  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
-    const home = process.env.USERPROFILE || process.env.HOME || '';
-    return home ? path.join(home, trimmed.slice(2)) : trimmed;
-  }
-  return trimmed.replace(/^%USERPROFILE%/i, process.env.USERPROFILE || '%USERPROFILE%');
 }
 
 function sanitizePathList(value: unknown): string[] {

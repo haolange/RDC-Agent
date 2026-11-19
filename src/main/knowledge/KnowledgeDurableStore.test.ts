@@ -15,6 +15,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { directoryLinkType } from '../platform/paths';
 import type { KnowledgeCardRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
 import { acquireDirectoryFileLock, releaseDirectoryFileLock } from '../sessions/store/directoryFileLock';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
@@ -427,7 +428,7 @@ describe('Knowledge write gates', () => {
     const outside = path.join(root, 'outside');
     mkdirSync(outside, { recursive: true });
     const junction = path.join(root, 'facts');
-    symlinkSync(outside, junction, process.platform === 'win32' ? 'junction' : 'dir');
+    symlinkSync(outside, junction, directoryLinkType());
     await expect(write.write({
       spaceId: 'user',
       card: factCard('user:facts/via-junction.md'),
@@ -454,7 +455,7 @@ describe('Knowledge write gates', () => {
     mkdirSync(outside, { recursive: true });
     const before = readdirSync(outside);
     const junction = path.join(root, 'junction');
-    symlinkSync(outside, junction, process.platform === 'win32' ? 'junction' : 'dir');
+    symlinkSync(outside, junction, directoryLinkType());
     const write = writeService(path.join(junction, 'knowledge'));
     await expect(write.write({
       spaceId: 'user',

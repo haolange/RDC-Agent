@@ -1,4 +1,4 @@
-import path from 'node:path';
+import { samePath } from '../../platform/paths';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
@@ -25,8 +25,6 @@ import type { TurnHandle } from './TurnCoordinator';
 import type { ApprovedCaptureHost } from './ApprovedCaptureController';
 
 type Destination = { inputId: string; contentSha256: string; deviceId: string };
-const equalPath = (a: string, b: string) => process.platform === 'win32'
-  ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
 
 /** Concrete main-process adapter; every destination is re-resolved from the owning project. */
 export function createApprovedCaptureHost(input: {
@@ -103,7 +101,7 @@ export function createApprovedCaptureHost(input: {
         || opened.replaySessionId !== lease.runtimeContext.replaySessionId) throw new Error('RDC_SWITCH_STATE_UNVERIFIED: current replay projection is incomplete or inconsistent.');
       const destination = { inputId: state.inputId, contentSha256: state.captureHash, deviceId: state.replayDeviceId };
       const resolved = await resolve(destination);
-      if (!equalPath(opened.filePath, resolved.capture.filePath)) throw new Error('RDC_SWITCH_STATE_UNVERIFIED: opened capture path differs from the registered input.');
+      if (!samePath(opened.filePath, resolved.capture.filePath)) throw new Error('RDC_SWITCH_STATE_UNVERIFIED: opened capture path differs from the registered input.');
       const native = await readRdcSwitchSnapshot({ ...scope, binding, signal });
       assertOwningTurn();
       if (native.eventId !== state.appliedEventId) throw new Error('RDC_SWITCH_STATE_UNVERIFIED: native and displayed event positions differ.');
@@ -152,7 +150,7 @@ export function createApprovedCaptureHost(input: {
         throw new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED: the current failure does not match the last verified capture.');
       }
       const resolved = await resolve(destinationOf(point));
-      if (!equalPath(opened.filePath, resolved.capture.filePath)) throw new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED: input path changed.');
+      if (!samePath(opened.filePath, resolved.capture.filePath)) throw new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED: input path changed.');
       const observed = await readRdcRecoverySnapshot({ ...scope, binding, signal });
       if (observed.contextId !== point.native.contextId || observed.leaseVersion !== point.native.leaseVersion
         || observed.replaySessionId !== point.native.replaySessionId || observed.captureFileId !== point.native.captureFileId

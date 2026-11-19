@@ -10,6 +10,7 @@ import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentR
 import { mcpTrustService } from '../../settings/settings-core/McpTrustService';
 import type { McpDisconnectDetail } from '../agent/MCPManager';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import { describeHost } from '../../platform/host';
 import type { SupervisedProcess } from '../../runtime/ProcessSupervisor';
 
 function descriptor(id: string) {
@@ -38,9 +39,9 @@ describe('McpConnectionCoordinator project ownership', () => {
     const expectedWin = (() => {
       try { return fs.realpathSync.native(resolved).toLowerCase(); } catch { return resolved.toLowerCase(); }
     })();
-    expect(canonicalMcpProjectRoot(resolved, 'linux')).toBe(expectedLinux);
-    expect(canonicalMcpProjectRoot(resolved, 'darwin')).toBe(expectedLinux);
-    expect(canonicalMcpProjectRoot(resolved, 'win32')).toBe(expectedWin);
+    expect(canonicalMcpProjectRoot(resolved, describeHost('linux', 'x64'))).toBe(expectedLinux);
+    expect(canonicalMcpProjectRoot(resolved, describeHost('darwin', 'arm64'))).toBe(expectedLinux);
+    expect(canonicalMcpProjectRoot(resolved, describeHost('win32', 'x64'))).toBe(expectedWin);
 
     const d = descriptor('identity-server');
     vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockReturnValue([d]);

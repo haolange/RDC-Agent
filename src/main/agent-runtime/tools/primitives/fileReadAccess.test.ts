@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile, readFile, symlink, unlink } from 'node:fs/promi
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
+import { directoryLinkType } from '../../../platform/paths';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { readFileTool } from './ReadFileTool';
 import { editFileTool } from './EditFileTool';
@@ -39,7 +40,7 @@ it('does not count failed/cancelled reads and permits creating a new file only o
 it('keeps the existing symlink rejection even when the canonical file has been read', async () => {
   const { root, context } = await fixture();
   const alias = path.join(root, 'alias');
-  await symlink(root, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  await symlink(root, alias, directoryLinkType());
   try {
     await expect(readFileTool.execute('read', { path: 'alias/file.txt' }, undefined, undefined, context)).rejects.toThrow('SYMLINK_PATH_REJECTED');
     expect(context.successfulFileReads?.size).toBe(0);

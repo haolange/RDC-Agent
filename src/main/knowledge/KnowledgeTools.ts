@@ -14,7 +14,7 @@ import {
   type KnowledgeImageRef,
   type KnowledgeReadRequest,
 } from '@shared/types/knowledge';
-import { pathIdentityKey } from '../agent-runtime/knowledgeReadRoots';
+import { samePath } from '../platform/paths';
 import { knowledgeCandidateService, type KnowledgeCandidateService } from './KnowledgeCandidateService';
 import { knowledgeCompileService, type KnowledgeCompileService } from './KnowledgeCompileService';
 import { knowledgeQueryProperties, toKnowledgeQueryRequest } from './KnowledgeToolQuery';
@@ -174,7 +174,7 @@ async function imageReadRefs(images: KnowledgeImageRef[], spaceRoot: string | un
   if (!images.length) return [];
   let root: string | undefined;
   try { if (spaceRoot) root = await fs.realpath(spaceRoot); } catch { /* Missing space roots do not grant image access. */ }
-  const permitted = root && frozenRoots.some(candidate => pathIdentityKey(candidate) === pathIdentityKey(root!));
+  const permitted = root && frozenRoots.some(candidate => samePath(candidate, root!));
   return Promise.all(images.map(async image => {
     if (!permitted || !root) return { ...image, readError: 'KNOWLEDGE_IMAGE_READ_SCOPE_UNAVAILABLE' };
     try {

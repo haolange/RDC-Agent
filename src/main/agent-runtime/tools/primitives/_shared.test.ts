@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile, symlink, mkdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { directoryLinkType } from '../../../platform/paths';
 import {
   assertTextReadable,
   safeResolvePath,
@@ -194,7 +195,7 @@ describe('safeResolvePath', () => {
     await writeFile(secret, 'leak', 'utf8');
     const planted = path.join(knowledge, 'escape');
     try {
-      await symlink(memory, planted, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(memory, planted, directoryLinkType());
     } catch {
       return;
     }
@@ -220,7 +221,7 @@ describe('safeResolvePath', () => {
     await writeFile(path.join(memory, 'secret.md'), 'leak', 'utf8');
     const planted = path.join(knowledge, 'escape');
     try {
-      await symlink(memory, planted, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(memory, planted, directoryLinkType());
     } catch {
       return;
     }

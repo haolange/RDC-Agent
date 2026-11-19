@@ -4,6 +4,7 @@ import path from 'path';
 import YAML from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CANONICAL_HOOK_EVENTS } from '@shared/types/rdcRuntime';
+import { directoryLinkType } from '../platform/paths';
 import { HookEngine } from './HookEngine';
 import { CURRENT_HOOK_TRUST_SCHEMA_VERSION } from './hookTrustStore';
 
@@ -276,7 +277,7 @@ describe('HookEngine trust fingerprint', () => {
     fs.writeFileSync(path.join(targetA, 'run.mjs'), 'process.exit(0)\n');
     fs.writeFileSync(path.join(targetB, 'run.mjs'), 'process.exit(0)\n');
     try {
-      fs.symlinkSync(targetA, linkDir, process.platform === 'win32' ? 'junction' : 'dir');
+      fs.symlinkSync(targetA, linkDir, directoryLinkType());
     } catch (error) {
       expect(error).toBeTruthy();
       return;
@@ -292,7 +293,7 @@ describe('HookEngine trust fingerprint', () => {
     engine.load(path.join(root, 'user'), project, emptyBuiltin());
     engine.trustProjectHook(project, 'check');
     fs.rmSync(linkDir, { recursive: true, force: true });
-    fs.symlinkSync(targetB, linkDir, process.platform === 'win32' ? 'junction' : 'dir');
+    fs.symlinkSync(targetB, linkDir, directoryLinkType());
     const reloaded = engine.load(path.join(root, 'user'), project, emptyBuiltin());
     expect(reloaded[0].trust.trusted).toBe(false);
     expect(reloaded[0].trust.needsRetrust).toBe(true);

@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { commandFileNames } from '../platform/paths';
 import type { HookDefinition, ResourceScope } from '@shared/types/rdcRuntime';
 import { hashScopedResource } from '../runtime/ScopedResourceResolver';
 import { isNodeCommand, resolveHookArg, resolveHookCommand, resolveHookCwd } from './hookResolve';
@@ -51,20 +52,13 @@ export const fileIdentity = (filePath: string): FileIdentity => {
 
 const isFlagOrEmptyArg = (value: string): boolean => !value || value.startsWith('-');
 
-const windowsPathExtensions = (): string[] => {
-  const raw = process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD;.VBS;.JS';
-  return raw.split(';').map((entry) => entry.trim()).filter(Boolean);
-};
-
 export const resolveCommandOnPath = (command: string): string | null => {
   if (!command.trim()) return null;
   if (path.isAbsolute(command) || command.includes('/') || command.includes('\\')) {
     return fs.existsSync(command) && fs.statSync(command).isFile() ? command : null;
   }
   const dirs = (process.env.PATH ?? '').split(path.delimiter).map((entry) => entry.trim()).filter(Boolean);
-  const names = process.platform === 'win32' && !path.extname(command)
-    ? [command, ...windowsPathExtensions().map((ext) => `${command}${ext}`)]
-    : [command];
+  const names = commandFileNames(command);
   for (const dir of dirs) {
     for (const name of names) {
       const candidate = path.join(dir, name);

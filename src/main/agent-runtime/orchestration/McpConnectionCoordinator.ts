@@ -7,6 +7,8 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { currentHost, type HostDescriptor } from '../../platform/host';
+import { pathComparisonKey } from '../../platform/paths';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
@@ -75,7 +77,7 @@ export interface AcquiredMcpConnections {
   lease: McpConnectionLease | null;
 }
 
-export function canonicalMcpProjectRoot(projectRootPath: string, platform = process.platform): string {
+export function canonicalMcpProjectRoot(projectRootPath: string, host: HostDescriptor = currentHost()): string {
   const resolved = path.resolve(projectRootPath);
   let real: string;
   try {
@@ -83,7 +85,7 @@ export function canonicalMcpProjectRoot(projectRootPath: string, platform = proc
   } catch {
     real = resolved;
   }
-  return platform === 'win32' ? real.toLowerCase() : real;
+  return pathComparisonKey(real, host);
 }
 
 export function classifyMcpFailure(err: unknown): McpFailureKind {

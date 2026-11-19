@@ -1,9 +1,9 @@
 import fs from 'fs';
+import { pathComparisonKey } from '../../../platform/paths';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 function readKey(absolute: string): string {
-  const resolved = fs.realpathSync(absolute);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+  return pathComparisonKey(fs.realpathSync(absolute));
 }
 
 export function recordSuccessfulFileRead(absolute: string, context?: ToolExecutionContext): void {

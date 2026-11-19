@@ -21,6 +21,7 @@ import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@share
 import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
+import { resolvedPathKey, samePath } from '../../platform/paths';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { isReservedAgentId } from '../settings-core/reservedAgentIds';
 
@@ -242,9 +243,7 @@ export class AgentManifestService {
       });
     }
     const uniqueDiagnostics = [...new Map(diagnostics.map(issue => {
-      const normalized = path.resolve(issue.sourcePath);
-      const source = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-      return [JSON.stringify([source, issue.code, issue.message]), issue] as const;
+      return [JSON.stringify([resolvedPathKey(issue.sourcePath), issue.code, issue.message]), issue] as const;
     })).values()].sort((a, b) => a.scope.localeCompare(b.scope) || a.sourcePath.localeCompare(b.sourcePath) || a.code.localeCompare(b.code));
     const builtinHashes = new Map(candidates.filter((candidate) => candidate.scope === 'builtin')
       .map((candidate) => [candidate.id, hashManifestFile(candidate.sourcePath)] as const));
@@ -439,14 +438,13 @@ export class AgentManifestService {
     code: string,
     projectRoot?: string,
   ): { agentId: string; scope: AgentManifestWriteScope; sourcePath: string; sourceHash: string } {
-    const target = path.resolve(sourcePath);
     const diagnostic = this.resolveEffectiveSnapshot(paths, projectRoot).diagnostics.find((issue) => (
-      issue.code === code && issue.scope !== 'builtin' && path.resolve(issue.sourcePath) === target
+      issue.code === code && issue.scope !== 'builtin' && samePath(issue.sourcePath, sourcePath)
     ));
     if (!diagnostic || diagnostic.scope === 'builtin') {
       throw new Error(`AGENT_OVERRIDE_NOT_DIAGNOSED: ${sourcePath} has no current ${code} diagnostic.`);
     }
-    return { agentId: diagnostic.agentId, scope: diagnostic.scope, sourcePath: target, sourceHash: hashManifestFile(target) };
+    return { agentId: diagnostic.agentId, scope: diagnostic.scope, sourcePath: diagnostic.sourcePath, sourceHash: hashManifestFile(diagnostic.sourcePath) };
   }
 
   /** The current builtin and the effective user/project override of one Agent. */

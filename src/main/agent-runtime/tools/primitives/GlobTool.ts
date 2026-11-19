@@ -13,8 +13,8 @@
  */
 
 import * as fs from 'fs/promises';
-import * as os from 'os';
 import * as path from 'path';
+import { expandHomePath } from '../../../platform/paths';
 import type { AgentTool } from '../../agent/AgentTool';
 import { getWorkspaceRoot, safeResolvePath, truncateOutput } from './_shared';
 import { GLOB_MAX_OUTPUT_BYTES } from './toolLimits';
@@ -123,17 +123,8 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
   },
 };
 
-function expandUserPath(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed === '~') return os.homedir();
-  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
-    return path.resolve(os.homedir(), trimmed.slice(2));
-  }
-  return trimmed.replace(/^%USERPROFILE%/i, os.homedir());
-}
-
 function splitExternalPattern(pattern: string): { baseDir: string; pattern: string } | null {
-  const expanded = expandUserPath(pattern);
+  const expanded = expandHomePath(pattern);
   if (!path.isAbsolute(expanded)) return null;
 
   const wildcardIndex = expanded.search(/[*?{[]/);
