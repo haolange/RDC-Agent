@@ -36,10 +36,19 @@ jobs:
       - run: pnpm run check:coverage-ratchet
       - run: pnpm run test:coverage:renderer
       - run: pnpm run check:coverage-ratchet coverage/renderer/coverage-summary.json scripts/fidelity/coverage-ratchet-renderer.json
+      # Pull requests compare with their base and pushes with the previous head; a manual run
+      # has neither, so it compares with where the branch left the default branch.
+      - name: Resolve the comparison base
+        id: base
+        shell: bash
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ]; then base="$(git merge-base "origin/${{ github.event.repository.default_branch }}" HEAD)"; fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
       - name: Check gates
         env:
-          RDC_SYSTEM_DEBT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
-          RDC_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RDC_SYSTEM_DEBT_BASE_REF: ${{ steps.base.outputs.sha }}
+          RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:gates
       - run: pnpm run check:provider-catalog
       - run: pnpm run check:scoped-resources
@@ -52,7 +61,7 @@ jobs:
       - run: pnpm run check:request-cache-profile
       - name: Check git diff whitespace
         env:
-          RDC_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:git-diff
       - run: pnpm run build
 

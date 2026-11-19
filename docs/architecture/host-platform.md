@@ -56,6 +56,10 @@
 
 `secretStorageUnavailableReason(safeStorage)` 给出拒绝写入凭据的原因或 `null`；`hardenSecretFile` 把凭据文件限制为当前用户（0600，Windows 另加 `icacls` ACL）。
 
+### `fileIdentity.ts`
+
+`openedFileIdentity(path)` 打开文件取句柄 stat，`sameFileState(a, b)` 比较设备号、inode、大小与两个时间戳。capture 哈希、外部 capture 引用和知识锁清理都用它判断"还是同一个文件"。
+
 ### `rdcLayout.ts`
 
 `RDC_HOST_LAYOUTS` 镜像 RDC-Tool `rdc_tool/runtime_paths.py` 的 `HOST_LAYOUTS`：
@@ -84,6 +88,10 @@ Linux 上 Electron `safeStorage.isEncryptionAvailable()` 在没有系统钥匙�
 ## CI
 
 `build`（ubuntu）运行 node 与 renderer 两个测试项目，即 Linux 单元测试；`windows-unit` 在 windows-latest 运行 node 项目；`linux-smoke` 经 POSIX launcher 准备后在 `xvfb-run` 下运行 Browser QA smoke；`macos-shell` 保留 runtime / shell 子集（macOS 读不到 birth，相关身份为 unknown）。
+
+`windows-unit` 把测试进程的 TEMP/TMP/TMPDIR 指到 runner 自有的长路径临时目录：runner 默认 TEMP 是 8.3 短路径，realpath 会展开它，路径身份断言因此不成立，这不是产品缺陷，也不放宽产品路径检查。手动触发（`workflow_dispatch`）没有 PR base 和上一次 head，门禁的比较基线取分支与默认分支的 merge-base。
+
+文件身份只在句柄 stat 之间比较（`fileIdentity.ts` 的 `openedFileIdentity`）：较新的 Windows 版本按路径的 stat 走另一条系统调用，同一文件的路径 stat 与句柄 stat 可能报告不同的设备号、inode 或变更时间。路径 stat 只用于类型和链接检查。
 
 ## Linux 上的 CPU 回放
 
