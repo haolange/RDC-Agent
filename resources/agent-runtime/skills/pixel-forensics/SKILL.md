@@ -32,6 +32,4 @@ If the image or the mapping cannot be obtained, record the exact failed step. If
 - Judge over explicit bounded regions: the affected surface, representative areas where the quality constraint applies, and an unaffected control. State which structure or transitions remain, disappear or cannot be resolved. If the image cannot resolve the distinction, take a bounded native readback while that state is still active and keep its coordinates and sampling conditions.
 - Inspect images already available in authorized material, including retrieved Knowledge cards via `knowledge_read`'s `readImageArgs`, before asking for new ones. Historical images are appearance leads with their own provenance, never evidence about the current capture.
 
-## 4. Record
-
-When the anchored region is the earliest divergence, record the Debugger First Bad Event (`$debugger-causal-method`) as an `EvidenceRecord` with `region.kind` in `{event, pixel}` and an `observed_fact` Claim. Evidence comes first; causal Claims need a qualifying Experiment.
+When the anchored region is the earliest divergence, record it as the First Bad Event with `$debugger-causal-method`.
