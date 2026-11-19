@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { directoryLinkType } from '../../../platform/paths';
+import { currentHost } from '../../../platform/host';
+import { windowsPowerShellPath } from '../../../platform/shell';
 import {
   assertTextReadable,
   safeResolvePath,
@@ -295,7 +297,7 @@ describe('safeResolvePath', () => {
   });
 
   it('recognizes a Windows 8.3 project alias as the same knowledge root when available', async () => {
-    if (process.platform !== 'win32') return;
+    if (!currentHost().isWindows) return;
     const { realpathSync } = await import('node:fs');
     const project = await mkdtemp(path.join(os.tmpdir(), 'rdc-e3ident-'));
     roots.push(project);
@@ -308,7 +310,7 @@ describe('safeResolvePath', () => {
       const { execFileSync } = await import('node:child_process');
       const escaped = project.replace(/'/g, "''");
       shortProject = execFileSync(
-        'powershell.exe',
+        windowsPowerShellPath(),
         ['-NoProfile', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${escaped}').ShortPath`],
         { encoding: 'utf8' },
       ).trim().replace(/^["']|["']$/g, '');

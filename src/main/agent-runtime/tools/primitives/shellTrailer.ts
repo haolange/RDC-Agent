@@ -1,5 +1,7 @@
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { currentHost, type HostDescriptor } from '../../../platform/host';
+import { defaultShellLocale } from '../../../platform/shell';
 import type { ShellKind } from '../../../runtime/ShellResolver';
 
 export interface ShellTrailerState {
@@ -27,11 +29,11 @@ export function quotePosixSingle(value: string): string {
 
 export function buildAgentShellEnv(
   base: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
+  host: HostDescriptor = currentHost(),
 ): NodeJS.ProcessEnv {
   const env = { ...base };
   if (!env.LANG) {
-    env.LANG = platform === 'darwin' ? 'en_US.UTF-8' : 'C.UTF-8';
+    env.LANG = defaultShellLocale(host);
   }
   return env;
 }

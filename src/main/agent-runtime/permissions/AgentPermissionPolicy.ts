@@ -1,5 +1,6 @@
 import * as os from 'os';
 import { expandHomePath } from '../../platform/paths';
+import { defaultShellKind } from '../../platform/shell';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
 import * as path from 'path';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
@@ -267,7 +268,7 @@ function resolveShellKind(): ShellKind {
   try {
     return resolveConfiguredShell().kind;
   } catch {
-    return process.platform === 'win32' ? 'pwsh' : 'bash';
+    return defaultShellKind();
   }
 }
 

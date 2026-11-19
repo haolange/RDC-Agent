@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
+import { currentHost } from '../../platform/host';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
@@ -47,7 +48,7 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).not.toContain('# Available Skills');
     expect(plan.systemPrompt).toContain('如实更新 Task 状态');
     expect(plan.systemPrompt).toContain('No Tasks tools are available in this turn.');
-    expect(plan.systemPrompt).toContain(`Host OS: ${process.platform}`);
+    expect(plan.systemPrompt).toContain(`Host OS: ${currentHost().platform}`);
     expect(plan.systemPrompt).toContain('Shell: unavailable');
     expect(plan.systemPrompt).toContain('Shell cwd: D:/Project');
 

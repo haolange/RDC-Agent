@@ -18,6 +18,7 @@ import type {
 import { charsToTokens } from '@shared/utils/tokens';
 import { generateEventId } from '@shared/utils/id';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import { currentHost } from '../../platform/host';
 import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
 import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
 import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
@@ -189,7 +190,7 @@ export class PromptPlanBuilder {
         ? ['When a structured response is requested, follow the requested schema in the prompt; no native structured-output contract is available.']
         : []),
       `Project root: ${input.workDir || '(none)'}`,
-      `Host OS: ${process.platform}`,
+      `Host OS: ${currentHost().platform}`,
       `Shell: ${resolvePromptShellLabel()}`,
       `Shell cwd: ${resolvePromptShellCwd(input.sessionId, input.workDir)}`,
       'Permission mode is controlled live by the host; runtime permission context applies to future tool admission.',

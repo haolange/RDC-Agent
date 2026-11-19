@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { createHash } from 'node:crypto';
+import { defaultPythonCommand } from '../../../platform/shell';
 import type { AgentTool } from '../../agent/AgentTool';
 import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
 import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
@@ -45,7 +46,7 @@ const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 function resolveInterpreterCommand(configured: string): string {
   const trimmed = configured.trim();
   if (trimmed) return trimmed;
-  return process.platform === 'win32' ? 'python' : 'python3';
+  return defaultPythonCommand();
 }
 
 export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetails> = {
