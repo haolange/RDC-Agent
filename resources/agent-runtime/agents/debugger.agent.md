@@ -33,6 +33,7 @@ handoffs:
       - investigation_read
       - investigation_write
       - investigation_list
+      - subagent
     requiredSkillIds:
       - renderdoc-execution
       - pixel-forensics
