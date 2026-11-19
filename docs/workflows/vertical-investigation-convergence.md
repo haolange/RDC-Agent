@@ -270,3 +270,84 @@ M1 和 M2 只走 Android 远程回放，不在 PC 本机回放顶替。每次开
 ### 9.6 完成后
 
 M3 从第十三轮继续，条件与此前相同，新增上限 6 轮。前十二轮的停点记录保留，不再计入"连续三轮"。
+
+## 10. 收敛之后的五项遗留
+
+M1–M3 通过后，调查方法不再改动。本节处理五个遗留问题：结论写得过于保守、成本过高、计划和方法文本像机器生成、给 Agent 指定模型必须整份覆盖配置、产品只能在 Windows 上运行。证据要求不降低，调查主线不改。
+
+云端会话（Linux、无 GPU、无设备、无模型账号）完成代码、测试、构建与 Linux 冒烟；需要真实 capture、设备或模型的步骤写进第 11 节的交接单，由监工在本机执行后带回。状态词沿用第 8 节。
+
+### 10.1 状态
+
+| 项 | 云端 | 本机 |
+|---|---|---|
+| 一、结论写法与审查分档 | 待执行 | 待执行（交接单 B） |
+| 二、请求组装与缓存的测量 | 执行中 | 待执行（交接单 A） |
+| 二、缓存与上下文修复 | 待执行 | 待执行（交接单 B） |
+| 三、计划、方法文本与 Agent 配置 | 待执行 | 待执行（交接单 B） |
+| 四、Agent 模型设置 | 待执行 | 待执行（交接单 B） |
+| 五、Linux 运行 | 待执行 | 待执行（交接单 B 的 M1 兼作 Windows 回归） |
+
+### 10.2 一次请求怎样组装
+
+按 provider 建立缓存前缀的顺序（tools → instructions → input）列出各部分，以及它们在同一回合的相邻请求之间会不会变。行号对应本轮起点 `9abb7c3`。
+
+| 部分 | 来源 | 回合内会变吗 |
+|---|---|---|
+| tools | `RuntimeToolAssembly.ts:642-734` 的装配顺序；已激活的 deferred 工具追加在末尾（`deferredTools.ts:79-108`） | `tool_search` 激活新工具时变（`ToolExecutorFactory.ts:396-400`）；只剩一次请求时发空工具表（`AgentLoop.ts:323`） |
+| instructions：core 四份文本、文件工具路由、Agent 正文、项目指令、预载 Skill、Skill 目录、工具能力表 | `PromptPlanBuilder.ts:100-177`，回合开始时冻结 | 不变 |
+| instructions：`runtime:facts`、`runtime:profile-limits`、`runtime:approved-execution-offer`、`runtime:request-plan`、`runtime:execution-limits` | `PromptPlanBuilder.ts:179-266`、`TurnPreparationService.ts:189` | 不变 |
+| instructions：`runtime:identity` | `PromptPlanRuntimeIdentity.ts:8-17` | 获批的 capture 切换或现场恢复后变，之后保持 |
+| instructions：`runtime:continuation` | `RuntimeContinuation.ts:23-32`，`AgentLoop.ts:671` 追加在末尾 | 只出现在"终答被运行时义务退回"后的那一次请求 |
+| instructions：`runtime:permission` | `RuntimePermissionContext.ts:9-20`，每次请求追加在末尾 | 用户切换权限挡位时变 |
+| input：历史消息 | 会话 journal；工具返回只追加不改写（`AgentLoop.ts:358-362`） | 只在末尾追加；压缩时重写窗口（`RecoverableContextWindow.ts:53-100`），之后稳定 |
+| input：临时尾消息 | 无进展提示、余量提醒（`AgentLoop.ts:298-310,380-386`），不落盘 | 只影响当次请求的末尾 |
+
+一个回合内，instructions 与 tools 在上表列出的少数事件之外逐字节不变。跨回合时 PromptPlan 重建，tool-loop 内的 reasoning 项从 journal 丢弃（`SessionContextJournal.ts:104-106,237-246`），新回合的历史从上一回合第一条带工具调用的助手消息起与前一请求不同。
+
+缓存键与亲和：ChatGPT 账号路由沿用 `openai-responses` 协议的 `cache.mode: unknown`（`profiles/openai-responses.json:35`，`surfaces/chatgpt-account.json` 未覆盖），`PromptCacheCompiler.ts:30-33` 因此关闭缓存，请求既不带 `prompt_cache_key`，也不带 `session-id` 请求头（`responsesShared.ts:340-351`、`OpenAIResponsesProvider.ts:130-140`）。Codex CLI 对同一后端在请求体带 `prompt_cache_key`、请求头带 `session-id`，源码注释写明 ChatGPT 从 `session-id` 请求头推导缓存亲和（`openai/codex` 的 `codex-rs/core/src/client.rs`、`codex-rs/codex-api/src/requests/headers.rs`）。[源码]
+
+据此，命中约 25% 有两种可能的主因，交接单 A 用同一份统计区分：
+
+- 相邻请求覆盖前一请求的比例普遍在九成以上、缓存读取却低：内容是稳定的，主因是缓存亲和缺失。
+- 首个差异位置集中在 tools 或 instructions 的某一段：是回合内有内容在变，按差异位置修。
+
+## 11. 本机交接单
+
+本节写给本机监工，按顺序执行，不需要读其他需求材料。每张交接单写明条件、步骤、要取回的数据、怎样判断通过、失败时停在哪里。结果按第 5 节写进验收账本，并更新 10.1 的状态表，提交并推送到当前分支。
+
+### 11.1 交接单 A：从已有归档统计请求
+
+不需要设备、模型账号或回放，只读已有归档，不新跑调查。
+
+**条件**
+
+- 当前分支已拉取到包含 `scripts/request-cache-profile.mjs` 的提交；Node 与仓库依赖已就绪（`pnpm install` 成功过即可）。
+- 归档与隔离 userData 都在本机 `.local/` 下，不进仓库。
+
+**步骤**
+
+1. M3 第十二轮（会话 `sess_3a7256f5905b`）：把 `.local/vertical-investigation-20261108/evidence/m3-20261118-round-12-sources.zip` 解压到 `.local/request-profile/round-12/`，先核对 SHA-256 等于 `657c8c1a897a4c09790edf25c02ec5bc3ef0b57e3c776567eb2bd2a326bd4627`。在解压结果里找到 `llm-calls` 目录下以 `sess_3a7256f5905b` 开头的全部子目录（根会话、`--subagent--` 子执行、压缩与自动审查都在其中）。
+2. M3 第十四轮（会话 `sess_60d672e14cde`）：在隔离 userData `.local/m1-20261114/user-data/state/llm-calls/` 下找到以 `sess_60d672e14cde` 开头的全部子目录。原地读取，不复制。
+3. 对每一轮运行一次，把第一步或第二步找到的目录全部作为参数：
+
+   ```bash
+   node scripts/request-cache-profile.mjs <目录1> <目录2> ... --json .local/request-profile/round-12.json
+   node scripts/request-cache-profile.mjs <目录1> <目录2> ... --json .local/request-profile/round-14.json
+   ```
+
+   标准输出是一张汇总表和四行说明；JSON 留在 `.local/`，不提交。
+4. 在验收账本顶部为每一轮追加一条（不超过 10 行）：轮次与会话、`root` 行的请求数／输入 token／缓存读取／比例／平均输入、tools 变化次数、相邻请求覆盖前一请求的中位比例、"前缀稳定但未命中"的请求数、首个差异位置的分布、字节占比、工具返回字节占比前三、单次请求最多图片数。直接抄脚本输出的数字，不改写。
+5. 把 10.1 中"二、请求组装与缓存的测量"的本机列改为 `待用户确认`，提交并推送。
+
+**要取回的数据**：账本里的两条记录。脚本只输出尺寸、hash、segment 与工具名称和记录编号，不含提示词、对话或工具返回正文；提交前仍扫一眼，确认没有凭据和用户内容。
+
+**怎样判断通过**
+
+- 两轮都跑完、没有报错。
+- 第十二轮 `root` 行的请求数应与账本中该轮 General 的请求数（转接 3 次加执行 85 次）相符，输入与缓存读取应与账本中 General 的累计数（输入 12,463,399，含缓存读取 3,127,168）相近；偏差超过一成时在账本里写明偏差，不自行解释原因。
+
+**失败时停在哪里**
+
+- 归档里找不到 `llm-calls`，或脚本报 `Malformed request snapshot`：停下，在账本里记下错误原文和归档的目录结构（只列目录名），推送后告诉用户。不手工修改快照。
+- 第十四轮的目录已被清理：只交第十二轮的结果，并写明第十四轮缺失。
