@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { spawnSync } from 'child_process';
 import { safeStorage } from 'electron';
 import { sanitizeToken } from '@shared/utils/id';
 import { appPathService } from '../../runtime/AppPathService';
+import { hardenSecretFile, secretStorageUnavailableReason } from '../../platform/secrets';
 
 interface SecretRecord {
   encoding: 'safeStorage';
@@ -36,27 +36,9 @@ export class SecretStoreCorruptError extends Error {
 }
 
 function assertSafeStorageAvailable(): void {
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new SecretStorageUnavailableError();
-  }
-}
-
-function applySecretFileMode(filePath: string): void {
-  try {
-    fs.chmodSync(filePath, 0o600);
-  } catch {
-    // Windows may ignore POSIX mode bits; ACL hardening is best-effort below.
-  }
-  if (process.platform === 'win32' && process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test') {
-    try {
-      // Restrict the secret file to the current user where icacls is available.
-      spawnSync('icacls', [filePath, '/inheritance:r', '/grant:r', `${process.env.USERNAME}:F`], {
-        windowsHide: true,
-        stdio: 'ignore',
-      });
-    } catch {
-      // Best-effort Windows ACL.
-    }
+  const reason = secretStorageUnavailableReason(safeStorage);
+  if (reason) {
+    throw new SecretStorageUnavailableError(reason);
   }
 }
 
@@ -132,7 +114,7 @@ export class SecretStorageService {
         fs.rmSync(filePath, { force: true, maxRetries: 5, retryDelay: 100 });
         fs.renameSync(temporaryPath, filePath);
       }
-      applySecretFileMode(filePath);
+      hardenSecretFile(filePath);
       try {
         fsyncPath(directory);
       } catch {

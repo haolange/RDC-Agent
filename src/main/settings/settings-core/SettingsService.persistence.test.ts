@@ -15,6 +15,7 @@ vi.mock('electron', () => ({
   },
   safeStorage: {
     isEncryptionAvailable: () => electronMock.encryptionAvailable,
+    getSelectedStorageBackend: () => 'gnome_libsecret',
     decryptString: (buffer: Buffer) => {
       const text = buffer.toString('utf8');
       if (!text.startsWith('enc:')) {
