@@ -90,7 +90,13 @@ jobs:
           node-version: '22.13.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The runner's TEMP is an 8.3 short path (RUNNER~1) that realpath expands; tests use the
+      # runner's own long-path temp directory instead of relaxing product path checks (AGENTS.md §5).
       - run: pnpm test --project node
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          TMPDIR: ${{ runner.temp }}
 
   linux-smoke:
     runs-on: ubuntu-latest
