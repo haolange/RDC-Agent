@@ -2,18 +2,19 @@ import { retainResourceUntilExit, currentProcessExecutionOwner } from './Resourc
 /**
  * ProcessSupervisor — unified child-process registry with tree kill + ring buffers.
  *
- * POSIX: spawn with detached process group; SIGTERM → grace → SIGKILL (-pid).
- * Windows: process-tree termination via taskkill /T (Job Object not available without native addon).
+ * Isolated children get their own killable tree from the host platform module:
+ * a detached process group on POSIX (SIGTERM → grace → SIGKILL), a forced
+ * process-tree kill on Windows (Job Object not available without native addon).
  */
 
 import {
   spawn,
-  spawnSync,
   type ChildProcess,
   type SpawnOptions,
   type StdioOptions,
 } from 'child_process';
 import { generateEventId } from '@shared/utils/id';
+import { isolatedChildSpawnOptions, signalChildProcessTree } from '../platform/process';
 
 export type ProcessExitReason =
   | 'exit'
@@ -139,25 +140,7 @@ interface RegistryEntry {
 
 function terminateTree(pid: number | undefined, signal: NodeJS.Signals = 'SIGTERM'): void {
   if (pid == null || pid <= 0) return;
-  if (process.platform === 'win32') {
-    // taskkill has no graceful process-tree signal; /F is the only bounded abort.
-    spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], {
-      windowsHide: true,
-      stdio: 'ignore',
-      timeout: PROCESS_TERMINATION_POLICY.treeKillTimeoutMs,
-      killSignal: 'SIGKILL',
-    });
-    return;
-  }
-  try {
-    process.kill(-pid, signal);
-  } catch {
-    try {
-      process.kill(pid, signal);
-    } catch {
-      // already gone
-    }
-  }
+  signalChildProcessTree(pid, signal, PROCESS_TERMINATION_POLICY.treeKillTimeoutMs);
 }
 
 export class ProcessSupervisor {
@@ -203,7 +186,6 @@ export class ProcessSupervisor {
     const stderr = new RingBuffer(ringBytes);
     const startedAt = Date.now();
     const isolate = opts.isolateProcessGroup !== false;
-    const isWin = process.platform === 'win32';
 
     const spawnOpts: SpawnOptions = {
       cwd: opts.cwd,
@@ -213,9 +195,8 @@ export class ProcessSupervisor {
       windowsHide: opts.windowsHide ?? true,
     };
 
-    if (isolate && !isWin) {
-      // New process group so we can kill(-pid).
-      spawnOpts.detached = true;
+    if (isolate) {
+      Object.assign(spawnOpts, isolatedChildSpawnOptions());
     }
 
     let child: ChildProcess;

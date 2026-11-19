@@ -203,7 +203,6 @@ async function executeShellCommand(
       cwd: spawnCwd,
       env: buildAgentShellEnv(),
       windowsHide: true,
-      isolateProcessGroup: process.platform !== 'win32',
       timeoutMs,
       abortSignal: signal,
       ringBufferBytes: SHELL_MAX_OUTPUT_BYTES * 2,

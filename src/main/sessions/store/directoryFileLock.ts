@@ -1,12 +1,15 @@
 import { existsSync, mkdirSync, openSync, closeSync, writeFileSync, unlinkSync, readFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { currentProcessIdentity, probeProcess } from '../../platform/process';
 import type { FileHandle } from 'node:fs/promises';
 
 const DEFAULT_MAX_LOCK_ATTEMPTS = 40;
 
+/** The owner's process identity; an empty birth was not recorded and is judged by pid. */
 export interface DirectoryFileLockOwner {
   pid: number;
+  birth: string;
   createdAt: number;
 }
 
@@ -16,24 +19,25 @@ export interface DirectoryFileLockOptions {
   timeoutCode?: string;
 }
 
-function isProcessAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+/** Only a proven exit frees a lock; an unreadable identity keeps it held. */
+function ownerHasExited(owner: DirectoryFileLockOwner): boolean {
+  return probeProcess({ pid: owner.pid, birth: owner.birth }) === 'exited';
 }
 
 function parseLockOwner(raw: string): DirectoryFileLockOwner | null {
   try {
     const parsed = JSON.parse(raw) as Partial<DirectoryFileLockOwner>;
     if (typeof parsed.pid !== 'number' || typeof parsed.createdAt !== 'number') return null;
-    return { pid: parsed.pid, createdAt: parsed.createdAt };
+    return { pid: parsed.pid, birth: typeof parsed.birth === 'string' ? parsed.birth : '', createdAt: parsed.createdAt };
   } catch {
     return null;
   }
+}
+
+/** Built before the exclusive create so the owner identity is never read while holding an empty lock. */
+function lockOwnerRecord(): string {
+  const { pid, birth } = currentProcessIdentity();
+  return JSON.stringify({ pid, birth, createdAt: Date.now() } satisfies DirectoryFileLockOwner);
 }
 
 function timeoutError(lockPath: string, timeoutCode: string): Error {
@@ -67,7 +71,7 @@ function readLockOwnerSync(lockPath: string): DirectoryFileLockOwner | null {
  */
 async function recoverStaleLock(lockPath: string): Promise<boolean> {
   const owner = await readLockOwner(lockPath);
-  if (!owner || isProcessAlive(owner.pid)) {
+  if (!owner || !ownerHasExited(owner)) {
     return false;
   }
   // Only one contender may decide and remove a dead owner's lock. Otherwise a
@@ -81,7 +85,7 @@ async function recoverStaleLock(lockPath: string): Promise<boolean> {
   }
   try {
     const current = await readLockOwner(lockPath);
-    if (!current || isProcessAlive(current.pid)) return false;
+    if (!current || !ownerHasExited(current)) return false;
     try { await fs.unlink(lockPath); return true; }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
@@ -94,7 +98,7 @@ async function recoverStaleLock(lockPath: string): Promise<boolean> {
 
 function recoverStaleLockSync(lockPath: string): boolean {
   const owner = readLockOwnerSync(lockPath);
-  if (!owner || isProcessAlive(owner.pid)) {
+  if (!owner || !ownerHasExited(owner)) {
     return false;
   }
   const recoveryPath = `${lockPath}.recovery`;
@@ -106,7 +110,7 @@ function recoverStaleLockSync(lockPath: string): boolean {
   }
   try {
     const current = readLockOwnerSync(lockPath);
-    if (!current || isProcessAlive(current.pid)) return false;
+    if (!current || !ownerHasExited(current)) return false;
     try { unlinkSync(lockPath); return true; }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
@@ -124,15 +128,13 @@ export async function acquireDirectoryFileLock(
   await fs.mkdir(directory, { recursive: true });
   const lockPath = path.join(directory, options.lockFileName);
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_LOCK_ATTEMPTS;
+  const ownerRecord = lockOwnerRecord();
   const timeoutCode = options.timeoutCode ?? 'DIRECTORY_LOCK_TIMEOUT';
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const handle = await fs.open(lockPath, 'wx');
       try {
-        await handle.writeFile(JSON.stringify({
-          pid: process.pid,
-          createdAt: Date.now(),
-        } satisfies DirectoryFileLockOwner), 'utf8');
+        await handle.writeFile(ownerRecord, 'utf8');
       } finally {
         await handle.close();
       }
@@ -149,7 +151,7 @@ export async function acquireDirectoryFileLock(
 
 export async function releaseDirectoryFileLock(lockPath: string): Promise<void> {
   const owner = await readLockOwner(lockPath);
-  if (owner && owner.pid !== process.pid && isProcessAlive(owner.pid)) {
+  if (owner && owner.pid !== process.pid && !ownerHasExited(owner)) {
     return;
   }
   try {
@@ -174,7 +176,7 @@ export async function withDirectoryFileLock<T>(
 
 export function releaseDirectoryFileLockSync(lockPath: string): void {
   const owner = readLockOwnerSync(lockPath);
-  if (owner && owner.pid !== process.pid && isProcessAlive(owner.pid)) {
+  if (owner && owner.pid !== process.pid && !ownerHasExited(owner)) {
     return;
   }
   try {
@@ -194,15 +196,13 @@ export function withDirectoryFileLockSync<T>(
   }
   const lockPath = path.join(directory, options.lockFileName);
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_LOCK_ATTEMPTS;
+  const ownerRecord = lockOwnerRecord();
   const timeoutCode = options.timeoutCode ?? 'DIRECTORY_LOCK_TIMEOUT';
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const fd = openSync(lockPath, 'wx');
       try {
-        writeFileSync(fd, JSON.stringify({
-          pid: process.pid,
-          createdAt: Date.now(),
-        } satisfies DirectoryFileLockOwner), 'utf8');
+        writeFileSync(fd, ownerRecord, 'utf8');
       } finally {
         closeSync(fd);
       }

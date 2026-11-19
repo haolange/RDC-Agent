@@ -1,8 +1,9 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { currentProcessIdentity } from '../../platform/process';
 import { acquireMemoryDirectoryLock, releaseMemoryDirectoryLock } from './memoryDirectoryLock';
 import { MemoryStore } from './MemoryStore';
 
@@ -14,9 +15,21 @@ describe('memoryDirectoryLock', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-stale-'));
     roots.push(root);
     const lockPath = path.join(root, '.memory.lock');
-    await writeFile(lockPath, JSON.stringify({ pid: 1, createdAt: Date.now() - 120_000 }), 'utf8');
+    const dead = spawnSync(process.execPath, ['-e', '']);
+    expect(dead.status).toBe(0);
+    await writeFile(lockPath, JSON.stringify({ pid: dead.pid, birth: '', createdAt: Date.now() - 120_000 }), 'utf8');
     const acquired = await acquireMemoryDirectoryLock(root);
     expect(acquired.lockPath).toBe(lockPath);
+    await releaseMemoryDirectoryLock(lockPath);
+  });
+
+  it.skipIf(!currentProcessIdentity().birth)('recovers a lock whose pid now belongs to a process with another birth', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-reused-'));
+    roots.push(root);
+    const lockPath = path.join(root, '.memory.lock');
+    await writeFile(lockPath, JSON.stringify({ pid: process.pid, birth: 'stale-birth', createdAt: Date.now() - 120_000 }), 'utf8');
+    const acquired = await acquireMemoryDirectoryLock(root, { maxAttempts: 3 });
+    expect(JSON.parse(await readFile(acquired.lockPath, 'utf8'))).toMatchObject(currentProcessIdentity());
     await releaseMemoryDirectoryLock(lockPath);
   });
 

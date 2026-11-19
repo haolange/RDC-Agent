@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
@@ -9,18 +8,30 @@ import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import { settingsService } from '../settings/settings-core/SettingsService';
+import {
+  probeProcess,
+  readProcessCommandLine,
+  terminateProcessTree,
+  type ProcessIdentity,
+  type ProcessLiveness,
+  type ProcessTermination,
+} from '../platform/process';
 
 export const APP_RDC_CONTEXT_ID = /^rdc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REGISTRY_SCHEMA = 1;
 const REGISTRY_FILE = 'owned-rdc-daemons.json';
 
+/** Births are the RDC-Tool daemon state tokens; an empty birth was not recorded. */
 export interface OwnedRdcDaemonRecord {
   contextId: string;
   command: string;
   intermediateRoot: string;
   ownerPid: number;
+  ownerBirth: string;
   daemonPid: number;
+  daemonBirth: string;
   workerPid: number;
+  workerBirth: string;
   startedAt: number;
 }
 
@@ -87,10 +98,14 @@ type OwnedRdcDaemonHarvestOptions = OwnedRdcDaemonStoreOptions & {
   execute?: typeof rdcCliInvokerService.executeCLI;
   settings?: RdcCliInvokerSettings;
   signal?: AbortSignal;
-  readCommandLine?: (pid: number) => string;
-  killPid?: (pid: number) => boolean;
-  isProcessAlive?: (pid: number) => boolean;
+  probeProcess?: (identity: ProcessIdentity) => ProcessLiveness;
+  readCommandLine?: (pid: number) => string | null;
+  terminateProcess?: (identity: ProcessIdentity) => ProcessTermination;
 };
+
+const ownerIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({ pid: record.ownerPid, birth: record.ownerBirth });
+const daemonIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({ pid: record.daemonPid, birth: record.daemonBirth });
+const workerIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({ pid: record.workerPid, birth: record.workerBirth });
 
 export async function harvestOwnedRdcDaemons(
   options: OwnedRdcDaemonHarvestOptions = {},
@@ -105,8 +120,11 @@ export async function harvestOwnedRdcDaemons(
         command: options.settings?.command ?? settingsService.getAll().tooling.rdcCli.command,
         intermediateRoot,
         ownerPid: process.pid,
+        ownerBirth: '',
         daemonPid: 0,
+        daemonBirth: '',
         workerPid: 0,
+        workerBirth: '',
         startedAt: 0,
       });
     }
@@ -118,12 +136,13 @@ export async function harvestOwnedRdcDaemons(
     if (!isAppRdcContextId(record.contextId)) continue;
     try {
       options.signal?.throwIfAborted();
-      const alive = options.isProcessAlive ?? isProcessAlive;
-      if (record.ownerPid !== process.pid && record.ownerPid > 0 && alive(record.ownerPid)) {
-        throw new Error(`RDC_OWNERSHIP_BUSY: owner ${record.ownerPid} is still alive.`);
+      const probe = options.probeProcess ?? probeProcess;
+      const owner = probe(ownerIdentity(record));
+      if (record.ownerPid !== process.pid && owner !== 'exited') {
+        throw new Error(`RDC_OWNERSHIP_BUSY: owner ${record.ownerPid} is ${owner === 'alive' ? 'still alive' : 'unverifiable'}.`);
       }
       const stateFile = path.join(record.intermediateRoot, 'runtime', 'rdc_tool_cli', `daemon_state_${record.contextId}.json`);
-      const dead = [record.ownerPid, record.daemonPid, record.workerPid].every(pid => pid <= 0 || !alive(pid));
+      const dead = owner === 'exited' && [daemonIdentity(record), workerIdentity(record)].every((identity) => probe(identity) === 'exited');
       // A dead owner, no native processes and no endpoint state need no CLI mutation.
       if (!dead || fs.existsSync(stateFile)) await stopOwnedDaemon(record, options);
       forgetOwnedRdcDaemon(record.contextId, options);
@@ -196,43 +215,28 @@ function killVerifiedOwnedPids(
   record: OwnedRdcDaemonRecord,
   options: OwnedRdcDaemonHarvestOptions,
 ): void {
+  const probe = options.probeProcess ?? probeProcess;
   const readCommandLine = options.readCommandLine ?? readProcessCommandLine;
-  const killPid = options.killPid ?? terminatePid;
+  const terminate = options.terminateProcess ?? terminateProcessTree;
   const remaining: number[] = [];
-  for (const [pid, expected] of [
-    [record.daemonPid, 'rdc_tool.daemon.server'],
-    [record.workerPid, 'rdc_tool.runtime.worker_main'],
+  for (const [identity, expected] of [
+    [daemonIdentity(record), 'rdc_tool.daemon.server'],
+    [workerIdentity(record), 'rdc_tool.runtime.worker_main'],
   ] as const) {
-    if (pid <= 0) continue;
-    const commandLine = readCommandLine(pid);
-    if (!commandLine) continue;
-    if (!commandLine.includes(expected) || !commandLine.includes(record.contextId)) {
-      throw new Error(`RDC_CLOSE_FAILED: pid ${pid} is not a confirmed ${expected} for ${record.contextId}.`);
+    const liveness = probe(identity);
+    if (liveness === 'exited') continue;
+    // An unreadable identity or command line is never proof of exit and never authorizes a kill.
+    const commandLine = liveness === 'alive' ? readCommandLine(identity.pid) : null;
+    if (!commandLine?.includes(expected) || !commandLine.includes(record.contextId)) {
+      throw new Error(`RDC_CLOSE_FAILED: pid ${identity.pid} is not a confirmed ${expected} for ${record.contextId}.`);
     }
-    if (!killPid(pid)) remaining.push(pid);
+    if (terminate(identity) === 'unconfirmed') remaining.push(identity.pid);
   }
   if (remaining.length) throw new Error(`RDC_CLOSE_FAILED: owned pids still running: ${remaining.join(', ')}`);
 }
 
 function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {
   return withRdcHostRuntimeEnv(settings ?? settingsService.getAll().tooling.rdcCli).env[RDC_INTERMEDIATE_ROOT_ENV] ?? '';
-}
-
-function isProcessAlive(pid: number): boolean {
-  if (pid === process.pid) return true;
-  if (process.platform === 'win32') {
-    const result = spawnSync('powershell.exe', ['-NoProfile', '-Command',
-      `$ErrorActionPreference='Stop'; if (Get-CimInstance Win32_Process -Filter "ProcessId=${pid}") { 'alive' } else { 'absent' }`,
-    ], { windowsHide: true, encoding: 'utf8' });
-    const state = result.stdout?.trim();
-    if (result.status !== 0 || (state !== 'alive' && state !== 'absent')) throw new Error(`RDC_PROCESS_QUERY_FAILED: ${pid}`);
-    return state === 'alive';
-  }
-  try { process.kill(pid, 0); return true; }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
-    throw error;
-  }
 }
 
 function readRegistry(registryPath?: string): RegistryDocument {
@@ -246,9 +250,15 @@ function readRegistry(registryPath?: string): RegistryDocument {
     throw new Error(`STORAGE_SCHEMA_UNSUPPORTED: owned-rdc-daemons schema ${String(payload.schemaVersion)}`);
   }
   const records: Record<string, OwnedRdcDaemonRecord> = {};
+  const birth = (value: unknown): string => (typeof value === 'string' ? value : '');
   for (const [contextId, record] of Object.entries(payload.records ?? {})) {
     if (!record || !isAppRdcContextId(contextId) || record.contextId !== contextId) continue;
-    records[contextId] = record;
+    records[contextId] = {
+      ...record,
+      ownerBirth: birth(record.ownerBirth),
+      daemonBirth: birth(record.daemonBirth),
+      workerBirth: birth(record.workerBirth),
+    };
   }
   return { schemaVersion: REGISTRY_SCHEMA, records };
 }
@@ -259,22 +269,4 @@ function writeRegistry(document: RegistryDocument, registryPath?: string): void 
   const tempPath = `${filePath}.${process.pid}.tmp`;
   fs.writeFileSync(tempPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
   fs.renameSync(tempPath, filePath);
-}
-
-function readProcessCommandLine(pid: number): string {
-  if (process.platform !== 'win32') {
-    try { return fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' '); } catch { return ''; }
-  }
-  const result = spawnSync('powershell.exe', [
-    '-NoProfile', '-Command',
-    `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`,
-  ], { windowsHide: true, encoding: 'utf8' });
-  return (result.stdout ?? '').trim();
-}
-
-function terminatePid(pid: number): boolean {
-  const result = process.platform === 'win32'
-    ? spawnSync('taskkill', ['/PID', String(pid), '/F', '/T'], { windowsHide: true, stdio: 'ignore' })
-    : spawnSync('kill', ['-9', String(pid)], { stdio: 'ignore' });
-  return result.status === 0;
 }

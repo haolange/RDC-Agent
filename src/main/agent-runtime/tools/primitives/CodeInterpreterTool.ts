@@ -99,7 +99,6 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
       cwd,
       env,
       windowsHide: true,
-      isolateProcessGroup: process.platform !== 'win32',
       timeoutMs: settings.timeoutMs,
       abortSignal: signal,
       ringBufferBytes: SHELL_MAX_OUTPUT_BYTES * 2,

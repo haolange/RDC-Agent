@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { execFileSync } from 'node:child_process';
+import { probeProcess, type ProcessIdentity, type ProcessLiveness } from '../platform/process';
 
-export interface UserDataInstanceLockOwner {
-  pid: number;
+/** The owner's process identity plus the acquisition stamp; an empty birth was not recorded. */
+export interface UserDataInstanceLockOwner extends ProcessIdentity {
   mode: 'browser' | 'desktop' | 'unknown';
   startTs: string;
 }
@@ -12,39 +12,13 @@ export type UserDataInstanceLockResult =
   | { acquired: true; lockPath: string; release: () => void }
   | { acquired: false; lockPath: string; owner: UserDataInstanceLockOwner | null };
 
-function defaultIsProcessAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // An inaccessible live process is not evidence of a dead owner.
-    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
-  }
-}
-
-export function readWindowsProcessStartedAt(pid: number): number | null {
-  if (process.platform !== 'win32' || !Number.isSafeInteger(pid) || pid <= 0) return null;
-  const systemRoot = process.env.SystemRoot;
-  if (!systemRoot || !path.isAbsolute(systemRoot)) return null;
-  try {
-    const value = execFileSync(path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
-      '-NoProfile', '-NonInteractive', '-Command',
-      `[System.Diagnostics.Process]::GetProcessById(${pid}).StartTime.ToUniversalTime().ToString('o')`,
-    ], { encoding: 'utf8', windowsHide: true, timeout: 2_000, maxBuffer: 1_024, stdio: ['ignore', 'pipe', 'ignore'] });
-    const startedAt = Date.parse(value.trim());
-    return Number.isFinite(startedAt) ? startedAt : null;
-  } catch {
-    return null;
-  }
-}
-
 function readLockOwner(lockPath: string): UserDataInstanceLockOwner | null {
   try {
     const value = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as Partial<UserDataInstanceLockOwner>;
     if (typeof value.pid !== 'number') return null;
     return {
       pid: value.pid,
+      birth: typeof value.birth === 'string' ? value.birth : '',
       mode: value.mode === 'browser' || value.mode === 'desktop' ? value.mode : 'unknown',
       startTs: typeof value.startTs === 'string' ? value.startTs : 'unknown',
     };
@@ -56,8 +30,7 @@ function readLockOwner(lockPath: string): UserDataInstanceLockOwner | null {
 export function acquireUserDataInstanceLock(
   userDataPath: string,
   owner: UserDataInstanceLockOwner,
-  isProcessAlive: (pid: number) => boolean = defaultIsProcessAlive,
-  readProcessStartedAt: (pid: number) => number | null = readWindowsProcessStartedAt,
+  probe: (identity: ProcessIdentity) => ProcessLiveness = probeProcess,
 ): UserDataInstanceLockResult {
   const lockPath = path.join(path.resolve(userDataPath), 'instance.lock');
   const payload = `${JSON.stringify(owner)}\n`;
@@ -80,16 +53,10 @@ export function acquireUserDataInstanceLock(
       if (code !== 'EEXIST') throw error;
 
       const existingOwner = readLockOwner(lockPath);
-      if (existingOwner && isProcessAlive(existingOwner.pid)) {
-        const parsedLockTime = Date.parse(existingOwner.startTs);
-        const lockStartedAt = Number.isFinite(parsedLockTime)
-          && new Date(parsedLockTime).toISOString() === existingOwner.startTs ? parsedLockTime : Number.NaN;
-        const processStartedAt = Number.isFinite(lockStartedAt) ? readProcessStartedAt(existingOwner.pid) : null;
-        // A process born after this lock cannot be its owner: the PID was reused.
-        // Unknown birth times and legacy/invalid timestamps remain fail-closed.
-        if (processStartedAt === null || !Number.isFinite(processStartedAt) || processStartedAt <= lockStartedAt) {
-          return { acquired: false, lockPath, owner: existingOwner };
-        }
+      // Only a proven exit frees the lock: a reused PID has another birth, while an
+      // unreadable identity or an unrecorded birth on a live PID stays fail-closed.
+      if (existingOwner && probe(existingOwner) !== 'exited') {
+        return { acquired: false, lockPath, owner: existingOwner };
       }
 
       try {

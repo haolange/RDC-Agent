@@ -532,13 +532,18 @@ export class RdcSessionRuntime {
       : {};
     const ownerPid = Number(payload.data.owner_pid ?? state.owner_pid ?? 0);
     if (ownerPid !== process.pid) throw new Error('RDC_CLOSE_FAILED: daemon start did not bind the application owner_pid.');
+    const worker = state.worker && typeof state.worker === 'object' ? state.worker as { pid?: unknown; birth?: unknown } : {};
+    const birth = (value: unknown): string => (typeof value === 'string' ? value : '');
     rememberOwnedRdcDaemon({
       contextId,
       command: cli.command,
       intermediateRoot: cli.env[RDC_INTERMEDIATE_ROOT_ENV] || hostRdcIntermediateRoot(),
       ownerPid,
+      ownerBirth: birth(state.owner_birth),
       daemonPid: Number(state.pid ?? 0),
-      workerPid: Number((state.worker && typeof state.worker === 'object' ? (state.worker as { pid?: unknown }).pid : 0) ?? 0),
+      daemonBirth: birth(state.birth),
+      workerPid: Number(worker.pid ?? 0),
+      workerBirth: birth(worker.birth),
       startedAt: Date.now(),
     });
   }

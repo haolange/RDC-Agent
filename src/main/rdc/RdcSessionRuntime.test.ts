@@ -21,7 +21,7 @@ beforeEach(() => { clearRdcContextLeases(); ownership.remember.mockReset(); owne
   const context = args[args.lastIndexOf('--daemon-context') + 1] ?? 'default';
   if (_command === 'daemon' && operation === 'start') {
     return { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rdc_tool.daemon.start', data: {
-      context_id: context, owner_pid: process.pid, state: { context_id: context, owner_pid: process.pid, pid: 4242, worker: { pid: 0 } },
+      context_id: context, owner_pid: process.pid, state: { context_id: context, owner_pid: process.pid, owner_birth: 'owner-birth', pid: 4242, birth: 'daemon-birth', worker: { pid: 0, birth: '' } },
     } }) };
   }
   const data = _command === 'daemon' ? { context_id: context, stopped: true }
@@ -63,7 +63,9 @@ describe('native owning runtime', () => {
     expect(opened.contextId).toMatch(/^rdc-/); expect(opened.contextId).not.toBe(request.inputId);
     expect(getRdcContextLease('session')?.contextId).toBe(opened.contextId);
     expect(nativeStop).toHaveBeenCalledWith('daemon', ['start', '--daemon-context', opened.contextId], expect.objectContaining({ contextId: opened.contextId }));
-    expect(ownership.remember).toHaveBeenCalledWith(expect.objectContaining({ contextId: opened.contextId, ownerPid: process.pid }));
+    expect(ownership.remember).toHaveBeenCalledWith(expect.objectContaining({
+      contextId: opened.contextId, ownerPid: process.pid, ownerBirth: 'owner-birth', daemonPid: 4242, daemonBirth: 'daemon-birth', workerPid: 0, workerBirth: '',
+    }));
   });
   it('retains partial-open context until explicit confirmed close', async () => {
     nativeStop.mockImplementation(async (_command: string, args: string[]) => {

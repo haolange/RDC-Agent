@@ -55,7 +55,6 @@ export class ShellInvocationService {
       timeoutMs: request.timeoutMs,
       ringBufferBytes: request.outputBufferBytes,
       abortSignal: request.abortSignal,
-      isolateProcessGroup: process.platform !== 'win32',
     });
 
     const procId = supervised.id;
