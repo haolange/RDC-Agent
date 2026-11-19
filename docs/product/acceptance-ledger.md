@@ -8,7 +8,8 @@
 - 经产品接口建项目与会话，引用 lavapipe 自录的 `lavapipe_vkcube_frame1503.rdc`（sha256 `d138f0645298…`），在本地设备打开：约 5.0 s 进入 `ready`，6 个事件，停在最终事件 14 并有画面；切换到事件 11 后 `appliedEventId=11`、有画面、无错误。
 - 正常退出（SIGTERM）后 RDC 守护进程与 worker 均退出，无残留；`instance.lock` 写入 Linux 出生标识（平台模块提交 `6347d36`）。
 - 跨厂商：仓库 `vkcube.rdc`（NVIDIA 录制）在 lavapipe 上以内存类型不匹配被拒绝，属 Vulkan capture 不可移植，不作为缺陷。
-- 未覆盖：Windows 上的行为回归（交接单 B 的 M1）、Android 远端、模型调用。两 OS CI 结果见后续条目。
+- 两 OS CI：本分支手动触发的 [CI run 44623592339](https://github.com/haolange/RDC-Agent/actions/runs/44623592339)（head `e0485b3b`）中 build（Linux node/renderer 测试、覆盖率底线、check:gates、build）、windows-unit（Windows Server 2025 上 node 项目全量单测）、linux-smoke（Ubuntu 上真实 Electron 无头 Browser QA）、macos-shell、desktop-smoke、browser-smoke×2、launcher-fresh-checkout×2 全部 success；release 仅在 tag 运行。此前三次运行暴露并修复了：runner 8.3 短路径 TEMP（测试改用 runner 自有临时目录）、Windows 新版本上路径 stat 与句柄 stat 不可比（产品缺陷，`17875df4`）、手动触发缺比较基线、windows-unit 未补装 Electron 运行时。
+- 未覆盖：Windows 实机上的行为回归（交接单 B 的 M1）、Android 远端、模型调用。
 
 ## 2026-11-19：M3 第十四轮，可恢复实验待用户确认
 
