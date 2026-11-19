@@ -45,7 +45,7 @@ describe('PromptPlanBuilder', () => {
     // 空 skill catalog 时省略 skill-catalog 段。
     expect(plan.segments.some((segment) => segment.kind === 'skill-catalog')).toBe(false);
     expect(plan.systemPrompt).not.toContain('# Available Skills');
-    expect(plan.systemPrompt).toContain('Update actual task status without inventing progress.');
+    expect(plan.systemPrompt).toContain('如实更新 Task 状态');
     expect(plan.systemPrompt).toContain('No Tasks tools are available in this turn.');
     expect(plan.systemPrompt).toContain(`Host OS: ${process.platform}`);
     expect(plan.systemPrompt).toContain('Shell: unavailable');
