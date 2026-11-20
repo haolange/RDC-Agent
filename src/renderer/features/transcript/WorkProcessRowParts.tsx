@@ -27,7 +27,8 @@ const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }
 
 export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNode; density?: 'normal' | 'compact' }> = ({ row, extraDetail, density = 'normal' }) => {
   const { t } = useI18n();
-  const statusLabel = row.status === 'complete' || (row.approval && row.approval.status !== 'approved') || (row.planReview && row.status === 'cancelled')
+  // A plan row's verb already names its review state; only a real failure adds a status.
+  const statusLabel = row.status === 'complete' || (row.approval && row.approval.status !== 'approved') || (row.planReview && row.status !== 'error')
     ? '' : getRowStatusLabel(row.status, t);
   const hasDetail = row.previewLines.length > 0
     || Boolean(row.hookDiagnostics?.length)

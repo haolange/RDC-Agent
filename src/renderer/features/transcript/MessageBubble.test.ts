@@ -7,6 +7,7 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { PlanReviewStatus } from '@shared/types/planReview';
 vi.mock('./WorkProcess', () => ({ WorkProcess: () => createElement('div', null, 'work-process') }));
 vi.mock('./MessageActions', () => ({ MessageActions: () => null }));
+vi.mock('./PlanReaderHost', () => ({ usePlanReader: () => () => undefined }));
 vi.mock('./HandoffSuggestionRow', () => ({ HandoffSuggestionRow: () => createElement('button', null, 'Continue handoff') }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => content }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -22,6 +23,9 @@ it.each<PlanReviewStatus>(['awaiting', 'approved', 'rejected', 'superseded', 'ca
   const html = renderToStaticMarkup(createElement(MessageBubble, { message }));
   expect(html).toContain('Original result');
   expect(html).not.toContain('Continue handoff');
+  // The plan card lives in the reply, after Working, only while it is the revision under review or approved.
+  expect(html.includes('data-testid="plan-deliverable"')).toBe(status === 'awaiting' || status === 'approved');
+  if (status === 'awaiting') expect(html.indexOf('work-process')).toBeLessThan(html.indexOf('plan-deliverable'));
 });
 it('preserves ordinary handoffs and original stopped output without a duplicate stop badge', () => {
   expect(renderToStaticMarkup(createElement(MessageBubble, { message: base }))).toContain('Continue handoff');

@@ -315,7 +315,6 @@ work-process-hook-diagnostic-card
 work-process-image-group
 work-process-image-thumbs
 work-process-output
-work-process-plan-review
 work-process-section
 work-process-source-pills
 work-process-subagent

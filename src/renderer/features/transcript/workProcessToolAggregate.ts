@@ -57,7 +57,7 @@ function formatDuration(rows: ToolRow[]): string {
 
 /**
  * Settled tool disclosure: ≤7 tools stay flat; ≥8 consecutive tools become one aggregate row.
- * Non-tool rows (userInput / approval / …) flush any pending tools and pass through.
+ * Non-tool rows (userInput / approval / …) and the plan row flush any pending tools and pass through.
  */
 export function aggregateSectionSteps(steps: WorkProcessRow[], t: Translator, settled = true): WorkProcessRow[] {
   const output: WorkProcessRow[] = [];
@@ -81,7 +81,7 @@ export function aggregateSectionSteps(steps: WorkProcessRow[], t: Translator, se
   };
 
   for (const step of groupImageRows(steps)) {
-    if (step.type === 'tool' && !step.imageCalls) {
+    if (step.type === 'tool' && !step.imageCalls && !step.planReview) {
       pendingTools.push(step);
       continue;
     }
@@ -90,7 +90,8 @@ export function aggregateSectionSteps(steps: WorkProcessRow[], t: Translator, se
   }
   flushTools();
   return output;
-}/** Summarize application-owned counts directly in the selected language. */
+}
+/** Summarize application-owned counts directly in the selected language. */
 export function buildToolAggregateSummary(tools: ToolRow[], t: Translator): string {
   const counts: Record<AggregateBucket, number> = { created: 0, edited: 0, deleted: 0, read: 0, ran: 0, searched: 0, listed: 0, other: 0 };
   for (const tool of tools) counts[classifyTool(tool)] += 1;

@@ -143,7 +143,7 @@ const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, r
   if (row.type === 'section') return total + countToolSteps(row.steps);
   if (row.type === 'toolAggregate') return total + row.children.length;
   if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
-  if (row.type === 'userInput' || row.type === 'planReview') return total + 1;
+  if (row.type === 'userInput') return total + 1;
   return total;
 }, 0);
 

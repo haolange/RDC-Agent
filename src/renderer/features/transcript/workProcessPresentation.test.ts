@@ -1467,7 +1467,7 @@ describe('buildWorkProcessPresentation', () => {
     );
   });
 
-  it('renders awaiting plan_artifact as a planReview card and rejected as a shell row', () => {
+  it('renders every plan_artifact revision as one compact Working row named by its review state', () => {
     const awaiting: ConversationPlanReview = {
       planId: 'plan-1',
       revision: 2,
@@ -1487,7 +1487,7 @@ describe('buildWorkProcessPresentation', () => {
       argsPreview: JSON.stringify({ title: awaiting.title }),
       startedAt: now,
     }, t);
-    expect(card).toMatchObject({ type: 'planReview', plan: awaiting });
+    expect(card).toMatchObject({ type: 'tool', verb: '计划 · 待审阅', planReview: awaiting, target: awaiting.title });
 
     const shell = createToolRowForPresentation({
       id: 'plan-rejected',

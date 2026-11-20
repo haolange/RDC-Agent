@@ -3,7 +3,7 @@ import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 import { formatToolApprovalReason } from '../../lib/toolApprovalText';
 import { type WorkProcessRow, type WorkProcessToolApproval, type WorkProcessRowStatus } from './workProcessTypes';
 import { normalizeToolName, getToolDisplay, getToolFamily, formatMcpTarget } from './workProcessToolCatalog';
-import { createUserInputRow, createPlanReviewShellRow, createPlanReviewRow } from './workProcessDecisionRows';
+import { createUserInputRow, createPlanReviewShellRow } from './workProcessDecisionRows';
 import { parsePreview, createDetailLines, prettyPrint, toRecord, readNestedString, isJsonLike, readNestedValue, stringifyPreview, isRawPayloadPreview } from './workProcessContentText';
 import { unwrapToolContentLayer } from './workProcessToolContent';
 import { emptyUnwrappedContent, sanitizeContentText } from './workProcessToolContentShared';
@@ -54,12 +54,8 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
   if (normalizeToolName(call.toolName) === 'ask_user') {
     return createUserInputRow(call, t);
   }
-  if (normalizeToolName(call.toolName) === 'plan_artifact' && call.planReview) {
-    if (call.planReview.status === 'superseded' || call.planReview.status === 'rejected' || call.planReview.status === 'cancelled') {
-      return createPlanReviewShellRow(call, t);
-    }
-    return createPlanReviewRow(call);
-  }
+  // The plan itself is delivered after Working (PlanDeliverable); inside Working it is one compact row.
+  if (normalizeToolName(call.toolName) === 'plan_artifact' && call.planReview) return createPlanReviewShellRow(call, t);
   const display = getToolDisplay(call.toolName);
   const approval = createToolApprovalPresentation(call.approval, t);
   const rawResult = call.error || call.resultPreview;

@@ -50,11 +50,9 @@ const separator = (type: 'approval' | 'userInput' | 'planReview' | 'diagnostic',
   }
   if (type === 'planReview') {
     return {
-      type,
-      id,
-      status: 'running',
-      duration: '',
-      plan: {
+      ...tool(id),
+      toolName: 'plan_artifact',
+      planReview: {
         planId: 'plan-1',
         revision: 1,
         uri: 'session://plans/plan.md',
@@ -108,7 +106,7 @@ describe('aggregateSectionSteps', () => {
     ];
 
     expect(aggregateSectionSteps(rows, t).map((row) => row.type)).toEqual([
-      'tool', 'tool', 'tool', 'tool', type, 'tool', 'tool', 'tool', 'tool',
+      'tool', 'tool', 'tool', 'tool', type === 'planReview' ? 'tool' : type, 'tool', 'tool', 'tool', 'tool',
     ]);
   });
 });

@@ -227,13 +227,6 @@ export type WorkProcessRow =
     duration: string;
   }
   | {
-    type: 'planReview';
-    id: string;
-    status: WorkProcessRowStatus;
-    plan: import('@shared/types/planReview').ConversationPlanReview;
-    duration: string;
-  }
-  | {
     type: 'approval';
     id: string;
     status: WorkProcessRowStatus;
