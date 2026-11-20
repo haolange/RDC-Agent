@@ -455,17 +455,7 @@ export async function completeProfileTurn(
       visibleResponse = llmDiagnostic.userMessage;
       currentLoopText = llmDiagnostic.userMessage;
       recordLlmDiagnostic(input.context, llmDiagnostic);
-      assistantMessage = {
-        ...assistantMessage,
-        workTrace: upsertWorkBlock(assistantMessage.workTrace, 'llm-request-failed', {
-          kind: 'diagnostic',
-          status: llmDiagnostic.severity === 'warning' ? 'complete' : 'error',
-          diagnosticSeverity: llmDiagnostic.severity === 'warning' ? 'warning' : 'error',
-          title: llmDiagnostic.code,
-          summary: llmDiagnostic.userMessage,
-          completedAt: nowMs(),
-        }),
-      };
+      // The failure text is the message body (with the error tag); Working keeps only the steps that ran.
       commitVisibleAssistantText();
     }
 

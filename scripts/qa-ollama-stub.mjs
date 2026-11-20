@@ -8,9 +8,13 @@
 //   POST /api/chat   NDJSON stream. The capability probe's `capability_check` is answered with a structured
 //                    call. An agent turn follows a scenario chosen by a keyword in the latest user message:
 //     (default)  thinking → one `glob` call → streamed answer
-//     qa:loops   thinking → task_create → commentary + glob → start two Tasks → complete one, block one → answer
+//     qa:loops   thinking → task_create → commentary + glob → start two Tasks → complete, cancel and block → answer
 //     qa:long    five model steps of six parallel `glob` calls each, then a long Markdown answer
 //     qa:plan    (Mission agents) thinking → plan_artifact; the plan gate then pauses the turn
+//   An approved plan's execution turn (default scenario with `turn_complete` offered) declares an honest
+//   blocked outcome after its `glob`: the workspace has no capture, so the frozen goal cannot finish here.
+//   Runtime follow-up prompts ("# Incomplete Approved Obligation", "# Approved Goal Reassessment") continue
+//   the scripted turn instead of restarting it.
 // Usage: node scripts/qa-ollama-stub.mjs [port]   (default 11434); then connect Settings › Ollama with
 // its default Base URL (or http://127.0.0.1:<port>/v1).
 import http from 'node:http';
@@ -37,6 +41,18 @@ const PLAN = {
   summary: ['列出事件树并确认唯一的 draw 调用', '读取该调用的管线状态', '用三句话总结这一帧画了什么'],
   content: '## 目标\n\n确认这一帧只有一次 draw 调用，并说明它画了什么。\n\n## 步骤\n\n1. 列出事件树。\n2. 读取 draw 调用的管线状态。\n3. 汇总结论。\n',
   requiredTaskIds: [],
+};
+const BLOCKED_COMPLETION = {
+  disposition: 'blocked',
+  result: {
+    summary: '工作区里没有 capture，无法定位 draw 调用。',
+    outputs: {},
+    counterevidence: [],
+    unresolved: [{ gap: '定位唯一的 draw 调用并读取管线状态', attempted: '列出了工作区文件，没有找到 capture。', blocker: 'external', resumeWhen: '导入 capture 后' }],
+    scope: '只读核对工作区文件',
+    sideEffects: [],
+    recoveryState: [],
+  },
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -72,10 +88,13 @@ async function streamChat(response, chunks) {
     done: true, done_reason: 'stop', prompt_eval_count: 1200, eval_count: 80 })}\n`);
 }
 
+/** Runtime follow-up prompts are Markdown-headed; they continue the scripted turn rather than start a new one. */
+const isRuntimeFollowUp = (entry) => typeof entry.content === 'string' && entry.content.startsWith('# ');
+
 /** The latest user message and the tool results that followed it decide where the scripted turn is. */
 function turnState(body) {
   const messages = body.messages ?? [];
-  const lastUser = messages.map((entry) => entry.role).lastIndexOf('user');
+  const lastUser = messages.map((entry) => entry.role === 'user' && !isRuntimeFollowUp(entry)).lastIndexOf(true);
   const after = messages.slice(lastUser + 1);
   const prompt = typeof messages[lastUser]?.content === 'string' ? messages[lastUser].content : '';
   return {
@@ -100,10 +119,11 @@ function loopsScenario(state, tools) {
       ['task_update', { taskId: third, status: 'in_progress' }],
     ])];
   }
-  // Nothing is left running at the end, so the runtime does not ask for another loop.
-  if (state.step === 3 && tools.has('task_update') && first && third) {
-    return [...thinking(['第一项完成了，', '第三项要等 capture。']), toolCalls([
+  // Every Task ends settled (done, cancelled, blocked), so the runtime does not ask for another loop.
+  if (state.step === 3 && tools.has('task_update') && first && second && third) {
+    return [...thinking(['第一项完成了，', '第二项不需要了，第三项要等 capture。']), toolCalls([
       ['task_update', { taskId: first, status: 'completed' }],
+      ['task_update', { taskId: second, status: 'cancelled', statusReason: '工作区里没有 capture，这一项不再需要。' }],
       ['task_update', { taskId: third, status: 'blocked', statusReason: '等待 capture 导入后才能整理结论。' }],
     ])];
   }
@@ -127,6 +147,8 @@ function chatChunks(body) {
   if (state.scenario === 'qa:plan' && tools.has('plan_artifact') && state.step === 0) {
     return [...thinking(['先把调查计划写出来，', '交给用户审阅。']), toolCalls([['plan_artifact', PLAN]])];
   }
+  const declared = state.toolResults.some((result) => result.includes('Turn completion recorded'));
+  if (tools.has('turn_complete') && state.toolResults.length > 0 && !declared) return [toolCalls([['turn_complete', BLOCKED_COMPLETION]])];
   if (state.toolResults.length > 0 || !tools.has('glob')) return text(ANSWER);
   return [...thinking(THINKING), toolCalls([['glob', { pattern: '*' }]])];
 }
@@ -150,7 +172,7 @@ const server = http.createServer(async (request, response) => {
       const body = await readBody(request);
       const state = turnState(body);
       console.log(`[qa-ollama-stub]   scenario=${state.scenario} step=${state.step} think=${body.think ?? '(unset)'} tools=${(body.tools ?? []).length}`);
-      return streamChat(response, chatChunks(body));
+      return await streamChat(response, chatChunks(body));
     }
     return json(response, 404, { error: 'not found' });
   } catch (error) {
