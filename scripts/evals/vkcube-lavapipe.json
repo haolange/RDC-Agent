@@ -1,0 +1,17 @@
+{
+  "id": "vkcube-lavapipe",
+  "capture": "RDC-Tool tests/fixtures/vkcube_lavapipe.rdc (sha256 c62edae0ac451484ca651c88741e37dc011abaddbcb18f7aded0fd284a909cb6)",
+  "groundTruth": "Read with the RDC-Tool CLI from a replay of the capture: rd.event.get_action_tree and rd.pipeline.get_state at event 11.",
+  "prompt": {
+    "zh-CN": "打开项目里的 vkcube_lavapipe.rdc，只根据回放结果回答下面的问题。最后按每题一行给出答案，格式为 `Q<编号>: <答案>`。\nQ1 这一帧唯一的 draw 调用是哪个事件 ID？\nQ2 它绘制了多少个顶点？\nQ3 这个 draw 的颜色渲染目标是什么格式、多大尺寸？\nQ4 这一帧一共有多少个 action（事件树中的全部节点）？\nQ5 哪个事件 ID 把这一帧呈现（present）出去？\nQ6 这个 draw 绑定了哪些着色器阶段？",
+    "en": "Open vkcube_lavapipe.rdc in this project and answer only from what the replay shows. End with one line per question in the form `Q<number>: <answer>`.\nQ1 Which event ID is the frame's only draw call?\nQ2 How many vertices does it draw?\nQ3 What format and size is that draw's color render target?\nQ4 How many actions does the frame have (all nodes of the action tree)?\nQ5 Which event ID presents the frame?\nQ6 Which shader stages are bound at that draw?"
+  },
+  "tasks": [
+    { "id": "Q1", "name": "draw event", "expected": "11", "accept": ["^\\D*\\b11\\b"] },
+    { "id": "Q2", "name": "vertex count", "expected": "36", "accept": ["\\b36\\b"] },
+    { "id": "Q3", "name": "render target", "expected": "B8G8R8A8_UNORM, 500×500", "accept": ["^(?=.*B8G8R8A8_UNORM)(?=.*\\b500\\s*[x×*]\\s*500\\b)"] },
+    { "id": "Q4", "name": "action count", "expected": "6", "accept": ["^\\D*\\b6\\b"] },
+    { "id": "Q5", "name": "present event", "expected": "14", "accept": ["^\\D*\\b14\\b"] },
+    { "id": "Q6", "name": "shader stages", "expected": "vertex and pixel (fragment)", "accept": ["^(?=.*\\b(?:vertex|vs|顶点)\\b|.*顶点)(?=.*\\b(?:pixel|fragment|ps|fs)\\b|.*(?:像素|片元|片段))"] }
+  ]
+}

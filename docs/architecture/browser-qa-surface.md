@@ -54,6 +54,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 - Smoke：`pnpm run smoke:agent-browser`
 - 手动：运行 `start:agent-browser`，从最新日志复制完整的一次性 `/qa?qaBootstrap=...` URL，核对真实 Settings / Project / Session / usage、语言持久化与 parity；高风险 channel 分别在未设置与设置 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时检查；仅在获授权的真实数据流程中显式使用 canonical userData。
 - 对话走查：`node scripts/qa-ollama-stub.mjs [端口]` 在本机起一个确定性的 Ollama 协议桩（`/api/tags`、`/api/show`、`/api/chat` NDJSON），无需凭据或模型即可在 disposable 实例里连接内置「Ollama」供应商，走通 Composer 模型选择、流式思考、一次 `glob` 调用与最终答复。它只是 QA 工具，不进打包产物，也不代表真实模型的质量。
+- 结果评测：`node scripts/eval-investigation.mjs --print-prompt` 给出 `scripts/evals/vkcube-lavapipe.json` 的问题（基于 RDC-Tool 的 `vkcube_lavapipe.rdc`，答案来自真实回放：唯一 draw 的事件、顶点数、渲染目标格式与尺寸、action 数、present 事件、着色器阶段）。在应用里用任一模型完成这次调查后，`node scripts/eval-investigation.mjs <会话目录>` 按会话最后的答复与 InvestigationReport 记录逐题判分。它不依赖模型，不进 CI；`--self-test` 校验判分本身。
 - 可读性：`RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 启动一个 disposable 实例（切换外观需要写设置），把日志路径交给 `node scripts/qa-readability.mjs <日志> [截图目录]`。它用这次的一次性 URL 进入，在 Settings › Appearance 切换深色/浅色，对首页、设置与 720px 窄屏逐一检查可见文字小于 12px、文字对比度低于 WCAG AA（正文 4.5:1、大字 3:1）与水平溢出，有问题即非零退出。Playwright 来自 QA 环境；CI 只执行静态的一半（`check:design-tokens` 的排版角色规则）。打印日志时遮去 `qaBootstrap` 令牌。
 
 ## 原生交互性能观察
