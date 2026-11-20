@@ -124,7 +124,17 @@
   "authModes": [
     "oauth"
   ],
-  "accountLoginConfigured": true,
+  "accountAuth": {
+    "flow": "chatgpt-oauth",
+    "loginMode": "browser",
+    "codeInput": false,
+    "credential": {
+      "tokenFields": [
+        "accessToken",
+        "apiKey"
+      ]
+    }
+  },
   "capabilities": [
     "chat",
     "tool-calling",
@@ -1199,6 +1209,9 @@
         "visionInput": "rdc-agent:chatgpt-account:review-20260922"
       }
     }
+  ],
+  "retiredModelIds": [
+    "gpt-5.5"
   ],
   "protocolOverrides": [],
   "recommendedModels": [

@@ -9,6 +9,7 @@ import {
   parseProviderError,
   readString,
   readStringArray,
+  renderAccountDiagnosticMessage,
 } from './oauthHttp';
 
 export const readOAuthError = (payload: unknown): { error?: string; detail?: string } => {
@@ -41,9 +42,6 @@ export const createGrokOAuthDiagnostic = (
   checklist: options.checklist ?? GROK_LOGIN_CHECKLIST,
 });
 
-export const renderGrokOAuthDiagnosticMessage = (diagnostic: LlmProviderAccountDiagnostic): string => [
-  diagnostic.summary, diagnostic.detail,
-].filter(Boolean).join(' ');
 
 export const createGrokOAuthFailureDiagnostic = (
   stage: LlmProviderAccountDiagnostic['stage'],
@@ -67,7 +65,7 @@ export const createGrokOAuthFailureDiagnostic = (
 
 export class GrokOAuthDiagnosticError extends Error {
   constructor(readonly diagnostic: LlmProviderAccountDiagnostic) {
-    super(renderGrokOAuthDiagnosticMessage(diagnostic));
+    super(renderAccountDiagnosticMessage(diagnostic));
   }
 }
 

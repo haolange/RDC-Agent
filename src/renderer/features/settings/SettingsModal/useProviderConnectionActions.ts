@@ -120,7 +120,6 @@ export const useProviderConnectionActions = (
           : await window.electronAPI.llm.startProviderAccountLogin({
             providerId: connectionDraft.providerId,
             authMode: connectionDraft.authMode,
-            accountLoginMode: connectionDraft.accountLoginMode,
           });
         if (!status.connected && status.state !== 'pending') {
           updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
@@ -164,14 +163,13 @@ export const useProviderConnectionActions = (
     }
   };
 
-  const handleStartAccountLogin = async (accountLoginMode = connectionDraft?.accountLoginMode) => {
+  const handleStartAccountLogin = async () => {
     if (!connectionDraft) return;
     updateConnectionDraft({ busy: 'saving', error: '' });
     try {
       const status = await window.electronAPI.llm.startProviderAccountLogin({
         providerId: connectionDraft.providerId,
         authMode: connectionDraft.authMode,
-        accountLoginMode,
       });
       updateConnectionDraft({
         busy: 'idle',

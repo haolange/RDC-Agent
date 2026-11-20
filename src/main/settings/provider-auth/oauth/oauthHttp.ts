@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
+import type { LlmProviderAccountDiagnostic } from '@shared/types/settings';
 import { REQUEST_TIMEOUT_MS } from './oauthConstants';
 
 export const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
@@ -125,3 +126,8 @@ export const extractChatGptAccountId = (idToken?: string): string | undefined =>
     ?? readString(claims.account_id)
     ?? readString(firstOrganization.id);
 };
+
+/** The one-line message a structured sign-in diagnostic reads as. */
+export const renderAccountDiagnosticMessage = (diagnostic: LlmProviderAccountDiagnostic): string => [
+  diagnostic.summary, diagnostic.detail,
+].filter(Boolean).join(' ');

@@ -8,7 +8,7 @@
     "openai-compatible"
   ],
   "authSchemaId": "declarative-api-key",
-  "discoveryPolicyId": "anthropic-candidate-validation",
+  "discoveryPolicyId": "volcengine-coding-plan-models",
   "vendorId": "bytedance",
   "label": "Volcengine Ark Coding Plan",
   "status": "stable",
@@ -76,7 +76,7 @@
     "authority": "candidate-validation",
     "strategy": {
       "kind": "custom-parser",
-      "parserId": "anthropic-candidate-validation"
+      "parserId": "volcengine-coding-plan-models"
     }
   },
   "models": [

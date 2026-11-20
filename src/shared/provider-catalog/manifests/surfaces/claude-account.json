@@ -41,7 +41,16 @@
   "authModes": [
     "oauth"
   ],
-  "accountLoginConfigured": true,
+  "accountAuth": {
+    "flow": "claude-oauth",
+    "loginMode": "browser",
+    "codeInput": true,
+    "credential": {
+      "tokenFields": [
+        "accessToken"
+      ]
+    }
+  },
   "capabilities": [
     "chat",
     "tool-calling",
@@ -71,6 +80,11 @@
           "continuation": "exact-execution"
         },
         "compatibilityGroup": "claude-account:AnthropicMessages"
+      },
+      "headers": {
+        "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+        "User-Agent": "claude-cli/2.1.119 (external, cli)",
+        "x-app": "cli"
       }
     }
   ],

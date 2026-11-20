@@ -36,7 +36,7 @@ export {
   mergeManagedModelAvailability,
   normalizeDiscoveredModels,
   normalizeCodingPlanModelMatchKey,
-  selectSupportedCodingPlanModels,
+  selectAvailableCodingPlanModels,
 } from './providerConnectionModelUtils';
 export {
   parseGoogleVertexPublisherModels,
@@ -259,7 +259,7 @@ export class ProviderConnectionService {
         error: 'Provider does not support account login.',
       });
     }
-    if (availability?.state === 'unavailable' || !provider.accountLoginConfigured) {
+    if (availability?.state === 'unavailable' || !provider.accountLogin) {
       return Promise.resolve({
         providerId: request.providerId,
         state: 'unavailable',

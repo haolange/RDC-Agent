@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { listenGrokCallback } from './grokCallback';
 import { verifyGrokIdentity } from './grokIdentity';
-import type { LlmProviderModel } from '@shared/types/settings';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { getLoadedProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { parseGrokBuilderCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
@@ -23,6 +23,7 @@ import {
 } from './grokOAuth';
 
 export async function startGrokBrowserLogin(
+  providerId: LlmProviderId,
   clientId: string,
   setFlow: (flow: OAuthFlowState) => void,
   openBrowser: (url: string) => Promise<void>,
@@ -30,7 +31,7 @@ export async function startGrokBrowserLogin(
 ): Promise<OAuthFlowState> {
   const { verifier, challenge } = createPkce();
   const flow: OAuthFlowState = {
-    providerId: 'grok-account', flowId: randomUUID(), state: randomUUID(), nonce: randomUUID(),
+    providerId, flowId: randomUUID(), state: randomUUID(), nonce: randomUUID(),
     codeVerifier: verifier, clientId, authorizationMode: 'browser',
     expiresAt: Date.now() + 10 * 60 * 1000, abortController: new AbortController(),
   };
@@ -91,7 +92,7 @@ export async function exchangeGrokCode(flow: OAuthFlowState, code: string): Prom
   await verifyGrokIdentity(payload.id_token, flow);
   const account = await fetchGrokUserInfo(payload.access_token, flow.userinfoEndpoint, flow.abortController?.signal);
   return {
-    providerId: 'grok-account',
+    providerId: flow.providerId,
     accessToken: payload.access_token,
     apiKey: payload.access_token,
     refreshToken: payload.refresh_token,
@@ -182,7 +183,7 @@ export async function discoverGrokCatalog(
 ): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[]; detail?: string }> {
   const token = bundle.accessToken ?? bundle.apiKey;
   if (!token) throw new Error('Grok subscription token is missing. Sign in again.');
-  const surface = getLoadedProviderSurface('grok-account');
+  const surface = getLoadedProviderSurface(bundle.providerId);
   if (!surface) throw new Error('Grok subscription catalog is unavailable.');
   const payload = await fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, {
     method: 'GET', signal, headers: { Accept: 'application/json',

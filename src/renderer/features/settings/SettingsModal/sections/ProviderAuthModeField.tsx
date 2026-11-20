@@ -47,7 +47,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
         {options.map((mode) => {
           const availability = provider.authModeAvailability?.[mode] ?? provider.providerAvailability;
           const unavailable = availability.state === 'unavailable'
-            || (mode === 'account' && !provider.accountLoginConfigured);
+            || (mode === 'account' && !provider.accountLogin);
           const reason = availability.reason
             ?? (unavailable ? t('settings.providerAuthUnavailable') : undefined);
           return (

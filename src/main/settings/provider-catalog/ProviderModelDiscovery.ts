@@ -1,6 +1,9 @@
+import { authSchemaResolvesAmbientCredentials } from '@shared/provider-catalog/implementationRegistry';
 import {
+  getProviderAuthSchemaId,
   getProviderCatalogOwnership,
   getProviderDefaultBaseUrl,
+  getProviderRouteHeaders,
   loadProviderSurface,
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
@@ -42,7 +45,7 @@ import {
   normalizeCodingPlanModelMatchKey,
   requireManagedModels,
   requireModels,
-  selectSupportedCodingPlanModels,
+  selectAvailableCodingPlanModels,
   toStaticModels,
 } from '../provider-auth/providerConnectionModelUtils';
 import {
@@ -84,7 +87,8 @@ function resolveDiscoveryStrategy(
   if (!discovery) return null;
   const parserId = discovery.kind === 'custom-parser' ? discovery.parserId : undefined;
   if (parserId === 'kimi-code-catalog' || parserId === 'openrouter-catalog' || parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'cline-pass-catalog' || parserId === 'google-vertex-models'
-    || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments') return parserId;
+    || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments'
+    || parserId === 'volcengine-coding-plan-models') return parserId;
   if (parserId === 'freemodel-catalog') return parserId;
   if (parserId === 'google-ai-studio' || parserId === 'azure-deployment' || parserId === 'ollama-tags') return parserId;
   if (parserId === 'anthropic' || parserId === 'anthropic-candidate-validation') return 'anthropic-candidate-validation';
@@ -114,7 +118,7 @@ function createDiscoveryHeaders(
     return {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
-      ...(provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : {}),
+      ...getProviderRouteHeaders(provider.id, provider.protocol),
       ...connectionHeaders,
     };
   }
@@ -206,10 +210,8 @@ async function validateCodingPlanModels(
       aliasesByModelId,
     })
     : validatedModels;
-  const models = selectSupportedCodingPlanModels(providerId, mergedModels);
-  const filteredModelCount = providerId === 'volcengine-coding-plan'
-    ? Math.max(0, mergedModels.length - models.length)
-    : 0;
+  const models = selectAvailableCodingPlanModels(mergedModels);
+  const filteredModelCount = mergedModels.length - models.length;
   return {
     models,
     discoveryDiagnostic: {
@@ -278,11 +280,10 @@ export async function discoverProviderModels(
   if (!definition) {
     throw new ProviderConnectionError('Provider 不在内置 catalog 中');
   }
-  const hasCredentialResolver = provider.id === 'google-vertex'
-    || provider.id === 'google-vertex-anthropic'
-    || provider.id === 'amazon-bedrock';
+  const authSchemaId = getProviderAuthSchemaId(provider.id);
+  const hasCredentialResolver = authSchemaResolvesAmbientCredentials(authSchemaId);
   const apiKey = provider.authMode === 'api-key'
-    ? (provider.id === 'google-vertex' || provider.id === 'google-vertex-anthropic') && !apiKeyDraft
+    ? authSchemaId === 'google-vertex' && !apiKeyDraft
       ? await resolveGoogleVertexAccessToken(connectionValues.GOOGLE_APPLICATION_CREDENTIALS)
       : apiKeyDraft
     : '';
@@ -306,7 +307,7 @@ export async function discoverProviderModels(
   if (!baseUrl) {
     throw new ProviderConnectionError('请填写 Provider Base URL');
   }
-  if (provider.id === 'amazon-bedrock') {
+  if (authSchemaId === 'aws-bedrock') {
     const url = appendPath(baseUrl, '/models');
     const unsignedHeaders = { Accept: 'application/json' };
     const headers = apiKey
@@ -478,9 +479,7 @@ export async function discoverProviderModels(
       contributions,
     };
   }
-  if (
-    provider.id === 'volcengine-coding-plan'
-  ) {
+  if (strategy === 'volcengine-coding-plan-models') {
     // Both Anthropic and OpenAI Coding Plan protocols share the same /models surface.
     // Always resolve through the Coding Plan helper so OpenAI never hits a wrong
     // `baseUrl + /models` shape when the draft base is still the Anthropic `/api/coding`.

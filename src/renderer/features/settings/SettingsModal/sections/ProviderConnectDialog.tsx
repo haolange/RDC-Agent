@@ -33,7 +33,7 @@ interface ProviderConnectDialogProps {
   onModelChange: (modelId: string, patch: Partial<LlmProviderModel>) => void;
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
-  onStartAccountLogin: (mode?: ProviderConnectionDraft['accountLoginMode']) => void | Promise<void>;
+  onStartAccountLogin: () => void | Promise<void>;
   t: Translate;
 }
 

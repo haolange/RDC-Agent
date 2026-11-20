@@ -58,7 +58,6 @@ export type ProviderSurfaceSummary = Omit<ProviderSurfaceManifest,
   | 'identityIds'
   | 'profileId'
   | 'adapterIds'
-  | 'authSchemaId'
   | 'defaultFactSourceId'
   | 'discovery'
   | 'discoveryPolicyId'
@@ -489,6 +488,15 @@ function validateSurface(
   }
   if (!profile) errors.push(`${surface.id} references unknown profile ${surface.profileId}`);
   if (!authSchemas.has(surface.authSchemaId)) errors.push(`${surface.id} references unknown auth schema ${surface.authSchemaId}`);
+  for (const retiredId of surface.retiredModelIds ?? []) {
+    if (surface.models.some((model) => model.modelId === retiredId || model.aliases.includes(retiredId))) {
+      errors.push(`${surface.id} lists retired model ${retiredId} in its catalog`);
+    }
+  }
+  const signsInWithAccount = surface.authModes.includes('oauth') || surface.authModes.includes('device');
+  if (signsInWithAccount !== Boolean(surface.accountAuth)) {
+    errors.push(`${surface.id} must declare accountAuth exactly when an account auth mode is offered`);
+  }
   if (!discoveryPolicies.has(surface.discoveryPolicyId)) {
     errors.push(`${surface.id} references unknown discovery policy ${surface.discoveryPolicyId}`);
   }
@@ -680,7 +688,9 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
     authModes: surface.authModes,
     authModeAvailability: surface.authModeAvailability,
     baseUrlEditable: surface.baseUrlEditable,
-    accountLoginConfigured: surface.accountLoginConfigured,
+    authSchemaId: surface.authSchemaId,
+    accountAuth: surface.accountAuth,
+    retiredModelIds: surface.retiredModelIds,
     capabilities: surface.capabilities,
     routes: surface.routes,
     discoveryAuthority: surface.discovery.authority,

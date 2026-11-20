@@ -145,7 +145,8 @@ describe('reviewed provider catalog request paths', () => {
     if (!account.ok) throw new Error(account.message);
     expect(account.plan.fastMode).toBe(false);
     expect(wire(account.plan)).not.toHaveProperty('speed');
-    expect(account.plan.headers).not.toHaveProperty('anthropic-beta');
+    expect(account.plan.headers['anthropic-beta']).not.toContain('fast-mode-2026-02-01');
+    expect(account.plan.headers['anthropic-beta']).toContain('oauth-2025-04-20');
   });
 
   for (const surfaceId of ['glm-global-coding-plan']) {

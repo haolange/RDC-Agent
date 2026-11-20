@@ -169,7 +169,7 @@ describe('catalog output planning', () => {
         context_window: 272_000,
         max_context_window: 272_000,
       }],
-    });
+    }, { models: [] });
     const [model] = mergeModels({
       providerId: 'chatgpt-account',
       protocol: 'OpenAIResponses',
@@ -188,7 +188,7 @@ describe('catalog output planning', () => {
 
   it.each([undefined, ['text'], ['text', 'image']])('preserves manifest vision through ChatGPT discovery %j', (input_modalities) => {
     const definition = compiledCatalog.surfaces.get('chatgpt-account')!.surface.models.find((model) => model.modelId === 'gpt-5.6-sol')!;
-    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] });
+    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] }, { models: [] });
     const [model] = mergeModels({
       providerId: 'chatgpt-account', protocol: 'OpenAIResponses', baseUrl: definition.route.baseUrl!,
       catalog: [definition], discovery: live.contributions,
@@ -206,7 +206,7 @@ describe('catalog output planning', () => {
         supported_in_api: true,
         context_window: 272_000,
       }],
-    });
+    }, { models: [] });
     const [model] = mergeModels({
       providerId: 'chatgpt-account',
       protocol: 'OpenAIResponses',

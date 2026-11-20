@@ -79,7 +79,8 @@
         "id": "apiKey",
         "label": "API Key",
         "kind": "secret",
-        "required": true
+        "required": true,
+        "valuePrefix": "sk-ant-"
       }
     ],
     "primarySecretFieldId": "apiKey"

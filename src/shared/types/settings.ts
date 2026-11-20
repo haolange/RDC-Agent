@@ -182,6 +182,7 @@ export interface LlmProviderConnectionField {
   required: boolean;
   environmentVariable?: string;
   placeholder?: string;
+  valuePrefix?: string;
 }
 
 export interface LlmProviderConnectionSchema {
@@ -435,7 +436,7 @@ export interface LlmProviderEntry {
   lastTestedAt?: string;
   lastModelRefreshAt?: string;
   lastError?: string;
-  accountLoginConfigured?: boolean;
+  accountLogin?: LlmProviderAccountLogin;
   accountLabel?: string;
   planLabel?: string;
   oauthExpiresAt?: string;
@@ -504,7 +505,7 @@ export interface LlmProviderCatalogEntry {
   baseUrlEditable?: boolean;
   recommendedModels: string[];
   docsUrl?: string;
-  accountLoginConfigured?: boolean;
+  accountLogin?: LlmProviderAccountLogin;
   unavailableReason?: string;
   capabilities?: LlmProviderCapability[];
 }
@@ -609,7 +610,13 @@ export interface LlmProviderDraftRequest {
 export interface LlmProviderAccountLoginStartRequest {
   providerId: LlmProviderId;
   authMode?: LlmProviderAuthMode;
-  accountLoginMode?: LlmProviderAccountLoginMode;
+}
+
+/** How a provider's account sign-in works, projected from its manifest for the connect dialog. */
+export interface LlmProviderAccountLogin {
+  mode: LlmProviderAccountLoginMode;
+  /** The browser flow ends with a code the person pastes back into the app. */
+  codeInput: boolean;
 }
 
 export interface LlmProviderAccountLoginFinishRequest {

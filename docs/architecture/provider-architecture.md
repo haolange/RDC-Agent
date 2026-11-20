@@ -150,11 +150,23 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 - Fast 是否生效只认真实回执：Anthropic `speed=fast`、OpenAI/xAI `service_tier=priority` 或实际 Fast model id；请求参数不能充当 entitlement。
 - 多协议模型各协议使用各自的 wire profile；兼容输入档位（如 `minimal/medium`）只在 wire 折叠，不渲染成额外档位。Thinking 开启时无效的采样参数从 wire 删除。
 - canonical wire 保留 `xhigh`，产品统一显示 `Extra`；不存在 Ultra 档位，Ultra 属客户端编排能力，不写为 Provider reasoning 值。
-- 已退役的模型 ID 不保留 alias，历史会话保留原模型记录，继续使用时需重选模型。
+- 已退役的模型 ID 写在 surface 的 `retiredModelIds`（小写）：discovery 解析、Effective Catalog 每一层与已持久化的模型行都丢弃它，不保留 alias；历史会话保留原模型记录，继续使用时需重选模型。
 
 ## Adapter 边界
 
-Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolicyId` 和 `wireProfileId`。现有协议、认证机制、标准 discovery mapping、endpoint、route、model facts、controls、bindings 与 provenance 只改 JSON。
+Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolicyId`、`accountAuth.flow` 和 `wireProfileId`。现有协议、认证机制、标准 discovery mapping、endpoint、route、model facts、controls、bindings 与 provenance 只改 JSON。
+
+代码不按 provider id 分支；surface 之间的差异全部是 manifest 字段：
+
+| 差异 | Manifest 字段 | 代码侧 |
+|---|---|---|
+| 账号登录 | `accountAuth`：`flow`、`loginMode`（browser/device）、`codeInput`、`credential.tokenFields` / `baseUrlField` | `ACCOUNT_AUTH_FLOWS` 按 flow id 注册实现；`ProviderAccountAuthService` 只做通用的 flow 簿记、持久化、刷新归属与状态；连接对话框读投影的 `accountLogin` |
+| 固定请求 header（客户端身份、beta、UA） | `routes[].headers` | 进 `RequestPlan.headers`，各 adapter 统一经 `requestPlanHeaders` 发送；账号目录请求与 discovery 读同一路线 |
+| 环境凭据解析 | `authSchemaId`（`google-vertex` / `aws-bedrock`） | `authSchemaResolvesAmbientCredentials` 与 credential lease 按 schema 选择 resolver |
+| 密钥格式 | `connectionSchema.fields[].valuePrefix` | 不带该前缀的已存密钥视为不可用 |
+| 非标准目录 | `discovery.strategy.parserId` | `ProviderModelDiscovery` 按 parser id 分派 |
+
+`accountAuth` 恰好在提供 `oauth` / `device` 认证模式时声明，编译期校验。
 
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
 

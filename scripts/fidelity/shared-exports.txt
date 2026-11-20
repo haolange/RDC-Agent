@@ -607,7 +607,6 @@ isRdcLeaseToolName
 isReasoningSelection
 isRendererEventChannel
 isRendererInvokeChannel
-isRetiredModel
 isSafeAgentProfileId
 isSessionArtifactCategory
 isSessionArtifactizedEnvelope

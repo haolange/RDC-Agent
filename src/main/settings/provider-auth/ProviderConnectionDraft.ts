@@ -2,6 +2,8 @@ import type {
   LlmProviderDraftRequest,
   LlmProviderEntry,
 } from '@shared/types/settings';
+import { authSchemaResolvesAmbientCredentials } from '@shared/provider-catalog/implementationRegistry';
+import { getProviderAuthSchemaId } from '../../provider-catalog/ProviderCatalogRegistry';
 import {
   isProviderConnectionSchemaSatisfied,
   resolvePrimaryConnectionSecretFieldId,
@@ -36,9 +38,7 @@ export function resolveProviderConnectionDraft(
     const schemaSatisfied = provider.connectionSchema?.fields.length
       ? isProviderConnectionSchemaSatisfied(provider.connectionSchema, values)
       : Boolean(apiKey);
-    const supportsCredentialResolver = provider.id === 'google-vertex'
-      || provider.id === 'google-vertex-anthropic'
-      || provider.id === 'amazon-bedrock';
+    const supportsCredentialResolver = authSchemaResolvesAmbientCredentials(getProviderAuthSchemaId(provider.id));
     if (!schemaSatisfied || (!apiKey && !supportsCredentialResolver)) {
       throw new ProviderConnectionError('Provider connection fields are incomplete.');
     }

@@ -1,5 +1,4 @@
 import type {
-  LlmProviderAccountLoginMode,
   LlmProviderAccountStatus,
   LlmProviderAuthMode,
   LlmProviderCatalogResponse,
@@ -46,7 +45,6 @@ export interface ProviderConnectionDraft {
   discoveryAccountId: string | null;
   models: LlmProviderModel[];
   accountStatus?: LlmProviderAccountStatus;
-  accountLoginMode: LlmProviderAccountLoginMode;
   authCode: string;
 }
 

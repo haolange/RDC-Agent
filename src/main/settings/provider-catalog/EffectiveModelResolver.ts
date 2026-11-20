@@ -200,8 +200,9 @@ export function buildCatalogModelContribution(
 }
 
 
-function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
-  if (provider.id !== 'github-copilot') return undefined;
+/** Context tiers an account's own billing data grants, when its sign-in stored any. */
+function accountBillingEntitlement(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
+  if (provider.authMode !== 'account') return undefined;
   try {
     const raw = settingsService.getProviderOAuthSecret(provider.id);
     const bundle = JSON.parse(raw) as { copilotModelBilling?: Record<string, unknown> };
@@ -211,7 +212,7 @@ function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLaye
     return {
       source: 'entitlement',
       observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
-      detail: 'GitHub Copilot account billing context tiers',
+      detail: `${provider.label} account billing context tiers`,
       models,
     };
   } catch {
@@ -325,9 +326,7 @@ export function applyDiscoveryAuthority(
     completed.push({
       modelId: definition.modelId,
       availability: 'unavailable',
-      unavailableReason: provider.id === 'grok-account'
-        ? 'The last successful Grok subscription catalog did not list this model.'
-        : 'This account-scoped model was absent from the authoritative provider catalog.',
+      unavailableReason: `The last successful ${surface.label} catalog did not list this model.`,
     });
   }
   return completed;
@@ -521,7 +520,7 @@ export function buildEffectiveCatalogRequest(
     fallbackRoute: routeFor(provider),
     catalog,
     overlay,
-    entitlement: copilotEntitlementContribution(provider),
+    entitlement: accountBillingEntitlement(provider),
     user: userContribution(provider),
     userOverride: userOverrideContribution(provider),
     providerAvailability: provider.status === 'unavailable'

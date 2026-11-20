@@ -38,7 +38,7 @@ function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromCatal
     baseUrlEditable: provider.baseUrlEditable,
     recommendedModels: [...provider.recommendedModels],
     docsUrl: provider.docsUrl,
-    accountLoginConfigured: provider.accountLoginConfigured,
+    accountLogin: provider.accountLogin ? { ...provider.accountLogin } : undefined,
     unavailableReason: provider.unavailableReason,
     capabilities: provider.capabilities ? [...provider.capabilities] : undefined,
   };

@@ -99,7 +99,17 @@
   "authModes": [
     "oauth"
   ],
-  "accountLoginConfigured": true,
+  "accountAuth": {
+    "flow": "grok-oauth",
+    "loginMode": "browser",
+    "codeInput": false,
+    "credential": {
+      "tokenFields": [
+        "accessToken",
+        "apiKey"
+      ]
+    }
+  },
   "capabilities": [
     "chat",
     "tool-calling",

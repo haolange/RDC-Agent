@@ -48,7 +48,6 @@ export const LlmProviderAccountLoginStartArgsSchema = z.tuple([
   z.object({
     providerId: ipcNonEmptyString(200, 'providerId'),
     authMode: LlmProviderAuthModeSchema.optional(),
-    accountLoginMode: z.enum(['browser', 'device']).optional(),
   }).strict(),
 ]);
 

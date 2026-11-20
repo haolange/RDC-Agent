@@ -1,5 +1,4 @@
 import type { ProviderSurfaceManifest } from '@shared/provider-catalog/catalogManifestSchema';
-import { isRetiredModel } from '@shared/provider-catalog/modelLifecycle';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import type {
@@ -308,7 +307,11 @@ export function parseKimiCodeCatalog(
   return asResult(projectLiveModelObservations(surface, observations));
 }
 /** Account discovery reports availability and windows; structural capabilities remain manifest-owned. */
-export function parseChatGptAccountCatalog(payload: unknown, surface?: Pick<ProviderSurfaceManifest, 'models'>): ParsedLiveCatalog {
+export function parseChatGptAccountCatalog(
+  payload: unknown,
+  surface: Pick<ProviderSurfaceManifest, 'models' | 'retiredModelIds'>,
+): ParsedLiveCatalog {
+  const retired = new Set(surface.retiredModelIds ?? []);
   const root = record(payload);
   const values = Array.isArray(root.models) ? root.models : [];
   return asResult(values.flatMap((candidate): CatalogModelContribution[] => {
@@ -318,13 +321,13 @@ export function parseChatGptAccountCatalog(payload: unknown, surface?: Pick<Prov
     if (
       !id
       || !identity
-      || isRetiredModel('chatgpt-account', id)
+      || retired.has(id.toLowerCase())
       || value.supported_in_api === false
       || (text(value.visibility) && text(value.visibility) !== 'list')
       || /(?:^|-)pro$/i.test(id)
       || /(?:auto-review|compaction)/i.test(id)
     ) return [];
-    const definition = surface?.models.find(model => model.modelId === id);
+    const definition = surface.models.find(model => model.modelId === id);
     const maxControl = definition?.controls.maxContext;
     const contextWindow = positiveInteger(value.context_window);
     const maxContextWindow = positiveInteger(value.max_context_window);
@@ -351,7 +354,7 @@ export function parseChatGptAccountCatalog(payload: unknown, surface?: Pick<Prov
     }
     return [{
       modelId: identity.id,
-      aliases: identity.aliases.filter(alias => !isRetiredModel('chatgpt-account', alias)),
+      aliases: identity.aliases.filter(alias => !retired.has(alias.toLowerCase())),
       label: text(value.display_name) ?? text(value.name) ?? id,
       availability: 'available',
       route: { protocol: 'OpenAIResponses', baseUrl: 'https://chatgpt.com/backend-api/codex', source: 'model' },

@@ -30,6 +30,8 @@ function surface(name: string) {
 }
 
 const KIMI_SURFACE = surface('kimi-coding-plan');
+/** The ChatGPT surface's lifecycle facts alone, for parser cases that exercise rows without manifest models. */
+const CHATGPT_RETIREMENTS = { models: [], retiredModelIds: surface('chatgpt-account').retiredModelIds };
 const GROK_SURFACE = surface('grok-account');
 const parseGrokBuilderCatalog = (payload: unknown) => parseGrokBuilderCatalogWithSurface(payload, GROK_SURFACE);
 const OPENCODE_GO_SURFACE = surface('opencode-go');
@@ -287,7 +289,7 @@ describe('live Provider Catalog parsers', () => {
   });
 
   it('parses account-visible ChatGPT ids without duplicating manifest controls', () => {
-    const parsed = parseChatGptAccountCatalog(fixture('chatgpt-account.json'));
+    const parsed = parseChatGptAccountCatalog(fixture('chatgpt-account.json'), CHATGPT_RETIREMENTS);
     expect(parsed.models.map((model) => model.id)).toEqual([
       'gpt-5.6-luna',
       'gpt-5.6-sol',
@@ -310,7 +312,7 @@ describe('live Provider Catalog parsers', () => {
   it.each([undefined, ['text'], ['text', 'image']])('keeps ChatGPT structure manifest-owned for modalities %j', (input_modalities) => {
     const parsed = parseChatGptAccountCatalog({ models: [
       { slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities },
-    ] });
+    ] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0].visionInput).toBeUndefined();
     expect(parsed.contributions[0].toolCalling).toBeUndefined();
     expect(parsed.contributions[0].structuredOutput).toBeUndefined();
@@ -321,7 +323,7 @@ describe('live Provider Catalog parsers', () => {
       { slug: 'hidden-model', visibility: 'hide', supported_in_api: true },
       { slug: 'unavailable-model', visibility: 'list', supported_in_api: false },
       { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true },
-    ] });
+    ] }, CHATGPT_RETIREMENTS);
     expect(parsed.models).toEqual([]);
   });
 
@@ -329,7 +331,7 @@ describe('live Provider Catalog parsers', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
       slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000, max_context_window: 872_000,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0].contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000 }),
       expect.objectContaining({ id: 'max', maxPromptTokens: 872_000, entitlement: 'granted' }),
@@ -340,7 +342,7 @@ describe('live Provider Catalog parsers', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
       slug: 'future-live-model', visibility: 'list', supported_in_api: true,
       context_window: 256_000, max_context_window: 1_000_000,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0]).toMatchObject({
       modelId: 'future-live-model',
       contextTiers: [
@@ -437,7 +439,7 @@ describe('live Provider Catalog parsers', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
       slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0].contextTiers?.[0]).toEqual(expect.objectContaining({
       maxPromptTokens: 272_000,
     }));
@@ -446,7 +448,7 @@ describe('live Provider Catalog parsers', () => {
     const withOutput = parseChatGptAccountCatalog({ models: [{
       slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000, max_output_tokens: 16_384,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(withOutput.contributions[0].contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, maxOutputTokens: 16_384 }),
     ]);

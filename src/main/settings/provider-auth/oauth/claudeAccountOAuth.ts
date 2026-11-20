@@ -1,17 +1,17 @@
 import { randomUUID } from 'crypto';
-import type { LlmProviderModel } from '@shared/types/settings';
-import { CLAUDE_ACCOUNT_WIRE_HEADERS } from '../ClaudeWire';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { parseClaudeAccountCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
+import { accountDefaultRoute } from './accountRoute';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import { CLAUDE_CLIENT_ID } from './oauthConstants';
 import { appendParams, createPkce, fetchJson } from './oauthHttp';
 
-export function startClaudeLogin(setFlow: (flow: OAuthFlowState) => void): OAuthFlowState {
+export function startClaudeLogin(providerId: LlmProviderId, setFlow: (flow: OAuthFlowState) => void): OAuthFlowState {
   const { verifier, challenge } = createPkce();
   const state = randomUUID();
   const flow: OAuthFlowState = {
-    providerId: 'claude-account',
+    providerId,
     flowId: randomUUID(),
     state,
     codeVerifier: verifier,
@@ -51,7 +51,7 @@ export async function exchangeClaudeCode(flow: OAuthFlowState, code: string): Pr
     throw new Error('Claude OAuth did not return an access token.');
   }
   return {
-    providerId: 'claude-account',
+    providerId: flow.providerId,
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token,
     expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
@@ -85,13 +85,14 @@ export async function refreshClaudeBundle(bundle: OAuthSecretBundle): Promise<OA
 export async function discoverClaudeCatalog(bundle: OAuthSecretBundle): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
   const token = bundle.accessToken;
   if (!token) throw new Error('Claude Account OAuth token is missing.');
-  const payload = await fetchJson('https://api.anthropic.com/v1/models', {
+  const route = accountDefaultRoute(bundle.providerId);
+  const payload = await fetchJson(`${route.baseUrl}/models`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
       'x-api-key': token,
       'anthropic-version': '2023-06-01',
-      ...CLAUDE_ACCOUNT_WIRE_HEADERS,
+      ...route.headers,
     },
   });
   const parsed = parseClaudeAccountCatalog(payload);

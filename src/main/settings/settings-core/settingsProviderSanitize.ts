@@ -19,8 +19,11 @@ import {
   getProviderCatalogOwnership,
   getProviderDiscoveryAuthority,
   getProviderDefaultBaseUrl,
+  getProviderAccountAuth,
   getProviderModelSummaries,
+  getProviderSurfaceSummary,
   isBuiltinProviderId,
+  isRetiredProviderModel,
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../../runtime/AppPathService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
@@ -35,25 +38,13 @@ export interface ProviderSanitizeOptions {
   credentialView?: ProviderCredentialView;
 }
 
+/** A stored key is usable when it is non-empty and carries the prefix the provider's manifest declares. */
 export function isVendorSecretUsable(providerId: string, secret: string): boolean {
-  const normalized = secret.trim();
-  if (!normalized) {
-    return false;
-  }
-
-  if (providerId === 'openrouter') {
-    return /^sk-or-/i.test(normalized);
-  }
-
-  if (providerId === 'openai') {
-    return /^sk-/i.test(normalized);
-  }
-
-  if (providerId === 'anthropic') {
-    return /^sk-ant-/i.test(normalized);
-  }
-
-  return true;
+  const normalized = secret.trim().toLowerCase();
+  if (!normalized) return false;
+  const schema = getProviderSurfaceSummary(providerId)?.connectionSchema;
+  const primaryField = schema?.fields.find((field) => field.id === schema.primarySecretFieldId);
+  return !primaryField?.valuePrefix || normalized.startsWith(primaryField.valuePrefix.toLowerCase());
 }
 
 export function getResolvedProviderSecret(providerId: string, secretRef: string | undefined, workspaceRoot: string): string {
@@ -129,6 +120,10 @@ export function resolveAccountRuntimeCredential(
   workspaceRoot: string,
 ): { apiKey: string; baseUrl?: string; accountId?: string } {
   const providerId = provider.id;
+  const accountAuth = getProviderAccountAuth(providerId);
+  if (!accountAuth) {
+    return { apiKey: '' };
+  }
   const raw = secretStorageService.getSecret(
     getProviderAccountSecretRef(providerId, provider.activeAccountId, 'oauth'),
     workspaceRoot,
@@ -137,52 +132,18 @@ export function resolveAccountRuntimeCredential(
     return { apiKey: '' };
   }
   try {
-    const bundle = JSON.parse(raw) as {
-      accessToken?: string;
-      apiKey?: string;
-      copilotToken?: string;
-      copilotApiBaseUrl?: string;
-      accountId?: string;
-      resourceUrl?: string;
-    };
-    if (providerId === 'github-copilot') {
-      return {
-        apiKey: bundle.copilotToken ?? '',
-        baseUrl: bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com',
-      };
-    }
-    if (providerId === 'chatgpt-account') {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
-        baseUrl: 'https://chatgpt.com/backend-api/codex',
-        accountId: bundle.accountId,
-      };
-    }
-    if (providerId === 'grok-account') {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
-        baseUrl: 'https://cli-chat-proxy.grok.com/v1',
-        accountId: bundle.accountId,
-      };
-    }
-    if (providerId === 'nous') {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
-        baseUrl: bundle.resourceUrl ?? 'https://inference-api.nousresearch.com/v1',
-        accountId: bundle.accountId,
-      };
-    }
-    if (providerId === 'openrouter') {
-      return {
-        apiKey: bundle.apiKey ?? bundle.accessToken ?? '',
-        baseUrl: 'https://openrouter.ai/api/v1',
-        accountId: bundle.accountId,
-      };
-    }
+    const bundle = JSON.parse(raw) as Partial<Record<
+      'accessToken' | 'apiKey' | 'copilotToken' | 'copilotApiBaseUrl' | 'resourceUrl' | 'accountId',
+      unknown
+    >>;
+    const readField = (value: unknown): string | undefined => (
+      typeof value === 'string' && value.trim() ? value.trim() : undefined
+    );
+    const { tokenFields, baseUrlField } = accountAuth.credential;
     return {
-      apiKey: bundle.accessToken ?? '',
-      baseUrl: 'https://api.anthropic.com/v1',
-      accountId: bundle.accountId,
+      apiKey: tokenFields.map((field) => readField(bundle[field])).find(Boolean) ?? '',
+      baseUrl: (baseUrlField ? readField(bundle[baseUrlField]) : undefined) ?? getProviderDefaultBaseUrl(providerId),
+      accountId: readField(bundle.accountId),
     };
   } catch {
     return { apiKey: '' };
@@ -290,7 +251,7 @@ export function applyModelPreferences(
 }
 
 export function resolveProviderModels(providerId: string, persistedModels: unknown): LlmProviderModel[] {
-  const sanitized = sanitizeModels(persistedModels);
+  const sanitized = sanitizeModels(persistedModels).filter((model) => !isRetiredProviderModel(providerId, model.id));
   const ownership = getProviderCatalogOwnership(providerId);
   const authority = getProviderDiscoveryAuthority(providerId);
   const catalogMetadata = getProviderCatalogModelSummaries(providerId);
@@ -632,7 +593,7 @@ export function sanitizeUserProvider(
     lastTestedAt: typeof provider.lastTestedAt === 'string' ? provider.lastTestedAt : undefined,
     lastModelRefreshAt: typeof provider.lastModelRefreshAt === 'string' ? provider.lastModelRefreshAt : undefined,
     lastError: status === 'failed' && typeof provider.lastError === 'string' ? provider.lastError : undefined,
-    accountLoginConfigured: definition?.accountLoginConfigured,
+    accountLogin: definition?.accountLogin,
     accountLabel: typeof provider.accountLabel === 'string' ? provider.accountLabel : undefined,
     planLabel: typeof provider.planLabel === 'string' ? provider.planLabel : undefined,
     oauthExpiresAt: typeof provider.oauthExpiresAt === 'string' ? provider.oauthExpiresAt : undefined,

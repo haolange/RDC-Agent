@@ -68,7 +68,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     const models = mergeEffectiveCatalog(request);
     expect(models.find(model => model.modelId === 'grok-4.3')).toMatchObject({
       availability: 'unavailable',
-      unavailableReason: 'The last successful Grok subscription catalog did not list this model.',
+      unavailableReason: 'The last successful Grok Subscription catalog did not list this model.',
     });
     expect(mergeEffectiveCatalog({ ...request, discovery: undefined }).find(model => model.modelId === 'grok-4.3'))
       .toMatchObject({ availability: 'unknown' });
@@ -364,7 +364,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     expect(completed).toContainEqual({
       modelId: 'gpt-5.6-sol',
       availability: 'unavailable',
-      unavailableReason: 'This account-scoped model was absent from the authoritative provider catalog.',
+      unavailableReason: 'The last successful ChatGPT Account catalog did not list this model.',
     });
   });
 

@@ -155,7 +155,6 @@ export function createProviderConnectionDraft(provider: LlmProviderEntry): Provi
           models,
         }
       : undefined,
-    accountLoginMode: provider.id === 'grok-account' ? 'browser' : 'device',
     authCode: '',
   };
 }

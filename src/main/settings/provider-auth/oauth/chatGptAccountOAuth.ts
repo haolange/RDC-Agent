@@ -1,7 +1,7 @@
 import { loadProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { randomUUID } from 'crypto';
 import { createServer } from 'http';
-import type { LlmProviderModel } from '@shared/types/settings';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { parseChatGptAccountCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
@@ -9,6 +9,7 @@ import { CHATGPT_CALLBACK_PORT, CHATGPT_CLIENT_ID, CHATGPT_CATALOG_CLIENT_VERSIO
 import { appendParams, createPkce, extractChatGptAccountId, fetchJson } from './oauthHttp';
 
 export async function startChatGptLogin(
+  providerId: LlmProviderId,
   setFlow: (flow: OAuthFlowState) => void,
   startCallbackServer: (flow: OAuthFlowState) => Promise<void>,
   openExternal: (url?: string) => Promise<void>,
@@ -16,7 +17,7 @@ export async function startChatGptLogin(
   const { verifier, challenge } = createPkce();
   const state = randomUUID();
   const flow: OAuthFlowState = {
-    providerId: 'chatgpt-account',
+    providerId,
     flowId: randomUUID(),
     state,
     codeVerifier: verifier,
@@ -54,7 +55,7 @@ export async function exchangeChatGptCode(flow: OAuthFlowState, code: string): P
   }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
   if (!tokenPayload.access_token) throw new Error('OpenAI OAuth did not return an access token.');
   return {
-    providerId: 'chatgpt-account',
+    providerId: flow.providerId,
     accessToken: tokenPayload.access_token,
     refreshToken: tokenPayload.refresh_token,
     apiKey: tokenPayload.access_token,
@@ -101,7 +102,9 @@ export async function discoverChatGptCatalog(bundle: OAuthSecretBundle): Promise
       },
     },
   );
-  const parsed = parseChatGptAccountCatalog(payload, await loadProviderSurface('chatgpt-account') ?? undefined);
+  const surface = await loadProviderSurface(bundle.providerId);
+  if (!surface) throw new Error(`Provider surface ${bundle.providerId} is unavailable.`);
+  const parsed = parseChatGptAccountCatalog(payload, surface);
   if (parsed.models.length > 0) return parsed;
   throw new Error('ChatGPT Codex catalog returned no agent-routable models.');
 }

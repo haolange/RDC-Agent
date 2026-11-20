@@ -4,7 +4,7 @@ import {
   mergeManagedModelAvailability,
   normalizeDiscoveredModels,
   normalizeCodingPlanModelMatchKey,
-  selectSupportedCodingPlanModels,
+  selectAvailableCodingPlanModels,
   resolveCodingPlanModelsUrl,
   resolveClineCatalogUrl,
   resolveClineCredentialProbeUrl,
@@ -23,8 +23,6 @@ import {
   getLoadedProviderSurface,
   loadProviderSurface,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import fs from 'node:fs';
-import path from 'node:path';
 
 const managed = (...ids: string[]): LlmProviderModel[] => ids.map((id) => ({
   id,
@@ -241,25 +239,13 @@ describe('typed provider connection resolution', () => {
   });
 });
 
-describe('coding-plan Anthropic discovery routing', () => {
-  it('routes volcengine-coding-plan discovery through validateCodingPlanModels for both protocols', () => {
-    const source = fs.readFileSync(
-      path.join(__dirname, '../provider-catalog/ProviderModelDiscovery.ts'),
-      'utf8',
+describe('coding-plan discovery routing', () => {
+  it('declares one Volcengine Coding Plan parser for every protocol route', async () => {
+    const surface = await loadProviderSurface('volcengine-coding-plan');
+    expect(surface?.discovery.strategy).toEqual({ kind: 'custom-parser', parserId: 'volcengine-coding-plan-models' });
+    expect(new Set(surface?.routes.map((route) => route.protocol))).toEqual(
+      new Set(['AnthropicMessages', 'OpenAICompatibleChatCompletions']),
     );
-    expect(source).toMatch(
-      /provider\.id === 'volcengine-coding-plan'/,
-    );
-    expect(source).not.toMatch(
-      /provider\.id === 'volcengine-coding-plan'[\s\S]*&& provider\.protocol === 'AnthropicMessages'/,
-    );
-    expect(source).toContain('resolveVolcengineCodingPlanModelsUrl');
-    expect(source).toContain('validateCodingPlanModels');
-    expect(source).toContain('selectSupportedCodingPlanModels');
-    expect(source).toContain("strategy === 'kimi-code-catalog'");
-    expect(source).toContain('parseKimiCodeCatalog');
-    expect(source).toContain('resolveClineCatalogUrl');
-    expect(source).toContain('resolveClineCredentialProbeUrl');
   });
 });
 
@@ -378,8 +364,7 @@ describe('mergeManagedModelAvailability', () => {
       managed('doubao-seed-2.0-code', 'glm-5.2'),
       [{ id: 'ark-code-latest', label: 'ark-code-latest', enabled: true }],
     );
-    expect(selectSupportedCodingPlanModels('volcengine-coding-plan', models)).toEqual([]);
-    expect(selectSupportedCodingPlanModels('kimi-coding-plan', models)).toEqual(models);
+    expect(selectAvailableCodingPlanModels(models)).toEqual([]);
   });
 
   it('keeps the catalog unchanged when no live model list is available', () => {
