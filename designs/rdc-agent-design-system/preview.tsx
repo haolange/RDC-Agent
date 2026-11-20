@@ -5,7 +5,7 @@ import { createDefaultUiPreferences } from '../../src/shared/theme/uiPreferences
 import { applyChromeTheme } from '../../src/renderer/app/theme/applyChromeTheme';
 import '../../src/renderer/styles/design-system.css';
 import '../../src/renderer/ui/kit.css';
-import { ComposerSample, PlanSample, TaskTrackSample, ProgressSample } from './domainSamples';
+import { ComposerSample, PlanSample, TaskTrackSample, TaskListSample } from './domainSamples';
 import { ExtraControls } from './extraControls';
 import { ColorSample, NavigationSample, UnsavedSample } from './controlSamples';
 import { contracts, type CatalogName } from './contracts';
@@ -30,7 +30,7 @@ export default function Preview() {
     { name: 'Composer Markdown', group: '领域组合', usage: '真实输入与预览组件。输入保持领域所有权；此处 Enter 仅反馈本地状态。', api: 'value / onChange / mode / onSend', keyboard: 'Enter 提交、Shift+Enter 换行、Tab 缩进', source: 'features/composer/ComposerMarkdownInput.tsx', sample: <ComposerSample /> },
     { name: 'PlanCard', group: '领域组合', usage: '历史计划摘要和全文入口；审批与交接仍由业务持有。示例弹层仅显示样本正文。', api: 'plan / onOpen', keyboard: 'Enter、Space 打开；选中文字不触发打开', source: 'features/transcript/PlanCard.tsx', sample: <PlanSample /> },
     { name: 'TaskSnapshotCard', group: '领域组合', usage: '按时间呈现任务快照；折叠记忆由会话作用域管理，不以当前任务覆盖历史。', api: 'row / ScopedWorkDisclosure', keyboard: 'Enter、Space 展开；运行中可继续操作', source: 'features/transcript/TaskSnapshotCard.tsx', sample: <TaskTrackSample /> },
-    { name: 'RightRailTaskList', group: '领域组合', usage: '单轨任务投影；真实宽度渐隐并提供完整标题。示例定位只发送页面内事件。', api: 'tasks / locateLabel', keyboard: 'Tab、Enter 定位', source: 'features/right-rail/RightRailProgressList.tsx', sample: <ProgressSample /> },
+    { name: 'RightRailTaskList', group: '领域组合', usage: '单轨任务投影；真实宽度渐隐并提供完整标题。示例定位只发送页面内事件。', api: 'tasks / locateLabel', keyboard: 'Tab、Enter 定位', source: 'features/right-rail/RightRailTaskList.tsx', sample: <TaskListSample /> },
     { name: 'SearchMultiSelect / Menu / ListRow / Feedback', group: '组合控件', usage: '目录多选保留不可用引用；菜单动作、列表选择、错误和成功反馈分别表达。', api: '各项接口与状态见展开示例', keyboard: '方向键菜单导航、Escape 返回、Tab 选择', source: 'ui/index.ts', sample: <ExtraControls /> },
     { name: 'Button', group: '操作', usage: '单一动作；loading 阻止重复提交。导航选择使用 Tabs。', api: 'variant / size / loading / disabled', keyboard: 'Tab、Enter、Space', source: 'ui/Button.tsx', sample: <div className="catalog-row">{(['primary','secondary','ghost','danger'] as const).map(variant => <Button key={variant} variant={variant}>{variant}</Button>)}<Button loading>保存中</Button><Button disabled>不可用</Button></div> },
     { name: 'Input / Textarea', group: '输入', usage: '短字段与自动增长正文；全文编辑使用 fill，由父容器分配高度。', api: 'value / onChange / sizing / minRows / maxRows', keyboard: '原生编辑、Tab', source: 'ui/Textarea.tsx', sample: <><Input aria-label="示例名称" placeholder="名称" /><Textarea aria-label="示例说明" placeholder="输入多行内容观察增长" /></> },

@@ -285,7 +285,7 @@ Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件
 
 Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，不读取 session runtime。选中 Session 时渲染五张不可折叠圆角卡 `Tasks / Artifacts / Outputs / Context / Capture`：
 
-- Tasks 消费 canonical `taskProjection`，是单一规范列表（`RightPanelViewModel.tasks: TaskRailItem[]`），创建序，已完成项就地保留，与 transcript 同序同态；始终分离任务序号、状态与标题，完成不划线。
+- Tasks 消费 canonical `taskProjection`，是单一规范列表（`RightPanelViewModel.tasks: TaskRailItem[]`），创建序，已完成项就地保留，与 transcript 同序同态；始终分离任务序号、状态与标题，完成不划线。每项带 TaskRegistry 状态 `status` 与展示态 `displayState`：未完成、未取消的 Task 当前执行为 `failed` / `interrupted` 时显示为 `failed`，其余等于 `status`；`execution` 只取当前执行记录的事实（`mode`、`dispatch` wait／background、实际 Agent、模型与推理档位），不从文本推断。
 - Artifacts 只投影 main-owned `rdc.investigation.v1` Investigation Artifacts（不是 Working Directory 扫描，也不是 `output_register`）。`InvestigationArtifactRow` 携带完整 `contentHash`（renderer 只缩显）。
 - Outputs 只接受 `output_register` 发布的用户输出文件，拒绝 inputs 与 plan；Investigation Artifacts 不混进 Outputs。
 - Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。

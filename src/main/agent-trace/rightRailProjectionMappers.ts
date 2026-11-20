@@ -35,6 +35,8 @@ export function mapRightRailTasks(
       branchId,
       title: item.title,
       status: item.status,
+      displayState: item.displayState,
+      ...(item.execution ? { execution: item.execution } : {}),
       order: item.order,
       createdAt: toIso(task?.createdAt),
       updatedAt: toIso(task?.updatedAt),

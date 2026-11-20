@@ -4,8 +4,8 @@ import type {
   InvestigationMission,
   InvestigationRecordType,
 } from './renderdocInvestigation';
-import type { ConversationTaskStatus } from './conversation';
-import type { TaskDependencyWait } from './taskExecution';
+import type { ConversationTaskStatus, TaskDisplayState } from './conversation';
+import type { TaskDependencyWait, TaskExecutionDispatch, TaskExecutionPreparation, TaskExecutionStatus } from './taskExecution';
 
 export interface RawAuditRef {
   id: string;
@@ -16,6 +16,16 @@ export interface RawAuditRef {
   ref?: string;
 }
 
+/** Facts from a Task's current execution record, shown beside the Task; never inferred from text. */
+export interface TaskExecutionFacts {
+  mode: 'direct' | 'subagent' | 'handoff';
+  status: TaskExecutionStatus;
+  dispatch?: TaskExecutionDispatch;
+  /** The Agent that actually ran the execution, from its prepared runtime facts. */
+  agentId?: string;
+  model?: { providerId: string; modelId: string; reasoningLevel?: TaskExecutionPreparation['reasoningLevel'] };
+}
+
 /** One Task as the session right rail shows it, projected by main from TaskRegistry. */
 export interface TaskRailItem {
   id: string;
@@ -24,6 +34,8 @@ export interface TaskRailItem {
   branchId: string;
   title: string;
   status: ConversationTaskStatus;
+  displayState: TaskDisplayState;
+  execution?: TaskExecutionFacts;
   order: number;
   createdAt: string;
   updatedAt: string;

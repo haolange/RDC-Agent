@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
+import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
 import { orderTasks } from './taskProjection';
 import {
   TASK_SCHEMA_VERSION,
@@ -334,7 +334,8 @@ function validateState(state: TaskStateDocument): void {
       || !Number.isInteger(execution.childMessageAckSequence) || execution.childMessageAckSequence < 0
       || !Number.isInteger(execution.parentMessageAckSequence) || execution.parentMessageAckSequence < 0
       || !['direct', 'subagent', 'handoff'].includes(execution.mode)
-      || !['queued', 'running', 'waiting', 'cancelling', 'completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted'].includes(execution.status)
+      || (execution.dispatch !== undefined && !['wait', 'background'].includes(execution.dispatch))
+      || !(TASK_EXECUTION_STATUSES as readonly string[]).includes(execution.status)
       || !validBudget(execution.budget)) {
       throw new Error(`Malformed canonical task execution: ${id}.`);
     }

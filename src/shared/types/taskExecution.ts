@@ -8,6 +8,15 @@ export interface TaskDependencyWait {
   reason: 'unfinished' | 'unverified' | 'missing';
 }
 
+/** Lifecycle of one Task execution instance; distinct from the logical Task status. */
+export const TASK_EXECUTION_STATUSES = [
+  'queued', 'running', 'waiting', 'cancelling', 'completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted',
+] as const;
+export type TaskExecutionStatus = typeof TASK_EXECUTION_STATUSES[number];
+
+/** How a subagent execution was dispatched: the parent waited for it, or it runs in the background. */
+export type TaskExecutionDispatch = 'wait' | 'background';
+
 const id = z.string().trim().min(1).max(256);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 

@@ -312,7 +312,7 @@ Stop 后的 cancelled execution 保持不可变。用户在后续回合明确要
 
 旧格式不由 TaskStore 自动迁移。转换须先逐文件备份原字节与 hash，再验证当前文档、依赖和状态后安装 `task-state.json` 并移除被替代的活动文件；历史完成状态不伪造执行证明。正常运行只有当前格式，无法读取时明确拒绝。runtimeInstanceId 变化使未结束执行转 interrupted；持久化恢复不自动启动模型、工具或重置预算。显式重试/恢复创建新执行，并继承限制与已消费预算。
 
-subagent（mode=background） 必须绑定 Task，持久化启动状态后返回执行标识。query/result 读取状态与结果；wait/join 等待既有执行；message 提交有限补充；cancel 和 task_stop 取消执行树并 join。父回复可以结束而 Task 继续托管；父 Task 正式完成检查子任务、阻塞、失败及结果。用户 Stop、会话删除和应用退出清理运行树；未观察进程退出不能声明清理完成。
+subagent（mode=background） 必须绑定 Task，持久化启动状态后返回执行标识。subagent 执行记录写入 `dispatch`（`wait` 或 `background`），供投影显示；缺省表示该执行写入时尚未记录此事实。query/result 读取状态与结果；wait/join 等待既有执行；message 提交有限补充；cancel 和 task_stop 取消执行树并 join。父回复可以结束而 Task 继续托管；父 Task 正式完成检查子任务、阻塞、失败及结果。用户 Stop、会话删除和应用退出清理运行树；未观察进程退出不能声明清理完成。
 
 每个父 `subagent` tool call 只绑定一份所属 session 的子代理可见记录；child session、Task execution ID 与 generation 约束归属并隔离迟到事件。子事件按主 `ConversationWorkBlock` 语义增量投影可见 loop、消息、工具、审批和诊断，不复制 opaque / 隐藏推理。冻结 capsule 的结构化任务正文、实际发送载荷、实际 final、父工具回执、调用参数及子工具长回执分别保存；final 不与结构化完成声明或执行错误混用。后台头部另存 Task Execution 生命周期状态，不能用 child turn 结束或 Task aggregate 状态代替；等待、取消中、部分完成、受阻与终态由实际 Execution 更新。正文受会话所有权、身份和大小上限约束，超限明确标记不可完整读取。renderer 收起时仅取头部，展开后分页读取步骤、按 revision 合并活跃项并按需分块读取正文。子执行记录不复制进父 `workTrace`，后台完成不修改父回复的 continuation。
 

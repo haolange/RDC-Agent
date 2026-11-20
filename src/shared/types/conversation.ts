@@ -27,6 +27,12 @@ export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | '
 /** Durable TaskRegistry lifecycle state carried by task work-trace blocks. */
 export type ConversationTaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
 
+/**
+ * What a Task shows: its TaskRegistry status, or `failed` while the logical Task is still open but its current
+ * execution ended `failed` / `interrupted` (TaskRegistry records such a Task as `blocked` with the error as reason).
+ */
+export type TaskDisplayState = ConversationTaskStatus | 'failed';
+
 export type ConversationDiagnosticSeverity = 'info' | 'warning' | 'error';
 
 export type ConversationWorkBlockKind =
@@ -48,6 +54,8 @@ export interface ConversationTaskSnapshotItem {
   taskId: string;
   title: string;
   status: ConversationTaskStatus;
+  /** Projected display state at the moment of the snapshot; absent on snapshots recorded before it existed. */
+  displayState?: TaskDisplayState;
   statusReason?: string;
   waitingOn?: TaskDependencyWait[];
   order: number;

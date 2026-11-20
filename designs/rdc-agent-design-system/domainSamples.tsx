@@ -52,9 +52,9 @@ export function TaskTrackSample() {
   </ol></ScopedWorkDisclosure>;
 }
 
-export function ProgressSample() {
+export function TaskListSample() {
   return <RightRailTaskList locateLabel="示例定位" tasks={items.map(item => ({
-    id: item.taskId, title: item.title, status: item.status, order: item.order,
+    id: item.taskId, title: item.title, status: item.status, displayState: item.status, order: item.order,
     sessionId: 'catalog', traceLaneId: 'catalog', branchId: 'catalog',
     createdAt: '2026-10-30T00:00:00Z', updatedAt: '2026-10-30T00:00:00Z',
   }))} />;

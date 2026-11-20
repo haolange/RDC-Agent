@@ -124,7 +124,7 @@ export class BackgroundSubagentService {
       deadlineAt: input.capsule.budget.maxWallTimeMs === undefined ? undefined : now + input.capsule.budget.maxWallTimeMs,
     };
     const execution = await registry.startExecution(input.taskId, {
-      mode: 'subagent', parentExecutionId: input.parentExecutionId, rootBudgetId: durableRoot ? rootBudgetId : undefined, budget,
+      mode: 'subagent', dispatch: 'background', parentExecutionId: input.parentExecutionId, rootBudgetId: durableRoot ? rootBudgetId : undefined, budget,
       requiredSkillIds: input.capsule.requiredSkillIds,
       requestedProfileId: input.targetProfile,
       requestedInputArtifactRefs: delegationCapsuleArtifactRefs(input.capsule),

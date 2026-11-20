@@ -12,6 +12,7 @@ export function normalizeTaskSnapshotItems(payload: {
       taskId: item.taskId,
       title: item.title,
       status: item.status,
+      ...(item.displayState ? { displayState: item.displayState } : {}),
       statusReason: item.statusReason,
       waitingOn: item.waitingOn?.map(wait => ({ ...wait })),
       order: typeof item.order === 'number' ? item.order : index,
