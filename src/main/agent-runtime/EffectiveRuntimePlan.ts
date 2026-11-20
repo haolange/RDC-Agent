@@ -6,7 +6,7 @@ import { isRdcLeaseToolName, stripRdcLeaseToolsFromAllowlist } from '@shared/con
 import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
 import { agentAccessCeiling, agentCompletionContract, type AgentCompletionContract } from '@shared/types/agentManifest';
 import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
-import type { AgentManifestDefinition, HandoffLabelTranslations } from '@shared/types/agentManifest';
+import type { AgentManifestDefinition, ManifestTextTranslations } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdcRuntime';
 import type { AgentPermissionSettings } from '@shared/types/settings';
@@ -17,7 +17,7 @@ import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 export interface FrozenHandoffDefinition {
   agent: string;
   label: string;
-  labelTranslations?: HandoffLabelTranslations;
+  labelTranslations?: ManifestTextTranslations;
   prompt: string;
   send?: boolean;
   surface?: 'turn-end' | 'plan-gate' | 'hidden';

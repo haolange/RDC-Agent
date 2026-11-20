@@ -2,6 +2,10 @@
 name: Analyzer
 description: Planning Orchestrator that maximizes explainability of an unknown rendering system.
 argument-hint: System, capture, or behavior to explain
+description-translations:
+  zh-CN: 规划编排者：让未知的渲染系统尽可能可解释。
+argument-hint-translations:
+  zh-CN: 要解释的系统、capture 或现象
 target: rdc-agent
 icon: waveform-gauge
 accent: "#8d8bff"

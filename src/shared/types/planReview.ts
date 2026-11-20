@@ -1,4 +1,4 @@
-import type { HandoffLabelTranslations } from './agentManifest';
+import type { ManifestTextTranslations } from './agentManifest';
 
 export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
 
@@ -15,7 +15,7 @@ export interface PlanReviewHandoffIdentity {
 }
 
 export interface PlanReviewHandoffOption extends PlanReviewHandoffIdentity {
-  labelTranslations?: HandoffLabelTranslations;
+  labelTranslations?: ManifestTextTranslations;
 }
 
 export interface PlanReviewHandoffSuggestion extends PlanReviewHandoffOption {

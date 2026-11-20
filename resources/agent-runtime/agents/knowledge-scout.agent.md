@@ -2,6 +2,10 @@
 name: Knowledge Scout
 description: Find relevant knowledge, compare scope and contrary material, and identify applicable checks with versioned sources.
 argument-hint: Task and evidence
+description-translations:
+  zh-CN: 查找相关知识，比较适用范围与相反材料，给出带版本来源的适用检查。
+argument-hint-translations:
+  zh-CN: 任务与证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

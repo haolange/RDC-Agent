@@ -2,6 +2,10 @@
 name: General
 description: Execution Orchestrator for ordinary read, write, search, shell, and tool work.
 argument-hint: Describe the task you want executed
+description-translations:
+  zh-CN: 执行编排者：负责普通的读写、搜索、Shell 与工具工作。
+argument-hint-translations:
+  zh-CN: 要执行的任务
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

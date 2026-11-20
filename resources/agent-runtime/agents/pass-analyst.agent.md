@@ -2,6 +2,10 @@
 name: Pass Analyst
 description: Analyze authorized pass, pipeline and execution relationships and identify unresolved dependencies.
 argument-hint: Task and evidence
+description-translations:
+  zh-CN: 分析已授权的 pass、管线与执行关系，找出尚未解决的依赖。
+argument-hint-translations:
+  zh-CN: 任务与证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

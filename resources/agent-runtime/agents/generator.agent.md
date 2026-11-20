@@ -2,6 +2,10 @@
 name: Generator
 description: Develop evidence-based explanations, competing hypotheses and candidate checks within the assigned investigation.
 argument-hint: Task and evidence
+description-translations:
+  zh-CN: 在分配的调查范围内，基于证据提出解释、相互竞争的假设与候选检查。
+argument-hint-translations:
+  zh-CN: 任务与证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

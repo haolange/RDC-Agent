@@ -22,7 +22,8 @@ Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 
 - `name`
 - `description`
-- `argument-hint`
+- `argument-hint`（Composer 占位文字：中文为「向 {名称} 说明{提示}」，英文为「{名称}: {提示}」，因此提示写成名词短语）
+- `description-translations` / `argument-hint-translations`（可选；仅支持 `zh-CN` / `en`，每项为非空、至多 1000 字符，至少一项，未知语言键拒绝。只在随应用分发的内置 manifest 里生效：界面按当前语言显示对应译文，缺少时显示原字段；Settings 写入用户或项目副本时从不写这两个字段，副本始终显示自己的文字。名称 `name` 不翻译）
 - `target`
 - `based-on`（复制内置时由 Settings 写入的内置 sourceHash，64 位十六进制；用于「内置已更新」提示，手写覆盖可省略）
 - `icon`（图标预设）

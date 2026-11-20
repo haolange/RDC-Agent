@@ -528,7 +528,6 @@ HAL_REASONING_LEVELS
 HalReasoningLevel
 halReasoningLevelFromCanonical
 HANDOFF_SURFACES
-HandoffLabelTranslations
 handoffLabelTranslationsSchema
 HandoffSurface
 handoffSurfaceOf

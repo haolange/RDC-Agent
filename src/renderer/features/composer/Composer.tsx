@@ -43,7 +43,7 @@ export const Composer: React.FC<ComposerProps> = ({
   composer,
   shellRef,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
   const [markdownMode, setMarkdownMode] = useState<ComposerMarkdownMode>('write');
   const appearanceTheme = useAppSettingsStore((state) => state.settings.appearance.theme);
@@ -108,7 +108,7 @@ export const Composer: React.FC<ComposerProps> = ({
     handleFilesIngest,
   });
   const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
-  const selectedAgentCapability = agentDescription(userInvocableAgents.find(agent => agent.id === selectedAgentId), t);
+  const selectedAgentCapability = agentDescription(userInvocableAgents.find(agent => agent.id === selectedAgentId), language);
   const composeAccentVars = useMemo(
     () => deriveComposeAccentVars(currentModeConfig.accentColor, resolvedTheme),
     [currentModeConfig.accentColor, resolvedTheme],

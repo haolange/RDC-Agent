@@ -2,6 +2,10 @@
 name: Shader Analyst
 description: Analyze authorized shader source, IR and dataflow and qualify reconstructed and inferred conclusions.
 argument-hint: Task and evidence
+description-translations:
+  zh-CN: 分析已授权的着色器源码、IR 与数据流，标明重建与推断得出的结论。
+argument-hint-translations:
+  zh-CN: 任务与证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

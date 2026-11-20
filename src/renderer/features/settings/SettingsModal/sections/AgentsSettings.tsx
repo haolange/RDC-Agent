@@ -191,7 +191,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                 id={agent.id}
                 name={agent.name}
                 description={settings.agents.definitions.some(definition => definition.id === agent.id && definition.description === agent.description)
-                  ? agentDescription(settings.agents.definitions.find(definition => definition.id === agent.id), t) : agent.description}
+                  ? agentDescription(settings.agents.definitions.find(definition => definition.id === agent.id), settings.appearance.language) : agent.description}
                 icon={agent.icon}
                 selected={agent.id === selectedId}
                 onSelect={() => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agent.id); }}

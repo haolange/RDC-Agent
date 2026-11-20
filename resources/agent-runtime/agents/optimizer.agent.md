@@ -2,6 +2,10 @@
 name: Optimizer
 description: Planning Orchestrator that minimizes cost while preserving correctness, quality, and scope.
 argument-hint: Cost, constraints, and required correctness
+description-translations:
+  zh-CN: 规划编排者：在保持正确性、质量与范围的前提下把成本降到最低。
+argument-hint-translations:
+  zh-CN: 成本、约束与必须保持的正确性
 target: rdc-agent
 icon: spark-tuning
 accent: "#4ee3a0"

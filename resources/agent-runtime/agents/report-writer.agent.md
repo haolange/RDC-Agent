@@ -2,6 +2,10 @@
 name: Report Writer
 description: Organize eligible claims and evidence without upgrading their qualification or concealing limitations.
 argument-hint: Task and evidence
+description-translations:
+  zh-CN: 整理合格的结论与证据，不抬高其限定程度，也不隐藏局限。
+argument-hint-translations:
+  zh-CN: 任务与证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"
