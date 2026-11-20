@@ -17,7 +17,7 @@ const tool = (id: string, status: 'running' | 'pending' | 'error' | 'complete' =
 }, t) as Extract<WorkProcessRow, { type: 'tool' }>;
 const section = (id: string, steps: WorkProcessRow[]): Extract<WorkProcessRow, { type: 'section' }> => ({
   type: 'section', id, loopId: id, status: 'running',
-  steps, visibleSteps: steps, stepCount: steps.length, duration: '', defaultOpen: false,
+  steps, visibleSteps: steps, stepCount: steps.length, duration: '',
 });
 it('preserves pending delegation until execution starts instead of creating a running node', () => {
   const presentation = buildWorkProcessPresentation({ status: 'running', updatedAt: 1, blocks: [{

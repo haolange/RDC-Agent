@@ -1020,6 +1020,15 @@ const i18nSource = [
     .filter((entry) => String(entry).endsWith('.ts'))
     .map((entry) => fs.readFileSync(path.join(CONTRACT_ROOT, 'src/renderer/i18n/locales', entry), 'utf8')),
 ].join('\n');
+const sectionModelSource = scriptRead('src/renderer/features/transcript/workProcessSectionModel.ts', 'utf8');
+// Steps are not numbered: a step leads with its thinking or commentary, or reads as its actions line.
+for (const [label, source] of [['components', componentSource], ['section model', sectionModelSource], ['i18n', i18nSource]]) {
+  assert(!/workProcessSectionTitle|\bordinal\b|numberSections|markLastSectionOpen/.test(source), `${label} must not number Working steps`);
+}
+assert(/'thinking' \| 'thinking\+commentary' \| 'commentary' \| 'actions'/.test(sectionModelSource),
+  'section model must name the four step leads');
+assert(componentSource.includes("useScopedWorkDisclosure('root'"), 'Working root must use the scoped disclosure so a manual toggle wins');
+assert(!/setExpanded\(true\)/.test(componentSource), 'Working root must not force itself open after a turn ends');
 const userInputPanelSource = scriptRead('src/renderer/features/composer/UserInputRequestPanel.tsx', 'utf8');
 const userInputSubmitHookSource = scriptRead('src/renderer/features/composer/useUserInputRequestSubmit.ts', 'utf8');
 const toolApprovalPanelSource = scriptRead('src/renderer/features/composer/ToolApprovalRequestPanel.tsx', 'utf8');
@@ -1253,8 +1262,8 @@ assert(
   'section turns should zero bottom padding so turn gap is only the next section top pad',
 );
 assert(
-  /\.work-process-steps\s*>\s*\.work-process-section\.has-narrative:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
-  'visible narrative entrances after events or spacers should use space-3',
+  /\.work-process-steps\s*>\s*\.work-process-section:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
+  'each step after the first enters with space-3',
 );
 assert(
   /\.work-process-steps\s*>\s*\.work-process-step:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-2\)/.test(cssSource),

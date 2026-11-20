@@ -189,7 +189,7 @@
 /* One boundary owns sibling spacing, including standalone snapshots and virtual rows. */
 .work-process-steps > .work-process-step { padding-bottom: 0; }
 .work-process-steps > .work-process-step:not(:first-child) { padding-top: var(--space-2); }
-.work-process-steps > .work-process-section.has-narrative:not(:first-child) {
+.work-process-steps > .work-process-section:not(:first-child) {
   padding-top: var(--space-3);
 }
 

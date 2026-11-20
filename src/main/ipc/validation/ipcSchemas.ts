@@ -75,6 +75,7 @@ export const SettingsSetArgsSchema = z.tuple([
       composerMarkdown: z.boolean().optional(),
       usePointerCursors: z.boolean().optional(),
       contextBreakdownExpanded: z.boolean().optional(),
+      workProcessExpansion: z.enum(['latest', 'all']).optional(),
       chromeThemes: z.object({
         light: themeChromePatch.optional(),
         dark: themeChromePatch.optional(),

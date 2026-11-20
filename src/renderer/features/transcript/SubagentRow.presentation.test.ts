@@ -18,7 +18,7 @@ const body = JSON.stringify({ capsule: {
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('p', null, content) }));
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (selector: (state: unknown) => unknown) =>
-  selector({ settings: { agents: { definitions: [] } } }) }));
+  selector({ settings: { agents: { definitions: [] }, appearance: { workProcessExpansion: 'latest' } } }) }));
 vi.mock('./useSubagentDisclosure', () => ({ useSubagentDisclosure: () => ({
   expanded: state.expanded, workOpen: state.workOpen, finalOpen: state.finalOpen, detailsOpen: false,
   factsOpen: false, constraintsOpen: false, toggle: () => {}, openCard: () => {},

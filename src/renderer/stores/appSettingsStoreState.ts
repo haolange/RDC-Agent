@@ -40,6 +40,7 @@ export interface AppSettingsState {
   setUsePointerCursors: (usePointerCursors: boolean) => Promise<void>;
   setChromeTheme: (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => Promise<void>;
   setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
+  setWorkProcessExpansion: (workProcessExpansion: import('@shared/types/settings').WorkProcessExpansion) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
   saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>;
   flushProviderSaves: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;

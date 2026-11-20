@@ -25,6 +25,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     target: 'language',
   },
   {
+    id: 'work-process-expansion',
+    section: 'general',
+    titleKey: 'settings.workProcessExpansion',
+    keywords: ['working', 'work process', 'steps', 'expand', 'collapse', '工作过程', '步骤', '展开', '折叠'],
+    target: 'work-process-expansion',
+  },
+  {
     id: 'personalization',
     section: 'general',
     titleKey: 'settings.personalization',

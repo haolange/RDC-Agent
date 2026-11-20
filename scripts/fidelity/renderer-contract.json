@@ -80,6 +80,7 @@
     "transcript.workProcess": "src/renderer/features/transcript/WorkProcess.tsx",
     "transcript.workProcessContent": "src/renderer/features/transcript/WorkProcessContent.tsx",
     "transcript.workProcessSectionRow": "src/renderer/features/transcript/WorkProcessSectionRow.tsx",
+    "transcript.workProcessSectionModel": "src/renderer/features/transcript/workProcessSectionModel.ts",
     "transcript.workProcessThinking": "src/renderer/features/transcript/WorkProcessThinking.tsx",
     "transcript.toolAggregateRow": "src/renderer/features/transcript/ToolAggregateRow.tsx",
     "transcript.workProcessRows": "src/renderer/features/transcript/WorkProcessRows.tsx",

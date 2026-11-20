@@ -27,3 +27,11 @@ describe('UI preferences without motion controls', () => {
     expect(JSON.parse(JSON.stringify(result))).toEqual(sanitizeUiPreferences(result));
   });
 });
+
+describe('Working expansion preference', () => {
+  it('opens only the latest step by default and keeps a valid choice', () => {
+    expect(createDefaultUiPreferences().workProcessExpansion).toBe('latest');
+    expect(sanitizeUiPreferences({ workProcessExpansion: 'all' }).workProcessExpansion).toBe('all');
+    expect(sanitizeUiPreferences({ workProcessExpansion: 'every' }).workProcessExpansion).toBe('latest');
+  });
+});

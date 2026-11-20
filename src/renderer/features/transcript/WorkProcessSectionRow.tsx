@@ -1,8 +1,11 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
+import { Disclosure } from '../../ui/Disclosure';
 import { MeasuredWorkRows } from './MeasuredWorkRows';
+import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
+import { useWorkProcessExpansion } from './WorkProcessExpansion';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
-import { isTrackActivity } from './workProcessTrack';
+import { workProcessSectionModel } from './workProcessSectionModel';
 import type { WorkProcessRow } from './workProcessTypes';
 
 interface WorkProcessSectionRowProps {
@@ -11,34 +14,35 @@ interface WorkProcessSectionRowProps {
 }
 
 /**
- * One model loop's steps. A loop that acted gets a heading that names the group and carries its rail
- * node, so tool-only groups read as one unit instead of hanging the node on their first card.
+ * One model loop. Its thinking and commentary lead and stay visible; its actions fold behind one
+ * "N actions · time" line whose default follows the Working expansion preference, while a user's own
+ * toggle wins across streaming updates and remounts. Folding Working hides thinking and commentary but
+ * never the reply text in the same list.
  */
-export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
-  row,
-  renderRow,
-}) => {
+export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({ row, renderRow }) => {
   const { t } = useI18n();
-  const hasError = row.status === 'error' || row.steps.some((step) => step.status === 'error');
-  const visibleSteps = row.visibleSteps;
-  const running = isTrackActivity(row);
-  const actions = t(row.stepCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: row.stepCount });
-  const detail = running
-    ? t('chat.workProcessSectionRunning', { actions })
-    : row.duration ? t('chat.workProcessSectionDone', { actions, duration: row.duration }) : actions;
+  const model = workProcessSectionModel(row, t);
+  const expansion = useWorkProcessExpansion();
+  const defaultOpen = model.hasError || expansion.preference === 'all' || (expansion.active && expansion.latestSectionId === row.id);
+  const [open, toggle] = useScopedWorkDisclosure(`section-${row.id}`, defaultOpen);
   return (
-    <li className={`work-process-step work-process-section kind-section status-${row.status}`} data-testid="work-process-section">
+    <li className={`work-process-step work-process-section kind-section lead-${model.lead} status-${row.status}`}
+      data-testid="work-process-section" data-section-lead={model.lead}>
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
-        {row.stepCount > 0 ? (
-          <p className={`work-process-section-heading${running ? ' is-running' : ''}`} data-work-node-heading>
-            {row.ordinal ? <span className="work-process-section-title">{t('chat.workProcessSectionTitle', { ordinal: row.ordinal })}</span> : null}
-            <span className="work-process-section-detail">{detail}</span>
-          </p>
+        {model.leadRows.length > 0 ? (
+          <ol className="work-process-steps work-process-section-lead">{model.leadRows.map(renderRow)}</ol>
         ) : null}
-        {visibleSteps.length > 0 ? (
-          <MeasuredWorkRows className={`work-process-steps work-process-section-list ${hasError || row.defaultOpen ? 'is-open' : ''}`}
-            rows={visibleSteps} renderRow={renderRow} />
+        {model.actionRows.length > 0 ? (
+          <Disclosure
+            className="work-process-section-actions"
+            triggerClassName={`work-process-section-toggle${model.running ? ' is-running' : ''}`}
+            open={open}
+            onOpenChange={toggle}
+            summary={<span className="work-process-section-label" data-work-node-heading>{model.actionsLabel}</span>}
+          >
+            <MeasuredWorkRows className="work-process-steps work-process-section-list" rows={model.actionRows} renderRow={renderRow} />
+          </Disclosure>
         ) : null}
       </div>
     </li>

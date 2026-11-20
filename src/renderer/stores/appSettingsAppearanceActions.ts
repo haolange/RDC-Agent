@@ -4,6 +4,7 @@ import type {
   FontScale,
   ThemeChromeConfig,
   ThemeVariant,
+  WorkProcessExpansion,
 } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
 
@@ -18,6 +19,7 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
   | 'setUsePointerCursors'
   | 'setChromeTheme'
   | 'setContextBreakdownExpanded'
+  | 'setWorkProcessExpansion'
 > {
   let pending: Promise<unknown> = Promise.resolve();
   type Patch = Parameters<AppSettingsState['patchSettings']>[0];
@@ -53,6 +55,9 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
     },
     setContextBreakdownExpanded: async (contextBreakdownExpanded: boolean) => {
       await save({ appearance: { contextBreakdownExpanded } });
+    },
+    setWorkProcessExpansion: async (workProcessExpansion: WorkProcessExpansion) => {
+      await save({ appearance: { workProcessExpansion } });
     },
   };
 }

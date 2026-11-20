@@ -100,27 +100,6 @@ export function buildPresentationUnits(
   return units;
 }
 
-export function markLastSectionOpen(rows: WorkProcessRow[]): void {
-  let lastSectionIndex = -1;
-  rows.forEach((row, index) => {
-    if (row.type === 'section') lastSectionIndex = index;
-  });
-  if (lastSectionIndex < 0) return;
-  const lastSection = rows[lastSectionIndex];
-  if (lastSection.type === 'section' && lastSection.status !== 'complete') lastSection.defaultOpen = true;
-}
-
-/** Steps are numbered in display order, so a heading reads "步骤 N" however loops were grouped. */
-function numberSections(rows: WorkProcessRow[]): void {
-  let ordinal = 0;
-  for (const row of rows) {
-    if (row.type === 'section') row.ordinal = ++ordinal;
-  }
-}
-
 export function presentationUnitsToDetailRows(units: PresentationUnit[]): WorkProcessRow[] {
-  const rows = units.flatMap((unit) => unit.kind === 'loop' || unit.kind === 'standalone' ? unit.rows : []);
-  numberSections(rows);
-  markLastSectionOpen(rows);
-  return rows;
+  return units.flatMap((unit) => unit.kind === 'loop' || unit.kind === 'standalone' ? unit.rows : []);
 }

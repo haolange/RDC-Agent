@@ -97,7 +97,6 @@ export function projectLlmTurn(
         && call.executionStartedAt !== undefined && (!call.approval || call.approval.status === 'approved')),
       stepCount: deps.countToolSteps(steps),
       duration: formatDurationMs(block.startedAt, block.completedAt),
-      defaultOpen: false,
       steps,
       visibleSteps: steps,
       outputPhase,

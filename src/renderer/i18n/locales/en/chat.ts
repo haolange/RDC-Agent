@@ -30,7 +30,6 @@ export const enChat = {
   'chat.system': 'System',
   'chat.thinking': 'Thinking',
   'chat.workProcessTitle': 'Work process',
-  'chat.workProcessSectionTitle': 'Step {ordinal}',
   'chat.workProcessSectionRunning': 'Working · {actions}',
   'chat.workProcessSectionDone': '{actions} · {duration}',
   'chat.diagnosticTechnicalDetails': 'Technical details',

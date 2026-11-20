@@ -31,6 +31,30 @@ it('restores a main-process tool after folding the process and isolates another 
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });
 
+it('folds Working when its turn completes and keeps a manual choice across updates', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  const block = { id: 'loop', kind: 'llm_turn' as const, title: 'Loop', status: 'running' as const, startedAt: 1,
+    toolCalls: [{ id: 'read', toolName: 'read_file', status: 'complete' as const, startedAt: 1, completedAt: 2 }] };
+  const render = (status: ConversationWorkTrace['status'], messageId: string) => act(async () => root.render(React.createElement(WorkProcess, {
+    trace: { status, updatedAt: 3, blocks: [{ ...block, status: status === 'running' ? 'running' : 'complete', completedAt: status === 'running' ? undefined : 3 }] },
+    sessionId: 'collapse-session', messageId })));
+  const collapsed = () => host.querySelector('.work-process')?.classList.contains('is-collapsed');
+  try {
+    await render('running', 'turn-a');
+    expect(collapsed()).toBe(false);
+    await render('complete', 'turn-a');
+    expect(collapsed()).toBe(true);
+    await render('error', 'turn-b');
+    expect(collapsed()).toBe(false);
+    await act(async () => host.querySelector<HTMLButtonElement>('.work-process-header')!.click());
+    expect(collapsed()).toBe(true);
+    await render('error', 'turn-b');
+    expect(collapsed()).toBe(true);
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
 it('keeps streamed text in the same DOM node when its phase is confirmed', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div'); document.body.append(host);

@@ -14,6 +14,10 @@ import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessContent } from './WorkProcessContent';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { ToolAggregateRow } from './ToolAggregateRow';
+vi.mock('./WorkProcessExpansion', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./WorkProcessExpansion')>(),
+  useWorkProcessExpansion: () => ({ preference: 'all', active: false }),
+}));
 
 const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 
@@ -220,7 +224,7 @@ it('keeps one event sequence and wording across process densities without invent
         startedAt: now + 200, completedAt: now + 245 },
     ] }, t);
   const render = (density: 'normal' | 'compact') => new DOMParser().parseFromString(renderToStaticMarkup(createElement(
-    WorkProcessContent, { presentation, density, embedded: density === 'compact' })), 'text/html');
+    WorkProcessContent, { presentation, density, embedded: density === 'compact', active: false })), 'text/html');
   const normal = render('normal');
   const compact = render('compact');
   for (const document of [normal, compact]) {

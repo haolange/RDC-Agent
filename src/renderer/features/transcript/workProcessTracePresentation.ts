@@ -6,7 +6,7 @@ import { isMeaningfulText, getMeaningfulBlockSummary, isNoisyText } from './work
 import { createApprovalRow } from './workProcessDecisionRows';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
-import { buildPresentationUnits, presentationUnitsToDetailRows, markLastSectionOpen, type ThinkingItemPresentation } from './workProcessBlockProjection';
+import { buildPresentationUnits, presentationUnitsToDetailRows, type ThinkingItemPresentation } from './workProcessBlockProjection';
 import type { Translator } from '../../i18n/messages';
 
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
@@ -120,7 +120,6 @@ export const buildWorkProcessPresentation = (
 ): WorkProcessPresentation => {
   const blocks = Array.isArray(trace.blocks) ? trace.blocks : [];
   const rows = blocksToDetailRows(blocks, t);
-  markLastSectionOpen(rows);
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);
@@ -134,7 +133,6 @@ export const buildWorkProcessPresentation = (
     summary,
     toolEvidence: trace.toolEvidence ? { ...trace.toolEvidence } : undefined,
     duration: formatTraceDuration(blocks),
-    defaultExpanded: trace.status !== 'idle' || rows.length > 0 || Boolean(summary),
     important,
   };
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
 import { PersonalizationSettings } from './PersonalizationSettings';
@@ -33,6 +34,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   onSavePersonalization,
   t,
 }) => {
+  const onWorkProcessExpansionChange = useAppSettingsStore((state) => state.setWorkProcessExpansion);
   return (
     <section className="settings-page settings-page-general" data-settings-search="general">
       <div className="settings-general-grid">
@@ -55,6 +57,15 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
               tabs={[{ id: 'zh-CN', label: t('language.zh') }, { id: 'en', label: t('language.en') }]}
               onChange={(language) => {
                 if (language === 'zh-CN' || language === 'en') void onLanguageChange(language);
+              }} />
+          </SettingsField>
+          <SettingsField layout="row" label={t('settings.workProcessExpansion')} description={t('settings.workProcessExpansionHelp')}
+            search="work-process-expansion">
+            <Tabs variant="segmented" label={t('settings.workProcessExpansion')}
+              value={settings.appearance.workProcessExpansion}
+              tabs={[{ id: 'latest', label: t('settings.workProcessExpansionLatest') }, { id: 'all', label: t('settings.workProcessExpansionAll') }]}
+              onChange={(expansion) => {
+                if (expansion === 'latest' || expansion === 'all') void onWorkProcessExpansionChange(expansion);
               }} />
           </SettingsField>
         </SettingsSection>
