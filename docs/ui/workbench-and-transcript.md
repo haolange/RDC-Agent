@@ -127,7 +127,7 @@ Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent 
 
 左右停靠栏最大宽度同为 520px。最小宽度与默认宽度仍按各自内容下限，不跟着上限一起改。
 
-右栏有两个明确的目标面。选中 Project 时只显示 `Import .rdc` 与项目级 capture 输入；选中 Session 时恒为一条 `Tasks / Artifacts / Outputs / Context / Capture` 标签栏，一次只显示所选标签的一张卡；标签上带完成数或条目数。默认打开 Progress。空会话五个标签都在，所选标签给出如实空态，不回退到 Classic、Working Directory、Memory、Skills/MCP、Capture Library 或其他已退役面板。
+右栏有两个明确的目标面。选中 Project 时只显示 `Import .rdc` 与项目级 capture 输入；选中 Session 时恒为一条 `Tasks / Artifacts / Outputs / Context / Capture` 标签栏，一次只显示所选标签的一张卡；标签上带完成数或条目数。默认打开 Tasks。空会话五个标签都在，所选标签给出如实空态，不回退到 Classic、Working Directory、Memory、Skills/MCP、Capture Library 或其他已退役面板。
 
 - **Tasks**：只投影会话内真实的 `TaskRegistry` 任务（经 `taskProjection`），简单只读提问可以为空。列表是单一创建序数组，完成与取消项原位保留；点击任务定位并聚焦对应的 Work Process 快照。生命周期状态与阻塞原因始终是 TaskRegistry 的事实，即使所属回合已结束也不改写；禁止由阶段、harness 或 UI 合成进度。runtime 自带的 Stop 原因只在显示时翻译，存储值和用户原文不变。Stop 在 producer join 之后把被停止回合创建、尚未开始的任务结算为 cancelled；没有可知回合归属的旧任务保持不变。
 - **Artifacts**：只投影主进程持有的 `rdc.investigation.v1` 记录。renderer 不得从 action 事件、工作目录扫描或工具目录重建该清单。行操作为复制 ID，或经所属会话的 `investigation:read` 与期望内容 hash 打开只读预览。报告预览把既有类型化记录分成七个可读分组，缺失数据标为未记录，原始 JSON 为次级；不新增报告 schema，也不提升 Claim 等级。调查记录永不进入 Outputs。
@@ -233,7 +233,7 @@ Tasks 标题采用 text-sm / normal / leading-normal，固定单行，剩余宽�
 
 主要信息和动作直接显示；协议来源、原始记录、位置与比较条件等附属内容在所属详情里展开。错误、权限限制、未保存状态和写入确认保持可见。设置窗口的宽高分别随可用空间调整，长正文在内容区域滚动；菜单按屏幕边界调整位置，Escape 逐层关闭并返回触发按钮。长附件名按实际宽度渐隐，完整名称保留在 title，不按字符数裁剪。
 
-普通配置、素材、Knowledge 和调查原始信息披露统一使用 `ui/Details`。Transcript 受控工作轨道保留 `ScopedWorkDisclosure`。`PlanCard` 只接收计划与 `onOpen`；生产 `PlanReviewRow` 将动作交给既有 `PlanReaderHost`，读取/审批身份仍由领域链路校验。
+普通配置、素材、Knowledge 和调查原始信息披露统一使用 `ui/Details`。Transcript 受控工作轨道保留 `ScopedWorkDisclosure`。`PlanCard` 只接收计划与 `onOpen`；生产路径是回复流里 Working 之后的 `PlanDeliverable`，它把打开动作交给既有 `PlanReaderHost`，读取/审批身份仍由领域链路校验。Working 里的 `plan_artifact` 只是一行紧凑工具壳（计划 · 待审阅 / 已批准）。
 
 Settings 以独立宽高上限适应视口；桌面 Agent 列表与编辑区各自滚动，窄容器顺序布局由正文区滚动。短空态不撑出额外空洞，Skill 全文编辑器填满已分配余高。TaskDialog 操作区固定，超高正文内部滚动。
 

@@ -64,7 +64,7 @@
 - 无 Reply 边界行（收束 thinking 归入普通折叠）。
 - opaque/hidden 永不渲染 CoT 占位句（仅保留真实 tools/commentary/可见 thinking；answer-only 静默）。
 - `error_recovery_*` 自动恢复遥测不进 Work Process 叙事（仅 Agent Activity / runtime log；禁止蓝字「错误恢复成功…」旁白）。
-- Provider turn 最终失败：**一条** diagnostic（`CONVERSATION_LLM_REQUEST_FAILED` + 分类 userMessage + `technicalMessage`：`provider HTTP <status|n/a> · attempts <n>/<max> · <snippet>`）；`stopReason === 'error'` 时不 emit `empty_response_without_tool_call`。
+- Provider turn 最终失败：**一条** diagnostic（`CONVERSATION_LLM_REQUEST_FAILED` + 分类 userMessage + `technicalMessage`：`provider HTTP <status|n/a> · attempts <n>/<max> · <snippet>`）；`stopReason === 'error'` 时不 emit `empty_response_without_tool_call`。转录里失败文案只出现一次：作为消息正文并带「错误」标签；Working 只保留已经跑过的步骤，不再追加同文的诊断行。
 - Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板。
 - 真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）。
 

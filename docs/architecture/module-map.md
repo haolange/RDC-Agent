@@ -14,7 +14,7 @@
 | Hooks | `src/main/hooks/*`（`HookEngine`, `hookTrustStore`） | Hook 文档与 trust fingerprint | `rdc-runtime:*` | Settings > Hooks | typecheck, scoped-resources |
 | Conversation | `src/main/conversation/*`（`ConversationService`, `ConversationTurnRunner`, `ConversationWorkTrace`） | `ConversationWorkTrace`, 附件与分支 | `conversation:*` | `features/composer`, `features/transcript` | typecheck, agent-runtime, work-process |
 | Permissions | `src/main/agent-runtime/permissions/*`（`AgentPermissionPolicy`, `PolicyCompiler`） | 权限模式与 policy | `conversation:answerToolApproval` 等 | 审批卡、Settings > Policy | typecheck, 见 `contracts/permissions.md` |
-| Tasks | `src/main/agent-runtime/tasks/*`（`TaskRegistry`, `TaskTools`, `taskProjection`） | `TaskRailItem` | `task_*` 工具、trace 投影 | Right Rail Progress、Tasks 卡 | typecheck, agent-runtime |
+| Tasks | `src/main/agent-runtime/tasks/*`（`TaskRegistry`, `TaskTools`, `taskProjection`） | `TaskRailItem` | `task_*` 工具、trace 投影 | Right Rail Tasks、Tasks 历史卡 | typecheck, agent-runtime |
 | Provider adapters | `src/main/agent-runtime/providers/*` | `RequestPlan`, `EffectiveModel` | 无直接 IPC | 无 | typecheck, provider-system tests（见 `provider-architecture.md`） |
 | Browser app bridge | `src/main/browserAppBridge/*` | `src/shared/renderer-api/` manifest | localhost HTTP/SSE | Browser 路径同一 renderer | `bridgeSecurity.test.ts`（见 `browser-qa-surface.md`） |
 | Reports/evidence | `src/main/reports/*` | `ArtifactRecord`, `ActionEvent`, diagnostics | `evidence:getChain`, `evidence:eventAdded` | Activity, artifacts, trace cards | typecheck |

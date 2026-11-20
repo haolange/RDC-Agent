@@ -19,7 +19,7 @@
 - `data-flow.md`：Project、Session、Capture、Agent、Trace 与 RDC shell action 的端到端数据流。
 - `agent-runtime-kernel.md`：实现导览，从属于 `docs/contracts/runtime-kernel.md`。
 - `rdc-runtime.md`：RDC 操作契约：CLI 绑定、lease/隔离、回执、capture_select/restore/recover、Android 连接与回放观察。
-- `agentic-trace-protocol.md`：Trace、Progress 与 right-panel projection。
+- `agentic-trace-protocol.md`：Trace、Tasks 与 right-panel projection。
 - `provider-architecture.md`：Catalog / EffectiveModel / RequestPlan / credential lease。
 - `browser-qa-surface.md`：Browser（debug-only）与 Desktop 的单轨 API、transport、安全及状态 parity。
 - `host-platform.md`：宿主平台模块 `src/main/platform` 的盘点、能力契约、宿主平台门禁与 Linux 密钥策略。

@@ -25,7 +25,7 @@ Right-panel records use `traceLaneId`.
 
 ## Tasks lane
 
-Tasks lane（`RightPanelViewModel.tasks`）只由 session 作用域的 `TaskRegistry`（`${userData}/state/tasks/{sessionId}`，工具 `task_create` / `task_update` / `task_list`）经 `taskProjection` 与 `mapRightRailProgress` 映射为 `ProgressTask[]`。`RightRailProjectionService` 不会从 UI 阶段、harness 记录或 plan 文本合成任务。它按 session 而非 run 作用域，因此在 conversation 驱动的投影路径（`buildConversationPresentation`）下同样有内容；列表是单一创建顺序数组，已完成项原位保留。Task 变化发出 `task.created` / `task.updated`，重新发布 `trace:projectionChanged` 并原位刷新该 lane。子代理的 task 只在内存 store 中，不写入 session lane。Tasks 与 transcript live snapshot 共用同一 `taskProjection`，Work Process 仍是事件定位目标；task work-trace 块携带 `TaskRegistry` 的同一生命周期状态与 blocked 原因，回合结束不得把 pending 或 blocked 的 task 转成 completed 行。
+Tasks lane（`RightPanelViewModel.tasks`）只由 session 作用域的 `TaskRegistry`（`${userData}/state/tasks/{sessionId}`，工具 `task_create` / `task_update` / `task_list`）经 `taskProjection` 与 `mapRightRailTasks` 映射为 `TaskRailItem[]`。`RightRailProjectionService` 不会从 UI 阶段、harness 记录或 plan 文本合成任务。它按 session 而非 run 作用域，因此在 conversation 驱动的投影路径（`buildConversationPresentation`）下同样有内容；列表是单一创建顺序数组，已完成项原位保留。Task 变化发出 `task.created` / `task.updated`，重新发布 `trace:projectionChanged` 并原位刷新该 lane。子代理的 task 只在内存 store 中，不写入 session lane。Tasks 与 transcript live snapshot 共用同一 `taskProjection`，Work Process 仍是事件定位目标；task work-trace 块携带 `TaskRegistry` 的同一生命周期状态与 blocked 原因，回合结束不得把 pending 或 blocked 的 task 转成 completed 行。
 
 ## IPC
 

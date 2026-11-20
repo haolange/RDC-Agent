@@ -16,7 +16,8 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('../../patterns/ProfileAvatar', () => ({ ProfileAvatar: () => null }));
 vi.mock('../../ui/Tabs', async (original) => {
   const { Tabs } = await original<typeof import('../../ui/Tabs')>();
-  return { Tabs: (props: TabsProps) => { controls.push(props); return createElement(Tabs, props); } };
+  // React's dev warning stack probe calls the component with no props; record real renders only.
+  return { Tabs: (props?: TabsProps) => { if (props) controls.push(props); return createElement(Tabs, props); } };
 });
 
 afterEach(() => { controls.length = 0; vi.unstubAllGlobals(); });
