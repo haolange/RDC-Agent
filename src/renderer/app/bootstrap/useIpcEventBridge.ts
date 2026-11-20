@@ -1,4 +1,3 @@
-import type { ContextSnapshot } from '@shared/types/session';
 import { useCallback, useEffect, useRef } from 'react';
 import { mergeCapturesWithSnapshot } from '../../services/conversationTimeline';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
@@ -9,7 +8,6 @@ import { useSessionStore } from '../../stores/sessionStore';
 
 import { createCaptureProjection, subscribeCaptureStatusChanged, subscribeDeviceStatusChanged } from './captureSubscriptions';
 import { subscribeConversation, subscribeToolExecutionComplete } from './conversationSubscriptions';
-import type { EventBridgeOptions } from './eventBridgeOptions';
 import {
   subscribeAgentStatusChanged,
   subscribeEvidenceEventAdded,
@@ -21,6 +19,8 @@ import {
 } from './sessionSubscriptions';
 import { subscribePermissionState } from './permissionSubscriptions';
 import { subscribeAppThemeChanged, subscribeRuntimeLogAppended, subscribeShellCommands } from './shellSubscriptions';
+import type { EventBridgeOptions } from './eventBridgeOptions';
+import type { ContextSnapshot } from '@shared/types/session';
 
 export function useSyncCapturesFromSnapshot() {
   return useCallback((snapshot: ContextSnapshot) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Context } from '../core/types';
 import { partitionSystemPrompt } from './promptCacheWire';
+import type { Context } from '../core/types';
 
 const context = (overrides: Partial<Context> = {}): Context => ({
   systemPrompt: 'Stable A\n\nStable B\n\nVolatile',

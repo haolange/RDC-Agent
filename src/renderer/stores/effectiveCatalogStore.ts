@@ -1,9 +1,9 @@
-import { getElectronApi } from '../platform/getElectronApi';
 import { create } from 'zustand';
-import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
-import type { LlmProviderEntry, LlmProviderProtocol } from '@shared/types/settings';
+import { getElectronApi } from '../platform/getElectronApi';
 import { observeEffectiveCatalog, readEffectiveCatalog, refreshEffectiveCatalog } from '../services/effectiveCatalogService';
 import { latestCatalogProjection } from '../lib/catalogProjection';
+import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
+import type { LlmProviderEntry, LlmProviderProtocol } from '@shared/types/settings';
 
 export interface CatalogScope {
   id: string;

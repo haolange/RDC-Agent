@@ -1,4 +1,3 @@
-import type { MaxVisualTimeline, MaxVisualPhase } from './maxVisual';
 import {
   createActiveMaxTimeline,
   createIdleMaxTimeline,
@@ -6,6 +5,7 @@ import {
   createMaxTimeline,
   resolveMaxVisualFrame,
 } from './maxVisual';
+import type { MaxVisualTimeline, MaxVisualPhase } from './maxVisual';
 
 function visualNow(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now();

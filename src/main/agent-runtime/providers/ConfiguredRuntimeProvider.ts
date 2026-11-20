@@ -1,20 +1,15 @@
-import type { LLMProviderConfig } from '@shared/types/llm';
-import type { LlmProviderProtocol } from '@shared/types/settings';
 import {
   providerAdapterSupportsProtocol,
   type ProviderAdapterId,
 } from '@shared/provider-catalog/implementationRegistry';
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
 import { getProviderAuthSchemaId } from '../../provider-catalog/ProviderCatalogRegistry';
 import { providerAccountAuthService } from '../../settings/provider-auth/ProviderAccountAuthService';
+import {
+  createAwsBedrockRequestAuthorizerFromCredentials,
+  type ProviderRequestAuthorizer,
+} from '../../settings/provider-auth/AwsBedrockCredentials';
+import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 import { AnthropicProvider } from './AnthropicProvider';
 import { AzureOpenAIResponsesProvider } from './AzureOpenAIResponsesProvider';
 import { BedrockConverseProvider } from './BedrockConverseProvider';
@@ -25,12 +20,17 @@ import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
 import { streamWithUnauthorizedRefresh } from './AccountStreamRetry';
-import {
-  createAwsBedrockRequestAuthorizerFromCredentials,
-  type ProviderRequestAuthorizer,
-} from '../../settings/provider-auth/AwsBedrockCredentials';
-import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 import { createGitLabDuoProvider, createSapAiCoreProvider } from './DedicatedAiSdkProviders';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Model,
+  StreamOptions,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { LLMProviderConfig } from '@shared/types/llm';
 
 const CONFIGURED_PROVIDER_API = 'rdc-agent-configured-provider';
 

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
-import type { LlmProviderAccountDiagnostic } from '@shared/types/settings';
 import { REQUEST_TIMEOUT_MS } from './oauthConstants';
+import type { LlmProviderAccountDiagnostic } from '@shared/types/settings';
 
 export const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
 export const shouldOpenSystemBrowser = (): boolean => !isTestMode() && process.env.RDC_AGENT_HEADLESS !== '1';

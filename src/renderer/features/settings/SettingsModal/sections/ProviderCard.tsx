@@ -1,7 +1,5 @@
-import { Details } from '../../../../ui/Details';
 import React, { useState } from 'react';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import { Details } from '../../../../ui/Details';
 import { Button } from '../../../../ui/Button';
 import { getProviderProtocolLabel } from '../utils';
 import {
@@ -10,6 +8,8 @@ import {
   resolveProviderCardStatus,
   resolveProviderIdentity,
 } from './providerCardModel';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

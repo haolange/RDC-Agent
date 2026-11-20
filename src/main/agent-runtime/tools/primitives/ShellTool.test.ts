@@ -22,7 +22,6 @@ vi.mock('../../../sessions/store/StorageAdapter', () => ({
     },
   },
 }));
-import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { toolToDefinition } from '../../agent/AgentTool';
 import { toolValidator } from '../../core/ToolValidator';
 import { shellTool } from './ShellTool';
@@ -32,6 +31,7 @@ import {
   wrapPosixCommand,
   wrapPowerShellCommand,
 } from './shellTrailer';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const roots: string[] = [];
 afterEach(async () => {

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { IpcApprovalTokenService } from '../../runtime/IpcApprovalTokenService';
 import {
   IpcValidationError,
   assertIpcPayloadBytes,
   ipcId,
   parseIpcArgs,
 } from './IpcPayloadGuard';
-import { IpcApprovalTokenService } from './IpcApprovalTokenService';
 import {
   MemoryWriteArgsSchema,
   SettingsGetEffectiveCatalogArgsSchema,

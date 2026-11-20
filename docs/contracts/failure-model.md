@@ -134,7 +134,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 ## 相关测试
 
 - Provider 失败保真：`ErrorRecovery.test.ts`、`ConversationTurnDiagnostic.test.ts`、`providers/internal/http.test.ts`、`OpenAIResponsesProvider.test.ts`、`AgentLoop.recoveryDiagnostic.test.ts`
-- Integrity 存储：`src/shared/utils/jsonl.test.ts`、`src/main/testing/contracts/storageFaultContract.test.ts`
+- Integrity 存储：`src/main/runtime/jsonl.test.ts`、`src/main/testing/contracts/storageFaultContract.test.ts`
 - Availability 取消：`TurnCoordinator.test.ts`、`ProcessSupervisor.test.ts`、`cancellationContract.test.ts`
 - Security 矩阵：`securityContract.test.ts`
 

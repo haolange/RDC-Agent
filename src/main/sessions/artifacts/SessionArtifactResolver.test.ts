@@ -4,9 +4,9 @@ import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { directoryLinkType } from '../../platform/paths';
+import { StorageIo } from '../store/StorageIo';
 import { SessionArtifactResolver } from './SessionArtifactResolver';
 import { SESSION_ARTIFACT_QUOTA_FILENAME, resetSessionArtifactQuotaLedger } from './SessionArtifactQuota';
-import { StorageIo } from '../store/StorageIo';
 
 const roots: string[] = [];
 

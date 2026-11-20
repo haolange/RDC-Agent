@@ -1,8 +1,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getProviderModelDefinitions } from '../../provider-catalog/ProviderCatalogRegistry';
 import { ProviderAccountAuthService } from './ProviderAccountAuthService';
 

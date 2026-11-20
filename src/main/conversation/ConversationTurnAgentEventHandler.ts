@@ -1,26 +1,19 @@
 import { rootScopeId } from '@shared/utils/executionScope';
-import type { AgentEvent } from '@shared/types/agentRuntime';
-import { normalizeTaskSnapshotItems } from './ConversationTaskSnapshot';
-import type {
-  ConversationLoopOutputPhase,
-  ConversationLoopStopReason,
-  ConversationMessage,
-  ConversationMessageDiagnostic,
-  ConversationToolCall,
-  ConversationTaskSnapshotItem,
-  ConversationWorkTrace,
-} from '@shared/types/conversation';
-import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 import { nowMs } from '@shared/utils/id';
-import type { ToolCallResult } from '@shared/types/tool';
-import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
+import {
+  resolveConversationLoopOutputPhase,
+  resolveConversationReasoningState,
+  type ConversationLoopContinuationState,
+} from '@shared/conversation/loopOutputPhase';
+import { lastLoopThinking, loopFinalAnswerText, sameProviderBlock } from '@shared/conversation/loopItems';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { redactCredentialLikeText, redactedArgumentsPreview } from '../runtime/secretRedaction';
-import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
+import { buildConversationToolCompletion } from './ConversationToolCompletion';
+import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
 import {
   attachRuntimeHookDiagnostic,
   upsertRuntimeToolApproval,
@@ -37,21 +30,28 @@ import {
   applyPlanReviewRequested,
   isPlanReviewApprovalPayload,
 } from './ConversationPlanReviewEvents';
-import {
-  resolveConversationLoopOutputPhase,
-  resolveConversationReasoningState,
-  type ConversationLoopContinuationState,
-} from '@shared/conversation/loopOutputPhase';
 import { reduceCanonicalAssistantOutput } from './CanonicalAssistantOutput';
 import { delegationTraceStore } from './DelegationTraceStore';
-import type { CanonicalAssistantOutputState } from './CanonicalAssistantOutput';
 import {
   isActiveRun,
   isLoopTool,
   summarizeRuntimePayload,
 } from './ConversationRoutePreflight';
-import { lastLoopThinking, loopFinalAnswerText, sameProviderBlock } from '@shared/conversation/loopItems';
+import { normalizeTaskSnapshotItems } from './ConversationTaskSnapshot';
 import { mergeThinkingPayload } from './ConversationThinkingArtifacts';
+import type { CanonicalAssistantOutputState } from './CanonicalAssistantOutput';
+import type { ToolCallResult } from '@shared/types/tool';
+import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
+import type {
+  ConversationLoopOutputPhase,
+  ConversationLoopStopReason,
+  ConversationMessage,
+  ConversationMessageDiagnostic,
+  ConversationToolCall,
+  ConversationTaskSnapshotItem,
+  ConversationWorkTrace,
+} from '@shared/types/conversation';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationTurnRunnerHost, CompleteProfileTurnInput } from './ConversationTurnRunner';
 import type { PlanReviewDecision } from '@shared/types/planReview';
 

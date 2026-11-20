@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   filterComposerPickerOptions,
   groupComposerPickerOptions,
@@ -8,6 +7,7 @@ import {
   resolvePickerContextWindow,
   toComposerPickerOption,
 } from './composerModelPicker';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 function model(partial: Record<string, unknown> & { modelId: string }): EffectiveModel {
   return {

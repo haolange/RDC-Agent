@@ -1,8 +1,8 @@
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   isFastModeDenied,
   isMaxContextDenied,
 } from '../../lib/turnControlsUtils';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 export function buildEffortCapabilityStatusLabels(input: {
   capability: EffectiveModel | null;

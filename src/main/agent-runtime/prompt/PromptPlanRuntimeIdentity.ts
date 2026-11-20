@@ -1,8 +1,8 @@
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
-import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { runtimeIdentityContent } from './RuntimeIdentity';
+import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 /** A new replay identity changes only the volatile identity segment of the frozen PromptPlan. */
 export function refreshPromptPlanRuntimeIdentity(plan: PromptPlan, sessionId: string, permissionRevision: number | null, lease: RdcContextLease | null): PromptPlan {

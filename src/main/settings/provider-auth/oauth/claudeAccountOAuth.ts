@@ -1,11 +1,11 @@
 import { randomUUID } from 'crypto';
-import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { parseClaudeAccountCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
-import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import { accountDefaultRoute } from './accountRoute';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import { CLAUDE_CLIENT_ID } from './oauthConstants';
 import { appendParams, createPkce, fetchJson } from './oauthHttp';
+import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
 export function startClaudeLogin(providerId: LlmProviderId, setFlow: (flow: OAuthFlowState) => void): OAuthFlowState {
   const { verifier, challenge } = createPkce();

@@ -1,4 +1,8 @@
 import { createHash } from 'crypto';
+import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
+import { isRetiredProviderModel } from '../../provider-catalog/ProviderCatalogRegistry';
+import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import type {
   CapabilityEvidence,
   ContextTier,
@@ -8,10 +12,6 @@ import type {
 } from '@shared/types/providerCapability';
 import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
-import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
-import { isRetiredProviderModel } from '../../provider-catalog/ProviderCatalogRegistry';
-import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
-import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
 import type {
   CatalogLayerContribution,
   EffectiveCatalogRequest,

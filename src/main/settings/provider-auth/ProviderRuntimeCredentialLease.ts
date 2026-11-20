@@ -1,11 +1,11 @@
-import type { LlmProviderId } from '@shared/types/settings';
 import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { settingsService } from '../settings-core/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import {
   providerRuntimeCredentialService,
   type ProviderRuntimeCredentialOperation,
 } from './ProviderRuntimeCredentialService';
-import { settingsService } from '../settings-core/SettingsService';
+import type { LlmProviderId } from '@shared/types/settings';
 
 export interface FrozenProviderRuntimeCredentialLease {
   handle: string;

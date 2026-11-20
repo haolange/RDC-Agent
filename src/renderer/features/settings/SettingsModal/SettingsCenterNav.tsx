@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { TranslationKey } from '../../../i18n';
 import { cn } from '../../../lib/cn';
 import { SearchField } from '../../../ui/SearchField';
 import { SettingsNavIcon } from './SettingsNavIcon';
@@ -7,6 +6,7 @@ import {
   matchSettingsSearchEntries,
   type SettingsSearchEntry,
 } from './settingsSearchIndex';
+import type { TranslationKey } from '../../../i18n';
 import type { SettingsSection } from './types';
 
 export function focusSettingsSearchTarget(target: string): void {

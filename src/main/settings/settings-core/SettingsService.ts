@@ -1,5 +1,3 @@
-import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
-import { auditLog } from '../../runtime/AuditLog';
 /**
  * SettingsService — persists and normalizes application settings.
  *
@@ -12,34 +10,25 @@ import { auditLog } from '../../runtime/AuditLog';
  * `agentManifestService.routeForAgent` resolves them. Scoped agent-definition saves keep
  * `clientRevision <= latestRevision` conflict detection and never change a route.
  */
-import type {
-  AppRuntimePaths,
-  AgentShellSettings,
-  AppSettings,
-  AppSettingsPatch,
-  LlmProviderAuthMode,
-  LlmProviderEntry,
-  LlmProviderId,
-  LlmProviderModel,
-  LlmProviderModelPreference,
-  ProviderDefinitionCommitSnapshot,
-  ProviderDefinitionSaveRequest,
-  ProviderDefinitionSaveResult,
-  WindowLayoutPreference,
-} from '@shared/types/settings';
-import type {
-  AgentBuiltinComparison,
-  AgentDefinitionCommitQuery,
-  AgentDefinitionCommitSnapshot,
-  AgentDefinitionSaveRequest,
-  AgentDefinitionSaveResult,
-  AgentModelMigrationPreview,
-  AgentOverrideFileRequest,
-  ProjectAgentTrustPreview,
-} from '@shared/types/agentManifest';
-import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
-import { compiledRoutesFromDefinitions } from '../provider-catalog/compiledAgentRoutes';
 import { mergeUiPreferences, sanitizeUiPreferences } from '@shared/theme/uiPreferences';
+import {
+  DEFAULT_APPEARANCE,
+  DEFAULT_LAYOUT,
+  DEFAULT_PROFILE,
+  DEFAULT_CODE_INTERPRETER,
+  DEFAULT_RDC_CLI_INVOKER,
+  DEFAULT_SHELL_TOOLING,
+} from '@shared/constants/appSettingsDefaults';
+import { compiledRoutesFromDefinitions } from '../provider-catalog/compiledAgentRoutes';
+import { appPathService } from '../../runtime/AppPathService';
+import { shellResolver } from '../../runtime/ShellResolver';
+import { agentManifestService } from '../agent-manifests/AgentManifestService';
+import { providerCatalogService } from '../provider-catalog/ProviderCatalogService';
+import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
+import { auditLog } from '../../runtime/AuditLog';
+import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
+import { secretStorageService } from './SecretStorageService';
+import { executionProfileService } from './ExecutionProfileService';
 import {
   createLocalAccountId,
   getProviderAccountSecretRef,
@@ -49,21 +38,6 @@ import {
   sanitizeUserProvider,
   type ProviderCredentialView,
 } from './settingsProviderSanitize';
-import { appPathService } from '../../runtime/AppPathService';
-import { shellResolver } from '../../runtime/ShellResolver';
-import { executionProfileService } from './ExecutionProfileService';
-import { agentManifestService } from '../agent-manifests/AgentManifestService';
-import { providerCatalogService } from '../provider-catalog/ProviderCatalogService';
-import { secretStorageService } from './SecretStorageService';
-import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
-import {
-  DEFAULT_APPEARANCE,
-  DEFAULT_LAYOUT,
-  DEFAULT_PROFILE,
-  DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDC_CLI_INVOKER,
-  DEFAULT_SHELL_TOOLING,
-} from '@shared/constants/appSettingsDefaults';
 import {
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
@@ -97,6 +71,32 @@ import {
   writeSettings,
   writeSettingsAsync,
 } from './settingsServiceHelpers';
+import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
+import type {
+  AgentBuiltinComparison,
+  AgentDefinitionCommitQuery,
+  AgentDefinitionCommitSnapshot,
+  AgentDefinitionSaveRequest,
+  AgentDefinitionSaveResult,
+  AgentModelMigrationPreview,
+  AgentOverrideFileRequest,
+  ProjectAgentTrustPreview,
+} from '@shared/types/agentManifest';
+import type {
+  AppRuntimePaths,
+  AgentShellSettings,
+  AppSettings,
+  AppSettingsPatch,
+  LlmProviderAuthMode,
+  LlmProviderEntry,
+  LlmProviderId,
+  LlmProviderModel,
+  LlmProviderModelPreference,
+  ProviderDefinitionCommitSnapshot,
+  ProviderDefinitionSaveRequest,
+  ProviderDefinitionSaveResult,
+  WindowLayoutPreference,
+} from '@shared/types/settings';
 
 export { SETTINGS_SCHEMA_VERSION } from './settingsDefaults';
 

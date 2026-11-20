@@ -1,7 +1,7 @@
 import { generateEventId } from '@shared/utils/id';
+import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import { redactSecretsDeep } from '../../runtime/secretRedaction';
 
 export interface RequestEnvelopeInput {
   promptPlan: PromptPlan;

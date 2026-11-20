@@ -1,9 +1,9 @@
 import { isSubagentScopeId } from '@shared/utils/executionScope';
+import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { traceService } from './TraceService';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { SessionScope } from '@shared/types/session';
 import type { TraceSessionResult } from '@shared/types/trace';
-import { traceService } from './TraceService';
-import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 
 export interface TraceProjectionRefreshDeps {
   getProjection(sessionId: string): Promise<TraceSessionResult>;

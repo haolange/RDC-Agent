@@ -1,8 +1,7 @@
-import { confirmInMainProcess } from '../window/mainConfirmation';
-import { nativeMessage } from '../window/nativeI18n';
 import path from 'node:path';
 import { ipcMain } from 'electron';
-import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
+import { nativeMessage } from '../window/nativeI18n';
+import { confirmInMainProcess } from '../window/mainConfirmation';
 import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
 import { readKnowledgeImagePreview } from '../knowledge/knowledgeImagePreview';
 import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
@@ -19,9 +18,8 @@ import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import { knowledgeTopicService } from '../knowledge/KnowledgeTopicService';
 import { projectKnowledgeRead } from '../knowledge/KnowledgeReadService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import type { WorkbenchIpcContext } from './workbenchContext';
+import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
-import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
 import {
   KnowledgeCandidateCreateArgsSchema,
   KnowledgeCandidatesArgsSchema,
@@ -41,6 +39,8 @@ import {
   KnowledgeTopicApplyArgsSchema,
   KnowledgeReadArgsSchema,
 } from './validation/knowledgeSchemas';
+import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
+import type { WorkbenchIpcContext } from './workbenchContext';
 
 const knowledgeExportService = new KnowledgeExportService(createDefaultExportDependencies({
   getCard: (spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath),

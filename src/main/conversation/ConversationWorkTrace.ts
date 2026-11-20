@@ -1,3 +1,9 @@
+import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
+import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
+import { nowMs } from '@shared/utils/id';
+import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
+import { normalizeWorkBlockKind, providerOutputRefKey } from './StoredWorkTrace';
+import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import type {
   ConversationLoopItem,
   ConversationLoopOutputPhase,
@@ -10,12 +16,6 @@ import type {
   ConversationWorkBlock,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
-import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
-import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
-import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
-import { nowMs } from '@shared/utils/id';
-import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
-import { normalizeWorkBlockKind, providerOutputRefKey } from './StoredWorkTrace';
 
 interface LoopTraceOptions {
   loopId?: string;

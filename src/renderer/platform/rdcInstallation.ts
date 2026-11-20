@@ -1,5 +1,5 @@
-import type { RdcInstallationRequest } from '@shared/types/rdcInstallation';
 import { getElectronApi } from './getElectronApi';
+import type { RdcInstallationRequest } from '@shared/types/rdcInstallation';
 
 function api() {
   const value = getElectronApi();

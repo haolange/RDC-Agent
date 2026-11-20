@@ -11,8 +11,6 @@ import {
   TERMINAL_MAX_HEIGHT,
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
-import { expandHomePath } from '../../platform/paths';
-import { assertRdcCliBinding } from '../../rdc/rdcCliBinding';
 import {
   DEFAULT_AGENT_RUNTIME,
   DEFAULT_LAYOUT,
@@ -20,6 +18,8 @@ import {
   DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
 } from '@shared/constants/appSettingsDefaults';
+import { expandHomePath } from '../../platform/paths';
+import { assertRdcCliBinding } from '../../rdc/rdcCliBinding';
 import {
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,

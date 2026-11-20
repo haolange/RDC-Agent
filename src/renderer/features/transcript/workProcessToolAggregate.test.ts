@@ -1,8 +1,9 @@
-import { translate } from '../../i18n/messages';
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { describe, expect, it } from 'vitest';
-import type { WorkProcessRow } from './workProcessTypes';
+import { translate } from '../../i18n/messages';
 import { aggregateSectionSteps } from './workProcessToolAggregate';
+import type { WorkProcessRow } from './workProcessTypes';
+
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 
 const tool = (id: string): Extract<WorkProcessRow, { type: 'tool' }> => ({
   type: 'tool',

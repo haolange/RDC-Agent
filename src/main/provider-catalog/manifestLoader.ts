@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ProviderCatalogCompileInput } from './compiler';
+import type { ProviderCatalogCompileInput } from './catalogCompiler';
 
 function readJsonDirectory(directory: string): unknown[] {
   return fs.readdirSync(directory, { withFileTypes: true })

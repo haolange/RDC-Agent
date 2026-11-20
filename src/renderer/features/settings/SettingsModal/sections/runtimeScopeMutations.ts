@@ -1,7 +1,7 @@
-import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { selectFiles } from '../../../../hooks/appShellBridge';
 import { contentFromForm, type ResourceFormState } from './scopedResourceForm';
 import { importScopedResource, upsertScopedResource, validateScopedResource } from './runtimeScopeActions';
+import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 export const templateResourceId = (kind: ScopedResourceKind): string => `new-${kind}`;
 

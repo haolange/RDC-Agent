@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import { planModelRequest } from '../settings/provider-catalog/RequestPlanner';
 import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const model = {
   providerId: 'provider', modelId: 'model', label: 'Model', aliases: [], enabled: true,

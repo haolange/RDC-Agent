@@ -2,8 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { toAgentManifestEditorDraft, type AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
 import { canInitializeAgentEditor, useSettingsModalState } from './useSettingsModalState';
+import type { AppSettings } from '@shared/types/settings';
 
 const projectAgent: AgentManifestDefinition = {
   id: 'general', fileName: 'general.agent.md', filePath: '/project/general.agent.md', name: 'General',

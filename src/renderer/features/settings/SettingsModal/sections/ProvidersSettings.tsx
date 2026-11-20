@@ -1,15 +1,15 @@
-import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
-import { Details } from '../../../../ui/Details';
-import { SectionHeader } from '../../../../ui/SectionHeader';
 import React, { useMemo, useState } from 'react';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import { SectionHeader } from '../../../../ui/SectionHeader';
+import { Details } from '../../../../ui/Details';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { SearchField } from '../../../../ui/SearchField';
-import type { ProviderCatalogCategory } from '../types';
 import { getProviderCategoryTranslation } from '../utils';
+import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import { ProviderCard } from './ProviderCard';
 import { isProviderActionBlocked } from './providerCardModel';
+import type { ProviderCatalogCategory } from '../types';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

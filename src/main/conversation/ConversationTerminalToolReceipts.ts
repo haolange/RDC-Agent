@@ -1,8 +1,8 @@
-import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { toolResultToSharedResult } from '../agent-runtime/AgentEventBridge';
-import type { Message } from '../agent-runtime/core/types';
 import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import { upsertRuntimeToolCall } from './ConversationWorkTrace';
+import type { Message } from '../agent-runtime/core/types';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 /** Complete only existing tool rows from the owning turn's canonical terminal context. */
 export function reconcileTerminalToolReceipts(

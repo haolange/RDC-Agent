@@ -1,4 +1,3 @@
-import { retainResourceUntilExit, currentProcessExecutionOwner } from './ResourceExecutionLifetime';
 /**
  * ProcessSupervisor — unified child-process registry with tree kill + ring buffers.
  *
@@ -15,6 +14,7 @@ import {
 } from 'child_process';
 import { generateEventId } from '@shared/utils/id';
 import { isolatedChildSpawnOptions, signalChildProcessTree } from '../platform/process';
+import { retainResourceUntilExit, currentProcessExecutionOwner } from './ResourceExecutionLifetime';
 
 export type ProcessExitReason =
   | 'exit'

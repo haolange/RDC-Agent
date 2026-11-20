@@ -1,8 +1,8 @@
 import React from 'react';
-import type { PlanReviewHandoffOption } from '@shared/types/planReview';
-import { Button } from '../../ui/Button';
 import { resolveHandoffLabel } from '@shared/utils/handoffLabels';
+import { Button } from '../../ui/Button';
 import { useI18n } from '../../i18n';
+import type { PlanReviewHandoffOption } from '@shared/types/planReview';
 import './HandoffActionRow.css';
 
 export interface HandoffActionRowProps {

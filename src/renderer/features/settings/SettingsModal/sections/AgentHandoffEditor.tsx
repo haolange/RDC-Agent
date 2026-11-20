@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
-import type { AgentSkillCatalog } from './AgentSkillPicker';
 import { AgentHandoffCard } from './AgentHandoffCard';
 import { persistAgentHandoff, validateAgentHandoffs } from './agentHandoffValidation';
+import type { AgentSkillCatalog } from './AgentSkillPicker';
+import type { useI18n } from '../../../../i18n';
+import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

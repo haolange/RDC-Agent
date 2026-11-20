@@ -1,6 +1,5 @@
-import { useI18n } from '../../../i18n';
 import React, { useCallback, useEffect, useState } from 'react';
-import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
+import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { EmptyState } from '../../../ui/EmptyState';
 import {
@@ -14,6 +13,7 @@ import {
   TERMINAL_WINDOW_THRESHOLD,
   terminalActivityWindow,
 } from './terminalActivityWindow';
+import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { TerminalDrawerViewModel } from './useTerminalDrawer';
 
 interface TerminalActivityPaneProps {

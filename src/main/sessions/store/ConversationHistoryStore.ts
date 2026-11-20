@@ -1,13 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { generateShortId, nowMs } from '@shared/utils/id';
-import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../../runtime/jsonl';
 import { readStoredWorkTrace, sanitizeStoredWorkTrace } from '../../conversation/StoredWorkTrace';
-import type { SessionAttachmentKind, SessionAttachmentLayer, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import { classifyAttachmentBytes } from '../../conversation/attachmentClassify';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
 import {
   CONVERSATION_COMPACTION_DELTA_THRESHOLD,
   type ConversationHistoryCacheEntry,
@@ -29,6 +25,10 @@ import {
 } from './storageSchema';
 import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 import { readProjectSessions } from './sessionRecordReconcile';
+import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { SessionAttachmentKind, SessionAttachmentLayer, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
+import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 
 export type {
   ExistingConversationTurnCommit,

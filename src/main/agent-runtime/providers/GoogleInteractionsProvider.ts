@@ -1,12 +1,4 @@
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
@@ -23,6 +15,14 @@ import {
   buildGoogleInteractionsUrl,
 } from './GoogleInteractionsWire';
 import { GoogleInteractionsStreamState } from './GoogleInteractionsStreamState';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Model,
+  StreamOptions,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1';
 const PROVIDER_API = 'google-interactions';

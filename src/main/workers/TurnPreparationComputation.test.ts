@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { UserMessage } from '../agent-runtime/core/types';
 import { computeTurnPreparation } from './TurnPreparationComputation';
 import { TurnPreparationWorkerPool } from './TurnPreparationWorkerPool';
+import type { UserMessage } from '../agent-runtime/core/types';
 
 const user = (content: string, timestamp: number): UserMessage => ({ role: 'user', content, timestamp });
 

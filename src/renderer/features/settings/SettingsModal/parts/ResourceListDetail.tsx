@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
 import { cn } from '../../../../lib/cn';
 import { EmptyState } from '../../../../ui/EmptyState';
+import type { ReactNode } from 'react';
 
 export interface ResourceListDetailProps {
   /** Scope switcher and per-scope actions. */

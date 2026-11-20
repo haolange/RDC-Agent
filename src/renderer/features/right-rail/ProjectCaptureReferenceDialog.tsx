@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { ProjectInputRecord } from '@shared/types/session';
 import { TaskDialog } from '../../ui/TaskDialog';
 import { Input } from '../../ui/Input';
 import { Button } from '../../ui/Button';
 import { useI18n } from '../../i18n';
 import { referenceProjectInput } from './projectCaptureActions';
+import type { ProjectInputRecord } from '@shared/types/session';
 
 export function ProjectCaptureReferenceDialog({ projectId, onClose, onRegistered }: {
   projectId: string; onClose: () => void;

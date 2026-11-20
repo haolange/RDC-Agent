@@ -3,13 +3,13 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
+import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
 import { TaskSnapshotCard } from './TaskSnapshotCard';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { WorkProcessContent } from './WorkProcessContent';
 import type { WorkProcessRow } from './workProcessTypes';
-import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({
   t: (key: string, values?: { completed: number; total: number }) => values

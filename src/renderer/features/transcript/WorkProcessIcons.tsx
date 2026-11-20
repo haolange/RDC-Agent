@@ -1,7 +1,7 @@
-import type { FC, ReactElement } from 'react';
-import type { WorkProcessIconKey } from './workProcessTypes';
 import { renderKnowledgeIconPath } from './WorkProcessKnowledgeIcons';
 import { renderInvestigationIconPath } from './WorkProcessInvestigationIcons';
+import type { FC, ReactElement } from 'react';
+import type { WorkProcessIconKey } from './workProcessTypes';
 interface WorkProcessIconProps {
   icon: WorkProcessIconKey;
   className?: string;

@@ -4,10 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StorageIo } from '../../store/StorageIo';
-import type { StorageHost } from '../../store/storageHost';
 import { readPersistedRun, writeRunFiles } from '../sessionRunPersistence';
 import { SessionRecordStore } from '../../store/SessionRecordStore';
 import { PersistedRunRecordV3Schema, toPersistedRunV3 } from './runRecordSchema';
+import type { StorageHost } from '../../store/storageHost';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));

@@ -1,7 +1,4 @@
 import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../i18n';
-import type { ProviderConnectionDraft } from './types';
 import {
   createProviderConnectionDraft,
   getConnectionDraftSignature,
@@ -9,6 +6,9 @@ import {
   projectConnectionProvider,
 } from './providerConnectionState';
 import { cloneProvider } from './utils';
+import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
+import type { useI18n } from '../../../i18n';
+import type { ProviderConnectionDraft } from './types';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

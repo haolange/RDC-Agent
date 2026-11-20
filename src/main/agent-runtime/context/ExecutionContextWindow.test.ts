@@ -3,7 +3,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { beforeEach, expect, it, vi } from 'vitest';
-import type { AgentMessage, AssistantMessage } from '../core/types';
 const mocks = vi.hoisted(() => ({ hook: vi.fn(), save: vi.fn(), verify: vi.fn(), state: vi.fn(), generate: vi.fn(), assemble: vi.fn(), message: vi.fn(), write: vi.fn(), read: vi.fn(), list: vi.fn(), resolve: vi.fn(), journal: vi.fn(), archive: vi.fn(), project: vi.fn() }));
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: mocks.hook }));
 vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSession: () => ({ projectId: 'project' }), readSessionContextJournal: mocks.journal } }));
@@ -15,6 +14,7 @@ vi.mock('../../sessions/artifacts/DelegatedArtifactAccess', () => ({ delegatedAr
 vi.mock('../../sessions/artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver: { write: mocks.write, read: mocks.read, list: mocks.list, resolve: mocks.resolve } }));
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { createExecutionContextWindow } from './ExecutionContextWindow';
+import type { AgentMessage, AssistantMessage } from '../core/types';
 const messages: AgentMessage[] = Array.from({ length: 12 }, (_, i) => ({ role: 'user', content: `source ${i}: ` + 'x'.repeat(100), timestamp: i }));
 const create = (providerId = 'provider', snapshotId = 'snapshot-a', routeRevision = 'route-a', catalogRevision = 'catalog-a', identityPatch: Record<string, unknown> = {}) => createExecutionContextWindow({
   sessionId: 'child', provider: { id: providerId } as never, model: { modelId: 'model' } as never,

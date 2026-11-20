@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
 import { cn } from '../../../../lib/cn';
 import { HelpTip } from '../../../../ui/HelpTip';
+import type { ReactNode } from 'react';
 
 export interface SettingsFieldProps {
   label: ReactNode;

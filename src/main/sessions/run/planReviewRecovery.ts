@@ -1,9 +1,9 @@
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { PlanReadRequest } from '@shared/types/planReview';
 import { resolveVisibleConversationMessages } from '../../conversation/ConversationBranchResolver';
 import { storageAdapter } from '../store/StorageAdapter';
 import { planReviewStateStore, type PlanReviewStateStore } from './PlanReviewStateStore';
 import { readReferencedPlan } from './sessionPlanReference';
+import type { PlanReadRequest } from '@shared/types/planReview';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 /** Durable plan ownership is separate from the interrupted producer's lifetime. */
 export function resolveRecoverablePlan(sessionId: string, store: PlanReviewStateStore = planReviewStateStore) {

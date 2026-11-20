@@ -1,4 +1,3 @@
-import type { ResolvedTheme, ThemeChromeConfig } from '../types/settings';
 import {
   applyContrastPair,
   hexToRgb,
@@ -8,6 +7,7 @@ import {
   scaleInkPalette,
   scaleSurfacePalette,
 } from './color';
+import type { ResolvedTheme, ThemeChromeConfig } from '../types/settings';
 
 export type CompiledChromeCssVars = Record<string, string>;
 

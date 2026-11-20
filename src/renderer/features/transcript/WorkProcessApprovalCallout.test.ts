@@ -1,9 +1,9 @@
-import { createToolRowForPresentation } from './workProcessToolRows';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import { ToolApprovalCallout } from './WorkProcessToolCardParts';
 import { translate } from '../../i18n';
+import { ToolApprovalCallout } from './WorkProcessToolCardParts';
+import { createToolRowForPresentation } from './workProcessToolRows';
 import type { ConversationToolCall } from '@shared/types/conversation';
 
 vi.mock('../../i18n', async importOriginal => {

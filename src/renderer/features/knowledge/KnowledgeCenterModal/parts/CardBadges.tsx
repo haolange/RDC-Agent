@@ -1,6 +1,6 @@
-import type { KnowledgeCardType, KnowledgeLifecycle } from '@shared/types/knowledge';
 import { useI18n } from '../../../../i18n';
 import { LIFECYCLE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
+import type { KnowledgeCardType, KnowledgeLifecycle } from '@shared/types/knowledge';
 
 interface CardBadgesProps {
   type?: KnowledgeCardType;

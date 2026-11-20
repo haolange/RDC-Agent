@@ -1,7 +1,7 @@
 import React from 'react';
-import type { AgentMode, ModeIconKey } from '@shared/types/layout';
 import { getAgentModeConfig } from '@shared/constants/agents';
 import { useDynStyle } from '../lib/useDynStyle';
+import type { AgentMode, ModeIconKey } from '@shared/types/layout';
 import './ModeGlyph.css';
 
 interface ModeGlyphProps {

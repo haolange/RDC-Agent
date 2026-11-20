@@ -6,7 +6,22 @@ import { extname, isAbsolute, join, normalize, relative, resolve } from 'path';
 import { URL } from 'url';
 import { app } from 'electron';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
-import { rendererEventHub } from './rendererEventHub';
+import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/provider-catalog/effectiveCatalogTypes';
+import {
+  MODELS_DEV_IDENTITY_COUNT,
+  MODELS_DEV_SNAPSHOT_SHA256,
+  PROVIDER_CATALOG_SCHEMA_VERSION,
+} from '../provider-catalog/catalogCompiler';
+import {
+  getProviderCatalogRevision,
+  listProviderSummaries,
+} from '../provider-catalog/ProviderCatalogRegistry';
+import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsDefaults';
+import {
+  attachDevRendererWebSocketProxy,
+  proxyHttpToDevRenderer,
+  shouldProxyToDevRenderer,
+} from './devRendererProxy';
 import {
   buildBridgeAuthCookie,
   createBridgeBearerToken,
@@ -18,22 +33,7 @@ import {
   tokensMatch,
   cookieOriginRequiredForPath,
 } from './bridgeSecurity';
-import {
-  attachDevRendererWebSocketProxy,
-  proxyHttpToDevRenderer,
-  shouldProxyToDevRenderer,
-} from './devRendererProxy';
-import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/provider-catalog/effectiveCatalogTypes';
-import {
-  MODELS_DEV_IDENTITY_COUNT,
-  MODELS_DEV_SNAPSHOT_SHA256,
-  PROVIDER_CATALOG_SCHEMA_VERSION,
-} from '@shared/provider-catalog/compiler';
-import {
-  getProviderCatalogRevision,
-  listProviderSummaries,
-} from '../provider-catalog/ProviderCatalogRegistry';
-import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsDefaults';
+import { rendererEventHub } from './rendererEventHub';
 
 type BridgeOptions = {
   devRendererUrl: string | null;

@@ -1,7 +1,7 @@
-import type { ConversationMessage } from '@shared/types/conversation';
 import { findPendingToolApproval, type PendingToolApprovalRequest } from './toolApprovalRequestModel';
 import { type PendingPlanReviewRequest } from './planReviewRequestModel';
 import { findPendingUserInput, type PendingUserInputRequest } from './userInputRequestModel';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 export type ComposerPendingRequestState =
   | { kind: 'tool-approval'; request: PendingToolApprovalRequest }

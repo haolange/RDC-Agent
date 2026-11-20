@@ -1,10 +1,10 @@
 import React from 'react';
-import type { AppSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
 import { PersonalizationSettings } from './PersonalizationSettings';
 import { ProfileSettings } from './ProfileSettings';
+import type { useI18n } from '../../../../i18n';
+import type { AppSettings } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

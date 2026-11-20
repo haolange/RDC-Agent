@@ -1,8 +1,8 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { orderTasks } from './taskProjection';
 import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
+import { orderTasks } from './taskProjection';
 import {
   TASK_SCHEMA_VERSION,
   type TaskExecutionMessage,

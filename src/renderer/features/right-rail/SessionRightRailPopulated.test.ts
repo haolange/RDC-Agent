@@ -2,13 +2,13 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
+import { SessionRightRail } from './SessionRightRail';
+import { readInvestigationArtifact } from './investigationPreviewActions';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { CaptureReplayState } from '@shared/types/captureReplay';
 import type { InvestigationArtifactRow } from '@shared/types/trace';
 import type { InvestigationReadIpcResult } from '@shared/types/renderdocInvestigation';
-import { SessionRightRail } from './SessionRightRail';
-import { readInvestigationArtifact } from './investigationPreviewActions';
-import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 
 const state = vi.hoisted(() => ({
   tracePresentation: null as AgentRunPresentation | null,

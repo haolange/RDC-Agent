@@ -2,8 +2,8 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { TerminalDrawer } from './index';
 import { useTerminalStore } from '../../../stores/terminalStore';
+import { TerminalDrawer } from './index';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));

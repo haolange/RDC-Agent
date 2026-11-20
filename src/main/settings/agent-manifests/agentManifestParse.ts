@@ -2,10 +2,10 @@ import path from 'path';
 import YAML from 'yaml';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import { isAgentIconPreset } from '@shared/constants/agents';
-import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft, AgentAccessCeiling, AgentCompletionContract, HandoffSurface } from '@shared/types/agentManifest';
 import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS, HANDOFF_SURFACES } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
+import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft, AgentAccessCeiling, AgentCompletionContract, HandoffSurface } from '@shared/types/agentManifest';
 
 /** A manifest still declares a field that moved to Settings → Agents; the file is not applied until migrated. */
 export const AGENT_MANIFEST_FIELD_MOVED = 'AGENT_MANIFEST_FIELD_MOVED';

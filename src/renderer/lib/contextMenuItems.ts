@@ -1,5 +1,5 @@
-import type { ContextMenuCommandId } from './contextMenuCommands';
 import { canRedo, canUndo } from './contextMenuCommands';
+import type { ContextMenuCommandId } from './contextMenuCommands';
 import type { ContextMenuTarget } from './contextMenuTarget';
 
 export type ContextMenuItem =

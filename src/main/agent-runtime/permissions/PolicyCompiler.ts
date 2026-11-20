@@ -2,13 +2,13 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
+import { appPathService } from '../../runtime/AppPathService';
+import { hashScopedResource, scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import type {
   CompiledPolicy,
   PolicyApprovalFloor,
   RestrictivePolicy,
 } from '@shared/types/rdcRuntime';
-import { appPathService } from '../../runtime/AppPathService';
-import { hashScopedResource, scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 
 const APPROVAL_STRENGTH = { none: 0, destructive: 1, mutation: 2, all: 3 } as const;
 const FLOOR_STRENGTH = { none: 0, auto_review: 1, user: 2 } as const;

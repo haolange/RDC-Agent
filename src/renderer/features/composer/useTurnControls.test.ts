@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import { buildInitialTurnControls } from '../../lib/turnControlsUtils';
 import {
   buildSessionTurnControlsKey,
   resolveTurnControlsForCapabilityChange,
 } from '../../lib/turnControlHelpers';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const limitedLevelsCapability: EffectiveModel = {
   providerId: 'deepseek',

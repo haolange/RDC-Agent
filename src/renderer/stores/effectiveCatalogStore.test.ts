@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import { catalogScopeKey, reconcileCatalogProviders, resetCatalogProjection, useEffectiveCatalogStore } from './effectiveCatalogStore';
+import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
 
 const { read, refresh } = vi.hoisted(() => ({ read: vi.fn(), refresh: vi.fn() }));

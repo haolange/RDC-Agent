@@ -1,12 +1,9 @@
 import { ipcMain } from 'electron';
-import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
-import type { RunContextUsageReadResult } from '@shared/types/session';
-import type { WorkflowState } from '@shared/types/workflow';
 import { nowIso } from '@shared/utils/id';
+import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { rdcSessionService } from '../sessions';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
-import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
@@ -15,6 +12,9 @@ import {
   WorkflowStopArgsSchema,
 } from './validation/ipcSchemas';
 import { readRunContextUsage } from './runContextUsageBoundary';
+import type { WorkflowState } from '@shared/types/workflow';
+import type { RunContextUsageReadResult } from '@shared/types/session';
+import type { WorkbenchIpcContext } from './workbenchContext';
 
 function readWorkflowState(sessionId: string, runId: string | null): WorkflowState | null {
   const run = runId

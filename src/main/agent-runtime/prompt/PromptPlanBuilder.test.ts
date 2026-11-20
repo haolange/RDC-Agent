@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 import { currentHost } from '../../platform/host';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
 vi.mock('../../runtime/resolveConfiguredShell', () => ({

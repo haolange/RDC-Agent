@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
 import { PlanReaderHost } from '../features/transcript/PlanReaderHost';
 import { WorkbenchReadingLayoutContext } from '../lib/WorkbenchReadingLayout';
 import { RightRail } from '../features/right-rail/RightRail';
@@ -6,13 +7,12 @@ import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/sidebar/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
 import { Composer } from '../features/composer/Composer';
-import type { ComposerController } from '../features/composer/useComposer';
-import type { TranslationKey } from '../i18n';
-import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
 import { useDynStyle } from '../lib/useDynStyle';
 import { isDockedResizeHandleVisible, ResizeHandle } from '../shell/ResizeHandle';
 import { WorkbenchPanelDrawer } from './WorkbenchPanelDrawer';
 import { SidebarFooter } from './SidebarFooter';
+import type { TranslationKey } from '../i18n';
+import type { ComposerController } from '../features/composer/useComposer';
 
 type DragSide = 'left' | 'right';
 

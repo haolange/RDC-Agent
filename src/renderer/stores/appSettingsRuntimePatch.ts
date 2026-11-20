@@ -1,5 +1,5 @@
-import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
+import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 
 export function withPermissionMode(settings: AppSettings, mode: AgentPermissionMode): AppSettings {
   const permissions = settings.agentRuntime?.permissions ?? DEFAULT_AGENT_RUNTIME.permissions;

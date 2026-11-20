@@ -1,9 +1,9 @@
 import React from 'react';
-import type { WorkProcessRow } from './workProcessTypes';
-import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { WorkProcessThinking } from './WorkProcessThinking';
+import type { WorkProcessRow } from './workProcessTypes';
 
 interface WorkProcessSectionRowProps {
   row: Extract<WorkProcessRow, { type: 'section' }>;

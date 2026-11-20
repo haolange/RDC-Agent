@@ -1,3 +1,4 @@
+import { RENDERER_EVENT_CHANNEL as EVENT, RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type {
   AppMetaApi,
   AppShellApi,
@@ -14,7 +15,6 @@ import type {
   WorkflowApi,
 } from '../types/electron-api';
 import type { ElectronAPI } from '../types/electron';
-import { RENDERER_EVENT_CHANNEL as EVENT, RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type { RendererApiTransport, RendererEventCallback } from './transport';
 
 export function createAppMetaApi(transport: RendererApiTransport): AppMetaApi {

@@ -7,12 +7,12 @@
  *  - 协调与 ConversationService、SettingsService、StorageAdapter 的交互
  */
 
+import { CommandRegistry } from './CommandRegistry';
 import type {
   CommandExecuteRequest,
   CommandResult,
 } from '@shared/types/command';
 import type { ConversationMessage } from '@shared/types/conversation';
-import { CommandRegistry } from './CommandRegistry';
 
 export class CommandService {
   constructor(private registry: CommandRegistry) {}

@@ -1,13 +1,13 @@
-import type { Translator } from '../../i18n/messages';
-import { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat';
-import { groupImageRows } from './groupImageRows';
 import { type ConversationWorkBlock, type ConversationReasoningState, type ConversationLoopStopReason, type ConversationLoopOutputPhase, type ConversationThinkingItem, type ConversationWorkTrace } from '@shared/types/conversation';
 import { lastLoopThinking } from '@shared/conversation/loopItems';
+import { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat';
+import { groupImageRows } from './groupImageRows';
 import { isMeaningfulText, getMeaningfulBlockSummary, isNoisyText } from './workProcessBlockText';
 import { createApprovalRow } from './workProcessDecisionRows';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
 import { buildPresentationUnits, presentationUnitsToDetailRows, markLastSectionOpen, type ThinkingItemPresentation } from './workProcessBlockProjection';
+import type { Translator } from '../../i18n/messages';
 
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
 

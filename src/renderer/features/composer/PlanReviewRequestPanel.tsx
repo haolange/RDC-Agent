@@ -1,21 +1,21 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 import { Textarea } from '../../ui/Textarea';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
-import { type PendingPlanReviewRequest } from './planReviewRequestModel';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
-import { usePlanReviewSubmit } from './usePlanReviewSubmit';
-import { useComposerTurnControls } from './ComposerTurnControlsContext';
-import { capabilityStatusPresentation } from './capabilityPresentation';
-import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
-import './composer-plan-review.css';
 import { cancelPlanReview } from '../../services/planReviewService';
-import type { HandoffSendPayload } from './composerHandoffSend';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
+import { capabilityStatusPresentation } from './capabilityPresentation';
+import { useComposerTurnControls } from './ComposerTurnControlsContext';
+import { usePlanReviewSubmit } from './usePlanReviewSubmit';
+import { type PendingPlanReviewRequest } from './planReviewRequestModel';
+import type { SessionRecord } from '@shared/types/session';
+import type { HandoffSendPayload } from './composerHandoffSend';
+import './composer-plan-review.css';
 
 export const PlanReviewRequestPanel: React.FC<{
   request: PendingPlanReviewRequest;

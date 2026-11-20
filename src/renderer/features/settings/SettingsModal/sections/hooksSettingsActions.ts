@@ -1,5 +1,5 @@
-import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import { getElectronApi } from '../../../../platform/getElectronApi';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
 const runtime = () => getElectronApi()?.rdcRuntime;
 

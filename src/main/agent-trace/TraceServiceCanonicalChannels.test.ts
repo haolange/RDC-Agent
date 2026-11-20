@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import { findCanonicalFinalAnswer, resolveHistoryTurnProfileId } from './TraceService';
+import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 
 function block(id: string, text: string, outputPhase: 'commentary' | 'final_answer'): ConversationWorkBlock {
   return {

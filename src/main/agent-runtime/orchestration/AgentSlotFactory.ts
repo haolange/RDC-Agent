@@ -5,25 +5,12 @@
  * session journal passed in as `initialMessages`.
  */
 
-import type { AgentRole } from '@shared/types/agent';
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
 import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
 import { Agent } from '../agent/Agent';
-import type { AgentLoopConfig, ToolExecutor } from '../agent/AgentLoop';
 import { ErrorRecovery } from '../agent/ErrorRecovery';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { createExecutionContextManager } from '../context/ExecutionContextWindow';
-import type { TokenizerService } from '../core/TokenizerService';
-import type {
-  AgentMessage,
-  AssistantMessage,
-  Message,
-  StreamOptions,
-  ToolDefinition,
-  Usage,
-} from '../core/types';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { RUNTIME_PERMISSION_TOKEN_RESERVE } from '../permissions/RuntimePermissionContext';
 import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
@@ -33,8 +20,21 @@ import { configuredRuntimeProvider, encodeAgentModel } from '../providers/Config
 import { recordResponseReceipt, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
-import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import { requireExecutionScopeId } from './executionScope';
+import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+import type {
+  AgentMessage,
+  AssistantMessage,
+  Message,
+  StreamOptions,
+  ToolDefinition,
+  Usage,
+} from '../core/types';
+import type { TokenizerService } from '../core/TokenizerService';
+import type { AgentLoopConfig, ToolExecutor } from '../agent/AgentLoop';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AgentRole } from '@shared/types/agent';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
 
 /** A provider response that actually completed (not a transport/stream error). */

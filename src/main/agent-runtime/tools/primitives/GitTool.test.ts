@@ -4,8 +4,8 @@ import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { gitAddTool, gitStatusTool } from './GitTool';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const execFileAsync = promisify(execFile);
 const roots: string[] = [];

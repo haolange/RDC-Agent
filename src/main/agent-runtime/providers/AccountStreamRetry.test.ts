@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../core/EventStream';
-import type { AssistantMessage, AssistantMessageEvent } from '../core/types';
 import { ProviderHttpError } from './internal/http';
 import { streamWithUnauthorizedRefresh } from './AccountStreamRetry';
+import type { AssistantMessage, AssistantMessageEvent } from '../core/types';
 
 const textRef = {
   protocol: 'test',

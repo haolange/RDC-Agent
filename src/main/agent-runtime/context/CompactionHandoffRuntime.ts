@@ -1,13 +1,13 @@
-import type { AssistantMessage } from '../core/types';
-import { assistantMessageText, executeToolFreeRequest } from '../prompt/ToolFreeRequest';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { assistantMessageText, executeToolFreeRequest } from '../prompt/ToolFreeRequest';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { COMPACTION_HANDOFF_SYSTEM_PROMPT } from './StructuredHandoffBuilder';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { AssistantMessage } from '../core/types';
 
 const COMPACTION_MAX_OUTPUT_TOKENS = 4096;
 

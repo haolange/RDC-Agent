@@ -1,38 +1,22 @@
-import { conversationRdcHost } from './conversationRdcHost';
-import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
-import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
-import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type {
-  ConversationAttachmentInput,
-  ConversationCancelActiveTurnRequest,
-  ConversationCancelActiveTurnResult,
-  ConversationMessage,
-  ConversationRewriteFromMessageRequest,
-  ConversationSendRequest,
-  ConversationTurnResult,
-} from '@shared/types/conversation';
-import type {
-  ConversationBranchState,
-  ConversationSwitchBranchRequest,
-  ConversationSwitchBranchResult,
-} from '@shared/types/conversationBranch';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { SessionRecord } from '@shared/types/session';
 import { generateEventId } from '@shared/utils/id';
+import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
+import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { traceService } from '../agent-trace/TraceService';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import {
   answerConversationPlanReview,
   answerConversationToolApproval,
   answerConversationUserInput,
 } from './ConversationInteractionAnswers';
-import { traceService } from '../agent-trace/TraceService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { conversationRdcHost } from './conversationRdcHost';
 import { sessionContextJournal } from './SessionContextJournal';
 import {
   createDefaultBranchState,
@@ -40,11 +24,6 @@ import {
   repairConversationBranchState,
   resolveVisibleConversationMessages,
 } from './ConversationBranchResolver';
-import type {
-  ConversationBranchTurnContext,
-  ActiveConversationTurn,
-  ResolvedConversationContext,
-} from './ConversationRoutePreflight';
 import { canonicalJson } from './ConversationRoutePreflight';
 import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
 import { hashAttachmentContents } from './ConversationAttachmentHashing';
@@ -58,6 +37,27 @@ import {
   publishTraceProjection,
   ephemeralTraceSessionId,
 } from './ConversationTurnTerminal';
+import type { SessionRecord } from '@shared/types/session';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type {
+  ConversationBranchState,
+  ConversationSwitchBranchRequest,
+  ConversationSwitchBranchResult,
+} from '@shared/types/conversationBranch';
+import type {
+  ConversationAttachmentInput,
+  ConversationCancelActiveTurnRequest,
+  ConversationCancelActiveTurnResult,
+  ConversationMessage,
+  ConversationRewriteFromMessageRequest,
+  ConversationSendRequest,
+  ConversationTurnResult,
+} from '@shared/types/conversation';
+import type {
+  ConversationBranchTurnContext,
+  ActiveConversationTurn,
+  ResolvedConversationContext,
+} from './ConversationRoutePreflight';
 
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;

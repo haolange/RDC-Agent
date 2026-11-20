@@ -2,9 +2,9 @@ import React from 'react';
 import { useI18n } from '../../i18n';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { Button } from '../../ui/Button';
-import type { ToolRowModel } from './workProcessToolTypes';
 import { WorkProcessHighlightedCode } from './WorkProcessHighlightedCode';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
+import type { ToolRowModel } from './workProcessToolTypes';
 
 export const isDedicatedFamily = (family: ToolRowModel['family']): boolean => (
   family === 'interpreter'

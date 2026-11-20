@@ -1,4 +1,8 @@
-import type { AppRuntimePaths } from '@shared/types/settings';
+import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
+import { isSafeAgentProfileId } from '@shared/types/agent';
+import { appPathService } from '../../runtime/AppPathService';
+import { agentManifestService } from '../agent-manifests/AgentManifestService';
+import { resolveRegisteredProjectRoot } from './resolveRegisteredProjectRoot';
 import type {
   AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
@@ -6,11 +10,7 @@ import type {
   AgentDefinitionSaveResult,
   AgentManifestDraft,
 } from '@shared/types/agentManifest';
-import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
-import { isSafeAgentProfileId } from '@shared/types/agent';
-import { appPathService } from '../../runtime/AppPathService';
-import { agentManifestService } from '../agent-manifests/AgentManifestService';
-import { resolveRegisteredProjectRoot } from './resolveRegisteredProjectRoot';
+import type { AppRuntimePaths } from '@shared/types/settings';
 
 export class SettingsAgentOps {
   private readonly agentDefinitionRevisions = new Map<string, number>();

@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, it, vi } from 'vitest';
-import { sendComposerConversationTurn } from './composerSendFlow';
-import { inspectHandoffCommit } from './composerHandoffSend';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { restoreLastSentIfCurrentSession, useComposerSessionContextStore as context } from '../../stores/composerSessionContextStore';
+import { inspectHandoffCommit } from './composerHandoffSend';
+import { sendComposerConversationTurn } from './composerSendFlow';
 const mock = vi.hoisted(() => ({ configure: vi.fn(), apply: vi.fn(), persist: vi.fn() }));
 vi.mock('../../stores/conversationConfigurationCommit', () => ({ buildConversationConfigurationCommit: mock.configure }));
 vi.mock('../../hooks/useComposerEffectiveModel', () => ({ readComposerEffectiveModel: () => null }));

@@ -1,9 +1,9 @@
-import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
+import { loopTextItems, loopThinkingItems } from '@shared/conversation/loopItems';
 import { formatDurationMs } from './workProcessFormat';
+import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
 import type { LoopPresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 import type { WorkProcessRow } from './workProcessTypes';
 import type { BlockProjectionContext, LoopProjectionDeps, ThinkingItemPresentation } from './workProcessBlockProjection';
-import { loopTextItems, loopThinkingItems } from '@shared/conversation/loopItems';
 
 export function isVisibleToolCall(call: ConversationToolCall): boolean {
   if (call.approval || call.planReview || call.userInputQuestions) return true;

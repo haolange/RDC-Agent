@@ -1,9 +1,9 @@
+import { isBrowserAppSession } from '../../platform/browserSession';
 import type {
   ComposerAttachmentDescriptor,
   ConversationAttachmentStageItem,
 } from '@shared/types/conversation';
 import type { PendingAttachmentDraft } from '../../types/attachments';
-import { isBrowserAppSession } from '../../platform/browserSession';
 
 export function descriptorToDraft(descriptor: ComposerAttachmentDescriptor): PendingAttachmentDraft {
   return {

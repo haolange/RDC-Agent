@@ -1,18 +1,18 @@
 import { createHash, randomBytes } from 'crypto';
+import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
+import { resolveEffectiveCompactionPercent } from '@shared/utils/contextBudget';
+import { freezeDelegationCapsule } from '@shared/types/delegationCapsule';
+import { isRdcLeaseToolName, stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
+import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
+import { agentAccessCeiling, agentCompletionContract, type AgentCompletionContract } from '@shared/types/agentManifest';
+import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
 import type { AgentManifestDefinition, HandoffLabelTranslations } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdcRuntime';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
-import { resolveEffectiveCompactionPercent } from '@shared/utils/contextBudget';
 import type { ToolDefinition } from './core/types';
-import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
-import { freezeDelegationCapsule } from '@shared/types/delegationCapsule';
-import { isRdcLeaseToolName, stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
-import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
-import { agentAccessCeiling, agentCompletionContract, type AgentCompletionContract } from '@shared/types/agentManifest';
 
 export interface FrozenHandoffDefinition {
   agent: string;

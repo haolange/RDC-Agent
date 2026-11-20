@@ -1,7 +1,7 @@
+import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import type { TaskCompletionResult, TaskExecutionRecord } from '../tasks';
 import type { TurnCompletionDeclaration } from './TurnCoordinator';
-import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
-import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
 
 export interface PersistedSubagentResult { uri: string; hash: string }
 export interface DelegationSourceFailure { code: 'ARTIFACT_NOT_FOUND'; message: string }

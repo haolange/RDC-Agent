@@ -4,13 +4,7 @@ import { createHash } from 'node:crypto';
 import YAML from 'yaml';
 import { expect, it, vi } from 'vitest';
 import { EventStream } from '../agent-runtime/core/EventStream';
-import type { ProviderStrategy } from '../agent-runtime/core/ProviderRegistry';
-import type { AssistantMessage, AssistantMessageEvent, Message, Model, Context } from '../agent-runtime/core/types';
-import type { AgentTool } from '../agent-runtime/agent/AgentTool';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { agentLoop } from '../agent-runtime/agent/AgentLoop';
-import { createTestRequestPlan } from './createTestRequestPlan';
 import { PromptPlanBuilder } from '../agent-runtime/prompt/PromptPlanBuilder';
 import { RuntimeToolAssembly } from '../agent-runtime/orchestration/RuntimeToolAssembly';
 import { SubagentRunner } from '../agent-runtime/orchestration/SubagentRunner';
@@ -22,6 +16,12 @@ import { artifactizeToolResult } from '../agent-runtime/tools/ToolResultArtifact
 import { artifactReadTool } from '../agent-runtime/tools/primitives/ArtifactReadTool';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
 import { createInvestigationHarness, writeDraft, baselineWorld, hypothesisClaim, sampleChallenge, sampleCheckpoint, SESSION_ID } from '../investigation/investigationTestFixtures';
+import { createTestRequestPlan } from './createTestRequestPlan';
+import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { AgentTool } from '../agent-runtime/agent/AgentTool';
+import type { AssistantMessage, AssistantMessageEvent, Message, Model, Context } from '../agent-runtime/core/types';
+import type { ProviderStrategy } from '../agent-runtime/core/ProviderRegistry';
 
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP, getAppPath: () => process.cwd() }, safeStorage: { isEncryptionAvailable: () => false } }));
 vi.mock('../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: async () => true }));

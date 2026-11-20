@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import { TraceProjectionRefreshService } from './TraceProjectionRefreshService';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 
 afterEach(() => vi.useRealTimers());
 

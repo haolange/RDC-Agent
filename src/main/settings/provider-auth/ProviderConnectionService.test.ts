@@ -1,5 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { LlmProviderModel } from '@shared/types/settings';
+import {
+  createProviderEntryFromCatalog,
+  getLoadedProviderSurface,
+  loadProviderSurface,
+} from '../../provider-catalog/ProviderCatalogRegistry';
 import {
   mergeManagedModelAvailability,
   normalizeDiscoveredModels,
@@ -18,11 +22,7 @@ import {
   resolveTestDiscoveryAccountId,
   resolveVolcengineCodingPlanModelsUrl,
 } from './ProviderConnectionService';
-import {
-  createProviderEntryFromCatalog,
-  getLoadedProviderSurface,
-  loadProviderSurface,
-} from '../../provider-catalog/ProviderCatalogRegistry';
+import type { LlmProviderModel } from '@shared/types/settings';
 
 const managed = (...ids: string[]): LlmProviderModel[] => ids.map((id) => ({
   id,

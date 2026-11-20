@@ -1,19 +1,19 @@
-import { isolatedRdcTools } from '../testing/isolatedRdcTools';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFileSync, cpSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { InvestigationContentRef, ExperimentRecord } from '@shared/types/renderdocInvestigation';
 import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
+import { isolatedRdcTools } from '../testing/isolatedRdcTools';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import { setRdcRuntimeContextForSession, getRdcContextLease } from './RdcRuntimeContextRegistry';
+import { assertExecutionEvidence } from '../investigation/investigationExecutionEvidence';
+import { recordedExperiment } from '../investigation/investigationTestFixtures';
 import { RdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { executeRdcShell } from './executeRdcShell';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
-import { assertExecutionEvidence } from '../investigation/investigationExecutionEvidence';
-import { recordedExperiment } from '../investigation/investigationTestFixtures';
+import { setRdcRuntimeContextForSession, getRdcContextLease } from './RdcRuntimeContextRegistry';
+import type { InvestigationContentRef, ExperimentRecord } from '@shared/types/renderdocInvestigation';
 
 const state = vi.hoisted(() => ({ receipts: null as RdcExecutionReceipts | null }));
 vi.mock('./RdcExecutionReceipts', async (original) => ({

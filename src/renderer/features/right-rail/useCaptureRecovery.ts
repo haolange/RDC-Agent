@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CaptureRecoveryStatus, CaptureReplayState } from '@shared/types/captureReplay';
 import { getCaptureRecovery, restorePreviousCapture, type CaptureScope } from './capturePanelActions';
+import type { CaptureRecoveryStatus, CaptureReplayState } from '@shared/types/captureReplay';
 
 export function useCaptureRecovery(scope: CaptureScope, revision: number | undefined) {
   const [status, setStatus] = useState<CaptureRecoveryStatus | null>(null);

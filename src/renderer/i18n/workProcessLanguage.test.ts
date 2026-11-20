@@ -2,16 +2,16 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { AppLanguage } from '@shared/types/settings';
-import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 import { BUILTIN_AGENT_TOOL_IDS } from '@shared/constants/agentToolTokens';
-import { translate, type Translator } from './messages';
 import { createToolRowForPresentation, getToolVerb } from '../features/transcript/workProcessToolRows';
 import { buildToolAggregateSummary } from '../features/transcript/workProcessToolAggregate';
 import { buildWorkProcessPresentation } from '../features/transcript/workProcessTracePresentation';
 import { WorkProcess } from '../features/transcript/WorkProcess';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { localizeCommands } from '../lib/commandLabels';
+import { translate, type Translator } from './messages';
+import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
+import type { AppLanguage } from '@shared/types/settings';
 
 const translator = (language: AppLanguage): Translator => (key, params) => translate(language, key, params);
 const call = (toolName: string, status: ConversationToolCall['status'] = 'complete'): ConversationToolCall => ({

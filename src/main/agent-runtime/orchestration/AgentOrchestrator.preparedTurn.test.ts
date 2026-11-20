@@ -3,8 +3,6 @@ import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { directoryLinkType, resolvedPathKey } from '../../platform/paths';
@@ -58,6 +56,8 @@ vi.mock('electron', () => ({
 }));
 
 import { AgentOrchestrator } from './AgentOrchestrator';
+import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const requestPlan = createTestRequestPlan({
   providerId: 'provider',

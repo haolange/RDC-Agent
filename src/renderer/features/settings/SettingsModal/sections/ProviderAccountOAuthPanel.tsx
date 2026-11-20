@@ -1,11 +1,11 @@
-import { Details } from '../../../../ui/Details';
 import React, { type ReactNode } from 'react';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import { Details } from '../../../../ui/Details';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { Input } from '../../../../ui/Input';
 import { Spinner } from '../../../../ui/Spinner';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];

@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import type { ToolRowModel } from './workProcessToolTypes';
 import { useI18n } from '../../i18n';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
@@ -10,6 +9,7 @@ import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import { CopyPathButton } from './WorkProcessFamilyLayers';
 import { RawPanel } from './WorkProcessToolCardParts';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
+import type { ToolRowModel } from './workProcessToolTypes';
 
 export function WorkProcessImageRow({ row, renderToolDetail }: {
   row: ToolRowModel; renderToolDetail?: (row: ToolRowModel) => ReactNode;

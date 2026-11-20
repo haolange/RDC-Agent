@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CaptureReplayApplyRequest, CaptureReplayState } from '@shared/types/captureReplay';
-import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
-import { createReplayApplyQueue } from './replayApplyQueue';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
+import { createReplayApplyQueue } from './replayApplyQueue';
+import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
+import type { CaptureReplayApplyRequest, CaptureReplayState } from '@shared/types/captureReplay';
 
 export function CaptureReplayControls({ scope, state, disabled, receive }: {
   scope: CaptureScope; state: CaptureReplayState | null; disabled: boolean; receive: (state: CaptureReplayState) => void;

@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { AgentTool } from '../../agent/AgentTool';
 import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../primitives/_shared';
 import { COPY_MOVE_MAX_BYTES } from '../primitives/toolLimits';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface CopyFileParams {
   source: string;

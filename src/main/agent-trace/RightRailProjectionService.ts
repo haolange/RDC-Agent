@@ -1,6 +1,3 @@
-import type { ActionEvent } from '@shared/types/evidence';
-import type { RunSummary } from '@shared/types/session';
-import type { RightPanelViewModel } from '@shared/types/trace';
 import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore';
 import { TaskRegistry } from '../agent-runtime/tasks/TaskRegistry';
 import { rdcSessionService } from '../sessions';
@@ -16,6 +13,9 @@ import {
   mapRightRailOutputs,
   mapRightRailProgress,
 } from './rightRailProjectionMappers';
+import type { RightPanelViewModel } from '@shared/types/trace';
+import type { RunSummary } from '@shared/types/session';
+import type { ActionEvent } from '@shared/types/evidence';
 
 const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
   progress: [],

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
+import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 
 const approvedCall = {
   id: 'call',

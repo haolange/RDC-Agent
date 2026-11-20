@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import { isToolDeniedByPolicy, resolvePolicyApprovalFloor, compileEffectivePolicy } from './PolicyCompiler';
+import { describe, expect, it } from 'vitest';
 import { compileFixturePolicy } from '../../testing/policyFixture';
+import { isToolDeniedByPolicy, resolvePolicyApprovalFloor, compileEffectivePolicy } from './PolicyCompiler';
 
 describe('PolicyCompiler', () => {
   it('defaults to one child level without capping explicit policy limits', () => {

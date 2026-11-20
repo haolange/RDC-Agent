@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { rdcSessionService } from '../sessions';
+import { registerProjectSessionHandlers } from './projectSessionHandlers';
 import type { RunSummary } from '@shared/types/session';
+
+import type { WorkbenchIpcContext } from './workbenchContext';
 
 const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversation } = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -24,7 +28,6 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
     executionOffers: { read: vi.fn(() => null), write: vi.fn(), clear: vi.fn(), discardRemovedHandoffState: vi.fn() },
   },
 }));
-
 vi.mock('electron', () => ({
   app: { getPath: () => process.cwd() },
   dialog: {},
@@ -34,52 +37,40 @@ vi.mock('electron', () => ({
     },
   },
 }));
-
 vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: storage,
 }));
 vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
 vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
-
 vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
   agentOrchestrator: { syncSessionSlots, releaseSessionToolState: vi.fn(), backgroundSubagents: { abortSession: abortBackgroundSession } },
 }));
-
 vi.mock('../conversation/ConversationService', () => ({
   conversationService: conversation,
 }));
-
 vi.mock('../conversation/ConversationRoutePreflight', () => ({
   resolveEnabledAgentDefinition: vi.fn(() => ({ id: 'general' })),
 }));
-
 vi.mock('../hooks/sessionLifecycle', () => ({
   createSessionWithHooks: vi.fn(),
   removeSessionWithHooks: vi.fn(async (sessionId: string) => {
     storage.removeSession(sessionId);
   }),
 }));
-
 vi.mock('../conversation/AttachmentStagingService', () => ({
   attachmentStagingService: {
     releaseBySessionId: vi.fn(),
   },
 }));
-
 vi.mock('../agent-runtime/orchestration/RunExecutionService', () => ({
   runExecutionService: {
     stopRun: vi.fn(),
     listActiveRuns: vi.fn(() => []),
   },
 }));
-
 vi.mock('../rdc/RdcCliInvokerService', () => ({
   rdcCliInvokerService: { abortRun: vi.fn() },
 }));
-
-import { registerProjectSessionHandlers } from './projectSessionHandlers';
-import { rdcSessionService } from '../sessions';
-import type { WorkbenchIpcContext } from './workbenchContext';
 
 describe('session:remove slot sync', () => {
   beforeEach(() => {

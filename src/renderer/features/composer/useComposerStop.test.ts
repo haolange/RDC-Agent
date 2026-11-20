@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { selectActiveAssistantForTurn } from './composerStopSelection';
 import { stopWorkTrace } from './useComposerStop';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 function activeAssistant(overrides: Partial<ConversationMessage>): ConversationMessage {
   return {

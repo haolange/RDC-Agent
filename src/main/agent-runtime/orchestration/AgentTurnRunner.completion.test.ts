@@ -14,16 +14,16 @@ vi.mock('./DirectTaskTurnLifecycle', () => ({
 }));
 vi.mock('./ApprovedGoalContinuation', () => ({ createApprovedGoalContinuation: () => vi.fn(async () => undefined) }));
 
+import { MissionCompletionError } from '../../investigation/missionCompletionContract';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { AgentTurnRunner, type AgentTurnRunnerDeps } from './AgentTurnRunner';
-import type { AgentSlot } from './AgentSlotRegistry';
 import { turnCoordinator, type TurnHandle } from './TurnCoordinator';
+import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import type { AgentSlot } from './AgentSlotRegistry';
 import type { AgentEvent, AssistantMessage } from '../core/types';
 import type { PreparedAgentRuntime } from './orchestratorTypes';
 import type { AgentSlotRequest } from './AgentSlotFactory';
 import type { TurnCompletionReadinessValidator, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
-import { MissionCompletionError } from '../../investigation/missionCompletionContract';
-import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 
 function harness(scope: string, validateCompletion: TurnCompletionValidator, approvedPlan = false,
   validateCompletionReadiness: TurnCompletionReadinessValidator = () => undefined,

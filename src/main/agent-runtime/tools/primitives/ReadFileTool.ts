@@ -8,10 +8,9 @@
 
 import * as fs from 'fs';
 import { createHash } from 'node:crypto';
+import * as readline from 'readline';
 import { recordSuccessfulFileRead } from './fileReadAccess';
 import { auditFiles, type FileAuditDetails, type FileAuditParams } from './fileAudit';
-import * as readline from 'readline';
-import type { AgentTool } from '../../agent/AgentTool';
 import { assertTextReadable, safeResolvePath, truncateOutput } from './_shared';
 import {
   READ_FILE_DEFAULT_LIMIT,
@@ -19,6 +18,7 @@ import {
   READ_FILE_MAX_OUTPUT_BYTES,
   TEXT_FILE_MAX_BYTES,
 } from './toolLimits';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface ReadFileParams extends FileAuditParams {
   mode?: 'text' | 'audit';

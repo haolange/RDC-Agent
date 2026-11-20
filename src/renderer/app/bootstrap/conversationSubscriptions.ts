@@ -1,5 +1,3 @@
-import type { ConversationStreamEvent } from '@shared/types/conversation';
-import type { ToolTraceEntry } from '@shared/types/tool';
 import { applyToolTraceToMessage } from '../../services/conversationTimeline';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -7,6 +5,8 @@ import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { createConversationEventBatcher } from './conversationEventBatcher';
+import type { ToolTraceEntry } from '@shared/types/tool';
+import type { ConversationStreamEvent } from '@shared/types/conversation';
 
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';

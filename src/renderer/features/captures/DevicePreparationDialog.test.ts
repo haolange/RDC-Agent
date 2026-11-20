@@ -2,11 +2,11 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { DevicePreparationDialog } from './DevicePreparationDialog';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 import { replayFixture } from '../../testing/replayFixture';
 import { translate } from '../../i18n/messages';
+import { DevicePreparationDialog } from './DevicePreparationDialog';
 
 const locale = vi.hoisted(() => ({ language: 'en' as 'en' | 'zh-CN' }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate(locale.language, key, params) }) }));

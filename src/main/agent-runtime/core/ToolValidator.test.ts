@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ToolValidationError, ToolValidator } from './ToolValidator';
-import type { ToolDefinition } from './types';
 import { toolToDefinition } from '../agent/AgentTool';
 import { getPrimitiveTools, createToolSearchTool } from '../tools';
+import { ToolValidationError, ToolValidator } from './ToolValidator';
+import type { ToolDefinition } from './types';
 
 const validator = new ToolValidator();
 

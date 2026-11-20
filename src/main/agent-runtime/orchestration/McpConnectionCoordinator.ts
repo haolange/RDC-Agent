@@ -9,20 +9,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { currentHost, type HostDescriptor } from '../../platform/host';
 import { pathComparisonKey } from '../../platform/paths';
-import type { AgentRole } from '@shared/types/agent';
-import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
-import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import {
   MCPManager,
   type MCPServerConfig,
   type McpDisconnectDetail,
   type McpDisconnectStatus,
 } from '../agent/MCPManager';
-import type { AgentTool } from '../agent/AgentTool';
-import type { SupervisedProcess } from '../../runtime/ProcessSupervisor';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { mcpTrustService } from '../../settings/settings-core/McpTrustService';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import type { AgentRole } from '@shared/types/agent';
+import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
+import type { MCPServerStatusSummary } from '@shared/types/mcp';
+import type { AgentTool } from '../agent/AgentTool';
+import type { SupervisedProcess } from '../../runtime/ProcessSupervisor';
 
 const MCP_MAX_RETRYABLE_ATTEMPTS = 5;
 const MCP_RETRY_BASE_MS = 2_000;

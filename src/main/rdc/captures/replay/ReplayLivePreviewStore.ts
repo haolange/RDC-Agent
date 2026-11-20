@@ -1,8 +1,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { OpenedCapturePreview } from '@shared/types/session';
 import { appPathService } from '../../../runtime/AppPathService';
 import { assertSession, missing } from './replayFileSafety';
+import type { OpenedCapturePreview } from '@shared/types/session';
 import type { EncodedReplayPng } from './replayStorageTypes';
 
 export function livePreviewToken(generation: number, imageEventId: number): string {

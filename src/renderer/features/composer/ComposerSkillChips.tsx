@@ -1,5 +1,5 @@
-import { Button } from '../../ui/Button';
 import React from 'react';
+import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 
 export const ComposerSkillChips: React.FC<{

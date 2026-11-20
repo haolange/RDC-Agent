@@ -1,27 +1,27 @@
-import { agentDescription } from '../../../../lib/agentDescription';
 import React, { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import { agentDescription } from '../../../../lib/agentDescription';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
 import { SettingsScopeBar } from '../parts';
-import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
-import { AgentAutosaveStatus } from './AgentAutosaveStatus';
-import { AgentListItem } from './AgentListItem';
-import { AgentManifestEditor } from './AgentManifestEditor';
-import type { AgentProvenanceScope } from './agentConfigStatus';
-import { uniqueResourceId } from './uniqueResourceId';
-import { createNewAgent, draftScope, toSlug, visibleDrafts, type AgentScope } from './agentDraftFactory';
 import { useScopedSkillSelection } from '../useScopedSkillSelection';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
+import { uniqueResourceId } from './uniqueResourceId';
+import { createNewAgent, draftScope, toSlug, visibleDrafts, type AgentScope } from './agentDraftFactory';
+import { AgentManifestEditor } from './AgentManifestEditor';
+import { AgentListItem } from './AgentListItem';
+import { AgentAutosaveStatus } from './AgentAutosaveStatus';
+import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
 import { AgentDefaultModelSection } from './AgentDefaultModelSection';
 import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
 import { AgentModelMigrationDialog } from './AgentModelMigrationDialog';
 import { ProjectAgentTrustDialog } from './ProjectAgentTrustDialog';
 import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
+import type { AgentProvenanceScope } from './agentConfigStatus';
+import type { useI18n } from '../../../../i18n';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AppSettings } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

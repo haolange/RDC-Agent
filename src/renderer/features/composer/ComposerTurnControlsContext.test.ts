@@ -2,10 +2,10 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { useTurnControlsStore } from '../../stores/turnControlsStore';
+import { ComposerTurnControlsProvider, useComposerTurnControls } from './ComposerTurnControlsContext';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { SessionRecord } from '@shared/types/session';
-import { ComposerTurnControlsProvider, useComposerTurnControls } from './ComposerTurnControlsContext';
-import { useTurnControlsStore } from '../../stores/turnControlsStore';
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 const agentDefaults = vi.hoisted(() => ({ reasoningLevel: undefined as 'high' | 'xhigh' | undefined }));
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: unknown) => unknown) => select({

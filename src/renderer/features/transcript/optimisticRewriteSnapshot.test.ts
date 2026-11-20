@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
 import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const user = (overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
   id: 'user-1',

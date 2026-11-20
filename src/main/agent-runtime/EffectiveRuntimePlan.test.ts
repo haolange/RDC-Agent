@@ -1,13 +1,13 @@
 import { createHash } from 'crypto';
 import { describe, expect, it } from 'vitest';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
+import { compileFixturePolicy } from '../testing/policyFixture';
 import {
   activeToolNamesForPlan,
   buildEffectiveRuntimePlan,
   rebuildEffectiveRuntimePlan,
   policyFingerprintOf,
 } from './EffectiveRuntimePlan';
-import { compileFixturePolicy } from '../testing/policyFixture';
 
 const routeCapability = {
   providerId: 'p',

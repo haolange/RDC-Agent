@@ -1,12 +1,12 @@
-import { agentDescription } from '../../lib/agentDescription';
 import React, { useCallback, useEffect, useRef } from 'react';
+import { agentDescription } from '../../lib/agentDescription';
 import { Icon } from '../../ui/Icon';
 import { ModeGlyph } from '../../ui/ModeGlyph';
 import { Pill } from '../../ui/Pill';
 import { useI18n } from '../../i18n';
+import { useComposerMenu } from './useComposerMenuRegistry';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
-import { useComposerMenu } from './useComposerMenuRegistry';
 
 export const ComposerAgentMenu: React.FC<{
   currentMode: AgentMode;

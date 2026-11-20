@@ -2,10 +2,10 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import { RenamePopover, type RenamePopoverProps } from './RenamePopover';
 import { ProjectGroup } from './ProjectGroup';
 import { SessionListItem } from './SessionListItem';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 const project = { projectId: 'project', name: 'Project', rootPath: 'D:\\project' } as ProjectRecord;

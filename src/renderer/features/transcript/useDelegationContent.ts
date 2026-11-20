@@ -1,6 +1,6 @@
 import React from 'react';
-import type { DelegationContentKind } from '@shared/types/delegationTrace';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import type { DelegationContentKind } from '@shared/types/delegationTrace';
 
 export function useDelegationContent(input: {
   sessionId?: string | null;

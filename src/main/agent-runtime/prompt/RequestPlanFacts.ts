@@ -1,6 +1,6 @@
+import { applyRuntimeFact } from './RuntimeFactSegment';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
-import { applyRuntimeFact } from './RuntimeFactSegment';
 
 /** Bind model-visible controls to the same RequestPlan frozen for execution. */
 export function applyRequestPlanFacts(plan: PromptPlan, request: RequestPlan): PromptPlan {

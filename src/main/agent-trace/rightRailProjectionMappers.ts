@@ -1,5 +1,8 @@
-import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import path from 'path';
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
+import { nowIso } from '@shared/utils/id';
+import { projectTaskItems } from '../agent-runtime/tasks/taskProjection';
+import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
   ContextPanelViewModel,
@@ -9,13 +12,10 @@ import type {
   TaskContextResource,
   TraceArtifactRecord,
 } from '@shared/types/trace';
-import { nowIso } from '@shared/utils/id';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import type { TaskExecutionRecord } from '../agent-runtime/tasks/TaskContracts';
-import { projectTaskItems } from '../agent-runtime/tasks/taskProjection';
 import type { SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
-import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 
 const toIso = (value: number | undefined): string => value ? new Date(value).toISOString() : nowIso();
 

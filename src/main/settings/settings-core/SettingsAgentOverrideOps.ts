@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { AGENT_PROJECT_UNTRUSTED } from '@shared/types/agentManifest';
 import { appPathService } from '../../runtime/AppPathService';
 import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict } from '../agent-manifests/agentManifestParse';
 import { planAgentModelFieldMigration } from '../agent-manifests/agentModelFieldMigration';
 import { projectAgentTrust } from '../agent-manifests/ProjectAgentTrust';
 import { resolveRegisteredProjectRoot, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
-import { AGENT_PROJECT_UNTRUSTED } from '@shared/types/agentManifest';
 import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
 import type {
   AgentBuiltinComparison,

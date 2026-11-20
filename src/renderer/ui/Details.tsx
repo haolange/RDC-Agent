@@ -1,5 +1,5 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { cn } from '../lib/cn';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import './Details.css';
 
 export interface DetailsProps extends Omit<ComponentPropsWithoutRef<'details'>, 'title'> {

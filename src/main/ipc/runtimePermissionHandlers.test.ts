@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { registerRuntimePermissionHandlers } from './runtimePermissionHandlers';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
@@ -13,7 +14,6 @@ vi.mock('../agent-runtime/permissions/RuntimePermissionStateService', () => ({ r
   getSnapshot: () => fixture.state,
   subscribe: (listener: (state: RuntimePermissionState) => void) => { fixture.listener = listener; return fixture.unsubscribe; },
 } }));
-import { registerRuntimePermissionHandlers } from './runtimePermissionHandlers';
 
 beforeEach(() => { fixture.handle.mockClear(); fixture.unsubscribe.mockClear(); });
 

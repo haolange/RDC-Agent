@@ -6,8 +6,8 @@ import {
   MODELS_DEV_IDENTITY_COUNT,
   MODELS_DEV_SNAPSHOT_SHA256,
   type ProviderCatalogCompileInput,
-} from './compiler';
-import { loadProviderCatalogManifestInput } from './nodeManifestLoader';
+} from './catalogCompiler';
+import { loadProviderCatalogManifestInput } from './manifestLoader';
 
 const manifestRoot = path.resolve(process.cwd(), 'src/shared/provider-catalog/manifests');
 

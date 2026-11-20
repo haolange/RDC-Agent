@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { completeProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
+
 
 const orchestrator = vi.hoisted(() => ({
   sendProfileMessage: vi.fn(),
@@ -7,14 +9,11 @@ const orchestrator = vi.hoisted(() => ({
   backgroundSubagents: { beforeParentProviderRequestMessages: vi.fn(() => []) },
 }));
 const storage = vi.hoisted(() => ({ updateSession: vi.fn(), updateRun: vi.fn(), commitConversationTerminal: vi.fn() }));
-
 vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({ agentOrchestrator: orchestrator }));
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: storage }));
 vi.mock('./ConversationAttachmentMaterializer', () => ({ hydrateFrozenUserContent: vi.fn(async () => 'inspect') }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('./approvedPlanExit', () => ({ verifyApprovedPlanExit: (_session: string, _turn: string, approved: unknown) => Boolean(approved) }));
-
-import { completeProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
 
 function message(role: 'user' | 'assistant', status: ConversationMessage['status']): ConversationMessage {
   return { id: role, role, turnId: 'turn-1', content: role === 'user' ? 'inspect' : '', status, createdAt: 1 } as ConversationMessage;

@@ -1,4 +1,3 @@
-import type { SessionRecord } from '@shared/types/session';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useProjectStore } from '../stores/projectStore';
 import {
@@ -11,6 +10,7 @@ import {
   readComposerDraftModel,
   useComposerModelDraftStore,
 } from '../stores/composerModelDraftStore';
+import type { SessionRecord } from '@shared/types/session';
 
 export function readComposerEffectiveModel(
   agentId: string,

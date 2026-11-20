@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import {
   beginAgentDefinitionSave,
@@ -7,6 +6,7 @@ import {
   rollbackAgentDefinitionSave,
   settleAgentDefinitionSave,
 } from './agentDefinitionSettings';
+import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 

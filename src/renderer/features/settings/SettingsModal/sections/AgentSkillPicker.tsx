@@ -1,6 +1,6 @@
-import type { useI18n } from '../../../../i18n';
 import { SearchMultiSelect } from '../../../../ui/SearchMultiSelect';
 import { projectSkillSelection } from '../scopedSkillSelection';
+import type { useI18n } from '../../../../i18n';
 import type { useScopedSkillSelection } from '../useScopedSkillSelection';
 
 export type AgentSkillCatalog = ReturnType<typeof useScopedSkillSelection>;

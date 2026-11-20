@@ -2,8 +2,8 @@
  * ContextManager 单元测试。
  */
 import { describe, it, expect } from 'vitest';
-import { ContextManager, estimateImageTokensFromBase64Length } from './ContextManager';
 import { TokenizerService } from '../core/TokenizerService';
+import { ContextManager, estimateImageTokensFromBase64Length } from './ContextManager';
 import type {
   AgentMessage,
   AssistantMessage,

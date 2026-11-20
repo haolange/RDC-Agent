@@ -1,13 +1,9 @@
-import { shouldSendComposerOnEnter } from './composerKeyboard';
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import type { AgentMode } from '@shared/types/layout';
-import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import type { useI18n } from '../../i18n';
-import type { PendingAttachmentDraft } from '../../types/attachments';
+import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { sendComposerConversationTurn } from './composerSendFlow';
 import { useComposerStop } from './useComposerStop';
 import { executeSlashCommand } from './slashCommandExecutor';
@@ -16,7 +12,11 @@ import {
   shouldClearSubmittedPrompt,
 } from './composerCommandConcurrency';
 import { inspectHandoffCommit, type HandoffSendPayload } from './composerHandoffSend';
-import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
+import { shouldSendComposerOnEnter } from './composerKeyboard';
+import type { PendingAttachmentDraft } from '../../types/attachments';
+import type { useI18n } from '../../i18n';
+import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
+import type { AgentMode } from '@shared/types/layout';
 type Translate = ReturnType<typeof useI18n>['t'];
 
 export function useComposerSend(options: {

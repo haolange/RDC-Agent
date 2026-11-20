@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import type { AgentPermissionSettings } from '@shared/types/settings';
+import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
 import { useI18n } from '../../../../i18n';
 import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
-import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
 import { Button } from '../../../../ui/Button';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField, SettingsSection } from '../parts';
+import type { AgentPermissionSettings } from '@shared/types/settings';
 
 type CustomRules = Pick<AgentPermissionSettings, 'readableRoots' | 'writableRoots' | 'allowedCommandPrefixes' | 'deniedCommandPrefixes'>;
 

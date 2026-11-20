@@ -2,10 +2,10 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { samePath } from '../platform/paths';
-import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
 import { StorageIo } from '../sessions/store/StorageIo';
-import type { ParsedKnowledgeSource } from './knowledgeCardSchema';
 import { KnowledgeWriteIntegrityError, KnowledgeWritePathError } from './knowledgeErrors';
+import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
+import type { ParsedKnowledgeSource } from './knowledgeCardSchema';
 
 const PREVIEW_MAX_CHARS = 160;
 const MAX_WALK_DEPTH = 8;

@@ -9,12 +9,12 @@
  * 调用方（Agent 上层）负责按 RecoveryAction 调度具体行为。
  */
 
-import type { Model } from '../core/types';
 import {
   isProviderEmptyStreamError,
   ProviderHttpError,
   ProviderWireFailureError,
 } from '../providers/internal/http';
+import type { Model } from '../core/types';
 
 // =====================================================================
 // 类型

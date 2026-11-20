@@ -1,13 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import type { RdcRuntimeOverview, RestrictivePolicy, ScopedResourceDocument, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
-import { appPathService } from './AppPathService';
-import { hashScopedResource, scopedResourceResolver } from './ScopedResourceResolver';
 import { hookEngine } from '../hooks/HookEngine';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
 import { projectAgentTrust } from '../settings/agent-manifests/ProjectAgentTrust';
 import { mcpTrustService } from '../settings/settings-core/McpTrustService';
+import { hashScopedResource, scopedResourceResolver } from './ScopedResourceResolver';
+import { appPathService } from './AppPathService';
+import type { RdcRuntimeOverview, RestrictivePolicy, ScopedResourceDocument, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
 
 const EXTENSIONS: Partial<Record<ScopedResourceKind, string>> = {
   agent: '.agent.md', mcp: '.mcp.json', hook: '.hook.yml', policy: '.policy.yml', memory: '.md', knowledge: '.md',

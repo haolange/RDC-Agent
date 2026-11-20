@@ -1,18 +1,30 @@
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { modelsOverrideService } from '../settings-core/ModelsOverrideService';
+import { parseCopilotBillingContribution } from '../provider-auth/CopilotBilling';
+import { settingsService } from '../settings-core/SettingsService';
+import {
+  getLoadedProviderSurface,
+  getProviderCatalogRevision,
+  getProviderModelDefinitions,
+  lookupProviderModelDefinition,
+} from '../../provider-catalog/ProviderCatalogRegistry';
 import {
   isProbeAvailabilityDenied,
   receiptConfirmsFast,
   receiptConfirmsModelSwitch,
   receiptExceedsSmallerTiers,
 } from './ProviderProbeEvidence';
+import { effectiveCatalogService } from './EffectiveCatalogService';
+import { revisionFor } from './effectiveCatalogMerge';
+import { planModelRequest } from './RequestPlanner';
+import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
+import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
 import type { AssistantMessage } from '../../agent-runtime/core/types';
 import type {
   CatalogLayerContribution,
   CatalogModelContribution,
   EffectiveCatalogRequest,
 } from './effectiveCatalogTypes';
-import { effectiveCatalogService } from './EffectiveCatalogService';
-import { revisionFor } from './effectiveCatalogMerge';
-import { modelsOverrideService } from '../settings-core/ModelsOverrideService';
 import type { ModelOverride, CustomModel } from '@shared/provider-catalog/modelsOverrideSchema';
 import type {
   EffectiveCatalogSnapshot,
@@ -31,18 +43,6 @@ import type {
   LlmProviderModel,
   LlmProviderProtocol,
 } from '@shared/types/settings';
-import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { planModelRequest } from './RequestPlanner';
-import { parseCopilotBillingContribution } from '../provider-auth/CopilotBilling';
-import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
-import { settingsService } from '../settings-core/SettingsService';
-import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
-import {
-  getLoadedProviderSurface,
-  getProviderCatalogRevision,
-  getProviderModelDefinitions,
-  lookupProviderModelDefinition,
-} from '../../provider-catalog/ProviderCatalogRegistry';
 
 const CONSERVATIVE_REASONING: ReasoningControl = {
   kind: 'unknown',

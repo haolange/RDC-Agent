@@ -1,10 +1,10 @@
-import type React from 'react';
-import type { ReasoningSelection } from '@shared/types/modelCapability';
 import {
   findAdjacentSupportedLevel,
   resolveNearestSnapLevel,
 } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, ratioFromInsetClientX } from './effortSliderGeometry';
+import type React from 'react';
+import type { ReasoningSelection } from '@shared/types/modelCapability';
 
 export function createEffortSliderHandlers(input: {
   trackRef: React.RefObject<HTMLDivElement | null>;

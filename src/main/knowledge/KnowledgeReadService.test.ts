@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 import { projectKnowledgeRead } from './KnowledgeReadService';
+import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 
 it('projects a same-version preview, section, line range and raw source without leaking the remaining body', () => {
   const source = '---\ntitle: Sample\n---\n# Sample\n\n## Evidence\nsource\n\n## Other\nother\n';

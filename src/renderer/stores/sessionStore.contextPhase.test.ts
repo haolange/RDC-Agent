@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { useSessionStore } from './sessionStore';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 const prepared = (overrides: Partial<PreparedTurnContextSummary> = {}): PreparedTurnContextSummary => ({
   requestId: 'request-1',

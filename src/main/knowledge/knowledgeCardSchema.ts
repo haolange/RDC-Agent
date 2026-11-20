@@ -13,8 +13,8 @@ import {
   type KnowledgeRelation,
   type KnowledgeScope,
 } from '@shared/types/knowledge';
-import { sanitizeKnowledgeImages } from './knowledgeImages';
 import { parse as parseYaml } from 'yaml';
+import { sanitizeKnowledgeImages } from './knowledgeImages';
 
 const optionalString = z.string().trim().min(1).optional();
 

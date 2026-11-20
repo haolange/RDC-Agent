@@ -1,11 +1,3 @@
-import type { ProviderAccountFlowId } from '@shared/provider-catalog/implementationRegistry';
-import type {
-  LlmProviderAccountDiagnostic,
-  LlmProviderAccountStatus,
-  LlmProviderId,
-  LlmProviderModel,
-} from '@shared/types/settings';
-import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import {
   discoverChatGptCatalog,
   exchangeChatGptCode,
@@ -44,6 +36,14 @@ import {
   startOpenRouterLogin,
 } from './openRouterAccountOAuth';
 import { GROK_OAUTH_CLIENT_ID } from './oauthConstants';
+import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
+import type {
+  LlmProviderAccountDiagnostic,
+  LlmProviderAccountStatus,
+  LlmProviderId,
+  LlmProviderModel,
+} from '@shared/types/settings';
+import type { ProviderAccountFlowId } from '@shared/provider-catalog/implementationRegistry';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 
 export interface AccountCatalogDiscovery {

@@ -1,5 +1,5 @@
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import { isAgentToolExecutableModel, classifyAgentToolEligibility, describeAgentToolIneligibility } from '@shared/utils/agentToolCapability';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
 export type CapabilityUnavailableReason =
   | 'missing-model'

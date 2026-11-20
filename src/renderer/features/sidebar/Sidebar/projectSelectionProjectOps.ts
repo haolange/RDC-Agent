@@ -1,7 +1,5 @@
 import { useSessionStore } from '../../../stores/sessionStore';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
-import type { ProjectRecord } from '@shared/types/session';
-import type { LoadProjectsOptions, LoadSessionsOptions } from './types';
 import { selectSessionOp } from './projectSelectionSessionOps';
 import {
   captureSelectionSnapshot,
@@ -9,6 +7,8 @@ import {
   type ProjectSelectionHandlerOpsContext,
   type ProjectSelectionLoaderOpsContext,
 } from './projectSelectionContext';
+import type { ProjectRecord } from '@shared/types/session';
+import type { LoadProjectsOptions, LoadSessionsOptions } from './types';
 
 export async function loadSessionsOp(
   ctx: ProjectSelectionLoaderOpsContext,

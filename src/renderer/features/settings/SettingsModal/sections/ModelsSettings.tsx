@@ -1,8 +1,8 @@
 import React from 'react';
+import { ProvidersSettings } from './ProvidersSettings';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogCategory } from '../types';
 import type { useI18n } from '../../../../i18n';
-import { ProvidersSettings } from './ProvidersSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

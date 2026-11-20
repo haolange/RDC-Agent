@@ -1,10 +1,10 @@
 import { expect, it, vi } from 'vitest';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { RdcLifecyclePoint, RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
 import { bindRdcTurn, freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
-import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import { TurnHandle } from './TurnCoordinator';
 import { ApprovedCaptureController, type ApprovedCaptureHost } from './ApprovedCaptureController';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { RdcLifecyclePoint, RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
+import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 
 const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
 function point(inputId: string, eventId: number): RdcLifecyclePoint {

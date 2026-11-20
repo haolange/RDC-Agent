@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import type { SessionScope } from '@shared/types/session';
 import { useSessionDeviceStore, sessionDeviceKey } from '../stores/sessionDeviceStore';
 import { useDeviceStore } from '../stores/deviceStore';
+import type { SessionScope } from '@shared/types/session';
 
 export function usePreparedSessionDevice(projectId?: string, sessionId?: string) {
   const devices = useDeviceStore((state) => state.devices);

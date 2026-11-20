@@ -1,7 +1,7 @@
-import type { KnowledgeImageRef } from '@shared/types/knowledge';
 import { useI18n } from '../../../../i18n';
 import { groupKnowledgeImages } from '../knowledgeCardImages';
 import { KnowledgeCardImage } from './KnowledgeCardImage';
+import type { KnowledgeImageRef } from '@shared/types/knowledge';
 
 interface KnowledgeCardImagesProps {
   spaceId: string;

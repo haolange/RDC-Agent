@@ -1,9 +1,3 @@
-import type {
-  ArtifactSourceRef,
-  InvestigationArtifactManifest,
-  InvestigationRecord,
-  WorldState,
-} from '@shared/types/renderdocInvestigation';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { hashesEqual, sha256Prefixed } from './investigationHash';
 import { requireInvestigationKind } from './investigationKindRegistry';
@@ -17,6 +11,12 @@ import {
   type InvestigationIndexEntry,
 } from './investigationRecordKeys';
 import { parseInvestigationRecord } from './investigationRecordSchemas';
+import type {
+  ArtifactSourceRef,
+  InvestigationArtifactManifest,
+  InvestigationRecord,
+  WorldState,
+} from '@shared/types/renderdocInvestigation';
 
 export interface InvestigationContentRead {
   text: string;

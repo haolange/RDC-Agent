@@ -1,4 +1,3 @@
-import type { ResolvedTheme } from '../types/settings';
 import {
   hexToRgb,
   hslToRgb,
@@ -8,6 +7,7 @@ import {
   rgbToHsl,
   mixRgb,
 } from './color';
+import type { ResolvedTheme } from '../types/settings';
 
 /** Last-resort compose accent when manifest accent is missing (not a product authority). */
 export const COMPOSE_ACCENT_FALLBACK = '#33d1ff';

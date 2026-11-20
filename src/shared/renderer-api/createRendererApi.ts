@@ -1,4 +1,3 @@
-import type { ElectronAPI } from '../types/electron';
 import { isRendererEventChannel } from './channels';
 import {
   createAppMetaApi,
@@ -18,7 +17,6 @@ import {
 } from './core';
 import { createEventSubscriptionApi } from './events';
 import { createLlmApi, createMemoryApi, createRdcRuntimeApi, createSettingsApi } from './settings';
-import type { RendererApiTransport } from './transport';
 import {
   createCaptureApi,
   createContextApi,
@@ -29,6 +27,8 @@ import {
   createSessionApi,
   createTraceApi,
 } from './workbench';
+import type { RendererApiTransport } from './transport';
+import type { ElectronAPI } from '../types/electron';
 
 export function createRendererApi(platform: NodeJS.Platform, transport: RendererApiTransport): ElectronAPI {
   const dialog = createDialogApi(transport);

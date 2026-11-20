@@ -1,6 +1,6 @@
+import { buildInitialTurnControls, sanitizeTurnControls } from './turnControlsUtils';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import { buildInitialTurnControls, sanitizeTurnControls } from './turnControlsUtils';
 
 type SessionTurnControlsInput = Parameters<typeof buildInitialTurnControls>[1];
 

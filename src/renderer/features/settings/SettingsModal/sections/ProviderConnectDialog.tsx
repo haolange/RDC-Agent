@@ -1,21 +1,21 @@
-import { Details } from '../../../../ui/Details';
 import React, { useState } from 'react';
-import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import { Details } from '../../../../ui/Details';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
 import { TaskDialog } from '../../../../ui/TaskDialog';
-import type { ProviderConnectionDraft } from '../types';
 import { getProviderCategoryTranslation } from '../utils';
+import { SettingsField } from '../parts';
+import { shouldUseProviderDocsLink } from '../providerConnectionState';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderConnectionFields } from './ProviderConnectionFields';
 import { ProviderAuthModeField } from './ProviderAuthModeField';
 import { ProviderConnectModelList } from './ProviderConnectModelList';
 import { ProviderConnectActions } from './ProviderConnectActions';
 import { ProviderConnectionStatusLine, ProviderDiscoveryEmpty, ProviderProtocolSummary, connectionPhase } from './ProviderConnectSummary';
-import { SettingsField } from '../parts';
-import { shouldUseProviderDocsLink } from '../providerConnectionState';
+import type { ProviderConnectionDraft } from '../types';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

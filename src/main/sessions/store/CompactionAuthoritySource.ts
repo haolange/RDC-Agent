@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import { generateShortId } from '@shared/utils/id';
 import { sessionArtifactResolver } from '../artifacts/SessionArtifactResolver';
 import { TaskRegistry } from '../../agent-runtime/tasks/TaskRegistry';
 import { collectOpenInvestigationWork } from '../../investigation/openInvestigationWork';
-import type { TaskExecutionRecord, TaskRecord } from '../../agent-runtime/tasks/TaskContracts';
 import { createSessionTaskStore } from '../../agent-runtime/tasks/sessionTaskStore';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
-import { generateShortId } from '@shared/utils/id';
-import type { AgentMessage, Message } from '../../agent-runtime/core/types';
 import { delegatedArtifactOwner, delegatedArtifactReferences, grantDelegatedOutput } from '../artifacts/DelegatedArtifactAccess';
 import { getDelegatedTaskScope } from '../../agent-runtime/tasks/DelegatedTaskScopes';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import type { AgentMessage, Message } from '../../agent-runtime/core/types';
+import type { TaskExecutionRecord, TaskRecord } from '../../agent-runtime/tasks/TaskContracts';
 import type { InvestigationArtifactManifest } from '@shared/types/renderdocInvestigation';
 
 interface AuthorityState {

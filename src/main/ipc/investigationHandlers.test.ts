@@ -1,29 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { InvestigationError } from '../investigation/investigationErrors';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { InvestigationError } from '../investigation/investigationErrors';
+import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
 import { IpcValidationError } from './validation/IpcPayloadGuard';
+import { registerInvestigationHandlers } from './investigationHandlers';
 
 const { handle, readRecord, readSession } = vi.hoisted(() => ({
   handle: vi.fn(),
   readRecord: vi.fn(),
   readSession: vi.fn(),
 }));
-
 vi.mock('electron', () => ({
   ipcMain: { handle },
 }));
-
 vi.mock('../investigation/InvestigationArtifactService', () => ({
   investigationArtifactService: { readRecord },
 }));
-
 vi.mock('../sessions/store/StorageAdapter', () => ({
   storageAdapter: { readSession },
 }));
-
 vi.mock('../agent-trace/rightRailInvestigationArtifacts', () => ({ listInvestigationArtifacts: vi.fn(() => ({ rows: [], totalCount: 0, storeDegraded: false })) }));
-import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
-import { registerInvestigationHandlers } from './investigationHandlers';
 
 const HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const OTHER_HASH = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';

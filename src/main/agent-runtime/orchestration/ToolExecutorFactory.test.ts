@@ -1,18 +1,32 @@
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
-beforeEach(() => { runtimePermissionStateService.initialize('default'); runtimePermissionStateService.commitMode('default'); });
-import { registerPolicyBudgetObserver } from './DelegationBudget';
-const handoffPreflight = vi.hoisted(() => vi.fn());
-vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: handoffPreflight }));
-import { createPolicyBudgetState, type TurnHandle } from './TurnCoordinator';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
-import { StorageIo } from '../../sessions/store/StorageIo';
-import { grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseInvestigationPlanContract } from '@shared/types/planInvestigation';
 
+import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
+import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
+import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
+import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
+import { TaskRegistry, registerDelegatedTaskScope } from '../tasks';
+import { grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { StorageIo } from '../../sessions/store/StorageIo';
+import { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import * as toolResultArtifacts from '../tools/ToolResultArtifactizer';
+import { shellTool } from '../tools/primitives/ShellTool';
+import { parseRdcNativeResult } from '../../rdc/RdcNativeProtocol';
+import { directoryLinkType } from '../../platform/paths';
+import { registerPolicyBudgetObserver } from './DelegationBudget';
+import { ToolExecutorFactory } from './ToolExecutorFactory';
+import { createPolicyBudgetState, type TurnHandle } from './TurnCoordinator';
+import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
+import type { AgentSlotRegistry } from './AgentSlotRegistry';
+import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+
+beforeEach(() => { runtimePermissionStateService.initialize('default'); runtimePermissionStateService.commitMode('default'); });
+const handoffPreflight = vi.hoisted(() => vi.fn());
+vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: handoffPreflight }));
 vi.mock('electron', () => ({
   app: {
     getPath: () => process.env.TEMP ?? process.env.TMP ?? process.cwd(),
@@ -24,7 +38,6 @@ vi.mock('electron', () => ({
     encryptString: (value: string) => Buffer.from(value),
   },
 }));
-
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: () => ({
@@ -33,20 +46,17 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
     }),
   },
 }));
-
 vi.mock('../../settings/agent-manifests/AgentRuntimeConfigService', () => ({
   agentRuntimeConfigService: {
     loadSkill: () => null,
   },
 }));
-
 vi.mock('../core/ToolValidator', () => ({
   ToolValidationError: class ToolValidationError extends Error {},
   toolValidator: {
     validate: (_definition: unknown, args: Record<string, unknown> = {}) => args,
   },
 }));
-
 const { hookTrigger } = vi.hoisted(() => ({
   hookTrigger: vi.fn(async () => [] as Array<{ allowed: boolean; status: string }>),
 }));
@@ -61,7 +71,6 @@ vi.mock('../../hooks/HookEngine', () => ({
     run: async () => ({ continue: true }),
   },
 }));
-
 vi.mock('../../runtime/AppPathService', () => ({
   appPathService: {
     getUserRdcPaths: () => ({
@@ -75,47 +84,28 @@ vi.mock('../../runtime/AppPathService', () => ({
     getAppPath: () => process.cwd(),
   },
 }));
-
 vi.mock('../../sessions/store/StorageAdapter', () => ({
   storageAdapter: {
     getSessionAttachmentsDir: () => 'D:/sessions/session-a/attachments',
   },
 }));
-
 vi.mock('../permissions/AgentPermissionPolicy', () => ({
   agentPermissionPolicyService: {
     evaluate: permissionEvaluate,
   },
 }));
-
 vi.mock('../permissions/AgentToolApprovalRequestService', () => ({
   agentToolApprovalRequestService: {
     request: approvalRequest,
     autoReview: vi.fn(async () => ({ approved: false, reason: 'Native mutation requires review.' })),
   },
 }));
-
 vi.mock('../interactions/AgentUserInputRequestService', () => ({
   agentUserInputRequestService: {},
 }));
-
 vi.mock('../interactions/AgentPlanReviewRequestService', () => ({
   agentPlanReviewRequestService: { request: vi.fn(async () => 'rejected') },
 }));
-
-import { ToolExecutorFactory } from './ToolExecutorFactory';
-import { TaskRegistry, registerDelegatedTaskScope } from '../tasks';
-import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
-import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
-import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
-import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
-import * as toolResultArtifacts from '../tools/ToolResultArtifactizer';
-import { shellTool } from '../tools/primitives/ShellTool';
-import { parseRdcNativeResult } from '../../rdc/RdcNativeProtocol';
-import { directoryLinkType } from '../../platform/paths';
-import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
-import type { AgentSlotRegistry } from './AgentSlotRegistry';
-import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
 describe('ToolExecutorFactory', () => {
   it('requires a frozen capture scope before an approved Mission can use live RDC, while allowing offline work and catalog discovery', async () => {

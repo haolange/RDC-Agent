@@ -1,22 +1,9 @@
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Message,
-  Model,
-  ProviderContinuationArtifact,
-  StopReason,
-  StreamOptions,
-  ThinkingArtifactKind,
-  ThinkingArtifactVisibility,
-  ToolDefinition,
-} from '../core/types';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
-import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
@@ -30,9 +17,22 @@ import {
 } from './internal/http';
 import { applyReasoningToAnthropicLikeBody, reasoningVisibilityRequest } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
+import type { ReasoningVisibility } from '@shared/types/agentRuntime';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Message,
+  Model,
+  ProviderContinuationArtifact,
+  StopReason,
+  StreamOptions,
+  ThinkingArtifactKind,
+  ThinkingArtifactVisibility,
+  ToolDefinition,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';

@@ -1,20 +1,20 @@
-import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { compileProviderCatalog, dedicatedToolCallingFactSourceIds } from './compiler';
-import { loadProviderCatalogManifestInput } from './nodeManifestLoader';
+import { describe, expect, it } from 'vitest';
 import {
   PROVIDER_ADAPTER_IMPLEMENTATIONS,
   providerAdapterIdForProtocol,
-} from './implementationRegistry';
+} from '@shared/provider-catalog/implementationRegistry';
 import {
   PROTOCOL_WIRE_FIXTURE_COVERAGE,
-} from './protocolWireFixtureCoverage';
+} from '@shared/provider-catalog/protocolWireFixtureCoverage';
 import {
   hasImplementedStructuredToolAdapter,
   isAgentToolExecutableModel,
-} from '../utils/agentToolCapability';
-import type { LlmProviderProtocol } from '../types/settings';
+} from '@shared/utils/agentToolCapability';
+import { compileProviderCatalog, dedicatedToolCallingFactSourceIds } from './catalogCompiler';
+import { loadProviderCatalogManifestInput } from './manifestLoader';
+import type { LlmProviderProtocol } from '@shared/types/settings';
 
 const manifestRoot = path.resolve(process.cwd(), 'src/shared/provider-catalog/manifests');
 const fixtureRoot = path.resolve(process.cwd(), 'src/main/agent-runtime/providers/__fixtures__');

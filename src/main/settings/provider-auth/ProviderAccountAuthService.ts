@@ -1,15 +1,7 @@
 import { openExternalHttps } from '../../window/rendererTrust';
-import type { ProviderAccountAuth } from '@shared/provider-catalog/catalogManifestSchema';
-import type {
-  LlmProviderAccountDiagnostic,
-  LlmProviderAccountLoginFinishRequest,
-  LlmProviderAccountLoginStartRequest,
-  LlmProviderAccountStatus,
-  LlmProviderId,
-} from '@shared/types/settings';
 import { settingsService } from '../settings-core/SettingsService';
-import { oauthRefreshManager } from './OAuthRefreshManager';
 import { getProviderAccountAuth, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { oauthRefreshManager } from './OAuthRefreshManager';
 import {
   ACCOUNT_AUTH_FLOWS,
   type AccountAuthFlow,
@@ -17,6 +9,14 @@ import {
   type AccountFlowHost,
 } from './oauth/accountAuthFlows';
 import { parseProviderError, renderAccountDiagnosticMessage, shouldOpenSystemBrowser } from './oauth/oauthHttp';
+import type {
+  LlmProviderAccountDiagnostic,
+  LlmProviderAccountLoginFinishRequest,
+  LlmProviderAccountLoginStartRequest,
+  LlmProviderAccountStatus,
+  LlmProviderId,
+} from '@shared/types/settings';
+import type { ProviderAccountAuth } from '@shared/provider-catalog/catalogManifestSchema';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauth/oauthTypes';
 
 export type { AccountCatalogDiscovery } from './oauth/accountAuthFlows';

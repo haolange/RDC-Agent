@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentDefinitionSaveRequest, AgentManifestDefinition } from '@shared/types/agentManifest';
 import { createSettingsModalActions } from './settingsModalActions';
+import type { AgentDefinitionSaveRequest, AgentManifestDefinition } from '@shared/types/agentManifest';
 
 const draft = {
   id: 'project-only',

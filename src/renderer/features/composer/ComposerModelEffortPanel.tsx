@@ -1,14 +1,14 @@
 import React from 'react';
-import type { ReasoningSelection } from '@shared/types/modelCapability';
-import type { TranslationKey } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { EFFORT_LABEL_KEYS, EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
+import { EffortMaxField } from './EffortMaxField';
 import type { MaxVisualTimeline } from './maxVisual';
 import type { ExitingMaxPhase } from './useMaxVisualController';
-import { EffortMaxField } from './EffortMaxField';
+import type { TranslationKey } from '../../i18n';
+import type { ReasoningSelection } from '@shared/types/modelCapability';
 
 const EffortSliderStop: React.FC<{
   level: ReasoningSelection;

@@ -2,9 +2,9 @@ import {
   getProviderModelDefinitions,
   getProviderModelSummaries,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import type { LlmProviderModel } from '@shared/types/settings';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
 import { ProviderConnectionError } from './providerConnectionErrors';
+import type { LlmProviderModel } from '@shared/types/settings';
 
 export function normalizeDiscoveredModels(
   values: unknown[],

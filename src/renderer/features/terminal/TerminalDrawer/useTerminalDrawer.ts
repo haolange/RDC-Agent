@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import { useI18n } from '../../../i18n';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { buildEntryCopy } from './terminalFormatters';
@@ -9,6 +8,7 @@ import {
   useTerminalDrawerOptions,
 } from './terminalDrawerDerived';
 import { useTerminalDrawerResize } from './useTerminalDrawerResize';
+import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
 export function useTerminalDrawer() {
   const { t } = useI18n();

@@ -1,4 +1,3 @@
-import type { HookDefinition, ResourceScope } from '@shared/types/rdcRuntime';
 import {
   argumentFileIdentities,
   canonicalRealpath,
@@ -8,6 +7,7 @@ import {
 } from '../runtime/fileIdentity';
 import { hashScopedResource } from '../runtime/ScopedResourceResolver';
 import { isNodeCommand, resolveHookArg, resolveHookCommand, resolveHookCwd } from './hookResolve';
+import type { HookDefinition, ResourceScope } from '@shared/types/rdcRuntime';
 
 export interface ExecutableIdentity {
   command: string;

@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
-import type {
-  ConversationMessage,
-  ConversationMessageStatus,
-} from '@shared/types/conversation';
-import { WorkProcess } from './WorkProcess';
-import { MessageActions } from './MessageActions';
-import { UserMessageEditForm } from './UserMessageEditForm';
-import { useUserMessageRewrite } from './useUserMessageRewrite';
-import { MessageAttachments } from './MessageAttachments';
-import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
-import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { hasPlanReviewInteraction } from '@shared/conversation/planReviewPresentation';
-import { SystemMessage } from './SystemMessage';
+import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useI18n } from '../../i18n';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { WorkProcess } from './WorkProcess';
+import { MessageActions } from './MessageActions';
+import { UserMessageEditForm } from './UserMessageEditForm';
+import { useUserMessageRewrite } from './useUserMessageRewrite';
+import { MessageAttachments } from './MessageAttachments';
+import { HandoffSuggestionRow } from './HandoffSuggestionRow';
+import { SystemMessage } from './SystemMessage';
+import type {
+  ConversationMessage,
+  ConversationMessageStatus,
+} from '@shared/types/conversation';
 
 interface MessageBubbleProps {
   message: ConversationMessage;

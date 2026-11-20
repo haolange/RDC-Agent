@@ -1,3 +1,4 @@
+import { normalizeContinuationArtifact, toContinuationMetadata } from './ContinuationArtifacts';
 import type { ThinkingArtifact as SharedThinkingArtifact } from '@shared/types/reasoning';
 import type {
   ProviderContinuationArtifact,
@@ -6,7 +7,6 @@ import type {
   ThinkingArtifactVisibility,
   ThinkingContent,
 } from '../core/types';
-import { normalizeContinuationArtifact, toContinuationMetadata } from './ContinuationArtifacts';
 
 export interface ThinkingContentInput {
   text?: string;

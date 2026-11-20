@@ -1,6 +1,6 @@
 import React from 'react';
-import type { WorkProcessRow } from './workProcessTypes';
 import { isTrackActivity, isProcessTrackRow } from './workProcessTrack';
+import type { WorkProcessRow } from './workProcessTypes';
 
 export const WorkProcessTrackContext = React.createContext<string | undefined>(undefined);
 

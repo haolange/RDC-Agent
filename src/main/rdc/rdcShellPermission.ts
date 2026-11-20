@@ -1,6 +1,3 @@
-import type { AgentPermissionMode } from '@shared/types/settings';
-import type { RdcOperationDefinition } from '@shared/types/tool';
-import type { AgentAccessCeiling } from '@shared/types/agentManifest';
 import { fileOperationBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
 import {
   registerRdcShellBaseline,
@@ -10,6 +7,9 @@ import {
 import { assertRdcDiscovery, parseShellRdcInput } from './RdcShellInput';
 import { assertRdcBindingOwnership, authorizeRdcOperation, rdcCatalogCapabilitySummary, rdcOperationCapability } from './RdcOperationPolicy';
 import { readRdcHostControls } from './RdcHostControls';
+import type { AgentAccessCeiling } from '@shared/types/agentManifest';
+import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { AgentPermissionMode } from '@shared/types/settings';
 
 function request(
   mode: AgentPermissionMode,

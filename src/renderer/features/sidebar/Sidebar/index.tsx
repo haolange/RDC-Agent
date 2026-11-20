@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import { useI18n } from '../../../i18n';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import { ProjectGroup } from './ProjectGroup';
 import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
 import { useProjectTree } from './useProjectTree';
-import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import { ProjectAddDialog } from './ProjectAddDialog';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import './Sidebar.css';
 import './sidebar-chrome.css';
 

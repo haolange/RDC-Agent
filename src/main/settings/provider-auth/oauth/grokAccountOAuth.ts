@@ -1,11 +1,8 @@
 import { randomUUID } from 'crypto';
-import { listenGrokCallback } from './grokCallback';
-import { verifyGrokIdentity } from './grokIdentity';
-import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { getLoadedProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { parseGrokBuilderCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
-import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import { listenGrokCallback } from './grokCallback';
+import { verifyGrokIdentity } from './grokIdentity';
 import { GROK_BUILD_API_BASE_URL, GROK_OAUTH_CLIENT_ID } from './oauthConstants';
 import {
   appendParams,
@@ -21,6 +18,9 @@ import {
   GrokOAuthDiagnosticError,
   resolveGrokOAuthScope,
 } from './grokOAuth';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
+import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
+import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 
 export async function startGrokBrowserLogin(
   providerId: LlmProviderId,

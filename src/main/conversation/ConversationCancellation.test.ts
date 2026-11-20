@@ -1,10 +1,10 @@
-import { translate } from '../../renderer/i18n/messages';
 import { describe, expect, it } from 'vitest';
-import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { translate } from '../../renderer/i18n/messages';
 import { createToolRowForPresentation } from '../../renderer/features/transcript/workProcessToolRows';
+import { stopWorkTrace } from '../../renderer/lib/stopWorkTrace';
+import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
 import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import { applyPlanReviewAnswered } from './ConversationPlanReviewEvents';
-import { stopWorkTrace } from '../../renderer/lib/stopWorkTrace';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 
 const pendingTrace = (): ConversationWorkTrace => upsertRuntimeToolCall(undefined, {

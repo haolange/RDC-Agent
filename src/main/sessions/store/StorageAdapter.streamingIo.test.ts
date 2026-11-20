@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { CONVERSATION_COMPACTION_DELTA_THRESHOLD } from './storageCommitTypes';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-conversation-io-'));
 

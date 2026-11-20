@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import type { ReasoningSelection } from '@shared/types/modelCapability';
 import { useI18n } from '../../i18n';
 import {
   hasSelectableFastMode,
@@ -22,6 +21,7 @@ import { createEffortSliderHandlers } from './effortSliderHandlers';
 import { useEffortPopupLayout } from './useEffortPopupLayout';
 import { useMaxVisualController } from './useMaxVisualController';
 import { useComposerTurnControls } from './ComposerTurnControlsContext';
+import type { ReasoningSelection } from '@shared/types/modelCapability';
 
 export function useComposerEffortControl(options: {
   open: boolean;

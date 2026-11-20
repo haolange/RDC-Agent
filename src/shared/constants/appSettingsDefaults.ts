@@ -1,3 +1,12 @@
+import { TOP_LEVEL_AGENT_IDS } from '../types/agent';
+import { createDefaultUiPreferences } from '../theme/uiPreferences';
+import {
+  APP_DEFAULT_WINDOW_HEIGHT,
+  APP_DEFAULT_WINDOW_WIDTH,
+  LEFT_SIDEBAR_DEFAULT_WIDTH,
+  RIGHT_PANEL_DEFAULT_WIDTH,
+  TERMINAL_DEFAULT_HEIGHT,
+} from './layout';
 import type {
   AgentRuntimeSettings,
   AgentShellSettings,
@@ -10,15 +19,6 @@ import type {
   ToolingSettings,
   UiPreferences,
 } from '../types/settings';
-import { TOP_LEVEL_AGENT_IDS } from '../types/agent';
-import { createDefaultUiPreferences } from '../theme/uiPreferences';
-import {
-  APP_DEFAULT_WINDOW_HEIGHT,
-  APP_DEFAULT_WINDOW_WIDTH,
-  LEFT_SIDEBAR_DEFAULT_WIDTH,
-  RIGHT_PANEL_DEFAULT_WIDTH,
-  TERMINAL_DEFAULT_HEIGHT,
-} from './layout';
 
 /** The one set of settings defaults: main persists and sanitizes against it, the renderer starts from it. */
 

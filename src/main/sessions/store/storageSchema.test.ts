@@ -1,5 +1,13 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { afterEach } from 'vitest';
+import { readPersistedRun } from '../run/sessionRunPersistence';
+import { assertPersistedSettingsSchemaVersion } from '../../settings/settings-core/settingsServiceHelpers';
+import { SETTINGS_SCHEMA_VERSION } from '../../settings/settings-core/settingsDefaults';
+import { stringifyYaml } from '../../runtime/yaml';
 import {
   parseStoredDocument,
   PROJECT_REGISTRY_MIGRATIONS,
@@ -18,15 +26,7 @@ import {
   type StorageMigration,
 } from './storageSchema';
 import { StorageIo } from './StorageIo';
-import { readPersistedRun } from '../run/sessionRunPersistence';
 import type { StorageHost } from './storageHost';
-import { assertPersistedSettingsSchemaVersion } from '../../settings/settings-core/settingsServiceHelpers';
-import { SETTINGS_SCHEMA_VERSION } from '../../settings/settings-core/settingsDefaults';
-import { stringifyYaml } from '@shared/utils/yaml';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { afterEach } from 'vitest';
 
 describe('storageSchema parseStoredDocument', () => {
   const current = z.object({

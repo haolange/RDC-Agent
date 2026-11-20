@@ -1,19 +1,7 @@
-import { registerProviderProbeHandlers } from './providerProbeHandlers';
-import { refreshApplicationMenu } from '../window/applicationMenu';
-import { providerAccountAuthService } from '../settings/provider-auth/ProviderAccountAuthService';
 import { ipcMain } from 'electron';
+import { providerAccountAuthService } from '../settings/provider-auth/ProviderAccountAuthService';
+import { refreshApplicationMenu } from '../window/applicationMenu';
 import { confirmResourceTrust } from '../window/trustConfirmation';
-import type {
-  AppSettings,
-  AppSettingsPatch,
-  LlmModelCapabilityProbeRequest,
-  LlmProviderAccountLoginStartRequest,
-  LlmProviderAccountLoginFinishRequest,
-  LlmProviderDraftRequest,
-  LlmProviderId,
-  ProviderDefinitionSaveRequest,
-} from '@shared/types/settings';
-import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
 import { resolveCompiledRouteForAgent } from '../settings/provider-catalog/compiledAgentRoutes';
@@ -27,7 +15,7 @@ import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { applyProductIcon } from '../window/productIcon';
 import { formatShellInterpreterLabel, shellResolver } from '../runtime/ShellResolver';
-import type { WorkbenchIpcContext } from './workbenchContext';
+import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
@@ -54,8 +42,20 @@ import {
   SettingsGetModelsOverrideArgsSchema,
   SettingsSetModelsOverrideArgsSchema,
 } from './validation/settingsLlmSchemas';
+import { registerProviderProbeHandlers } from './providerProbeHandlers';
 import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
-import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
+import type { WorkbenchIpcContext } from './workbenchContext';
+import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
+import type {
+  AppSettings,
+  AppSettingsPatch,
+  LlmModelCapabilityProbeRequest,
+  LlmProviderAccountLoginStartRequest,
+  LlmProviderAccountLoginFinishRequest,
+  LlmProviderDraftRequest,
+  LlmProviderId,
+  ProviderDefinitionSaveRequest,
+} from '@shared/types/settings';
 
 /** Observers of committed settings may fail; the saved file stays authoritative. */
 async function notifyCommitted(notify: () => unknown): Promise<void> {

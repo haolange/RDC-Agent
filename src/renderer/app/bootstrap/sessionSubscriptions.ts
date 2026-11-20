@@ -1,6 +1,3 @@
-import type { AgentState } from '@shared/types/agent';
-import type { ActionEvent } from '@shared/types/evidence';
-import type { RunSummary } from '@shared/types/session';
 import {
   applyActionEventToMessage,
   mapActionEventToTimelineEntry
@@ -14,6 +11,9 @@ import { isActiveSessionEvent, isActiveSessionScope } from '../../stores/session
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import type { RunSummary } from '@shared/types/session';
+import type { ActionEvent } from '@shared/types/evidence';
+import type { AgentState } from '@shared/types/agent';
 
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';

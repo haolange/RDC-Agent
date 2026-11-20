@@ -11,19 +11,10 @@
  */
 
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Message,
-  Model,
-  StopReason,
-  StreamOptions,
-  ToolDefinition,
-} from '../core/types';
-import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,
@@ -37,10 +28,19 @@ import {
   parseJsonLines,
   ProviderEmptyStreamError,
 } from './internal/http';
-import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { reasoningProjectionSource } from './reasoningProjection';
 import { applyOllamaThink } from './reasoningWire';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Message,
+  Model,
+  StopReason,
+  StreamOptions,
+  ToolDefinition,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
 const DEFAULT_BASE_URL = 'http://localhost:11434';

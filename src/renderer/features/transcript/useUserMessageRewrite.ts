@@ -1,6 +1,5 @@
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { useCallback } from 'react';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { getElectronApi } from '../../platform/getElectronApi';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -18,6 +17,7 @@ import { useComposerSessionContextStore } from '../../stores/composerSessionCont
 import { useLayoutStore } from '../../stores/layoutStore';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: string | null): boolean {
   const state = useConversationStore.getState();

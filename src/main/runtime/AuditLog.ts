@@ -1,9 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AgentPermissionSettings } from '@shared/types/settings';
 import { appPathService } from './AppPathService';
 import { hashScopedResource } from './ScopedResourceResolver';
+import type { AgentPermissionSettings } from '@shared/types/settings';
 
 /** Who asked: the desktop window, the unpackaged Browser QA bridge, or main itself. */
 export type AuditOrigin = 'desktop' | 'browser-qa' | 'runtime';

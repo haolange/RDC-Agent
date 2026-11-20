@@ -1,9 +1,9 @@
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { ProviderHttpError } from './internal/http';
 import { reasoningProjectionSource } from './reasoningProjection';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 const PROVIDER_API = 'google-interactions';
 

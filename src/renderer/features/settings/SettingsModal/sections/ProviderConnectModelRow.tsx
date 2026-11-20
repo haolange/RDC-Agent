@@ -1,10 +1,10 @@
 import React from 'react';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Switch } from '../../../../ui/Switch';
 import { resolveProviderModelAvailabilityBadge } from '../providerModelAvailabilityBadge';
 import { ProviderModelCapabilitySummary } from './ProviderModelCapabilitySummary';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

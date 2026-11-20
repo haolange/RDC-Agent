@@ -1,10 +1,10 @@
-import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { randomUUID } from 'node:crypto';
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
+import { sameRdcLifecyclePosition, type RdcLifecyclePoint, type RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
+import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TaskRuntimeEpoch } from '@shared/types/taskExecution';
-import { sameRdcLifecyclePosition, type RdcLifecyclePoint, type RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
-import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { RdcSwitchSnapshot } from '../../rdc/RdcSwitchSnapshot';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PromptPlan } from '@shared/types/rdcRuntime';

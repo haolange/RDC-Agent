@@ -1,21 +1,21 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { AppSettings } from '@shared/types/settings';
 import { useModalFocus } from '../../../lib/useModalFocus';
 import { isTopOverlayLayer, useOverlayLayer } from '../../../lib/overlayStack';
-import { useSettingsModal } from './useSettingsModal';
-import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
-import { SettingsCenterNav } from './SettingsCenterNav';
-import { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 import { Icon } from '../../../ui/Icon';
 import { ProductLogo } from '../../../ui/ProductLogo';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { IconButton } from '../../../ui/IconButton';
 import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
+import { useSettingsNavigationStore } from '../../../stores/settingsNavigationStore';
+import { useSettingsModal } from './useSettingsModal';
+import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
+import { SettingsCenterNav } from './SettingsCenterNav';
+import { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 import { useSettingsNavigation } from './useSettingsNavigation';
 import { SettingsPageContent } from './SettingsPageContent';
 import './SettingsModal.css';
-import { useSettingsNavigationStore } from '../../../stores/settingsNavigationStore';
+import type { AppSettings } from '@shared/types/settings';
 
 interface SettingsModalProps {
   open: boolean;

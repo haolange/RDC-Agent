@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
 import { Textarea } from '../../../../ui/Textarea';
@@ -7,6 +6,7 @@ import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { SettingsField } from '../parts';
 import { previewThemeImport, themeImportErrorMessage, type AppearanceTranslate } from './appearanceChromeModel';
+import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 
 interface ThemeImportDialogProps {
   open: boolean;

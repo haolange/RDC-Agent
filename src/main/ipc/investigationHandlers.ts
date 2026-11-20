@@ -1,12 +1,12 @@
 import { ipcMain } from 'electron';
-import type { InvestigationReadIpcResult } from '@shared/types/renderdocInvestigation';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { InvestigationError, isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { InvestigationReadArgsSchema, InvestigationListArgsSchema } from './validation/investigationSchemas';
+import type { InvestigationReadIpcResult } from '@shared/types/renderdocInvestigation';
 import type { WorkbenchIpcContext, WorkbenchIpcState } from './workbenchContext';
 
 function sessionDenied(message: string): InvestigationReadIpcResult {

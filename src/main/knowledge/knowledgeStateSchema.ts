@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { KnowledgeCardRecord, KnowledgeReviewRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
 import { KnowledgeCardRecordSchema } from './knowledgeCardSchema';
+import type { KnowledgeCardRecord, KnowledgeReviewRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
 
 export const KNOWLEDGE_STATE_SCHEMA_VERSION = '1';
 export const KNOWLEDGE_STATE_FILE = 'knowledge-state.json';

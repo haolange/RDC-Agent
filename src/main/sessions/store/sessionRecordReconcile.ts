@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import { SessionRecordSchema } from './storageSchema';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { StorageHost } from './storageHost';
 
 export function readProjectSessions(

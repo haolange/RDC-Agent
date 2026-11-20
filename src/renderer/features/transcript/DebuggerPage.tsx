@@ -1,5 +1,5 @@
-import type { AgentMode } from '@shared/types/layout';
 import { AgentChat } from './index';
+import type { AgentMode } from '@shared/types/layout';
 import './Debugger.css';
 
 export function DebuggerPage({ mode }: { mode: AgentMode }) {

@@ -1,7 +1,7 @@
 import fs from 'fs';
-import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
+import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import { isSafeAgentProfileId } from '@shared/types/agent';
 import {
   AGENT_PROJECT_CEILING_NARROWED,
@@ -10,6 +10,19 @@ import {
   narrowerAccessCeiling,
   type AgentAccessCeiling,
 } from '@shared/types/agentManifest';
+import { AGENT_ROLES } from '@shared/constants/agents';
+import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
+import { appPathService } from '../../runtime/AppPathService';
+import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
+import { resolvedPathKey, samePath } from '../../platform/paths';
+import { isReservedAgentId } from '../settings-core/reservedAgentIds';
+import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
+import { projectAgentTrust } from './ProjectAgentTrust';
+import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type {
   AgentManifestDefinition,
   AgentManifestDiagnostic,
@@ -19,19 +32,6 @@ import type {
   AgentModelOption,
   AgentBuiltinComparison,
 } from '@shared/types/agentManifest';
-import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
-import { AGENT_ROLES } from '@shared/constants/agents';
-import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
-import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
-import { appPathService } from '../../runtime/AppPathService';
-import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
-import { resolvedPathKey, samePath } from '../../platform/paths';
-import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
-import { isReservedAgentId } from '../settings-core/reservedAgentIds';
-import { projectAgentTrust } from './ProjectAgentTrust';
 
 const toSlug = (value: string): string => {
   const slug = value

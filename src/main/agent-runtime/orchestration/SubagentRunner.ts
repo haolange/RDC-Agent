@@ -1,12 +1,18 @@
+import { createHash } from 'node:crypto';
 import { isTransientScopeId, rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { agentAccessCeiling, narrowerAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { generateEventId, nowMs } from '@shared/utils/id';
+import {
+  DELEGATION_CAPSULE_JSON_SCHEMA,
+  freezeDelegationCapsule,
+  parseDelegationCapsule,
+  type DelegationCapsule,
+} from '@shared/types/delegationCapsule';
 import { withDelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { reviewEvidenceClosure } from '../../investigation/reviewEvidenceClosure';
-import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudgetObserver } from './DelegationBudget';
-import { bindTaskRootBudget } from './TaskRootBudget';
 import { delegatedArtifactOwner, delegatedArtifactReferences, grantDelegatedArtifactAccess } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { shellInvocationService } from '../../tools/ShellInvocationService';
 import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
@@ -19,35 +25,8 @@ import { resolveRdcDelegation } from '../../rdc/RdcDelegation';
  * admission and child tool effects enforce the actual resource constraints.
  */
 
-import type { AgentRole } from '@shared/types/agent';
-import type {
-  AgentEvent as SharedAgentEvent,
-} from '@shared/types/agentRuntime';
-import { generateEventId, nowMs } from '@shared/utils/id';
-import type { AgentTool } from '../agent/AgentTool';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
-import {
-  APPROVED_CAPTURE_SCOPE_REQUIRED,
-  assertSubagentBudgetAllowsChild,
-  consumeReservedSubagentSlot,
-  createSubagentBudgetState,
-  createPolicyBudgetState,
-  finishSubagentBudgetChild,
-  reserveDispatchBudget,
-  startSubagentBudgetChild,
-  subagentActiveWallMs,
-  type SubagentResultStatus,
-  type TurnHandle,
-} from './TurnCoordinator';
-import type { AgentProfileTurnOptions } from './orchestratorTypes';
-import { createEphemeralScopeId } from './executionScope';
-import {
-  DELEGATION_CAPSULE_JSON_SCHEMA,
-  freezeDelegationCapsule,
-  parseDelegationCapsule,
-  type DelegationCapsule,
-} from '@shared/types/delegationCapsule';
 import { compileDelegationCapsule } from '../prompt/DelegationCapsuleCompiler';
 import {
   grantDelegatedLease,
@@ -62,11 +41,32 @@ import {
   registerDelegatedTaskScope,
   getDelegatedTaskScope,
 } from '../tasks';
-import type { BackgroundSubagentStart } from './BackgroundSubagentService';
-import { createHash } from 'node:crypto';
-import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult, type DelegationSourceFailure } from './SubagentResultEnvelope';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult, type DelegationSourceFailure } from './SubagentResultEnvelope';
+import { createEphemeralScopeId } from './executionScope';
+import {
+  APPROVED_CAPTURE_SCOPE_REQUIRED,
+  assertSubagentBudgetAllowsChild,
+  consumeReservedSubagentSlot,
+  createSubagentBudgetState,
+  createPolicyBudgetState,
+  finishSubagentBudgetChild,
+  reserveDispatchBudget,
+  startSubagentBudgetChild,
+  subagentActiveWallMs,
+  type SubagentResultStatus,
+  type TurnHandle,
+} from './TurnCoordinator';
+import { bindTaskRootBudget } from './TaskRootBudget';
+import { deriveChildPolicyBudget, flushPolicyBudgetObservers, registerPolicyBudgetObserver } from './DelegationBudget';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
+import type { BackgroundSubagentStart } from './BackgroundSubagentService';
+import type { AgentProfileTurnOptions } from './orchestratorTypes';
+import type { AgentTool } from '../agent/AgentTool';
+import type {
+  AgentEvent as SharedAgentEvent,
+} from '@shared/types/agentRuntime';
+import type { AgentRole } from '@shared/types/agent';
 
 export interface SubagentRunnerDeps {
   sendProfileMessage: (

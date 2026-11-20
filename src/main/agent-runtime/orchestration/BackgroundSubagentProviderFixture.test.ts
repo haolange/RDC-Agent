@@ -7,10 +7,10 @@ vi.mock('electron', () => ({ app: { getPath: () => process.cwd(), getAppPath: ()
 vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ paths: {}, llm: { providers: [], agentRoutes: [] } }) } }));
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: { getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'General', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { providerId: 'openai', modelId: 'gpt-5.6-sol' } }] } }));
 
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { TaskRegistry } from '../tasks';
 import { SubagentRunner } from './SubagentRunner';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
+import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });

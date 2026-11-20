@@ -1,3 +1,6 @@
+import { aggregateSectionSteps } from './workProcessToolAggregate';
+import { projectLlmTurn } from './workProcessLlmProjection';
+import { pushStandaloneBlock } from './workProcessStandaloneProjection';
 import type { Translator } from '../../i18n/messages';
 import type {
   ConversationLoopOutputPhase,
@@ -9,9 +12,6 @@ import type {
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { PresentationUnit } from './workProcessUnits';
-import { aggregateSectionSteps } from './workProcessToolAggregate';
-import { projectLlmTurn } from './workProcessLlmProjection';
-import { pushStandaloneBlock } from './workProcessStandaloneProjection';
 import type { WorkProcessRow } from './workProcessTypes';
 
 export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';

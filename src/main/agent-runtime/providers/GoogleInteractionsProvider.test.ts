@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type { RequestPlan } from '@shared/types/providerCapability';
-import type { ReasoningControl } from '@shared/types/modelCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import type { AssistantMessage, Context, Model } from '../core/types';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { createProviderStateRef } from '../reasoning/ProviderStateRefs';
 import { GoogleInteractionsProvider } from './GoogleInteractionsProvider';
@@ -12,6 +8,10 @@ import {
   buildGoogleInteractionsRequest,
   toGoogleInteractionSteps,
 } from './GoogleInteractionsWire';
+import type { AssistantMessage, Context, Model } from '../core/types';
+import type { ReasoningControl } from '@shared/types/modelCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 
 const reasoningControl: ReasoningControl = {
   kind: 'levels' as const,

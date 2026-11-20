@@ -13,8 +13,8 @@ vi.mock('electron', () => ({
 }));
 
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import { encodeAgentModel, configuredRuntimeProvider } from './ConfiguredRuntimeProvider';
 import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
+import { encodeAgentModel, configuredRuntimeProvider } from './ConfiguredRuntimeProvider';
 
 const requestPlan = createTestRequestPlan({
   providerId: 'openai',

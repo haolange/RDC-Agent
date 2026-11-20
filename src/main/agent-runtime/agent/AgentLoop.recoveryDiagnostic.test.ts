@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
+import { ProviderEmptyStreamError, ProviderHttpError } from '../providers/internal/http';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { agentLoop, type AgentContext } from './AgentLoop';
 import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
-import { ProviderEmptyStreamError, ProviderHttpError } from '../providers/internal/http';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
   AgentEvent,
   AssistantMessage,
@@ -12,7 +13,6 @@ import type {
   Model,
   StreamOptions,
 } from '../core/types';
-import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
 const TEST_MODEL: Model = {
   id: 'test-model',

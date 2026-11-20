@@ -1,6 +1,4 @@
 import React, { useCallback } from 'react';
-import type { AgentMode } from '@shared/types/layout';
-import type { ConversationMessage } from '@shared/types/conversation';
 import {
   selectOrderedConversationMessages,
   useConversationStore,
@@ -8,6 +6,8 @@ import {
 import { EmptyWorkbenchPrompt } from '../../patterns/EmptyWorkbenchPrompt';
 import { VirtualMessageList } from './VirtualMessageList';
 import { MessageBubble } from './MessageBubble';
+import type { ConversationMessage } from '@shared/types/conversation';
+import type { AgentMode } from '@shared/types/layout';
 
 interface ConversationThreadProps {
   mode: AgentMode;

@@ -1,7 +1,7 @@
-import type { ElectronAPI } from '@shared/types/electron';
-import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import type { ElectronAPI } from '@shared/types/electron';
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
 export function subscribePermissionState(electronAPI: ElectronAPI): () => void {
   let disposed = false;

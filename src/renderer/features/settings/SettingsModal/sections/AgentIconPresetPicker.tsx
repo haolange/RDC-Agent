@@ -1,10 +1,10 @@
 import React, { useRef, useState, type KeyboardEvent } from 'react';
 import { AGENT_ICON_PRESETS } from '@shared/constants/agents';
-import type { ModeIconKey } from '@shared/types/layout';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Popover } from '../../../../ui/Popover';
+import type { ModeIconKey } from '@shared/types/layout';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];

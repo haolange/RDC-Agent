@@ -1,12 +1,12 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import type { ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import {
   applyConversationTurnResult,
   buildOptimisticConversationTurn,
   resolveComposerProfileId,
 } from '../../stores/conversationSendHelpers';
 import { useConversationStore } from '../../stores/conversationStore';
+import type { ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 
 const makeMessage = (
   id: string,

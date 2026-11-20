@@ -7,12 +7,12 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useOverlayDismiss } from '../../lib/overlayStack';
 import {
   isInsideComposerMenuRoot,
   reduceComposerMenu,
   type ComposerMenuId,
 } from './composerMenuState';
-import { useOverlayDismiss } from '../../lib/overlayStack';
 
 export interface ComposerMenuRegistryApi {
   activeId: ComposerMenuId | null;

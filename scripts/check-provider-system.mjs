@@ -56,7 +56,7 @@ if (/category:\s*z\.enum\(\[[\s\S]*?'image'/.test(catalogSchema)) {
 if (/surfaceKind:\s*z\.enum\(\[[\s\S]*?'media'/.test(catalogSchema)) {
   fail('catalogManifestSchema must not allow surfaceKind media');
 }
-const compilerSource = fs.readFileSync(path.join(repoRoot, 'src/shared/provider-catalog/compiler.ts'), 'utf8');
+const compilerSource = fs.readFileSync(path.join(repoRoot, 'src/main/provider-catalog/catalogCompiler.ts'), 'utf8');
 if (/image:\s*\[\s*'media'/.test(compilerSource) || compilerSource.includes("'image-generation'")) {
   fail('compiler must not compile image/media generation category shapes');
 }
@@ -96,7 +96,7 @@ const registrySource = fs.readFileSync(path.join(repoRoot, 'src/main/provider-ca
 if (!registrySource.includes("from 'virtual:rdc-provider-catalog-index'")) {
   fail('ProviderCatalogRegistry must consume the compiled virtual index and lazy surface chunks');
 }
-for (const forbidden of ['nodeManifestLoader', 'compileProviderCatalog(', 'src/shared/provider-catalog/manifests']) {
+for (const forbidden of ['manifestLoader', 'compileProviderCatalog(', 'src/shared/provider-catalog/manifests']) {
   if (registrySource.includes(forbidden)) fail(`ProviderCatalogRegistry contains a source-manifest runtime fallback: ${forbidden}`);
 }
 
@@ -128,7 +128,7 @@ if (connectionSource.includes("provider.id === 'moonshot'")) {
 }
 
 const contractTests = [
-  'src/shared/provider-catalog/compiler.test.ts',
+  'src/main/provider-catalog/catalogCompiler.test.ts',
   'src/shared/utils/modelControls.test.ts',
   'src/main/settings/provider-catalog/RequestPlanner.catalogOutput.test.ts',
   'src/main/settings/provider-catalog/EffectiveModelResolver.test.ts',

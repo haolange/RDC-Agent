@@ -2,9 +2,9 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CaptureReplayState } from '@shared/types/captureReplay';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { applyReplayEvent } from './capturePanelActions';
+import type { CaptureReplayState } from '@shared/types/captureReplay';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, args?: Record<string, unknown>) => `${key}${args ? JSON.stringify(args) : ''}` }) }));
 vi.mock('./capturePanelActions', () => ({ applyReplayEvent: vi.fn() }));

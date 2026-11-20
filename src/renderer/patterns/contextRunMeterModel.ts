@@ -1,5 +1,5 @@
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { formatTokenCount } from '@shared/utils/tokens';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 const unavailable = '—';
 const tokens = (value: number | undefined): string => typeof value === 'number' ? formatTokenCount(value) : unavailable;

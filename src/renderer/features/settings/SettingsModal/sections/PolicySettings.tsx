@@ -1,17 +1,17 @@
 import React from 'react';
-import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import {
   CONTEXT_COMPACTION_PERCENT_MAX,
   CONTEXT_COMPACTION_PERCENT_MIN,
   CONTEXT_COMPACTION_PERCENT_STEP,
 } from '@shared/types/modelCapability';
+import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
 import { useI18n } from '../../../../i18n';
 import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
-import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
 import { Select } from '../../../../ui/Select';
 import { SettingsField, SettingsSection } from '../parts';
 import { CustomPermissionFields } from './CustomPermissionFields';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
 const COMPACTION_PERCENT_OPTIONS: number[] = (() => {
   const options: number[] = [];

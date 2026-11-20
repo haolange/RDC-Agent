@@ -1,8 +1,8 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import { SessionListItem } from './SessionListItem';
 import { EmptyState } from '../../../ui/EmptyState';
+import { SessionListItem } from './SessionListItem';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export interface SessionListProps {
   project: ProjectRecord;

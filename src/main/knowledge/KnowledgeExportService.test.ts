@@ -4,7 +4,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
-import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
 import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
 import { KnowledgeExportService, isExportable, toPackageCard } from './KnowledgeExportService';
@@ -13,6 +12,7 @@ import {
   unzipKnowledgeFiles,
   utf8FromZip,
 } from './knowledgeZip';
+import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',

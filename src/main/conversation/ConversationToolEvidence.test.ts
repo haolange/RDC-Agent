@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
 import {
   attachToolExecutionEvidence,
   deriveToolExecutionEvidence,
 } from './ConversationToolEvidence';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 const TRACE: ConversationWorkTrace = {
   status: 'running',

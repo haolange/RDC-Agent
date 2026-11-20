@@ -1,12 +1,12 @@
-import { loadProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { randomUUID } from 'crypto';
 import { createServer } from 'http';
-import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
+import { loadProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { parseChatGptAccountCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
-import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import { CHATGPT_CALLBACK_PORT, CHATGPT_CLIENT_ID, CHATGPT_CATALOG_CLIENT_VERSION } from './oauthConstants';
 import { appendParams, createPkce, extractChatGptAccountId, fetchJson } from './oauthHttp';
+import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
+import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 
 export async function startChatGptLogin(
   providerId: LlmProviderId,

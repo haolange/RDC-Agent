@@ -1,6 +1,6 @@
+import { projectEndpointTemplate } from './providerConnectionState';
 import type { LlmProviderEntry, LlmProviderModelPreference } from '@shared/types/settings';
 import type { ProviderConnectionDraft } from './types';
-import { projectEndpointTemplate } from './providerConnectionState';
 
 export function projectProviderModelPreferences(
   draft: ProviderConnectionDraft | null,

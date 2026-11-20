@@ -1,5 +1,5 @@
-import type { ProviderOutputRef } from '../../core/types';
 import { AssistantStreamBuilder, createProviderOutputRef } from './AssistantStreamBuilder';
+import type { ProviderOutputRef } from '../../core/types';
 
 export type StreamChannelKind = 'text' | 'thinking';
 

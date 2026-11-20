@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { useRuntimePermissionStore } from './runtimePermissionStore';
 import { DEFAULT_AGENT_RUNTIME, createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+import { useRuntimePermissionStore } from './runtimePermissionStore';
 import {
   beginAgentDefinitionSave,
   isLatestAgentDefinitionRevision,
@@ -16,12 +16,12 @@ import {
   rollbackProviderDefinitionSave,
   settleProviderDefinitionSave,
 } from './providerDefinitionSettings';
-import type { AppSettingsState } from './appSettingsStoreState';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
 import {
   withCompactionThresholdPercent,
   withPermissionMode,
 } from './appSettingsRuntimePatch';
+import type { AppSettingsState } from './appSettingsStoreState';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
 

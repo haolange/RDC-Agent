@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
+import { validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import { validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 const definition = { evidence_kind: 'measurement' } as RdcOperationDefinition;
 const context = {} as ToolExecutionContext;
 it.each([{ event_durations: [] }, { event_durations: [{ event_id: 1, duration_us: -1 }] }, { event_durations: [{ event_id: 1, duration_us: Infinity }] }, { perf: { samples: [] } }, { duration_ms: 0 }])('rejects unusable measurement %j', async result => {

@@ -1,12 +1,12 @@
+import { stopWorkTrace } from '../lib/stopWorkTrace';
+import { useConversationStore } from './conversationStore';
+import { useProjectStore } from './projectStore';
+import { getActiveSessionId, isActiveSessionEvent } from './sessionEventGate';
+import { useSessionProjectionStore } from './sessionProjectionStore';
 import type { ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
-import { useConversationStore } from './conversationStore';
-import { useProjectStore } from './projectStore';
-import { stopWorkTrace } from '../lib/stopWorkTrace';
-import { getActiveSessionId, isActiveSessionEvent } from './sessionEventGate';
-import { useSessionProjectionStore } from './sessionProjectionStore';
 
 /**
  * Turn 响应里的消息以“可见分支成员集”为准，但流事件（SSE/IPC）可能先于

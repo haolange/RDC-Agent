@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type { ProviderReasoningContract } from '@shared/provider-catalog/modelManifestSchema';
+import { ProviderHttpError } from '../providers/internal/http';
 import {
   claimStructuredToolCallingEvidence,
   describeRouteCapabilityDiagnostic,
@@ -10,7 +8,9 @@ import {
   resolveAgentRouteCapability,
   type StructuredToolCallingEvidenceGate,
 } from './RouteCapabilityResolver';
-import { ProviderHttpError } from '../providers/internal/http';
+import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { ProviderReasoningContract } from '@shared/provider-catalog/modelManifestSchema';
 
 const provider = {
   id: 'test-provider',

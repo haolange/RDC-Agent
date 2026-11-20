@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagnostic';
+import { AGENT_PROJECT_CEILING_NARROWED, AGENT_PROJECT_UNTRUSTED, type AgentManifestDiagnostic } from '@shared/types/agentManifest';
 import { useClipboardBridge } from '../../../../hooks/useClipboardBridge';
 import { Button } from '../../../../ui/Button';
 import { Details } from '../../../../ui/Details';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import type { useI18n } from '../../../../i18n';
-import { AGENT_PROJECT_CEILING_NARROWED, AGENT_PROJECT_UNTRUSTED, type AgentManifestDiagnostic } from '@shared/types/agentManifest';
 import './AgentManifestDiagnostics.css';
 
 type Translate = ReturnType<typeof useI18n>['t'];

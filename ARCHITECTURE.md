@@ -126,6 +126,17 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - `docs/architecture/` — [`README.md`](docs/architecture/README.md)（模块地图与数据流入口）、[`browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)（Browser QA 与桌面 channel 矩阵，debug-only）、[`rdc-runtime.md`](docs/architecture/rdc-runtime.md)（RDC 操作契约、lease、回放身份）、[`host-platform.md`](docs/architecture/host-platform.md)（宿主平台模块、能力契约、门禁、Linux 密钥策略）
 - `docs/workflows/` — [`README.md`](docs/workflows/README.md)；当前执行计划为 [`vertical-investigation-convergence.md`](docs/workflows/vertical-investigation-convergence.md)
 
+### 进程间与主进程依赖方向
+
+ESLint `no-restricted-imports` 强制以下方向（`eslint.config.mjs`）：
+
+- `src/shared` 在每个进程里运行：不 import Node 内建模块（`fs`、`crypto`、`node:*` …），也不 import `main` / `renderer` / `preload`。只在主进程用的工具（JSONL、YAML 文件读写、Provider manifest 编译器与 loader）放在 `src/main`；随机数用 Web Crypto。
+- `src/main/platform` 与 `src/main/provider-catalog` 是叶子：不 import 其它主进程域。
+- `src/main/ipc` 是最外层适配器：只有 `src/main/index.ts` 与 `src/main/browserAppBridge` 调用它；被多个域共用的原语（如单次审批 token）放在 `src/main/runtime`。
+- 生产代码不 import `src/main/testing`。
+
+import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
+
 ### Renderer 架构
 
 视觉定位与 Token 规则由 [`DESIGN.md`](DESIGN.md) 及其 UI 主题文档维护；本文件规定工程分层与运行时约束。

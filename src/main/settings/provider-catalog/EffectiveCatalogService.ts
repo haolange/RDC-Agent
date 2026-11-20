@@ -1,7 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { LlmProviderProtocol } from '@shared/types/settings';
 import { appPathService } from '../../runtime/AppPathService';
 import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
 import { CatalogProjectionClock } from './CatalogProjectionClock';
@@ -26,6 +24,8 @@ import {
   type PersistedCatalogState,
   type TransientQuotaEntry,
 } from './effectiveCatalogTypes';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
 const EMPTY_STATE: PersistedCatalogState = {
   schemaVersion: EFFECTIVE_CATALOG_SCHEMA_VERSION,

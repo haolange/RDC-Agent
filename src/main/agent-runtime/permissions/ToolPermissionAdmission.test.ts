@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentPermissionMode } from '@shared/types/settings';
-import type { AgentPermissionDecision } from './AgentPermissionPolicy';
+import { ToolResourceArbiter } from '../orchestration/ToolResourceArbiter';
 import { RuntimePermissionStateService } from './RuntimePermissionStateService';
 import { executeWithPermissionAdmission } from './ToolPermissionAdmission';
 import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestService';
-import { ToolResourceArbiter } from '../orchestration/ToolResourceArbiter';
+import type { AgentPermissionMode } from '@shared/types/settings';
+import type { AgentPermissionDecision } from './AgentPermissionPolicy';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 function deferred<T = void>() {

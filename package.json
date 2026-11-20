@@ -46,7 +46,7 @@
     "check:browser-capability": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"browser capability\"",
     "check:provider-system": "node scripts/check-provider-system.mjs",
     "check:agent-tool-capability": "node scripts/check-agent-tool-capability.mjs",
-    "check:provider-catalog": "vitest run src/shared/provider-catalog/compiler.test.ts && node scripts/check-agent-tool-capability.mjs",
+    "check:provider-catalog": "vitest run src/main/provider-catalog/catalogCompiler.test.ts && node scripts/check-agent-tool-capability.mjs",
     "check:settings-agents": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"settings agents\"",
     "check:i18n": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"i18n catalogs\"",
     "check:appearance": "vitest run src/main/testing/gates/behaviorChecks.test.ts -t \"appearance theme\"",

@@ -1,6 +1,6 @@
 const path = require('path');
-const { compileProviderCatalog } = require('../src/shared/provider-catalog/compiler.ts');
-const { loadProviderCatalogManifestInput } = require('../src/shared/provider-catalog/nodeManifestLoader.ts');
+const { compileProviderCatalog } = require('../src/main/provider-catalog/catalogCompiler.ts');
+const { loadProviderCatalogManifestInput } = require('../src/main/provider-catalog/manifestLoader.ts');
 
 const manifestRoot = path.join(
   __dirname,

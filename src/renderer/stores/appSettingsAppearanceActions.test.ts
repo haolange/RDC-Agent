@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 

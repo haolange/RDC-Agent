@@ -1,25 +1,7 @@
-import type { AgentManifestDiagnostic } from '@shared/types/agentManifest';
 import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagnostic';
-import type {
-  ConversationMessage,
-  ConversationMessageDiagnostic,
-  ConversationWorkTrace,
-} from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import type { AgentRole } from '@shared/types/agent';
 import { isTopLevelAgentId } from '@shared/types/agent';
-import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
-import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
-import type {
-  OpenedCaptureState,
-  ProjectInputRecord,
-  RunSummary,
-  SessionAttachmentRecord,
-  SessionRecord,
-} from '@shared/types/session';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
-import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import {
   classifyAgentToolEligibility,
@@ -33,6 +15,24 @@ import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
 import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import type { ReplayDeviceEntry } from '@shared/types/device';
+import type {
+  OpenedCaptureState,
+  ProjectInputRecord,
+  RunSummary,
+  SessionAttachmentRecord,
+  SessionRecord,
+} from '@shared/types/session';
+import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
+import type { AgentRole } from '@shared/types/agent';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import type {
+  ConversationMessage,
+  ConversationMessageDiagnostic,
+  ConversationWorkTrace,
+} from '@shared/types/conversation';
+import type { AgentManifestDiagnostic } from '@shared/types/agentManifest';
 
 export interface ConversationBranchTurnContext {
   branchId: string;

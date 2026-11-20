@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { useI18n } from '../../../../i18n';
 import { emptyForm, formFromContent, type ResourceFormState } from './scopedResourceForm';
 import { uniqueResourceId } from './uniqueResourceId';
 import { deleteScopedResource } from './runtimeScopeActions';
 import { importScopedResourceFromPicker, saveScopedResource, templateResourceId } from './runtimeScopeMutations';
+import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 export { normalizeResourceId, templateResourceId } from './runtimeScopeMutations';
 

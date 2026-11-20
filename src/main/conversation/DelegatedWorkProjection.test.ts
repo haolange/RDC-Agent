@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import type { AgentEvent } from '@shared/types/agentRuntime';
 import { createDelegatedProjectionState, projectDelegatedEvent } from './DelegatedWorkProjection';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const event = (id: string, type: AgentEvent['type'], payload: object, timestamp: number): AgentEvent => ({
   id, type, timestamp, payload: payload as AgentEvent['payload'],

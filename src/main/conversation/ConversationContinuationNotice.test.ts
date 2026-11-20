@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { shouldAnnounceContinuationDrop } from './ConversationContinuationNotice';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 describe('shouldAnnounceContinuationDrop', () => {
   const next = {

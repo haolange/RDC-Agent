@@ -1,8 +1,6 @@
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { pathComparisonKey } from '../../platform/paths';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
@@ -10,6 +8,8 @@ import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { rdcExecutionReceipts } from '../../rdc/RdcExecutionReceipts';
 import { rdcLifecycleReceipts } from '../../rdc/RdcLifecycleReceipts';
 import { fileOperationBoundary } from './FileOperationBoundary';
+import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
 import type { ApprovedCaptureController } from '../orchestration/ApprovedCaptureController';
 

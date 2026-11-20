@@ -1,4 +1,19 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { getLoadedProviderSurface, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
+import {
+  applyDiscoveryAuthority,
+  buildCatalogModelContribution,
+  buildEffectiveCatalogRequest,
+  planEffectiveModelCapabilityProbe,
+  planEffectiveModelRequest,
+  refreshEffectiveCatalogDiscovery,
+  resolveEffectiveModelSelection,
+} from './EffectiveModelResolver';
+import { planModelRequest } from './RequestPlanner';
+import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
@@ -12,21 +27,6 @@ vi.mock('electron', () => ({
     encryptString: (value: string) => Buffer.from(value, 'utf8'),
   },
 }));
-
-import {
-  applyDiscoveryAuthority,
-  buildCatalogModelContribution,
-  buildEffectiveCatalogRequest,
-  planEffectiveModelCapabilityProbe,
-  planEffectiveModelRequest,
-  refreshEffectiveCatalogDiscovery,
-  resolveEffectiveModelSelection,
-} from './EffectiveModelResolver';
-import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
-import { getLoadedProviderSurface, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
-import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { planModelRequest } from './RequestPlanner';
-import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';
 
 const parseKimiCodeCatalog = (payload: unknown) => parseKimiCodeCatalogWithSurface(
   payload,

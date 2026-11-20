@@ -1,8 +1,8 @@
-import type { FC, RefObject } from 'react';
-import type { ConversationAskUserQuestion } from '@shared/types/conversation';
-import { CheckIcon } from './userInputRequestIcons';
 import { Textarea } from '../../ui/Textarea';
 import { useI18n } from '../../i18n';
+import { CheckIcon } from './userInputRequestIcons';
+import type { FC, RefObject } from 'react';
+import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 
 export const UserInputOptionList: FC<{
   question: ConversationAskUserQuestion;

@@ -1,4 +1,6 @@
-import type { RequestPlan } from '@shared/types/providerCapability';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { findLatestProviderState } from '../reasoning/ProviderStateRefs';
+import { applyGoogleInteractionsReasoning, reasoningVisibilityRequest } from './reasoningWire';
 import type {
   Context,
   Message,
@@ -6,9 +8,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
-import { findLatestProviderState } from '../reasoning/ProviderStateRefs';
-import { applyGoogleInteractionsReasoning, reasoningVisibilityRequest } from './reasoningWire';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 export function buildGoogleInteractionsUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/u, '');

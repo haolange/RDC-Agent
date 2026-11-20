@@ -2,10 +2,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
-import type { TabsProps } from '../../ui/Tabs';
 import { enLanguage } from '../../i18n/locales/en/language';
 import { zhLanguage } from '../../i18n/locales/zh-CN/language';
 import { UserMenu } from './index';
+import type { TabsProps } from '../../ui/Tabs';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 

@@ -1,4 +1,3 @@
-import type { ConversationMessageDiagnostic } from '@shared/types/conversation';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import {
   AgentRecoveryAbortError,
@@ -21,6 +20,7 @@ import {
   redactTechnicalMessage,
   type AgentRoutePreflightOk,
 } from './ConversationRoutePreflight';
+import type { ConversationMessageDiagnostic } from '@shared/types/conversation';
 
 export function createTurnFailedDiagnostic(
   route: Pick<AgentRoutePreflightOk, 'agentId' | 'providerId' | 'modelId'>,

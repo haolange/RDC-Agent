@@ -1,8 +1,8 @@
-import type { DiscoveryStrategy } from '@shared/types/providerCapability';
-import type { LlmProviderModel } from '@shared/types/settings';
 import { isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
 import { ProviderConnectionError } from './providerConnectionErrors';
 import { normalizeDiscoveredModels } from './providerConnectionModelUtils';
+import type { LlmProviderModel } from '@shared/types/settings';
+import type { DiscoveryStrategy } from '@shared/types/providerCapability';
 
 export const REQUEST_TIMEOUT_MS = 20000;
 

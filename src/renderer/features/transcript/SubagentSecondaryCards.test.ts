@@ -2,10 +2,10 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { DelegationTraceHeader } from '@shared/types/delegationTrace';
 import { DelegationTaskDocument } from './DelegationTaskDocument';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { SubagentCallDetails } from './SubagentCallDetails';
+import type { DelegationTraceHeader } from '@shared/types/delegationTrace';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { count: number }) =>
   `${key}${values ? `:${values.count}` : ''}` }) }));

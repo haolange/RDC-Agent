@@ -3,8 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
-import type { PreparedTurnContextSummary } from '@shared/types/session';
 import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
 const mock = vi.hoisted(() => ({ controls: { saveState: { saving: false }, retrySave: () => {}, capabilityState: { status: 'ready' } }, choice: false, commit: vi.fn(), clear: vi.fn(), save: vi.fn() }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, string | number>) => key === 'composer.effort.reasoningValue' ? `模型思考：${params?.level}` : key }) }));
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: unknown) => unknown) => select({

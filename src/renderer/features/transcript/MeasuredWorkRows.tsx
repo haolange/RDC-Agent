@@ -1,7 +1,7 @@
 import React from 'react';
-import type { WorkProcessRow } from './workProcessTypes';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
+import type { WorkProcessRow } from './workProcessTypes';
 
 const THRESHOLD = 24;
 const ESTIMATE = 96;

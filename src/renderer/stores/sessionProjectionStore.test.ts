@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
 import { useCaptureStore } from './captureStore';
 import { useSessionProjectionStore } from './sessionProjectionStore';
 import { useSessionStore } from './sessionStore';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const message = (overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
   id: 'msg-1',

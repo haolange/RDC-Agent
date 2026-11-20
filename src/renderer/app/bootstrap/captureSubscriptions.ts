@@ -1,10 +1,10 @@
-import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
-import type { ContextSnapshot, SessionScopedPayload } from '@shared/types/session';
 import { useCaptureStore } from '../../stores/captureStore';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { isActiveSessionScope } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
+import type { ContextSnapshot, SessionScopedPayload } from '@shared/types/session';
+import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';

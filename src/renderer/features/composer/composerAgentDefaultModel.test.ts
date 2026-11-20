@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { ComposerModelPickerOption } from './composerModelPicker';
 import {
   isComposerAgentDefaultToken,
   resolveComposerAgentDefaultState,
 } from './composerAgentDefaultModel';
+import type { ComposerModelPickerOption } from './composerModelPicker';
 
 const option: ComposerModelPickerOption = {
   providerId: 'openai',

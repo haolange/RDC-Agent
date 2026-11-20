@@ -1,3 +1,10 @@
+import { randomBytes } from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { app, BrowserWindow, dialog, session, shell } from 'electron';
+import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
 import { installApplicationMenu } from './window/applicationMenu';
 import { nativeMessage } from './window/nativeI18n';
 import { providerAccountAuthService } from './settings/provider-auth/ProviderAccountAuthService';
@@ -6,12 +13,6 @@ import { appPathService } from './runtime/AppPathService';
  * Electron Main Process Entry
  */
 
-import { app, BrowserWindow, dialog, session, shell } from 'electron';
-import { randomBytes } from 'crypto';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './sessions/store/StorageAdapter';
@@ -30,7 +31,6 @@ import {
   stopBrowserAppBridge,
 } from './browserAppBridge/BrowserAppBridgeServer';
 import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
-import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
 import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './agent-runtime/orchestration/AgentOrchestrator';
 import { processSupervisor } from './runtime/ProcessSupervisor';

@@ -1,15 +1,15 @@
+import { useRef, type Dispatch, type SetStateAction } from 'react';
+import { updateProviderModelPreference } from './providerModelProjection';
+import { useProviderConnectionActions } from './useProviderConnectionActions';
+import { useProviderConnectionDraft } from './useProviderConnectionDraft';
+import type { ProviderConnectionDraft } from './types';
+import type { useI18n } from '../../../i18n';
 import type {
   AppSettings,
   LlmProviderEntry,
   LlmProviderModel,
   ProviderDefinitionSaveResult,
 } from '@shared/types/settings';
-import { useRef, type Dispatch, type SetStateAction } from 'react';
-import type { useI18n } from '../../../i18n';
-import type { ProviderConnectionDraft } from './types';
-import { updateProviderModelPreference } from './providerModelProjection';
-import { useProviderConnectionActions } from './useProviderConnectionActions';
-import { useProviderConnectionDraft } from './useProviderConnectionDraft';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

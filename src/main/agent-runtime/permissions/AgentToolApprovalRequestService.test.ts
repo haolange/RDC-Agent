@@ -1,5 +1,5 @@
-import { PermissionModeChangedError } from './RuntimePermissionStateService';
 import { expect, it, vi } from 'vitest';
+import { PermissionModeChangedError } from './RuntimePermissionStateService';
 import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestService';
 import { PermissionReviewError } from './PermissionReviewRuntime';
 const base = { agentId: 'general', sessionId: 'session', turnId: 'turn', toolCallId: 'call', toolName: 'shell', argumentsSha256: 'a'.repeat(64),

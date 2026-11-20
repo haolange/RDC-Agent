@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { selectFiles } from '../../../../hooks/appShellBridge';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { InlineError } from '../../../../ui/InlineError';
 import { SettingsField } from '../parts';
 import { getResolvedShell } from './shellSettingsActions';
+import type { useI18n } from '../../../../i18n';
+import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

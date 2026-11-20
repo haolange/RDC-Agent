@@ -1,7 +1,7 @@
+import { taskDependencyWait } from './taskDependencies';
 import type { TaskRecord, TaskStatus } from './TaskRegistry';
 import type { TaskExecutionRecord } from './TaskContracts';
 import type { TaskDependencyWait } from '@shared/types/taskExecution';
-import { taskDependencyWait } from './taskDependencies';
 
 export type ProjectedTaskStatus = TaskStatus;
 

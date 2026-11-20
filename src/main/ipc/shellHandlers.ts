@@ -1,7 +1,7 @@
-import { nativeMessage } from '../window/nativeI18n';
 import fs from 'fs';
 import path from 'path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from 'electron';
+import { nativeMessage } from '../window/nativeI18n';
 
 import { appPathService } from '../runtime/AppPathService';
 import { acknowledgeGettingStarted, hasSeenGettingStarted } from '../runtime/GettingStartedState';

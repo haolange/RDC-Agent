@@ -1,3 +1,6 @@
+import { generateEventId, nowIso } from '@shared/utils/id';
+import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
+import { toolResultNormalizer } from './ToolResultNormalizer';
 import type { ActionEvent } from '@shared/types/evidence';
 import type {
   TraceEvent,
@@ -11,9 +14,6 @@ import type {
   VisibleReasoningPacket,
 } from '@shared/types/agenticTrace';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
-import { generateEventId, nowIso } from '@shared/utils/id';
-import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
-import { toolResultNormalizer } from './ToolResultNormalizer';
 import type { TraceEventStore } from './TraceEventStore';
 
 const toIso = (value: number | string | undefined, fallback = nowIso()): string => {

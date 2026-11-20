@@ -2,8 +2,13 @@
  * ID Generation Utilities - ID生成工具
  */
 
-import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+
+/** Hex of `byteCount` random bytes from Web Crypto, available in Node and the renderer alike. */
+function randomHex(byteCount: number): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(byteCount));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 /**
  * 生成唯一ID
@@ -31,15 +36,15 @@ export function generateEventId(prefix: string = 'evt'): string {
  */
 export function generateCaseId(): string {
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const random = randomBytes(4).toString('hex');
+  const random = randomHex(4);
   return `case_${timestamp}_${random}`;
 }
 
 /**
- * 生成 Run ID（≥56 bits entropy via crypto.randomBytes）。
+ * 生成 Run ID（64 bits entropy from Web Crypto）。
  */
 export function generateRunId(): string {
-  return `run_${randomBytes(8).toString('hex')}`;
+  return `run_${randomHex(8)}`;
 }
 
 /**

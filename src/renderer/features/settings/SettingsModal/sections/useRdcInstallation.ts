@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { detectRdcInstallations, resolveRdcInstallation, selectRdcInstallation, validateRdcInstallation } from '../../../../platform/rdcInstallation';
+import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { RdcInstallationCandidate } from '@shared/types/rdcInstallation';
 import type { ToolRuntimeSummary } from '@shared/types/tool';
-import { detectRdcInstallations, resolveRdcInstallation, selectRdcInstallation, validateRdcInstallation } from '../../../../platform/rdcInstallation';
-import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 
 export function useRdcInstallation(draft: RdcCliInvokerSettings, onApplied: (settings: RdcCliInvokerSettings) => void) {
   const revision = useRef(0);

@@ -1,11 +1,11 @@
-import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import React, { useEffect, useMemo, useState } from 'react';
-import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../../../stores/effectiveCatalogStore';
 import { projectProviderModels } from '../providerModelProjection';
 import { SearchField } from '../../../../ui/SearchField';
+import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
+import type { useI18n } from '../../../../i18n';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

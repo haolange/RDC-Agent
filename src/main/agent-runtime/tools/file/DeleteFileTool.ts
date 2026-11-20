@@ -1,10 +1,10 @@
 import * as fs from 'fs/promises';
-import type { AgentTool } from '../../agent/AgentTool';
 import {
   assertNotSensitiveDeletePath,
   requireMutationWorkspaceRoot,
   safeResolvePath,
 } from '../primitives/_shared';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface DeleteFileParams {
   path: string;

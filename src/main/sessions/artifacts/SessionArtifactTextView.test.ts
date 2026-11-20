@@ -3,9 +3,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { StorageIo } from '../store/StorageIo';
 import { SessionArtifactResolver } from './SessionArtifactResolver';
 import { resetSessionArtifactQuotaLedger } from './SessionArtifactQuota';
-import { StorageIo } from '../store/StorageIo';
 
 const roots: string[] = [];
 afterEach(() => {

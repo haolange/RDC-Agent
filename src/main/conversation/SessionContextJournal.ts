@@ -1,8 +1,3 @@
-import type { AgentRole } from '@shared/types/agent';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
-import type { ProviderContinuationArtifact } from '@shared/types/reasoning';
-import type { AssistantMessage, Message, ToolCall, ToolResultMessage } from '../agent-runtime/core/types';
 import {
   decideContinuationReplay,
   type ContinuationReplayAction,
@@ -12,6 +7,11 @@ import { providerStateReuseReason } from '../agent-runtime/reasoning/ProviderSta
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { INTERRUPTED_CONVERSATION_SUMMARY } from './DelegatedInteractionRecovery';
 import { normalizeBranchId } from './ConversationBranchResolver';
+import type { AgentRole } from '@shared/types/agent';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
+import type { ProviderContinuationArtifact } from '@shared/types/reasoning';
+import type { AssistantMessage, Message, ToolCall, ToolResultMessage } from '../agent-runtime/core/types';
 
 export interface SessionContextTurnEntry {
   schemaVersion: 2;

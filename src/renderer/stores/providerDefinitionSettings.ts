@@ -1,10 +1,10 @@
+import { ProviderDefinitionMutationCoordinator } from './ProviderDefinitionMutationCoordinator';
 import type {
   AppSettings,
   LlmProviderEntry,
   ProviderDefinitionCommitSnapshot,
   ProviderDefinitionSaveResult,
 } from '@shared/types/settings';
-import { ProviderDefinitionMutationCoordinator } from './ProviderDefinitionMutationCoordinator';
 
 const mutations = new ProviderDefinitionMutationCoordinator(
   (request) => window.electronAPI.settings.saveProviderDefinition(request),

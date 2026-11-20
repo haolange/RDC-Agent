@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { SessionRecord } from '@shared/types/session';
 import { useTurnControls } from './useTurnControls';
+import type { SessionRecord } from '@shared/types/session';
 
 const Context = createContext<ReturnType<typeof useTurnControls> | null>(null);
 

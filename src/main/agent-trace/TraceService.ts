@@ -1,19 +1,5 @@
-import type { ActionEvent } from '@shared/types/evidence';
-import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
-import type { ThinkingArtifact } from '@shared/types/reasoning';
 import { loopFinalAnswerText, loopThinkingItems } from '@shared/conversation/loopItems';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
-import type { RunSummary } from '@shared/types/session';
-import type {
-  AgentRun,
-  AgentRunPresentation,
-  AgentRunViewModel,
-  TraceStatus,
-} from '@shared/types/agenticTrace';
-import type {
-  RawAuditRef,
-  TraceSessionResult,
-} from '@shared/types/trace';
 import { nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { traceStateStore } from '../agent-runtime/orchestration/TraceStateStore';
@@ -24,6 +10,20 @@ import { traceTreeBuilder } from './TraceTreeBuilder';
 import { projectionBuilder } from './ProjectionBuilder';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import { rightRailProjectionService } from './RightRailProjectionService';
+import type {
+  RawAuditRef,
+  TraceSessionResult,
+} from '@shared/types/trace';
+import type {
+  AgentRun,
+  AgentRunPresentation,
+  AgentRunViewModel,
+  TraceStatus,
+} from '@shared/types/agenticTrace';
+import type { RunSummary } from '@shared/types/session';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
+import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
+import type { ActionEvent } from '@shared/types/evidence';
 
 const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
   if (typeof value === 'string') return value;

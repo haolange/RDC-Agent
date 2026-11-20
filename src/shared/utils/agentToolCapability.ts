@@ -2,10 +2,10 @@ import {
   PROVIDER_ADAPTER_IMPLEMENTATIONS,
   PROVIDER_ADAPTER_IDS,
 } from '../provider-catalog/implementationRegistry';
+import { isEffectiveModelPickerSelectable } from './effectiveModelPicker';
 import type { CapabilityState, EffectiveAvailability } from '../types/providerCapability';
 import type { LlmProviderProtocol } from '../types/settings';
 import type { EffectiveModelPickerCandidate } from './effectiveModelPicker';
-import { isEffectiveModelPickerSelectable } from './effectiveModelPicker';
 
 export type AgentToolCallingEvidence = CapabilityState['state'];
 

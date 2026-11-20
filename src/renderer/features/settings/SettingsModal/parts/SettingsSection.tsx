@@ -1,6 +1,6 @@
-import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '../../../../lib/cn';
 import { SectionHeader } from '../../../../ui/SectionHeader';
+import type { HTMLAttributes, ReactNode } from 'react';
 
 export interface SettingsSectionProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title: ReactNode;

@@ -1,6 +1,6 @@
-import { formatToolApprovalReason } from '../../lib/toolApprovalText';
-import type { Translator } from '../../i18n/messages';
 import { type ConversationToolCall, type ConversationToolApproval, type ConversationToolApprovalStatus } from '@shared/types/conversation';
+import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
+import { formatToolApprovalReason } from '../../lib/toolApprovalText';
 import { type WorkProcessRow, type WorkProcessToolApproval, type WorkProcessRowStatus } from './workProcessTypes';
 import { normalizeToolName, getToolDisplay, getToolFamily, formatMcpTarget } from './workProcessToolCatalog';
 import { createUserInputRow, createPlanReviewShellRow, createPlanReviewRow } from './workProcessDecisionRows';
@@ -10,7 +10,7 @@ import { emptyUnwrappedContent, sanitizeContentText } from './workProcessToolCon
 import { extractWebToolPresentation } from './workProcessWebPresentation';
 import { formatDurationMs, normalizeWorkProcessText, compactText } from './workProcessFormat';
 import { getToolOutcome } from './workProcessOutcome';
-import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
+import type { Translator } from '../../i18n/messages';
 
 const TARGET_KEYS = [
   'uri',

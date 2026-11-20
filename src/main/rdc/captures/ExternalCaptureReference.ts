@@ -1,10 +1,10 @@
 import { promises as fs, type BigIntStats } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { ProjectInputRecord } from '@shared/types/session';
 import { openedFileIdentity } from '../../platform/fileIdentity';
 import { hashCaptureFile } from './replay/captureContentHash';
 import { safePath } from './replay/replayFileSafety';
+import type { ProjectInputRecord } from '@shared/types/session';
 
 /** Explicit file registration only: no directory discovery and no write authority. */
 export async function createExternalCaptureReference(filePath: string): Promise<ProjectInputRecord> {

@@ -1,9 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
-import type { LlmProviderEntry, ProviderDefinitionSaveResult } from '@shared/types/settings';
-import type { useI18n } from '../../../i18n';
-import type { ProviderConnectionDraft } from './types';
 import { getErrorMessage } from './utils';
-import type { useProviderConnectionDraft } from './useProviderConnectionDraft';
 import { mergeTestedProviderModels } from './providerModelProjection';
 import {
   getConnectionDraftSignature,
@@ -13,6 +8,11 @@ import {
   hasProviderConnectionDefinitionChanged,
   projectProviderModelPreferences,
 } from './providerConnectionRequest';
+import type { Dispatch, SetStateAction } from 'react';
+import type { LlmProviderEntry, ProviderDefinitionSaveResult } from '@shared/types/settings';
+import type { useI18n } from '../../../i18n';
+import type { ProviderConnectionDraft } from './types';
+import type { useProviderConnectionDraft } from './useProviderConnectionDraft';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type DraftApi = Pick<

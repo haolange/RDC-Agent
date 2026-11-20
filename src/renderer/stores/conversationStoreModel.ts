@@ -1,8 +1,8 @@
+import { compareConversationMessages, resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ReasoningSummary } from '@shared/types/workflow';
-import { compareConversationMessages, resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
 
 const TERMINAL_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>([
   'complete',

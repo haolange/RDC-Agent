@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { ModeConfig } from '@shared/types/layout';
 import { AGENT_MODES, resolveAgentDisplay } from '@shared/constants/agents';
 import { COMPOSE_ACCENT_FALLBACK } from '@shared/theme/composeAccent';
 import { useI18n } from '../../i18n';
@@ -10,6 +9,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { usePreparedSessionDevice } from '../../hooks/useSessionDevicePreparation';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
+import { hydrateComposerAgentFromSession } from '../../stores/sessionAgentHydration';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerPendingSkills } from './useComposerPendingSkills';
 import { useComposerSend } from './useComposerSend';
@@ -18,9 +18,9 @@ import { buildComposerPresentation } from './composerPresentation';
 import { projectContextUsagePreview } from './projectContextUsagePreview';
 import { useSelectedContextProfile } from './useSelectedContextProfile';
 import { useComposerDomEffects } from './useComposerDomEffects';
-import { hydrateComposerAgentFromSession } from '../../stores/sessionAgentHydration';
 import { persistSessionAgentId } from './sessionAgentId';
 import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
+import type { ModeConfig } from '@shared/types/layout';
 
 
 export function useComposer(options: {

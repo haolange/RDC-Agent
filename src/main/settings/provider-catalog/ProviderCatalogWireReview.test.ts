@@ -1,12 +1,12 @@
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
-import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { LlmProviderProtocol } from '@shared/types/settings';
+import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
+import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import { applyAnthropicReasoning, applyOpenAiCompatibleReasoning, buildOpenAiResponsesReasoning } from '../../agent-runtime/providers/reasoningWire';
 import { applyRequestPlanBody } from '../../agent-runtime/providers/requestPlanWire';
 import { planModelRequest } from './RequestPlanner';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 
 const catalog = compileProviderCatalog(loadProviderCatalogManifestInput(
   resolve(__dirname, '../../../shared/provider-catalog/manifests'),

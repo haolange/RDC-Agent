@@ -1,9 +1,27 @@
-import { AgentToolApprovalRequestService } from '../permissions/AgentToolApprovalRequestService';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { AgentToolApprovalRequestService } from '../permissions/AgentToolApprovalRequestService';
+
+import { TaskRegistry, type TaskRecord } from '../tasks';
+import { createSessionTaskStore } from '../tasks/sessionTaskStore';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
+import {
+  assertRdcContextLeaseOwnership,
+  clearRdcContextLeases,
+  getRdcContextLease,
+  setRdcRuntimeContextForSession,
+} from '../../rdc/RdcRuntimeContextRegistry';
+import { SubagentRunner } from './SubagentRunner';
+import { DelegationConfigurationError } from './DelegationConfigurationError';
+import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
+import type { AgentProfileTurnOptions } from './orchestratorTypes';
+import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { RdcRuntimeContext } from '@shared/types/session';
 
 vi.mock('electron', () => ({
   BrowserWindow: class { static getAllWindows() { return []; } },
@@ -12,7 +30,6 @@ vi.mock('electron', () => ({
     getAppPath: () => process.cwd(),
   },
 }));
-
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: () => ({
@@ -22,7 +39,6 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
     }),
   },
 }));
-
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({
   agentManifestService: {
     getEffectiveProfiles: () => [
@@ -32,7 +48,6 @@ vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({
     ],
   },
 }));
-
 vi.mock('../../settings/provider-catalog/EffectiveModelResolver', () => ({
   resolveEffectiveModel: (providerId: string, modelId: string) => {
     if (providerId === 'openai' && modelId === 'gpt-5.6-sol') {
@@ -47,18 +62,6 @@ vi.mock('../../settings/provider-catalog/EffectiveModelResolver', () => ({
     return null;
   },
 }));
-
-import { TaskRegistry, type TaskRecord } from '../tasks';
-import { createSessionTaskStore } from '../tasks/sessionTaskStore';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
-import { SubagentRunner } from './SubagentRunner';
-import { DelegationConfigurationError } from './DelegationConfigurationError';
-import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
-import type { AgentProfileTurnOptions } from './orchestratorTypes';
-import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
-import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
-
 /** The live turn a `subagent` tool call runs inside: its frozen plan carries delegates and ceiling. */
 const delegatingTurn = (): TurnHandle => ({
   runtimePlan: { profileDelegates: [], accessCeiling: 'full' },
@@ -67,13 +70,6 @@ const delegatingTurn = (): TurnHandle => ({
   generation: 1,
   isLive: () => true,
 }) as unknown as TurnHandle;
-import {
-  assertRdcContextLeaseOwnership,
-  clearRdcContextLeases,
-  getRdcContextLease,
-  setRdcRuntimeContextForSession,
-} from '../../rdc/RdcRuntimeContextRegistry';
-import type { RdcRuntimeContext } from '@shared/types/session';
 
 function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCapsule {
   return {

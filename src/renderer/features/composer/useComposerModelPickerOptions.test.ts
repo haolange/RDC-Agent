@@ -2,10 +2,10 @@
 import { act, createElement as h, Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import { resetCatalogProjection, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import type { LlmProviderEntry } from '@shared/types/settings';
 
 const { read, refresh } = vi.hoisted(() => ({ read: vi.fn(), refresh: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../platform/getElectronApi', () => ({ getElectronApi: () => undefined }));

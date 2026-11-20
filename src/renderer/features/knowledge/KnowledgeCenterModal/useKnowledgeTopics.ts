@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KnowledgeTopicChanges, KnowledgeTopicPreview, KnowledgeTopicProposal, KnowledgeTopicSuggestion } from '@shared/types/knowledge';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
 import { buildTopicChanges } from './knowledgeTopicChanges';
+import type { KnowledgeTopicChanges, KnowledgeTopicPreview, KnowledgeTopicProposal, KnowledgeTopicSuggestion } from '@shared/types/knowledge';
 
 export function useKnowledgeTopics(active: boolean, onApplied: () => Promise<void>) {
   const sequence = useRef(0);

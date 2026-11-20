@@ -1,5 +1,5 @@
-import type { ServerResponse } from 'http';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
+import type { ServerResponse } from 'http';
 
 type EventPayload = {
   channel: string;

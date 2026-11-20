@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 const plan = createTestRequestPlan({
   providerId: 'anthropic',

@@ -2,9 +2,9 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import { createProviderConnectionDraft } from '../providerConnectionState';
 import { ProviderConnectActions } from './ProviderConnectActions';
+import type { LlmProviderEntry } from '@shared/types/settings';
 
 it('allows testing a stored account credential without claiming it is verified or permitting save', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

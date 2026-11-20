@@ -2,21 +2,31 @@ import * as os from 'os';
 import * as path from 'path';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { directoryLinkType } from '../../platform/paths';
-import { currentHost } from '../../platform/host';
-import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
-import type { AgentTool } from '../agent/AgentTool';
-import type { ToolCall } from '../core/types';
-import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import '../../rdc/rdcShellPermission';
-import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
-import { compileFixturePolicy } from '../../testing/policyFixture';
-import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
+import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { compileFixturePolicy } from '../../testing/policyFixture';
+import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
+import { currentHost } from '../../platform/host';
+import { directoryLinkType } from '../../platform/paths';
+
+import { readFileTool as productionReadFile } from '../tools/primitives/ReadFileTool';
+import { readImageTool as productionReadImage } from '../tools/primitives/ReadImageTool';
+import { globTool as productionGlob } from '../tools/primitives/GlobTool';
+import { grepTool as productionGrep } from '../tools/primitives/GrepTool';
+import { writeFileTool as productionWriteFile } from '../tools/primitives/WriteFileTool';
+import { editFileTool as productionEditFile } from '../tools/primitives/EditFileTool';
+import { webSearchTool as productionWebSearch } from '../tools/primitives/WebTools';
+import { deleteFileTool as productionDeleteFile } from '../tools/file/DeleteFileTool';
+import { moveFileTool as productionMoveFile } from '../tools/file/MoveFileTool';
+import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { ToolCall } from '../core/types';
+import type { AgentTool } from '../agent/AgentTool';
+import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
+
 const ownership = vi.hoisted(() => ({ lease: vi.fn() }));
 vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: ownership.lease, getRdcContextLease: () => null }));
-
 const { mockSettings } = vi.hoisted(() => ({
   mockSettings: {
     paths: { userRdcRoot: 'D:\\AppWorkspace' },
@@ -31,18 +41,15 @@ const { mockSettings } = vi.hoisted(() => ({
     },
   },
 }));
-
 const fixtureRoot = path.join(os.tmpdir(), 'rdc-agent-permission-tests');
 const workspaceRoot = path.join(fixtureRoot, 'workspace');
 const externalRoot = path.join(fixtureRoot, 'external');
 const readableRoot = path.join(fixtureRoot, 'shared');
-
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: () => mockSettings,
   },
 }));
-
 vi.mock('../../runtime/resolveConfiguredShell', () => ({
   resolveConfiguredShell: () => ({
     executable: currentHost().isWindows ? 'pwsh' : '/bin/bash',
@@ -50,16 +57,6 @@ vi.mock('../../runtime/resolveConfiguredShell', () => ({
     version: 'test',
   }),
 }));
-
-import { readFileTool as productionReadFile } from '../tools/primitives/ReadFileTool';
-import { readImageTool as productionReadImage } from '../tools/primitives/ReadImageTool';
-import { globTool as productionGlob } from '../tools/primitives/GlobTool';
-import { grepTool as productionGrep } from '../tools/primitives/GrepTool';
-import { writeFileTool as productionWriteFile } from '../tools/primitives/WriteFileTool';
-import { editFileTool as productionEditFile } from '../tools/primitives/EditFileTool';
-import { webSearchTool as productionWebSearch } from '../tools/primitives/WebTools';
-import { deleteFileTool as productionDeleteFile } from '../tools/file/DeleteFileTool';
-import { moveFileTool as productionMoveFile } from '../tools/file/MoveFileTool';
 
 /** Fixtures keep the production effect declarations; the policy reads effects, never names. */
 const PRODUCTION_EFFECTS: Record<string, AgentTool['effects']> = {

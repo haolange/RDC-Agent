@@ -2,9 +2,9 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 import { AgentsSettings } from './AgentsSettings';
 import { createNewAgent } from './agentDraftFactory';
-import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 
 vi.mock('../useScopedSkillSelection', () => ({ useScopedSkillSelection: () => ({}) }));
 vi.mock('./AgentManifestEditor', () => ({ AgentManifestEditor: ({ selectedAgent }: { selectedAgent: { id: string } }) =>

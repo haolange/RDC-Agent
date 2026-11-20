@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DiscoveryLoader, EffectiveCatalogRequest } from './effectiveCatalogTypes';
 import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
+import type { DiscoveryLoader, EffectiveCatalogRequest } from './effectiveCatalogTypes';
 
 const electronMock = vi.hoisted(() => ({ root: '' }));
 vi.mock('electron', () => ({

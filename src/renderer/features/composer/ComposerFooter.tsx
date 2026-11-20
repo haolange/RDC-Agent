@@ -2,13 +2,13 @@ import React from 'react';
 import { ContextUsageIndicator } from '../../patterns/ContextUsageIndicator';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
+import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
+import { IconButton } from '../../ui/IconButton';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { ComposerModelEffortControl } from './ComposerModelEffortControl';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { useComposerMenu } from './useComposerMenuRegistry';
-import { Button } from '../../ui/Button';
-import { Icon } from '../../ui/Icon';
-import { IconButton } from '../../ui/IconButton';
 import type { ComposerController } from './useComposer';
 
 type ComposerFooterProps = Pick<ComposerController,

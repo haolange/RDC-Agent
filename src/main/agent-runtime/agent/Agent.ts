@@ -16,6 +16,15 @@
 import { EventStream } from '../core/EventStream';
 import { ErrorRecovery } from './ErrorRecovery';
 import { convertAgentMessagesToLlm } from './ContextManager';
+import {
+  agentLoop,
+  type AgentContext,
+  type AgentLoopConfig,
+  type AgentLoopHandle,
+  type LoopRuntimeState,
+  type ToolExecutor,
+  type TransformContextResult,
+} from './AgentLoop';
 import type {
   AgentEvent,
   AgentMessage,
@@ -30,15 +39,6 @@ import type {
   UserMessage,
 } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
-import {
-  agentLoop,
-  type AgentContext,
-  type AgentLoopConfig,
-  type AgentLoopHandle,
-  type LoopRuntimeState,
-  type ToolExecutor,
-  type TransformContextResult,
-} from './AgentLoop';
 
 /** Agent 事件订阅者签名。 */
 export type AgentEventSubscriber = (event: AgentEvent) => void;

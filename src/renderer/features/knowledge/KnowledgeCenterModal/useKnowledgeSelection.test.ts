@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { KnowledgeReadResult } from '@shared/types/knowledge';
 import { useKnowledgeSelection } from './useKnowledgeSelection';
+import type { KnowledgeReadResult } from '@shared/types/knowledge';
 
 const hooks = vi.hoisted(() => ({ values: [] as unknown[], cleanup: [] as (() => void)[] }));
 vi.mock('react', () => ({

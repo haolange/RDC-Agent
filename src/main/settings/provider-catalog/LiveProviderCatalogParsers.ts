@@ -1,3 +1,9 @@
+import {
+  extractDiscoveredModelIdentity,
+  isAdmittedDiscoveredModel,
+  normalizeDiscoveredModelMatchKey,
+} from './DiscoveryAdmission';
+import { projectLiveModelObservations, type LiveModelObservation } from './LiveProviderCatalogProjection';
 import type { ProviderSurfaceManifest } from '@shared/provider-catalog/catalogManifestSchema';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
@@ -7,12 +13,6 @@ import type {
   ReasoningControl,
 } from '@shared/types/modelCapability';
 import type { LlmProviderModel, LlmProviderProtocol } from '@shared/types/settings';
-import {
-  extractDiscoveredModelIdentity,
-  isAdmittedDiscoveredModel,
-  normalizeDiscoveredModelMatchKey,
-} from './DiscoveryAdmission';
-import { projectLiveModelObservations, type LiveModelObservation } from './LiveProviderCatalogProjection';
 
 export interface GrokBuilderCatalogDiagnostic {
   envelopeKind: 'root-array' | 'models-array' | 'models-map' | 'data-array' | 'items-array' | 'unknown';

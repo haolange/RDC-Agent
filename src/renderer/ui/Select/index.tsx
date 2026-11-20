@@ -1,4 +1,3 @@
-import { useUiLabels } from '../../lib/useUiLabels';
 import React, {
   useCallback,
   useEffect,
@@ -7,6 +6,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useUiLabels } from '../../lib/useUiLabels';
+import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import {
   ANCHOR_GAP,
   clamp,
@@ -18,8 +20,6 @@ import {
 } from './selectUtils';
 import { SelectMenu, SelectTrigger } from './SelectPrimitives';
 import type { SelectProps } from './types';
-import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
-import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import './Select.css';
 
 export type { SelectOption } from './types';

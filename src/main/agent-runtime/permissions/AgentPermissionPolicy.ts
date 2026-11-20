@@ -1,30 +1,30 @@
 import * as os from 'os';
+import * as path from 'path';
+import { isToolWithinCeiling, toolAccessOf } from '@shared/constants/toolAccess';
+import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { expandHomePath } from '../../platform/paths';
 import { defaultShellKind } from '../../platform/shell';
+import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
+import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
+import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
+import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
+import { safeResolvePath } from '../tools/primitives/_shared';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
-import * as path from 'path';
+import {
+  matchesDeniedCommandPrefix,
+  shellCommandRiskAnalyzer,
+} from './ShellCommandRiskAnalyzer';
+import {
+  isToolDeniedByPolicy,
+  resolvePolicyApprovalFloor,
+} from './PolicyCompiler';
+import { fileOperationBoundary } from './FileOperationBoundary';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { AgentTool, ToolExecutionContext } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
-import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
-import {
-  matchesDeniedCommandPrefix,
-  shellCommandRiskAnalyzer,
-} from './ShellCommandRiskAnalyzer';
-import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
 import type { ShellKind } from '../../runtime/ShellResolver';
-import {
-  isToolDeniedByPolicy,
-  resolvePolicyApprovalFloor,
-} from './PolicyCompiler';
-import { isToolWithinCeiling, toolAccessOf } from '@shared/constants/toolAccess';
-import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
-import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
-import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
-import { safeResolvePath } from '../tools/primitives/_shared';
-import { fileOperationBoundary } from './FileOperationBoundary';
 
 /**
  * Agent permission risk classifier for tool / shell calls.

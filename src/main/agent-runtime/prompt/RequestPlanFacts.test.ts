@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { ResolvedReasoningSelection } from '@shared/types/modelCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { applyRequestPlanFacts } from './RequestPlanFacts';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { ResolvedReasoningSelection } from '@shared/types/modelCapability';
 
 const base: PromptPlan = {
   id: 'plan', segments: [{ id: 'core', kind: 'core-contract', scope: 'builtin', sourcePath: 'builtin://core', sourceHash: 'core-hash',

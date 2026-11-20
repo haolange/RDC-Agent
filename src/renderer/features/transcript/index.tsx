@@ -1,12 +1,12 @@
 import React from 'react';
-import { useTranscriptScroll } from './useTranscriptScroll';
-import type { AgentMode } from '@shared/types/layout';
 import {
   selectConversationMessageCount,
   selectLatestMessageActivityAt,
   useConversationStore,
 } from '../../stores/conversationStore';
+import { useTranscriptScroll } from './useTranscriptScroll';
 import { ConversationThread } from './ConversationThread';
+import type { AgentMode } from '@shared/types/layout';
 import './AgentChat.css';
 import './AgentChat.markdown.css';
 import './AgentChat.extras.css';

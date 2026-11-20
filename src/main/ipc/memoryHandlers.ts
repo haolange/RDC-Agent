@@ -1,11 +1,9 @@
-import { confirmInMainProcess } from '../window/mainConfirmation';
-import { nativeMessage } from '../window/nativeI18n';
 import { ipcMain } from 'electron';
-import type { MemoryWriteRequest } from '@shared/types/electron';
+import { nativeMessage } from '../window/nativeI18n';
+import { confirmInMainProcess } from '../window/mainConfirmation';
 import { MemoryStore } from '../agent-runtime/memory';
 import { appPathService } from '../runtime/AppPathService';
-import type { WorkbenchIpcContext } from './workbenchContext';
-import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
+import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
 import {
   MemoryDeleteArgsSchema,
@@ -14,6 +12,8 @@ import {
   MemoryListArgsSchema,
   MemoryWriteArgsSchema,
 } from './validation/ipcSchemas';
+import type { MemoryWriteRequest } from '@shared/types/electron';
+import type { WorkbenchIpcContext } from './workbenchContext';
 
 const storeFor = (scope: 'user' | 'project', projectRoot?: string): MemoryStore => {
   if (scope === 'project') {

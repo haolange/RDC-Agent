@@ -1,3 +1,5 @@
+import { contextTierPromptCap, contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
 import type { CapabilityState, CatalogModelRoute, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
@@ -7,8 +9,6 @@ import type {
   ReasoningWireProfile,
 } from '@shared/types/modelCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
-import { contextTierPromptCap, contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
-import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 
 export interface LiveModelObservation {
   modelId: string;

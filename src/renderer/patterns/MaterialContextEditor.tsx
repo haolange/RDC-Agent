@@ -1,6 +1,6 @@
-import { Details } from '../ui/Details';
 import React, { useState } from 'react';
 import { MaterialContextSchema, type MaterialContext } from '@shared/types/materialContext';
+import { Details } from '../ui/Details';
 import { Button, Input, Textarea, Select } from '../ui';
 import { TaskDialog } from '../ui/TaskDialog';
 import { useI18n } from '../i18n';

@@ -1,5 +1,5 @@
-import type { StopReason } from '../core/types';
 import { AgentLoopTerminationError } from './LoopProgressGuard';
+import type { StopReason } from '../core/types';
 
 /** Stop a repeated terminal response that cannot change the same obligation. */
 export class RuntimeContinuationGuard {

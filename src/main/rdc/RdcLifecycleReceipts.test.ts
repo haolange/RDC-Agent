@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
 import { rmSync } from 'node:fs';
+import { expect, it } from 'vitest';
 import { createInvestigationHarness, SESSION_ID } from '../investigation/investigationTestFixtures';
 import { RdcLifecycleReceipts, type RdcLifecycleReceipt } from './RdcLifecycleReceipts';
 

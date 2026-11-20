@@ -1,7 +1,7 @@
 import { registerConversationRdcHost } from '../conversation/conversationRdcHost';
+import { rdcSessionService } from '../sessions';
 import { replayDeviceService } from './captures/ReplayDeviceService';
 import { acquireRdcPreparationLock, setRdcInteractionLock } from './RdcOperationCoordinator';
-import { rdcSessionService } from '../sessions';
 
 registerConversationRdcHost({
   acquirePreparationLock: acquireRdcPreparationLock,

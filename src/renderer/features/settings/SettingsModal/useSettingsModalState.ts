@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import { toAgentManifestEditorDraft, type AgentManifestDefinition } from '@shared/types/agentManifest';
+import { cloneProvider } from './utils';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type {
   AppSettings,
   LlmProviderEntry,
@@ -9,7 +10,6 @@ import type {
   CodeInterpreterSettings,
 } from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
-import { cloneProvider } from './utils';
 
 export function canInitializeAgentEditor(definitions: AgentManifestDefinition[], currentProjectId?: string | null) {
   return Boolean(currentProjectId?.trim()) || !definitions.some((definition) => definition.provenance?.scope === 'project');

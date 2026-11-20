@@ -1,4 +1,3 @@
-import type { AppSettings, AppSettingsPatch, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
 import {
   createProviderEntryFromCatalog,
   getProviderDefaultBaseUrl,
@@ -6,8 +5,8 @@ import {
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../../runtime/AppPathService';
 import { normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
-import { secretStorageService } from './SecretStorageService';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
+import { secretStorageService } from './SecretStorageService';
 import {
   SETTINGS_SCHEMA_VERSION,
   createDefaultPersistedSettings,
@@ -33,6 +32,7 @@ import {
   readJsonFile,
   writeSettingsAsync,
 } from './settingsServiceHelpers';
+import type { AppSettings, AppSettingsPatch, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
 
 export interface SettingsProviderOpsHost {
   getAll(): AppSettings;

@@ -6,12 +6,12 @@ import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { resolveAgentToolAllowlistFromDefinition } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { buildTurnPromptPlan } from '../agent-runtime/orchestration/TurnPromptPlan';
 import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
+import { resolveEffectiveAgentSnapshot } from './ConversationRoutePreflight';
 import type {
   AgentRoutePreflightOk,
   PreparedConversationPrompt,
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
-import { resolveEffectiveAgentSnapshot } from './ConversationRoutePreflight';
 
 export interface PrepareConversationPromptInput {
   context: ResolvedConversationContext;

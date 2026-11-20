@@ -1,8 +1,16 @@
-import { parseRdcNativeResult } from './RdcNativeProtocol';
-import { assertRdcCliBinding } from './rdcCliBinding';
-import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOperations } from './RdcOperationCatalog';
 import fs from 'fs';
 import path from 'path';
+import { generateEventId, nowMs } from '@shared/utils/id';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { shellInvocationService, type ShellInvocationService } from '../tools/ShellInvocationService';
+import { samePath } from '../platform/paths';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
+import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOperations } from './RdcOperationCatalog';
+import { assertRdcCliBinding } from './rdcCliBinding';
+import { parseRdcNativeResult } from './RdcNativeProtocol';
+import { resolveRdcBatchInvocation } from './resolveRdcBatchInvocation';
+import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type {
   CLIResult,
   ToolCallRequest,
@@ -12,14 +20,6 @@ import type {
   ToolRuntimeSummary,
   ToolTraceEntry,
 } from '@shared/types/tool';
-import { generateEventId, nowMs } from '@shared/utils/id';
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
-import { settingsService } from '../settings/settings-core/SettingsService';
-import { shellInvocationService, type ShellInvocationService } from '../tools/ShellInvocationService';
-import { samePath } from '../platform/paths';
-import { rdcInstallationFiles } from '../platform/rdcLayout';
-import { resolveRdcBatchInvocation } from './resolveRdcBatchInvocation';
-import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 
 export class RdcCliInvokerService {
   private catalogs = new Map<string, Promise<ToolCatalog>>();

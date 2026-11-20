@@ -1,15 +1,3 @@
-import type {
-  AgentModelSettings,
-  AgentPermissionMode,
-  AgentPermissionSettings,
-  LayoutPreferences,
-  ProfileSettings,
-  RdcCliInvokerSettings,
-  AgentShellSettings,
-  CodeInterpreterSettings,
-  UiPreferences,
-  LlmProviderEntry,
-} from '@shared/types/settings';
 import {
   DEFAULT_AGENT_RUNTIME,
   DEFAULT_APPEARANCE,
@@ -26,6 +14,18 @@ import {
   RIGHT_PANEL_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
 } from '@shared/constants/layout';
+import type {
+  AgentModelSettings,
+  AgentPermissionMode,
+  AgentPermissionSettings,
+  LayoutPreferences,
+  ProfileSettings,
+  RdcCliInvokerSettings,
+  AgentShellSettings,
+  CodeInterpreterSettings,
+  UiPreferences,
+  LlmProviderEntry,
+} from '@shared/types/settings';
 
 export const SETTINGS_SCHEMA_VERSION = 8;
 

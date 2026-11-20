@@ -1,9 +1,9 @@
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { operationFingerprint } from '../../rdc/RdcOperationCatalog';
 import { rebuildEffectiveRuntimePlan, type EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import { refreshPromptPlanRuntimeIdentity } from '../prompt/PromptPlanRuntimeIdentity';
+import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 /** Compile the next identity from frozen authority; installation is a separate host transaction. */
 export function prepareRdcRuntimeEpoch(input: {

@@ -1,6 +1,6 @@
+import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { sessionArtifactResolver } from './SessionArtifactResolver';
 import type { SessionArtifactResolver } from './SessionArtifactResolver';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
 interface Grant { ownerSessionId: string; refs: Map<string, string>; outputs: Set<string> }
 const grants = new Map<string, Grant>();
 /** Freeze explicit read references before child prepareTurn. Never infer ownership from a session-id suffix. */

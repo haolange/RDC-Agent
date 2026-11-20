@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import {
   filterComposerPickerOptions,
   groupComposerPickerOptions,
@@ -16,8 +17,7 @@ import {
 } from './composerAgentDefaultModel';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
-import { Button } from '../../ui/Button';
-import { InlineError } from '../../ui/InlineError';
+import type { SessionRecord } from '@shared/types/session';
 import type { ComposerModelSaveState } from './ComposerModelEffortControl';
 
 function formatAgentDefaultMeta(

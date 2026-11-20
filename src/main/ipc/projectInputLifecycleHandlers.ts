@@ -1,5 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { watch, type FSWatcher } from 'node:fs';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { ProjectInputLifecycle } from '../rdc/captures/ProjectInputLifecycle';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -7,7 +7,7 @@ import { rdcSessionService } from '../sessions';
 import { conversationService } from '../conversation/ConversationService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { settingsService } from '../settings/settings-core/SettingsService';
-import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
+import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { ProjectInputPrepareRemoveArgsSchema, ProjectInputRemoveArgsSchema } from './validation/projectSessionSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';

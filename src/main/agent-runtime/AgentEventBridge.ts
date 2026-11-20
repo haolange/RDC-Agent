@@ -3,6 +3,8 @@
  * contract consumed by IPC, Trace, and ConversationService.
  */
 
+import { generateEventId, nowMs } from '@shared/utils/id';
+import { toSharedThinkingArtifact } from './reasoning/ReasoningArtifacts';
 import type {
   AgentEvent as SharedAgentEvent,
   AgentEventPayload,
@@ -12,7 +14,6 @@ import type {
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { ConversationLoopStopReason } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
-import { generateEventId, nowMs } from '@shared/utils/id';
 import type {
   AgentEvent as CoreAgentEvent,
   AssistantMessage,
@@ -22,7 +23,6 @@ import type {
   ToolResultMessage,
   StopReason,
 } from './core/types';
-import { toSharedThinkingArtifact } from './reasoning/ReasoningArtifacts';
 
 /** Context fields copied into the shared AgentEvent. */
 export interface AgentEventBridgeContext {

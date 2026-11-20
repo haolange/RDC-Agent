@@ -1,3 +1,6 @@
+import { describe, expect, it, vi } from 'vitest';
+import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import {
   buildProbeFailurePatch,
   buildProbeSuccessPatch,
@@ -5,17 +8,14 @@ import {
   receiptConfirmsFast,
   receiptExceedsSmallerTiers,
 } from './ProviderProbeEvidence';
-import { describe, expect, it, vi } from 'vitest';
-import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared/types/providerCapability';
-import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
-import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
-import type { AssistantMessage } from '../../agent-runtime/core/types';
 import {
   ProviderCapabilityProbeService,
   type ProviderCapabilityProbeDependencies,
   type ResolvedProbeTarget,
 } from './ProviderCapabilityProbeService';
+import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared/types/providerCapability';
+import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
+import type { AssistantMessage } from '../../agent-runtime/core/types';
 
 function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
   return {

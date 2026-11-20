@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField, SettingsSection } from '../parts';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { describeHost } from '../platform/host';
-import type { ShellResolverDeps } from './ShellResolver';
 import {
   ShellResolver,
   ShellUnavailableError,
@@ -8,6 +7,7 @@ import {
   formatShellInterpreterLabel,
   isWindowsAppsAliasPath,
 } from './ShellResolver';
+import type { ShellResolverDeps } from './ShellResolver';
 
 function createResolver(overrides: {
   platform?: NodeJS.Platform;

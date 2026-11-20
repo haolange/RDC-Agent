@@ -1,20 +1,20 @@
 import { subagentScopeId } from '@shared/utils/executionScope';
 import { delegationCapsuleArtifactRefs } from '../prompt/DelegationCapsuleCompiler';
+import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, registerTaskExecutionCancellationOwner, type TaskExecutionRecord } from '../tasks';
+import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
+import { requestSnapshotStore } from '../prompt';
+import { grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
+import { bounded, normalizeSubagentResult, persistSubagentResult, projectSubagentExecution, type DelegationSourceFailure } from './SubagentResultEnvelope';
+import { bindTaskRootBudget } from './TaskRootBudget';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { AgentTool } from '../agent/AgentTool';
-import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, registerTaskExecutionCancellationOwner, type TaskExecutionRecord } from '../tasks';
 import type { PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
 import type { TurnHandle } from './TurnCoordinator';
-import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import type { SubagentRunner } from './SubagentRunner';
-import { requestSnapshotStore } from '../prompt';
-import { grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
-import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
-import { bounded, normalizeSubagentResult, persistSubagentResult, projectSubagentExecution, type DelegationSourceFailure } from './SubagentResultEnvelope';
-import { bindTaskRootBudget } from './TaskRootBudget';
-import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 
 export interface BackgroundSubagentStart {
   /** Durable Task/result owner. */

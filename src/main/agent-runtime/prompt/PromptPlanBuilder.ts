@@ -1,11 +1,19 @@
 import fs from 'fs';
 import path from 'path';
+import { charsToTokens } from '@shared/utils/tokens';
+import { generateEventId } from '@shared/utils/id';
 import { appPathService } from '../../runtime/AppPathService';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { AgentPermissionSettings } from '@shared/types/settings';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import { currentHost } from '../../platform/host';
+import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
+import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
+import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
+import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import { applyRequestPlanFacts } from './RequestPlanFacts';
+import { runtimeIdentityContent } from './RuntimeIdentity';
 import type {
   EffectiveAgentProfile,
   PromptPlan,
@@ -15,19 +23,11 @@ import type {
   SkillLoadResult,
   SkillMetadata,
 } from '@shared/types/rdcRuntime';
-import { charsToTokens } from '@shared/utils/tokens';
-import { generateEventId } from '@shared/utils/id';
-import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { currentHost } from '../../platform/host';
-import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
-import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
-import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
-import { applyRequestPlanFacts } from './RequestPlanFacts';
-import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
-import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
-import { runtimeIdentityContent } from './RuntimeIdentity';
+import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { AgentPermissionSettings } from '@shared/types/settings';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 

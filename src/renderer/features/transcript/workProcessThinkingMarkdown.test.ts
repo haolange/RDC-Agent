@@ -1,8 +1,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { WorkProcess } from './WorkProcess';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 vi.mock('../../i18n', () => ({
   useI18n: () => ({

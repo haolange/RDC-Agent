@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ThinkingArtifact } from '@shared/types/reasoning';
 import { beginAssistantContentLoopIfPending, type ConversationLoopRuntimeState } from './ConversationLoopRuntimeState';
 import { upsertLoopResult, upsertLoopTextItem, upsertLoopThinkingItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
 
 const toolLoopThinking: ThinkingArtifact = {
   text: 'I should read memory before answering.',

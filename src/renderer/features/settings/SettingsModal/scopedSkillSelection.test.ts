@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SkillSelectionOption } from '@shared/types/rdcRuntime';
 import { observeScopedRequest, projectSkillSelection, resolveSkillSelectionRequest } from './scopedSkillSelection';
+import type { SkillSelectionOption } from '@shared/types/rdcRuntime';
 
 const skill = (id: string, unavailableToAgentIds: string[] = []): SkillSelectionOption => ({
   id, name: id, description: '', allowedTools: [], scope: 'builtin', sourcePath: '/skills',

@@ -1,9 +1,9 @@
+import { agentRuntimeConfigService } from '../agent-manifests/AgentRuntimeConfigService';
+import { resolveEffectiveModel } from '../provider-catalog/EffectiveModelResolver';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AppSettings, RuntimeResourceCatalog, LlmAgentRoute, SettingsDiagnostic } from '@shared/types/settings';
 import type { EffectiveAgentRuntimeConfig } from '@shared/types/profile';
-import { agentRuntimeConfigService } from '../agent-manifests/AgentRuntimeConfigService';
-import { resolveEffectiveModel } from '../provider-catalog/EffectiveModelResolver';
 
 const profileForAgent = (settings: AppSettings, agentId: AgentRole): AgentManifestDefinition | undefined =>
   settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);

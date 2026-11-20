@@ -1,12 +1,8 @@
 import React from 'react';
-import type { ContextUsageBreakdownId, PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
-import { useI18n } from '../i18n';
-import { useDynStyle } from '../lib/useDynStyle';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { formatUsdCost } from '@shared/utils/cost';
-import './ContextBreakdownPopover.css';
-import './ContextBreakdownMeter.css';
-import './ContextBreakdownLegend.css';
+import { useDynStyle } from '../lib/useDynStyle';
+import { useI18n } from '../i18n';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
 import { ContextRunMeterBand, MeterStat } from './ContextRunMeterBand';
 import {
@@ -21,6 +17,10 @@ import {
   CONTEXT_BREAKDOWN_ORDER,
   SEGMENT_LABEL_KEYS,
 } from './contextBreakdownMeta';
+import type { ContextUsageBreakdownId, PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
+import './ContextBreakdownPopover.css';
+import './ContextBreakdownMeter.css';
+import './ContextBreakdownLegend.css';
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 const METER_UNAVAILABLE = '—';

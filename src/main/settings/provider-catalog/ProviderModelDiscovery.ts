@@ -6,23 +6,6 @@ import {
   getProviderRouteHeaders,
   loadProviderSurface,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { ProviderSurfaceDefinition } from '@shared/types/providerCapability';
-import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import {
-  parseDeclarativeCatalog,
-  resolveDeclarativeDiscoveryUrl,
-  toDeclarativeCatalogContributions,
-} from './DeclarativeCatalogDiscovery';
-import {
-  parseClineCatalog,
-  parseClinePassCatalog,
-  parseFreeModelCatalog,
-  parseKimiCodeCatalog,
-  parseOpenCodeGoCatalog,
-  parseOpenRouterAccountCatalog,
-  type ParsedLiveCatalog,
-} from './LiveProviderCatalogParsers';
 import {
   resolveProviderConnectionHeaders,
 } from '../provider-auth/ProviderConnectionSchema';
@@ -59,6 +42,23 @@ import {
   resolveGoogleVertexPublisherModelsUrl,
   resolveVolcengineCodingPlanModelsUrl,
 } from '../provider-auth/providerConnectionUrls';
+import {
+  parseClineCatalog,
+  parseClinePassCatalog,
+  parseFreeModelCatalog,
+  parseKimiCodeCatalog,
+  parseOpenCodeGoCatalog,
+  parseOpenRouterAccountCatalog,
+  type ParsedLiveCatalog,
+} from './LiveProviderCatalogParsers';
+import {
+  parseDeclarativeCatalog,
+  resolveDeclarativeDiscoveryUrl,
+  toDeclarativeCatalogContributions,
+} from './DeclarativeCatalogDiscovery';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
+import type { ProviderSurfaceDefinition } from '@shared/types/providerCapability';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
 type ManifestProjectedCatalogParser = (
   payload: unknown,

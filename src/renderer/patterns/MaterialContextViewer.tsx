@@ -1,9 +1,9 @@
-import { Details } from '../ui/Details';
 import React from 'react';
-import type { MaterialContext } from '@shared/types/materialContext';
+import { Details } from '../ui/Details';
 import { Button } from '../ui';
 import { TaskDialog } from '../ui/TaskDialog';
 import { useI18n } from '../i18n';
+import type { MaterialContext } from '@shared/types/materialContext';
 import './MaterialContextEditor.css';
 
 export interface MaterialPreview {

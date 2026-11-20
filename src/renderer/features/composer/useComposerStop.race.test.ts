@@ -2,13 +2,13 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ConversationCancelActiveTurnResult, ConversationMessage } from '@shared/types/conversation';
-import type { SessionRecord } from '@shared/types/session';
-import { useComposerStop } from './useComposerStop';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
+import { useComposerStop } from './useComposerStop';
+import type { SessionRecord } from '@shared/types/session';
+import type { ConversationCancelActiveTurnResult, ConversationMessage } from '@shared/types/conversation';
 
 const session: SessionRecord = {
   schemaVersion: '1',

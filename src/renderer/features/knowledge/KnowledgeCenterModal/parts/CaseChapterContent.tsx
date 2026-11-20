@@ -1,8 +1,8 @@
 import { useId, useState } from 'react';
 import { Button } from '../../../../ui/Button';
 import { useI18n } from '../../../../i18n';
-import type { TranslationKey } from '../../../../i18n/messages';
 import { KnowledgeMarkdown } from './KnowledgeMarkdown';
+import type { TranslationKey } from '../../../../i18n/messages';
 
 type Value = null | boolean | number | string | Value[] | { [key: string]: Value };
 

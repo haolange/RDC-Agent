@@ -1,7 +1,7 @@
-import { useI18n } from '../../i18n';
 import { useCallback } from 'react';
-import type { PlanReadRequest } from '@shared/types/planReview';
+import { useI18n } from '../../i18n';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import type { PlanReadRequest } from '@shared/types/planReview';
 
 export function usePlanReviewActions() {
   const api = useElectronApi();

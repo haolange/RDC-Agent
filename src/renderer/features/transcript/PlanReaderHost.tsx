@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
-import type { ConversationPlanReview } from '@shared/types/planReview';
-import { PlanReviewPanel } from './PlanReviewPanel';
 import { useProjectStore } from '../../stores/projectStore';
+import { PlanReviewPanel } from './PlanReviewPanel';
+import type { ConversationPlanReview } from '@shared/types/planReview';
 
 const PlanReaderContext = createContext<((plan: ConversationPlanReview) => void) | null>(null);
 

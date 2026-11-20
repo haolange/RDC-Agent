@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentMessage, AssistantMessage } from '../core/types';
 import {
   assembleDerivedContextView,
   computeContextSourceHash,
@@ -8,6 +7,7 @@ import {
   serializeHandoffSourceTranscript,
   type ModelHandoffSections,
 } from './StructuredHandoffBuilder';
+import type { AgentMessage, AssistantMessage } from '../core/types';
 
 const testHandoffSections = (objective: string, extras: Partial<ModelHandoffSections> = {}): ModelHandoffSections => ({
   objective,

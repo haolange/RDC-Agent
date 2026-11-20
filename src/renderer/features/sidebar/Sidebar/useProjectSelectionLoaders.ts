@@ -4,13 +4,6 @@ import { useCaptureStore } from '../../../stores/captureStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useI18n } from '../../../i18n';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type {
-  LoadProjectsOptions,
-  LoadSessionsOptions,
-  SelectSessionOptions,
-  SelectionSnapshot,
-} from './types';
 import {
   captureSelectionSnapshot,
   loadRunsForSession,
@@ -19,6 +12,13 @@ import {
 } from './projectSelectionContext';
 import { loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
 import { selectSessionOp } from './projectSelectionSessionOps';
+import type {
+  LoadProjectsOptions,
+  LoadSessionsOptions,
+  SelectSessionOptions,
+  SelectionSnapshot,
+} from './types';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export interface UseProjectSelectionLoadersOptions {
   ensureProjectExpanded: (projectId: string) => void;

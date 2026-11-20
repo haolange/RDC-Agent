@@ -1,7 +1,7 @@
-import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
+import type { HTMLAttributes, ReactNode } from 'react';
 import './Toast.css';
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'error';

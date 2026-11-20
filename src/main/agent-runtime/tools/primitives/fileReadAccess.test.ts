@@ -3,10 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { directoryLinkType } from '../../../platform/paths';
-import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { readFileTool } from './ReadFileTool';
 import { editFileTool } from './EditFileTool';
 import { writeFileTool } from './WriteFileTool';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 async function fixture() {

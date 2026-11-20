@@ -1,13 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import type {
-  AgentRuntimeMcpDescriptor,
-  AgentRuntimeSkillDescriptor,
-} from '@shared/types/agentRuntime';
 import { MCP_TRANSPORTS as MCP_TRANSPORT_LIST, type MCPTransport } from '@shared/types/mcp';
-import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata, SkillSelectionProjection } from '@shared/types/rdcRuntime';
 import { TOP_LEVEL_AGENT_IDS } from '@shared/types/agent';
+import { isSkillVisibleToProfile } from '@shared/constants/canonicalSkills';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import {
@@ -16,7 +12,11 @@ import {
   mcpUntrustedReason,
   projectOverridesUserExecutable,
 } from '../settings-core/McpTrustService';
-import { isSkillVisibleToProfile } from '@shared/constants/canonicalSkills';
+import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata, SkillSelectionProjection } from '@shared/types/rdcRuntime';
+import type {
+  AgentRuntimeMcpDescriptor,
+  AgentRuntimeSkillDescriptor,
+} from '@shared/types/agentRuntime';
 
 const MCP_TRANSPORTS = new Set<MCPTransport>(MCP_TRANSPORT_LIST);
 

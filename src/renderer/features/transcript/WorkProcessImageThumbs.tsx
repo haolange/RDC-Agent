@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import type { ConversationToolImagePreviewRef } from '@shared/types/conversation';
 import { useI18n } from '../../i18n';
 import { useToolImagePreviews } from '../../hooks/useToolImagePreviews';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
 import { TaskDialog } from '../../ui/TaskDialog';
+import type { ConversationToolImagePreviewRef } from '@shared/types/conversation';
 
 export const WorkProcessImageThumbs: React.FC<{ previews: ConversationToolImagePreviewRef[] }> = ({ previews }) => {
   const { t } = useI18n();

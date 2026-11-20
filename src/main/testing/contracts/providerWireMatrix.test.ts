@@ -5,12 +5,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
-import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
-import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createTestRequestPlan } from '../createTestRequestPlan';
 import { EventStream } from '../../agent-runtime/core/EventStream';
-import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import {
   AssistantStreamBuilder,
   createProviderOutputRef,
@@ -25,6 +21,10 @@ import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWir
 import { classifyProviderError } from '../../agent-runtime/providers/internal/errorClassifier';
 import { normalizeCacheUsage } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
 import { calculateUsageCost } from '../../agent-runtime/providers/internal/costCalculator';
+import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
+import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
+import type { LlmProviderProtocol } from '@shared/types/settings';
 
 const FIXTURE_ROOT = path.join(__dirname, '../../agent-runtime/providers/__fixtures__');
 const PROFILE_ROOT = path.join(__dirname, '../../../shared/provider-catalog/manifests/profiles');

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import { translateCoreToSharedAgentEvent } from '../agent-runtime/AgentEventBridge';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 
 const eventContext = {
   runId: 'run-cancel-test',

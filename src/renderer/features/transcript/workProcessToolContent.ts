@@ -1,4 +1,3 @@
-import type { Translator } from '../../i18n/messages';
 import { normalizeToolName } from './workProcessToolCatalog';
 import { toRecord, parsePreview } from './workProcessContentText';
 import { getDetailsRecord } from './workProcessWebPresentation';
@@ -15,6 +14,7 @@ import { unwrapCatalogContent } from './workProcessCatalogContent';
 import { unwrapFileContent } from './workProcessFileContent';
 import { unwrapWebContent } from './workProcessWebContent';
 import { unwrapGenericContent } from './workProcessGenericContent';
+import type { Translator } from '../../i18n/messages';
 
 export const unwrapToolContentLayer = (
   toolName: string,

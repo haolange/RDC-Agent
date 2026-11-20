@@ -2,11 +2,11 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import { translate } from '../../../../i18n/messages';
 import { ProviderModelCapabilitySummary, type ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 import { testModelCapability } from './providerCatalogActions';
 import { providerProbeResultText } from './providerProbeResultText';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 vi.mock('./providerCatalogActions', () => ({ testModelCapability: vi.fn() }));
 
 it.each([

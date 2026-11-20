@@ -1,9 +1,9 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import type { RdcValidatedEvidence } from './RdcValidatedEvidence';
-import { canonicalJson } from './RdcOperationCatalog';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
+import { canonicalJson } from './RdcOperationCatalog';
+import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
+import type { RdcValidatedEvidence } from './RdcValidatedEvidence';
 import type { RdcProcessIdentity } from './RdcProcessIdentity';
 
 export interface RdcExecutionReceipt {

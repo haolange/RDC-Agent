@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { finalizeTrace, upsertLoopResult, upsertLoopTextItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 const finish = (trace: ConversationWorkTrace | undefined, id: string) => upsertLoopResult(trace, id, { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary' });
 

@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { AgentDefinitionSaveResult, AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
 import { nextAgentDefinitionClientRevision } from '../../../stores/appSettingsStore';
 import {
   applyAgentDefinitionSaveResults,
@@ -9,6 +7,8 @@ import {
   serializeAgentManifestDraft,
   shouldRollbackFailedAgentManifestSave,
 } from './agentManifestAutosaveState';
+import type { AgentDefinitionSaveResult, AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AppSettings } from '@shared/types/settings';
 import type { AgentManifestSaveBatch } from './settingsModalActions';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -159,7 +159,7 @@ export function useAgentManifestAutosave({
       window.clearTimeout(timer);
       if (debounceTimerRef.current === timer) debounceTimerRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- draftSnapshot serializes agentManifestDrafts for deep change detection
+
   }, [draftSnapshot, open]);
 
   useEffect(() => {
@@ -172,7 +172,7 @@ export function useAgentManifestAutosave({
       }
     }
     wasOpenRef.current = open;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- draftSnapshot serializes agentManifestDrafts for deep change detection
+
   }, [draftSnapshot, open]);
 
   const retry = async () => {

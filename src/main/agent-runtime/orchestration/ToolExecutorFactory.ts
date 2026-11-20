@@ -1,28 +1,21 @@
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { childScopePrefix, rootScopeId } from '@shared/utils/executionScope';
-import type { RuntimePermissionState } from '@shared/types/runtimePermission';
-import type { AgentPermissionDecision } from '../permissions/AgentPermissionPolicy';
+import { normalizeAskUserQuestions } from '@shared/utils/askUser';
+import { isHandoffContinueAction } from '@shared/types/planReview';
+import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { executeWithPermissionAdmission } from '../permissions/ToolPermissionAdmission';
-import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { withProcessExecutionOwner } from '../../runtime/ResourceExecutionLifetime';
 import { getRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 /**
  * ToolExecutorFactory — createToolExecutor and tool-call mediation helpers.
  */
 
-import type { AgentRole } from '@shared/types/agent';
-import type { HookEvent } from '@shared/types/rdcRuntime';
-import { normalizeAskUserQuestions } from '@shared/utils/askUser';
-import type { AgentToolResult, ToolExecutionContext } from '../agent/AgentTool';
 import { toolToDefinition } from '../agent/AgentTool';
-import type { ToolExecutor } from '../agent/AgentLoop';
-import type { ToolCall, ToolResultMessage } from '../core/types';
 import { getWorkspaceRoot, withTemporaryPathAccess } from '../tools/primitives/_shared';
 import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
 import { buildDiagnosticAgentEvent } from '../AgentEventBridge';
 import { agentUserInputRequestService } from '../interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
-import { isHandoffContinueAction } from '@shared/types/planReview';
 import {
   composePlanMarkdown,
   planArtifactWriter,
@@ -39,22 +32,29 @@ import { isToolDeniedByPolicy } from '../permissions/PolicyCompiler';
 import { ToolValidationError, toolValidator } from '../core/ToolValidator';
 import { hookEngine } from '../../hooks/HookEngine';
 import { appPathService } from '../../runtime/AppPathService';
+import { countSubagentCalls, isAgentToolCallConcurrencySafe } from '../agent/toolConcurrency';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
+import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
+import { APPROVED_CAPTURE_SCOPE_REQUIRED, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
+import { normalizeToolName } from './RuntimeToolPolicy';
 import {
   extractDeferredToolNamesFromToolSearchDetails,
   isDeferredToolName,
 } from './deferredTools';
-import { normalizeToolName } from './RuntimeToolPolicy';
-import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
-import type { AgentSlotRegistry } from './AgentSlotRegistry';
-import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import { APPROVED_CAPTURE_SCOPE_REQUIRED, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
-import { countSubagentCalls, isAgentToolCallConcurrencySafe } from '../agent/toolConcurrency';
-import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
-import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
-import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
+import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
 import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
+import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+import type { AgentSlotRegistry } from './AgentSlotRegistry';
+import type { ToolCall, ToolResultMessage } from '../core/types';
+import type { ToolExecutor } from '../agent/AgentLoop';
+import type { AgentToolResult, ToolExecutionContext } from '../agent/AgentTool';
+import type { HookEvent } from '@shared/types/rdcRuntime';
+import type { AgentRole } from '@shared/types/agent';
+import type { AgentPermissionDecision } from '../permissions/AgentPermissionPolicy';
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
 export interface ToolExecutorFactoryDeps {
   slots: AgentSlotRegistry;

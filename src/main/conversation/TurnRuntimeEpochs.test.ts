@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
+import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type { RdcLifecycleReceipt } from '../rdc/RdcLifecycleReceipts';
-import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
 
 it('accepts only a linked, signed transition for the same approved plan and owning turn', () => {
   const ref = (id: string) => ({ uri: `session://tool-outputs/${id}.json`, expectedHash: `sha256:${'a'.repeat(64)}` });

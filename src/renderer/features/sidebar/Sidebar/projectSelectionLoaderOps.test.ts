@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectSelectionHandlerOpsContext, ProjectSelectionLoaderOpsContext } from './projectSelectionContext';
+import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 import { handleProjectSelectOp, loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
 import { handleSessionActivateOp, selectSessionOp } from './projectSelectionSessionOps';
+import type { ProjectSelectionHandlerOpsContext, ProjectSelectionLoaderOpsContext } from './projectSelectionContext';
 import type { ProjectRecord } from '@shared/types/session';
-import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 
 const reloadSettings = vi.fn(async () => ({ agents: { definitions: [{ id: 'project-only' }] } }));
 const activateSession = vi.hoisted(() => vi.fn());

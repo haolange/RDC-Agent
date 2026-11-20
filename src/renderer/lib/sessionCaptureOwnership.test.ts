@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 import { isContextSnapshotOwnedBySession, isOpenedCaptureOwnedBySession } from './sessionCaptureOwnership';
+import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 
 const openedCapture = {
   projectId: 'project-a', ownerSessionId: 'session-a', inputId: 'input-a', filePath: 'capture.rdc', captureId: 'capture-a', sessionId: 'rdc-replay-session', contextId: 'context-a', replaySessionId: 'rdc-replay-session', backend: 'local', deviceId: 'local', deviceLabel: 'Local', status: 'open', openedAt: 1,

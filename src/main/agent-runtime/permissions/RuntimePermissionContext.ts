@@ -1,7 +1,7 @@
+import { charsToTokens } from '@shared/utils/tokens';
+import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { Context } from '../core/types';
-import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { charsToTokens } from '@shared/utils/tokens';
 
 export const RUNTIME_PERMISSION_TOKEN_RESERVE = 128;
 

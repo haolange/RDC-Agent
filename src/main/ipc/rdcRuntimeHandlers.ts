@@ -1,6 +1,5 @@
 import { ipcMain, shell } from 'electron';
 import { confirmResourceTrust } from '../window/trustConfirmation';
-import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
 import { hookEngine } from '../hooks/HookEngine';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { scopedRuntimeService } from '../runtime/ScopedRuntimeService';
@@ -19,6 +18,7 @@ import {
   ScopedResourceImportArgsSchema,
   ScopedResourceWriteArgsSchema,
 } from './validation/rdcRuntimeSchemas';
+import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
 
 async function mutateHookTrust(
   projectRoot: string | undefined | null,

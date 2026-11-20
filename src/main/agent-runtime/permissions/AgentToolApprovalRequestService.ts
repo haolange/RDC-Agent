@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { PermissionModeChangedError } from './RuntimePermissionStateService';
-import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
-import { PermissionReviewError } from './PermissionReviewRuntime';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
-import type { AgentRole } from '@shared/types/agent';
-import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { auditLog } from '../../runtime/AuditLog';
+import { PermissionModeChangedError } from './RuntimePermissionStateService';
+import { PermissionReviewError } from './PermissionReviewRuntime';
+import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
+import type { AgentRole } from '@shared/types/agent';
+import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 
 export interface ToolApprovalRequestInput {
   agentId: AgentRole;

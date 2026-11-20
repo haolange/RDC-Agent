@@ -1,8 +1,8 @@
-import type { ConversationWorkBlock } from '@shared/types/conversation';
 import { formatDurationMs } from './workProcessFormat';
+import { isVisibleToolCall } from './workProcessLlmProjection';
+import type { ConversationWorkBlock } from '@shared/types/conversation';
 import type { PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 import type { WorkProcessRow } from './workProcessTypes';
-import { isVisibleToolCall } from './workProcessLlmProjection';
 import type { BlockProjectionContext, LoopProjectionDeps } from './workProcessBlockProjection';
 
 export function pushStandaloneBlock(

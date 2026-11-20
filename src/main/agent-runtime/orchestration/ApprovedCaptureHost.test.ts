@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
-import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
 import { clearRdcContextLeases, quarantineRdcContext, setRdcRuntimeContextForSession } from '../../rdc/RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { setRdcInteractionLock } from '../../rdc/RdcOperationCoordinator';
 import { createApprovedCaptureHost } from './ApprovedCaptureHost';
 import { TurnHandle } from './TurnCoordinator';
-import { setRdcInteractionLock } from '../../rdc/RdcOperationCoordinator';
+import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
+import type { ExecutionOffer } from '@shared/types/executionOffer';
 
 const mock = vi.hoisted(() => ({ state: vi.fn(), opened: vi.fn(), open: vi.fn(), close: vi.fn(), restore: vi.fn(), prepareDevice: vi.fn(),
   project: vi.fn(), session: vi.fn(), verifyInput: vi.fn(), device: vi.fn(), snapshot: vi.fn(), recoverySnapshot: vi.fn(), permission: vi.fn(), active: vi.fn(),

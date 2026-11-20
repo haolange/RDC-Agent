@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { KnowledgeCardRecord, KnowledgeHumanConfirmation, KnowledgeLifecycle, KnowledgeSpace } from '@shared/types/knowledge';
-import type { AgentPermissionMode } from '@shared/types/settings';
 import { missingCaseChapters, serializeKnowledgeCard } from './knowledgeCardSchema';
 import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
 import {
@@ -15,9 +13,11 @@ import {
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
 import { clearStagedKnowledgeImages, putStagedKnowledgeImages, takeStagedKnowledgeImages } from './knowledgeImageStaging';
 import { isKnowledgeImagePathAllowed } from './knowledgeImages';
-import type { KnowledgeStagedImage } from './knowledgeIngest';
 import { knowledgeIndexService, KnowledgeIndexService } from './KnowledgeIndexService';
 import { knowledgeQueryService } from './KnowledgeQueryService';
+import type { KnowledgeStagedImage } from './knowledgeIngest';
+import type { AgentPermissionMode } from '@shared/types/settings';
+import type { KnowledgeCardRecord, KnowledgeHumanConfirmation, KnowledgeLifecycle, KnowledgeSpace } from '@shared/types/knowledge';
 
 export interface KnowledgeWriteInput {
   spaceId: string;

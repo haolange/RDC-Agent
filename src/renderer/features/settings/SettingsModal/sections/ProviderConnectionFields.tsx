@@ -1,13 +1,13 @@
 import React from 'react';
-import type { LlmProviderConnectionField, LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import {
   projectEndpointTemplate,
   resolvePrimarySecretField,
 } from '../providerConnectionState';
-import type { ProviderConnectionDraft } from '../types';
 import { STORED_SECRET_MASK } from '../utils';
+import type { LlmProviderConnectionField, LlmProviderEntry } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
+import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

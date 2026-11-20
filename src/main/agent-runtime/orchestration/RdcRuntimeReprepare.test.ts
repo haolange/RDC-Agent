@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { buildEffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import { compileFixturePolicy } from '../../testing/policyFixture';
 import { freezeRdcTurnBinding, getRdcTurnBinding, rdcBindingFingerprint } from '../../rdc/RdcTurnBindings';
-import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';
+import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 it('rebuilds the next request from frozen authority and refuses catalog or prior-plan drift', () => {
   const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };

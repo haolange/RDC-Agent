@@ -1,14 +1,7 @@
-import { isSubagentScopeId } from '@shared/utils/executionScope';
 import fs from 'fs';
 import crypto from 'crypto';
+import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { ContextManager, type ContextManagerConfig } from '../agent/ContextManager';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { ExecutionIdentity } from '@shared/types/providerCapability';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { AgentMessage, AssistantMessage, Message } from '../core/types';
-import { RecoverableContextWindow } from './RecoverableContextWindow';
-import { generateCompactionSections } from './CompactionHandoffService';
-import { assembleDerivedContextView, createStructuredHandoffMessage, serializeHandoffSourceTranscript } from './StructuredHandoffBuilder';
 import { projectCompactionJournalMessages, readCompactionAuthorityJournal, readCompactionAuthorityState, saveCompactionAuthoritySource, verifyCompactionAuthoritySource } from '../../sessions/store/CompactionAuthoritySource';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
@@ -16,7 +9,14 @@ import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/art
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { lookupProjectById } from '../../settings/settings-core/projectRegistryLookup';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
+import { assembleDerivedContextView, createStructuredHandoffMessage, serializeHandoffSourceTranscript } from './StructuredHandoffBuilder';
+import { generateCompactionSections } from './CompactionHandoffService';
+import { RecoverableContextWindow } from './RecoverableContextWindow';
 import { reconcileHandoffReferences } from './VerifiedHandoffReferences';
+import type { AgentMessage, AssistantMessage, Message } from '../core/types';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { ExecutionIdentity } from '@shared/types/providerCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 
 const portableContextMessages = (messages: AgentMessage[]): AgentMessage[] => messages.flatMap(message => {
   if (message.role !== 'assistant') return [message];

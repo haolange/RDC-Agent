@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP ?? process.cwd(), getAppPath: () => process.cwd() },
   safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (v: string) => Buffer.from(v) } }));
-import { createRdcProbeTool, type RdcProbeToolDeps } from './RdcProbeTool';
-import type { ApprovedCaptureController } from './ApprovedCaptureController';
+import { compileRdcProbe, RdcProbeInputSchema } from '@shared/constants/rdcProbe';
 import { toolToDefinition } from '../agent/AgentTool';
 import { ToolValidator } from '../core/ToolValidator';
 import { clearRdcContextLeases, getRdcContextLease, setRdcRuntimeContextForSession, grantDelegatedLease, quarantineRdcContext } from '../../rdc/RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { createRdcProbeTool, type RdcProbeToolDeps } from './RdcProbeTool';
+import type { ApprovedCaptureController } from './ApprovedCaptureController';
 import type { RdcProbeInput } from '@shared/constants/rdcProbe';
-import { compileRdcProbe, RdcProbeInputSchema } from '@shared/constants/rdcProbe';
 
 const settings = { enabled: true, command: 'configured-rdc-tool.exe', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
 function context() {

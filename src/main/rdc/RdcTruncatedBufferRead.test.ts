@@ -1,9 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import type { RdcOperationDefinition } from '@shared/types/tool';
-import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { executeRdcShell } from './executeRdcShell';
+import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
+import type { RdcOperationDefinition } from '@shared/types/tool';
 
 const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
 vi.mock('../sessions', () => ({ rdcSessionService: { observeAgentOperation: mock.observe } }));

@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
-import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
 import { clampReasoningSelection, createReasoningControl } from '@shared/types/modelCapability';
+import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
+import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import { applyAnthropicReasoning, applyOpenAiCompatibleReasoning } from './reasoningWire';
 
 const surface = compileProviderCatalog(loadProviderCatalogManifestInput(path.resolve(

@@ -106,7 +106,7 @@
 | 发布配置 | 才执行 pack |
 | 宿主相关行为（`src/main/platform`） | 另加 `pnpm run check:host-platform`；Linux 单元测试由 CI `build` 运行，Windows 由 CI `windows-unit` 运行 |
 
-行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数与分层由 ESLint `max-lines` / `no-restricted-imports` 执行；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
+行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
 
 完整 gates 的历史比较需要基线：`RDC_SYSTEM_DEBT_BASE_REF=<本轮起点提交>`，secrets 与 diff 检查用 `RDC_DIFF_BASE` 指向同一提交；不指定时历史比较被跳过。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
 

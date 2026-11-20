@@ -1,6 +1,6 @@
+import { findEffectiveCapabilityModel } from './modelCapabilitySummaryUtils';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderCatalogOwnership, LlmProviderModel } from '@shared/types/settings';
-import { findEffectiveCapabilityModel } from './modelCapabilitySummaryUtils';
 
 export interface ProjectedProviderModel {
   model: LlmProviderModel;

@@ -1,12 +1,12 @@
 import React from 'react';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { useI18n } from '../../../../i18n';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { ColorField } from '../../../../ui/ColorField';
 import { Input } from '../../../../ui/Input';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import { AgentIconPresetPicker } from './AgentIconPresetPicker';
+import type { useI18n } from '../../../../i18n';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

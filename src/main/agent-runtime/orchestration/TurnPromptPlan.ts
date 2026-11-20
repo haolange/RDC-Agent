@@ -1,9 +1,3 @@
-import type { AgentRole } from '@shared/types/agent';
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
-import type { AgentPermissionSettings } from '@shared/types/settings';
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
 import { appPathService } from '../../runtime/AppPathService';
@@ -11,6 +5,12 @@ import { scopedInstructionResolver } from '../../runtime/ScopedInstructionResolv
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { promptPlanBuilder, resolvePromptClock } from '../prompt';
 import { combineActiveSkillAllowlists, normalizeToolName } from './RuntimeToolPolicy';
+import type { AgentPermissionSettings } from '@shared/types/settings';
+import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AgentRole } from '@shared/types/agent';
 
 export interface TurnPromptPlanInput {
   agentId: AgentRole;

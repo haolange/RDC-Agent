@@ -1,14 +1,14 @@
-import { resolveDelegatedArtifactRead } from '../../../sessions/artifacts/DelegatedArtifactAccess';
-import type { AgentTool } from '../../agent/AgentTool';
 import {
   ARTIFACT_TOOL_PAGE_BYTES,
   ARTIFACT_READ_MAX_OUTPUT_LINES,
   SessionArtifactError,
 } from '@shared/types/sessionArtifact';
+import { resolveDelegatedArtifactRead } from '../../../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver } from '../../../sessions/artifacts/SessionArtifactResolver';
-import type { ArtifactJsonInspection, ArtifactJsonTextView } from '../../../sessions/artifacts/SessionArtifactJsonInspection';
 import { ARTIFACT_TEXT_SEARCH_MAX_MATCHES, type ArtifactTextSearch } from '../../../sessions/artifacts/SessionArtifactTextSearch';
 import { materializeRecordedRdcRequest, type RecordedRequestQualification } from '../../../rdc/RecordedRdcRequest';
+import type { AgentTool } from '../../agent/AgentTool';
+import type { ArtifactJsonInspection, ArtifactJsonTextView } from '../../../sessions/artifacts/SessionArtifactJsonInspection';
 
 interface ArtifactReadParams {
   uri: string;

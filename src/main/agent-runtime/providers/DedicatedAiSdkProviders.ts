@@ -1,7 +1,3 @@
-import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { JSONObject } from '@ai-sdk/provider';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type { StreamOptions } from '../core/types';
 import {
   assertSapAiCoreApiUrl,
   createSapAiCoreDestination,
@@ -9,6 +5,10 @@ import {
 } from '../../settings/provider-auth/SapAiCoreCredentials';
 import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
 import { reasoningVisibilityRequest } from './reasoningWire';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { JSONObject } from '@ai-sdk/provider';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
+import type { StreamOptions } from '../core/types';
 
 interface DedicatedProviderConfig {
   apiKey: string;

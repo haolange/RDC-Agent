@@ -2,13 +2,13 @@
  * Concurrency contract — dual session turns, temporary path isolation.
  * Phase 7 matrix entry for TurnCoordinator / path root isolation.
  */
-import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, writeFile, rm } from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import type { AgentEvent } from '@shared/types/agentRuntime';
+import { afterEach, describe, expect, it } from 'vitest';
 import { TurnCoordinator } from '../../agent-runtime/orchestration/TurnCoordinator';
 import { safeResolvePath } from '../../agent-runtime/tools/primitives/_shared';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 
 function makeEvent(id: string, sessionId: string): AgentEvent {
   return {

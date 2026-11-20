@@ -2,9 +2,9 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { AgentDefinitionSaveRequest, AgentManifestDefinition } from '@shared/types/agentManifest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { useSettingsModal } from './useSettingsModal';
+import type { AgentDefinitionSaveRequest, AgentManifestDefinition } from '@shared/types/agentManifest';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 

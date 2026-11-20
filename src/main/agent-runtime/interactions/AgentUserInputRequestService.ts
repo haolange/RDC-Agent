@@ -1,3 +1,9 @@
+import {
+  formatAskUserAnswersForToolResult,
+  normalizeAskUserAnswers,
+  normalizeAskUserQuestions,
+} from '@shared/utils/askUser';
+import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
@@ -5,12 +11,6 @@ import type {
   ConversationAskUserAnswer,
   ConversationAskUserQuestion,
 } from '@shared/types/conversation';
-import {
-  formatAskUserAnswersForToolResult,
-  normalizeAskUserAnswers,
-  normalizeAskUserQuestions,
-} from '@shared/utils/askUser';
-import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 
 interface PendingUserInputRequest {
   delegatedOwner?: DelegatedInteractionOwner;

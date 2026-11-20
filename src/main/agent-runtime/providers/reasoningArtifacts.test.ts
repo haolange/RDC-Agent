@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ReasoningControl } from '@shared/types/modelCapability';
-import type {
-  ProviderContractBundle,
-  ProviderReasoningContract,
-  ProviderToolLoopContract,
-} from '@shared/provider-catalog/modelManifestSchema';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { __testing as anthropicTesting } from './AnthropicProvider';
@@ -14,6 +7,13 @@ import { __testing as geminiTesting } from './GeminiProvider';
 import { __testing as ollamaTesting } from './OllamaProvider';
 import { __testing as openAICompatibleTesting } from './OpenAICompatibleProvider';
 import { __testing as openAIResponsesTesting } from './OpenAIResponsesProvider';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type {
+  ProviderContractBundle,
+  ProviderReasoningContract,
+  ProviderToolLoopContract,
+} from '@shared/provider-catalog/modelManifestSchema';
+import type { ReasoningControl } from '@shared/types/modelCapability';
 import type { AssistantMessage, Context, Model } from '../core/types';
 
 const baseContext: Context = { messages: [] };

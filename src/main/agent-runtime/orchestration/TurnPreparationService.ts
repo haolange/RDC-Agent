@@ -1,32 +1,26 @@
-import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
-import { withRdcHostRuntimeEnv } from '../../rdc/withRdcHostRuntimeEnv';
-import { assertRdcContextLeaseOwnership } from '../../rdc/RdcRuntimeContextRegistry';
-import { assertExecutionOfferSkillCompatibility } from '../../sessions/run/handoffSkillCompatibility';
-import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
-import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
-import { approvedInvestigationContract } from '../../sessions/run/approvedInvestigationContract';
-import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { approvedExecutionOfferFact } from '../prompt/PromptPlanBuilder';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
 
 import { createHash } from 'crypto';
-import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint } from '../../rdc/RdcTurnBindings';
-import type { AgentRole } from '@shared/types/agent';
 import { agentCompletionContract } from '@shared/types/agentManifest';
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
-import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
 import {
   resolveCompactionThresholdTokens,
   resolveEffectiveCompactionPercent,
 } from '@shared/utils/contextBudget';
 import { nowMs } from '@shared/utils/id';
+import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint } from '../../rdc/RdcTurnBindings';
+import { approvedExecutionOfferFact } from '../prompt/PromptPlanBuilder';
+import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import { approvedInvestigationContract } from '../../sessions/run/approvedInvestigationContract';
+import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
+import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
+import { assertExecutionOfferSkillCompatibility } from '../../sessions/run/handoffSkillCompatibility';
+import { assertRdcContextLeaseOwnership } from '../../rdc/RdcRuntimeContextRegistry';
+import { withRdcHostRuntimeEnv } from '../../rdc/withRdcHostRuntimeEnv';
+import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
 import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
 import { requestEnvelopeBuilder } from '../prompt';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
@@ -53,16 +47,22 @@ import {
   partitionDeferredTools,
   preactivateWorkflowTools,
 } from './deferredTools';
-import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
-import type { TurnHandle } from './TurnCoordinator';
-import type { UserMessage, ToolDefinition } from '../core/types';
 import {
   countContinuationDecisions,
   type FrozenAttachmentManifestEntry,
   type PreparedAgentTurnContext,
   type ResolvedRuntimeTools,
 } from './orchestratorTypes';
+import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AgentRole } from '@shared/types/agent';
+import type { UserMessage, ToolDefinition } from '../core/types';
+import type { TurnHandle } from './TurnCoordinator';
+import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
 function aggregateMcpDescriptorHash(
   profile: EffectiveAgentProfile,

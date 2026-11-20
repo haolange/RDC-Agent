@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
-import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
 import { type WorkProcessRow } from './workProcessTypes';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';

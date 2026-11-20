@@ -1,6 +1,6 @@
-import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
 
 /** Replace a volatile main-owned fact before preparation freezes the prompt. */
 export function applyRuntimeFact(plan: PromptPlan, fact: { id: string; sourcePath: string; content: string }): PromptPlan {

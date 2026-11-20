@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
+import { stopWorkTrace } from '../lib/stopWorkTrace';
 import {
   shouldRejectActivePatchForMonotonicStop,
   useConversationStore,
 } from './conversationStore';
-import { stopWorkTrace } from '../lib/stopWorkTrace';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const baseAssistant = (overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
   id: 'assistant-1',

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import {
   resolveDisplayedCompactionThreshold,
   resolveDisplayedGeneratable,
@@ -7,6 +6,7 @@ import {
   resolveDisplayedPromptBudget,
   type ContextUsageSelectedProfile,
 } from './contextUsageDisplay';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 const profile: ContextUsageSelectedProfile = {
   contextWindowTokens: 1_000_000,

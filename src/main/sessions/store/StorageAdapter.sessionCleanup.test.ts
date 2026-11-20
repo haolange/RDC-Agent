@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { prepareTerminalAppend } from './ConversationTerminalAppend';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
-import { prepareTerminalAppend } from './ConversationTerminalAppend';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-cleanup-'));
 afterAll(() => fs.rmSync(tempRoot, { recursive: true, force: true }));

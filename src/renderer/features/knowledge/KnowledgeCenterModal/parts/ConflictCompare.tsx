@@ -1,10 +1,10 @@
-import type { KnowledgeCardDetail, KnowledgePackConflict } from '@shared/types/knowledge';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 import { CardBadges } from './CardBadges';
+import type { KnowledgeCardDetail, KnowledgePackConflict } from '@shared/types/knowledge';
 
 interface ConflictCompareProps {
   conflict: KnowledgePackConflict;

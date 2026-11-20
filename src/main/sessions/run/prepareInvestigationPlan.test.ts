@@ -2,9 +2,9 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { afterEach, expect, it } from 'vitest';
-import type { ProjectRecord } from '@shared/types/session';
 import { hashCaptureFile } from '../../rdc/captures/replay/captureContentHash';
 import { prepareInvestigationPlan, type InvestigationPlanHost } from './prepareInvestigationPlan';
+import type { ProjectRecord } from '@shared/types/session';
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });

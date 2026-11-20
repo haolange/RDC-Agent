@@ -1,6 +1,6 @@
+import { getElectronApi } from '../../platform/getElectronApi';
 import type { CaptureReplayApplyRequest, CaptureReplayBindingRequest } from '@shared/types/captureReplay';
 import type { SessionScope } from '@shared/types/session';
-import { getElectronApi } from '../../platform/getElectronApi';
 
 export type CaptureScope = SessionScope;
 const api = () => {

@@ -31,12 +31,12 @@ vi.mock('../../stores/projectStore', () => ({
   },
 }));
 
-import { clearComposerModelChoice, commitComposerModelChoice, persistSessionModelOverride, persistSessionTurnControls, flushSessionModelSaves } from './sessionModelOverride';
 import {
   readComposerDraftModel,
   useComposerModelDraftStore,
   writeComposerDraftModel,
 } from '../../stores/composerModelDraftStore';
+import { clearComposerModelChoice, commitComposerModelChoice, persistSessionModelOverride, persistSessionTurnControls, flushSessionModelSaves } from './sessionModelOverride';
 
 beforeEach(() => {
   projection.projectId = 'project-a'; projection.sessionId = 'session-a';

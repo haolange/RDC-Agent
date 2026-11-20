@@ -1,5 +1,5 @@
-import type { MaxVisualTimeline } from './maxVisual';
 import { MAX_VISUAL_EGRESS_MS } from './maxVisual';
+import type { MaxVisualTimeline } from './maxVisual';
 
 /** hold = freeze Max rail one frame; settle = ease ordinary fill in (CSS needs both). */
 export type ExitingMaxPhase = 'off' | 'hold' | 'settle';

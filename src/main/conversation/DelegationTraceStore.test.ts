@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
+import { delegationTraceStore } from './DelegationTraceStore';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const fixture = vi.hoisted(() => ({ root: '', publish: vi.fn() }));
@@ -9,7 +10,6 @@ vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {
   readSession: (id: string) => id === 'owner' ? { sessionPath: fixture.root } : null,
 } }));
 vi.mock('../agent-runtime/orchestration/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: { publish: fixture.publish } }));
-import { delegationTraceStore } from './DelegationTraceStore';
 
 afterEach(() => {
   if (fixture.root) fs.rmSync(fixture.root, { recursive: true, force: true });

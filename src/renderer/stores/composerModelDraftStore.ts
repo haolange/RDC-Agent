@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { SessionModelOverride } from '@shared/types/session';
 import { buildComposerSessionScopeKey } from '../lib/composerSessionScope';
+import type { SessionModelOverride } from '@shared/types/session';
 
 interface ComposerModelDraftState {
   draftByScope: Record<string, SessionModelOverride>;

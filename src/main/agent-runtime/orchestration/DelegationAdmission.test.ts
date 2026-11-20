@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import type { PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
 import { newDelegationBudgetExhausted } from './DelegationAdmission';
 import { finishSubagentBudgetChild, startSubagentBudgetChild } from './TurnCoordinator';
+import type { PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
 
 const policy = (now: number): PolicyBudgetState => ({
   toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: now,

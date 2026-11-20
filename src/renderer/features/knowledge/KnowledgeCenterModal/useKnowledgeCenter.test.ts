@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { KnowledgeLaneHit, KnowledgePack } from '@shared/types/knowledge';
 import { assignKnowledgeCenterList, includeSelectedSpaceId } from './knowledgeCenterQuery';
+import type { KnowledgeLaneHit, KnowledgePack } from '@shared/types/knowledge';
 
 function hit(cardId: string, score: number): KnowledgeLaneHit {
   return {

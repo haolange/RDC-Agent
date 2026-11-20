@@ -1,5 +1,5 @@
-import type { ConversationMessage } from '@shared/types/conversation';
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 export const stopWorkTrace = (message: ConversationMessage): ConversationMessage => {
   if (message.status !== 'draft' && message.status !== 'streaming') return message;

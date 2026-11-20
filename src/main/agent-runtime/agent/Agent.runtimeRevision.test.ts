@@ -2,11 +2,11 @@
  * Agent LoopRuntimeState COW / revision semantics (Phase 4.2).
  */
 import { describe, expect, it } from 'vitest';
-import type { AssistantMessage, AssistantMessageEvent, Context, Message, Model, ToolDefinition } from '../core/types';
 import { EventStream } from '../core/EventStream';
 import { __testing as responsesWire } from '../providers/OpenAIResponsesProvider';
-import { Agent } from './Agent';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import { Agent } from './Agent';
+import type { AssistantMessage, AssistantMessageEvent, Context, Message, Model, ToolDefinition } from '../core/types';
 
 const model: Model = {
   id: 'test-model',

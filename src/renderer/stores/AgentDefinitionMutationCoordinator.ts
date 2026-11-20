@@ -1,10 +1,10 @@
+import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 import type {
   AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
 } from '@shared/types/agentManifest';
-import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 
 type CommitAgentDefinition = (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
 

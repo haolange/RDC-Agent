@@ -2,8 +2,8 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ConversationPlanReview } from '@shared/types/planReview';
 import { PlanCard } from './PlanCard';
+import type { ConversationPlanReview } from '@shared/types/planReview';
 const mock = vi.hoisted(() => ({ open: vi.fn(), measure: () => {}, disconnect: vi.fn(), height: 100 }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) =>

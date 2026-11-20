@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import type { KnowledgeTopicProposal } from '@shared/types/knowledge';
 import { buildTopicChanges } from './knowledgeTopicChanges';
+import type { KnowledgeTopicProposal } from '@shared/types/knowledge';
 
 it('prepares only selected cards, edited synonyms and explicit merges for preview', () => {
   const proposal: KnowledgeTopicProposal = {

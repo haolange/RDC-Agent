@@ -1,6 +1,6 @@
+import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranch, ConversationBranchState, ConversationFork } from '@shared/types/conversationBranch';
-import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 
 const ROLE_ORDER: Record<ConversationMessage['role'], number> = { system: 0, user: 1, assistant: 2 };
 

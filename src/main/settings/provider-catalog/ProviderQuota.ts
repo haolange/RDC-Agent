@@ -1,6 +1,6 @@
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import { effectiveCatalogService } from './EffectiveCatalogService';
 import { settingsService } from '../settings-core/SettingsService';
+import { effectiveCatalogService } from './EffectiveCatalogService';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 
 const DEFAULT_RETRY_SECONDS = 60;
 const RESET_HEADERS = [

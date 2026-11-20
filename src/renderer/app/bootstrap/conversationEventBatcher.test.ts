@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 import { createConversationEventBatcher } from './conversationEventBatcher';
+import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 
 const message = (id: string, content: string, updatedAt: number): ConversationMessage => ({
   id,

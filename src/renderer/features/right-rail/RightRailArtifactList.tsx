@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, InvestigationListPage } from '@shared/types/trace';
 import { useI18n } from '../../i18n';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
@@ -7,6 +6,7 @@ import { TaskDialog } from '../../ui/TaskDialog';
 import { RightRailArtifactGlyph } from './RightRailArtifactGlyphs';
 import { RightRailInvestigationPreview } from './RightRailInvestigationPreview';
 import { listInvestigationArtifacts } from './investigationPreviewActions';
+import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, InvestigationListPage } from '@shared/types/trace';
 
 function ArtifactRows({ rows, select }: { rows: InvestigationArtifactRow[]; select: (row: InvestigationArtifactRow) => void }) {
   const { t } = useI18n();

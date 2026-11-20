@@ -1,13 +1,3 @@
-import type {
-  Context,
-  Message,
-  Model,
-  ProviderContinuationArtifact,
-  StopReason,
-  StreamOptions,
-  ToolDefinition,
-} from '../../core/types';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../../reasoning/ContinuationReplayPolicy';
 import { createProviderStateRef, findLatestProviderState } from '../../reasoning/ProviderStateRefs';
@@ -22,6 +12,16 @@ import {
   ProviderEmptyStreamError,
 } from './http';
 import { finalizeProviderUsage } from './normalizeCacheUsage';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type {
+  Context,
+  Message,
+  Model,
+  ProviderContinuationArtifact,
+  StopReason,
+  StreamOptions,
+  ToolDefinition,
+} from '../../core/types';
 
 export const RESPONSES_REASONING_INCLUDE = 'reasoning.encrypted_content';
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { composePlanMarkdown } from './sessionPlanArtifact';
 import { parseInvestigationPlanContract } from '@shared/types/planInvestigation';
 import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { composePlanMarkdown } from './sessionPlanArtifact';
 
 describe('investigation plan contract', () => {
   it('freezes host-owned mission and capture identity ahead of Task requirements', () => {

@@ -2,20 +2,20 @@
  * PromptPlanForTurn — build PromptPlan for Debug sendMessage / profile turns.
  */
 
-import type { AgentId, AgentRole } from '@shared/types/agent';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import {
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
 } from '@shared/constants/agents';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { buildTurnPromptPlan } from './TurnPromptPlan';
+import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { AgentId, AgentRole } from '@shared/types/agent';
 
 export class PromptPlanForTurn {
   systemPromptForAgent(agentId: AgentRole, prompt?: string): string {

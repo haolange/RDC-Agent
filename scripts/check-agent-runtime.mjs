@@ -310,7 +310,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const globTool = read('src/main/agent-runtime/tools/primitives/GlobTool.ts');
   assert(globTool.includes('splitExternalPattern'), 'Glob tool must resolve approved external path patterns.');
 
-  assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/agentToolCapabilityAudit.test.ts')), 'Catalog tool-calling audit must exist.');
+  assert(fs.existsSync(path.join(repoRoot, 'src/main/provider-catalog/agentToolCapabilityAudit.test.ts')), 'Catalog tool-calling audit must exist.');
   assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/protocolWireFixtureCoverage.ts')), 'Native protocol wire-fixture coverage map must exist.');
   const toolCapability = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/check-agent-tool-capability.mjs')], {
     cwd: repoRoot,

@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { AgentPlanReviewRequestService } from '../../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { readReferencedPlan } from './sessionPlanReference';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationPlanReview, PlanReviewStateDocument } from '@shared/types/planReview';
+
 const fixture = vi.hoisted(() => ({ state: null as PlanReviewStateDocument | null, history: [] as ConversationMessage[],
   content: 'A verified plan', failWrite: false, freeze: vi.fn(), offer: vi.fn(), readOffer: vi.fn() }));
 vi.mock('../store/StorageAdapter', () => ({ storageAdapter: {
@@ -19,8 +22,6 @@ vi.mock('./sessionPlanArtifact', () => ({ planArtifactWriter: {
   }, freezeApprovedPlan: (...args: unknown[]) => fixture.freeze(...args),
 } }));
 vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: vi.fn(() => ({ agent: 'general', label: 'Execute', prompt: 'Continue', send: true, requiredSkillIds: [], requiredToolIds: [] })), writeExecutionOfferFromApproval: (...args: unknown[]) => fixture.offer(...args) }));
-import { AgentPlanReviewRequestService } from '../../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { readReferencedPlan } from './sessionPlanReference';
 const hash = createHash('sha256').update('A verified plan').digest('hex');
 const plan: ConversationPlanReview = { planId: 'plan', revision: 1, uri: 'session://plans/plan.md', hash,
   title: 'Plan', summary: [], sections: [], status: 'cancelled', handoffOptions: [{ agent: 'general', label: 'Execute' }] };

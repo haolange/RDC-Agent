@@ -5,8 +5,8 @@ import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/vi
 import { Prec, type Extension } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
 import { registerCodeMirrorView } from '../../lib/contextMenuCommands';
-import { useComposerMarkdownSizing } from './useComposerMarkdownSizing';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { useComposerMarkdownSizing } from './useComposerMarkdownSizing';
 import './ComposerMarkdownInput.css';
 
 export type ComposerMarkdownMode = 'write' | 'preview';

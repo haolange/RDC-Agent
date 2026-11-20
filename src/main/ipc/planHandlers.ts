@@ -1,19 +1,19 @@
-import { confirmInMainProcess } from '../window/mainConfirmation';
-import { nativeMessage } from '../window/nativeI18n';
-import { dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { PlanApprovalTokenRequest, PlanExportRequest, PlanReadRequest, PlanSaveToProjectRequest } from '@shared/types/planReview';
+import { dialog, ipcMain } from 'electron';
+import { nativeMessage } from '../window/nativeI18n';
+import { confirmInMainProcess } from '../window/mainConfirmation';
 import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
 import { assertPlanWritePath, composeProjectPlan, writePlanFile } from '../sessions/run/planFilePersistence';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { appPathService } from '../runtime/AppPathService';
-import type { WorkbenchIpcContext } from './workbenchContext';
-import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
-import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { PlanExportArgsSchema, PlanIssueApprovalTokenArgsSchema, PlanReadArgsSchema, PlanSaveToProjectArgsSchema, PlanCancelReviewArgsSchema } from './validation/planSchemas';
+import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { conversationService } from '../conversation/ConversationService';
+import { PlanExportArgsSchema, PlanIssueApprovalTokenArgsSchema, PlanReadArgsSchema, PlanSaveToProjectArgsSchema, PlanCancelReviewArgsSchema } from './validation/planSchemas';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import type { PlanApprovalTokenRequest, PlanExportRequest, PlanReadRequest, PlanSaveToProjectRequest } from '@shared/types/planReview';
+import type { WorkbenchIpcContext } from './workbenchContext';
 
 async function confirmPlanMutation(action: 'plan.saveToProject' | 'plan.export', sessionId: string): Promise<boolean> {
   return confirmInMainProcess({

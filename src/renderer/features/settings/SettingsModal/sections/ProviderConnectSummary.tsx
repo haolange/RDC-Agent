@@ -1,9 +1,9 @@
 import React from 'react';
+import { Icon } from '../../../../ui/Icon';
+import { getProviderProtocolLabel } from '../utils';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { Icon } from '../../../../ui/Icon';
 import type { ProviderConnectionDraft } from '../types';
-import { getProviderProtocolLabel } from '../utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

@@ -1,7 +1,7 @@
 import { assistantMessageText } from '../prompt/ToolFreeRequest';
+import { ContextManager } from '../agent/ContextManager';
 import { executeCompactionHandoff, type CompactionHandoffExecution } from './CompactionHandoffRuntime';
 import { parseModelHandoffSections } from './StructuredHandoffBuilder';
-import { ContextManager } from '../agent/ContextManager';
 
 /** Frozen route, credentials and cancellation are owned by the calling execution. */
 export async function generateCompactionSections(input: CompactionHandoffExecution) {

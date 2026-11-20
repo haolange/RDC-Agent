@@ -1,12 +1,12 @@
 import React, { useId } from 'react';
-import { WorkCardHeader } from './WorkCardHeader';
+import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 import { useI18n } from '../../i18n';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
+import { WorkCardHeader } from './WorkCardHeader';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
-import type { WorkProcessRow } from './workProcessTypes';
-import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import type { WorkProcessRow } from './workProcessTypes';
 
 export const TaskSnapshotCard: React.FC<{
   row: Extract<WorkProcessRow, { type: 'taskSnapshot' }>;

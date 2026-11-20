@@ -1,16 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
-import { useComposerTurnControls } from './ComposerTurnControlsContext';
-import { EFFORT_LABEL_KEYS } from './effortControlParts';
-import type { PreparedTurnContextSummary } from '@shared/types/session';
 import { Icon } from '../../ui/Icon';
 import { Pill } from '../../ui/Pill';
 import { OverflowFade } from '../../ui/OverflowFade';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { useComposerMenu } from './useComposerMenuRegistry';
 import { useOverlayDismiss } from '../../lib/overlayStack';
+import { useComposerMenu } from './useComposerMenuRegistry';
+import { EFFORT_LABEL_KEYS } from './effortControlParts';
+import { useComposerTurnControls } from './ComposerTurnControlsContext';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import { buildModelEffortCapsulePresentation, ChevronIcon } from './effortControlParts';
 import { useComposerEffortControl } from './useComposerEffortControl';
@@ -20,6 +18,8 @@ import {
   nextComposerModelEffortView,
   type ComposerModelEffortView,
 } from './composerModelEffortView';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
+import type { SessionRecord } from '@shared/types/session';
 
 export interface ComposerModelSaveState { saving: boolean; error?: string; retry?: () => void }
 

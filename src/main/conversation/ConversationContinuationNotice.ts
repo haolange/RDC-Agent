@@ -1,7 +1,7 @@
+import { createConversationMessage } from './ConversationRoutePreflight';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
-import { createConversationMessage } from './ConversationRoutePreflight';
 
 export function shouldAnnounceContinuationDrop(
   previous: PreparedTurnContextSummary | PreparedTurnContextSummary['route'] | undefined,

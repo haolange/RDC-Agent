@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import { SessionArtifactError, SESSION_ARTIFACT_MAX_FILE_BYTES, isSessionArtifactizedEnvelope } from '@shared/types/sessionArtifact';
-import { sessionContextJournal, type SessionContextJournal } from '../conversation/SessionContextJournal';
-import { canonicalJson } from './RdcOperationCatalog';
-import { containsSensitiveRequestKey } from './RdcInvocationRecord';
 import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
+import { sessionContextJournal, type SessionContextJournal } from '../conversation/SessionContextJournal';
 import { delegatedArtifactOwner } from '../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { canonicalJson } from './RdcOperationCatalog';
+import { containsSensitiveRequestKey } from './RdcInvocationRecord';
+import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 export type RecordedRequestQualification = 'recorded-model-request-only' | 'recorded-operation-index-only';
 interface RecordedRdcDeps {

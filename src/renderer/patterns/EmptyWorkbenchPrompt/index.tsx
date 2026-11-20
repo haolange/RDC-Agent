@@ -1,12 +1,12 @@
 import React from 'react';
-import type { AgentMode } from '@shared/types/layout';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { resolveAgentDisplay } from '@shared/constants/agents';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ModeGlyph } from '../../ui/ModeGlyph';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { AgentMode } from '@shared/types/layout';
 import './EmptyWorkbenchPrompt.css';
 
 interface EmptyWorkbenchPromptProps {

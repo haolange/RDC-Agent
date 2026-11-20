@@ -1,3 +1,4 @@
+import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, KNOWLEDGE_RETRIEVAL_LANES } from '@shared/types/knowledge';
 import type {
   KnowledgeCardRecord,
   KnowledgeCardType,
@@ -5,7 +6,6 @@ import type {
   KnowledgeQueryRequest,
   KnowledgeRetrievalLane,
 } from '@shared/types/knowledge';
-import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, KNOWLEDGE_RETRIEVAL_LANES } from '@shared/types/knowledge';
 
 export type KnowledgeViewMode = 'cards' | 'candidates' | 'conflicts';
 export type KnowledgeNarrowPane = 'spaces' | 'list' | 'detail';

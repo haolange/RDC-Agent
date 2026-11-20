@@ -1,12 +1,12 @@
 import React from 'react';
-import type { DelegationContentKind, DelegationTraceHeader } from '@shared/types/delegationTrace';
 import { useI18n } from '../../i18n';
-import { useDelegationContent } from './useDelegationContent';
 import { Button } from '../../ui/Button';
 import { useClipboardBridge } from '../../hooks/useClipboardBridge';
+import { useDelegationContent } from './useDelegationContent';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkDisclosure } from './WorkDisclosure';
 import { formatInvocation } from './subagentPresentation';
+import type { DelegationContentKind, DelegationTraceHeader } from '@shared/types/delegationTrace';
 
 function Detail({ label, kind, available, sessionId, parentToolCallId, childSessionId, executionId, generation }: {
   label: string; kind: DelegationContentKind; available: boolean;

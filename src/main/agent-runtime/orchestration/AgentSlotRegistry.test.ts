@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { AgentSlotRegistry, agentSlotKey } from './AgentSlotRegistry';
-import type { AgentSlot } from './AgentSlotRegistry';
-import { createEphemeralScopeId } from './executionScope';
 import { isTransientScopeId } from '@shared/utils/executionScope';
+import { AgentSlotRegistry, agentSlotKey } from './AgentSlotRegistry';
+import { createEphemeralScopeId } from './executionScope';
+import type { AgentSlot } from './AgentSlotRegistry';
 
 function mockSlot(): AgentSlot {
   return {

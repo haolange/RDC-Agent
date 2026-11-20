@@ -1,5 +1,5 @@
-import type { LlmProviderId } from '@shared/types/settings';
 import { getLoadedProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
+import type { LlmProviderId } from '@shared/types/settings';
 
 export interface AccountRoute {
   baseUrl: string;

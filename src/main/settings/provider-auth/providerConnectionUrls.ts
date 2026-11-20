@@ -1,6 +1,6 @@
+import { ProviderConnectionError } from './providerConnectionErrors';
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from '../provider-catalog/effectiveCatalogTypes';
-import { ProviderConnectionError } from './providerConnectionErrors';
 
 export function projectGoogleVertexModelRoutes(
   models: readonly LlmProviderModel[],

@@ -2,9 +2,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
-import { RdcCliInvokerService } from './RdcCliInvokerService';
-import { ShellInvocationService } from '../tools/ShellInvocationService';
 import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
+import { ShellInvocationService } from '../tools/ShellInvocationService';
+import { RdcCliInvokerService } from './RdcCliInvokerService';
 
 const root = process.env.RDC_NATIVE_TOOLS_ROOT;
 const python = process.env.RDC_NATIVE_PYTHON;

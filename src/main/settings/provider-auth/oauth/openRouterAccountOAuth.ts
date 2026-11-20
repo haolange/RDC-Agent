@@ -1,12 +1,12 @@
 import { randomUUID } from 'crypto';
 import { createServer } from 'http';
-import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { getLoadedProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { parseOpenRouterAccountCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
 import { buildOpenRouterAuthorizationUrl, buildOpenRouterExchange, createPkcePair, parseOpenRouterExchange } from '../../provider-catalog/LiveProviderOAuthContracts';
+import { fetchJson } from './oauthHttp';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
-import { fetchJson } from './oauthHttp';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
 export async function startOpenRouterLogin(
   providerId: LlmProviderId,

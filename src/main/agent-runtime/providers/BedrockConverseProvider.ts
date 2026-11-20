@@ -12,20 +12,9 @@
  */
 
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Message,
-  Model,
-  StopReason,
-  StreamOptions,
-  ToolDefinition,
-} from '../core/types';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import {
@@ -38,6 +27,17 @@ import {
   type ProviderStreamReadOptions,
 } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Message,
+  Model,
+  StopReason,
+  StreamOptions,
+  ToolDefinition,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { ProviderRequestAuthorizer } from '../../settings/provider-auth/AwsBedrockCredentials';
 
 const PROVIDER_API = 'bedrock-converse-stream';

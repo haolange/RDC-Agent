@@ -2,9 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useI18n } from '../../../i18n';
-import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
-import type { ProviderCatalogSnapshot } from './types';
 import { createSettingsModalActions } from './settingsModalActions';
 import { findProjectedHandoffTargetConflicts, validateAgentHandoffs } from './sections/agentHandoffValidation';
 import { useAgentManifestAutosave } from './useAgentManifestAutosave';
@@ -17,6 +14,9 @@ import {
   getProviderDisplayLabel,
   sortProvidersByLabel,
 } from './utils';
+import type { ProviderCatalogSnapshot } from './types';
+import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
+import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 
 const EMPTY_PROVIDER_CATALOG_SNAPSHOT: ProviderCatalogSnapshot = {
   categories: [],

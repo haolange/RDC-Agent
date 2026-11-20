@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import { getMcpStatusSummary } from './mcpStatusActions';
+import type { MCPServerStatusSummary } from '@shared/types/mcp';
 
 export interface McpStatusState {
   servers: MCPServerStatusSummary[];

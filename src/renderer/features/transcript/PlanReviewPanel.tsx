@@ -8,16 +8,16 @@ import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { Details } from '../../ui/Details';
-import { planAppendixMarkdown } from './planPreview';
-import { usePlanReviewActions } from './usePlanReviewActions';
 import { useProjectStore } from '../../stores/projectStore';
 import { useReadingPanelGeometry } from '../../lib/useReadingPanelGeometry';
-import './plan-review-panel.css';
 import { Button } from '../../ui/Button';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import { usePlanReviewActions } from './usePlanReviewActions';
+import { planAppendixMarkdown } from './planPreview';
 import type { ConversationPlanReview } from '@shared/types/planReview';
+import './plan-review-panel.css';
 
 export const PlanReviewPanel: React.FC<{
   plan: ConversationPlanReview;

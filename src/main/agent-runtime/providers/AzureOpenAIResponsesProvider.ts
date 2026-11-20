@@ -4,16 +4,8 @@
  */
 
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
-import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -26,6 +18,14 @@ import {
   consumeResponsesEventStream,
   toResponsesInput,
 } from './internal/responsesShared';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Model,
+  StreamOptions,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 
 const DEFAULT_API_VERSION = '2024-10-21';
 const PROVIDER_API = 'azure-openai-responses';

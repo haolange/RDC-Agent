@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { SkillSelectionProjection } from '@shared/types/rdcRuntime';
 import { useProjectStore } from '../../../stores/projectStore';
 import { observeScopedRequest, resolveSkillSelectionRequest, type SkillSelectionScope } from './scopedSkillSelection';
+import type { SkillSelectionProjection } from '@shared/types/rdcRuntime';
 
 interface CatalogState {
   key: string;

@@ -1,14 +1,4 @@
 import { randomUUID } from 'crypto';
-import type {
-  LlmAgentRoute,
-  LlmProviderAuthMode,
-  LlmProviderAvailability,
-  LlmProviderConnectionStatus,
-  LlmProviderConnectionSchema,
-  LlmProviderEntry,
-  LlmProviderModel,
-  LlmProviderModelPreference,
-} from '@shared/types/settings';
 import { isReasoningSelection } from '@shared/types/modelCapability';
 import { TOP_LEVEL_AGENT_IDS, isSafeAgentProfileId } from '@shared/types/agent';
 import {
@@ -27,9 +17,19 @@ import {
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../../runtime/AppPathService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
-import { secretStorageService } from './SecretStorageService';
 import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from '../provider-catalog/DiscoveryAdmission';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
+import { secretStorageService } from './SecretStorageService';
+import type {
+  LlmAgentRoute,
+  LlmProviderAuthMode,
+  LlmProviderAvailability,
+  LlmProviderConnectionStatus,
+  LlmProviderConnectionSchema,
+  LlmProviderEntry,
+  LlmProviderModel,
+  LlmProviderModelPreference,
+} from '@shared/types/settings';
 import type { PersistedLlmProviderEntry } from './settingsDefaults';
 
 export type ProviderCredentialView = 'runtime' | 'storage-metadata';

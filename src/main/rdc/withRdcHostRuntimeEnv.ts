@@ -1,5 +1,5 @@
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 export const RDC_INTERMEDIATE_ROOT_ENV = 'RDC_TOOL_INTERMEDIATE_ROOT';
 

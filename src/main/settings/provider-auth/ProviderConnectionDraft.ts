@@ -1,7 +1,3 @@
-import type {
-  LlmProviderDraftRequest,
-  LlmProviderEntry,
-} from '@shared/types/settings';
 import { authSchemaResolvesAmbientCredentials } from '@shared/provider-catalog/implementationRegistry';
 import { getProviderAuthSchemaId } from '../../provider-catalog/ProviderCatalogRegistry';
 import {
@@ -10,6 +6,10 @@ import {
   resolveProviderEndpointTemplate,
 } from './ProviderConnectionSchema';
 import { ProviderConnectionError } from './providerConnectionErrors';
+import type {
+  LlmProviderDraftRequest,
+  LlmProviderEntry,
+} from '@shared/types/settings';
 
 interface ResolvedProviderConnectionDraft {
   apiKey: string;

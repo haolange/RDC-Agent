@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
-import type { LlmProviderProtocol } from '@shared/types/settings';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { type CapabilityResolutionState, resolveCatalogCapability } from '../../lib/capabilityResolution';
+import type { LlmProviderProtocol } from '@shared/types/settings';
 
 export function useEffectiveModelCapability(
   agentId: string, routeFingerprint: string,

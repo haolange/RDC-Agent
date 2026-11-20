@@ -1,15 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { LanguageModel } from 'ai';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
-const streamTextMock = vi.hoisted(() => vi.fn());
+import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
+import type { LanguageModel } from 'ai';
 
+const streamTextMock = vi.hoisted(() => vi.fn());
 vi.mock('ai', async () => {
   const actual = await vi.importActual<typeof import('ai')>('ai');
   return { ...actual, streamText: streamTextMock };
 });
-
-import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
 
 const requestPlan = createTestRequestPlan({
   providerId: 'gitlab',

@@ -1,5 +1,3 @@
-import type { LlmProviderAccountDiagnostic, LlmProviderAccountLoginMode } from '@shared/types/settings';
-import type { GrokOAuthMetadata } from './oauthTypes';
 import {
   GROK_OAUTH_REQUESTED_SCOPES,
   GROK_OPENID_CONFIGURATION_URL,
@@ -11,6 +9,8 @@ import {
   readStringArray,
   renderAccountDiagnosticMessage,
 } from './oauthHttp';
+import type { LlmProviderAccountDiagnostic, LlmProviderAccountLoginMode } from '@shared/types/settings';
+import type { GrokOAuthMetadata } from './oauthTypes';
 
 export const readOAuthError = (payload: unknown): { error?: string; detail?: string } => {
   const record = payload && typeof payload === 'object' && !Array.isArray(payload)

@@ -4,7 +4,6 @@ import { settingsService } from '../../settings/settings-core/SettingsService';
 import { withRdcHostRuntimeEnv } from '../withRdcHostRuntimeEnv';
 import { rendererEventHub } from '../../browserAppBridge/rendererEventHub';
 import { processSupervisor } from '../../runtime/ProcessSupervisor';
-import type { ReplayDeviceEntry, ReplayDeviceSnapshot } from '@shared/types/device';
 import { AdbExecutableCache } from './adbExecutable';
 import {
   queryAdbDevicesLines,
@@ -17,6 +16,7 @@ import {
   POLL_BASE_MS,
 } from './replayDeviceDiff';
 import { parseAdbDeviceLine } from './replayDeviceParse';
+import type { ReplayDeviceEntry, ReplayDeviceSnapshot } from '@shared/types/device';
 
 export const WATCH_POLL_MS = 2500;
 export const WATCH_LEASE_TTL_MS = 10_000;

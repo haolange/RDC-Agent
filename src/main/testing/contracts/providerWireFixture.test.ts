@@ -11,15 +11,11 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from '@shared/provider-catalog/protocolWireFixtureCoverage';
-import type { LlmProviderProtocol } from '@shared/types/settings';
 import { getProviderAdapterImplementation, type ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { buildAnthropicMessagesUrl } from '../../agent-runtime/providers/AnthropicProvider';
 import { buildGeminiStreamUrl } from '../../agent-runtime/providers/GeminiProvider';
 import { createTestRequestPlan } from '../createTestRequestPlan';
-import type { Context, Model } from '../../agent-runtime/core/types';
 import { EventStream } from '../../agent-runtime/core/EventStream';
-import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import {
   AssistantStreamBuilder,
   createProviderOutputRef,
@@ -44,6 +40,10 @@ import { __testing as azureTesting } from '../../agent-runtime/providers/AzureOp
 import { __testing as mistralTesting } from '../../agent-runtime/providers/MistralProvider';
 import { __testing as bedrockTesting } from '../../agent-runtime/providers/BedrockConverseProvider';
 import { buildGoogleInteractionsRequest } from '../../agent-runtime/providers/GoogleInteractionsWire';
+import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
+import type { Context, Model } from '../../agent-runtime/core/types';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { LlmProviderProtocol } from '@shared/types/settings';
 
 const FIXTURE_ROOT = path.join(__dirname, '../../agent-runtime/providers/__fixtures__');
 

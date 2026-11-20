@@ -1,8 +1,8 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import type { ContextUsageSelectedProfile } from './contextUsageDisplay';
 
 vi.mock('../i18n', () => ({

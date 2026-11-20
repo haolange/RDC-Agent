@@ -1,16 +1,16 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { crc32, deflateSync } from 'node:zlib';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { convertAgentMessagesToLlm } from '../../agent/ContextManager';
 import { __testing as responses } from '../../providers/OpenAIResponsesProvider';
 import { createTestRequestPlan } from '../../../testing/createTestRequestPlan';
-import type { ToolExecutionContext } from '../../agent/AgentTool';
+import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 import { readImageTool } from './ReadImageTool';
 import { withTemporaryPathAccess } from './_shared';
-import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const imageMock = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('electron', () => ({ nativeImage: { createFromBuffer: imageMock.create },

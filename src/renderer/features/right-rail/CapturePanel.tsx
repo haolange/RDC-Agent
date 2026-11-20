@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
@@ -23,6 +22,7 @@ import {
 import { useCaptureReplay } from './useCaptureReplay';
 import { useCaptureRecovery } from './useCaptureRecovery';
 import { clearOpenedCapture, getTraceProjection, openProjectCaptureInput, refreshProjectCaptureInputs, refreshReplayDevices, refreshReplayFrame, type CaptureScope } from './capturePanelActions';
+import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import './CaptureReplay.css';
 
 type Action = 'open' | 'close' | 'refresh' | 'image';

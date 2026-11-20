@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 import { ModelsOverrideSchema } from '@shared/provider-catalog/modelsOverrideSchema';
 import { ProviderProtocolSchema } from '@shared/provider-catalog/modelManifestSchema';
+import { ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 const LlmProviderAuthModeSchema = z.enum(['none', 'api-key', 'local', 'account', 'environment']);
 

@@ -2,17 +2,13 @@
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
 
+import path from 'node:path';
 import { UNRESOLVED_BLOCKERS, parseUnresolvedItems } from '@shared/types/unresolvedWork';
 import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
-import type { AgentRole } from '@shared/types/agent';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
-import path from 'node:path';
-import type { MCPServerStatusSummary } from '@shared/types/mcp';
-import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
-import type { AgentTool } from '../agent/AgentTool';
+import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { toolToDefinition } from '../agent/AgentTool';
-import type { ToolDefinition } from '../core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../tools';
 import { readFileTool } from '../tools/primitives/ReadFileTool';
 import { MemoryStore } from '../memory/MemoryStore';
@@ -25,20 +21,24 @@ import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTo
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
+import { readRdcHostControls } from '../../rdc/RdcHostControls';
 import {
   expandCanonicalToolToken,
   isToolAllowedByFrozenAllowlist,
   normalizeToolName,
 } from './RuntimeToolPolicy';
-import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { createRdcProbeTool } from './RdcProbeTool';
-import { readRdcHostControls } from '../../rdc/RdcHostControls';
-import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
-import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
-import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
 import { listActiveDelegations, listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 import { completionBudgetEvidence } from './CompletionBudgetEvidence';
+import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
+import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { ResolvedRuntimeTools } from './orchestratorTypes';
+import type { ToolDefinition } from '../core/types';
+import type { AgentTool } from '../agent/AgentTool';
+import type { ConversationAskUserQuestion } from '@shared/types/conversation';
+import type { MCPServerStatusSummary } from '@shared/types/mcp';
+import type { AgentRole } from '@shared/types/agent';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;

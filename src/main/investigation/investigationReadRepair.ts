@@ -1,4 +1,3 @@
-import type { InvestigationArtifactManifest } from '@shared/types/renderdocInvestigation';
 import {
   collectRetiredRecordDependents,
   collectSupersededWorldStateDependents,
@@ -8,9 +7,10 @@ import {
 import { InvestigationError } from './investigationErrors';
 import { serializeInvestigationJson, sha256Prefixed } from './investigationHash';
 import { collectRecordKeys, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
-import type { InvestigationRecord } from '@shared/types/renderdocInvestigation';
 import { INDEX_URI } from './investigationRecordKeys';
 import { isReadySourceDriftError } from './investigationReadIntegrity';
+import type { InvestigationRecord } from '@shared/types/renderdocInvestigation';
+import type { InvestigationArtifactManifest } from '@shared/types/renderdocInvestigation';
 import type { InvestigationTxnMutation } from './investigationTxn';
 
 interface ReadRepairAccess {

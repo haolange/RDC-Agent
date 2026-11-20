@@ -5,8 +5,6 @@ import { useSessionProjectionStore } from '../../../stores/sessionProjectionStor
 import { useAgentStore } from '../../../stores/agentStore';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 import { hydrateComposerAgentFromSession } from '../../../stores/sessionAgentHydration';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { SelectSessionOptions } from './types';
 import {
   captureSelectionSnapshot,
   loadRunsForSession,
@@ -14,6 +12,8 @@ import {
   type ProjectSelectionHandlerOpsContext,
   type ProjectSelectionLoaderOpsContext,
 } from './projectSelectionContext';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { SelectSessionOptions } from './types';
 
 export async function selectSessionOp(
   ctx: ProjectSelectionLoaderOpsContext,

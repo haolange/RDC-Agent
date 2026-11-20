@@ -1,8 +1,8 @@
 import { INVESTIGATION_ARTIFACT_KINDS, INVESTIGATION_ARTIFACT_STATUSES } from '@shared/types/renderdocInvestigation';
-import type { InvestigationArtifactKind, InvestigationArtifactStatus } from '@shared/types/renderdocInvestigation';
 import { UNRESOLVED_BLOCKERS, type UnresolvedItem } from '@shared/types/unresolvedWork';
 import { parsePreview, toRecord } from './workProcessContentText';
 import { getDetailsRecord } from './workProcessWebPresentation';
+import type { InvestigationArtifactKind, InvestigationArtifactStatus } from '@shared/types/renderdocInvestigation';
 
 export type ToolOutcome =
   | { type: 'investigation'; title: string; kind?: InvestigationArtifactKind; status?: InvestigationArtifactStatus }

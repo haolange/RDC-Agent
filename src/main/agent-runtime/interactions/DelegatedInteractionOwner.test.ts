@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentEvent } from '@shared/types/agentRuntime';
 import { AgentToolApprovalRequestService } from '../permissions/AgentToolApprovalRequestService';
 import { AgentUserInputRequestService } from './AgentUserInputRequestService';
 import { withDelegatedInteractionOwner } from './DelegatedInteractionOwner';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const owner = { ownerSessionId: 'parent', childSessionId: 'child', executionId: 'execution-1' };
 const context = { sessionId: 'child', turnId: 'child-turn', agentId: 'general' as const };

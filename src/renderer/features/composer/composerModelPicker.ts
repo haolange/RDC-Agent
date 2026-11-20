@@ -1,7 +1,7 @@
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { formatTokenCount } from '@shared/utils/tokens';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 export interface ComposerModelPickerOption {
   providerId: string;

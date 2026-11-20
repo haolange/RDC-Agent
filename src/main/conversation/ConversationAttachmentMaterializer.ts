@@ -1,12 +1,7 @@
-import { describeMaterialContext } from '@shared/types/materialContext';
-import { hashAttachmentContents } from './ConversationAttachmentHashing';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { AttachmentLayer, ConversationAttachmentInput } from '@shared/types/conversation';
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { SessionAttachmentKind, SessionAttachmentRecord } from '@shared/types/session';
-import type { UserMessage } from '../agent-runtime/core/types';
-import type { FrozenAttachmentManifestEntry } from '../agent-runtime/orchestration/orchestratorTypes';
+import { describeMaterialContext } from '@shared/types/materialContext';
+import { hashAttachmentContents } from './ConversationAttachmentHashing';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
   MAX_ATTACHMENT_COUNT,
@@ -23,6 +18,11 @@ import {
   extractUtf8Text,
   resolveInlineTokenBudget,
 } from './AttachmentTextExtractor';
+import type { AttachmentLayer, ConversationAttachmentInput } from '@shared/types/conversation';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { SessionAttachmentKind, SessionAttachmentRecord } from '@shared/types/session';
+import type { UserMessage } from '../agent-runtime/core/types';
+import type { FrozenAttachmentManifestEntry } from '../agent-runtime/orchestration/orchestratorTypes';
 
 export {
   MAX_ATTACHMENT_BYTES_PER_FILE,

@@ -1,14 +1,14 @@
 import { randomUUID } from 'crypto';
-import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { COPILOT_EDITOR_HEADERS } from '../CopilotWire';
 import { parseCopilotModelCatalog } from '../CopilotBilling';
 import { isAdmittedDiscoveredModel } from '../../provider-catalog/DiscoveryAdmission';
 import { getProviderModelDefinitions } from '../../../provider-catalog/ProviderCatalogRegistry';
-import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import { accountDefaultRoute } from './accountRoute';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import { GITHUB_COPILOT_CLIENT_ID } from './oauthConstants';
 import { fetchJson, isTestMode, wait } from './oauthHttp';
+import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
 const isAgentRoutableAccountModel = (modelId: string): boolean => isAdmittedDiscoveredModel(modelId);
 

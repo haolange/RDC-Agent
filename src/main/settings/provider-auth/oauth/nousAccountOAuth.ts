@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
-import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 import { isAdmittedDiscoveredModel } from '../../provider-catalog/DiscoveryAdmission';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import { NOUS_INFERENCE_BASE_URL, NOUS_OAUTH_CLIENT_ID, NOUS_OAUTH_SCOPE, NOUS_PORTAL_BASE_URL } from './oauthConstants';
 import { createFormBody, fetchJson, fetchOAuthJson, isTestMode, readString, wait } from './oauthHttp';
+import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
 const isAgentRoutableAccountModel = (modelId: string): boolean => isAdmittedDiscoveredModel(modelId);
 

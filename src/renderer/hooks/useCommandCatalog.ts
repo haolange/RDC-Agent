@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CommandListResult } from '@shared/types/command';
 import { useI18n } from '../i18n';
 import { localizeCommands } from '../lib/commandLabels';
 import { useElectronApi } from './useElectronApi';
+import type { CommandListResult } from '@shared/types/command';
 export function useCommandCatalog(enabled = true) {
   const api = useElectronApi();
   const { t } = useI18n();

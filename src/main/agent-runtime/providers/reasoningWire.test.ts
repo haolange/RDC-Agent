@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { ReasoningControl } from '@shared/types/modelCapability';
 import {
   applyAnthropicReasoning,
   applyGeminiReasoning,
@@ -8,6 +7,7 @@ import {
   applyOpenAiCompatibleReasoning,
   buildOpenAiResponsesReasoning,
 } from './reasoningWire';
+import type { ReasoningControl } from '@shared/types/modelCapability';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
 const openAi56 = {

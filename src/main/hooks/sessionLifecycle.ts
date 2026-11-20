@@ -1,7 +1,7 @@
 import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { dispatchRuntimeHooks } from './runtimeHookDispatch';
 import { rdcSessionService } from '../sessions';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
+import { dispatchRuntimeHooks } from './runtimeHookDispatch';
 
 export async function createSessionWithHooks(
   projectId: string,

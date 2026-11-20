@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { LLMProviderConfig } from '@shared/types/llm';
-import type { LlmProviderId } from '@shared/types/settings';
 import { getProviderAuthSchemaId } from '../../provider-catalog/ProviderCatalogRegistry';
 import { settingsService } from '../settings-core/SettingsService';
 import { resolveProviderConnectionHeaders } from './ProviderConnectionSchema';
@@ -10,6 +8,8 @@ import {
   resolveAwsBedrockCredentials,
   type AwsBedrockCredentials,
 } from './AwsBedrockCredentials';
+import type { LlmProviderId } from '@shared/types/settings';
+import type { LLMProviderConfig } from '@shared/types/llm';
 
 export type ProviderRuntimeCredentialOperation = 'chat' | 'embed';
 

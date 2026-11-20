@@ -1,8 +1,8 @@
 /** Request budgeting and model-window conversion; canonical history is never truncated. */
-import type { AgentMessage, AssistantMessage, ImageContent, Message, ProviderContinuationArtifact,
-  TextContent, ToolCall, ToolResultMessage, UserMessage } from '../core/types';
 import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
+import type { AgentMessage, AssistantMessage, ImageContent, Message, ProviderContinuationArtifact,
+  TextContent, ToolCall, ToolResultMessage, UserMessage } from '../core/types';
 
 export interface ContextManagerConfig {
   contextTokenLimit: number;

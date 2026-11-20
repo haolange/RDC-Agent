@@ -1,10 +1,10 @@
 import React from 'react';
-import type { ProgressTask } from '@shared/types/trace';
-import './RightRailProgress.css';
 import { OverflowFade } from '../../ui/OverflowFade';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import { useI18n } from '../../i18n';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
+import type { ProgressTask } from '@shared/types/trace';
+import './RightRailProgress.css';
 
 const focusWorkProcessTask = (taskId: string): void => {
   const candidates: WorkProcessTaskLocationRequest['candidates'] = [];

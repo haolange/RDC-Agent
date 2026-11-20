@@ -1,5 +1,3 @@
-import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
-import { assertExecutionEvidence } from './investigationExecutionEvidence';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
 import {
@@ -20,8 +18,10 @@ import {
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
-import { readCompleteInvestigationArtifact } from './investigationArtifactRead';
+import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
 import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
+import { readCompleteInvestigationArtifact } from './investigationArtifactRead';
+import { assertExecutionEvidence } from './investigationExecutionEvidence';
 import { InvestigationError, isInvestigationStoreDegraded, toInvestigationError } from './investigationErrors';
 import {
   collectStalePropagation,

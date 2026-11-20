@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import { buildEffortCapabilityStatusLabels } from './effortControlStatusLabels';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const capability = {
   controls: {

@@ -15,9 +15,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { expandHomePath } from '../../../platform/paths';
-import type { AgentTool } from '../../agent/AgentTool';
 import { getWorkspaceRoot, safeResolvePath, truncateOutput } from './_shared';
 import { GLOB_MAX_OUTPUT_BYTES } from './toolLimits';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface GlobParams {
   pattern: string;

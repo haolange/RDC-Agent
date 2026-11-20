@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { assertDeclaredHandoffSkillCompatibility, assertDirectTaskSkillPreparation } from './handoffSkillCompatibility';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { PlanTaskRequirement } from '@shared/types/taskExecution';
-import { assertDeclaredHandoffSkillCompatibility, assertDirectTaskSkillPreparation } from './handoffSkillCompatibility';
 
 const mock = vi.hoisted(() => ({ load: vi.fn(), policy: vi.fn() }));
 vi.mock('../../settings/agent-manifests/AgentRuntimeConfigService', () => ({ agentRuntimeConfigService: { loadSkill: mock.load } }));

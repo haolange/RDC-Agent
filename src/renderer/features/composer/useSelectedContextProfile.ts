@@ -1,8 +1,8 @@
+import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import { resolvedCapability } from '../../lib/capabilityResolution';
-import { resolveSelectedContextProfile, type SelectedContextProfile } from './selectedContextProfile';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
+import { resolveSelectedContextProfile, type SelectedContextProfile } from './selectedContextProfile';
 
 export type { SelectedContextProfile };
 

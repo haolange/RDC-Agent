@@ -1,14 +1,14 @@
 import React, { useCallback, useRef, useState } from 'react';
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
-import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import { formatTokenCount } from '@shared/utils/tokens';
+import { formatUsdCost } from '@shared/utils/cost';
+import { useI18n } from '../i18n';
 import {
   awaitsExecutionContextWindow,
   resolveDisplayedPromptBudget,
   type ContextUsageSelectedProfile,
 } from './contextUsageDisplay';
-import { formatTokenCount } from '@shared/utils/tokens';
-import { formatUsdCost } from '@shared/utils/cost';
-import { useI18n } from '../i18n';
+import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 

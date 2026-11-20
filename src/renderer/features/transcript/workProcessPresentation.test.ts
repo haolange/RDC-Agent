@@ -1,6 +1,8 @@
-import { translate } from '../../i18n/messages';
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { describe, expect, it } from 'vitest';
+import { translate } from '../../i18n/messages';
+import { buildWorkProcessPresentation } from './workProcessTracePresentation';
+import { createToolRowForPresentation } from './workProcessToolRows';
+import { createApprovalRow } from './workProcessDecisionRows';
 import type {
   ConversationTextItem,
   ConversationThinkingItem,
@@ -9,9 +11,8 @@ import type {
 } from '@shared/types/conversation';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
-import { buildWorkProcessPresentation } from './workProcessTracePresentation';
-import { createToolRowForPresentation } from './workProcessToolRows';
-import { createApprovalRow } from './workProcessDecisionRows';
+
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 
 const now = 1_700_000_000_000;
 

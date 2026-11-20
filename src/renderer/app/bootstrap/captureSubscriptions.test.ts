@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createCaptureProjection, subscribeCaptureStatusChanged } from './captureSubscriptions';
 import type { ElectronAPI } from '@shared/types/electron';
 import type { ContextSnapshot } from '@shared/types/session';
 
@@ -12,7 +13,6 @@ vi.mock('../../stores/projectStore', () => ({ useProjectStore: { getState: () =>
 vi.mock('../../stores/captureStore', () => ({ useCaptureStore: { getState: () => state.capture } }));
 vi.mock('../../stores/sessionProjectionStore', () => ({ useSessionProjectionStore: { getState: () => state.projection } }));
 vi.mock('../../stores/deviceStore', () => ({ useDeviceStore: { getState: () => state.device } }));
-import { createCaptureProjection, subscribeCaptureStatusChanged } from './captureSubscriptions';
 
 describe('capture event subscriptions', () => {
   beforeEach(() => {

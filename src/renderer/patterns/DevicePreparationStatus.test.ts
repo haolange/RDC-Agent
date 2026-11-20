@@ -3,8 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
-import { DevicePreparationStatus } from './DevicePreparationStatus';
 import { translate } from '../i18n/messages';
+import { DevicePreparationStatus } from './DevicePreparationStatus';
 import type { ReplayDeviceIssue } from '@shared/types/device';
 
 afterEach(() => { vi.unstubAllGlobals(); });

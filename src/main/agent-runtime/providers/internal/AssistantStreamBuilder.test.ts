@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { EventStream } from '../../core/EventStream';
-import type { AssistantMessage, AssistantMessageEvent } from '../../core/types';
 import {
   AssistantStreamBuilder,
   createProviderOutputRef,
   ProviderStreamProtocolError,
 } from './AssistantStreamBuilder';
+import type { AssistantMessage, AssistantMessageEvent } from '../../core/types';
 
 function makeBuilder() {
   const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(

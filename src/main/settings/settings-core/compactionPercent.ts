@@ -1,9 +1,9 @@
-import type { AppSettings } from '@shared/types/settings';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import { resolveEffectiveCompactionPercent } from '@shared/utils/contextBudget';
 import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { settingsService } from './SettingsService';
+import type { AppSettings } from '@shared/types/settings';
 
 export function resolveCompactionPercentForSettings(
   settings: AppSettings,

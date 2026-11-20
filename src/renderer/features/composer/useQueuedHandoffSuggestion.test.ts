@@ -2,11 +2,11 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
 import { useComposerSessionContextStore as context } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
+import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
 const mock = vi.hoisted(() => ({ apply: vi.fn() }));
 vi.mock('./sessionAgentId', () => ({ applyDeclaredHandoffOnClient: mock.apply }));
 let root: Root;

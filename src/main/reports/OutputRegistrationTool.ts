@@ -1,11 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import { generateEventId, nowIso } from '@shared/utils/id';
-import type { ArtifactKind, ArtifactRecord } from '@shared/types/harness';
-import type { AgentTool } from '../agent-runtime/agent/AgentTool';
-import { artifactStore } from './ArtifactStore';
 import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
 import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
+import { artifactStore } from './ArtifactStore';
+import type { ArtifactKind, ArtifactRecord } from '@shared/types/harness';
+import type { AgentTool } from '../agent-runtime/agent/AgentTool';
 
 const OUTPUT_KINDS: ArtifactKind[] = ['report', 'screenshot', 'trace', 'shader', 'log', 'data', 'note'];
 

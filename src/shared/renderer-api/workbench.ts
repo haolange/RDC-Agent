@@ -1,3 +1,4 @@
+import { RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type { ElectronAPI } from '../types/electron';
 import type {
   CaptureApi,
@@ -8,7 +9,6 @@ import type {
   RuntimeLogApi,
   SessionApi,
 } from '../types/electron-api';
-import { RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type { RendererApiTransport } from './transport';
 
 export function createProjectApi(transport: RendererApiTransport): ProjectApi {

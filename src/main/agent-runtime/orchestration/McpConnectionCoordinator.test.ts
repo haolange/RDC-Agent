@@ -1,16 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import path from 'path';
 import fs from 'fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
+import { mcpTrustService } from '../../settings/settings-core/McpTrustService';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import { describeHost } from '../../platform/host';
 import {
   canonicalMcpProjectRoot,
   classifyMcpFailure,
   McpConnectionCoordinator,
 } from './McpConnectionCoordinator';
-import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
-import { mcpTrustService } from '../../settings/settings-core/McpTrustService';
 import type { McpDisconnectDetail } from '../agent/MCPManager';
-import { runtimeLogService } from '../../runtime/RuntimeLogService';
-import { describeHost } from '../../platform/host';
 import type { SupervisedProcess } from '../../runtime/ProcessSupervisor';
 
 function descriptor(id: string) {

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ProviderDefinitionMutationCoordinator } from './ProviderDefinitionMutationCoordinator';
 import type {
   LlmProviderEntry,
   ProviderDefinitionSaveRequest,
   ProviderDefinitionSaveResult,
 } from '@shared/types/settings';
-import { ProviderDefinitionMutationCoordinator } from './ProviderDefinitionMutationCoordinator';
 
 const provider = (modelId: string): LlmProviderEntry => ({
   id: 'provider-under-test',

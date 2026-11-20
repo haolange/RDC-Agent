@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { AgentTool } from '../../agent/AgentTool';
 import { assertFileSizeCap, assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../primitives/_shared';
 import { NOTEBOOK_MAX_BYTES } from '../primitives/toolLimits';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface NotebookEditParams {
   notebook_path: string;

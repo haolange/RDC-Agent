@@ -1,16 +1,16 @@
 import * as fs from 'fs';
-import { sha256Hex } from '../../runtime/contentHash';
-import type { AgentToolResult } from '../agent/AgentTool';
 import {
   SessionArtifactError,
   TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES,
   formatSessionArtifactUri,
   type SessionArtifactizedEnvelope,
 } from '@shared/types/sessionArtifact';
+import { sha256Hex } from '../../runtime/contentHash';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { ToolResultSummarizer } from './ToolResultSummarizer';
 import { storeToolImage } from './ToolImageArtifact';
+import type { AgentToolResult } from '../agent/AgentTool';
 
 const summarizer = new ToolResultSummarizer();
 

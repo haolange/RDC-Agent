@@ -66,7 +66,7 @@ if (
 const vitest = path.join(repoRoot, 'node_modules/vitest/vitest.mjs');
 const result = spawnSync(process.execPath, [vitest, 'run',
   'src/shared/utils/agentToolCapability.test.ts',
-  'src/shared/provider-catalog/agentToolCapabilityAudit.test.ts',
+  'src/main/provider-catalog/agentToolCapabilityAudit.test.ts',
   'src/main/agent-runtime/capabilities/RouteCapabilityResolver.test.ts',
   'src/main/conversation/ConversationRoutePreflight.test.ts',
   'src/main/settings/provider-catalog/RequestPlanner.test.ts',

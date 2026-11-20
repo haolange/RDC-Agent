@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import type { KnowledgeRetrievalLane } from '@shared/types/knowledge';
 import { ALL_CARD_TYPES, ALL_LANES, ALL_LIFECYCLES, toggleSetValue } from './knowledgeCenterModel';
+import type { KnowledgeRetrievalLane } from '@shared/types/knowledge';
 
 /** Type / lifecycle / retrieval-lane multi-select; every group starts fully selected. */
 export function useKnowledgeFilters() {

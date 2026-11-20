@@ -1,6 +1,6 @@
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 /** Read the owning daemon's actual progress; unavailable status never fabricates a stage. */
 export async function withRdcOpenProgress<T>(contextId: string, cli: RdcCliInvokerSettings,

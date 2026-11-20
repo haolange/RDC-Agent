@@ -1,3 +1,4 @@
+import { isLlmProviderProtocol } from '@shared/constants/llm';
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type {
@@ -7,7 +8,6 @@ import type {
   CatalogModelRoute,
 } from '@shared/types/providerCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
-import { isLlmProviderProtocol } from '@shared/constants/llm';
 
 type JsonCatalogDiscovery = Exclude<DiscoveryStrategy, null | { kind: 'custom-parser'; parserId: string }>;
 

@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '@shared/utils/jsonl';
 import {
   generateEventId,
   generateRunId,
@@ -8,8 +7,14 @@ import {
   nowMs,
   sanitizeToken,
 } from '@shared/utils/id';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
 import { requestSnapshotStore } from '../../agent-runtime/prompt/RequestSnapshotStore';
 import { removeSessionTasks } from '../../agent-runtime/tasks/sessionTaskStore';
+import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
+import { appPathService } from '../../runtime/AppPathService';
+import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
+import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
+import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -20,13 +25,8 @@ import type {
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
-import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
-import { appPathService } from '../../runtime/AppPathService';
 import type { PersistedRunRecord } from './storageTypes';
 import type { ReservedStagedConversationSession, StagedConversationSessionCommit } from './storageCommitTypes';
-import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
-import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
-import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
 
 
 const SAFE_RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

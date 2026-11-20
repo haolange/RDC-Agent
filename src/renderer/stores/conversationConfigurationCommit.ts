@@ -1,7 +1,7 @@
-import type { ConversationSendRequest } from '@shared/types/conversation';
 import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
-import { useAppSettingsStore } from './appSettingsStore';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
+import { useAppSettingsStore } from './appSettingsStore';
+import type { ConversationSendRequest } from '@shared/types/conversation';
 
 export interface ConversationModelOverride {
   providerId: string;

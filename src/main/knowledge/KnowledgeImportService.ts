@@ -1,13 +1,5 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type {
-  KnowledgeCardDetail,
-  KnowledgeCardRecord,
-  KnowledgeCardSummary,
-  KnowledgeImportItem,
-  KnowledgeImportResult,
-  KnowledgeSpace,
-} from '@shared/types/knowledge';
 import { StorageIo } from '../sessions/store/StorageIo';
 import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
 import {
@@ -22,9 +14,17 @@ import {
   type KnowledgeDurableStore,
 } from './KnowledgeDurableStore';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
-import type { KnowledgeDurableDraft } from './knowledgeStateSchema';
 import { KnowledgeQueryService, knowledgeQueryService } from './KnowledgeQueryService';
 import { knowledgeWriteService, KnowledgeWriteService } from './KnowledgeWriteService';
+import type { KnowledgeDurableDraft } from './knowledgeStateSchema';
+import type {
+  KnowledgeCardDetail,
+  KnowledgeCardRecord,
+  KnowledgeCardSummary,
+  KnowledgeImportItem,
+  KnowledgeImportResult,
+  KnowledgeSpace,
+} from '@shared/types/knowledge';
 
 export interface KnowledgeSpaceOccupant {
   cardId: string;

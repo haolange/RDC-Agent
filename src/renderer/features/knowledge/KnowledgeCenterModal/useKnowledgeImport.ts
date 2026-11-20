@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../../../i18n';
+import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
+import { knowledgeErrorMessage } from './knowledgeCenterModel';
+import { beginSynchronousFlight } from './knowledgeImportExportModel';
 import type {
   KnowledgeImportResult,
   KnowledgeCandidatesResult,
   KnowledgeCardRecord,
   KnowledgeSpace,
 } from '@shared/types/knowledge';
-import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
-import { knowledgeErrorMessage } from './knowledgeCenterModel';
-import { beginSynchronousFlight } from './knowledgeImportExportModel';
-import { useI18n } from '../../../i18n';
 
 export type KnowledgeImportMode = 'file' | 'paste';
 

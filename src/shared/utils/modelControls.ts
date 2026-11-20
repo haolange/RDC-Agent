@@ -1,5 +1,6 @@
-import type { ConversationTurnControls } from '../types/modelCapability';
 import { clampReasoningSelection } from '../types/modelCapability';
+import { contextTierWindowTokens, isEligibleMaxContextTier } from './contextTiers';
+import type { ConversationTurnControls } from '../types/modelCapability';
 import type {
   ControlDefinition,
   EffectiveModel,
@@ -8,7 +9,6 @@ import type {
   ResolvedBooleanControlCapability,
   ResolvedModelControls,
 } from '../types/providerCapability';
-import { contextTierWindowTokens, isEligibleMaxContextTier } from './contextTiers';
 
 export interface ModelControlEvaluation {
   controls: ConversationTurnControls;

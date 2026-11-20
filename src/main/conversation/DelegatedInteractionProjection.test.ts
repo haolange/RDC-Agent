@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
-import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
-import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import { resolveComposerPendingRequest } from '../../renderer/features/composer/pendingRequestSelection';
 import { findPendingUserInput } from '../../renderer/features/composer/userInputRequestModel';
+import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
+import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 describe('delegated request projection after parent completion', () => {
   it('persists a pending child question without reopening parent output and routes answer to child turn', () => {

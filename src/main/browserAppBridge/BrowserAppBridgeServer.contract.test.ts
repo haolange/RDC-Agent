@@ -1,6 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
-import type { AddressInfo } from 'net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  buildBridgeAuthCookie,
+  resolveProvidedBridgeToken,
+  tokensMatch,
+} from './bridgeSecurity';
+import type { AddressInfo } from 'net';
 
 /**
  * Lightweight contract tests for /qa cookie entry and auth fail-closed JSON.
@@ -11,12 +17,6 @@ vi.mock('../ipc/invokeRegistry', () => ({
   hasRegisteredIpcChannel: () => true,
   invokeRegisteredIpcChannel: async () => ({}),
 }));
-
-import {
-  buildBridgeAuthCookie,
-  resolveProvidedBridgeToken,
-  tokensMatch,
-} from './bridgeSecurity';
 
 const EXPECTED = 'a'.repeat(64);
 

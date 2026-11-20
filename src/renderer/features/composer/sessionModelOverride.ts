@@ -1,5 +1,3 @@
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { SessionModelOverride, SessionRecord } from '@shared/types/session';
 import { getElectronApi } from '../../platform/getElectronApi';
 import { useProjectStore } from '../../stores/projectStore';
 import {
@@ -7,6 +5,8 @@ import {
   readComposerDraftModel,
   writeComposerDraftModel,
 } from '../../stores/composerModelDraftStore';
+import type { SessionModelOverride, SessionRecord } from '@shared/types/session';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
 
 export function applySessionRecordToStore(session: SessionRecord): void {
   const store = useProjectStore.getState();

@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { isComposerPickerModel, toComposerPickerOption, type ComposerModelPickerOption } from './composerModelPicker';
+import type { LlmProviderEntry } from '@shared/types/settings';
 
 export async function loadComposerModelPickerOptions(
   providers: readonly LlmProviderEntry[],

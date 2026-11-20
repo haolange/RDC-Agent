@@ -1,5 +1,5 @@
-import type { ResolvedTheme, ThemeChromeConfig, UiPreferences } from '@shared/types/settings';
 import { compileThemeChrome } from '@shared/theme/compiler';
+import type { ResolvedTheme, ThemeChromeConfig, UiPreferences } from '@shared/types/settings';
 
 let chromeSheet: CSSStyleSheet | null = null;
 

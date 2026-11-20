@@ -7,12 +7,12 @@
  */
 
 import * as fs from 'fs/promises';
-import { requireSuccessfulFileRead } from './fileReadAccess';
 import * as path from 'path';
-import type { AgentTool } from '../../agent/AgentTool';
+import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
+import { requireSuccessfulFileRead } from './fileReadAccess';
 import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
 import { WRITE_FILE_MAX_CONTENT_BYTES } from './toolLimits';
-import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface WriteFileParams {
   path: string;

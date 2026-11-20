@@ -1,20 +1,20 @@
-import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
-import type { AgentRole } from '@shared/types/agent';
-import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
-import type { ConversationPlanReview, PlanReviewHandoffIdentity } from '@shared/types/planReview';
+import { randomUUID } from 'node:crypto';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
-import type { TurnHandle } from '../orchestration/TurnCoordinator';
 import { assertDeclaredHandoffForPlan, writeExecutionOfferFromApproval } from '../../conversation/applyDeclaredHandoff';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
-import type { PlanTaskRequirement } from '@shared/types/taskExecution';
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
-import { randomUUID } from 'node:crypto';
-import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, ConversationAnswerPlanReviewRequest, ConversationAnswerPlanReviewResult } from '@shared/types/planReview';
 import { resolveRecoverablePlan } from '../../sessions/run/planReviewRecovery';
 import { resolveApprovedHandoff } from '../../sessions/run/approvedHandoffRecovery';
+import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
+import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, ConversationAnswerPlanReviewRequest, ConversationAnswerPlanReviewResult } from '@shared/types/planReview';
+import type { PlanTaskRequirement } from '@shared/types/taskExecution';
+import type { TurnHandle } from '../orchestration/TurnCoordinator';
+import type { ConversationPlanReview, PlanReviewHandoffIdentity } from '@shared/types/planReview';
+import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentRole } from '@shared/types/agent';
 
 interface PendingPlanReviewRequest {
   reviewId: string;

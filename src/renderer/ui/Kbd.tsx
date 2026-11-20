@@ -1,5 +1,5 @@
-import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '../lib/cn';
+import type { HTMLAttributes, ReactNode } from 'react';
 import './Kbd.css';
 
 export interface KbdProps extends HTMLAttributes<HTMLElement> {

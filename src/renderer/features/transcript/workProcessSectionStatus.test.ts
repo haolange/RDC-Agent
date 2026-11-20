@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
-import { translate } from '../../i18n/messages';
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import type { ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
-import type { ConversationPlanReview } from '@shared/types/planReview';
+import { translate } from '../../i18n/messages';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { WorkProcessContent } from './WorkProcessContent';
 import { PlanReaderHost } from './PlanReaderHost';
+import type { ConversationPlanReview } from '@shared/types/planReview';
+import type { ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
+
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 const plan: ConversationPlanReview = { planId: 'plan', revision: 1, uri: 'session://plans/plan.md',

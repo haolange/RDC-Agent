@@ -3,8 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import { SubagentRow } from './SubagentRow';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
+import { SubagentRow } from './SubagentRow';
 
 const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false,
   configurationError: false, workOpen: false, finalOpen: false, projectedFinal: false }));

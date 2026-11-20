@@ -1,6 +1,6 @@
-import type { AgentMessage, Message } from '../agent-runtime/core/types';
 import { ContextManager } from '../agent-runtime/agent/ContextManager';
 import { TokenizerService } from '../agent-runtime/core/TokenizerService';
+import type { AgentMessage, Message } from '../agent-runtime/core/types';
 
 // 进程内共享实例：编码器缓存跨调用复用。
 const tokenizerService = new TokenizerService();

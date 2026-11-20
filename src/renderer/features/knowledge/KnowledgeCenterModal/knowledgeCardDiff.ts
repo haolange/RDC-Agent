@@ -1,5 +1,5 @@
-import type { KnowledgeCardRecord } from '@shared/types/knowledge';
 import { diffLines, type DiffLine } from '@shared/utils/lineDiff';
+import type { KnowledgeCardRecord } from '@shared/types/knowledge';
 
 const COMPARE_FIELDS: Array<keyof KnowledgeCardRecord> = [
   'title',

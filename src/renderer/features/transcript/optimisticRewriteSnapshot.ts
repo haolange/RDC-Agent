@@ -1,8 +1,8 @@
+import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+import { createDefaultBranchState, normalizeBranchId } from '@shared/conversation/conversationBranchResolver';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import { createDefaultBranchState, normalizeBranchId } from '@shared/conversation/conversationBranchResolver';
 
 export function buildOptimisticRewriteSnapshot(input: {
   requestId: string;

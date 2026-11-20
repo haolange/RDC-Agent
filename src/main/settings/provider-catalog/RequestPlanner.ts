@@ -1,18 +1,3 @@
-import { revisionFor } from './effectiveCatalogMerge';
-import type {
-  EffectiveModel,
-  ExecutionIdentity,
-  ProviderStateMode,
-  ToolLoopPhase,
-  JsonObject,
-  JsonValue,
-  CatalogModelRoute,
-  ModelSelection,
-  RequestPlan,
-  RequestPlanningErrorCode,
-  RequestPlanningResult,
-} from '@shared/types/providerCapability';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import {
   clampReasoningSelection,
   createReasoningControl,
@@ -38,6 +23,21 @@ import {
 } from '@shared/utils/agentToolCapability';
 
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
+import { revisionFor } from './effectiveCatalogMerge';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type {
+  EffectiveModel,
+  ExecutionIdentity,
+  ProviderStateMode,
+  ToolLoopPhase,
+  JsonObject,
+  JsonValue,
+  CatalogModelRoute,
+  ModelSelection,
+  RequestPlan,
+  RequestPlanningErrorCode,
+  RequestPlanningResult,
+} from '@shared/types/providerCapability';
 export interface RequestPlannerInput {
   model: EffectiveModel;
   /** Effective snapshot used to validate hidden internal model targets. */

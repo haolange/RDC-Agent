@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentDefinitionSaveResult, AgentManifestDraft, AgentManifestDefinition } from '@shared/types/agentManifest';
 import {
   applyAgentDefinitionSaveResults,
   getChangedAgentManifestDrafts,
@@ -9,6 +8,7 @@ import {
   shouldRollbackFailedAgentManifestSave,
 } from './agentManifestAutosaveState';
 import { findProjectedHandoffTargetConflicts, persistAgentHandoff, validateAgentHandoffs } from './sections/agentHandoffValidation';
+import type { AgentDefinitionSaveResult, AgentManifestDraft, AgentManifestDefinition } from '@shared/types/agentManifest';
 
 const draft = (id: string): AgentManifestDraft => ({
   id,

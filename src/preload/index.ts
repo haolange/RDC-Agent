@@ -6,9 +6,9 @@
  */
 
 import { contextBridge, webUtils } from 'electron';
-import type { ElectronAPI } from '@shared/types/electron';
 import { createRendererApi } from '@shared/renderer-api';
 import { createIpcRendererTransport } from './rendererTransport';
+import type { ElectronAPI } from '@shared/types/electron';
 
 const electronAPI: ElectronAPI = createRendererApi(process.platform, createIpcRendererTransport());
 

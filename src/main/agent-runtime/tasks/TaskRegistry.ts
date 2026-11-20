@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { TaskExecutionRequirementsSchema, TaskRuntimeEpochSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type TaskRuntimeEpoch, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { FileTaskStore, type TaskStore } from './TaskStore';
 import {
   TASK_SCHEMA_VERSION, type SettleTaskExecutionOptions, type StartTaskExecutionOptions,
@@ -8,7 +9,6 @@ import {
 import { cancelOwnedTaskExecution } from './TaskExecutionOwners';
 import { projectTaskItems, type ProjectedTaskItem } from './taskProjection';
 import { taskDependencyWait } from './taskDependencies';
-import { TaskExecutionRequirementsSchema, TaskRuntimeEpochSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type TaskRuntimeEpoch, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExecutionPreparation, assertTaskExecutionCompletion, assertIndependentReviewResult, readIndependentTaskSources, hashTaskRequirement, canReexecuteInvalidatedTask, canContinueReviewedSource, canContinueReviewWithNewSources } from './TaskExecutionRequirements';
 
 const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();

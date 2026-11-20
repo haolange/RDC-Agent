@@ -5,13 +5,13 @@ vi.mock('../settings/settings-core/SettingsService', () => ({
     getAll: () => ({ agents: { definitions: [] } }),
   },
 }));
+import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { AgentRecoveryAbortError } from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../agent-runtime/providers/internal/http';
-import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { MissionCompletionError } from '../investigation/missionCompletionContract';
 import { InvestigationError } from '../investigation/investigationErrors';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 
 const ROUTE = {
   agentId: 'plan' as const,

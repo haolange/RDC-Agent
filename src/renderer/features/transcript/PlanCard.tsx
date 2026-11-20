@@ -1,9 +1,9 @@
 import React, { useRef } from 'react';
-import type { ConversationPlanReview } from '@shared/types/planReview';
 import { useI18n } from '../../i18n';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { planPreview } from './planPreview';
 import { usePlanPreviewOverflow } from './usePlanPreviewOverflow';
+import type { ConversationPlanReview } from '@shared/types/planReview';
 import './plan-card.css';
 
 const STATUS_KEY = {

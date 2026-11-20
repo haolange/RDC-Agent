@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationWorkBlock } from '../types/conversation';
 import { loopFinalAnswerText, settleTextPhase, stoppedReplyText } from './loopItems';
+import type { ConversationWorkBlock } from '../types/conversation';
 
 const text = (value: string, phase?: 'commentary' | 'final_answer', index = 0) => ({
   kind: 'text' as const, providerOutputRef: { protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index },

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import {
   createProviderConnectionDraft,
   getConnectionDraftSignature,
@@ -8,6 +7,7 @@ import {
   projectEndpointTemplate,
   shouldUseProviderDocsLink,
 } from './providerConnectionState';
+import type { LlmProviderEntry } from '@shared/types/settings';
 
 function vertexProvider(): LlmProviderEntry {
   return {

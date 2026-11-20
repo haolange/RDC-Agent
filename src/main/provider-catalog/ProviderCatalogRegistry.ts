@@ -1,19 +1,19 @@
 import bundledCatalogIndex, {
   loadProviderSurface as loadCompiledProviderSurface,
 } from 'virtual:rdc-provider-catalog-index';
-import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
 import {
   ProviderSurfaceManifestSchema,
   type ProviderAccountAuth,
   type ProviderSurfaceManifest,
 } from '@shared/provider-catalog/catalogManifestSchema';
-import type { ProviderAuthSchemaId } from '@shared/provider-catalog/implementationRegistry';
 import {
   PROVIDER_CATALOG_SCHEMA_VERSION,
   type CompiledProviderCatalogIndex,
   type CompiledProviderSurface,
   type ProviderSurfaceSummary,
-} from '@shared/provider-catalog/compiler';
+} from './catalogCompiler';
+import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
+import type { ProviderAuthSchemaId } from '@shared/provider-catalog/implementationRegistry';
 import type {
   BuiltinLlmProviderId,
   LlmProviderAuthMode,

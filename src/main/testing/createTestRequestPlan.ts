@@ -1,9 +1,9 @@
+import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import type {
   ContextTransitionPlan,
   ExecutionIdentity,
   RequestPlan,
 } from '@shared/types/providerCapability';
-import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 
 type CompiledPlanFields =
   | 'contracts'

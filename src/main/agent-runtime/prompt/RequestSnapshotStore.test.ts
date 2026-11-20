@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
-import { RequestSnapshotStore } from './RequestSnapshotStore';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import { RequestSnapshotStore } from './RequestSnapshotStore';
+import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 
 let rootPath = '';
 let store: RequestSnapshotStore;

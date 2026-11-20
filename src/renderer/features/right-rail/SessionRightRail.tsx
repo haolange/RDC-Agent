@@ -1,5 +1,4 @@
 import React from 'react';
-import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import { useI18n } from '../../i18n';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { CapturePanel } from './CapturePanel';
@@ -8,6 +7,7 @@ import { RightRailContext } from './RightRailContext';
 import { RightRailEmptyState as EmptyState } from './RightRailEmptyState';
 import { RightRailOutputList } from './RightRailOutputList';
 import { RightRailProgressList } from './RightRailProgressList';
+import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 
 const RailSection: React.FC<{ id: 'progress' | 'artifacts' | 'outputs' | 'context' | 'capture'; title: string; populated?: boolean; meta?: string; children: React.ReactNode }> = ({ id, title, populated = false, meta, children }) => (
   <section className={`right-rail-section${populated ? ' is-populated' : ''}`} data-testid={`right-rail-${id}`}>

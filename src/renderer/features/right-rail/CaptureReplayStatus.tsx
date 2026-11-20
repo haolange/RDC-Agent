@@ -1,7 +1,7 @@
-import type { CaptureReplayError, CaptureReplayPhase, CaptureReplayState } from '@shared/types/captureReplay';
-import type { TranslationKey } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { Details } from '../../ui/Details';
+import type { CaptureReplayError, CaptureReplayPhase, CaptureReplayState } from '@shared/types/captureReplay';
+import type { TranslationKey } from '../../i18n';
 
 export type CaptureRetryAction = 'open' | 'close' | 'refresh' | 'image';
 export type CaptureStatusTone = 'success' | 'warning' | 'error' | 'info';

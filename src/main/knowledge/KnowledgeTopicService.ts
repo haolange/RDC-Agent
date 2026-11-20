@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
+import { appPathService } from '../runtime/AppPathService';
+import { knowledgeIndexService, type KnowledgeIndexService } from './KnowledgeIndexService';
+import { KnowledgeTopicChangesSchema, KnowledgeTopicStore } from './KnowledgeTopicStore';
+import { knowledgeTextMatches } from './knowledgeVocabulary';
+import type { KnowledgeIndexEntry } from './knowledgeLanes';
 import type {
   KnowledgeTopic, KnowledgeTopicChanges, KnowledgeTopicDocument, KnowledgeTopicPreview, KnowledgeTopicProposal,
 } from '@shared/types/knowledge';
-import { appPathService } from '../runtime/AppPathService';
-import { knowledgeIndexService, type KnowledgeIndexService } from './KnowledgeIndexService';
-import type { KnowledgeIndexEntry } from './knowledgeLanes';
-import { KnowledgeTopicChangesSchema, KnowledgeTopicStore } from './KnowledgeTopicStore';
-import { knowledgeTextMatches } from './knowledgeVocabulary';
 
 const seeds: KnowledgeTopic[] = [
   { id: 'shader', label: 'Shader', synonyms: ['着色器'] },

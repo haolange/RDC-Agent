@@ -2,12 +2,12 @@
  * T06 contract — delegated RDC lease + ConcurrentToolScheduler invariants.
  */
 import { afterEach, describe, expect, it } from 'vitest';
+import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
+import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import { executeConcurrentToolGroups } from '../../agent-runtime/agent/ConcurrentToolScheduler';
 import { isToolCallConcurrencySafe, partitionConsecutiveSafeGroups } from '../../agent-runtime/agent/toolConcurrency';
 import { buildEffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 import { compileFixturePolicy } from '../policyFixture';
-import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
-import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import {
   assertRdcContextLeaseOwnership,
   clearRdcContextLeases,

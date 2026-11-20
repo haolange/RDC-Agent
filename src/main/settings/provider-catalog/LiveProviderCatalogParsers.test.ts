@@ -1,9 +1,9 @@
-import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
-import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
+import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
+import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import {
   parseChatGptAccountCatalog,
   parseClaudeAccountCatalog,

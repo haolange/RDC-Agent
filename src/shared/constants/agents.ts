@@ -1,8 +1,8 @@
+import { TOP_LEVEL_AGENT_IDS, isTopLevelAgentId } from '../types/agent';
+import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '../theme/composeAccent';
 import type { AgentId } from '../types/agent';
 import type { AgentManifestDefinition } from '../types/agentManifest';
 import type { ModeConfig } from '../types/layout';
-import { TOP_LEVEL_AGENT_IDS, isTopLevelAgentId } from '../types/agent';
-import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '../theme/composeAccent';
 
 export { isTopLevelAgentId };
 

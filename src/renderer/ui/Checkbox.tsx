@@ -1,6 +1,6 @@
-import type { InputHTMLAttributes, ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import { Icon } from './Icon';
+import type { InputHTMLAttributes, ReactNode } from 'react';
 import './Checkbox.css';
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'onChange'> {

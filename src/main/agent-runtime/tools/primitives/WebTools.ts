@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { AgentTool } from '../../agent/AgentTool';
 import { assertPublicHttpUrl, fetchPinnedPublic } from '../../net/assertPublicHttpUrl';
 import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from './toolLimits';
 import { readWebTextPage, validateWebTextCursor, type WebTextCursor } from './WebTextPage';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface WebFetchParams extends WebTextCursor {
   url: string;

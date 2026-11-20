@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { KnowledgeCardRecord, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 import {
   canSubmitKnowledgeWrite,
   collectCardContradicts,
@@ -10,6 +9,7 @@ import {
   resolveWriteConfirmPack,
 } from './knowledgeWriteConfirm';
 import { knowledgeQueryKey } from './knowledgeCenterModel';
+import type { KnowledgeCardRecord, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
 function card(overrides: Partial<KnowledgeCardRecord> = {}): KnowledgeCardRecord {
   return {

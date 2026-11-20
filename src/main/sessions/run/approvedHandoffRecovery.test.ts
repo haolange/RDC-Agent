@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { resolveApprovedHandoff } from './approvedHandoffRecovery';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type { PlanReviewStateDocument } from '@shared/types/planReview';
@@ -14,7 +15,6 @@ vi.mock('../store/StorageAdapter', () => ({ storageAdapter: {
 } }));
 vi.mock('./sessionPlanReference', () => ({ readReferencedPlan: () => f.source }));
 vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: () => f.declaration }));
-import { resolveApprovedHandoff } from './approvedHandoffRecovery';
 
 const approval: PlanReviewStateDocument = { schemaVersion: '1', planId: 'plan', revision: 1, ownerTurnId: 'turn',
   status: 'approved', approvedHash: 'a'.repeat(64), frozenUri: 'session://plans/frozen.md',

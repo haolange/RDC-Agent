@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import type { ElectronAPI } from '@shared/types/electron';
 import { refreshEffectiveCatalog } from './effectiveCatalogService';
+import type { ElectronAPI } from '@shared/types/electron';
 
 it('uses the provider refresh action and preserves its failure', async () => {
   const refreshProviderModels = vi.fn().mockResolvedValueOnce({ success: false, error: 'Account is not connected.' })

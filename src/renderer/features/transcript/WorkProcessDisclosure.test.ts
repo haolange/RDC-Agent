@@ -2,8 +2,8 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { ConversationTextItem, ConversationThinkingItem, ConversationWorkTrace } from '@shared/types/conversation';
 import { WorkProcess } from './WorkProcess';
+import type { ConversationTextItem, ConversationThinkingItem, ConversationWorkTrace } from '@shared/types/conversation';
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
 it('restores a main-process tool after folding the process and isolates another message', async () => {

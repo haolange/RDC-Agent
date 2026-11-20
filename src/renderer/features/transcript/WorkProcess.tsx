@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { WorkProcessContent } from './WorkProcessContent';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;

@@ -1,5 +1,5 @@
-import type { DevicePreparationPhase, ReplayDeviceIssue } from '@shared/types/device';
 import { RdcNativeFailure } from '../RdcNativeProtocol';
+import type { DevicePreparationPhase, ReplayDeviceIssue } from '@shared/types/device';
 
 const record = (value: unknown): Record<string, unknown> | null => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const text = (value: unknown) => typeof value === 'string' ? value : undefined;

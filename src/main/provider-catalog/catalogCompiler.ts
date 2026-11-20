@@ -6,13 +6,13 @@ import {
   type ProviderIdentityManifest,
   type ProviderProfileManifest,
   type ProviderSurfaceManifest,
-} from './catalogManifestSchema';
+} from '../../shared/provider-catalog/catalogManifestSchema';
 import {
   PROVIDER_ADAPTER_IDS,
   PROVIDER_AUTH_SCHEMA_IDS,
   PROVIDER_DISCOVERY_POLICY_IDS,
   providerAdapterSupportsProtocol,
-} from './implementationRegistry';
+} from '../../shared/provider-catalog/implementationRegistry';
 import {
   ProviderContractBundlePatchSchema,
   ProviderProtocolSchema,
@@ -21,10 +21,10 @@ import {
   type ModelManifest,
   type ProviderContractBundle,
   type ProviderContractBundlePatch,
-} from './modelManifestSchema';
-import { contextTierWindowTokens, isEligibleMaxContextTier } from '../utils/contextTiers';
-import { hasImplementedStructuredToolAdapter } from '../utils/agentToolCapability';
-import { createFailClosedProviderContracts } from './providerContracts';
+} from '../../shared/provider-catalog/modelManifestSchema';
+import { contextTierWindowTokens, isEligibleMaxContextTier } from '../../shared/utils/contextTiers';
+import { hasImplementedStructuredToolAdapter } from '../../shared/utils/agentToolCapability';
+import { createFailClosedProviderContracts } from '../../shared/provider-catalog/providerContracts';
 
 export function dedicatedToolCallingFactSourceIds(
   surface: Pick<ProviderSurfaceManifest, 'factSources'>,

@@ -1,7 +1,7 @@
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
-import { safeDelegationText as safeText } from './DelegationTraceText';
 import { loopTextItems, sameProviderBlock } from '@shared/conversation/loopItems';
 import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
+import { safeDelegationText as safeText } from './DelegationTraceText';
 import { mergeThinkingPayload } from './ConversationThinkingArtifacts';
 import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
 import {

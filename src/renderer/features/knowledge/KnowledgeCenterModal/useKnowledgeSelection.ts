@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KnowledgeCardDetail, KnowledgeCardRecord, KnowledgeLaneHit, KnowledgePack, KnowledgeReadRequest, KnowledgeReadResult } from '@shared/types/knowledge';
 import { createRequestSeq, knowledgeErrorMessage } from './knowledgeCenterModel';
 import { useKnowledgeConflicts } from './useKnowledgeConflicts';
+import type { KnowledgeCardDetail, KnowledgeCardRecord, KnowledgeLaneHit, KnowledgePack, KnowledgeReadRequest, KnowledgeReadResult } from '@shared/types/knowledge';
 
 /** Card and conflict details share one selection/request owner. */
 export function useKnowledgeSelection({ open, queryKey, hits, pack, onShowDetail, setError }: {

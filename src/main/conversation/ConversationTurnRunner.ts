@@ -1,3 +1,46 @@
+import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+import { nowMs } from '@shared/utils/id';
+import { stoppedReplyText } from '@shared/conversation/loopItems';
+import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
+import { canonicalizeSessionContextTurnEntry } from './SessionContextJournal';
+import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
+import { finalizeTrace, upsertWorkBlock } from './ConversationWorkTrace';
+import { attachToolExecutionEvidence } from './ConversationToolEvidence';
+import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
+import { verifyApprovedPlanExit } from './approvedPlanExit';
+import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
+import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
+import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
+import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
+import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
+import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
+import {
+  getAgentLabel,
+  isActiveRun,
+  recordLlmDiagnostic,
+} from './ConversationRoutePreflight';
+import type {
+  ActiveConversationTurn,
+  AgentRoutePreflightOk,
+  PreparedConversationPrompt,
+  ResolvedConversationContext,
+} from './ConversationRoutePreflight';
+import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
+import type { ConversationLoopContinuationState } from '@shared/conversation/loopOutputPhase';
+import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
+import type { RunSummary, SessionAttachmentRecord } from '@shared/types/session';
+import type { ProviderOutputRef } from '@shared/types/reasoning';
+import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { AgentRole } from '@shared/types/agent';
 import type {
   ConversationLoopOutputPhase,
   ConversationMessage,
@@ -6,49 +49,6 @@ import type {
   ConversationTurnResult,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
-import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import type { AgentRole } from '@shared/types/agent';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
-import type { ProviderOutputRef } from '@shared/types/reasoning';
-import type { RunSummary, SessionAttachmentRecord } from '@shared/types/session';
-import { nowMs } from '@shared/utils/id';
-import { stoppedReplyText } from '@shared/conversation/loopItems';
-import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
-import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
-import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
-import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
-import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { canonicalizeSessionContextTurnEntry } from './SessionContextJournal';
-import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
-import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
-import { finalizeTrace, upsertWorkBlock } from './ConversationWorkTrace';
-import { attachToolExecutionEvidence } from './ConversationToolEvidence';
-import type { ConversationLoopContinuationState } from '@shared/conversation/loopOutputPhase';
-import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
-import { verifyApprovedPlanExit } from './approvedPlanExit';
-import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
-import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
-import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
-import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
-import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
-import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
-import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
-import type {
-  ActiveConversationTurn,
-  AgentRoutePreflightOk,
-  PreparedConversationPrompt,
-  ResolvedConversationContext,
-} from './ConversationRoutePreflight';
-import {
-  getAgentLabel,
-  isActiveRun,
-  recordLlmDiagnostic,
-} from './ConversationRoutePreflight';
 
 export interface CompleteProfileTurnInput {
     context: ResolvedConversationContext;

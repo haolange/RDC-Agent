@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { buildInitialTurnControls } from '../lib/turnControlsUtils';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { CapabilityResolutionState } from '../lib/capabilityResolution';
 
 interface TurnControlsState {

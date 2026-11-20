@@ -1,8 +1,8 @@
-import type { RuntimePermissionState } from '@shared/types/runtimePermission';
+import { auditArgumentsHash, auditLog } from '../../runtime/AuditLog';
 import { agentPermissionPolicyService, type AgentPermissionDecisionInput } from './AgentPermissionPolicy';
 import { agentToolApprovalRequestService, type ToolApprovalRequestInput } from './AgentToolApprovalRequestService';
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { PermissionReviewer } from './PermissionReviewRuntime';
-import { auditArgumentsHash, auditLog } from '../../runtime/AuditLog';
 
 export class ToolPermissionDenied extends Error {
   constructor(message: string, readonly requiresApproval = false) { super(message); }

@@ -8,14 +8,7 @@ import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../..
  * in AgentTurnRunner; permissions stay in AgentPermissionPolicy.
  */
 
-import type {
-  AgentConfig,
-  AgentRole,
-  AgentState,
-} from '@shared/types/agent';
-import type { MCPServerStatusSummary } from '@shared/types/mcp';
-import type { LLMConfig } from '@shared/types/llm';
-import type { LlmProviderId } from '@shared/types/settings';
+import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
 import {
   AGENT_DISPLAY_NAMES,
   AgentSlotRegistry,
@@ -58,8 +51,15 @@ import {
   type PreparedAgentTurnContext,
   type TurnHandle,
 } from './AgentOrchestrator.deps';
-import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
+import type {
+  AgentConfig,
+  AgentRole,
+  AgentState,
+} from '@shared/types/agent';
+import type { MCPServerStatusSummary } from '@shared/types/mcp';
+import type { LLMConfig } from '@shared/types/llm';
+import type { LlmProviderId } from '@shared/types/settings';
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
   private readonly slots = new AgentSlotRegistry();

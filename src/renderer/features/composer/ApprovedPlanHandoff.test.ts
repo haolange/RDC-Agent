@@ -2,9 +2,9 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ApprovedPlanHandoff } from './ApprovedPlanHandoff';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
+import { ApprovedPlanHandoff } from './ApprovedPlanHandoff';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 let root: Root;

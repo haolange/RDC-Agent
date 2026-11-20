@@ -3,12 +3,12 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskRegistry } from '../tasks';
+import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 import { BackgroundSubagentService } from './BackgroundSubagentService';
+import { flushPolicyBudgetObservers } from './DelegationBudget';
+import { createSubagentBudgetState } from './TurnCoordinator';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
-import { flushPolicyBudgetObservers } from './DelegationBudget';
-import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
-import { createSubagentBudgetState } from './TurnCoordinator';
 
 const roots: string[] = [];
 const capsule: DelegationCapsule = {

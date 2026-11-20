@@ -1,10 +1,10 @@
 import { BrowserWindow } from 'electron';
+import { rendererEventHub } from '../../browserAppBridge/rendererEventHub';
 import type { AgentState } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { RunContextUsageSummary, RunSummary, SessionScope } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
-import { rendererEventHub } from '../../browserAppBridge/rendererEventHub';
 
 export interface RunStatusProjection {
   sessionId: string;

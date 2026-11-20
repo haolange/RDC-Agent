@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import { planModelRequest } from '../settings/provider-catalog/RequestPlanner';
 import { startProfileTurn } from './ConversationTurnStarter';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const fixture = vi.hoisted(() => ({ level: 'high', model: null as unknown as EffectiveModel, preparedControls: null as unknown }));
 vi.mock('electron', () => ({ app: { getPath: () => '.', getAppPath: () => '.' }, BrowserWindow: class {} }));

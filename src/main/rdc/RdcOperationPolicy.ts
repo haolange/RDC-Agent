@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
+import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
+import { assertFileWriteBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
+import { operationFingerprint } from './RdcOperationCatalog';
+import { assertRdcContextLeaseOwnership, getRdcContextLease } from './RdcRuntimeContextRegistry';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
-import { operationFingerprint } from './RdcOperationCatalog';
-import { assertFileWriteBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
-import { assertRdcContextLeaseOwnership, getRdcContextLease } from './RdcRuntimeContextRegistry';
-import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
 
 const allowedEffects = new Set(['replay_position', 'replay_position_temporary', 'artifact_write', 'context_metadata', 'shader_debug', 'shader_replacement']);
 const scopes = new Set(['global', 'context', 'replay', 'capture']);

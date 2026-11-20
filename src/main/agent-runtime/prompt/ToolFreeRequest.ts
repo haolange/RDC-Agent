@@ -1,12 +1,12 @@
-import type { AssistantMessage } from '../core/types';
-import type { ProviderReasoningContract } from '@shared/types/rdcRuntime';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { generateEventId } from '@shared/utils/id';
 import { configuredRuntimeProvider, encodeAgentModel } from '../providers/ConfiguredRuntimeProvider';
 import { promptCacheCompiler } from './PromptCacheCompiler';
 import { requestEnvelopeBuilder } from './RequestEnvelopeBuilder';
 import { requestSnapshotStore } from './RequestSnapshotStore';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { ProviderReasoningContract } from '@shared/types/rdcRuntime';
+import type { AssistantMessage } from '../core/types';
 
 /** What asked for the request; it names the request's turn id and its snapshot control flag. */
 export type ToolFreeRequestPurpose = 'capability-probe' | 'compaction-handoff' | 'permission-review';
