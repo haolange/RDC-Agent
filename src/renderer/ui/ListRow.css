@@ -1,23 +1,24 @@
 .ui-list-row {
+  position: relative;
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: var(--ui-list-row-gap, var(--space-3));
   width: 100%;
   min-height: var(--control-height-md);
-  padding: var(--ui-list-row-padding, 0 var(--space-3));
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-sm);
-  background: var(--token-bg-raised);
+  padding: var(--ui-list-row-padding, var(--space-2) var(--space-3));
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--token-text-heading);
-  font-size: var(--type-body-size);
+  font-size: var(--type-item-size);
+  line-height: var(--type-item-line);
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.ui-list-row:hover:not(:disabled),
-.ui-list-row:focus-visible:not(:disabled) {
+.ui-list-row:hover:not(:disabled) {
   background: var(--token-interactive-hover);
 }
 
@@ -27,8 +28,23 @@
 }
 
 .ui-list-row.is-selected {
-  background: var(--token-interactive-active);
-  border-color: var(--ui-list-row-selected-border, var(--token-border-default));
+  background: var(--token-selection-bg);
+}
+
+.ui-list-row.is-selected:hover:not(:disabled) {
+  background: var(--token-selection-bg-hover);
+}
+
+/* The indicator bar names the selection on its own, so selection never depends on a tint alone. */
+.ui-list-row.is-selected::before {
+  content: '';
+  position: absolute;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  left: 0;
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: var(--token-selection-indicator);
 }
 
 .ui-list-row:disabled,
@@ -46,9 +62,26 @@
 }
 
 .ui-list-row-body {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ui-list-row-title,
+.ui-list-row-description {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: var(--ui-list-row-white-space, nowrap);
+}
+
+.ui-list-row-description {
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-line);
+}
+
+.ui-list-row.is-selected .ui-list-row-leading {
+  color: var(--token-accent-primary);
 }

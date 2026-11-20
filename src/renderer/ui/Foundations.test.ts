@@ -20,8 +20,8 @@ describe('shared foundation semantics', () => {
     expect(html).not.toContain('style=');
   });
   it('preserves empty-state visuals and marks loading buttons disabled and busy', () => {
-    const html = renderToStaticMarkup(React.createElement(EmptyState, { title: 'Empty', layout: 'fill', visual: 'Scene' }));
-    expect(html).toContain('is-layout-fill');
+    const html = renderToStaticMarkup(React.createElement(EmptyState, { title: 'Empty', variant: 'page', visual: 'Scene' }));
+    expect(html).toContain('ui-empty-state is-page');
     expect(html).toContain('ui-empty-state-visual');
     const button = renderToStaticMarkup(React.createElement(Button, { loading: true, children: 'Save' }));
     expect(button).toContain('disabled');

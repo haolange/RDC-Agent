@@ -1,83 +1,10 @@
-/* ── 上下文用量：锚定 composer 输入区上方（Cursor 式全宽弹层） ── */
-.context-breakdown-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-popover) - 1);
-}
-
-.context-breakdown {
+/* Context usage content inside the shared ReadingSheet; the sheet owns position, size and the one scroller. */
+.context-breakdown-content {
   container-type: inline-size;
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + var(--space-2));
-  z-index: var(--z-popover);
   display: flex;
   flex-direction: column;
-  gap: 0;
-  width: auto;
-  max-width: none;
-  /* Soft viewport cap; only the whole panel scrolls — never a nested legend scroller. */
-  max-height: min(var(--context-available-height, 90vh), 880px);
-  padding: 0;
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-xl);
-  background: var(--token-bg-overlay);
-  box-shadow: var(--token-shadow-popover);
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-/* Header */
-.context-breakdown-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5) var(--space-3);
-}
-
-.context-breakdown-title {
-  flex: 1 1 auto;
-  color: var(--token-text-heading);
-  font-size: var(--type-heading-size);
-  font-weight: var(--font-semibold);
-  letter-spacing: -0.01em;
-}
-
-.context-breakdown-close {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-8);
-  height: var(--space-8);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--token-text-caption);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.context-breakdown-close:hover,
-.context-breakdown-close:focus-visible {
-  background: var(--token-interactive-hover);
-  color: var(--token-text-body);
-}
-
-.context-breakdown-close:active {
-  background: var(--token-interactive-active);
-}
-
-.context-breakdown-close:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: 1px;
-}
-
-.context-breakdown-close:disabled {
-  opacity: 0.4;
-  pointer-events: none;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 /* Hero: % Full · occupied/window · full-width bar */
@@ -85,7 +12,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: 0 var(--space-5) var(--space-4);
 }
 
 .context-breakdown-hero-row {
@@ -107,8 +33,8 @@
   font-size: var(--type-display-size);
   font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  line-height: var(--type-display-line);
+  letter-spacing: var(--tracking-tight);
 }
 
 .context-breakdown-summary-caption {
@@ -128,7 +54,7 @@
   margin: 0;
   color: var(--token-text-caption);
   font-size: var(--type-caption-size);
-  line-height: 1.4;
+  line-height: var(--type-caption-line);
 }
 
 /* Stacked bar — thicker Cursor-style track */

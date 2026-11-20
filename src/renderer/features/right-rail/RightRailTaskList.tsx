@@ -23,8 +23,8 @@ export const RightRailTaskList: React.FC<{ tasks: TaskRailItem[]; locateLabel: s
       <li key={task.id} className={`right-rail-task-row status-${task.status}`}>
         <button type="button" onClick={() => focusWorkProcessTask(task.id)} title={`${task.title} — ${task.waitingOn?.length ? `${t('chat.taskWaitingDependencies')} — ` : ''}${locateLabel}`}>
           <span className="right-rail-task-order">{task.order + 1}</span>
-          <TaskStatusMarker status={task.status} label={task.status === 'pending' && task.waitingOn?.length
-            ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${task.status}`)} />
+          <TaskStatusMarker size="sm" status={task.displayState} label={task.status === 'pending' && task.waitingOn?.length
+            ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${task.displayState}`)} />
           <span className="right-rail-task-copy"><strong><OverflowFade text={task.title} /></strong></span>
         </button>
       </li>

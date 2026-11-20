@@ -20,7 +20,7 @@ describe('Tabs accessibility and navigation', () => {
   });
   it('keeps an enabled tab reachable when the selected option is disabled', () => {
     const markup = renderToStaticMarkup(React.createElement(Tabs, { tabs, value: 'disabled', onChange() {} }));
-    expect(markup).toMatch(/tabindex="0"[^>]*>Write/);
+    expect(markup).toMatch(/tabindex="0"[^>]*><span class="ui-tabs-label">Write/);
     expect(markup).not.toContain('aria-controls');
   });
   it('keeps intrinsic width by default and opts into uniform full-width segments explicitly', () => {

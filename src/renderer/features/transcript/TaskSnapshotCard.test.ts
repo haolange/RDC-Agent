@@ -33,7 +33,7 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.body.textContent).toContain('chat.workProcessTaskSnapshotCreated');
   expect(document.body.textContent).toContain('1 / 5 completed');
   expect(document.body.textContent).not.toContain('0ms');
-  expect(document.querySelectorAll('.task-status-marker.is-snapshot svg')).toHaveLength(5);
+  expect(document.querySelectorAll('.task-status-marker svg')).toHaveLength(5);
   expect(document.querySelector('.task-pending .task-status-marker circle')).not.toBeNull();
   expect(document.querySelector('.task-pending .task-status-marker')?.getAttribute('aria-label')).toBe('chat.taskWaitingDependencies');
   expect(document.querySelector('.task-pending details')?.hasAttribute('open')).toBe(false);

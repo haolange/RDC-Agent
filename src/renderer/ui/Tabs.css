@@ -6,45 +6,47 @@
 }
 
 .ui-tabs-list {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-1);
-  min-height: var(--control-height-md);
-  padding: var(--space-0-5);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-panel);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ui-tabs-tab {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--control-height-sm);
+  gap: calc(var(--space-1) + var(--space-0-5));
+  min-height: var(--control-height-md);
   padding: 0 var(--space-3);
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
+  line-height: var(--type-label-line);
+  white-space: nowrap;
   cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
-.ui-tabs-tab:hover:not(:disabled),
-.ui-tabs-tab:focus-visible:not(:disabled) {
+.ui-tabs-tab:hover:not(:disabled) {
   color: var(--token-text-heading);
-  background: var(--token-interactive-hover);
 }
 
 .ui-tabs-tab:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .ui-tabs-tab.is-selected {
   color: var(--token-text-heading);
-  background: var(--token-bg-raised);
 }
 
 .ui-tabs-tab:disabled {
@@ -52,11 +54,69 @@
   cursor: not-allowed;
 }
 
+.ui-tabs-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.ui-tabs-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(var(--type-caption-line) + var(--space-0-5));
+  height: var(--type-caption-line);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--token-interactive-hover);
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.ui-tabs-tab.is-selected .ui-tabs-count {
+  background: var(--token-selection-bg);
+  color: var(--token-text-heading);
+}
+
+.ui-tabs-indicator {
+  position: absolute;
+  left: 0;
+  width: var(--ui-tabs-indicator-width, 0);
+  transform: translateX(var(--ui-tabs-indicator-x, 0));
+  transition: transform var(--motion-indicator), width var(--motion-indicator);
+  pointer-events: none;
+}
+
+.ui-tabs-list:not(.is-measured) .ui-tabs-indicator {
+  display: none;
+}
+
 .ui-tabs-panel {
   min-width: 0;
 }
 
-/* Segmented: compact single-select control (theme mode, font scale, scopes). */
+/* Underline: page navigation over a hairline. */
+.ui-tabs:not(.is-segmented) .ui-tabs-list {
+  border-bottom: 1px solid var(--token-border-subtle);
+}
+
+.ui-tabs:not(.is-segmented) .ui-tabs-tab:hover:not(:disabled) {
+  background: var(--token-interactive-hover);
+}
+
+.ui-tabs:not(.is-segmented) .ui-tabs-indicator {
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--token-selection-indicator);
+}
+
+.ui-tabs:not(.is-segmented) .ui-tabs-list:not(.is-measured) .ui-tabs-tab.is-selected {
+  box-shadow: inset 0 -2px 0 var(--token-selection-indicator);
+}
+
+/* Segmented: a sunken track with one raised thumb that slides to the selection. */
 .ui-tabs.is-segmented {
   gap: var(--space-2);
 }
@@ -64,7 +124,29 @@
 .ui-tabs.is-segmented .ui-tabs-list {
   display: inline-flex;
   align-self: flex-start;
-  max-width: 100%;
+  gap: 0;
+  padding: var(--space-0-5);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--token-border-subtle);
+}
+
+.ui-tabs.is-segmented .ui-tabs-tab {
+  flex: 1;
+  min-width: var(--ui-tabs-min-width, 0);
+  min-height: var(--control-height-sm);
+}
+
+.ui-tabs.is-segmented .ui-tabs-indicator,
+.ui-tabs.is-segmented .ui-tabs-list:not(.is-measured) .ui-tabs-tab.is-selected {
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-raised);
+  box-shadow: var(--token-elevation-1), inset 0 0 0 1px var(--ui-tabs-accent, var(--token-border-default));
+}
+
+.ui-tabs.is-segmented .ui-tabs-indicator {
+  top: var(--space-0-5);
+  bottom: var(--space-0-5);
 }
 
 .ui-tabs.is-full-width,
@@ -81,21 +163,28 @@
   min-width: 0;
 }
 
-.ui-tabs.is-segmented .ui-tabs-tab {
-  flex: 1;
-  min-width: var(--ui-tabs-min-width, 0);
-  font-size: var(--type-label-size);
-  white-space: nowrap;
+/* Collapsible lists measure their labelled width; tabs never shrink below their content while labelled. */
+.ui-tabs.is-full-width:not(.is-icon-only) .ui-tabs-list:has(.ui-tabs-icon) .ui-tabs-tab {
+  min-width: max-content;
 }
 
-.ui-tabs.is-segmented .ui-tabs-tab.is-selected {
-  border-color: var(--ui-tabs-accent, var(--token-accent-primary));
-  background: color-mix(in srgb, var(--ui-tabs-accent, var(--token-accent-primary)) 10%, var(--token-bg-panel));
-  color: var(--token-text-heading);
+.ui-tabs.is-icon-only .ui-tabs-label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
-.ui-tabs.is-segmented .ui-tabs-tab.is-selected:hover:not(:disabled),
-.ui-tabs.is-segmented .ui-tabs-tab.is-selected:focus-visible:not(:disabled) {
-  background: color-mix(in srgb, var(--ui-tabs-accent, var(--token-accent-primary)) 16%, var(--token-bg-panel));
-  color: var(--token-text-heading);
+.ui-tabs.is-icon-only .ui-tabs-tab {
+  padding: 0 var(--space-2);
+}
+
+.ui-tabs.is-icon-only .ui-tabs-count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: var(--space-4);
+  min-width: var(--space-4);
+  padding: 0 var(--space-1);
 }

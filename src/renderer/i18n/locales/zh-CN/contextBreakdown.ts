@@ -1,6 +1,6 @@
 export const zhContextBreakdown = {
   'contextBreakdown.title': '上下文用量',
-  'contextBreakdown.tokensLabel': 'Tokens',
+  'contextBreakdown.tokensLabel': 'Token',
   'contextBreakdown.inputLabel': '输入',
   'contextBreakdown.outputLabel': '输出',
   'contextBreakdown.totalLabel': '总量',
@@ -21,8 +21,8 @@ export const zhContextBreakdown = {
   'contextBreakdown.segment.summarized_conversation': '压缩摘要',
   'contextBreakdown.segment.conversation': '对话消息',
   'contextBreakdown.segment.free': '空闲',
-  'contextBreakdown.tokensColumn': 'Tokens',
-  'contextBreakdown.cacheColumn': 'Cache',
+  'contextBreakdown.tokensColumn': 'Token',
+  'contextBreakdown.cacheColumn': '缓存',
   'contextBreakdown.cacheSavedLabel': '已节省',
   'contextBreakdown.reasoningAmountLabel': '累计',
   'contextBreakdown.reasoningShareLabel': '占输出',

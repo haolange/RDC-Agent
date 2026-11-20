@@ -49,7 +49,12 @@ export type IconName =
   | 'link'
   | 'user'
   | 'lightning'
-  | 'max-mode';
+  | 'max-mode'
+  | 'tasks'
+  | 'artifact'
+  | 'output'
+  | 'layers'
+  | 'capture';
 
 type IconPart =
   | { d: string }
@@ -134,6 +139,11 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
     { r: [4, 3.5, 12.5, 10, 2] },
     { r: [7.5, 10.5, 12.5, 10, 2] },
   ],
+  tasks: [{ d: 'M11 6.5h9M11 12h9M11 17.5h9' }, { d: 'm3.75 6.5 1.5 1.5 2.75-3' }, { d: 'm3.75 12 1.5 1.5 2.75-3' }, { c: [5.75, 17.5, 1.75] }],
+  artifact: [{ d: 'M6 3h8l4 4v14H6V3Z' }, { d: 'M14 3v4h4M9 12h6M9 16h4' }],
+  output: [{ d: 'M4 6.5h10M4 12h7M4 17.5h10' }, { d: 'm16 9 3.5 3-3.5 3' }],
+  layers: [{ d: 'M12 4 3.5 8.5 12 13l8.5-4.5L12 4Z' }, { d: 'm3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5' }],
+  capture: [{ d: 'M4 8.5V5h3.5M16.5 5H20v3.5M20 15.5V19h-3.5M7.5 19H4v-3.5' }, { c: [12, 12, 3] }],
 };
 
 export interface IconProps {

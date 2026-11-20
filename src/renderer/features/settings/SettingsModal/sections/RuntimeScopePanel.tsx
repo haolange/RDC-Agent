@@ -115,7 +115,7 @@ export const RuntimeScopePanel: React.FC<{
     if (kind === 'mcp') return null;
     return (
       <div className="settings-runtime-editor-placeholder">
-        <EmptyState title={t('settings.scopeSelectOrCreate', { kind: kindLabel })} />
+        <EmptyState variant="page" title={t('settings.scopeSelectOrCreate', { kind: kindLabel })} />
       </div>
     );
   })();
@@ -124,7 +124,7 @@ export const RuntimeScopePanel: React.FC<{
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
       <ResourceListDetail
           testId="settings-resource-frame"
-          emptyLayout={kind === 'skill' || kind === 'hook' ? 'fill' : 'compact'}
+          emptyVariant={kind === 'skill' || kind === 'hook' ? 'page' : 'panel'}
           isEmpty={panel.resources.length === 0 && !panel.editing}
           emptyTitle={t('settings.scopeEmpty', { kind: kindLabel })}
           emptyDescription={emptyDescriptionExtra ? (

@@ -1,16 +1,13 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { splitPlanAppendix } from '@shared/utils/planAppendix';
 import { useI18n } from '../../i18n';
-import { useModalFocus } from '../../lib/useModalFocus';
-import { useOverlayLayer } from '../../lib/overlayStack';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { Details } from '../../ui/Details';
 import { useProjectStore } from '../../stores/projectStore';
-import { useReadingPanelGeometry } from '../../lib/useReadingPanelGeometry';
 import { Button } from '../../ui/Button';
+import { ReadingSheet } from '../../ui/ReadingSheet';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
@@ -25,11 +22,6 @@ export const PlanReviewPanel: React.FC<{
 }> = ({ plan, onClose }) => {
   const { t } = useI18n();
   const api = useElectronApi();
-  const titleId = useId();
-  const geometry = useReadingPanelGeometry();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const { layerId } = useOverlayLayer(true);
-  useModalFocus({ open: geometry.ready, containerRef: dialogRef, onClose, layerId });
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId);
   const projection = usePlanReviewStore(state => sessionId ? state.bySession[sessionId] : undefined);
   const canReopen = projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
@@ -75,79 +67,46 @@ export const PlanReviewPanel: React.FC<{
     }
   };
 
-  if (typeof document === 'undefined' || !geometry.ready) return null;
-
-  return createPortal(
-    <div
-      className="plan-review-panel-overlay"
-      {...geometry.style}
-      data-overlay-layer
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={dialogRef}
-        className="plan-review-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        data-testid="plan-review-panel"
-      >
-        <header className="plan-review-panel__header">
-          <div className="plan-review-panel__heading">
-            <h2 id={titleId} className="plan-review-panel__title">{plan.title}</h2>
-            <span className="plan-review-panel__revision">{t('chat.planReviewRevision', { revision: plan.revision })}</span>
-          </div>
-          <div className="plan-review-panel__actions">
-          {canReopen ? <Button variant="secondary" size="sm" disabled={busy || loading} onClick={() => void runAction(async () => {
-            const restored = await reopenPlanReview(api, reference);
-            usePlanReviewStore.getState().accept(restored); onClose(); return true;
-          }, t('chat.planReviewReopened'))}>{t('chat.planReviewReopen')}</Button> : null}
-
-            <IconButton
-              label={t('chat.planReviewExport')}
-              size="sm"
-              disabled={busy || loading || !markdown || !sessionId}
-              onClick={() => void runAction(() => exportPlan(reference), t('chat.planReviewExported'))}
-            >
-              <Icon name="upload" size={14} />
-            </IconButton>
-            <IconButton
-              label={t('chat.planReviewSave')}
-              size="sm"
-              disabled={busy || loading || !markdown || !sessionId}
-              onClick={() => void runAction(() => saveToProject(reference), t('chat.planReviewSaved'))}
-            >
-              <Icon name="folder" size={14} />
-            </IconButton>
-            <IconButton
-              label={t('chat.planReviewCopy')}
-              size="sm"
-              disabled={busy || !markdown}
-              onClick={() => void runAction(() => copyPlan(markdown), t('chat.planReviewCopied'))}
-            >
-              <Icon name="copy" size={14} />
-            </IconButton>
-            <IconButton label={t('chat.planReviewClose')} size="sm" onClick={onClose}>
-              <Icon name="close" size={14} />
-            </IconButton>
-          </div>
-        </header>
+  const disabled = busy || loading || !markdown || !sessionId;
+  return (
+    <ReadingSheet
+      dataTestId="plan-review-panel"
+      title={plan.title}
+      meta={t('chat.planReviewRevision', { revision: plan.revision })}
+      closeLabel={t('chat.planReviewClose')}
+      onClose={onClose}
+      actions={<>
+        {canReopen ? <Button variant="secondary" size="sm" disabled={busy || loading} onClick={() => void runAction(async () => {
+          const restored = await reopenPlanReview(api, reference);
+          usePlanReviewStore.getState().accept(restored); onClose(); return true;
+        }, t('chat.planReviewReopened'))}>{t('chat.planReviewReopen')}</Button> : null}
+        <IconButton label={t('chat.planReviewExport')} size="sm" disabled={disabled}
+          onClick={() => void runAction(() => exportPlan(reference), t('chat.planReviewExported'))}>
+          <Icon name="upload" size={14} />
+        </IconButton>
+        <IconButton label={t('chat.planReviewSave')} size="sm" disabled={disabled}
+          onClick={() => void runAction(() => saveToProject(reference), t('chat.planReviewSaved'))}>
+          <Icon name="folder" size={14} />
+        </IconButton>
+        <IconButton label={t('chat.planReviewCopy')} size="sm" disabled={busy || !markdown}
+          onClick={() => void runAction(() => copyPlan(markdown), t('chat.planReviewCopied'))}>
+          <Icon name="copy" size={14} />
+        </IconButton>
+      </>}
+      status={notice || error || projection?.error ? <>
         {notice ? <p className="plan-review-panel__notice" role="status">{notice}</p> : null}
         {error || projection?.error ? <p className="plan-review-panel__error" role="alert">{error || projection?.error}</p> : null}
-        <div className="plan-review-panel__body" aria-busy={loading}>
-          {loading ? <p role="status">{t('chat.planReviewLoading')}</p> : markdown ? <>
-            <MessageMarkdown content={parts.body} />
-            {parts.appendix ? <Details variant="panel" className="plan-review-panel__appendix" data-testid="plan-review-appendix"
-              summary={t('chat.planReviewExecutionReferences')}>
-              <MessageMarkdown content={planAppendixMarkdown(parts.appendix)} />
-            </Details> : null}
-          </> : null}
-        </div>
+      </> : undefined}
+    >
+      <div className="plan-review-panel__body" aria-busy={loading}>
+        {loading ? <p role="status">{t('chat.planReviewLoading')}</p> : markdown ? <>
+          <MessageMarkdown content={parts.body} />
+          {parts.appendix ? <Details variant="panel" className="plan-review-panel__appendix" data-testid="plan-review-appendix"
+            summary={t('chat.planReviewExecutionReferences')}>
+            <MessageMarkdown content={planAppendixMarkdown(parts.appendix)} />
+          </Details> : null}
+        </> : null}
       </div>
-    </div>,
-    document.body,
+    </ReadingSheet>
   );
 };

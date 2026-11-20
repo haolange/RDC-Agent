@@ -48,11 +48,7 @@
   background: transparent;
 }
 
-.settings-provider-row.ui-list-row.is-selected {
-  border-color: var(--token-border-default);
-}
-
-.settings-provider-row .ui-list-row-body {
+.settings-provider-row .ui-list-row-title {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -225,11 +221,6 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--token-border-muted);
-}
-
-.settings-provider-detail-empty.ui-empty-state {
-  border: 1px dashed var(--token-border-default);
-  border-radius: var(--radius-md);
 }
 
 @container settings-panel (max-width: 46rem) {

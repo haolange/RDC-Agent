@@ -38,43 +38,6 @@
 
 /* ─── Shared Component Utilities ─── */
 
-/* Badge */
-.ui-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
-  line-height: var(--leading-normal);
-  border-radius: var(--radius-full);
-  white-space: nowrap;
-}
-
-.ui-badge--primary {
-  background: rgb(var(--color-primary-500) / 0.15);
-  color: rgb(var(--color-primary-400));
-}
-
-.ui-badge--accent {
-  background: rgb(var(--color-accent-500) / 0.15);
-  color: var(--token-accent-primary);
-}
-
-.ui-badge--success {
-  background: rgb(var(--color-success) / 0.15);
-  color: rgb(var(--color-success));
-}
-
-.ui-badge--warning {
-  background: rgb(var(--color-warning) / 0.15);
-  color: rgb(var(--color-warning));
-}
-
-.ui-badge--error {
-  background: rgb(var(--color-error) / 0.15);
-  color: rgb(var(--color-error));
-}
-
 /* Icon Button */
 .ui-icon-btn {
   display: inline-flex;

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useI18n } from '../../i18n';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import { Tabs } from '../../ui/Tabs';
+import { Icon } from '../../ui/Icon';
+import { Tabs, type TabItem } from '../../ui/Tabs';
 import { CapturePanel } from './CapturePanel';
 import { RightRailArtifactList } from './RightRailArtifactList';
 import { RightRailContext } from './RightRailContext';
@@ -17,10 +18,6 @@ const RailSection: React.FC<{ id: RailTab; title: string; populated?: boolean; m
     <h2 className="right-rail-section-heading">{title}{meta ? <span className="right-rail-section-meta">{meta}</span> : null}</h2>
     <div className="right-rail-section-content">{children}</div>
   </section>
-);
-
-const TabLabel: React.FC<{ title: string; count?: string }> = ({ title, count }) => (
-  <span className="right-rail-tab-label">{title}{count ? <span className="right-rail-tab-count">{count}</span> : null}</span>
 );
 
 /**
@@ -47,12 +44,12 @@ export const SessionRightRail: React.FC = () => {
     : undefined;
 
   const tabs = [
-    { id: 'tasks', label: <TabLabel title={t('control.rightRail.tasks.title')} count={taskCount} /> },
-    { id: 'artifacts', label: <TabLabel title={t('control.rightRail.artifacts.title')} count={hasArtifacts ? String(artifacts.totalCount) : undefined} /> },
-    { id: 'outputs', label: <TabLabel title={t('control.rightRail.outputs.title')} count={outputCount ? String(outputCount) : undefined} /> },
-    { id: 'context', label: <TabLabel title={t('control.rightRail.context.title')} /> },
-    { id: 'capture', label: <TabLabel title={t('control.rightRail.capture.title')} /> },
-  ] satisfies Array<{ id: RailTab; label: React.ReactNode }>;
+    { id: 'tasks', label: t('control.rightRail.tasks.title'), icon: <Icon name="tasks" />, count: tasks.length },
+    { id: 'artifacts', label: t('control.rightRail.artifacts.title'), icon: <Icon name="artifact" />, count: artifacts.totalCount },
+    { id: 'outputs', label: t('control.rightRail.outputs.title'), icon: <Icon name="output" />, count: outputCount },
+    { id: 'context', label: t('control.rightRail.context.title'), icon: <Icon name="layers" /> },
+    { id: 'capture', label: t('control.rightRail.capture.title'), icon: <Icon name="capture" /> },
+  ] satisfies Array<TabItem & { id: RailTab }>;
 
   const panel = (() => {
     switch (tab) {
@@ -106,7 +103,7 @@ export const SessionRightRail: React.FC = () => {
   return (
     <aside className="right-rail" aria-label={t('control.rightRail.inspector')}>
       <Tabs className="right-rail-tabs" tabs={tabs} value={tab} onChange={(id) => setTab(id as RailTab)}
-        label={t('control.rightRail.inspector')} fullWidth>
+        label={t('control.rightRail.inspector')} fullWidth collapsible>
         {panel}
       </Tabs>
     </aside>

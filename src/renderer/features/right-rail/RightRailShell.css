@@ -93,24 +93,6 @@
   min-height: 0;
 }
 
-.right-rail-tabs .ui-tabs-tab {
-  min-width: 0;
-  padding: 0 var(--space-1);
-}
-
-.right-rail-tab-label {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-1);
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.right-rail-tab-count {
-  color: var(--token-text-caption);
-  font-variant-numeric: tabular-nums;
-}
-
 .right-rail-tabs .right-rail-section-heading {
   position: absolute;
   inline-size: 1px;

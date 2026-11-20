@@ -45,9 +45,7 @@
   line-height: var(--leading-normal);
   white-space: nowrap;
 }
-.right-rail-task-row .task-status-marker,
-.right-rail-task-row .task-status-marker svg { width: var(--space-3); height: var(--space-3); }
-.right-rail-task-row .task-status-marker { margin-top: calc((var(--type-label-size) * var(--leading-normal) - var(--space-3)) / 2); }
+.right-rail-task-row .task-status-marker { margin-top: calc((var(--type-label-size) * var(--leading-normal) - var(--space-3) - var(--space-0-5)) / 2); }
 .right-rail-task-row.status-in_progress .right-rail-task-copy strong { color: var(--token-text-heading); font-weight: var(--font-medium); }
 .right-rail-task-row.status-completed .right-rail-task-copy strong,
 .right-rail-task-row.status-cancelled .right-rail-task-copy strong { color: var(--token-text-caption); }

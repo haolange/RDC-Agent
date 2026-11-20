@@ -31,8 +31,7 @@
 }
 
 .work-process-task-snapshot-item .task-status-marker {
-  flex: 0 0 var(--space-4);
-  height: calc(var(--type-label-size) * 1.45);
+  margin-top: calc((var(--type-label-size) * var(--leading-normal) - var(--space-4)) / 2);
 }
 
 .work-process-task-snapshot-copy {

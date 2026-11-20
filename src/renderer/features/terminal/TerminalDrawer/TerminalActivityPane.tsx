@@ -89,9 +89,9 @@ export const TerminalActivityPane: React.FC<TerminalActivityPaneProps> = ({ vm }
     >
       <div ref={activityBodyRef} className="runtime-terminal-activity-body scrollbar-thin">
         {isLoading ? (
-          <div role="status"><EmptyState layout="compact" title={t('terminal.loading')} /></div>
+          <div role="status"><EmptyState title={t('terminal.loading')} /></div>
         ) : filteredEntries.length === 0 ? (
-          <EmptyState layout="fill" title={emptyCopy} />
+          <EmptyState variant="page" title={emptyCopy} />
         ) : (
           <>
             {leading > 0 ? <TerminalSpacer height={leading} /> : null}

@@ -170,12 +170,12 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           <div className="settings-agent-editor-copy">
             <div className="settings-agent-editor-name">
               {selectedAgent.name}
-              <Badge tone="primary" data-testid="settings-agent-provenance">{provenanceLabel(provenanceScope, t)}</Badge>
+              <Badge variant="outline" data-testid="settings-agent-provenance">{provenanceLabel(provenanceScope, t)}</Badge>
               {builtinUpdate?.status === 'updated' ? (
                 <Badge tone="warning" data-testid="settings-agent-builtin-updated">{t('settings.agentBuiltinUpdated')}</Badge>
               ) : null}
               {builtinUpdate?.status === 'unknown-base' ? (
-                <Badge tone="primary" data-testid="settings-agent-builtin-base-unknown">{t('settings.agentBuiltinBaseUnknown')}</Badge>
+                <Badge variant="outline" data-testid="settings-agent-builtin-base-unknown">{t('settings.agentBuiltinBaseUnknown')}</Badge>
               ) : null}
             </div>
             <code className="settings-agent-editor-id">{selectedAgent.id}</code>

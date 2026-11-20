@@ -159,7 +159,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         </Details>
       </div>
       <div className="settings-provider-detail-pane">
-        {detail ?? <EmptyState className="settings-provider-detail-empty" title={t('settings.providers.selectHint')} />}
+        {detail ?? <EmptyState variant="page" title={t('settings.providers.selectHint')} />}
       </div>
     </div>
   );

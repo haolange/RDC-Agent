@@ -39,11 +39,10 @@ describe('resource editor layout contracts (not Browser geometry)', () => {
     const css = source('sections/resource-editor-layout.css');
     expect(css).toMatch(/\.settings-resource-document-field > \.settings-field-control\s*\{[^}]*display: flex;[^}]*flex: 1;[^}]*min-height: 0;/);
     expect(css).not.toMatch(/height:\s*100%/);
-    expect(source('parts/settings-kit.css')).toMatch(/\.settings-resource-empty\.ui-empty-state\s*\{[^}]*border:[^}]*background:/);
   });
 
-  it('uses compact Policy and MCP empty states while Skills and Hooks fill their document area', () => {
-    expect(source('sections/RuntimeScopePanel.tsx')).toContain("emptyLayout={kind === 'skill' || kind === 'hook' ? 'fill' : 'compact'}");
+  it('uses bounded Policy and MCP empty states while Skills and Hooks fill their document area', () => {
+    expect(source('sections/RuntimeScopePanel.tsx')).toContain("emptyVariant={kind === 'skill' || kind === 'hook' ? 'page' : 'panel'}");
     expect(source('sections/settings-page-layout.css')).toMatch(/\.settings-page-policy > \.settings-block\s*\{\s*flex: 0 0 auto;/);
   });
 

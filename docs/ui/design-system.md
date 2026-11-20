@@ -170,7 +170,11 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 ## 空态
 
-所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体，只有文案的空态显示为一行说明文字而非边框盒。Right Rail 各标签的卡片通过可选 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
+所有空态使用统一 `<EmptyState variant title description? actions? visual?>`，三种形态各有用途：`inline` 是列表里没有行时的一行安静说明（Sidebar、Knowledge 列表、能力选择）；`panel` 是带创建动作的空资源，一块下沉的有界表面；`page` 填满所在栏位并居中，用于「选择一项查看详情」和 Right Rail。消费方不再自己包边框盒子。Right Rail 各标签通过 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
+
+**阅读面板与披露**：计划全文与上下文用量共用 `ReadingSheet`：占据 Composer 上方的阅读区，按内容高度展开、最多到可用高度；头部、状态条与底部固定，正文是唯一滚动区，不出现双重滚动；工作台外（组件目录）居中显示。受控披露用 `Disclosure`：箭头由组件绘制并随 `--motion-disclosure` 旋转，关闭时不渲染正文，开合由所属方决定（流式、最新步骤或用户手动）。普通配置项的按需展开继续用原生 `Details`。
+
+**状态徽标与任务标记**：`Badge` 的 `soft` 变体按状态着色（成功、警告、错误、强调），`outline` 变体只做元数据标签（来源、类型、服务商），不暗示状态。`TaskStatusMarker` 每个显示状态一个字形：待开始灰色空心圆、进行中强调色旋转弧、已完成绿色实心对勾、受阻琥珀色暂停、执行失败红色实心叹号、已取消灰色斜线；颜色只来自 `--token-task-*`，「失败」由 main 从当前执行派生，renderer 不推断。
 
 共享空态区分紧凑区块与填充面板用途。带动作组的资源空态以有边界的中性实色承载标题、说明和动作；只有文案的紧凑空态不画边框盒，就地显示一行（或标题加说明）安静文字；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
 
@@ -217,7 +221,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 ## 轻量选择控件
 
 - **多选**用 `CheckPill`（勾选 + 文字，`role="checkbox"`，`aria-checked`，`is-selected`）或列表里的 `Checkbox`。两者共用空心方框 + 字色勾（`--checkbox-*`）。禁止 accent 实心方砖，禁止为多选画大方框卡片。`Switch` 是唯一胶囊，开态才灌 accent。
-- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、导入输入方式、导出范围与格式。默认按内容宽度布局；同组需要统一铺满时显式使用 `fullWidth`，各项等分可用宽度。语言选项在所有界面语言下统一使用自称 `简体中文` / `English`，便于用户在不熟悉当前界面语言时识别切换入口，并避免紧凑选择器因外语全称溢出。
+- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、导入输入方式、导出范围与格式：下沉的轨道里一个凸起滑块滑到选中项。页面导航用默认 `underline`：细分隔线上一条强调色指示条滑动。默认按内容宽度布局；同组需要统一铺满时显式使用 `fullWidth`。Tab 可带 `icon` 与 `count`（计数徽标）；`collapsible` 在带标签的一行放不下时整体降为图标加悬停提示，容器变宽后恢复，永不重叠或换行（Right Rail 检查器）。语言选项在所有界面语言下统一使用自称 `简体中文` / `English`，便于用户在不熟悉当前界面语言时识别切换入口，并避免紧凑选择器因外语全称溢出。
 - 动作按钮与选择控件不混同：普通执行 `ghost` / `secondary`，主要动作 `primary`，危险动作 `danger`。
 
 ## 颜色选择浮层
@@ -318,11 +322,11 @@ Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属
 - Settings 入口装配导航与弹层，`SettingsPageContent` 组合页面；`useSettingsNavigation` 统一未保存导航，各领域 controller 保留独立草稿、校验与保存语义。页面展示组件不直接调用 IPC。
 - Knowledge 查询、选中详情、导入、导出和写入各有明确 controller。`useKnowledgeSelection` 是详情选择的唯一来源；查询或会话切换、关闭及卸载使旧请求失效。失效只阻止迟到结果更新界面，不冒充取消已经提交的写操作。
 - Composer 编辑／预览使用共享 segmented `Tabs`。Tabs 的 DOM ID 按实例生成；没有对应面板的选择控件不输出 `aria-controls`。编辑器内部焦点由 Composer 外壳呈现，不全局关闭焦点样式。
-- 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。单行长文本使用 `OverflowFade`：保留完整 DOM / `title`，根据真实 overflow、ResizeObserver、字体加载与文本变化决定是否渐隐，空值仍占一行。ColorField 的紧凑布局与隐藏标签由组件自身管理。
+- 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 是无边框的扁平行，悬停给底色，选中用 `--token-selection-bg` 加左侧指示条；可选 `description` 作为第二行。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。单行长文本使用 `OverflowFade`：保留完整 DOM / `title`，根据真实 overflow、ResizeObserver、字体加载与文本变化决定是否渐隐，空值仍占一行。ColorField 的紧凑布局与隐藏标签由组件自身管理。
 - Provider、Agents、Tools、Appearance 与 Knowledge 的样式按展示职责组织；响应式规则跟随所属组件。CSS 入口仅声明加载关系，不恢复已替代的集中覆盖文件。
-- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用共享中性实色表面、细边框、小圆角及选中态，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 label 角色 / `--font-medium`，描述 caption 角色 / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
+- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用 ListRow 的扁平行与选中指示条，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 label 角色 / `--font-medium`，描述 caption 角色 / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
 - 交接预载技能与能力配置的候选来自真实解析，可搜索多选；缺失或目标不可用的已选 ID 明示且不丢失，读取失败不显示为「没有技能」。策略资源排在全局运行设置之前，MCP 紧凑空态不遮蔽本机工具。
-- 模型服务页是列表 + 详情：左侧服务列表先列「已连接 · N」，再按连接方式分组列出可添加的服务（OAuth 登录、第一方直连、云平台、本机等），每行是首字母标记、名称和一行状态（已连接显示「N 个模型可用」，失败显示失败原因标签，未连接显示怎么连：浏览器登录 / 设备码登录 / 需要 API Key / 无需密钥）；行是扁平 `ListRow`，只有选中时出现边框。右侧是所选服务的详情：名称与账号身份、刷新模型 / 断开（或退出登录）、连接字段、连接状态、模型列表，最后是折叠的「诊断信息」（服务标识、接口、协议摘要、单服务能力验证）。保存或登录成功后详情停留在该服务上，从保存后的设置重新读取。未配置为中性色，只有真实失败才用 error。
+- 模型服务页是列表 + 详情：左侧服务列表先列「已连接 · N」，再按连接方式分组列出可添加的服务（OAuth 登录、第一方直连、云平台、本机等），每行是首字母标记、名称和一行状态（已连接显示「N 个模型可用」，失败显示失败原因标签，未连接显示怎么连：浏览器登录 / 设备码登录 / 需要 API Key / 无需密钥）；行是扁平 `ListRow`，选中时出现指示条与选中底色。右侧是所选服务的详情：名称与账号身份、刷新模型 / 断开（或退出登录）、连接字段、连接状态、模型列表，最后是折叠的「诊断信息」（服务标识、接口、协议摘要、单服务能力验证）。保存或登录成功后详情停留在该服务上，从保存后的设置重新读取。未配置为中性色，只有真实失败才用 error。
 
 ### 工作台壳层接线与项目 Capture 面板
 

@@ -233,6 +233,7 @@ export const enChat = {
   'chat.taskDependency.missing': 'Prerequisite record unavailable: {title}',
   'chat.workProcessTaskStatus.completed': 'Completed',
   'chat.workProcessTaskStatus.cancelled': 'Cancelled',
+  'chat.workProcessTaskStatus.failed': 'Failed',
   'chat.workProcessVerb.imageComplete': 'Viewed image',
   'chat.workProcessVerb.imageRunning': 'Viewing image',
   'chat.workProcessVerb.interpreterComplete': 'Ran interpreter',

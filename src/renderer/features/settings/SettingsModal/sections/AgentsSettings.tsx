@@ -241,7 +241,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           />
         ) : (
           <div className="settings-runtime-editor-placeholder">
-            <EmptyState title={t('settings.agentSelectOrCreate')} />
+            <EmptyState variant="page" title={t('settings.agentSelectOrCreate')} />
           </div>
         )}
       </div>

@@ -40,9 +40,9 @@ export const TaskSnapshotCard: React.FC<{
                   data-work-process-task-status={item.status}
                   tabIndex={-1}
                 >
-                  <TaskStatusMarker status={item.status}
+                  <TaskStatusMarker status={item.displayState ?? item.status}
                     label={item.status === 'pending' && item.waitingOn?.length
-                      ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${item.status}`)} />
+                      ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${item.displayState ?? item.status}`)} />
                   {item.statusReason || item.waitingOn?.length ? <details className="work-process-task-snapshot-copy">
                     <summary className="work-process-task-snapshot-title">{item.title}</summary>
                     {item.statusReason ? <p className="work-process-task-snapshot-reason">{reasonText(item.statusReason)}</p> : null}

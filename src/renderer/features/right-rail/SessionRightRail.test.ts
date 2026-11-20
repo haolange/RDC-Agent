@@ -18,9 +18,9 @@ describe('session rail projection composition', () => {
     try {
       state.tracePresentation = { rightPanel: {
         tasks: [
-          { id: 'started', sessionId: 'session', order: 0, title: 'Started', status: 'cancelled', blockerSummary: TASK_STATUS_REASONS.parentTurnStopped },
-          { id: 'pending', sessionId: 'session', order: 1, title: 'Pending', status: 'cancelled', blockerSummary: TASK_STATUS_REASONS.createdTurnStopped },
-          { id: 'custom', sessionId: 'session', order: 2, title: 'Custom', status: 'blocked', blockerSummary: '等待用户确认' },
+          { id: 'started', sessionId: 'session', order: 0, title: 'Started', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.parentTurnStopped },
+          { id: 'pending', sessionId: 'session', order: 1, title: 'Pending', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.createdTurnStopped },
+          { id: 'custom', sessionId: 'session', order: 2, title: 'Custom', status: 'blocked', displayState: 'blocked', blockerSummary: '等待用户确认' },
         ],
       } };
       act(() => root.render(createElement(SessionRightRail)));
@@ -41,9 +41,9 @@ describe('session rail projection composition', () => {
     const host = document.createElement('div'); const root = createRoot(host);
     try {
       state.tracePresentation = { rightPanel: { tasks: [
-        { id: 'done', sessionId: 'session', order: 0, title: 'Complete title retained', status: 'completed' },
-        { id: 'live', sessionId: 'session', order: 1, title: 'Live', status: 'in_progress' },
-        { id: 'cancelled', sessionId: 'session', order: 2, title: 'Cancelled', status: 'cancelled' },
+        { id: 'done', sessionId: 'session', order: 0, title: 'Complete title retained', status: 'completed', displayState: 'completed' },
+        { id: 'live', sessionId: 'session', order: 1, title: 'Live', status: 'in_progress', displayState: 'in_progress' },
+        { id: 'cancelled', sessionId: 'session', order: 2, title: 'Cancelled', status: 'cancelled', displayState: 'cancelled' },
       ] } };
       act(() => root.render(createElement(SessionRightRail)));
       const progress = host.querySelector('[data-testid="right-rail-tasks"]')!;
@@ -77,7 +77,7 @@ describe('session rail projection composition', () => {
         tabs.map((id) => `control.rightRail.${id}.title`));
       visit(() => expect(host.querySelectorAll('[aria-expanded]')).toHaveLength(0));
       state.tracePresentation = { rightPanel: {
-        tasks: [{ id: 'task', sessionId: 'session', order: 1, title: 'A blocked task', status: 'blocked', blockerSummary: 'Needs input' }],
+        tasks: [{ id: 'task', sessionId: 'session', order: 1, title: 'A blocked task', status: 'blocked', displayState: 'blocked', blockerSummary: 'Needs input' }],
         artifacts: { rows: [], storeDegraded: true, totalCount: 0 },
         outputs: { current: [{ id: 'output', displayName: 'A long output name', path: '/output', status: 'failed' }], previous: [] },
         context: { task: { resources: [{ id: 'resource', kind: 'skill', label: 'A loaded skill', summary: 'Scope retained' }] } },

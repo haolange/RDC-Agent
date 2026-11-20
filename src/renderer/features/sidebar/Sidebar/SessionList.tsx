@@ -39,7 +39,7 @@ export const SessionList: React.FC<SessionListProps> = ({
 
   if (projectSessions.length === 0) {
     return (
-      <EmptyState layout="compact" className="session-list-empty" title={t('sidebar.noSessions')} />
+      <EmptyState className="session-list-empty" title={t('sidebar.noSessions')} />
     );
   }
 

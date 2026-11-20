@@ -217,6 +217,7 @@ export const zhChat = {
   'chat.taskDependency.missing': '前置任务记录不可用：{title}',
   'chat.workProcessTaskStatus.completed': '已完成',
   'chat.workProcessTaskStatus.cancelled': '已取消',
+  'chat.workProcessTaskStatus.failed': '执行失败',
   'chat.workProcessVerb.imageComplete': '已查看图片',
   'chat.workProcessVerb.imageRunning': '正在查看图片',
   'chat.workProcessVerb.interpreterComplete': '已运行解释器',

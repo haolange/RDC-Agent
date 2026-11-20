@@ -44,7 +44,8 @@ export function ExtraControls() {
     </Details>
     <Details summary="Panel / SectionHeader / ListRow · 结构和选择">
       <Panel header={<SectionHeader title="资源列表" />}>
-        <ListRow selected={checked} onClick={() => setChecked(!checked)} trailing={<Badge>示例</Badge>}>选择资源</ListRow>
+        <ListRow selected={checked} onClick={() => setChecked(!checked)} trailing={<Badge variant="outline">示例</Badge>}
+          description="第二行说明保留上下文，不截掉身份">选择资源</ListRow>
         <ListRow disabled>不可用资源</ListRow><Divider />
         <CheckPill checked={checked} onCheckedChange={setChecked}>加入当前选择</CheckPill>
       </Panel>

@@ -11,8 +11,8 @@ vi.mock('../i18n', () => ({
   }),
 }));
 
-vi.mock('./ContextBreakdownPopover', () => ({
-  ContextBreakdownPopover: () => null,
+vi.mock('./ContextBreakdownSheet', () => ({
+  ContextBreakdownSheet: () => null,
 }));
 
 const profile = (overrides: Partial<ContextUsageSelectedProfile> = {}): ContextUsageSelectedProfile => ({

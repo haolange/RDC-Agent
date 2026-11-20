@@ -3,6 +3,8 @@ import { formatTokenCount } from '@shared/utils/tokens';
 import { formatUsdCost } from '@shared/utils/cost';
 import { useDynStyle } from '../lib/useDynStyle';
 import { useI18n } from '../i18n';
+import { Disclosure } from '../ui/Disclosure';
+import { ReadingSheet } from '../ui/ReadingSheet';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
 import { ContextRunMeterBand, MeterStat } from './ContextRunMeterBand';
 import {
@@ -18,7 +20,7 @@ import {
   SEGMENT_LABEL_KEYS,
 } from './contextBreakdownMeta';
 import type { ContextUsageBreakdownId, PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
-import './ContextBreakdownPopover.css';
+import './ContextBreakdownSheet.css';
 import './ContextBreakdownMeter.css';
 import './ContextBreakdownLegend.css';
 
@@ -44,7 +46,7 @@ const ContextBarSegment: React.FC<{
   );
 };
 
-export const ContextBreakdownPopover: React.FC<{
+interface ContextBreakdownContentProps {
   prepared: PreparedTurnContextSummary | null;
   phase: PreparationPhase;
   usage: RunContextUsageSummary | null;
@@ -53,31 +55,23 @@ export const ContextBreakdownPopover: React.FC<{
   estimated?: boolean;
   detailsExpanded: boolean;
   onDetailsExpandedChange: (expanded: boolean) => void;
-  onClose: () => void;
-}> = ({ prepared, phase, usage, selectedProfile, stale, estimated = false, detailsExpanded, onDetailsExpandedChange, onClose }) => {
+}
+
+/** Context usage in the shared reading sheet: same area, size and single scroller as the plan reader. */
+export const ContextBreakdownSheet: React.FC<ContextBreakdownContentProps & { onClose: () => void }> = ({ onClose, ...content }) => {
   const { t } = useI18n();
-  const closeButtonRef = React.useRef<HTMLButtonElement>(null);
-  const panelRef = React.useRef<HTMLDivElement>(null);
-  const [availableHeight, setAvailableHeight] = React.useState<number | null>(null);
-  const panelStyle = useDynStyle({ '--context-available-height': availableHeight == null ? undefined : `${availableHeight}px` });
-  React.useLayoutEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-    const measure = () => {
-      const titlebarBottom = document.querySelector('.app-titlebar')?.getBoundingClientRect().bottom ?? 0;
-      setAvailableHeight(Math.max(0, panel.getBoundingClientRect().bottom - titlebarBottom - 8));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (panel.parentElement) observer.observe(panel.parentElement);
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, true);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, true);
-    };
-  }, []);
+  return (
+    <ReadingSheet title={t('contextBreakdown.title')} closeLabel={t('contextBreakdown.close')} onClose={onClose}
+      className="context-breakdown" dataTestId="context-breakdown">
+      <ContextBreakdownContent {...content} />
+    </ReadingSheet>
+  );
+};
+
+export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = ({
+  prepared, phase, usage, selectedProfile, stale, estimated = false, detailsExpanded, onDetailsExpandedChange,
+}) => {
+  const { t } = useI18n();
   const showPrepared = phase === 'current' && prepared !== null;
   const awaitingWindow = showPrepared && awaitsExecutionContextWindow(prepared);
   // A new request must not erase the last truthful snapshot before its own
@@ -164,44 +158,8 @@ export const ContextBreakdownPopover: React.FC<{
     typeof value === 'number' ? `${projected ? '~' : ''}${formatTokenCount(value)}` : METER_UNAVAILABLE
   );
 
-  React.useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    closeButtonRef.current?.focus();
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
   return (
-    <>
-      <div className="context-breakdown-backdrop" onClick={onClose} aria-hidden="true" />
-      <div
-        ref={panelRef}
-        {...panelStyle}
-        className="context-breakdown"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('contextBreakdown.title')}
-        data-testid="context-breakdown"
-      >
-        <div className="context-breakdown-header">
-          <span className="context-breakdown-title">{t('contextBreakdown.title')}</span>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="context-breakdown-close"
-            onClick={onClose}
-            aria-label={t('contextBreakdown.close')}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+    <div className="context-breakdown-content">
         <div className="context-breakdown-hero">
           <div className="context-breakdown-hero-row">
             <div className="context-breakdown-hero-usage">
@@ -264,27 +222,17 @@ export const ContextBreakdownPopover: React.FC<{
             </div>
           </div>
         ) : null}
-        <button
-          type="button"
-          className={`context-breakdown-details-toggle${detailsExpanded ? ' is-expanded' : ''}`}
-          aria-expanded={detailsExpanded}
-          aria-controls="context-breakdown-details"
-          aria-label={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
-          onClick={() => onDetailsExpandedChange(!detailsExpanded)}
+        <Disclosure
+          className="context-breakdown-disclosure"
+          triggerClassName="context-breakdown-details-toggle"
+          bodyClassName="context-breakdown-details"
+          open={detailsExpanded}
+          onOpenChange={onDetailsExpandedChange}
+          triggerLabel={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
+          summary={t('contextBreakdown.detailsLabel')}
         >
-          <span className={`context-breakdown-details-chevron${detailsExpanded ? ' is-expanded' : ''}`} aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </span>
-          <span className="context-breakdown-details-label">{t('contextBreakdown.detailsLabel')}</span>
-        </button>
-
-        {detailsExpanded ? (
-          <div id="context-breakdown-details" className="context-breakdown-details">
-            <ContextBreakdownLegend entries={breakdown} unavailable={!hasAuthoritativeBreakdown} />
-          </div>
-        ) : null}
+          <ContextBreakdownLegend entries={breakdown} unavailable={!hasAuthoritativeBreakdown} />
+        </Disclosure>
 
         {showEstimated ? (
           <p className="context-breakdown-footer" data-testid="context-breakdown-projected-note">
@@ -293,7 +241,6 @@ export const ContextBreakdownPopover: React.FC<{
         ) : stale ? (
           <p className="context-breakdown-footer">{t('contextBreakdown.staleNote')}</p>
         ) : null}
-      </div>
-    </>
+    </div>
   );
 };

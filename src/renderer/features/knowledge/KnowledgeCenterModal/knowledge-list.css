@@ -19,8 +19,8 @@
   padding-block: var(--space-2);
 }
 
-.knowledge-center-card-button .ui-list-row-body,
-.knowledge-center-inbox-row .ui-list-row-body {
+.knowledge-center-card-button .ui-list-row-title,
+.knowledge-center-inbox-row .ui-list-row-title {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -135,7 +135,7 @@
   padding-block: var(--space-2);
 }
 
-.knowledge-center-conflict-row .ui-list-row-body {
+.knowledge-center-conflict-row .ui-list-row-title {
   white-space: normal;
   overflow: visible;
   text-overflow: unset;
