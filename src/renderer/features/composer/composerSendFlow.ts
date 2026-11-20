@@ -11,7 +11,6 @@ import {
   applyConversationTurnResult,
   buildOptimisticConversationTurn,
   removeOptimisticConversationMessages,
-  syncE2EConversationState,
   resolveComposerProfileId,
   toConversationAttachmentInputs,
 } from '../../stores/conversationSendHelpers';
@@ -270,15 +269,6 @@ export async function sendComposerConversationTurn(options: {
       currentProject?.projectId,
     );
 
-    await syncE2EConversationState({
-      electronAPI,
-      sessionId: turn.session?.sessionId ?? currentSession?.sessionId ?? null,
-      turnId: turn.userMessage.turnId,
-      setConversationMessages,
-      setTracePresentation,
-      setBranchState,
-      shouldApply: () => isOwningSelectionActive(committedSessionId),
-    });
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     return { status: 'accepted', requestId };
   } catch (error) {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { useRuntimePermissionStore } from './runtimePermissionStore';
-import { DEFAULT_SETTINGS } from './defaultAppSettings';
+import { DEFAULT_AGENT_RUNTIME, createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import {
   beginAgentDefinitionSave,
   isLatestAgentDefinitionRevision,
@@ -31,7 +31,7 @@ const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
 
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
-  settings: DEFAULT_SETTINGS,
+  settings: createDefaultAppSettings(),
   hydrated: false,
   systemTheme: 'dark',
   hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true }),
@@ -130,7 +130,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   },
   setCompactionThresholdPercent: async (percent) => {
     const previous = get().settings.agentRuntime?.context?.compactionThresholdPercent
-      ?? DEFAULT_SETTINGS.agentRuntime.context.compactionThresholdPercent;
+      ?? DEFAULT_AGENT_RUNTIME.context.compactionThresholdPercent;
     if (previous === percent) return;
     set((state) => ({ settings: withCompactionThresholdPercent(state.settings, percent), hydrated: true }));
     try {

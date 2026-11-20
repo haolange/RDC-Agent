@@ -44,7 +44,9 @@ export const INTERNAL_BUILTIN_AGENT_IDS = [
 ] as const;
 export const BUILTIN_AGENT_IDS: readonly string[] = [...TOP_LEVEL_AGENT_IDS, ...INTERNAL_BUILTIN_AGENT_IDS];
 export const SAFE_AGENT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
-export const DEFAULT_AGENT_ID: AgentId = 'general';
+/** The only agent that executes approved plans and operates live replay. */
+export const GENERAL_AGENT_ID: AgentId = 'general';
+export const DEFAULT_AGENT_ID: AgentId = GENERAL_AGENT_ID;
 
 export function isTopLevelAgentId(value: string): value is AgentId {
   return (TOP_LEVEL_AGENT_IDS as string[]).includes(value);

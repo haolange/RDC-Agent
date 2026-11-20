@@ -7,7 +7,7 @@ import {
   rebuildEffectiveRuntimePlan,
   policyFingerprintOf,
 } from './EffectiveRuntimePlan';
-import { compilePolicyFromRestrictive } from './permissions/PolicyCompiler';
+import { compileFixturePolicy } from '../testing/policyFixture';
 
 const routeCapability = {
   providerId: 'p',
@@ -38,7 +38,7 @@ describe('EffectiveRuntimePlan', () => {
       profile: { skills: ['inspect'], maxTurns: 17, agents: ['verifier'], handoffs: [{ agent: 'general', label: 'Execute', prompt: 'Go', requiredSkillIds: ['inspect'] }] },
       toolAllowlist: ['read_file', 'rdc_probe'], permissionConstraints: basePermission, routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'request' } }, promptPlan: { systemPrompt: 'old identity' },
-      policy: compilePolicyFromRestrictive({ limits: { maxTurns: 20 } }), rdcBindingFingerprint: 'old-rdc',
+      policy: compileFixturePolicy({ limits: { maxTurns: 20 } }), rdcBindingFingerprint: 'old-rdc',
       skillIntersection: ['read_file'], visibleToolNames: ['read_file'], activatedDeferredTools: ['investigation_read'],
       mcpDescriptorHash: 'mcp', attachmentManifestFingerprint: 'attachments' });
     const same = rebuildEffectiveRuntimePlan(original, { rdcBindingFingerprint: 'old-rdc', systemPrompt: 'old identity' });
@@ -56,7 +56,7 @@ describe('EffectiveRuntimePlan', () => {
     const translations = { 'zh-CN': '执行计划' };
     const plan = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: null,
       profile: { skills: [], handoffs: [{ agent: 'custom', label: 'Implement Plan', prompt: 'Go', labelTranslations: translations }] },
-      toolAllowlist: [], permissionConstraints: basePermission, routeCapability, policy: compilePolicyFromRestrictive({}),
+      toolAllowlist: [], permissionConstraints: basePermission, routeCapability, policy: compileFixturePolicy({}),
       requestPlan: { executionIdentity: { fingerprint: 'exec' } }, promptPlan: { systemPrompt: 'system' },
     });
     translations['zh-CN'] = 'Changed';
@@ -64,7 +64,7 @@ describe('EffectiveRuntimePlan', () => {
     expect(Object.isFrozen(plan.profileHandoffs[0].labelTranslations)).toBe(true);
   });
   it('freezes permission/policy/tool allowlist under a stable fingerprint', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: ['shell'], limits: { maxTurns: 7 } });
+    const policy = compileFixturePolicy({ deniedTools: ['shell'], limits: { maxTurns: 7 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'ask',
       projectRootPath: 'D:/Project',
@@ -117,7 +117,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('keeps the same planId/fingerprint for Prompt and Executor within one turn', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const policy = compileFixturePolicy({ deniedTools: [], limits: { maxTurns: 3 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'debugger',
       projectRootPath: 'D:/Project',
@@ -159,7 +159,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('does not change frozen plan content when settings inputs would have drifted', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: ['shell'], limits: { maxTurns: 5 } });
+    const policy = compileFixturePolicy({ deniedTools: ['shell'], limits: { maxTurns: 5 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'ask',
       projectRootPath: 'D:/Project',
@@ -185,7 +185,7 @@ describe('EffectiveRuntimePlan', () => {
       mode: 'full-access' as const,
       readableRoots: ['D:/Other'],
     };
-    const driftedPolicy = compilePolicyFromRestrictive({
+    const driftedPolicy = compileFixturePolicy({
       deniedTools: ['read_file', 'shell'],
       limits: { maxTurns: 99 },
     });
@@ -219,7 +219,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('freezes knowledgeReadRoots into the fingerprint without writing readableRoots', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const policy = compileFixturePolicy({ deniedTools: [], limits: { maxTurns: 3 } });
     const shared = {
       agentId: 'ask',
       projectRootPath: 'D:/Project',
@@ -257,7 +257,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('activeToolNamesForPlan filters by allowlist and allows all when empty', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const policy = compileFixturePolicy({ deniedTools: [], limits: { maxTurns: 3 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'ask',
       projectRootPath: 'D:/Project',
@@ -300,8 +300,8 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('freezes min(user, policy) compaction percent into the fingerprint', () => {
-    const tightened = compilePolicyFromRestrictive({ limits: { contextCompactionPercent: 70 } });
-    const unlimited = compilePolicyFromRestrictive({ limits: {} });
+    const tightened = compileFixturePolicy({ limits: { contextCompactionPercent: 70 } });
+    const unlimited = compileFixturePolicy({ limits: {} });
     const shared = {
       agentId: 'ask',
       projectRootPath: 'D:/Project',
@@ -336,7 +336,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('strips Mission-forbidden tools from a frozen debugger plan even if the input allowlist is dirty', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const policy = compileFixturePolicy({ deniedTools: [], limits: { maxTurns: 3 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'debugger',
       projectRootPath: 'D:/Project',
@@ -360,7 +360,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('strips RDC lease tools from an offline child plan', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const policy = compileFixturePolicy({ deniedTools: [], limits: { maxTurns: 3 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'general',
       projectRootPath: 'D:/Project',
@@ -388,7 +388,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('excludes new delegation from every frozen tool view at the depth limit', () => {
-    const policy = compilePolicyFromRestrictive({ limits: { maxChildDepth: 1 } });
+    const policy = compileFixturePolicy({ limits: { maxChildDepth: 1 } });
     const base = {
       agentId: 'general', projectRootPath: 'D:/Project', profile: { skills: [] },
       toolAllowlist: ['read_file', 'subagent'], permissionConstraints: basePermission,

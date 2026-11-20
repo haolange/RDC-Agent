@@ -10,9 +10,9 @@ import type { ToolCall } from '../core/types';
 import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import '../../rdc/rdcShellPermission';
 import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
-import { compilePolicyFromRestrictive } from './PolicyCompiler';
+import { compileFixturePolicy } from '../../testing/policyFixture';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
-import { DEFAULT_RDC_CLI_INVOKER } from '../../settings/settings-core/settingsDefaults';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 const ownership = vi.hoisted(() => ({ lease: vi.fn() }));
 vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: ownership.lease, getRdcContextLease: () => null }));
@@ -116,7 +116,7 @@ it('classifies replay lifecycle separately from read-only probe queries', () => 
   const decision = (action: string, mode: AgentPermissionMode, ceiling: 'full' | 'read-only', policy = {}) => service.evaluate({
     ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
     tool, toolCall: { type: 'toolCall', id: 'probe', name: 'rdc_probe', arguments: { action } },
-    accessCeiling: ceiling, compiledPolicy: compilePolicyFromRestrictive(policy),
+    accessCeiling: ceiling, compiledPolicy: compileFixturePolicy(policy),
   });
   expect(decision('probe', 'auto-review', 'read-only').action).toBe('allow');
   expect(decision('capture_select', 'full-access', 'read-only').action).toBe('deny');
@@ -275,7 +275,7 @@ describe('structured RDC semantic risk', () => {
   const evaluate = (arguments_: Record<string, unknown>, mode: AgentPermissionMode = 'auto-review', floor = false) => service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
     agentId: 'general', tool: shellTool, toolCall: { id: 'rdc-query', type: 'toolCall', name: 'shell', arguments: arguments_ },
     projectRootPath: workspaceRoot, ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
-    compiledPolicy: compilePolicyFromRestrictive(floor ? { approvalFloorByTool: { shell: 'user' } } : {}),
+    compiledPolicy: compileFixturePolicy(floor ? { approvalFloorByTool: { shell: 'user' } } : {}),
   });
   it.each([{ kind: 'search', query: 'export.texture get_details', limit: 8 }, { kind: 'describe', operation: 'rd.texture.get_details' }, { kind: 'list' }])('reviews a valid frozen catalog query as low risk: %j', discovery => {
     expect(evaluate({ rdc: { discovery } })).toMatchObject({ action: 'auto_review', risk: 'low' });
@@ -404,7 +404,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('denies tools listed in compiledPolicy.deniedTools even in full-access', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({ deniedTools: ['shell'] });
+    const compiledPolicy = compileFixturePolicy({ deniedTools: ['shell'] });
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
       tool: shellTool,
       toolCall: {
@@ -421,7 +421,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('enforces compiled approval floors even in full-access mode', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({
+    const compiledPolicy = compileFixturePolicy({
       approvalFloorByTool: { read_file: 'user' },
     });
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
@@ -434,7 +434,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('raises allow baseline to auto_review via floor without short-circuiting baseline', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({
+    const compiledPolicy = compileFixturePolicy({
       approvalFloorByTool: { read_file: 'auto_review' },
     });
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
@@ -447,7 +447,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('does not weaken deny when floor is lower', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({
+    const compiledPolicy = compileFixturePolicy({
         deniedTools: ['shell'],
       approvalFloorByTool: { shell: 'auto_review' },
     });
@@ -485,8 +485,8 @@ describe('AgentPermissionPolicyService floor × mode lattice', () => {
     mockSettings.agentRuntime.permissions.allowedCommandPrefixes = [];
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
     const compiledPolicy = floor === 'none'
-      ? compilePolicyFromRestrictive({})
-      : compilePolicyFromRestrictive({ approvalFloorByTool: { write_file: floor } });
+      ? compileFixturePolicy({})
+      : compileFixturePolicy({ approvalFloorByTool: { write_file: floor } });
     return service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
       tool: writeFileTool,
       toolCall: {

@@ -121,9 +121,15 @@ function mergeApprovalFloors(
   return merged;
 }
 
-function loadPolicyDirectory(dir: string): RestrictivePolicy[] {
+/** One parsed policy document and the file it came from. */
+export interface PolicySource {
+  raw: unknown;
+  sourcePath: string;
+}
+
+function loadPolicyDirectory(dir: string): PolicySource[] {
   if (!fs.existsSync(dir)) return [];
-  const policies: RestrictivePolicy[] = [];
+  const policies: PolicySource[] = [];
   for (const entry of fs.readdirSync(dir).filter((name) => name.endsWith('.policy.yml')).sort()) {
     const sourcePath = path.join(dir, entry);
     let raw: unknown;
@@ -137,7 +143,7 @@ function loadPolicyDirectory(dir: string): RestrictivePolicy[] {
     if (raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as Record<string, unknown>).enabled === false) {
       continue;
     }
-    policies.push(sanitizeRestrictivePolicy(raw, sourcePath));
+    policies.push({ raw, sourcePath });
   }
   return policies;
 }
@@ -208,7 +214,15 @@ export function compileEffectivePolicy(projectRoot?: string | null): CompiledPol
   const projectPolicies = projectRoot
     ? loadPolicyDirectory(appPathService.getProjectRdcPaths(projectRoot).policiesPath)
     : [];
-  const merged = mergePolicies([...userPolicies, ...projectPolicies]);
+  return compilePolicySources([...userPolicies, ...projectPolicies]);
+}
+
+/**
+ * Validates and compiles policy documents in precedence order; each later document can only tighten
+ * what came before. Any invalid document throws POLICY_INVALID (fail-closed).
+ */
+export function compilePolicySources(sources: readonly PolicySource[]): CompiledPolicy {
+  const merged = mergePolicies(sources.map((source) => sanitizeRestrictivePolicy(source.raw, source.sourcePath)));
   const fingerprint = createHash('sha256')
     .update(hashScopedResource(merged))
     .digest('hex')
@@ -218,17 +232,6 @@ export function compileEffectivePolicy(projectRoot?: string | null): CompiledPol
 
 export function emptyCompiledPolicy(): CompiledPolicy {
   return compileRestrictivePolicy(EMPTY_POLICY, 'empty');
-}
-
-/** 仅测试/合成用：从已解析 RestrictivePolicy 编译。 */
-export function compilePolicyFromRestrictive(
-  policy: RestrictivePolicy,
-  sourceFingerprint = 'synthetic',
-): CompiledPolicy {
-  return compileRestrictivePolicy(
-    sanitizeRestrictivePolicy(policy, 'synthetic'),
-    sourceFingerprint,
-  );
 }
 
 export const APPROVAL_STRENGTH_TABLE = APPROVAL_STRENGTH;

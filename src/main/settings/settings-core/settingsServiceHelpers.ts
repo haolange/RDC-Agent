@@ -33,6 +33,8 @@ import {
   DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
   EMPTY_PATHS,
+} from '@shared/constants/appSettingsDefaults';
+import {
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
   SETTINGS_SCHEMA_VERSION,

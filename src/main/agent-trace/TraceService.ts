@@ -154,11 +154,11 @@ export class TraceService {
       ref: `raw-${event.event_id}`,
     }));
 
-    let profileId = 'general';
+    let profileId: string = DEFAULT_AGENT_ID;
 
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
-      const agentType = run.profileId ?? 'general';
+      const agentType = run.profileId ?? DEFAULT_AGENT_ID;
       profileId = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
 

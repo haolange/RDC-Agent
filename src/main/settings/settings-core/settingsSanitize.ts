@@ -19,6 +19,8 @@ import {
   DEFAULT_CODE_INTERPRETER,
   DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
+} from '@shared/constants/appSettingsDefaults';
+import {
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
   VALID_PERMISSION_MODES,

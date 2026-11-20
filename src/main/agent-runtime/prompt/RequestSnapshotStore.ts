@@ -64,22 +64,15 @@ export class RequestSnapshotStore {
     for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const dir = path.join(base, entry.name);
-      const meta = path.join(dir, 'prompt-segments.meta');
-      // Older request snapshots have no compact projection. Read only the
-      // first request of that turn; PromptPlan is frozen for the entire turn.
-      const source = fs.existsSync(meta)
-        ? meta
-        : fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort()[0];
-      if (!source) continue;
-      const file = source === meta ? meta : path.join(dir, source);
+      const file = path.join(dir, 'prompt-segments.meta');
+      if (!fs.existsSync(file)) continue;
       const stat = fs.statSync(file);
       const stamp = `${stat.size}:${stat.mtimeMs}`;
       let cached = this.promptSegmentsCache.get(file);
       if (!cached || cached.stamp !== stamp) {
-        const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as PromptPlan['segments'] | RequestEnvelopeSnapshot;
-        const values = Array.isArray(parsed) ? parsed : parsed.promptPlan.segments;
+        const values = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
         if (!Array.isArray(values)) throw new Error(`Request snapshot lacks PromptPlan segments: ${file}`);
-        cached = { stamp, segments: values };
+        cached = { stamp, segments: values as PromptPlan['segments'] };
         this.promptSegmentsCache.set(file, cached);
       }
       segments.push(...cached.segments);
@@ -94,20 +87,15 @@ export class RequestSnapshotStore {
     for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const dir = path.join(base, entry.name);
-      for (const name of fs.readdirSync(dir).filter((value) => value.endsWith('.json'))) {
-        const snapshotFile = path.join(dir, name);
-        const metaFile = path.join(dir, `${name.slice(0, -5)}.mailbox.meta`);
-        const file = fs.existsSync(metaFile) ? metaFile : snapshotFile;
+      for (const name of fs.readdirSync(dir).filter((value) => value.endsWith('.mailbox.meta')).sort()) {
+        const file = path.join(dir, name);
         const stat = fs.statSync(file);
         const stamp = `${stat.size}:${stat.mtimeMs}`;
         let cached = this.mailboxDeliveriesCache.get(file);
         if (!cached || cached.stamp !== stamp) {
-          // Legacy snapshots are parsed one at a time; never retain their
-          // conversation messages merely to recover mailbox commits.
-          const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as RequestEnvelopeSnapshot | NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']>;
-          const values = Array.isArray(parsed) ? parsed : parsed.mailboxDeliveries ?? [];
+          const values = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
           if (!Array.isArray(values)) throw new Error(`Request snapshot lacks mailbox deliveries: ${file}`);
-          cached = { stamp, deliveries: values };
+          cached = { stamp, deliveries: values as NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> };
           this.mailboxDeliveriesCache.set(file, cached);
         }
         deliveries.push(...cached.deliveries);

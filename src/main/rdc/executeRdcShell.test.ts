@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { artifactizeToolResult } from '../agent-runtime/tools/ToolResultArtifactizer';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import { executeRdcShell } from './executeRdcShell';

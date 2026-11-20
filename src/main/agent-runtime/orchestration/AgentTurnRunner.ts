@@ -1,3 +1,4 @@
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
 /**
  * AgentTurnRunner — runs one prepared agent turn; slot construction lives in AgentSlotFactory.
  */
@@ -329,7 +330,7 @@ export class AgentTurnRunner {
     turnHandle.promptPlan = promptPlan;
     const approvedCapture = preparedRuntime.approvedExecution?.investigation?.captureScope;
     if (approvedCapture) {
-      if (!input.sessionId || !input.projectId || input.agentId !== 'general' || !preparedRuntime.approvedExecution?.investigation) {
+      if (!input.sessionId || !input.projectId || input.agentId !== GENERAL_AGENT_ID || !preparedRuntime.approvedExecution?.investigation) {
         throw new Error('RDC_CAPTURE_SCOPE_INVALID: approved capture work requires the owning General session.');
       }
       const approved = preparedRuntime.approvedExecution;

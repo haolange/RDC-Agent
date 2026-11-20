@@ -4,7 +4,7 @@ import { copyFileSync, cpSync, mkdtempSync, readFileSync, writeFileSync, mkdirSy
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { InvestigationContentRef, ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { setRdcRuntimeContextForSession, getRdcContextLease } from './RdcRuntimeContextRegistry';
 import { RdcExecutionReceipts } from './RdcExecutionReceipts';

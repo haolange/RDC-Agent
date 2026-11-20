@@ -352,17 +352,7 @@ export class BedrockConverseProvider implements ProviderStrategy {
   }
 
   private buildEndpointUrl(modelId: string, baseUrlOverride?: string): string {
-    if (baseUrlOverride) {
-      const trimmed = baseUrlOverride.replace(/\/+$/u, '');
-      return trimmed.endsWith('/converse-stream') ? trimmed : `${trimmed}/converse-stream`;
-    }
-    if (this.baseUrl) {
-      const trimmed = this.baseUrl.replace(/\/+$/u, '');
-      return trimmed.endsWith('/converse-stream') ? trimmed : `${trimmed}/converse-stream`;
-    }
-    const region = this.region ?? process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1';
-    const encodedModelId = encodeURIComponent(modelId);
-    return `https://bedrock-runtime.${region}.amazonaws.com/model/${encodedModelId}/converse-stream`;
+    return buildBedrockConverseStreamUrl(modelId, baseUrlOverride || this.baseUrl, this.region);
   }
 
   private buildRequestBody(
@@ -540,3 +530,16 @@ function mapBedrockStopReason(reason: string | undefined): StopReason {
 }
 
 export const __testing = { mapBedrockStopReason, toBedrockMessages };
+
+/**
+ * The ConverseStream operation URL: a configured base is the model's endpoint prefix; without one the
+ * regional runtime endpoint names the model.
+ */
+export function buildBedrockConverseStreamUrl(modelId: string, baseUrl?: string, region?: string): string {
+  if (baseUrl) {
+    const trimmed = baseUrl.replace(/\/+$/u, '');
+    return trimmed.endsWith('/converse-stream') ? trimmed : `${trimmed}/converse-stream`;
+  }
+  const resolvedRegion = region ?? process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1';
+  return `https://bedrock-runtime.${resolvedRegion}.amazonaws.com/model/${encodeURIComponent(modelId)}/converse-stream`;
+}

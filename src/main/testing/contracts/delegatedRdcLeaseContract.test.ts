@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { executeConcurrentToolGroups } from '../../agent-runtime/agent/ConcurrentToolScheduler';
 import { isToolCallConcurrencySafe, partitionConsecutiveSafeGroups } from '../../agent-runtime/agent/toolConcurrency';
 import { buildEffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
-import { compilePolicyFromRestrictive } from '../../agent-runtime/permissions/PolicyCompiler';
+import { compileFixturePolicy } from '../policyFixture';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import {
@@ -214,7 +214,7 @@ describe('delegatedRdcLeaseContract: offline child allowlist', () => {
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'offline-child' } },
       promptPlan: { systemPrompt: 'system' },
-      policy: compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } }),
+      policy: compileFixturePolicy({ deniedTools: [], limits: { maxTurns: 3 } }),
       skillIntersection: ['read_file', 'runtime_context'],
       visibleToolNames: ['read_file', 'runtime_context', 'shell'],
       excludeRdcLeaseTools: true,

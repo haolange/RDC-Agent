@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SETTINGS } from './defaultAppSettings';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { useAppSettingsStore } from './appSettingsStore';
+
+const DEFAULT_SETTINGS = createDefaultAppSettings();
 
 describe('app settings browser parity', () => {
   afterEach(() => {

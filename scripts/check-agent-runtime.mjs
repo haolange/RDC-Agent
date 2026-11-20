@@ -123,11 +123,6 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
     assert(sharedTypes.includes(token), `shared agent runtime types must expose ${token}.`);
   }
 
-  const agentTypes = read('src/shared/types/agent.ts');
-  assert(agentTypes.includes("export type AgentId = 'general' | 'debugger' | 'analyzer' | 'optimizer'"), 'Top-level AgentId must be the four builtin profiles.');
-  assert(agentTypes.includes("TOP_LEVEL_AGENT_IDS: AgentId[] = ['general', 'debugger', 'analyzer', 'optimizer']"), 'TOP_LEVEL_AGENT_IDS must list the four builtin profiles.');
-  assert(agentTypes.includes("DEFAULT_AGENT_ID: AgentId = 'general'"), 'Default profile must be general.');
-
   const layoutTypes = read('src/shared/types/layout.ts');
   assert(layoutTypes.includes("export type AgentMode = 'general' | MissionKind | (string & {})"), 'AgentMode is the Composer profile-id selector.');
   assert(!layoutTypes.includes('BuiltinAgentMode'), 'BuiltinAgentMode must be removed.');

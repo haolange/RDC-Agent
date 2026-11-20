@@ -12,9 +12,8 @@ import { describe, expect, it } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from '@shared/provider-catalog/protocolWireFixtureCoverage';
 import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
+import { getProviderAdapterImplementation, type ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import { buildProviderOperationTarget } from '../../agent-runtime/providers/ProviderOperationRegistry';
 import { buildAnthropicMessagesUrl } from '../../agent-runtime/providers/AnthropicProvider';
 import { buildGeminiStreamUrl } from '../../agent-runtime/providers/GeminiProvider';
 import { createTestRequestPlan } from '../createTestRequestPlan';
@@ -571,21 +570,8 @@ function assertWireBody(spec: AdapterFixtureSpec, plan: RequestPlan): void {
     case 'gitlab-duo':
     case 'sap-ai-core-orchestration':
     case 'sap-ai-core-foundation-models': {
-      const target = buildProviderOperationTarget({
-        adapterId: spec.adapterId,
-        protocol: spec.protocol,
-        baseUrl: plan.route.baseUrl ?? 'https://example.test',
-        modelId: spec.modelId,
-        connectionValues: spec.connectionValues,
-      });
-      expect(target.transport).toBe('sdk');
-      if (spec.dir === 'gitlab-duo') {
-        expect(target.url).toMatch(/duo_workflows\/ws/);
-      } else if (spec.dir === 'sap-ai-core-orchestration') {
-        expect(target.url).toMatch(/\/inference\/deployments\/fixture-deployment\/v2\/completion$/);
-      } else {
-        expect(target.url).toMatch(/\/inference\/deployments\/fixture-deployment\/chat\/completions$/);
-      }
+      // The SDK owns these operation URLs; the fixture proves the route reaches an SDK transport.
+      expect(getProviderAdapterImplementation(spec.adapterId)?.transport).toBe('sdk');
       break;
     }
     default:

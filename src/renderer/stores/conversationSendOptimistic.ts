@@ -1,10 +1,11 @@
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import type { ConversationAttachmentInput, ConversationMessage } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { PendingAttachmentDraft } from '../types/attachments';
 
 export const resolveComposerProfileId = (_mode: AgentMode, selectedAgentId?: string): string =>
-  selectedAgentId?.trim() || 'general';
+  selectedAgentId?.trim() || DEFAULT_AGENT_ID;
 
 export function buildOptimisticConversationTurn(options: {
   requestId: string;

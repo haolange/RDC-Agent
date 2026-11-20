@@ -1,22 +1,23 @@
 import type {
   AgentModelSettings,
-  AppRuntimePaths,
   AgentPermissionMode,
   AgentPermissionSettings,
-  AgentRuntimeSettings,
   LayoutPreferences,
   ProfileSettings,
   RdcCliInvokerSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
-  ToolingSettings,
   UiPreferences,
   LlmProviderEntry,
 } from '@shared/types/settings';
-import { createDefaultUiPreferences } from '@shared/theme/uiPreferences';
 import {
-  APP_DEFAULT_WINDOW_HEIGHT,
-  APP_DEFAULT_WINDOW_WIDTH,
+  DEFAULT_AGENT_RUNTIME,
+  DEFAULT_APPEARANCE,
+  DEFAULT_LAYOUT,
+  DEFAULT_PROFILE,
+  DEFAULT_TOOLING,
+} from '@shared/constants/appSettingsDefaults';
+import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
   LEFT_SIDEBAR_MIN_WIDTH,
@@ -24,7 +25,6 @@ import {
   RIGHT_PANEL_DEFAULT_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
-  TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
 
 export const SETTINGS_SCHEMA_VERSION = 8;
@@ -66,93 +66,6 @@ export const RIGHT_DEFAULTS = {
 };
 
 export const VALID_PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
-
-export const EMPTY_PATHS: AppRuntimePaths = {
-  userRdcRoot: '',
-  settingsPath: '',
-  instructionsPath: '',
-  agentsPath: '',
-  profileStatePath: '',
-  logsPath: '',
-  logPath: '',
-  projectsPath: '',
-  knowledgePath: '',
-  policiesPath: '',
-  skillsPath: '',
-  mcpPath: '',
-  secretsPath: '',
-};
-
-export const DEFAULT_APPEARANCE: UiPreferences = createDefaultUiPreferences();
-
-export const DEFAULT_LAYOUT: LayoutPreferences = {
-  leftSidebar: {
-    collapsed: false,
-    width: LEFT_DEFAULTS.width,
-    expandedWidth: LEFT_DEFAULTS.width,
-  },
-  rightPanel: {
-    collapsed: false,
-    width: RIGHT_DEFAULTS.width,
-    expandedWidth: RIGHT_DEFAULTS.width,
-  },
-  terminal: {
-    height: TERMINAL_DEFAULT_HEIGHT,
-  },
-  window: {
-    width: APP_DEFAULT_WINDOW_WIDTH,
-    height: APP_DEFAULT_WINDOW_HEIGHT,
-    x: 0,
-    y: 0,
-    isMaximized: false,
-  },
-};
-
-export const DEFAULT_PROFILE: ProfileSettings = {
-  nickname: 'RDC Operator',
-  avatarPath: '',
-};
-
-export const DEFAULT_RDC_CLI_INVOKER: RdcCliInvokerSettings = {
-  enabled: false,
-  command: '',
-  argsPrefix: [],
-  workingDirectory: '',
-  env: {},
-  timeoutMs: 120000,
-};
-
-export const DEFAULT_CODE_INTERPRETER: CodeInterpreterSettings = {
-  enabled: false,
-  command: '',
-  argsPrefix: [],
-  timeoutMs: 60000,
-  env: {},
-  artifactsEnabled: true,
-};
-
-export const DEFAULT_SHELL_TOOLING: AgentShellSettings = {
-  executable: '',
-};
-
-export const DEFAULT_TOOLING: ToolingSettings = {
-  rdcCli: DEFAULT_RDC_CLI_INVOKER,
-  codeInterpreter: DEFAULT_CODE_INTERPRETER,
-  shell: DEFAULT_SHELL_TOOLING,
-};
-
-export const DEFAULT_AGENT_RUNTIME: AgentRuntimeSettings = {
-  permissions: {
-    mode: 'default',
-    readableRoots: [],
-    writableRoots: [],
-    allowedCommandPrefixes: [],
-    deniedCommandPrefixes: [],
-  },
-  context: {
-    compactionThresholdPercent: 80,
-  },
-};
 
 export function createDefaultPersistedSettings(): PersistedSettingsPayload {
   return {

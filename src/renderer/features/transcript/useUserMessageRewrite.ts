@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { useCallback } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import { getElectronApi } from '../../platform/getElectronApi';
@@ -8,7 +9,6 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import {
   applyConversationTurnResult,
   removeOptimisticConversationMessages,
-  syncE2EConversationState,
 } from '../../stores/conversationSendHelpers';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { createConversationRequestId } from '../../services/conversationRequestId';
@@ -48,7 +48,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     const previousMessages = useConversationStore.getState().allConversationMessages;
     const previousBranchState = useConversationStore.getState().branchState;
     const requestId = createConversationRequestId();
-    const rewriteAgentId = useLayoutStore.getState().selectedAgentId || 'general';
+    const rewriteAgentId = useLayoutStore.getState().selectedAgentId || DEFAULT_AGENT_ID;
     const turnOwnership = {
       sessionId: message.sessionId ?? 'no-session',
       requestId,
@@ -149,21 +149,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
 
       useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
       useSessionStore.getState().setConversationPreparationPhase('current');
-
-      void syncE2EConversationState({
-        electronAPI,
-        sessionId: result.session?.sessionId ?? message.sessionId,
-        turnId: result.userMessage.turnId,
-        setConversationMessages,
-        setTracePresentation,
-        setBranchState,
-        shouldApply: () => isRewriteTurnStillCurrent(
-          result.userMessage.turnId,
-          result.branchState?.activeLeafBranchId,
-        ),
-      }).catch((error) => {
-        console.warn('[conversation] Rewrite terminal sync failed.', error);
-      });
     } catch (error) {
       setConversationSnapshot(previousMessages, previousBranchState);
       useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);

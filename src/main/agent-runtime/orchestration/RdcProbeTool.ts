@@ -1,3 +1,4 @@
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
 import type { JsonSchema } from '../core/types';
 import { RDC_PROBE_ACTIONS, RDC_PROBE_READONLY_CLI_ACTIONS, RdcProbeInputSchema, compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
@@ -131,7 +132,7 @@ export function createRdcProbeTool(
         const ownerProject = projectId ?? context?.projectId ?? null;
         if (input.action === 'capture_select' || input.action === 'capture_restore' || input.action === 'capture_recover') {
           if (!ownerSession || !ownerProject || context?.sessionId !== ownerSession || context.projectId !== ownerProject
-            || context.agentId !== 'general' || context.accessCeiling !== 'full' || !context.turnId || !context.captureControl) {
+            || context.agentId !== GENERAL_AGENT_ID || context.accessCeiling !== 'full' || !context.turnId || !context.captureControl) {
             throw new Error('RDC_CAPTURE_SCOPE_DENIED: the approved owning General turn is required.');
           }
           const changed = input.action === 'capture_select'

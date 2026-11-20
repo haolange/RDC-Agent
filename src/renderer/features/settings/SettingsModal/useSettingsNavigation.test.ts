@@ -2,8 +2,10 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SETTINGS } from '../../../stores/defaultAppSettings';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { useSettingsNavigation } from './useSettingsNavigation';
+
+const DEFAULT_SETTINGS = createDefaultAppSettings();
 
 describe('settings manual draft leave protection', () => {
   it('keeps edits when cancelled and restores owned drafts before accepting close', () => {

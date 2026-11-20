@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { GREP_REGEX_TIMEOUT_MS } from './toolLimits';
@@ -10,12 +11,13 @@ export function searchLongLines(
   lines: string[], regex: RegExp, limit: number, signal?: AbortSignal,
 ): Promise<GrepWorkerMatch[]> {
   if (signal?.aborted) return Promise.reject(new Error('Aborted'));
-  const workerPath = process.env.VITEST
-    ? path.resolve(__dirname, '../../../workers/grepRegexWorker.ts')
-    : path.join(__dirname, 'grepRegexWorker.js');
+  // The bundle ships the compiled worker beside this module; from source, Node strips the worker's types.
+  const bundledWorker = path.join(__dirname, 'grepRegexWorker.js');
+  const runsFromBundle = fs.existsSync(bundledWorker);
+  const workerPath = runsFromBundle ? bundledWorker : path.resolve(__dirname, '../../../workers/grepRegexWorker.ts');
   const request: GrepWorkerRequest = { lines, source: regex.source, flags: regex.flags, limit };
   return new Promise<GrepWorkerMatch[]>((resolve, reject) => {
-    const worker = new Worker(workerPath, { execArgv: process.env.VITEST ? ['--experimental-strip-types'] : [] });
+    const worker = new Worker(workerPath, { execArgv: runsFromBundle ? [] : ['--experimental-strip-types'] });
     let settled = false;
     let executionTimer: NodeJS.Timeout | undefined;
     const startupTimer = setTimeout(() => finish(new Error('grep worker startup timed out')), WORKER_STARTUP_TIMEOUT_MS);

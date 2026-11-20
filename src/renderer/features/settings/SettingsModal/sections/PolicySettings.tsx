@@ -7,7 +7,7 @@ import {
 } from '@shared/types/modelCapability';
 import { useI18n } from '../../../../i18n';
 import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
-import { DEFAULT_SETTINGS } from '../../../../stores/defaultAppSettings';
+import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
 import { Select } from '../../../../ui/Select';
 import { SettingsField, SettingsSection } from '../parts';
 import { CustomPermissionFields } from './CustomPermissionFields';
@@ -34,7 +34,7 @@ export const PolicySettings: React.FC<{
   const { t } = useI18n();
   const percent = useAppSettingsStore(
     (state) => state.settings.agentRuntime.context?.compactionThresholdPercent
-      ?? DEFAULT_SETTINGS.agentRuntime.context.compactionThresholdPercent,
+      ?? DEFAULT_AGENT_RUNTIME.context.compactionThresholdPercent,
   );
   const setCompactionThresholdPercent = useAppSettingsStore(
     (state) => state.setCompactionThresholdPercent,

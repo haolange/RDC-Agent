@@ -1,3 +1,4 @@
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { childScopePrefix, rootScopeId } from '@shared/utils/executionScope';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { AgentPermissionDecision } from '../permissions/AgentPermissionPolicy';
@@ -375,7 +376,7 @@ export class ToolExecutorFactory {
               // The affected child may itself be waiting for this resource. Join it
               // after authorization but before taking the recovery's exclusive lock.
               if (normalizedName === 'rdc_probe' && validatedArgs.action === 'capture_recover'
-                && toolContext.captureControl && toolContext.agentId === 'general' && toolContext.accessCeiling === 'full'
+                && toolContext.captureControl && toolContext.agentId === GENERAL_AGENT_ID && toolContext.accessCeiling === 'full'
                 && toolContext.turnId && toolContext.sessionId && toolContext.projectId) {
                 announceExecution(permissionState);
                 await toolContext.captureControl.prepareRecovery(permissionState.revision, signal);

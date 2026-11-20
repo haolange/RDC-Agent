@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
 import { RdcCliInvokerService } from './RdcCliInvokerService';
 import { ShellInvocationService } from '../tools/ShellInvocationService';
-import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 
 const root = process.env.RDC_NATIVE_TOOLS_ROOT;
 const python = process.env.RDC_NATIVE_PYTHON;

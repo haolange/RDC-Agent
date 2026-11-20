@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
-import { DEFAULT_SETTINGS } from './defaultAppSettings';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import {
   beginAgentDefinitionSave,
   isLatestAgentDefinitionRevision,
   rollbackAgentDefinitionSave,
   settleAgentDefinitionSave,
 } from './agentDefinitionSettings';
+
+const DEFAULT_SETTINGS = createDefaultAppSettings();
 
 /** Revisions differ by instructions; the route belongs to Settings and must not move on a save. */
 const definition = (label: string): AgentManifestDefinition => ({

@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { executeRdcShell } from './executeRdcShell';
 

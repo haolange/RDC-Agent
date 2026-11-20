@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
-import { DEFAULT_SETTINGS } from './defaultAppSettings';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+
+const DEFAULT_SETTINGS = createDefaultAppSettings();
 
 describe('Appearance persistence ordering', () => {
   it('merges consecutive edits after the preceding save, without losing the other theme', async () => {

@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import path from 'path';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
@@ -106,7 +107,7 @@ export function buildTaskContext(input: {
   permissionMode: string;
 }): ContextPanelViewModel['task'] {
   const latest = input.runs.slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0];
-  const mode = latest?.profileId ?? input.profileId ?? 'general';
+  const mode = latest?.profileId ?? input.profileId ?? DEFAULT_AGENT_ID;
   const profile = agentProfileRegistry.getForMode(mode);
   const resources: TaskContextResource[] = input.attachments.filter((item) => item.kind === 'attachment').map((item) => ({
     id: `attachment:${item.id}`, kind: 'attachment', label: item.title, summary: item.filePath, path: item.filePath, state: 'active',
