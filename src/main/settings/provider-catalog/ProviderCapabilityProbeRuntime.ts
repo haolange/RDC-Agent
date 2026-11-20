@@ -1,14 +1,14 @@
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
-import { executeToolFreeRequest } from '../../agent-runtime/prompt/ToolFreeRequest';
+import { executeAuxiliaryRequest } from '../../agent-runtime/prompt/AuxiliaryRequest';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveAgentRouteCapability } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
+import { CAPABILITY_CHECK_TOOL } from './ProviderProbeEvidence';
 import type { AssistantMessage } from '../../agent-runtime/core/types';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 const PROBE_MAX_OUTPUT_TOKENS = 64;
-
 
 export interface CapabilityProbeExecution {
   request: LlmModelCapabilityProbeRequest;
@@ -20,7 +20,7 @@ export interface CapabilityProbeExecution {
 }
 
 function buildProbePromptPlan(): PromptPlan {
-  const content = 'This is a user-requested provider capability check. Reply with OK only. Do not call tools.';
+  const content = `This is a user-requested provider capability check. Call the ${CAPABILITY_CHECK_TOOL.name} tool once with {"ok": true}. Do not reply with text.`;
   return {
     id: generateEventId('prompt-plan'),
     segments: [{
@@ -48,15 +48,16 @@ function buildProbePromptPlan(): PromptPlan {
   };
 }
 
-/** Executes one explicit, minimal, tool-free probe through the canonical request pipeline. */
+/** Executes one explicit, minimal probe offering the no-op tool through the canonical request pipeline. */
 export async function executeCapabilityProbe(input: CapabilityProbeExecution): Promise<AssistantMessage> {
-  return executeToolFreeRequest({
+  return executeAuxiliaryRequest({
     purpose: 'capability-probe',
     plan: input.plan,
     modelId: input.model.modelId,
     credentialHandle: input.credentialHandle,
     promptPlan: buildProbePromptPlan(),
-    userContent: 'OK',
+    userContent: 'Run the capability check.',
+    tools: [CAPABILITY_CHECK_TOOL],
     maxTokens: PROBE_MAX_OUTPUT_TOKENS,
     reasoning: resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan).reasoningContract,
     // The probe checks the route as a real turn would use it, cache behaviour included.

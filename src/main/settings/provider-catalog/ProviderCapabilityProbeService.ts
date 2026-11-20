@@ -43,7 +43,7 @@ export interface ProviderCapabilityProbeDependencies {
   execute: (input: CapabilityProbeExecution) => Promise<AssistantMessage>;
   freezeCredentials: (providerId: LlmProviderEntry['id']) => Promise<string>;
   releaseCredentials: (handle: string | undefined) => void;
-  recordSuccess: (request: LlmModelCapabilityProbeRequest, target: ResolvedProbeTarget, plan: RequestPlan) => void;
+  recordSuccess: (request: LlmModelCapabilityProbeRequest, target: ResolvedProbeTarget, plan: RequestPlan, message: AssistantMessage) => void;
   recordFailure: (
     request: LlmModelCapabilityProbeRequest,
     target: ResolvedProbeTarget,
@@ -96,12 +96,12 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
   execute: executeCapabilityProbe,
   freezeCredentials: async (providerId) => (await freezeProviderRuntimeCredentials(providerId)).handle,
   releaseCredentials: releaseProviderRuntimeCredentials,
-  recordSuccess: (request, target, plan) => {
+  recordSuccess: (request, target, plan, message) => {
     const evidenceId = [
       'capability-probe', target.model.modelId, request.mode, plan.route.protocol,
       plan.appliedBindingIds.join(',') || 'default',
     ].join(':');
-    const patch = buildProbeSuccessPatch(request, target, plan);
+    const patch = buildProbeSuccessPatch(request, target, plan, message);
     if (patch) {
       effectiveCatalogService.recordObserved(
         identity(target, plan),
@@ -126,7 +126,7 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
       );
       return false;
     }
-    const patch = buildProbeFailurePatch(request, target, plan, status, manifestMatchesDenial);
+    const patch = buildProbeFailurePatch(request, target, plan, status, manifestMatchesDenial, detail);
     if (!patch) return false;
     const evidenceId = [
       'capability-probe', target.model.modelId, request.mode, plan.route.protocol,
@@ -239,7 +239,7 @@ export class ProviderCapabilityProbeService {
       }
       const issue = probeConfirmation(request, target, planning.plan, message);
       if (issue) return { success: false, status: 'inconclusive', requestSent, ...issue, evidence };
-      this.dependencies.recordSuccess(request, target, planning.plan);
+      this.dependencies.recordSuccess(request, target, planning.plan, message);
       return { success: true, status: 'verified', requestSent, evidence };
     } catch (error) {
       if (signal.aborted) {
@@ -251,10 +251,13 @@ export class ProviderCapabilityProbeService {
       const current = fingerprint === targetFingerprint(this.dependencies.resolve(request));
       const recorded = current && requestSent && status !== undefined
         && this.dependencies.recordFailure(request, target, planning.plan, status, detail);
+      const kind = status === undefined ? undefined : classifyCapabilityProbeFailure(status, false, detail);
+      if (recorded && kind === 'tools-unsupported') {
+        return { success: false, status: 'denied', requestSent, failureKind: kind, detail };
+      }
       return {
         success: false, status: recorded ? 'denied' : 'failed', requestSent,
-        ...(recorded ? { failureKind: 'entitlement-denied' as const } : status
-          ? { failureKind: classifyCapabilityProbeFailure(status, false, detail) as LlmModelCapabilityProbeResult['failureKind'] } : {}),
+        ...(recorded ? { failureKind: 'entitlement-denied' as const } : kind ? { failureKind: kind } : {}),
         detail: recorded ? 'Not available for current account.' : detail,
       };
     } finally {

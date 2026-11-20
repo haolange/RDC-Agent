@@ -103,6 +103,13 @@ function plan(
   };
 }
 
+function reply(content: AssistantMessage['content'], stopReason: AssistantMessage['stopReason'] = 'stop'): AssistantMessage {
+  return { role: 'assistant', content, model: 'model-a', provider: 'provider-a',
+    usage: { inputTokens: 3, outputTokens: 1, totalTokens: 4 }, stopReason, timestamp: 1 };
+}
+const TEXT_REPLY = reply([{ type: 'text', text: 'ok' }]);
+const TOOL_REPLY = reply([{ type: 'toolCall', id: 'call-1', name: 'capability_check', arguments: { ok: true } }], 'toolUse');
+
 function dependencies(effectiveModel: EffectiveModel) {
   const resolved = target(effectiveModel);
   const execute = vi.fn(async (): Promise<AssistantMessage> => ({
@@ -253,6 +260,7 @@ describe('ProviderCapabilityProbeService', () => {
       { providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' },
       fixture.resolved,
       plan({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' }, fixture.resolved.model).plan,
+      TEXT_REPLY,
     )).toMatchObject({
       modelId: 'model-a',
       controls: { maxContext: expect.objectContaining({ entitlement: 'granted' }) },
@@ -284,7 +292,7 @@ describe('ProviderCapabilityProbeService', () => {
     expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 403, true)).toMatchObject({
       modelId: 'model-a', controls: { fast: { entitlement: 'denied' } },
     });
-    expect(buildProbeSuccessPatch(request, fixture.resolved, plan(request, effectiveModel).plan)).toMatchObject({
+    expect(buildProbeSuccessPatch(request, fixture.resolved, plan(request, effectiveModel).plan, TEXT_REPLY)).toMatchObject({
       modelId: 'model-a',
       controls: { fast: { entitlement: 'granted' } },
       executionBindings: [expect.objectContaining({ id: 'fast:priority', entitlement: 'granted' })],
@@ -459,7 +467,7 @@ it('allows an explicit retry of an account-scoped probe denial while keeping ord
   const f = dependencies(denied);
   const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'default' } as const;
   await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({ success: true });
-  expect(buildProbeSuccessPatch(request, f.resolved, plan(request, denied).plan)).toMatchObject({ availability: 'available' });
+  expect(buildProbeSuccessPatch(request, f.resolved, plan(request, denied).plan, TEXT_REPLY)).toMatchObject({ availability: 'available' });
   const ordinary = dependencies(model({ availability: 'unavailable' }));
   await expect(new ProviderCapabilityProbeService(ordinary.value).test(request)).resolves.toMatchObject({ requestSent: false });
   expect(ordinary.execute).not.toHaveBeenCalled();
@@ -493,5 +501,32 @@ describe('response receipt evidence', () => {
     expect(receiptExceedsSmallerTiers(fastModel, 'long', reply({}))).toBe(false);
     expect(receiptExceedsSmallerTiers(fastModel, 'long', reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }))).toBe(true);
     expect(receiptExceedsSmallerTiers(fastModel, 'default', reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }))).toBe(false);
+  });
+});
+
+describe('tool-calling evidence', () => {
+  const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'default' } as const;
+  const unproven = model({ availability: 'available', toolCalling: { state: 'unknown' } });
+
+  it('records tool calling only from a structured call to the probe tool', async () => {
+    const f = dependencies(unproven);
+    f.execute.mockResolvedValue(TOOL_REPLY);
+    await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({ success: true, status: 'verified' });
+    expect(f.recordSuccess).toHaveBeenCalledWith(request, f.resolved, expect.any(Object), TOOL_REPLY);
+    expect(buildProbeSuccessPatch(request, f.resolved, plan(request, unproven).plan, TOOL_REPLY))
+      .toEqual({ modelId: 'model-a', toolCalling: { state: 'supported' } });
+    expect(buildProbeSuccessPatch(request, f.resolved, plan(request, unproven).plan, TEXT_REPLY)).toBeNull();
+  });
+
+  it('records a provider rejection of tools as unsupported tool calling, not as an account denial', async () => {
+    const f = dependencies(unproven);
+    const detail = 'registry.ollama.ai/library/gemma:2b does not support tools';
+    f.execute.mockRejectedValue(Object.assign(new Error(detail), { status: 400 }));
+    f.recordFailure.mockReturnValue(true);
+    await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({
+      success: false, status: 'denied', failureKind: 'tools-unsupported', detail,
+    });
+    expect(buildProbeFailurePatch(request, f.resolved, plan(request, unproven).plan, 400, false, detail))
+      .toEqual({ modelId: 'model-a', toolCalling: { state: 'unsupported', reason: detail } });
   });
 });

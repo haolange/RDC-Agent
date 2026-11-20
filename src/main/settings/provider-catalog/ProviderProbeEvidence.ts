@@ -1,15 +1,39 @@
-import type { AssistantMessage } from '../../agent-runtime/core/types';
+import type { AssistantMessage, ToolDefinition } from '../../agent-runtime/core/types';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { LlmModelCapabilityProbeRequest, LlmModelCapabilityProbeResult } from '@shared/types/settings';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { ResolvedProbeTarget } from './ProviderCapabilityProbeService';
+
+/**
+ * The probe's one no-op tool. Real turns always carry tools, so the probe offers one too; a structured call
+ * to it in the response is the receipt that this route and model support tool calling.
+ */
+export const CAPABILITY_CHECK_TOOL: ToolDefinition = {
+  name: 'capability_check',
+  description: 'Reports that the capability check ran. Call it once with {"ok": true}.',
+  parameters: {
+    type: 'object',
+    properties: { ok: { type: 'boolean', description: 'Always true.' } },
+    required: ['ok'],
+    additionalProperties: false,
+  },
+};
+
+/** Whether the response called the probe's no-op tool as a structured tool call. */
+export function probeCalledCapabilityCheck(message: AssistantMessage): boolean {
+  return message.content.some((block) => block.type === 'toolCall' && block.name === CAPABILITY_CHECK_TOOL.name);
+}
 
 export type CapabilityProbeFailureKind =
   | 'entitlement-denied'
   | 'quota-exhausted'
   | 'authentication-failed'
   | 'route-unavailable'
+  | 'tools-unsupported'
   | 'unknown';
+
+/** Provider wording for a request rejected because the model cannot take tools (e.g. Ollama's 400). */
+const TOOLS_UNSUPPORTED_DETAIL = /does not support tools|tools? (?:are |is )?not supported|tool (?:use|calling) is not supported/iu;
 
 export function classifyCapabilityProbeFailure(
   status: number,
@@ -20,6 +44,7 @@ export function classifyCapabilityProbeFailure(
   if (status === 401) return 'authentication-failed';
   if (status === 404) return 'route-unavailable';
   if (status === 429) return 'quota-exhausted';
+  if (status === 400 && TOOLS_UNSUPPORTED_DETAIL.test(detail)) return 'tools-unsupported';
   const normalizedDetail = detail.toLowerCase();
   if (status === 402 && (
     normalizedDetail.includes('quota_exceeded')
@@ -44,9 +69,14 @@ export function buildProbeSuccessPatch(
   request: LlmModelCapabilityProbeRequest,
   target: ResolvedProbeTarget,
   plan: RequestPlan,
+  message: AssistantMessage,
 ): CatalogModelContribution | null {
   const patch: CatalogModelContribution = { modelId: target.model.modelId };
   if (target.model.availability === 'unknown' || isProbeAvailabilityDenied(target.model)) patch.availability = 'available';
+  // A structured call to the probe's no-op tool is the receipt for tool calling on this route.
+  if (target.model.toolCalling.state !== 'supported' && probeCalledCapabilityCheck(message)) {
+    patch.toolCalling = { state: 'supported' };
+  }
   const fast = request.mode === 'fast' || request.mode === 'fast-max-context';
   const max = request.mode === 'max-context' || request.mode === 'fast-max-context';
   if (fast && target.model.controls.fast.state === 'selectable') {
@@ -63,7 +93,7 @@ export function buildProbeSuccessPatch(
   if (fast || max) patch.executionBindings = target.model.executionBindings?.map(binding => (
     plan.appliedBindingIds.includes(binding.id) ? { ...binding, entitlement: 'granted' } : binding
   ));
-  return patch.availability || patch.controls || patch.contextTiers || patch.executionBindings ? patch : null;
+  return patch.availability || patch.toolCalling || patch.controls || patch.contextTiers || patch.executionBindings ? patch : null;
 }
 
 export function buildProbeFailurePatch(
@@ -72,8 +102,12 @@ export function buildProbeFailurePatch(
   plan: RequestPlan,
   status: number,
   manifestMatchesDenial = false,
+  detail = '',
 ): CatalogModelContribution | null {
-  const kind = classifyCapabilityProbeFailure(status, manifestMatchesDenial);
+  const kind = classifyCapabilityProbeFailure(status, manifestMatchesDenial, detail);
+  if (kind === 'tools-unsupported') {
+    return { modelId: target.model.modelId, toolCalling: { state: 'unsupported', reason: detail.slice(0, 200) } };
+  }
   if (request.mode === 'default' && kind === 'entitlement-denied') {
     return { modelId: target.model.modelId, availability: 'unavailable',
       controls: {
@@ -168,7 +202,9 @@ export function receiptExceedsSmallerTiers(model: EffectiveModel, tierId: string
 export function probeConfirmation(
   request: LlmModelCapabilityProbeRequest, target: ResolvedProbeTarget, plan: RequestPlan, message: AssistantMessage,
 ): Pick<LlmModelCapabilityProbeResult, 'detail' | 'detailCode'> | undefined {
-  if (message.stopReason !== 'stop' || !message.content.some(part => part.type === 'text' && part.text.trim())) {
+  const answered = (message.stopReason === 'stop' && message.content.some(part => part.type === 'text' && part.text.trim()))
+    || probeCalledCapabilityCheck(message);
+  if (!answered) {
     return { detail: `Provider did not complete the minimal response (${message.stopReason}).` };
   }
   if (request.mode === 'fast' || request.mode === 'fast-max-context') {

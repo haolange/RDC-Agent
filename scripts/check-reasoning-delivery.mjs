@@ -104,7 +104,13 @@ assert(geminiCap.reasoningContract.semantic === 'unknown', 'Gemini display seman
 
 const ollamaCap = resolveAgentRouteCapability(ollama, 'test-model', effectiveModel(ollama, 'test-model'));
 assert(ollamaCap.reasoningDelivery === 'stream-full', 'Ollama must use stream-full delivery');
-assert(ollamaCap.reasoningContract.semantic === 'unknown', 'Ollama-compatible reasoning must not be inferred as raw');
+assert(
+  ollamaCap.reasoningContract.semantic === 'raw'
+    && ollamaCap.reasoningContract.source === 'provider-docs:ollama-thinking'
+    && Boolean(ollamaCap.reasoningContract.evidence)
+    && ollamaCap.reasoningContract.visibilityRequest === 'ollama-think',
+  'Ollama reasoning must be the manifest-declared, documented raw contract with the think request, never inferred',
+);
 
 assert(resolveAgentRouteCapability(deepseek, 'deepseek-reasoner', effectiveModel(deepseek, 'deepseek-reasoner')).reasoningContract.semantic === 'raw', 'Direct DeepSeek reasoning_content is documented raw reasoning');
 assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding', effectiveModel(kimi, 'kimi-for-coding')).reasoningContract.semantic === 'raw', 'Kimi Coding Plan must be raw, never Anthropic summary');

@@ -664,3 +664,67 @@ export function parseGrokBuilderCatalog(
     },
   };
 }
+
+/** The `/api/show` facts discovery reads for each installed local Ollama model. */
+export type OllamaShowPayloads = ReadonlyMap<string, unknown>;
+
+/**
+ * Ollama's `think` is an on/off switch. The route contract (`visibilityRequest: ollama-think`) carries the
+ * wire, so the control itself has no wire profile; thinking models think unless switched off.
+ */
+const OLLAMA_THINK_TOGGLE: ReasoningControl = {
+  kind: 'toggle',
+  supportsOff: true,
+  levels: [],
+  defaultState: 'known',
+  defaultSelection: 'on',
+  wireProfile: { kind: 'none' },
+};
+
+function ollamaCapability(capabilities: string[] | null, name: string): CapabilityState | undefined {
+  if (!capabilities) return undefined;
+  return capabilities.includes(name)
+    ? { state: 'supported' }
+    : { state: 'unsupported', reason: `Ollama reports no "${name}" capability for this model.` };
+}
+
+/**
+ * Local Ollama: `/api/tags` lists the installed models and `/api/show` states each one's capabilities
+ * and trained context length. An installed model is available; its capabilities are the local runtime's
+ * own facts. A model whose `/api/show` could not be read keeps unknown capabilities.
+ */
+export function parseOllamaInstalledModels(
+  tagsPayload: unknown,
+  showPayloads: OllamaShowPayloads,
+  surface: ProviderSurfaceDefinition,
+): ParsedLiveCatalog {
+  const installed = records(tagsPayload);
+  const thinkingModelIds = new Set<string>();
+  const observations = installed.flatMap((entry): LiveModelObservation[] => {
+    const id = text(entry.name) ?? text(entry.model);
+    if (!id) return [];
+    const show = record(showPayloads.get(id));
+    const capabilities = Array.isArray(show.capabilities)
+      ? show.capabilities.filter((value): value is string => typeof value === 'string')
+      : null;
+    const contextWindowTokens = Object.entries(record(show.model_info))
+      .filter(([key]) => key.endsWith('.context_length'))
+      .map(([, value]) => positiveInteger(value))
+      .find((value): value is number => value !== undefined);
+    const toolCalling = ollamaCapability(capabilities, 'tools');
+    const visionInput = ollamaCapability(capabilities, 'vision');
+    if (capabilities?.includes('thinking')) thinkingModelIds.add(id);
+    return [{
+      modelId: id,
+      availability: 'available',
+      ...(contextWindowTokens ? { contextWindowTokens } : {}),
+      ...(toolCalling ? { toolCalling } : {}),
+      ...(visionInput ? { visionInput } : {}),
+    }];
+  });
+  return asResult(projectLiveModelObservations(surface, observations).map((contribution) => (
+    thinkingModelIds.has(contribution.modelId)
+      ? { ...contribution, controls: { ...contribution.controls, reasoning: OLLAMA_THINK_TOGGLE } }
+      : contribution
+  )));
+}

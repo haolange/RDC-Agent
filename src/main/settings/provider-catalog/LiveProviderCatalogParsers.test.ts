@@ -11,6 +11,7 @@ import {
   parseClinePassCatalog,
   parseGrokBuilderCatalog as parseGrokBuilderCatalogWithSurface,
   parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface,
+  parseOllamaInstalledModels,
   parseOpenCodeGoCatalog as parseOpenCodeGoCatalogWithSurface,
   parseOpenRouterAccountCatalog as parseOpenRouterAccountCatalogWithSurface,
 } from './LiveProviderCatalogParsers';
@@ -490,5 +491,41 @@ it('aligns fixed Max entitlement with the explicitly observed default window', a
   expect(parsed.contributions.find(m => m.modelId === 'kimi-for-coding')).toMatchObject({
     controls: { maxContext: { state: 'fixed', entitlement: 'granted' } },
     contextTiers: [{ id: 'default', entitlement: 'granted' }],
+  });
+});
+
+describe('local Ollama installed models', () => {
+  const tags = { models: [
+    { name: 'qwen3:4b', model: 'qwen3:4b', details: { family: 'qwen3' } },
+    { name: 'llava:7b', model: 'llava:7b' },
+    { name: 'mystery:1b', model: 'mystery:1b' },
+  ] };
+  const shows = new Map<string, unknown>([
+    ['qwen3:4b', { capabilities: ['completion', 'tools', 'thinking'], model_info: { 'general.architecture': 'qwen3', 'qwen3.context_length': 40960 } }],
+    ['llava:7b', { capabilities: ['completion', 'vision'], model_info: { 'llama.context_length': 4096 } }],
+  ]);
+
+  it('takes availability, tool calling, image input and context window from the runtime\'s own facts', () => {
+    const parsed = parseOllamaInstalledModels(tags, shows, surface('ollama'));
+    const byId = new Map(parsed.contributions.map((model) => [model.modelId, model]));
+    expect(parsed.models.map((model) => model.id)).toEqual(['llava:7b', 'mystery:1b', 'qwen3:4b']);
+    expect(byId.get('qwen3:4b')).toMatchObject({
+      availability: 'available',
+      toolCalling: { state: 'supported' },
+      visionInput: { state: 'unsupported' },
+      defaultBudgetTokens: 40960,
+      contextTiers: [{ maxPromptTokens: 40960 }],
+      controls: { reasoning: { kind: 'toggle', supportsOff: true, defaultSelection: 'on' } },
+    });
+    expect(byId.get('llava:7b')).toMatchObject({ toolCalling: { state: 'unsupported' }, visionInput: { state: 'supported' } });
+    expect(byId.get('llava:7b')).not.toHaveProperty('controls');
+  });
+
+  it('keeps a model whose facts could not be read listed with unknown capabilities', () => {
+    const mystery = parseOllamaInstalledModels(tags, shows, surface('ollama')).contributions
+      .find((model) => model.modelId === 'mystery:1b');
+    expect(mystery).toMatchObject({ availability: 'available' });
+    expect(mystery).not.toHaveProperty('toolCalling');
+    expect(mystery).not.toHaveProperty('defaultBudgetTokens');
   });
 });

@@ -120,6 +120,8 @@ Discovery、overlay、entitlement、observed evidence 和 user preference 按字
 Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions. Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface. Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry. HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial. HTTP 429 is transient quota; HTTP 402 is transient quota only when the response explicitly identifies `quota_exceeded` / quota exhaustion / `insufficient_balance`, otherwise it remains unknown. Capability probes attach a bounded retry expiry and never downgrade structural capability. Probes and ordinary replies share one evidence rule (`ProviderProbeEvidence`): only a response receipt grants an entitlement — the switched-to model id that answered, an echoed `service_tier: priority` or reported `speed: fast`, or a prompt larger than every smaller tier. A request that merely succeeded grants nothing; receipt grants expire after seven days so a changed subscription is noticed again.
 
 
+本地 Ollama（`ollama-tags`）：`/api/tags` 列出已安装模型，再逐个读 `/api/show`——`capabilities` 中的 `tools` / `vision` / `thinking` 与 `model_info` 里的 `<arch>.context_length` 是本地运行时自己的事实，经 live observation 投影为工具调用、图像输入与上下文窗口（默认输入预算）。已安装即可用；读不到 `/api/show` 的模型仍列出，能力保持未知，可由显式探测补证。上下文窗口是模型训练上限，Ollama 服务端实际窗口由 `OLLAMA_CONTEXT_LENGTH` 决定，需要用户调大到能容纳 Agent 提示。
+
 ## 凭据与请求事务
 
 版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
@@ -299,7 +301,7 @@ Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/a
 
 ## 显式能力探测与批量生命周期
 
-Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。批次只在主进程内存中存在，准备阶段刷新已保存账号目录并列出请求数量；用户明确开始后串行发送短提示，无工具、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
+Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。批次只在主进程内存中存在，准备阶段刷新已保存账号目录并列出请求数量；用户明确开始后串行发送短提示，只附一个无副作用工具 `capability_check`（真实回合总是带工具，探测按回合的样子检查路线）、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。回复里对该工具的结构化调用是工具调用能力的回执，记为 `toolCalling: supported`；只回文字不改变工具调用状态；HTTP 400 且消息明确说模型不支持工具（如 Ollama 的 `does not support tools`）记为 `unsupported`，不算账号资格拒绝。不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
 
 成功必须有正常终止和文本。Fast 根据实际 binding 分别检查原生 usage.speed、响应 service tier 或响应 model id；请求参数和客户端构造的消息 model 不能冒充服务端回执。Max 的 implicit/client-tier 扩窗必须有明确当前账号目录资格，短请求成功不能独自授予更大窗口；明确 header/body 激活仍沿所属执行契约。组合 binding 独立验证，组合拒绝不撤销两个单项的资格。
 

@@ -1,6 +1,6 @@
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
-import { assistantMessageText, executeToolFreeRequest } from '../prompt/ToolFreeRequest';
+import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { COMPACTION_HANDOFF_SYSTEM_PROMPT } from './StructuredHandoffBuilder';
@@ -50,11 +50,11 @@ export function buildCompactionPromptPlan(transcript: string): PromptPlan {
   };
 }
 
-/** One tool-free compaction call through PromptPlan → RequestEnvelope → adapter. */
+/** One compaction call without tools through PromptPlan → RequestEnvelope → adapter. */
 export async function executeCompactionHandoff(
   input: CompactionHandoffExecution,
 ): Promise<AssistantMessage> {
-  const message = await executeToolFreeRequest({
+  const message = await executeAuxiliaryRequest({
     purpose: 'compaction-handoff',
     sessionId: input.sessionId,
     plan: input.plan,
@@ -62,6 +62,7 @@ export async function executeCompactionHandoff(
     credentialHandle: input.credentialHandle,
     promptPlan: buildCompactionPromptPlan(input.transcript),
     userContent: `Transcript to compact:\n\n${input.transcript}`,
+    tools: [],
     maxTokens: COMPACTION_MAX_OUTPUT_TOKENS,
     reasoning: resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan).reasoningContract,
     writesPromptCache: false,

@@ -656,7 +656,7 @@ export interface LlmModelCapabilityProbeRequest {
 export interface LlmModelCapabilityProbeResult {
   success: boolean;
   status: 'verified' | 'inconclusive' | 'denied' | 'failed' | 'cancelled';
-  failureKind?: 'entitlement-denied' | 'authentication-failed' | 'quota-exhausted' | 'route-unavailable' | 'unknown';
+  failureKind?: 'entitlement-denied' | 'authentication-failed' | 'quota-exhausted' | 'route-unavailable' | 'tools-unsupported' | 'unknown';
   requestSent: boolean;
   detail?: string;
   detailCode?: 'fast-tier-default' | 'fast-tier-missing' | 'fast-tier-other';

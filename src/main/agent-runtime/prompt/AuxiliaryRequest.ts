@@ -6,13 +6,13 @@ import { requestSnapshotStore } from './RequestSnapshotStore';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { ProviderReasoningContract } from '@shared/types/rdcRuntime';
-import type { AssistantMessage } from '../core/types';
+import type { AssistantMessage, ToolDefinition } from '../core/types';
 
 /** What asked for the request; it names the request's turn id and its snapshot control flag. */
-export type ToolFreeRequestPurpose = 'capability-probe' | 'compaction-handoff' | 'permission-review';
+export type AuxiliaryRequestPurpose = 'capability-probe' | 'compaction-handoff' | 'permission-review';
 
-export interface ToolFreeRequest {
-  purpose: ToolFreeRequestPurpose;
+export interface AuxiliaryRequest {
+  purpose: AuxiliaryRequestPurpose;
   /** Session the request snapshot belongs to; a capability probe has none. */
   sessionId?: string;
   plan: RequestPlan;
@@ -21,6 +21,11 @@ export interface ToolFreeRequest {
   credentialHandle: string;
   promptPlan: PromptPlan;
   userContent: string;
+  /**
+   * Tools offered to the model. Compaction and permission review offer none; a capability probe offers
+   * one no-op tool, because every real turn carries tools and the probe checks the route as a turn uses it.
+   */
+  tools: readonly ToolDefinition[];
   maxTokens: number;
   reasoning: ProviderReasoningContract;
   /**
@@ -34,16 +39,17 @@ export interface ToolFreeRequest {
 }
 
 /**
- * One request with no tools and no conversation history, through the same snapshot, route, credential and
- * cache rules as a normal turn. Capability probes, compaction hand-offs and permission reviews all go
- * through here; the caller judges the returned message.
+ * One request without conversation history or tool execution, through the same snapshot, route, credential
+ * and cache rules as a normal turn. Capability probes, compaction hand-offs and permission reviews all go
+ * through here; the caller judges the returned message, tool calls included.
  */
-export async function executeToolFreeRequest(request: ToolFreeRequest): Promise<AssistantMessage> {
+export async function executeAuxiliaryRequest(request: AuxiliaryRequest): Promise<AssistantMessage> {
   request.signal?.throwIfAborted();
   const { plan, promptPlan } = request;
   const turnId = generateEventId(request.purpose);
   const messages = [{ role: 'user' as const, content: request.userContent, timestamp: Date.now() }];
-  const compiledCache = promptCacheCompiler.compile({ promptPlan, requestPlan: plan, tools: [] });
+  const tools = [...request.tools];
+  const compiledCache = promptCacheCompiler.compile({ promptPlan, requestPlan: plan, tools });
   const promptCache = request.writesPromptCache
     ? compiledCache
     : { ...compiledCache, enabled: false, reason: `${request.purpose}-no-cache-write` };
@@ -55,7 +61,7 @@ export async function executeToolFreeRequest(request: ToolFreeRequest): Promise<
     route: { providerId: plan.providerId, modelId: plan.effectiveModelId, protocol: plan.route.protocol },
     requestPlan: plan,
     messages,
-    tools: [],
+    tools,
     controls: {
       [PURPOSE_CONTROL[request.purpose]]: true,
       ...request.controls,
@@ -72,7 +78,7 @@ export async function executeToolFreeRequest(request: ToolFreeRequest): Promise<
       contextWindow: plan.contextWindowTokens,
       maxOutputTokens: plan.maxOutputTokens || request.maxTokens,
     }),
-    { systemPrompt: promptPlan.systemPrompt, systemPromptSegments: promptPlan.segments, messages, tools: [] },
+    { systemPrompt: promptPlan.systemPrompt, systemPromptSegments: promptPlan.segments, messages, tools },
     {
       requestPlan: plan,
       promptCache,
@@ -103,7 +109,7 @@ export async function executeToolFreeRequest(request: ToolFreeRequest): Promise<
   return message;
 }
 
-const PURPOSE_CONTROL: Record<ToolFreeRequestPurpose, string> = {
+const PURPOSE_CONTROL: Record<AuxiliaryRequestPurpose, string> = {
   'capability-probe': 'capabilityProbe',
   'compaction-handoff': 'compactionHandoff',
   'permission-review': 'permissionReview',

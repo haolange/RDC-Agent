@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('./CompactionHandoffRuntime', () => ({ executeCompactionHandoff: execute }));
-vi.mock('../prompt/ToolFreeRequest', () => ({ assistantMessageText: () => '## Goal\nPreserve normal highlights\n## Critical Context\nIBL remains unverified.' }));
+vi.mock('../prompt/AuxiliaryRequest', () => ({ assistantMessageText: () => '## Goal\nPreserve normal highlights\n## Critical Context\nIBL remains unverified.' }));
 import { generateCompactionSections } from './CompactionHandoffService';
 import type { CompactionHandoffExecution } from './CompactionHandoffRuntime';
 const execution = { sessionId: 'session', provider: { id: 'frozen' }, model: { modelId: 'frozen-model' }, plan: { contextWindowTokens: 32768 }, credentialHandle: 'opaque', transcript: 'original' } as CompactionHandoffExecution;

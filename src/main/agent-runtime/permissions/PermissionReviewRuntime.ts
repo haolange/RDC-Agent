@@ -1,7 +1,7 @@
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { assistantMessageText, executeToolFreeRequest } from '../prompt/ToolFreeRequest';
+import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -77,7 +77,7 @@ export async function executePermissionReview(input: {
     stablePrefix: { fingerprint: hashScopedResource(SYSTEM), segmentIds: [segment.id], sourceHashes: [segment.sourceHash],
       tokenEstimate: segment.tokenEstimate, volatileSegmentIds: [] } };
   const request = async () => {
-    const message = await executeToolFreeRequest({
+    const message = await executeAuxiliaryRequest({
       purpose: 'permission-review',
       sessionId: input.sessionId,
       plan: input.plan,
@@ -85,13 +85,14 @@ export async function executePermissionReview(input: {
       credentialHandle: input.credentialHandle,
       promptPlan,
       userContent: content,
+      tools: [],
       maxTokens: 1024,
       reasoning: input.reasoning,
       writesPromptCache: false,
       signal,
     });
     signal.throwIfAborted();
-    if (message.stopReason !== 'stop' || message.content.some(block => block.type === 'toolCall')) throw new PermissionReviewError('PERMISSION_REVIEW_INCOMPLETE', 'no terminal tool-free verdict.');
+    if (message.stopReason !== 'stop' || message.content.some(block => block.type === 'toolCall')) throw new PermissionReviewError('PERMISSION_REVIEW_INCOMPLETE', 'no terminal verdict without tool calls.');
     return parsePermissionReview(assistantMessageText(message));
   };
   let abortListener: (() => void) | undefined;

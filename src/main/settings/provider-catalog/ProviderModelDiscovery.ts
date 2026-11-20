@@ -47,6 +47,7 @@ import {
   parseClinePassCatalog,
   parseFreeModelCatalog,
   parseKimiCodeCatalog,
+  parseOllamaInstalledModels,
   parseOpenCodeGoCatalog,
   parseOpenRouterAccountCatalog,
   type ParsedLiveCatalog,
@@ -504,10 +505,11 @@ export async function discoverProviderModels(
         : discoveredModels,
     };
   }
-  const url = strategy === 'ollama-tags'
-    ? appendPath(new URL(baseUrl).origin, '/api/tags')
-    : appendPath(baseUrl, '/models');
   const headers = createDiscoveryHeaders(provider, apiKey, connectionValues);
+  if (strategy === 'ollama-tags') {
+    return discoverOllamaInstalledModels(new URL(baseUrl).origin, headers, definition);
+  }
+  const url = appendPath(baseUrl, '/models');
   const payload = await getJson(url, {
     method: 'GET',
     headers,
@@ -520,4 +522,29 @@ export async function discoverProviderModels(
       })
       : discoveredModels,
   };
+}
+
+/**
+ * Lists the models installed in a local Ollama runtime and reads each one's `/api/show` facts
+ * (capabilities, trained context length). A model whose facts cannot be read stays listed with unknown
+ * capabilities rather than failing discovery.
+ */
+async function discoverOllamaInstalledModels(
+  origin: string,
+  headers: HeadersInit,
+  surface: ProviderSurfaceDefinition,
+): Promise<ModelDiscoveryResult> {
+  const tags = await getJson(appendPath(origin, '/api/tags'), { method: 'GET', headers });
+  const names = parseModelsPayload('ollama-tags', tags).map((model) => model.id);
+  const shows = await Promise.allSettled(names.map(async (name) => [name, await getJson(appendPath(origin, '/api/show'), {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: name }),
+  })] as const));
+  const parsed = parseOllamaInstalledModels(
+    tags,
+    new Map(shows.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))),
+    surface,
+  );
+  return { models: requireModels(parsed.models), contributions: parsed.contributions };
 }
