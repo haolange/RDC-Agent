@@ -122,6 +122,8 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'settings:previewAgentModelMigration': 'read',
   'settings:applyAgentModelMigration': 'high-impact',
   'settings:deleteAgentOverrideFile': 'high-impact',
+  'settings:previewProjectAgentTrust': 'read',
+  'settings:trustProjectAgent': 'high-impact',
   'settings:getAgentBuiltinComparison': 'read',
   'settings:saveProviderDefinition': 'high-impact',
   'settings:getProviderDefinitionCommit': 'read',

@@ -6,7 +6,8 @@ import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
 import { resolveHookCwd, resolveHookSpawn } from './hookResolve';
-import { canonicalRealpath, computeHookTrustFingerprint } from './hookTrustFingerprint';
+import { canonicalRealpath } from '../runtime/fileIdentity';
+import { computeHookTrustFingerprint } from './hookTrustFingerprint';
 import {
   hookTrustKey,
   readHookTrustStore,

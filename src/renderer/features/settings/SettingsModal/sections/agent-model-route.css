@@ -168,6 +168,23 @@
   padding-inline-start: var(--space-4);
 }
 
+/* Project Agent trust: the full profile, read before it can run in this project. */
+.settings-agent-trust-content {
+  max-height: min(56vh, 32rem);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  overflow: auto;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  color: var(--token-text-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .settings-agent-builtin-diff-dialog .ui-diff {
   --ui-diff-max-height: min(56vh, 32rem);
 }

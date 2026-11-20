@@ -34,6 +34,7 @@ import type {
   AgentDefinitionSaveResult,
   AgentModelMigrationPreview,
   AgentOverrideFileRequest,
+  ProjectAgentTrustPreview,
 } from '@shared/types/agentManifest';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import { compiledRoutesFromDefinitions } from '../provider-catalog/compiledAgentRoutes';
@@ -417,6 +418,16 @@ export class SettingsService {
   async deleteAgentOverrideFile(request: AgentOverrideFileRequest): Promise<AppSettings> {
     this.ensureInitialized();
     return this.agentOverrideOps.deleteOverrideFile(request);
+  }
+
+  previewProjectAgentTrust(sourcePath: string): ProjectAgentTrustPreview {
+    this.ensureInitialized();
+    return this.agentOverrideOps.previewProjectAgentTrust(sourcePath);
+  }
+
+  trustProjectAgent(request: AgentOverrideFileRequest): AppSettings {
+    this.ensureInitialized();
+    return this.agentOverrideOps.trustProjectAgent(request);
   }
 
   getAgentBuiltinComparison(query: AgentDefinitionCommitQuery): AgentBuiltinComparison {

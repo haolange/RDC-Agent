@@ -135,6 +135,8 @@ export const RENDERER_INVOKE_CHANNEL = {
     previewAgentModelMigration: 'settings:previewAgentModelMigration',
     applyAgentModelMigration: 'settings:applyAgentModelMigration',
     deleteAgentOverrideFile: 'settings:deleteAgentOverrideFile',
+    previewProjectAgentTrust: 'settings:previewProjectAgentTrust',
+    trustProjectAgent: 'settings:trustProjectAgent',
     getAgentBuiltinComparison: 'settings:getAgentBuiltinComparison',
     saveProviderDefinition: 'settings:saveProviderDefinition',
     getProviderDefinitionCommit: 'settings:getProviderDefinitionCommit',

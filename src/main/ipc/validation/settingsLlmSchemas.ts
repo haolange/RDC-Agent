@@ -96,7 +96,7 @@ const agentOverrideFileRequest = z.object({
   sourceHash: z.string().regex(/^[0-9a-f]{64}$/u),
 }).strict();
 
-export const SettingsPreviewAgentModelMigrationArgsSchema = z.tuple([z.string().min(1).max(4096)]);
+export const SettingsAgentSourcePathArgsSchema = z.tuple([z.string().min(1).max(4096)]);
 export const SettingsAgentOverrideFileArgsSchema = z.tuple([agentOverrideFileRequest]);
 
 export const SettingsSaveAgentDefinitionArgsSchema = z.tuple([

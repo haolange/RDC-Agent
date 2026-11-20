@@ -17,7 +17,7 @@ it.each(['en', 'zh-CN'] as const)('keeps source identity and exact copy data, in
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const onClose = vi.fn();
   const t = ((key: Parameters<typeof translate>[1], args?: Parameters<typeof translate>[2]) => translate(language, key, args));
-  const render = async (diagnostics = issues) => act(async () => root.render(createElement(AgentManifestDiagnostics, { open: true, onClose, diagnostics, onMigrate: vi.fn(), onDeleteOverride: vi.fn(), t })));
+  const render = async (diagnostics = issues) => act(async () => root.render(createElement(AgentManifestDiagnostics, { open: true, onClose, diagnostics, onMigrate: vi.fn(), onDeleteOverride: vi.fn(), onReviewTrust: vi.fn(), t })));
   try {
     bridge.copyText.mockResolvedValue(true); await render();
     const dialog = document.querySelector('[data-testid="settings-agent-diagnostics-dialog"]')!;
@@ -45,11 +45,28 @@ it('offers migrate and delete only for an override that still declares model fie
   const t = ((key: Parameters<typeof translate>[1], args?: Parameters<typeof translate>[2]) => translate('en', key, args));
   try {
     await act(async () => root.render(createElement(AgentManifestDiagnostics, {
-      open: true, onClose: vi.fn(), diagnostics: [moved, issues[1]], onMigrate, onDeleteOverride, t })));
+      open: true, onClose: vi.fn(), diagnostics: [moved, issues[1]], onMigrate, onDeleteOverride, onReviewTrust: vi.fn(), t })));
     expect(document.querySelectorAll('[data-testid="settings-agent-diagnostic-migrate"]')).toHaveLength(1);
     await act(async () => document.querySelector<HTMLButtonElement>('[data-testid="settings-agent-diagnostic-migrate"]')!.click());
     await act(async () => document.querySelector<HTMLButtonElement>('[data-testid="settings-agent-diagnostic-delete"]')!.click());
     expect(onMigrate).toHaveBeenCalledWith(moved);
     expect(onDeleteOverride).toHaveBeenCalledWith(moved);
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
+it('offers trust review only for a project profile that has not been trusted', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const untrusted: AgentManifestDiagnostic = { code: 'AGENT_PROJECT_UNTRUSTED', severity: 'warning', scope: 'project', agentId: 'reviewer',
+    sourcePath: 'D:/project/.rdc-agent/agents/reviewer.agent.md', message: 'This project brings its own Agent profile; it loads only after you trust it.' };
+  const onReviewTrust = vi.fn();
+  const t = ((key: Parameters<typeof translate>[1], args?: Parameters<typeof translate>[2]) => translate('en', key, args));
+  try {
+    await act(async () => root.render(createElement(AgentManifestDiagnostics, {
+      open: true, onClose: vi.fn(), diagnostics: [untrusted, issues[1]], onMigrate: vi.fn(), onDeleteOverride: vi.fn(), onReviewTrust, t })));
+    expect(document.querySelectorAll('[data-testid="settings-agent-diagnostic-trust"]')).toHaveLength(1);
+    expect(document.body.textContent).toContain(translate('en', 'settings.agentDiagnosticsUntrusted'));
+    await act(async () => document.querySelector<HTMLButtonElement>('[data-testid="settings-agent-diagnostic-trust"]')!.click());
+    expect(onReviewTrust).toHaveBeenCalledWith(untrusted);
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

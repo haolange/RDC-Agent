@@ -46,7 +46,7 @@ import {
   LlmProviderIdArgsSchema,
   LlmRefreshProviderModelsArgsSchema,
   SettingsGetAgentDefinitionCommitArgsSchema,
-  SettingsPreviewAgentModelMigrationArgsSchema,
+  SettingsAgentSourcePathArgsSchema,
   SettingsAgentOverrideFileArgsSchema,
   SettingsSaveAgentDefinitionArgsSchema,
   SettingsSaveProviderDefinitionArgsSchema,
@@ -316,7 +316,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('settings:previewAgentModelMigration', async (_event, ...rawArgs: unknown[]) => {
-    const [sourcePath] = parseIpcArgs(SettingsPreviewAgentModelMigrationArgsSchema, rawArgs, {
+    const [sourcePath] = parseIpcArgs(SettingsAgentSourcePathArgsSchema, rawArgs, {
       label: 'settings:previewAgentModelMigration',
       maxBytes: 8 * 1024,
     });
@@ -339,6 +339,24 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       maxBytes: 8 * 1024,
     });
     return withEffectiveAgentModelOptions(await settingsService.deleteAgentOverrideFile(request));
+  });
+
+  ipcMain.handle('settings:previewProjectAgentTrust', async (_event, ...rawArgs: unknown[]) => {
+    const [sourcePath] = parseIpcArgs(SettingsAgentSourcePathArgsSchema, rawArgs, {
+      label: 'settings:previewProjectAgentTrust',
+      maxBytes: 8 * 1024,
+    });
+    return settingsService.previewProjectAgentTrust(sourcePath);
+  });
+
+  ipcMain.handle('settings:trustProjectAgent', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(SettingsAgentOverrideFileArgsSchema, rawArgs, {
+      label: 'settings:trustProjectAgent',
+      maxBytes: 8 * 1024,
+    });
+    const settings = settingsService.trustProjectAgent(request);
+    await notifyCommitted(() => context.applyCurrentLlmConfig());
+    return withEffectiveAgentModelOptions(settings);
   });
 
   ipcMain.handle('settings:getAgentBuiltinComparison', async (_event, ...rawArgs: unknown[]) => {

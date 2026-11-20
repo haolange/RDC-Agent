@@ -19,6 +19,7 @@ type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'handleRefreshProviderModels' | 'handleDisconnectProvider' | 'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
   'handleAgentModelsChange' | 'previewAgentModelMigration' | 'handleCommitAgentOverrideFile' | 'loadAgentBuiltinComparison' |
+  'previewProjectAgentTrust' | 'handleTrustProjectAgent' |
   'rdcCliDraft' | 'codeInterpreterDraft' | 'shellDraft' | 'setRdcCliDraft' |
   'setCodeInterpreterDraft' | 'setShellDraft' | 'handleSaveToolsConfig' | 'dirty'>;
 interface SettingsPageContentProps {
@@ -66,6 +67,8 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     handleAgentModelsChange,
     previewAgentModelMigration,
     handleCommitAgentOverrideFile,
+    previewProjectAgentTrust,
+    handleTrustProjectAgent,
     loadAgentBuiltinComparison,
     rdcCliDraft,
     codeInterpreterDraft,
@@ -140,6 +143,8 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         onAgentModelsChange={handleAgentModelsChange}
         onPreviewAgentModelMigration={previewAgentModelMigration}
         onCommitAgentOverrideFile={handleCommitAgentOverrideFile}
+        onPreviewProjectAgentTrust={previewProjectAgentTrust}
+        onTrustProjectAgent={handleTrustProjectAgent}
         onLoadAgentBuiltinComparison={loadAgentBuiltinComparison}
         t={t}
       /></section>

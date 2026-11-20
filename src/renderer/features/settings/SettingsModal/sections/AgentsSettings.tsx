@@ -20,6 +20,7 @@ import { useSettingsNavigationStore } from '../../../../stores/settingsNavigatio
 import { AgentDefaultModelSection } from './AgentDefaultModelSection';
 import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
 import { AgentModelMigrationDialog } from './AgentModelMigrationDialog';
+import { ProjectAgentTrustDialog } from './ProjectAgentTrustDialog';
 import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -163,7 +164,8 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       />
       <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics}
         onMigrate={(issue) => models.openOverrideAction('migrate', issue)}
-        onDeleteOverride={(issue) => models.openOverrideAction('delete', issue)} t={t} />
+        onDeleteOverride={(issue) => models.openOverrideAction('delete', issue)}
+        onReviewTrust={models.openTrustReview} t={t} />
       {missingAgentId ? <p role="alert">{t('settings.agentNavigationNotFound', { id: missingAgentId })}</p> : null}
       <div className="settings-manifest-layout">
         <div className="settings-manifest-list-column">
@@ -257,6 +259,14 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           options={settings.agents.modelOptions}
           onConfirm={models.confirmOverrideAction}
           onClose={models.closeOverrideAction}
+          t={t}
+        />
+      ) : null}
+      {models.trustReview ? (
+        <ProjectAgentTrustDialog
+          review={models.trustReview}
+          onConfirm={models.confirmTrust}
+          onClose={models.closeTrustReview}
           t={t}
         />
       ) : null}

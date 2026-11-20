@@ -186,6 +186,14 @@ export function createSettingsModalActions({
     adoptAgentSettings(nextSettings);
   };
 
+  const previewProjectAgentTrust = (sourcePath: string) => (
+    window.electronAPI.settings.previewProjectAgentTrust(sourcePath)
+  );
+
+  const handleTrustProjectAgent = async (request: AgentOverrideFileRequest): Promise<void> => {
+    adoptAgentSettings(await window.electronAPI.settings.trustProjectAgent(request));
+  };
+
   const loadAgentBuiltinComparison = (draft: AgentManifestDraft) => {
     const write = resolveAgentWriteTargetFromDraft(draft, currentProjectId);
     return window.electronAPI.settings.getAgentBuiltinComparison({
@@ -227,6 +235,8 @@ export function createSettingsModalActions({
     handleAgentModelsChange,
     previewAgentModelMigration,
     handleCommitAgentOverrideFile,
+    previewProjectAgentTrust,
+    handleTrustProjectAgent,
     loadAgentBuiltinComparison,
     handleSaveToolsConfig,
     handleSavePersonalization,

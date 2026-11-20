@@ -35,7 +35,7 @@ describe('background SubagentRunner provider fixture', () => {
     await service.query('parent', 'missing');
     const task = await registry.createTask('model fixture');
     const capsule = { goal: 'inspect', task: 'inspect', scope: 'fixture', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [], outputRequirements: 'typed result', stopConditions: [], requiredSkillIds: [], budget: { maxToolCalls: 2, maxWallTimeMs: 10_000 } } satisfies DelegationCapsule;
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'parent', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule, parentOnEvent: (event) => { parentEvents.push(event.type); } });
+    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'parent', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule, parentOnEvent: (event) => { parentEvents.push(event.type); } });
     await service.join(execution.id);
     expect(receivedProfile).toBe('general');
     expect(parentEvents).toEqual(['approval.requested', 'approval.answered']);
@@ -69,7 +69,7 @@ describe('background SubagentRunner provider fixture', () => {
     const registry = registries.get('parent')!;
     const task = await registry.createTask('provider fixture');
     const capsule: DelegationCapsule = { goal: 'inspect', task: 'inspect', scope: 'fixture', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [], outputRequirements: 'typed result', stopConditions: [], requiredSkillIds: [], budget: { maxToolCalls: 2, maxWallTimeMs: 10_000 } };
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'parent', taskId: task.id, parentAgentId: 'general', targetProfile: 'general', capsule });
+    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 'parent', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
     await service.postMessage('parent', execution.id, execution.generation, 'new owner observation');
     continueChild();
     await service.join(execution.id);

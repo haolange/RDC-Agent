@@ -1,6 +1,7 @@
 import { subagentScopeId } from '@shared/utils/executionScope';
 import { delegationCapsuleArtifactRefs } from '../prompt/DelegationCapsuleCompiler';
 import type { AgentRole } from '@shared/types/agent';
+import type { AgentAccessCeiling } from '@shared/types/agentManifest';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { AgentTool } from '../agent/AgentTool';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, registerTaskExecutionCancellationOwner, type TaskExecutionRecord } from '../tasks';
@@ -25,6 +26,8 @@ export interface BackgroundSubagentStart {
   parentExecutionId?: string;
   rootBudgetId?: string;
   parentAgentId: AgentRole;
+  /** The delegating turn's frozen ceiling, held for the life of the execution. */
+  parentAccessCeiling: AgentAccessCeiling;
   targetProfile: AgentRole;
   capsule: DelegationCapsule;
   projectRootPath?: string | null;
@@ -428,7 +431,8 @@ export function createBackgroundSubagentService(subagents: SubagentRunner, depen
   listMailboxDeliveries?: ConstructorParameters<typeof BackgroundSubagentService>[3];
 }): BackgroundSubagentService {
   return new BackgroundSubagentService(async (input) => subagents.runSubagent({
-    parentAgentId: input.parentAgentId, parentToolCallId: input.parentToolCallId, targetProfile: input.targetProfile,
+    parentAgentId: input.parentAgentId, parentAccessCeiling: input.parentAccessCeiling,
+    parentToolCallId: input.parentToolCallId, targetProfile: input.targetProfile,
     capsule: input.capsule, parentSessionId: input.originSessionId ?? input.sessionId, projectRootPath: input.projectRootPath,
     projectId: input.projectId, signal: input.signal, detached: true, childSessionId: subagentScopeId(input.sessionId, input.executionId),
     // Detached execution progress belongs to TaskRegistry and its durable mailbox,

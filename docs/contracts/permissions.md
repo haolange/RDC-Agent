@@ -13,6 +13,11 @@ Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进�
 
 工具按 observe / record / mutate / execute 分类（`src/shared/constants/toolAccess.ts`）；`read-only` = observe + record，`workspace-write` 再加 mutate，`full` 再加 execute；未知工具与 MCP 按 execute；Full access 权限模式不能抬高 profile 天花板；原生 `shell.rdc` 要求 `full`。
 
+天花板只会收紧，不会被继承或覆盖放宽：
+
+- **子代理**：子代理以 `min(委派回合冻结的天花板, 目标 profile 天花板)` 运行；同步、后台执行都在委派时取父回合 `EffectiveRuntimePlan.accessCeiling` 并随执行携带，缺少冻结计划的委派以 `SUBAGENT_PARENT_PLAN_REQUIRED` 拒绝。
+- **项目 profile**：覆盖 user/builtin 同 id profile 时不得超过被覆盖者的天花板；项目新增的 profile 上限为 `workspace-write`。声明超出上限时按上限运行并给出 `AGENT_PROJECT_CEILING_NARROWED` 诊断。
+
 工具在定义处声明效果（`AgentTool.effects`：读路径参数、写路径参数、glob 前缀参数、是否联网），`AgentPermissionPolicy` 只读这些声明，不按工具名推断。写路径在任何挡位先经 `fileOperationBoundary`（工程内目标经 realpath 且拒绝 symlink）；只读目标拒绝，受保护目标需审批。未声明效果的工具按访问类别：observe / record 自动，mutate / execute 需审批。
 
 Browser QA 代答 `conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 属于 high-impact，只在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时放行。桌面 IPC 不受该环境变量限制。
@@ -87,14 +92,19 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 - Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。任一变化 → `needsRetrust`。
 - builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
-- 旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。
 - 12 canonical events 保持单一 `HookEngine` 路径。见 `ARCHITECTURE.md` 裁决 K。
-- 信任记录存于 `hook-trust.json`（schemaVersion 2），匹配只认 `trustFingerprint`，不接受 YAML-only `sourceHash`。
+- 信任记录存于 `hook-trust.json`（schemaVersion 2），匹配只认 `trustFingerprint`；其他形状的文件读作无信任，要求重新 trust。
+
+## Project Agent Trust
+
+- 随项目到来（clone、pull、解压）的 `.rdc-agent/agents/*.agent.md` 在信任前不加载，同 id 的 user/builtin profile 照常生效；Settings → 智能体的诊断给出 `AGENT_PROJECT_UNTRUSTED`，用户查看完整文件后信任。
+- 信任绑定 `realpath(projectRoot) + agentId + 文件 bytes`（`agent-trust.json`）；在 Settings 之外改动文件即失效。用户通过 Settings 保存、导入或写入的项目 profile 按写入的 bytes 自动信任；删除时撤销。
+- `settings:trustProjectAgent` 只接受主进程当前快照里确有该诊断的文件，并核对用户查看时的 `sourceHash`；文件在查看后变化 → `AGENT_OVERRIDE_CHANGED`。
 
 ## MCP Trust
 
 - Project MCP 与 user 同 ID 时，不可覆盖 user 的 `command` / `args` / `url` / `env`。
-- 可执行指纹变化 → `needsRetrust`；连接前 `assertConnectAllowed`。
+- Project MCP trust fingerprint 与 hook 同构：descriptor + 声明文件 realpath + PATH 解析后的 executable identity + 参数所指文件的 bytes（相对参数按项目真实路径解析）。任一变化 → `needsRetrust`；`assertConnectAllowed` 在连接时重新计算，不信任设置快照。记录存于 `mcp-trust.json`，形状不符读作无信任。
 - MCP 连接池按 `realpath(projectRoot) + projectId + descriptorHash` 分组；失败缓存指数退避（retryable→permanent）；orphan process quarantine 至 supervised.exit。Transport 仅 `stdio` / `streamable-http`；`sse` → `MCP_TRANSPORT_UNSUPPORTED`。
 - Settings 提供显式 trust 面板；Browser 与 Desktop 均通过相同 `rdc-runtime:trustMcp` handler 和主进程 trust 校验。
 
@@ -140,6 +150,8 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 - `src/shared/renderer-api/createRendererApi.test.ts`
 - `src/main/settings/settings-core/SecretStorageService.test.ts`
 - `src/main/settings/agent-manifests/AgentRuntimeConfigService.test.ts`（MCP trust）
+- `src/main/settings/agent-manifests/AgentManifestService.effectiveCommit.test.ts`（项目 Agent trust 与天花板收紧）
+- `src/main/agent-runtime/orchestration/SubagentRunner.test.ts`（子代理天花板取交集）
 - `src/main/ipc/validation/IpcPayloadGuard.test.ts`
 - `src/main/rdc/RdcRuntimeContextRegistry.test.ts`
 - `src/main/agent-runtime/permissions/*`

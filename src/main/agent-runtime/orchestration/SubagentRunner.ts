@@ -1,6 +1,6 @@
 import { isTransientScopeId, rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
-import { agentAccessCeiling } from '@shared/types/agentManifest';
+import { agentAccessCeiling, narrowerAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { withDelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
@@ -97,6 +97,8 @@ export class SubagentRunner {
     projectRootPath?: string | null;
     projectId?: string | null;
     parentTurn?: TurnHandle | null;
+    /** The delegating turn's frozen ceiling; the child runs with the stricter of it and its own. */
+    parentAccessCeiling: AgentAccessCeiling;
     detached?: boolean;
     policyBudget?: TurnHandle['policyBudget'];
     restoredPolicyBudget?: TurnHandle['policyBudget'];
@@ -143,10 +145,15 @@ export class SubagentRunner {
       }
       return { text, status: 'failed' as const, subagentId };
     };
-    const definition = effectiveProfiles.find((entry) => entry.id === input.targetProfile && entry.enabled);
-    if (!definition) {
+    const targetDefinition = effectiveProfiles.find((entry) => entry.id === input.targetProfile && entry.enabled);
+    if (!targetDefinition) {
       return rejectConfiguration('AGENT_PROFILE_UNAVAILABLE', 'AGENT_PROFILE_UNAVAILABLE: ' + input.targetProfile);
     }
+    // A child never does more than the turn that delegated to it.
+    const definition = {
+      ...targetDefinition,
+      accessCeiling: narrowerAccessCeiling(agentAccessCeiling(targetDefinition), input.parentAccessCeiling),
+    };
     if (rdcDelegation.requiresLease && !definition.tools.some(tool => isRdcLeaseToolName(tool)
       || (tool === 'shell' && agentAccessCeiling(definition) === 'full'))) {
       throw new Error('RDC_LEASE_DELEGATE_DENIED: target Agent has no live RDC capability.');
@@ -493,6 +500,10 @@ export class SubagentRunner {
         if (!authorized) {
           throw new Error(`SUBAGENT_DELEGATE_DENIED: ${targetProfile} is not in the frozen profileDelegates set.`);
         }
+        const parentAccessCeiling = turn?.runtimePlan?.accessCeiling;
+        if (!parentAccessCeiling) {
+          throw new Error('SUBAGENT_PARENT_PLAN_REQUIRED: delegation needs the delegating turn\'s frozen runtime plan.');
+        }
         const resolvedSessionId = sessionId ?? turn?.eventSink?.sessionId ?? null;
         const inheritedScope = resolvedSessionId ? getDelegatedTaskScope(resolvedSessionId) : null;
         const ownerSessionId = inheritedScope?.ownerSessionId ?? resolvedSessionId;
@@ -522,6 +533,7 @@ export class SubagentRunner {
             taskId,
             parentExecutionId: effectiveParentExecutionId,
             parentAgentId,
+            parentAccessCeiling,
             targetProfile,
             capsule,
             projectRootPath: turn?.eventSink?.projectRootPath ?? null,
@@ -586,6 +598,7 @@ export class SubagentRunner {
         try {
           runPromise = runSubagent({
             parentAgentId,
+            parentAccessCeiling,
             parentToolCallId: toolCallId,
             targetProfile,
             capsule,

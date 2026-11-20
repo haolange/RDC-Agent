@@ -183,16 +183,18 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     expect(() => mcpTrustService.assertConnectAllowed(docs!, project)).not.toThrow();
   });
 
-  it('marks project-only MCP as needing trust before connect', async () => {
+  it('binds project MCP trust to the launched script bytes, not just the descriptor', async () => {
     const project = path.join(root, 'project');
     const projectMcp = path.join(project, '.rdc-agent', 'mcp');
     fs.mkdirSync(projectMcp, { recursive: true });
+    fs.writeFileSync(path.join(project, 'server.mjs'), 'process.exit(0)\n');
     fs.writeFileSync(path.join(projectMcp, 'local.mcp.json'), JSON.stringify({
       id: 'local',
       name: 'Local',
       description: '',
       transport: 'stdio',
       command: 'node',
+      args: ['server.mjs'],
       enabledByDefault: true,
     }));
 
@@ -200,17 +202,17 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     const { mcpTrustService } = await import('../settings-core/McpTrustService');
     const service = new AgentRuntimeConfigService();
     const local = service.listMcpServers(project).find((server) => server.id === 'local');
-    expect(local).toMatchObject({
-      scope: 'project',
-      needsRetrust: true,
-      command: 'node',
-    });
-    expect(() => mcpTrustService.assertConnectAllowed(local!, project)).toThrow(/needs trust/);
+    expect(local).toMatchObject({ scope: 'project', needsRetrust: true, command: 'node' });
+    expect(() => mcpTrustService.assertConnectAllowed(local!, project)).toThrow(/MCP_TRUST_REQUIRED/);
 
-    mcpTrustService.trust(project, local!.id, local!.descriptorHash!);
+    mcpTrustService.trust(project, local!);
     const trusted = service.listMcpServers(project).find((server) => server.id === 'local');
     expect(trusted?.needsRetrust).toBe(false);
     expect(() => mcpTrustService.assertConnectAllowed(trusted!, project)).not.toThrow();
+
+    fs.writeFileSync(path.join(project, 'server.mjs'), 'process.exit(1)\n');
+    expect(service.listMcpServers(project).find((server) => server.id === 'local')?.needsRetrust).toBe(true);
+    expect(() => mcpTrustService.assertConnectAllowed(trusted!, project)).toThrow(/MCP_TRUST_REQUIRED/);
   });
 
   it('discovers the Wave 4 method skills and Debugger causal method from the builtin catalog', async () => {

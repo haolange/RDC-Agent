@@ -6,11 +6,13 @@ import type {
   AgentManifestDraft,
   AgentModelMigrationPreview,
   AgentOverrideFileRequest,
+  ProjectAgentTrustPreview,
 } from '@shared/types/agentManifest';
 import type { AgentModelBinding, AgentModelSettings, AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import type { AgentBuiltinDiffState } from './AgentBuiltinDiffDialog';
 import type { AgentOverrideFileAction } from './AgentModelMigrationDialog';
+import type { ProjectAgentTrustReview } from './ProjectAgentTrustDialog';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -22,6 +24,8 @@ export interface AgentModelCommands {
   onPreviewAgentModelMigration: (sourcePath: string) => Promise<AgentModelMigrationPreview>;
   onCommitAgentOverrideFile: (action: 'migrate' | 'delete', request: AgentOverrideFileRequest) => Promise<void>;
   onLoadAgentBuiltinComparison: (draft: AgentManifestDraft) => Promise<AgentBuiltinComparison>;
+  onPreviewProjectAgentTrust: (sourcePath: string) => Promise<ProjectAgentTrustPreview>;
+  onTrustProjectAgent: (request: AgentOverrideFileRequest) => Promise<void>;
 }
 
 const errorText = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
@@ -32,6 +36,7 @@ export function useAgentModelControls(settings: AppSettings, commands: AgentMode
   const [modelError, setModelError] = useState<{ target: string; message: string } | null>(null);
   const [builtinDiff, setBuiltinDiff] = useState<AgentBuiltinDiffState | null>(null);
   const [overrideAction, setOverrideAction] = useState<AgentOverrideFileAction | null>(null);
+  const [trustReview, setTrustReview] = useState<ProjectAgentTrustReview | null>(null);
 
   const commit = (agentModels: AgentModelSettings, target: string) => {
     setModelError(null);
@@ -73,6 +78,21 @@ export function useAgentModelControls(settings: AppSettings, commands: AgentMode
     setOverrideAction(null);
   };
 
+  const openTrustReview = (issue: AgentManifestDiagnostic) => {
+    const same = (current: ProjectAgentTrustReview | null) => current?.sourcePath === issue.sourcePath;
+    setTrustReview({ agentId: issue.agentId, sourcePath: issue.sourcePath });
+    void commands.onPreviewProjectAgentTrust(issue.sourcePath).then(
+      (preview) => setTrustReview((current) => (same(current) ? { ...current!, preview } : current)),
+      (error: unknown) => setTrustReview((current) => (same(current)
+        ? { ...current!, error: errorText(error, t('settings.agentTrustFailed')) } : current)),
+    );
+  };
+
+  const confirmTrust = async (preview: ProjectAgentTrustPreview) => {
+    await commands.onTrustProjectAgent({ sourcePath: preview.sourcePath, sourceHash: preview.sourceHash });
+    setTrustReview(null);
+  };
+
   return {
     modelError,
     setDefaultBinding,
@@ -84,5 +104,9 @@ export function useAgentModelControls(settings: AppSettings, commands: AgentMode
     openOverrideAction,
     confirmOverrideAction,
     closeOverrideAction: () => setOverrideAction(null),
+    trustReview,
+    openTrustReview,
+    confirmTrust,
+    closeTrustReview: () => setTrustReview(null),
   };
 }

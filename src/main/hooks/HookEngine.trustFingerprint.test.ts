@@ -7,7 +7,6 @@ import { CANONICAL_HOOK_EVENTS } from '@shared/types/rdcRuntime';
 import { directoryLinkType } from '../platform/paths';
 import { currentHost } from '../platform/host';
 import { HookEngine } from './HookEngine';
-import { CURRENT_HOOK_TRUST_SCHEMA_VERSION } from './hookTrustStore';
 
 const roots: string[] = [];
 const makeRoot = () => {
@@ -126,7 +125,7 @@ describe('HookEngine trust fingerprint', () => {
     expect(afterRevoke.load(path.join(root, 'user'), project, emptyBuiltin())[0].trust.trusted).toBe(false);
   });
 
-  it('does not accept an old YAML-only sourceHash even when it matches the parsed definition', () => {
+  it('does not trust a hook from a trust file in an unrecognized shape', () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
     const hooks = path.join(project, '.rdc-agent', 'hooks');
@@ -143,10 +142,6 @@ describe('HookEngine trust fingerprint', () => {
     const reloaded = engine.load(path.join(root, 'user'), project, emptyBuiltin());
     expect(reloaded[0].trust.trusted).toBe(false);
     expect(reloaded[0].trust.needsRetrust).toBe(true);
-    const persisted = JSON.parse(fs.readFileSync(trustPath, 'utf8')) as { schemaVersion: string; records: unknown };
-    expect(persisted.schemaVersion).toBe(CURRENT_HOOK_TRUST_SCHEMA_VERSION);
-    expect(persisted.records).toEqual({});
-    expect(JSON.stringify(persisted)).not.toContain(loaded[0].sourceHash);
   });
 
   it('requires retrust when referenced script bytes change', () => {

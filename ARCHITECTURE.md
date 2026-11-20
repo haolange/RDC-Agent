@@ -90,6 +90,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - **输出通道**：`ProviderOutputRef` 一经声明永久归属 `thinking` | `text` | `tool_call` 之一；ref 承载 provider 侧 block 身份，已关闭的 block 不复用，多 part / 多 item 映射到不同 ref；普通 assistant text 永不合成 thinking。输出项的 provider phase 独立保留并在同源 Responses 历史中回放；未确认阶段的文本以中性状态原位流式呈现，只有正常结束确认的 `final_answer` 进入 canonical 正文。
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不进入 renderer / IPC 明文 / Trace / RequestPlan。
 - **Browser Bridge (debug-only)**: only `RDC_AGENT_BROWSER_QA=1` (launcher browser/browser-dev) in an unpackaged build starts it; a packaged build never starts it, and every request must carry the bridge's own `Host`. The authoritative entry is the one-time `/qa?qaBootstrap=...` URL printed by the launcher; successful bootstrap mints an HttpOnly `SameSite=Strict` cookie (with `Secure` for HTTPS) and redirects to clean `/app` on the **same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge (including HMR WebSocket); the browser never opens the Vite port and never carries bridge auth or a challenge in a URL query. Cookie-authenticated `/invoke`, `/events`, and `/api/*` require `Origin` equal to the bridge origin. Dev proxy strips `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*` before forwarding to Vite. Programmatic clients may use an explicit Bearer header. Channel capability is a closed `Record<RendererInvokeChannel, BridgeChannelCapability>` in `src/shared/renderer-api/channelCapabilities.ts`; TypeScript forces every new channel to be classified; unknown channels fail closed. `high-impact` additionally requires `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; `desktop-only` is always denied. Browser and Desktop share the single `src/shared/renderer-api` ElectronAPI factory and channel manifest. This surface is never part of the release default path. See docs/contracts/permissions.md and docs/architecture/browser-qa-surface.md.
+- **项目自带资源**：项目 Agent profile、hook、MCP 都要显式 trust 才生效，trust 绑定文件/可执行 bytes，变化即失效；项目 profile 与子代理只能收紧天花板（子代理取父回合与自身的较严者）。
 - **MCP project**：同 ID 不覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust；运行时连接按 `projectRoot + descriptorHash` 建立独立 ref-counted pool，handoff 只属于当前 Turn terminal result。
 - **MCP transport**：仅 `stdio` / `streamable-http`；`sse` 配置 fail-closed（`MCP_TRANSPORT_UNSUPPORTED`）。Pool identity：`realpath + projectId + descriptorHash`；失败缓存指数退避；orphan pool quarantine。
 - **RDC**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 CLI 与应用固定生命周期对接。Mission 只读面与 `rdc_probe` 见裁决 J。
@@ -263,7 +264,7 @@ Mission 的禁止面：`shell`、`code_interpreter`、`write` / `edit` / `git` /
 
 ### K. Hook Trust Fingerprint
 
-Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity（`hook-trust.json` schemaVersion 2）。任一变化 → `needsRetrust`；仅 YAML 的旧记录首次加载失效并要求 retrust。user/project 必须显式 trust；builtin 默认信任，内容变化随仓库发布。12 canonical events 走单一 `HookEngine` 路径。
+Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity（`hook-trust.json` schemaVersion 2）。任一变化 → `needsRetrust`；其他形状的信任文件读作无信任。Project MCP 与项目 Agent profile 的 trust 复用同一文件身份（`src/main/runtime/fileIdentity.ts`）。user/project 必须显式 trust；builtin 默认信任，内容变化随仓库发布。12 canonical events 走单一 `HookEngine` 路径。
 
 ### L. Mission Completion Contract
 

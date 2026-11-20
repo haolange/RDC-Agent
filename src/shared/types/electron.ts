@@ -401,6 +401,8 @@ export interface ElectronAPI {
     previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
     applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
     deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
+    previewProjectAgentTrust: (sourcePath: string) => Promise<import('./agentManifest').ProjectAgentTrustPreview>;
+    trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
     getAgentBuiltinComparison: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<import('./agentManifest').AgentBuiltinComparison>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;

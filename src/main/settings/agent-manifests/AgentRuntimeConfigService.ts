@@ -13,6 +13,7 @@ import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import {
   mcpDescriptorHash,
   mcpTrustService,
+  mcpUntrustedReason,
   projectOverridesUserExecutable,
 } from '../settings-core/McpTrustService';
 import { isSkillVisibleToProfile } from '@shared/constants/canonicalSkills';
@@ -197,15 +198,13 @@ export class AgentRuntimeConfigService {
         return { ...descriptor, descriptorHash, needsRetrust: false };
       }
       const projectRealpath = mcpTrustService.resolveProjectRealpath(projectRoot);
-      const trusted = mcpTrustService.isTrusted(projectRealpath, descriptor.id, descriptorHash);
+      const trusted = mcpTrustService.isTrusted(projectRealpath, { ...descriptor, descriptorHash });
       return {
         ...descriptor,
         descriptorHash,
         projectRealpath,
         needsRetrust: !trusted,
-        ...(trusted ? {} : {
-          blockedReason: `Project MCP "${descriptor.id}" needs trust for projectRealpath+descriptorHash before connect.`,
-        }),
+        ...(trusted ? {} : { blockedReason: mcpUntrustedReason(descriptor.id) }),
       };
     };
 

@@ -6,6 +6,7 @@ import { appPathService } from './AppPathService';
 import { hashScopedResource, scopedResourceResolver } from './ScopedResourceResolver';
 import { hookEngine } from '../hooks/HookEngine';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
+import { projectAgentTrust } from '../settings/agent-manifests/ProjectAgentTrust';
 import { mcpTrustService } from '../settings/settings-core/McpTrustService';
 
 const EXTENSIONS: Partial<Record<ScopedResourceKind, string>> = {
@@ -165,11 +166,7 @@ export class ScopedRuntimeService {
     if (descriptor.scope !== 'project') {
       throw new Error(`MCP "${descriptorId}" is not a project-scoped descriptor requiring trust.`);
     }
-    const descriptorHash = descriptor.descriptorHash || '';
-    if (!descriptorHash) {
-      throw new Error(`MCP "${descriptorId}" is missing descriptorHash.`);
-    }
-    mcpTrustService.trust(projectRoot, descriptorId, descriptorHash);
+    mcpTrustService.trust(projectRoot, descriptor);
     return this.overview(projectRoot);
   }
 
@@ -209,6 +206,9 @@ export class ScopedRuntimeService {
     assertInside(root, sourcePath);
     fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
     fs.writeFileSync(sourcePath, `${request.content.trim()}\n`, 'utf8');
+    if (request.kind === 'agent' && request.scope === 'project') {
+      projectAgentTrust.trust(this.requireProject(request.projectRoot), id, sourcePath);
+    }
     return this.readDocument(request.kind, request.scope, id, sourcePath);
   }
 
@@ -255,6 +255,7 @@ export class ScopedRuntimeService {
     const id = safeId(idValue);
     if (kind === 'hook' && scope === 'project') this.hooks.revokeProjectHook(this.requireProject(projectRoot), id);
     if (kind === 'hook' && scope === 'user') this.hooks.revokeUserHook(id);
+    if (kind === 'agent' && scope === 'project') projectAgentTrust.revoke(this.requireProject(projectRoot), id);
     const root = this.rootFor(kind, scope, projectRoot);
     const target = kind === 'skill' ? path.join(root, id) : path.join(root, `${id}${EXTENSIONS[kind]}`);
     assertInside(root, target);

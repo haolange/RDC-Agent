@@ -3,6 +3,13 @@ import { isProviderExecutable } from '@shared/utils/providerExecutionAvailabilit
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
 import { isSafeAgentProfileId } from '@shared/types/agent';
+import {
+  AGENT_PROJECT_CEILING_NARROWED,
+  AGENT_PROJECT_UNTRUSTED,
+  agentAccessCeiling,
+  narrowerAccessCeiling,
+  type AgentAccessCeiling,
+} from '@shared/types/agentManifest';
 import type {
   AgentManifestDefinition,
   AgentManifestDiagnostic,
@@ -24,6 +31,7 @@ import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import { resolvedPathKey, samePath } from '../../platform/paths';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { isReservedAgentId } from '../settings-core/reservedAgentIds';
+import { projectAgentTrust } from './ProjectAgentTrust';
 
 const toSlug = (value: string): string => {
   const slug = value
@@ -98,6 +106,29 @@ const listAgentManifestFiles = (directory: string): string[] => {
     && !entry.startsWith('.')
     && isSafeAgentProfileId(idFromFileName(entry))
   ));
+};
+
+/** A project profile without a user or builtin profile of the same id never gets process execution. */
+const PROJECT_AGENT_ACCESS_CEILING: AgentAccessCeiling = 'workspace-write';
+
+/**
+ * A project profile may narrow what the profile it overrides can do, never widen it; a new project
+ * profile is held to workspace writes.
+ */
+const clampProjectAccessCeiling = (
+  candidate: ScopedResourceCandidate<AgentManifestDefinition>,
+  lowerScopes: ReadonlyArray<ScopedResourceCandidate<AgentManifestDefinition>>,
+): { candidate: ScopedResourceCandidate<AgentManifestDefinition>; narrowedFrom?: AgentAccessCeiling } => {
+  if (candidate.invalid) return { candidate };
+  const overridden = lowerScopes.filter((entry) => entry.id === candidate.id && !entry.invalid).at(-1);
+  const limit = overridden ? agentAccessCeiling(overridden.value) : PROJECT_AGENT_ACCESS_CEILING;
+  const declared = agentAccessCeiling(candidate.value);
+  const effective = narrowerAccessCeiling(declared, limit);
+  if (effective === declared) return { candidate };
+  return {
+    candidate: { ...candidate, value: { ...candidate.value, accessCeiling: effective } },
+    ...(candidate.value.accessCeiling ? { narrowedFrom: declared } : {}),
+  };
 };
 
 const loadManifestCandidates = (
@@ -224,7 +255,22 @@ export class AgentManifestService {
           );
           continue;
         }
-        candidates.push(loaded.candidate);
+        if (!loaded.candidate.invalid && !projectAgentTrust.isTrusted(projectRoot, loaded.candidate.id, loaded.candidate.sourcePath)) {
+          diagnostics.push({
+            code: AGENT_PROJECT_UNTRUSTED, severity: 'warning', scope: 'project', agentId: loaded.candidate.id,
+            sourcePath: loaded.candidate.sourcePath, message: 'This project brings its own Agent profile; it loads only after you trust it.',
+          });
+          continue;
+        }
+        const clamped = clampProjectAccessCeiling(loaded.candidate, candidates);
+        if (clamped.narrowedFrom) {
+          diagnostics.push({
+            code: AGENT_PROJECT_CEILING_NARROWED, severity: 'warning', scope: 'project', agentId: loaded.candidate.id,
+            sourcePath: loaded.candidate.sourcePath,
+            message: `Access ceiling ${clamped.narrowedFrom} narrowed to ${agentAccessCeiling(clamped.candidate.value)}: a project profile cannot exceed the profile it overrides.`,
+          });
+        }
+        candidates.push(clamped.candidate);
       }
     }
 
@@ -346,6 +392,7 @@ export class AgentManifestService {
         throw new Error('BUILTIN_AGENT_MANIFEST_READONLY: deleting a builtin profile is not allowed.');
       }
       await fs.promises.rm(filePath, { force: true });
+      if (options.scope === 'project') projectAgentTrust.revoke(options.projectRoot!, agentId);
       return {
         definition: this.resolveEffectiveDefinition(paths, agentId, resolutionRoot),
         commitHash: hashManifestContent(`deleted:${agentId}`),
@@ -380,6 +427,8 @@ export class AgentManifestService {
     if (path.basename(filePath) !== ownedFileName) {
       throw new Error(`AGENT_MANIFEST_FILENAME_MISMATCH: write path must be ${ownedFileName}.`);
     }
+    // The user wrote these bytes through Settings; trust exactly them in this project.
+    if (options.scope === 'project') projectAgentTrust.trust(options.projectRoot!, agentId, filePath);
     return {
       definition: this.resolveEffectiveDefinition(paths, agentId, resolutionRoot),
       commitHash: hashManifestContent(content),

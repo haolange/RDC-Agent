@@ -39,21 +39,6 @@ export const hookTrustKey = (scope: 'user' | 'project', ownerRoot: string, hookI
   `${scope}::${path.resolve(ownerRoot).toLowerCase()}::${hookId}`
 );
 
-const looksLikeYamlOnlyV1 = (raw: unknown): boolean => {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
-  const record = raw as Record<string, unknown>;
-  if ('schemaVersion' in record) {
-    return record.schemaVersion === '1' || record.schemaVersion === 1;
-  }
-  return Object.values(record).every((entry) => (
-    Boolean(entry)
-    && typeof entry === 'object'
-    && !Array.isArray(entry)
-    && typeof (entry as { sourceHash?: unknown }).sourceHash === 'string'
-    && !('trustFingerprint' in (entry as object))
-  ));
-};
-
 const schemaVersionOf = (raw: unknown): string | undefined => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const version = (raw as { schemaVersion?: unknown }).schemaVersion;
@@ -91,10 +76,6 @@ export const readHookTrustStore = (trustStorePath: string): HookTrustStoreV2 => 
     }
     return parsed.data;
   }
-  if (looksLikeYamlOnlyV1(raw) || version === '1' || version === undefined && raw && typeof raw === 'object') {
-    const invalidated = emptyHookTrustStore();
-    writeHookTrustStore(trustStorePath, invalidated);
-    return invalidated;
-  }
+  // Any other shape is not a trust decision this version made; the user is asked again.
   return emptyHookTrustStore();
 };

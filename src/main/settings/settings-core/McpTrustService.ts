@@ -1,17 +1,8 @@
-import fs from 'fs';
 import path from 'path';
 import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
-import { appPathService } from '../../runtime/AppPathService';
+import { argumentFileIdentities, canonicalRealpath, commandIdentity } from '../../runtime/fileIdentity';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-
-export interface McpTrustRecord {
-  projectRealpath: string;
-  descriptorId: string;
-  descriptorHash: string;
-  trustedAt: string;
-}
-
-type McpTrustStore = Record<string, McpTrustRecord>;
+import { ProjectTrustStore, type ProjectTrustRecord } from './ProjectTrustStore';
 
 export function mcpExecutableFingerprint(descriptor: Pick<AgentRuntimeMcpDescriptor, 'command' | 'args' | 'url' | 'env'>): string {
   return hashScopedResource({
@@ -33,6 +24,21 @@ export function mcpDescriptorHash(descriptor: AgentRuntimeMcpDescriptor): string
   });
 }
 
+/**
+ * What trusting a project MCP server binds to, matching hook trust: the descriptor, where it was
+ * declared, the executable the command resolves to and the bytes of every file its arguments name.
+ * Editing the launched script or swapping the binary on PATH asks for trust again.
+ */
+export function mcpTrustFingerprint(descriptor: AgentRuntimeMcpDescriptor, projectRealpath: string): string {
+  return hashScopedResource({
+    kind: 'mcp-trust-fingerprint',
+    descriptor: mcpDescriptorHash(descriptor),
+    sourcePath: descriptor.sourcePath ? canonicalRealpath(descriptor.sourcePath) : null,
+    executable: descriptor.command ? commandIdentity(descriptor.command) : null,
+    files: argumentFileIdentities(descriptor.args ?? [], (argument) => path.resolve(projectRealpath, argument)),
+  });
+}
+
 export function projectOverridesUserExecutable(
   user: AgentRuntimeMcpDescriptor,
   project: AgentRuntimeMcpDescriptor,
@@ -40,51 +46,33 @@ export function projectOverridesUserExecutable(
   return mcpExecutableFingerprint(user) !== mcpExecutableFingerprint(project);
 }
 
-export class McpTrustService {
-  constructor(
-    private readonly explicitTrustStorePath?: string,
-  ) {}
+export function mcpUntrustedReason(descriptorId: string): string {
+  return `MCP_TRUST_REQUIRED: project MCP "${descriptorId}" is not trusted, or its command or files changed since it was trusted.`;
+}
 
-  private get trustStorePath(): string {
-    return this.explicitTrustStorePath ?? path.join(appPathService.getAppStatePaths().appStateRoot, 'mcp-trust.json');
+export class McpTrustService {
+  private readonly store: ProjectTrustStore;
+
+  constructor(explicitTrustStorePath?: string) {
+    this.store = new ProjectTrustStore('mcp-trust.json', explicitTrustStorePath);
   }
 
   resolveProjectRealpath(projectRoot: string): string {
-    try {
-      return fs.realpathSync.native(path.resolve(projectRoot));
-    } catch {
-      return path.resolve(projectRoot);
-    }
+    return this.store.resolveProjectRealpath(projectRoot);
   }
 
-  isTrusted(projectRoot: string, descriptorId: string, descriptorHash: string): boolean {
+  isTrusted(projectRoot: string, descriptor: AgentRuntimeMcpDescriptor): boolean {
     const projectRealpath = this.resolveProjectRealpath(projectRoot);
-    const record = this.readStore()[this.trustKey(projectRealpath, descriptorId)];
-    return Boolean(record
-      && record.projectRealpath === projectRealpath
-      && record.descriptorHash === descriptorHash);
+    return this.store.isTrusted(projectRealpath, descriptor.id, mcpTrustFingerprint(descriptor, projectRealpath));
   }
 
-  trust(projectRoot: string, descriptorId: string, descriptorHash: string): McpTrustRecord {
+  trust(projectRoot: string, descriptor: AgentRuntimeMcpDescriptor): ProjectTrustRecord {
     const projectRealpath = this.resolveProjectRealpath(projectRoot);
-    const trustedAt = new Date().toISOString();
-    const store = this.readStore();
-    const record: McpTrustRecord = {
-      projectRealpath,
-      descriptorId,
-      descriptorHash,
-      trustedAt,
-    };
-    store[this.trustKey(projectRealpath, descriptorId)] = record;
-    this.writeStore(store);
-    return record;
+    return this.store.trust(projectRealpath, descriptor.id, mcpTrustFingerprint(descriptor, projectRealpath));
   }
 
   revoke(projectRoot: string, descriptorId: string): void {
-    const projectRealpath = this.resolveProjectRealpath(projectRoot);
-    const store = this.readStore();
-    delete store[this.trustKey(projectRealpath, descriptorId)];
-    this.writeStore(store);
+    this.store.revoke(projectRoot, descriptorId);
   }
 
   assertConnectAllowed(descriptor: AgentRuntimeMcpDescriptor, projectRoot?: string | null): void {
@@ -96,37 +84,10 @@ export class McpTrustService {
     if (descriptor.scope !== 'project') {
       return;
     }
-    if (!projectRoot) {
-      throw new Error(`Project MCP "${descriptor.id}" requires a trusted project root before connect.`);
+    // Re-fingerprint at connect time: the script may have changed since the settings snapshot.
+    if (!projectRoot || !this.isTrusted(projectRoot, descriptor)) {
+      throw new Error(mcpUntrustedReason(descriptor.id));
     }
-    const projectRealpath = this.resolveProjectRealpath(projectRoot);
-    const descriptorHash = descriptor.descriptorHash || mcpDescriptorHash(descriptor);
-    if (!this.isTrusted(projectRealpath, descriptor.id, descriptorHash)) {
-      throw new Error(
-        descriptor.blockedReason
-          || `Project MCP "${descriptor.id}" needs trust for projectRealpath+descriptorHash before connect.`,
-      );
-    }
-  }
-
-  private trustKey(projectRealpath: string, descriptorId: string): string {
-    return `${projectRealpath.toLowerCase()}::${descriptorId}`;
-  }
-
-  private readStore(): McpTrustStore {
-    try {
-      if (!fs.existsSync(this.trustStorePath)) {
-        return {};
-      }
-      return JSON.parse(fs.readFileSync(this.trustStorePath, 'utf8')) as McpTrustStore;
-    } catch {
-      return {};
-    }
-  }
-
-  private writeStore(store: McpTrustStore): void {
-    fs.mkdirSync(path.dirname(this.trustStorePath), { recursive: true });
-    fs.writeFileSync(this.trustStorePath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
   }
 }
 
