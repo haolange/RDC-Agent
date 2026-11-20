@@ -52,14 +52,14 @@
 }
 
 .settings-center-brand-title {
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: 1.2;
 }
 
 .settings-center-brand-subtitle {
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.4;
 }
 

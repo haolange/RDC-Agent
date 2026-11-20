@@ -36,7 +36,6 @@ describe('ContextUsageIndicator', () => {
     else expect(document).not.toContain('visibility="hidden"');
     if (usagePercent === 100) {
       expect(document).not.toContain('stroke-dash');
-      expect(html).toContain('data-value-length="medium"');
     }
     expect(html).not.toContain('width="36"');
   });
@@ -178,7 +177,6 @@ describe('ContextUsageIndicator', () => {
     expect(projected).toContain('is-estimated');
     expect(projected).toContain('data-estimated="true"');
     expect(projected).toContain(`title="contextBreakdown.projected ~${usagePercent}% 1M"`);
-    if (usagePercent === 100) expect(projected).toContain('data-value-length="long"');
     expect(projected).not.toContain('composer-usage-value-label');
   });
 

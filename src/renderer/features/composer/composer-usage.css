@@ -1,10 +1,10 @@
 .composer-usage-indicator {
   position: relative;
-  width: var(--control-height-sm);
   height: var(--control-height-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-1);
   flex: 0 0 auto;
   border-radius: var(--control-radius);
   border: 1px solid var(--token-border-default);
@@ -21,11 +21,10 @@
 }
 
 .composer-usage-ring {
-  position: absolute;
-  inset: 0;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
   transform: rotate(-90deg);
 }
 
@@ -51,30 +50,19 @@
 }
 
 .composer-usage-value {
-  position: absolute;
-  inset: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   line-height: 1;
 }
 
+/* The used share sits beside the ring at caption size; readable text never shrinks below it. */
 .composer-usage-value-number {
   color: var(--token-text-body);
   font-family: var(--font-mono);
-  font-size: calc(var(--text-xs) * .75);
-  font-weight: var(--font-semibold);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-medium);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
   white-space: nowrap;
-}
-
-.composer-usage-indicator[data-value-length='medium'] .composer-usage-value-number {
-  font-size: calc(var(--text-xs) * 2 / 3);
-}
-
-.composer-usage-indicator[data-value-length='long'] .composer-usage-value-number {
-  font-size: calc(var(--text-xs) * 7 / 12);
 }
 
 .composer-usage-indicator.is-pending .composer-usage-ring-progress {
@@ -89,7 +77,7 @@
 
 .composer-usage > .composer-usage-indicator {
   cursor: pointer;
-  padding: 0;
+  padding: 0 var(--space-2);
   font: inherit;
 }
 

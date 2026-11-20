@@ -56,7 +56,7 @@
 
 .ui-checkbox-label {
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: var(--leading-normal);
 }
 

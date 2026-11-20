@@ -31,7 +31,7 @@
 .context-breakdown-run-col-title {
   margin: 0;
   color: var(--token-text-placeholder);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -56,13 +56,13 @@
 .context-breakdown-meter-primary-label,
 .context-breakdown-meter-detail dt {
   color: var(--token-text-placeholder);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-medium);
 }
 
 .context-breakdown-meter-primary-value {
   color: var(--token-text-heading);
-  font-size: var(--text-3xl);
+  font-size: var(--type-display-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
   font-variant-numeric: tabular-nums;
@@ -97,7 +97,7 @@
 
 .context-breakdown-meter-detail dd {
   color: var(--token-text-body);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-variant-numeric: tabular-nums;
   text-align: right;
   overflow-wrap: anywhere;
@@ -112,7 +112,7 @@
 
 .context-breakdown-meter-stat-label {
   color: var(--token-text-placeholder);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-medium);
   line-height: 1.2;
   white-space: nowrap;
@@ -120,7 +120,7 @@
 
 .context-breakdown-meter-stat-value {
   color: var(--token-text-heading);
-  font-size: var(--text-md);
+  font-size: var(--type-heading-size);
   font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;

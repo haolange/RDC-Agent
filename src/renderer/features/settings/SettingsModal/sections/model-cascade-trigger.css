@@ -48,7 +48,7 @@
   display: block;
   margin-top: var(--space-2);
   color: var(--token-status-error);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   overflow-wrap: anywhere;
 }
 
@@ -61,12 +61,12 @@
 }
 
 .settings-model-cascade-trigger strong {
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
 }
 
 .settings-model-cascade-trigger span {
   color: var(--token-text-caption);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }

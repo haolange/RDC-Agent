@@ -35,7 +35,7 @@
   gap: var(--space-3);
   min-height: var(--control-height-md);
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   cursor: pointer;
 }
 
@@ -75,7 +75,7 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-semibold);
 }
 

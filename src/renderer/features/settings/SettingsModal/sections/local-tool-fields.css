@@ -34,7 +34,7 @@
   gap: var(--space-2);
   min-height: var(--control-height-md);
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .settings-local-tool-grid {
@@ -55,7 +55,7 @@
 }
 
 .settings-local-tool-grid .settings-field.is-row .settings-field-label {
-  padding-top: calc((var(--control-height-md) - var(--text-sm) * 1.4) / 2);
+  padding-top: calc((var(--control-height-md) - var(--type-label-size) * 1.4) / 2);
 }
 
 .settings-local-tool-grid .ui-input,
@@ -78,13 +78,13 @@
   min-height: var(--control-height-md);
   justify-content: center;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .settings-readonly-status code {
   color: var(--token-text-caption);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   overflow-wrap: anywhere;
 }
 

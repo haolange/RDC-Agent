@@ -6,8 +6,8 @@
   min-height: var(--composer-prompt-min-height);
   max-height: var(--composer-prompt-max-height);
   box-sizing: border-box;
-  /* Match .composer-textarea (responsive.css → --text-base), not --text-md. */
-  font-size: var(--text-base);
+  /* Match .composer-textarea (responsive.css → --type-body-size), not a larger role. */
+  font-size: var(--type-body-size);
   line-height: 1.55;
 }
 

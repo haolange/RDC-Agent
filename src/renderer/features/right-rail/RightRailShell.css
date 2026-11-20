@@ -28,7 +28,7 @@
   min-height: var(--control-height-md);
   margin: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
 }
@@ -64,7 +64,7 @@
 .right-rail-empty-state .ui-empty-state-title {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-normal);
   line-height: var(--leading-normal);
   text-align: left;

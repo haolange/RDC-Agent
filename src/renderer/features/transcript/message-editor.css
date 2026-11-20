@@ -18,14 +18,14 @@
 .conversation-edit-textarea {
   width: 100%;
   color: var(--token-text-heading);
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   line-height: 1.7;
 }
 
 .conversation-edit-preview {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.5;
 }
 
@@ -38,6 +38,6 @@
 
 .conversation-edit-error {
   color: var(--token-status-error);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.6;
 }

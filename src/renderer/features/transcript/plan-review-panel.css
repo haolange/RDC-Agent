@@ -35,11 +35,11 @@
 }
 
 .plan-review-panel__heading { min-width: 0; flex: 1 1 0; }
-.plan-review-panel__revision { color: var(--token-text-muted); font-size: var(--text-xs); }
+.plan-review-panel__revision { color: var(--token-text-muted); font-size: var(--type-caption-size); }
 
 .plan-review-panel__title {
   margin: 0;
-  font-size: var(--text-md);
+  font-size: var(--type-heading-size);
   font-weight: 600;
   overflow-wrap: anywhere;
   max-height: 3lh;
@@ -57,7 +57,7 @@
   min-height: 0;
   overflow: auto;
   padding: var(--space-4);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   overflow-wrap: anywhere;
   overscroll-behavior: contain;
 }
@@ -68,7 +68,7 @@
 .plan-review-panel__error {
   margin: 0 var(--space-4) var(--space-3);
   color: var(--token-status-error);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 @media (max-width: 640px) {
@@ -79,7 +79,7 @@
 .plan-review-panel__notice {
   margin: var(--space-3) var(--space-4) 0;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .plan-review-panel__appendix { margin-top: var(--space-4); }

@@ -8,7 +8,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   color: var(--token-text-body);
 }
 
@@ -16,7 +16,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 /* Import */
@@ -48,14 +48,14 @@
   gap: var(--space-2);
   min-width: 0;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   overflow-wrap: anywhere;
 }
 
 .knowledge-import-file-path {
   color: var(--token-text-caption);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -71,7 +71,7 @@
   border-radius: var(--radius-md);
   background: var(--token-bg-raised);
   color: var(--token-text-body);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .knowledge-import-pending .ui-icon {
@@ -82,7 +82,7 @@
 .knowledge-write-hint {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   line-height: 1.6;
 }
 
@@ -95,7 +95,7 @@
 .knowledge-import-result-count {
   margin: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-lg);
+  font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
 }
 
@@ -104,7 +104,7 @@
   align-items: center;
   gap: var(--space-2);
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .knowledge-import-result-card {
@@ -121,13 +121,13 @@
 
 .knowledge-import-result-card strong {
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .knowledge-import-result-card p {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   overflow-wrap: anywhere;
 }
 
@@ -144,7 +144,7 @@
 .knowledge-export-group legend {
   padding: 0 0 var(--space-1);
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-medium);
 }
 
@@ -152,7 +152,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   cursor: pointer;
 }
 
@@ -174,7 +174,7 @@
 .knowledge-export-path {
   color: var(--token-text-caption);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   overflow-wrap: anywhere;
 }
 
@@ -195,13 +195,13 @@
 
 .knowledge-write-fact dt {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .knowledge-write-fact dd {
   margin: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   overflow-wrap: anywhere;
 }
 
@@ -215,13 +215,13 @@
 .knowledge-write-section-title {
   margin: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
 }
 
 .knowledge-write-basis summary {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   cursor: pointer;
 }
 
@@ -229,6 +229,6 @@
   margin: var(--space-2) 0 0;
   color: var(--token-text-body);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   overflow-wrap: anywhere;
 }

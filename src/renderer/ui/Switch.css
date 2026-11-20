@@ -76,7 +76,7 @@
 .ui-switch-label {
   min-width: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.35;
 }
 

@@ -47,7 +47,7 @@
 }
 
 .composer-agent-pill-label {
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-semibold);
 }
 

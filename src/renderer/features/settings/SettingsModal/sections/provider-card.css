@@ -27,14 +27,14 @@
   border-radius: var(--radius-md);
   background: var(--token-bg-panel);
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-semibold);
 }
 
 .settings-provider-card-name {
   min-width: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -44,7 +44,7 @@
 .settings-provider-card-models {
   flex: none;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -76,7 +76,7 @@
 .settings-provider-card-status-label {
   min-width: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -107,14 +107,14 @@
 
 .settings-provider-card-summary-row dt {
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .settings-provider-card-summary-row dd {
   margin: 0;
   min-width: 0;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -133,7 +133,7 @@
   border: 0;
   background: transparent;
   color: var(--token-status-error);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   text-align: start;
   cursor: pointer;
 }
@@ -150,7 +150,7 @@
 .settings-provider-card-error-detail {
   margin: var(--space-2) 0 0;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }

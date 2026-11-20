@@ -16,7 +16,7 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .settings-mcp-table th,
@@ -30,7 +30,7 @@
 .settings-mcp-table th {
   color: var(--token-text-caption);
   font-weight: var(--font-medium);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   word-break: keep-all;
 }
 

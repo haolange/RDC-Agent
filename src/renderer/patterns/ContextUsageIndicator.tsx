@@ -110,7 +110,6 @@ export const ContextUsageIndicator: React.FC<{
         className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' || awaitingWindow ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
         data-estimated={showEstimatedRing ? 'true' : undefined}
-        data-value-length={valueText.length > 4 ? 'long' : valueText.length === 4 ? 'medium' : undefined}
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}

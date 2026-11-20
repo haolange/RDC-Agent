@@ -1,7 +1,7 @@
 .device-preparation-status { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border-top: 1px solid var(--token-border-default); }
-.device-preparation-status p { margin: 0; overflow-wrap: anywhere; font-size: var(--text-sm); }
+.device-preparation-status p { margin: 0; overflow-wrap: anywhere; font-size: var(--type-label-size); }
 .device-preparation-heading { font-weight: var(--font-semibold); }
 .device-preparation-heading.is-error { color: var(--token-status-error); }
-.device-preparation-diagnostic { min-width: 0; max-height: calc(var(--control-height-md) * 5); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-xs); }
+.device-preparation-diagnostic { min-width: 0; max-height: calc(var(--control-height-md) * 5); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--type-caption-size); }
 .device-preparation-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.device-preparation-status .device-preparation-hint { color: var(--token-text-caption); font-size: var(--text-xs); }
+.device-preparation-status .device-preparation-hint { color: var(--token-text-caption); font-size: var(--type-caption-size); }

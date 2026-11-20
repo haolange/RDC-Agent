@@ -14,13 +14,13 @@
 
 .investigation-preview-meta dt {
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .investigation-preview-meta dd {
   margin: 0;
   color: var(--token-text-body);
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 
@@ -40,7 +40,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -49,14 +49,14 @@
 .investigation-preview-error {
   margin: 0;
   color: var(--token-status-error);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   overflow-wrap: anywhere;
 }
 
 .investigation-preview-message {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .investigation-preview-body {
@@ -68,7 +68,7 @@
   background: var(--token-surface-sunken);
   color: var(--token-text-body);
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -90,13 +90,13 @@
 .investigation-report h3 {
   margin: 0 0 var(--space-2);
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-semibold);
 }
 
 .investigation-report p {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: var(--leading-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -107,7 +107,7 @@
 .investigation-report .investigation-report-meta,
 .investigation-report .investigation-report-note {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .investigation-report-claims,
@@ -126,13 +126,13 @@
   display: grid;
   gap: var(--space-1);
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .investigation-report-tuple {
   display: grid;
   gap: var(--space-2);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .investigation-report-tuple dl {
@@ -152,7 +152,7 @@
 
 .investigation-preview-source summary {
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   cursor: pointer;
 }
 

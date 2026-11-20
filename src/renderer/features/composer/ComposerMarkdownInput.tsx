@@ -28,7 +28,7 @@ const composerEditorTheme = EditorView.theme({
     height: '100%',
     backgroundColor: 'transparent',
     color: 'var(--token-text-body)',
-    /* Inherit host (= .composer-textarea → --text-base); never --text-md. */
+    /* Inherit host (= .composer-textarea → --type-body-size); never a larger role. */
     fontSize: 'inherit',
     lineHeight: 'inherit',
   },

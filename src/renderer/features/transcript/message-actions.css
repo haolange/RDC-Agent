@@ -15,7 +15,7 @@
 .conversation-message-trace-note {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .message-actions {
@@ -79,7 +79,7 @@
 
 .conversation-message-footer .conversation-message-time {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   letter-spacing: 0;
 }
 
@@ -95,7 +95,7 @@
   align-items: center;
   gap: var(--space-1);
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .message-variant-nav-btn {
@@ -149,7 +149,7 @@
 .conversation-message-footer .conversation-message-status-tag {
   min-height: var(--space-5);
   padding: 0 var(--space-2);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   letter-spacing: 0;
   text-transform: none;
 }

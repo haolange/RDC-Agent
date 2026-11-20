@@ -17,7 +17,7 @@
   padding: var(--space-1) var(--space-2);
   border-color: transparent;
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .right-rail-inline-actions .button:hover,
@@ -37,7 +37,7 @@
   padding-top: var(--space-2);
   border-top: 1px solid var(--token-border-subtle);
   color: var(--token-status-error);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .is-trace-flash { animation: trace-flash 1.6s ease-out; }

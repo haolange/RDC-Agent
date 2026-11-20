@@ -29,7 +29,7 @@
 
 .settings-search-result-section {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .is-settings-search-hit {
@@ -58,7 +58,7 @@
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
   border: 1px solid transparent;
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   line-height: 1.2;
 }
 

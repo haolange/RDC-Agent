@@ -25,13 +25,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
 }
 
 .settings-agent-list-item-description {
   color: var(--token-text-body);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-regular);
 }
 

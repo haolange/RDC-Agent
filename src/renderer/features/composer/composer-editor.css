@@ -62,8 +62,8 @@
   box-shadow: none;
   color: var(--token-text-body);
   line-height: 1.55;
-  /* Keep in lockstep with ComposerMarkdownInput; composer-viewport.css also pins --text-base. */
-  font-size: var(--text-base);
+  /* Keep in lockstep with ComposerMarkdownInput; composer-viewport.css also pins --type-body-size. */
+  font-size: var(--type-body-size);
 }
 
 .composer-textarea::placeholder {

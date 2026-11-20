@@ -113,13 +113,13 @@
 .work-process-label:not(.is-active) {
   order: 2;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
 }
 
 .work-process-label.is-active {
   order: 2;
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
 }
 
@@ -140,7 +140,7 @@
   display: inline-flex;
   align-items: center;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .work-process-meta::before {
@@ -157,7 +157,7 @@
   max-width: 100%;
   margin: 0 0 var(--space-2);
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -214,7 +214,7 @@
   max-width: 100%;
   margin: 0;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -222,14 +222,14 @@
 .work-process-diagnostic-message {
   width: 100%;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
 
 .work-process-diagnostic.severity-info .work-process-diagnostic-message {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   line-height: 1.5;
 }
 
@@ -251,7 +251,7 @@
 .work-process-approval {
   min-width: 0;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .work-process-approval {
