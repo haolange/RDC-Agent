@@ -103,8 +103,8 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
     ? t('chat.subagentContentUnavailable') : active ? t('chat.subagentStillRunning')
       : t('chat.subagentNoFinal'));
   const finalAvailable = !!header?.finalAvailable;
-  const finalShownInProcess = workOpen && page.steps.some((step) => step.block.outputItems
-    ?.some((item) => item.phase === 'final_answer'));
+  const finalShownInProcess = workOpen && page.steps.some((step) => step.block.items
+    ?.some((item) => item.kind === 'text' && item.phase === 'final_answer'));
   const progressDots = <SubagentProgressDots state={active ? 'active' : status === 'complete' ? 'complete' : 'stopped'} />;
   return <li ref={cardRef} className="work-process-step kind-subagent" data-work-process-block-id={row.id}>
     <WorkProcessRailIcon row={row} active={status === 'running'} />

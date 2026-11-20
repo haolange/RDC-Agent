@@ -1,49 +1,40 @@
 import type {
+  ConversationLoopItem,
   ConversationLoopOutputPhase,
   ConversationLoopResult,
   ConversationLoopResultStatus,
   ConversationLoopStopReason,
   ConversationReasoningState,
+  ConversationThinkingStatus,
   ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
+import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
-
-const WORK_BLOCK_KINDS = new Set<ConversationWorkBlock['kind']>([
-  'reasoning',
-  'llm_turn',
-  'approval',
-  'user_input',
-  'plan_review',
-  'compaction',
-  'handoff',
-  'diagnostic',
-  'output',
-  'command',
-  'task_snapshot',
-]);
+import { normalizeWorkBlockKind, providerOutputRefKey } from './StoredWorkTrace';
 
 interface LoopTraceOptions {
   loopId?: string;
-  loopResultText?: string;
   loopResultStatus?: ConversationLoopResultStatus;
   loopStopReason?: ConversationLoopStopReason;
   loopOutputPhase?: ConversationLoopOutputPhase;
   loopProviderOutputRefs?: ProviderOutputRef[];
   loopReasoningState?: ConversationReasoningState;
-  loopThinking?: ThinkingArtifact;
-  loopThinkingStatus?: ConversationWorkBlock['thinkingStatus'];
 }
 
-function normalizeWorkBlockKind(value: unknown): ConversationWorkBlock['kind'] | null {
-  return WORK_BLOCK_KINDS.has(value as ConversationWorkBlock['kind'])
-    ? value as ConversationWorkBlock['kind']
-    : null;
+/** Loop-level facts a provider event settles; text and thinking arrive as items instead. */
+export interface LoopResultPatch {
+  status?: ConversationLoopResultStatus;
+  stopReason?: ConversationLoopStopReason;
+  outputPhase?: ConversationLoopOutputPhase;
+  reasoningState?: ConversationReasoningState;
+  providerOutputRefs?: ProviderOutputRef[];
 }
+
 function createWorkBlock(
   id: string,
   title: string,
@@ -60,7 +51,7 @@ function createWorkBlock(
     startedAt: nowMs(),
   };
   if (block.kind === 'llm_turn') {
-    block.result = createLoopResult(undefined, block.status, []);
+    block.result = normalizeLoopResult(undefined, block.status, []);
   }
   return block;
 }
@@ -111,27 +102,38 @@ function cloneLoopResult(result: ConversationLoopResult | undefined): Conversati
     : undefined;
 }
 
+function cloneLoopItem(item: ConversationLoopItem): ConversationLoopItem {
+  return item.kind === 'text'
+    ? { ...item, providerOutputRef: { ...item.providerOutputRef } }
+    : { ...item, providerOutputRef: { ...item.providerOutputRef }, thinking: cloneThinkingArtifact(item.thinking)! };
+}
+
 function cloneWorkBlock(block: ConversationWorkBlock): ConversationWorkBlock {
   const toolCalls = block.toolCalls.map(cloneToolCall);
-  const normalizedKind = block.kind;
-  const thinking = cloneThinkingArtifact(block.thinking);
-  const thinkingStatus = block.thinkingStatus ?? (thinking ? 'complete' : undefined);
-  const result = normalizedKind === 'llm_turn'
-    ? normalizeLoopResult(block.result, block.summary, block.status, toolCalls)
+  const result = block.kind === 'llm_turn'
+    ? normalizeLoopResult(block.result, block.status, toolCalls)
     : cloneLoopResult(block.result);
   return {
     ...block,
-    kind: normalizedKind,
-    ...(thinking ? { thinking } : {}),
-    ...(thinkingStatus ? { thinkingStatus } : {}),
     ...(result ? { result } : {}),
-    outputItems: block.outputItems?.map((item) => ({ ...item, providerOutputRef: { ...item.providerOutputRef } })),
+    ...(block.items ? { items: block.items.map(cloneLoopItem) } : {}),
     toolCalls,
   };
 }
 
-export function upsertLoopOutputItem(
-  trace: ConversationWorkTrace,
+function ensureLoopBlock(trace: ConversationWorkTrace, loopId: string): ConversationWorkBlock {
+  let block = writableBlock(trace, (entry) => entry.id === loopId);
+  if (!block) {
+    block = createWorkBlock(loopId, 'LLM turn', 'model', 'llm_turn');
+    block.status = 'running';
+    trace.blocks.push(block);
+  }
+  return block;
+}
+
+/** Text of one provider block. It keeps the position it first appeared at, whatever arrives later. */
+export function upsertLoopTextItem(
+  trace: ConversationWorkTrace | null | undefined,
   loopId: string,
   ref: ProviderOutputRef,
   text: string,
@@ -139,28 +141,68 @@ export function upsertLoopOutputItem(
   status: 'streaming' | 'complete',
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
-  const block = nextTrace.blocks.find((entry) => entry.id === loopId && entry.kind === 'llm_turn');
-  if (!block || nextTrace.status === 'stopped') return nextTrace;
-  const items = block.outputItems ?? [];
-  const existing = items.find((item) => providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
-  if (existing) {
+  if (nextTrace.status === 'stopped') return nextTrace;
+  const block = ensureLoopBlock(nextTrace, loopId);
+  const items = block.items ?? [];
+  const existing = items.find((item) => item.kind === 'text' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
+  if (existing?.kind === 'text') {
     existing.text = text;
     existing.phase = phase ?? existing.phase;
     existing.status = status;
   } else {
-    items.push({ providerOutputRef: { ...ref }, text, phase, status, displayOrder: nextDisplayOrder(nextTrace) });
+    items.push({ kind: 'text', providerOutputRef: { ...ref }, text, phase, status, displayOrder: nextDisplayOrder(nextTrace) });
   }
-  block.outputItems = items;
-  if (block.result) delete block.result.text;
+  block.items = items;
+  nextTrace.updatedAt = nowMs();
   return nextTrace;
 }
 
+/**
+ * One provider thinking block. Each block is its own item, so a loop that thinks, calls a tool and thinks
+ * again keeps both passages in place instead of the last one overwriting the first.
+ */
+export function upsertLoopThinkingItem(
+  trace: ConversationWorkTrace | null | undefined,
+  loopId: string,
+  ref: ProviderOutputRef,
+  thinking: ThinkingArtifact,
+  status: ConversationThinkingStatus,
+): ConversationWorkTrace {
+  const nextTrace = cloneTrace(trace);
+  if (nextTrace.status === 'stopped') return nextTrace;
+  const block = ensureLoopBlock(nextTrace, loopId);
+  const items = block.items ?? [];
+  const existing = items.find((item) => item.kind === 'thinking' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
+  if (existing?.kind === 'thinking') {
+    if (shouldReplaceThinking(existing.thinking, thinking)) existing.thinking = cloneThinkingArtifact(thinking)!;
+    existing.status = status;
+  } else {
+    items.push({
+      kind: 'thinking', providerOutputRef: { ...ref }, thinking: cloneThinkingArtifact(thinking)!, status,
+      displayOrder: nextDisplayOrder(nextTrace),
+    });
+  }
+  block.items = items;
+  if (block.status !== 'running') {
+    block.status = 'running';
+    delete block.completedAt;
+  }
+  nextTrace.status = 'running';
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
+/**
+ * A new trace that shares every block with the old one. Updates copy only the block they change
+ * (writableBlock), so a streaming delta costs one block, not the whole trace, and earlier snapshots
+ * handed to the renderer or the store never change underneath them.
+ */
 function cloneTrace(trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace {
   return trace
     ? {
         ...trace,
         toolEvidence: trace.toolEvidence ? { ...trace.toolEvidence } : undefined,
-        blocks: trace.blocks.map(cloneWorkBlock),
+        blocks: trace.blocks.slice(),
       }
     : {
         status: 'idle',
@@ -169,11 +211,23 @@ function cloneTrace(trace: ConversationWorkTrace | null | undefined): Conversati
       };
 }
 
+/** Copies the first matching block into the (already copied) blocks array and returns the copy to edit. */
+function writableBlock(
+  trace: ConversationWorkTrace,
+  matches: (block: ConversationWorkBlock) => boolean,
+): ConversationWorkBlock | undefined {
+  const index = trace.blocks.findIndex(matches);
+  if (index < 0) return undefined;
+  const copy = cloneWorkBlock(trace.blocks[index]!);
+  trace.blocks[index] = copy;
+  return copy;
+}
+
 function nextDisplayOrder(trace: ConversationWorkTrace): number {
   return trace.blocks.reduce((highest, block) => {
-    const withBlock = Math.max(highest, block.displayOrder ?? 0, block.thinkingDisplayOrder ?? 0);
+    const withBlock = Math.max(highest, block.displayOrder ?? 0);
     const withTools = block.toolCalls.reduce((value, call) => Math.max(value, call.displayOrder ?? 0), withBlock);
-    return (block.outputItems ?? []).reduce((value, item) => Math.max(value, item.displayOrder), withTools);
+    return (block.items ?? []).reduce((value, item) => Math.max(value, item.displayOrder), withTools);
   }, 0) + 1;
 }
 
@@ -265,10 +319,9 @@ export function finalizeTrace(
       return {
         ...block,
         status: blockStatus,
-        ...(block.thinkingStatus ? { thinkingStatus: 'complete' as const } : {}),
         completedAt: blockCompletedAt,
         ...(result ? { result } : {}),
-        outputItems: block.outputItems?.map((item) => ({ ...item, status: 'complete' as const })),
+        ...(block.items ? { items: block.items.map((item) => ({ ...cloneLoopItem(item), status: 'complete' as const })) } : {}),
         toolCalls,
       };
     });
@@ -295,10 +348,10 @@ export function upsertRuntimeToolCall(
     owner.status = 'running';
     nextTrace.blocks.push(owner);
   }
-  const existingBlock = nextTrace.blocks.find((entry) => (
+  const existingBlock = writableBlock(nextTrace, (entry) => (
     entry.toolCalls.some((toolCall) => toolCall.id === patch.id)
   ));
-  let block = existingBlock ?? nextTrace.blocks.find((entry) => entry.id === blockId);
+  let block = existingBlock ?? writableBlock(nextTrace, (entry) => entry.id === blockId);
   if (!block) {
     block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
     block.status = 'running';
@@ -391,16 +444,14 @@ export function attachRuntimeHookDiagnostic(
 ): ConversationWorkTrace | null {
   if (!toolCallId) return null;
   const nextTrace = cloneTrace(trace);
-  for (const block of nextTrace.blocks) {
-    const call = block.toolCalls.find((entry) => entry.id === toolCallId);
-    if (!call) continue;
-    if (!call.hookDiagnostics?.some((entry) => entry.id === diagnostic.id)) {
-      call.hookDiagnostics = [...(call.hookDiagnostics ?? []), { ...diagnostic }];
-      nextTrace.updatedAt = nowMs();
-    }
-    return nextTrace;
+  const block = writableBlock(nextTrace, (entry) => entry.toolCalls.some((call) => call.id === toolCallId));
+  const call = block?.toolCalls.find((entry) => entry.id === toolCallId);
+  if (!call) return null;
+  if (!call.hookDiagnostics?.some((entry) => entry.id === diagnostic.id)) {
+    call.hookDiagnostics = [...(call.hookDiagnostics ?? []), { ...diagnostic }];
+    nextTrace.updatedAt = nowMs();
   }
-  return null;
+  return nextTrace;
 }
 
 export function supersedePreviousPlanReviews(
@@ -408,10 +459,13 @@ export function supersedePreviousPlanReviews(
   currentToolCallId: string,
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
-  for (const block of nextTrace.blocks) {
+  const supersedes = (toolCall: ConversationToolCall) => toolCall.id !== currentToolCallId
+    && toolCall.toolName === 'plan_artifact' && toolCall.planReview?.status === 'awaiting';
+  nextTrace.blocks = nextTrace.blocks.map((original) => {
+    if (!original.toolCalls.some(supersedes)) return original;
+    const block = cloneWorkBlock(original);
     for (const [index, toolCall] of block.toolCalls.entries()) {
-      if (toolCall.id === currentToolCallId || toolCall.toolName !== 'plan_artifact' || !toolCall.planReview) continue;
-      if (toolCall.planReview.status !== 'awaiting') continue;
+      if (!supersedes(toolCall) || !toolCall.planReview) continue;
       block.toolCalls[index] = {
         ...toolCall,
         planReview: {
@@ -420,7 +474,8 @@ export function supersedePreviousPlanReviews(
         },
       };
     }
-  }
+    return block;
+  });
   nextTrace.updatedAt = nowMs();
   return nextTrace;
 }
@@ -500,17 +555,11 @@ function stringifyApprovalField(value: unknown): string {
 function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions): void {
   if (block.kind === 'llm_turn') {
     const result = ensureLoopResult(block);
-    const nextText = options.loopResultText?.trim();
-    if (!block.outputItems?.length && nextText && (!result.text || nextText.length >= result.text.length)) {
-      result.text = nextText;
-    }
     if (options.loopResultStatus) {
       result.status = options.loopResultStatus;
-      // Defense: if content resumes as streaming on a previously settled loop without an
-      // explicit phase, drop stale commentary/final markers so projection cannot flash
-      // a new final answer through the Work Process prose slot.
-      // Thinking-only updates (no nextText) must not clear a phase already stamped by text/tools.
-      if (options.loopResultStatus === 'streaming' && !options.loopOutputPhase && nextText) {
+      // Text resuming on a settled loop without a declared phase drops the stale commentary/final
+      // marker, so earlier settlement cannot flash new text as an answer.
+      if (options.loopResultStatus === 'streaming' && !options.loopOutputPhase) {
         delete result.outputPhase;
         delete result.stopReason;
       }
@@ -532,49 +581,73 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
   if (options.loopReasoningState) {
     block.reasoningState = options.loopReasoningState;
   }
-  const nextThinking = cloneThinkingArtifact(options.loopThinking);
-  if (nextThinking && shouldReplaceThinking(block.thinking, nextThinking)) {
-    block.thinking = nextThinking;
+}
+
+/**
+ * A provider attempt that fails mid-stream is retried from the start. Its partial text and thinking, and
+ * tool calls it declared but never started, are dropped so the retry does not show them twice.
+ * A loop that already settled is not part of the retried attempt and stays as it is.
+ */
+export function discardLoopAttempt(trace: ConversationWorkTrace | null | undefined, loopId: string): ConversationWorkTrace {
+  const nextTrace = cloneTrace(trace);
+  const current = nextTrace.blocks.find((entry) => entry.id === loopId && entry.kind === 'llm_turn');
+  if (!current || nextTrace.status === 'stopped' || current.result?.status === 'complete') return nextTrace;
+  const block = writableBlock(nextTrace, (entry) => entry === current)!;
+  delete block.items;
+  block.toolCalls = block.toolCalls.filter((call) => call.status !== 'pending' || call.executionStartedAt !== undefined);
+  block.result = normalizeLoopResult({ status: 'streaming', toolCallIds: [] }, 'running', block.toolCalls);
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
+/**
+ * Settles a loop's items when the provider completes it: each text block gets its phase from the one
+ * shared rule, and every thinking block takes its final content (signatures arrive at the end).
+ */
+export function settleLoopItems(
+  trace: ConversationWorkTrace,
+  loopId: string,
+  loop: { stopReason?: ConversationLoopStopReason; outputPhase?: ConversationLoopOutputPhase },
+  completed: {
+    textItems?: Array<{ text: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef }>;
+    thinking?: ThinkingArtifact[];
+  } = {},
+): ConversationWorkTrace {
+  let next = trace;
+  const block = next.blocks.find((entry) => entry.id === loopId);
+  const existingText = loopTextItems(block);
+  for (const item of completed.textItems ?? existingText) {
+    const prior = existingText.find((candidate) => sameProviderBlock(candidate.providerOutputRef, item.providerOutputRef));
+    next = upsertLoopTextItem(next, loopId, item.providerOutputRef, item.text,
+      settleTextPhase(item.phase ?? prior?.phase, loop), 'complete');
   }
-  if (options.loopThinkingStatus && (nextThinking || block.thinking)) {
-    block.thinkingStatus = options.loopThinkingStatus;
+  const completedThinking = (completed.thinking ?? []).filter((artifact) => artifact.providerOutputRef);
+  for (const artifact of completedThinking) {
+    next = upsertLoopThinkingItem(next, loopId, artifact.providerOutputRef!, artifact, 'complete');
   }
+  for (const item of loopThinkingItems(next.blocks.find((entry) => entry.id === loopId))) {
+    if (item.status !== 'complete') next = upsertLoopThinkingItem(next, loopId, item.providerOutputRef, item.thinking, 'complete');
+  }
+  return next;
 }
 
 export function upsertLoopResult(
   trace: ConversationWorkTrace | null | undefined,
   loopId: string,
-  resultText?: string,
-  thinking?: ThinkingArtifact,
-  thinkingStatus?: ConversationWorkBlock['thinkingStatus'],
-  resultStatus: ConversationLoopResultStatus = 'streaming',
-  stopReason?: ConversationLoopStopReason,
-  outputPhase?: ConversationLoopOutputPhase,
-  reasoningState?: ConversationReasoningState,
-  providerOutputRefs?: ProviderOutputRef[],
+  patch: LoopResultPatch = {},
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
   if (nextTrace.status === 'stopped') return nextTrace;
-  let block = nextTrace.blocks.find((entry) => entry.id === loopId);
-  if (!block) {
-    block = createWorkBlock(loopId, 'LLM turn', 'model', 'llm_turn');
-    block.status = 'running';
-    nextTrace.blocks.push(block);
-  }
+  const block = ensureLoopBlock(nextTrace, loopId);
+  const resultStatus = patch.status ?? 'streaming';
   applyLoopFields(block, {
     loopId,
-    loopResultText: resultText,
     loopResultStatus: resultStatus,
-    loopStopReason: stopReason,
-    loopOutputPhase: outputPhase,
-    loopProviderOutputRefs: providerOutputRefs,
-    loopReasoningState: reasoningState,
-    loopThinking: thinking,
-    loopThinkingStatus: thinkingStatus,
+    loopStopReason: patch.stopReason,
+    loopOutputPhase: patch.outputPhase,
+    loopProviderOutputRefs: patch.providerOutputRefs,
+    loopReasoningState: patch.reasoningState,
   });
-  if (block.thinking?.text && block.thinking.visibility !== 'hidden' && block.thinkingDisplayOrder === undefined) {
-    block.thinkingDisplayOrder = nextDisplayOrder(nextTrace);
-  }
   const hasActiveTools = block.toolCalls.some((call) => call.status === 'pending' || call.status === 'running');
   if (resultStatus === 'streaming' || hasActiveTools) {
     block.status = 'running';
@@ -591,30 +664,19 @@ export function upsertLoopResult(
 
 function ensureLoopResult(block: ConversationWorkBlock): ConversationLoopResult {
   const status: ConversationLoopResultStatus = block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete';
-  const result = normalizeLoopResult(block.result, block.summary, status, block.toolCalls);
+  const result = normalizeLoopResult(block.result, status, block.toolCalls);
   block.result = result;
   return result;
 }
 
-function createLoopResult(
-  text: string | undefined,
-  blockStatus: ConversationWorkBlock['status'] | ConversationLoopResultStatus,
-  toolCalls: ConversationToolCall[],
-): ConversationLoopResult {
-  return normalizeLoopResult(undefined, text, blockStatus, toolCalls);
-}
-
 function normalizeLoopResult(
   result: ConversationLoopResult | undefined,
-  fallbackText: string | undefined,
   blockStatus: ConversationWorkBlock['status'] | ConversationLoopResultStatus,
   toolCalls: ConversationToolCall[],
 ): ConversationLoopResult {
   const status: ConversationLoopResultStatus = result?.status
     ?? (blockStatus === 'running' || blockStatus === 'pending' || blockStatus === 'streaming' ? 'streaming' : 'complete');
-  const text = result?.text ?? fallbackText?.trim() ?? undefined;
   return {
-    ...(text ? { text } : {}),
     ...(result?.stopReason ? { stopReason: result.stopReason } : {}),
     ...(result?.outputPhase ? { outputPhase: result.outputPhase } : {}),
     ...(result?.providerOutputRefs?.length
@@ -655,109 +717,11 @@ function uniqueProviderOutputRefs(refs: ProviderOutputRef[]): ProviderOutputRef[
   return unique;
 }
 
-function isProviderOutputRef(value: unknown): value is ProviderOutputRef {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const ref = value as Partial<ProviderOutputRef>;
-  return typeof ref.protocol === 'string'
-    && ref.protocol.trim().length > 0
-    && typeof ref.providerBlockKey === 'string'
-    && ref.providerBlockKey.trim().length > 0
-    && Number.isInteger(ref.contentIndex)
-    && Number(ref.contentIndex) >= 0
-    && (ref.responseId === undefined || typeof ref.responseId === 'string')
-    && (ref.itemId === undefined || typeof ref.itemId === 'string')
-    && (ref.sourceIndex === undefined || (Number.isInteger(ref.sourceIndex) && Number(ref.sourceIndex) >= 0));
-}
-
-function providerOutputRefKey(ref: ProviderOutputRef): string {
-  return [
-    ref.protocol,
-    ref.responseId ?? '',
-    ref.providerBlockKey,
-    ref.sourceIndex ?? '',
-    ref.itemId ?? '',
-  ].join('\u0000');
-}
-
-function hasProviderChannelCollision(block: ConversationWorkBlock): boolean {
-  const owners = new Map<string, 'thinking' | 'text' | 'tool_call'>();
-  const claim = (ref: ProviderOutputRef | undefined, channel: 'thinking' | 'text' | 'tool_call'): boolean => {
-    if (!ref) return false;
-    if (!isProviderOutputRef(ref)) return true;
-    const key = providerOutputRefKey(ref);
-    const owner = owners.get(key);
-    if (owner && owner !== channel) return true;
-    owners.set(key, channel);
-    return false;
-  };
-  if (claim(block.thinking?.providerOutputRef, 'thinking')) return true;
-  for (const ref of block.result?.providerOutputRefs ?? []) {
-    if (claim(ref, 'text')) return true;
-  }
-  for (const toolCall of block.toolCalls) {
-    if (claim(toolCall.providerOutputRef, 'tool_call')) return true;
-  }
-  return false;
-}
-
 function shouldReplaceThinking(current: ThinkingArtifact | undefined, next: ThinkingArtifact): boolean {
   if (!current) return true;
   if (next.continuation && !current.continuation) return true;
   if (next.continuation && JSON.stringify(next.continuation) !== JSON.stringify(current.continuation)) return true;
   return (next.text?.length ?? 0) >= (current.text?.length ?? 0);
-}
-
-export function sanitizeStoredWorkTrace(
-  trace: ConversationWorkTrace | null | undefined,
-): ConversationWorkTrace | null {
-  if (!trace || typeof trace !== 'object') return null;
-  if (!['idle', 'running', 'complete', 'error', 'stopped'].includes(trace.status)) return null;
-  if (!Array.isArray(trace.blocks)) return null;
-
-  for (const block of trace.blocks) {
-    if (!block || typeof block !== 'object') return null;
-    if (!normalizeWorkBlockKind(block.kind)) return null;
-    if (typeof block.id !== 'string' || !block.id.trim()) return null;
-    if (!['pending', 'running', 'complete', 'error', 'cancelled'].includes(block.status)) return null;
-    if (!Array.isArray(block.toolCalls)) return null;
-    if (block.displayOrder !== undefined && (!Number.isSafeInteger(block.displayOrder) || block.displayOrder < 1)) return null;
-    if (block.thinkingDisplayOrder !== undefined && (!Number.isSafeInteger(block.thinkingDisplayOrder) || block.thinkingDisplayOrder < 1)) return null;
-    if (block.parentLoopId !== undefined && (typeof block.parentLoopId !== 'string' || !block.parentLoopId)) return null;
-    if (block.outputItems !== undefined && (!Array.isArray(block.outputItems) || !block.outputItems.every((item) => item
-      && isProviderOutputRef(item.providerOutputRef) && typeof item.text === 'string'
-      && (item.phase === undefined || item.phase === 'commentary' || item.phase === 'final_answer')
-      && (item.status === 'streaming' || item.status === 'complete')
-      && Number.isSafeInteger(item.displayOrder) && item.displayOrder > 0))) return null;
-    for (const call of block.toolCalls) {
-      if (!call || typeof call !== 'object') return null;
-      if (call.executionStartedAt !== undefined && (!Number.isFinite(call.executionStartedAt) || call.executionStartedAt < 0)) return null;
-      if (call.displayOrder !== undefined && (!Number.isSafeInteger(call.displayOrder) || call.displayOrder < 1)) return null;
-      if (call.hookDiagnostics !== undefined && (
-        !Array.isArray(call.hookDiagnostics)
-        || !call.hookDiagnostics.every((diagnostic) => diagnostic
-          && typeof diagnostic.id === 'string'
-          && typeof diagnostic.code === 'string'
-          && ['info', 'warning', 'error'].includes(diagnostic.severity)
-          && typeof diagnostic.message === 'string'
-          && typeof diagnostic.timestamp === 'number'
-          && Number.isFinite(diagnostic.timestamp))
-      )) return null;
-    }
-    if (block.diagnosticSeverity !== undefined) {
-      if (block.kind !== 'diagnostic') return null;
-      if (!['info', 'warning', 'error'].includes(block.diagnosticSeverity)) return null;
-    }
-    if ('detail' in block && (block as { detail?: unknown }).detail !== undefined) return null;
-    if ('thinkingPresentation' in block) return null;
-    if (block.kind === 'llm_turn' && block.result && !Array.isArray(block.result.toolCallIds)) return null;
-    if (block.result?.providerOutputRefs && (
-      !Array.isArray(block.result.providerOutputRefs)
-      || !block.result.providerOutputRefs.every(isProviderOutputRef)
-    )) return null;
-    if (hasProviderChannelCollision(block)) return null;
-  }
-
-  return trace;
 }
 
 function getRuntimeToolBlockMeta(

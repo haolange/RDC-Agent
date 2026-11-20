@@ -3,6 +3,8 @@ import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
   ConversationReasoningState,
+  ConversationThinkingItem,
+  ConversationThinkingStatus,
   ConversationWorkBlock,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
@@ -23,38 +25,19 @@ export interface BlockProjectionContext {
   blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
 }
 
+export interface ThinkingItemPresentation {
+  preview: string;
+  label: string;
+  kind: ThinkingArtifact['kind'];
+  visibility: ThinkingArtifact['visibility'];
+  status: ConversationThinkingStatus;
+  openByDefault: boolean;
+}
+
 export interface LoopProjectionDeps {
   resolveOutputPhase: (block: ConversationWorkBlock, hasVisibleProcessEvidence: boolean) => ConversationLoopOutputPhase;
   resolveReasoningState: (block: ConversationWorkBlock) => ConversationReasoningState;
-  resolveSectionProse: (
-    block: ConversationWorkBlock,
-    outputPhase: ConversationLoopOutputPhase,
-  ) => {
-    proseText: string;
-    proseStreaming: boolean;
-  };
-  resolveSectionThinking: (
-    block: ConversationWorkBlock,
-    hasVisibleEvidence: boolean,
-  ) => {
-    preview: string;
-    label: string;
-    kind?: ThinkingArtifact['kind'];
-    source?: string;
-    visibility?: ThinkingArtifact['visibility'];
-    status?: ConversationWorkBlock['thinkingStatus'];
-    expandable: boolean;
-    openByDefault: boolean;
-  };
-  resolveResponseThinking: (block: ConversationWorkBlock) => {
-    preview: string;
-    label: string;
-    kind?: ThinkingArtifact['kind'];
-    visibility?: ThinkingArtifact['visibility'];
-    status?: ConversationWorkBlock['thinkingStatus'];
-    expandable: boolean;
-    openByDefault: boolean;
-  };
+  resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => ThinkingItemPresentation | null;
   isNonFinalStopReason: (stopReason?: ConversationLoopStopReason) => boolean;
   normalizeThinkingDedupKey: (value: string) => string;
   createApprovalRow: (block: ConversationWorkBlock) => WorkProcessRow;

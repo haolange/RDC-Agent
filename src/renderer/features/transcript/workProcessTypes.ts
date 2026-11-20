@@ -2,8 +2,8 @@ import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
   ConversationDiagnosticSeverity,
+  ConversationThinkingStatus,
   ConversationToolExecutionEvidence,
-  ConversationWorkBlock,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 
@@ -125,7 +125,7 @@ export type WorkProcessRow =
     kind?: ThinkingArtifact['kind'];
     source?: string;
     visibility?: ThinkingArtifact['visibility'];
-    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
+    thinkingStatus?: ConversationThinkingStatus;
     expandable: boolean;
     openByDefault: boolean;
   }
@@ -278,7 +278,7 @@ export type WorkProcessRow =
     thinkingKind?: ThinkingArtifact['kind'];
     thinkingSource?: string;
     thinkingVisibility?: ThinkingArtifact['visibility'];
-    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
+    thinkingStatus?: ConversationThinkingStatus;
     thinkingExpandable: boolean;
     /** Policy hint: expand while loop is live; fold after settle. UI may sticky-override. */
     thinkingOpenByDefault: boolean;

@@ -86,8 +86,11 @@ describe('stopWorkTrace', () => {
       workTrace: {
         status: 'running', updatedAt: 1, blocks: [{
           id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running',
-          startedAt: 1, thinkingStatus: 'streaming',
+          startedAt: 1,
           result: { status: 'streaming', toolCallIds: [] },
+          items: [{ kind: 'thinking', status: 'streaming', displayOrder: 1,
+            providerOutputRef: { protocol: 'test', providerBlockKey: 'reasoning', contentIndex: 0 },
+            thinking: { kind: 'raw', source: 'anthropic-thinking', visibility: 'raw-collapsed', text: 'Still reasoning' } }],
           toolCalls: [
             { id: 'queued', toolName: 'investigation_read', status: 'pending', startedAt: 1 },
             { id: 'review', toolName: 'plan_artifact', status: 'running', startedAt: 1,
@@ -101,7 +104,7 @@ describe('stopWorkTrace', () => {
     }));
 
     const loop = stopped.workTrace?.blocks[0];
-    expect(loop).toMatchObject({ status: 'cancelled', thinkingStatus: 'complete' });
+    expect(loop).toMatchObject({ status: 'cancelled', items: [{ kind: 'thinking', status: 'complete' }] });
     expect(loop?.result).toMatchObject({ status: 'complete', toolCallIds: ['queued', 'review'] });
     expect(loop?.toolCalls[0]).toMatchObject({ status: 'skipped', completedAt: expect.any(Number) });
     expect(loop?.toolCalls[1]).toMatchObject({

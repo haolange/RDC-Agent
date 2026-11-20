@@ -1,8 +1,9 @@
 import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
-import { formatDurationMs, normalizeWorkProcessText } from './workProcessFormat';
+import { formatDurationMs } from './workProcessFormat';
 import type { LoopPresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 import type { WorkProcessRow } from './workProcessTypes';
-import type { BlockProjectionContext, LoopProjectionDeps } from './workProcessBlockProjection';
+import type { BlockProjectionContext, LoopProjectionDeps, ThinkingItemPresentation } from './workProcessBlockProjection';
+import { loopTextItems, loopThinkingItems } from '@shared/conversation/loopItems';
 
 export function isVisibleToolCall(call: ConversationToolCall): boolean {
   if (call.approval || call.planReview || call.userInputQuestions) return true;
@@ -47,115 +48,40 @@ export function projectLlmTurn(
       order: call.displayOrder, time: call.executionStartedAt ?? call.approval?.requestedAt ?? call.startedAt,
       row: ctx.createToolRow(call),
     }))),
-    ...(block.outputItems ?? []).map((item) => ({
+    ...loopTextItems(block).map((item) => ({
       order: item.displayOrder, time: block.startedAt,
       row: { type: 'output', id: `${block.id}:output:${item.providerOutputRef.contentIndex}`,
         status: item.status === 'streaming' ? 'running' : 'complete', text: item.text, phase: item.phase, duration: '' } as WorkProcessRow,
     })),
   ];
-  const loopRows: WorkProcessRow[] = [];
-
-  const isFinalAnswer = outputPhase === 'final_answer' && !deps.isNonFinalStopReason(stopReason);
-
-  if (isFinalAnswer && orderedSteps.length === 0 && block.thinkingDisplayOrder === undefined) {
-    // Answer-only turns never create a Reply boundary row. Provider-visible closing
-    // thinking folds into a quiet thinking-only section; otherwise the turn is silent
-    // and the assistant body below the Work Process is the only final-answer surface.
-    // Opaque/hidden reasoning never renders a CoT placeholder — answer body only.
-    if (reasoningState === 'opaque' || reasoningState === 'hidden') {
-      return null;
-    }
-    const thinking = deps.resolveResponseThinking(block);
-    if (!thinking.label && !thinking.preview) {
-      if (!ctx.hasVisibleProcessEvidence) return null;
-      return null;
-    }
-    const sectionThinking = {
-      preview: thinking.preview,
-      label: thinking.label,
-      kind: thinking.kind,
-      source: '',
-      visibility: thinking.visibility,
-      status: thinking.status,
-      expandable: thinking.expandable,
-      openByDefault: thinking.openByDefault,
-    };
-    dedupeSectionThinking(sectionThinking, ctx, deps);
-    if (!sectionThinking.label && !sectionThinking.preview) {
-      return null;
-    }
-    ctx.hasVisibleProcessEvidence = true;
-    return {
-      kind: 'loop',
-      loopId: block.id,
-      rows: [{
-        type: 'section',
-        id: block.id,
-        loopId: block.id,
-        status: block.status,
-        proseText: '',
-        proseStreaming: false,
-        thinkingPreview: sectionThinking.preview,
-        thinkingLabel: sectionThinking.label,
-        thinkingKind: sectionThinking.kind,
-        thinkingSource: sectionThinking.source,
-        thinkingVisibility: sectionThinking.visibility,
-        thinkingStatus: sectionThinking.status,
-        thinkingExpandable: sectionThinking.expandable,
-        thinkingOpenByDefault: sectionThinking.openByDefault,
-        stepCount: 0,
-        duration: formatDurationMs(block.startedAt, block.completedAt),
-        defaultOpen: false,
-        steps: [],
-        visibleSteps: [],
-        outputPhase,
-        stopReason,
-      }],
-      hasDisplayableThinking: sectionThinking.expandable && Boolean(sectionThinking.preview),
-      hasSummaryThinking: sectionThinking.kind === 'summary' && Boolean(sectionThinking.preview),
-    };
-  }
-
-  const sectionProse = block.outputItems?.length ? { proseText: '', proseStreaming: false } : deps.resolveSectionProse(block, outputPhase);
-  const sectionThinking = deps.resolveSectionThinking(
-    block,
-    orderedSteps.length > 0
-      || reasoningState === 'raw'
-      || reasoningState === 'summary'
-      || reasoningState === 'unknown'
-      || ctx.hasVisibleProcessEvidence
-      || Boolean(normalizeWorkProcessText(block.result?.text ?? '')),
-  );
-  dedupeSectionThinking(sectionThinking, ctx, deps);
-  const hasDisplayableThinking = sectionThinking.expandable && Boolean(sectionThinking.preview);
-  const hasSummaryThinking = sectionThinking.kind === 'summary' && Boolean(sectionThinking.preview);
-  if (block.thinkingDisplayOrder !== undefined && (sectionThinking.label || sectionThinking.expandable)) {
-    orderedSteps.push({
-      order: block.thinkingDisplayOrder,
+  // Each visible thinking block is its own row at the position it first streamed in.
+  const thinkingRows = loopThinkingItems(block).flatMap((item) => {
+    const presented = deps.resolveThinkingItem(block, item);
+    if (!presented || isDuplicateThinking(presented, ctx, deps)) return [];
+    return [{
+      order: item.displayOrder,
       time: block.startedAt,
-      row: { type: 'thinking', id: `${block.id}:thinking`, duration: '',
-        status: sectionThinking.status === 'streaming' ? 'running' : 'complete',
-        preview: sectionThinking.preview, label: sectionThinking.label, kind: sectionThinking.kind,
-        source: sectionThinking.source, visibility: sectionThinking.visibility,
-        thinkingStatus: sectionThinking.status, expandable: sectionThinking.expandable,
-        openByDefault: sectionThinking.openByDefault } as WorkProcessRow,
-    });
-    sectionThinking.preview = '';
-    sectionThinking.label = '';
-    sectionThinking.source = '';
-    sectionThinking.expandable = false;
-    sectionThinking.openByDefault = false;
-  }
-  if (snapshots.length > 0 || interactions.length > 0 || block.outputItems?.length || block.thinkingDisplayOrder !== undefined) {
-    orderedSteps.sort((a, b) => a.order !== undefined && b.order !== undefined ? a.order - b.order : a.time - b.time);
-  }
-  const steps = ctx.groupProcessRows(orderedSteps.map((entry) => entry.row));
+      row: { type: 'thinking', id: `${block.id}:thinking:${item.providerOutputRef.providerBlockKey}:${item.providerOutputRef.contentIndex}`,
+        duration: '', status: presented.status === 'streaming' ? 'running' : 'complete',
+        preview: presented.preview, label: presented.label, kind: presented.kind, source: '',
+        visibility: presented.visibility, thinkingStatus: presented.status, expandable: true,
+        openByDefault: presented.openByDefault } as WorkProcessRow,
+      presented,
+    }];
+  });
+  const loopRows: WorkProcessRow[] = [];
+  const isFinalAnswer = outputPhase === 'final_answer' && !deps.isNonFinalStopReason(stopReason);
+  // An answer-only loop with nothing else to show leaves the answer body as its only surface.
+  if (isFinalAnswer && orderedSteps.length === 0 && thinkingRows.length === 0) return null;
+  if ((reasoningState === 'opaque' || reasoningState === 'hidden') && orderedSteps.length === 0) return null;
 
-  // Opaque/hidden never becomes WP thinking or a placeholder; only real tools/prose/visible thinking remain.
-  const shouldRenderSection = steps.length > 0
-    || Boolean(sectionProse.proseText)
-    || sectionThinking.label
-    || sectionThinking.expandable;
+  const hasDisplayableThinking = thinkingRows.length > 0;
+  const hasSummaryThinking = thinkingRows.some((entry) => entry.presented.kind === 'summary');
+  // Order is the shared display sequence only; every entry carries one.
+  const ordered = [...orderedSteps, ...thinkingRows.map(({ order, time, row }) => ({ order, time, row }))]
+    .sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER));
+  const steps = ctx.groupProcessRows(ordered.map((entry) => entry.row));
+  const shouldRenderSection = steps.length > 0;
 
   if (!shouldRenderSection) {
     return null;
@@ -167,16 +93,12 @@ export function projectLlmTurn(
       id: block.id,
       loopId: block.id,
       status: block.status,
-      proseText: sectionProse.proseText,
-      proseStreaming: sectionProse.proseStreaming,
-      thinkingPreview: sectionThinking.preview,
-      thinkingLabel: sectionThinking.label,
-      thinkingKind: sectionThinking.kind,
-      thinkingSource: sectionThinking.source,
-      thinkingVisibility: sectionThinking.visibility,
-      thinkingStatus: sectionThinking.status,
-      thinkingExpandable: sectionThinking.expandable,
-      thinkingOpenByDefault: sectionThinking.openByDefault,
+      proseText: '',
+      proseStreaming: false,
+      thinkingPreview: '',
+      thinkingLabel: '',
+      thinkingExpandable: false,
+      thinkingOpenByDefault: false,
       hasActiveTools: block.toolCalls.some((call) => isTaskLifecycleTool(call.toolName) && call.status === 'running'
         && call.executionStartedAt !== undefined && (!call.approval || call.approval.status === 'approved')),
       stepCount: deps.countToolSteps(steps),
@@ -200,21 +122,15 @@ export function projectLlmTurn(
   };
 }
 
-function dedupeSectionThinking(
-  sectionThinking: ReturnType<LoopProjectionDeps['resolveSectionThinking']>,
+/** Summaries repeated verbatim across loops show once; raw thinking is never collapsed this way. */
+function isDuplicateThinking(
+  presented: ThinkingItemPresentation,
   ctx: BlockProjectionContext,
   deps: LoopProjectionDeps,
-): void {
-  if (!sectionThinking.preview || sectionThinking.kind === 'raw') return;
-  const thinkingKey = deps.normalizeThinkingDedupKey(sectionThinking.preview);
-  if (ctx.visibleThinkingKeys.has(thinkingKey)) {
-    sectionThinking.preview = '';
-    sectionThinking.label = '';
-    sectionThinking.source = '';
-    sectionThinking.expandable = false;
-    sectionThinking.openByDefault = false;
-    return;
-  }
-  ctx.visibleThinkingKeys.add(thinkingKey);
+): boolean {
+  if (presented.kind === 'raw') return false;
+  const key = deps.normalizeThinkingDedupKey(presented.preview);
+  if (ctx.visibleThinkingKeys.has(key)) return true;
+  ctx.visibleThinkingKeys.add(key);
+  return false;
 }
-

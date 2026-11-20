@@ -3,7 +3,6 @@ import type {
   ConversationMessage,
   ConversationMessageDiagnostic,
   ConversationStreamEvent,
-  ConversationThinkingStatus,
   ConversationTurnResult,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
@@ -11,9 +10,10 @@ import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
-import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
+import type { ProviderOutputRef } from '@shared/types/reasoning';
 import type { RunSummary, SessionAttachmentRecord } from '@shared/types/session';
 import { nowMs } from '@shared/utils/id';
+import { stoppedReplyText } from '@shared/conversation/loopItems';
 import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
@@ -222,7 +222,7 @@ export async function completeProfileTurn(
     );
     commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
-      content: assistantMessage.content,
+      content: assistantMessage.content || stoppedReplyText(stoppedTrace?.blocks ?? []),
       workTrace: finalizeTrace(stoppedTrace, 'stopped'),
     });
   };
@@ -275,8 +275,6 @@ export async function completeProfileTurn(
   // Assistant turns are split into LLM loop turns. The loop result is model output;
   let currentLoopText = '';
   let currentLoopProviderOutputRefs: ProviderOutputRef[] = [];
-  let currentLoopThinking: ThinkingArtifact | undefined;
-  let currentLoopThinkingStatus: ConversationThinkingStatus | undefined;
   let loopSeq = 1;
   let loopHasTools = false;
   let pendingNewLoop = false;
@@ -308,8 +306,6 @@ export async function completeProfileTurn(
   const seenCompactionSummaries = new Set<string>();
   const turnStreamState = {} as import('./ConversationTurnAgentEventHandler').TurnStreamState;
   Object.defineProperty(turnStreamState, 'currentLoopText', { get: () => currentLoopText, set: (value) => { currentLoopText = value; } });
-  Object.defineProperty(turnStreamState, 'currentLoopThinking', { get: () => currentLoopThinking, set: (value) => { currentLoopThinking = value; } });
-  Object.defineProperty(turnStreamState, 'currentLoopThinkingStatus', { get: () => currentLoopThinkingStatus, set: (value) => { currentLoopThinkingStatus = value; } });
   Object.defineProperty(turnStreamState, 'currentLoopProviderOutputRefs', { get: () => currentLoopProviderOutputRefs, set: (value) => { currentLoopProviderOutputRefs = value; } });
   Object.defineProperty(turnStreamState, 'loopHasTools', { get: () => loopHasTools, set: (value) => { loopHasTools = value; } });
   Object.defineProperty(turnStreamState, 'visibleResponse', { get: () => visibleResponse, set: (value) => { visibleResponse = value; } });
@@ -338,26 +334,19 @@ export async function completeProfileTurn(
   const routePreflight = input.routePreflight;
   const currentLoopOptions = () => ({
     loopId: currentLoopId(),
-    loopResultText: currentLoopText.trim() || undefined,
     loopProviderOutputRefs: currentLoopProviderOutputRefs,
-    loopThinking: currentLoopThinking,
-    loopThinkingStatus: currentLoopThinkingStatus,
   });
   const beginAssistantContentLoop = () => {
     const previousLoopSeq = loopSeq;
     const next = beginAssistantContentLoopIfPending({
       loopSeq,
       currentLoopText,
-      currentLoopThinking,
-      currentLoopThinkingStatus,
       loopHasTools,
       pendingNewLoop,
       visibleResponse,
     });
     loopSeq = next.loopSeq;
     currentLoopText = next.currentLoopText;
-    currentLoopThinking = next.currentLoopThinking;
-    currentLoopThinkingStatus = next.currentLoopThinkingStatus;
     loopHasTools = next.loopHasTools;
     pendingNewLoop = next.pendingNewLoop;
     visibleResponse = next.visibleResponse;

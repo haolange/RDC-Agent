@@ -24,10 +24,9 @@ export function cancelWorkTrace(trace: ConversationWorkTrace, at: number): Conve
       const toolCalls = block.toolCalls.map(call => cancelConversationToolCall(call, at));
       return {
         ...block, toolCalls,
-        outputItems: block.outputItems?.map((item) => ({ ...item, status: 'complete' as const })),
+        ...(block.items ? { items: block.items.map((item) => ({ ...item, status: 'complete' as const })) } : {}),
         status: block.status === 'pending' || block.status === 'running' ? 'cancelled' : block.status,
         completedAt: block.completedAt ?? at,
-        ...(block.thinkingStatus ? { thinkingStatus: 'complete' as const } : {}),
         ...(block.kind === 'llm_turn' ? { result: { ...block.result, status: 'complete' as const,
           stopReason: block.result?.status === 'streaming' ? 'aborted' as const : block.result?.stopReason,
           toolCallIds: Array.from(new Set([...(block.result?.toolCallIds ?? []), ...toolCalls.map(call => call.id)])),

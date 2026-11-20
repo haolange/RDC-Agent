@@ -2,9 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { generateShortId, nowMs } from '@shared/utils/id';
-import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import { sanitizeStoredWorkTrace } from '../../conversation/ConversationWorkTrace';
+import { readStoredWorkTrace, sanitizeStoredWorkTrace } from '../../conversation/StoredWorkTrace';
 import type { SessionAttachmentKind, SessionAttachmentLayer, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import { classifyAttachmentBytes } from '../../conversation/attachmentClassify';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
@@ -12,6 +12,7 @@ import {
   CONVERSATION_COMPACTION_DELTA_THRESHOLD,
   type ConversationHistoryCacheEntry,
   type ConversationDeltaRecord,
+  type ConversationTraceBlocksPatch,
   type ConversationTerminalCommitJournal,
   type ConversationTerminalAppendJournal,
   type ConversationTurnCommitJournal,
@@ -35,7 +36,55 @@ export type {
 } from './storageCommitTypes';
 
 
+/** The blocks of `next` that are not the very same object in `previous`; untouched blocks are shared. */
+function traceBlocksPatch(previous: ConversationWorkTrace, next: ConversationWorkTrace): ConversationTraceBlocksPatch {
+  const previousById = new Map(previous.blocks.map((block) => [block.id, block] as const));
+  return {
+    status: next.status,
+    ...(next.summary !== undefined ? { summary: next.summary } : {}),
+    ...(next.toolEvidence ? { toolEvidence: next.toolEvidence } : {}),
+    updatedAt: next.updatedAt,
+    blockIds: next.blocks.map((block) => block.id),
+    changedBlocks: next.blocks.filter((block) => previousById.get(block.id) !== block),
+  };
+}
+
+/** A delta record; a trace change against a stored trace is written as its changed blocks only. */
+function deltaRecord(
+  existing: ConversationMessage,
+  id: string,
+  patch: Partial<ConversationMessage>,
+  updatedAt: number,
+): ConversationDeltaRecord {
+  const { workTrace: nextTrace, ...rest } = patch;
+  const traceBlocks = nextTrace && existing.workTrace ? traceBlocksPatch(existing.workTrace, nextTrace) : undefined;
+  return {
+    op: 'delta',
+    id,
+    patch: traceBlocks ? rest : patch,
+    ...(traceBlocks ? { traceBlocks } : {}),
+    updatedAt,
+  };
+}
+
+function applyTraceBlocksPatch(previous: ConversationWorkTrace, patch: ConversationTraceBlocksPatch): ConversationWorkTrace {
+  const byId = new Map(previous.blocks.map((block) => [block.id, block] as const));
+  for (const block of patch.changedBlocks) byId.set(block.id, block);
+  return {
+    status: patch.status,
+    ...(patch.summary !== undefined ? { summary: patch.summary } : {}),
+    ...(patch.toolEvidence ? { toolEvidence: patch.toolEvidence } : {}),
+    updatedAt: patch.updatedAt,
+    blocks: patch.blockIds.flatMap((id) => {
+      const block = byId.get(id);
+      return block ? [block] : [];
+    }),
+  };
+}
+
 export class ConversationHistoryStore {
+  private readonly compactionsPending = new Set<string>();
+
   constructor(private readonly host: import('./storageHost').StorageHost) {}
 
   beginExistingConversationTurnCommit(
@@ -209,7 +258,7 @@ export class ConversationHistoryStore {
       fs.rmSync(journalPath, { force: true });
       this.host.sessions.updateSession(sessionId, {});
       // Maintenance may rewrite history only after the append WAL is gone.
-      this.compactAfterDurableAppend(sessionId, this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0);
+      this.scheduleCompaction(sessionId, this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0);
     } finally {
       this.host.terminalCommitSessionIds.delete(sessionId);
     }
@@ -233,7 +282,7 @@ export class ConversationHistoryStore {
     if (!existing) {
       appendJsonl(filePath, message);
       this.applyConversationMessageToCache(sessionId, filePath, message);
-      this.compactAfterDurableAppend(sessionId, this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0);
+      this.scheduleCompaction(sessionId, this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0);
       return;
     }
 
@@ -242,16 +291,10 @@ export class ConversationHistoryStore {
       return;
     }
 
-    const delta: ConversationDeltaRecord = {
-      op: 'delta',
-      id: message.id,
-      patch,
-      updatedAt: message.updatedAt ?? message.createdAt,
-    };
-    appendJsonl(filePath, delta);
+    appendJsonl(filePath, deltaRecord(existing, message.id, patch, message.updatedAt ?? message.createdAt));
     this.applyConversationMessageToCache(sessionId, filePath, message);
     const nextDeltaCount = this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0;
-    this.compactAfterDurableAppend(sessionId, nextDeltaCount);
+    this.scheduleCompaction(sessionId, nextDeltaCount);
   }
 
   appendConversationDelta(
@@ -277,28 +320,30 @@ export class ConversationHistoryStore {
         ? normalizedPatch.updatedAt
         : nowMs(),
     };
-    const delta: ConversationDeltaRecord = {
-      op: 'delta',
-      id: messageId,
-      patch: normalizedPatch,
-      updatedAt: nextMessage.updatedAt ?? nowMs(),
-    };
-    appendJsonl(filePath, delta);
+    appendJsonl(filePath, deltaRecord(existing, messageId, normalizedPatch, nextMessage.updatedAt ?? nowMs()));
     this.applyConversationMessageToCache(sessionId, filePath, nextMessage);
     const nextDeltaCount = this.host.conversationPendingDeltaCounts.get(sessionId) ?? 0;
-    this.compactAfterDurableAppend(sessionId, nextDeltaCount);
+    this.scheduleCompaction(sessionId, nextDeltaCount);
   }
 
-  private compactAfterDurableAppend(sessionId: string, pendingDeltaCount: number): void {
+  /**
+   * Compaction rewrites the whole history, so it runs after the current event instead of inside the turn's
+   * update. It reads and replaces the file in one synchronous step, so no append can fall between the two.
+   */
+  private scheduleCompaction(sessionId: string, pendingDeltaCount: number): void {
     if (pendingDeltaCount < CONVERSATION_COMPACTION_DELTA_THRESHOLD || pendingDeltaCount % CONVERSATION_COMPACTION_DELTA_THRESHOLD !== 0) return;
-    try {
-      this.compactConversationHistory(sessionId);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EBUSY') throw error;
-      // The delta is already durable. A Windows reader can temporarily deny replacement of the journal;
-      // retain its cache and retry maintenance at the next threshold instead of aborting the live turn.
-      console.warn(`[ConversationHistoryStore] Deferred busy conversation compaction for session ${sessionId}.`);
-    }
+    if (this.compactionsPending.has(sessionId)) return;
+    this.compactionsPending.add(sessionId);
+    setImmediate(() => {
+      this.compactionsPending.delete(sessionId);
+      try {
+        this.compactConversationHistory(sessionId);
+      } catch (error) {
+        // Every delta is already durable. A busy journal on Windows, or a session deleted meanwhile, only
+        // postpones maintenance to the next threshold.
+        console.warn(`[ConversationHistoryStore] Deferred conversation compaction for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    });
   }
 
   writeConversationHistory(sessionId: string, messages: ConversationMessage[]): void {
@@ -411,6 +456,9 @@ export class ConversationHistoryStore {
         latestById.set(record.id, {
           ...existing,
           ...record.patch,
+          ...(record.traceBlocks && existing.workTrace
+            ? { workTrace: applyTraceBlocksPatch(existing.workTrace, record.traceBlocks) }
+            : {}),
           id: existing.id,
           updatedAt: record.updatedAt,
         });
@@ -433,7 +481,7 @@ export class ConversationHistoryStore {
       .sort((left, right) => left.createdAt - right.createdAt)
       .map((message) => ({
         ...message,
-        workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null),
+        ...readStoredWorkTrace(message.workTrace ?? null),
       }));
 
     return { messages, rawRecordCount: result.records.length };
@@ -542,7 +590,12 @@ export class ConversationHistoryStore {
       ...Object.keys(next),
     ]) as Set<keyof ConversationMessage>;
     for (const key of keys) {
-      if (key === 'id') continue;
+      if (key === 'id' || previous[key] === next[key]) continue;
+      // Traces are updated copy-on-write: a new object is a change, and the delta stores only changed blocks.
+      if (key === 'workTrace') {
+        patch.workTrace = next.workTrace;
+        continue;
+      }
       if (JSON.stringify(previous[key]) !== JSON.stringify(next[key])) {
         (patch as Record<string, unknown>)[key] = next[key];
       }

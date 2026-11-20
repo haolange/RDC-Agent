@@ -1,13 +1,44 @@
 import { translate } from '../../i18n/messages';
 const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { describe, expect, it } from 'vitest';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
+import type {
+  ConversationTextItem,
+  ConversationThinkingItem,
+  ConversationThinkingStatus,
+  ConversationWorkTrace,
+} from '@shared/types/conversation';
 import type { ConversationPlanReview } from '@shared/types/planReview';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import { createApprovalRow } from './workProcessDecisionRows';
 
 const now = 1_700_000_000_000;
+
+const rawThinking = { kind: 'raw', source: 'openai-compatible-raw', visibility: 'raw-collapsed' } as const;
+
+/** One provider thinking block; defaults to a settled summary. */
+function thinkingItem(
+  text: string,
+  displayOrder: number,
+  options: Partial<Pick<ThinkingArtifact, 'kind' | 'source' | 'visibility'>> & { status?: ConversationThinkingStatus } = {},
+): ConversationThinkingItem {
+  const { status = 'complete', ...artifact } = options;
+  return {
+    kind: 'thinking', status, displayOrder,
+    providerOutputRef: { protocol: 'test', providerBlockKey: `thinking-${displayOrder}`, contentIndex: displayOrder },
+    thinking: { text, kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', ...artifact },
+  };
+}
+
+/** One provider text block; defaults to settled commentary. */
+function textItem(text: string, displayOrder: number, overrides: Partial<ConversationTextItem> = {}): ConversationTextItem {
+  return {
+    kind: 'text', text, phase: 'commentary', status: 'complete', displayOrder,
+    providerOutputRef: { protocol: 'test', providerBlockKey: `text-${displayOrder}`, contentIndex: displayOrder },
+    ...overrides,
+  };
+}
 
 it.each([
   ['rule', 'approved', undefined, '规则检查通过'],
@@ -45,12 +76,18 @@ it.each(['tool-approval', 'auto-review-approval'])('does not label cancelled %s 
   });
 });
 
-function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['rows']): Array<(typeof rows)[number]> {
+type WorkRow = ReturnType<typeof buildWorkProcessPresentation>['rows'][number];
+
+function flattenWorkRows(rows: WorkRow[]): WorkRow[] {
   return rows.flatMap((row) => {
     if (row.type === 'section') return [row, ...flattenWorkRows(row.steps)];
     if (row.type === 'toolAggregate') return [row, ...row.children];
     return [row];
   });
+}
+
+function rowsOfType<Type extends WorkRow['type']>(rows: WorkRow[], type: Type): Array<Extract<WorkRow, { type: Type }>> {
+  return flattenWorkRows(rows).filter((row): row is Extract<WorkRow, { type: Type }> => row.type === type);
 }
 
 describe('buildWorkProcessPresentation', () => {
@@ -75,22 +112,6 @@ describe('buildWorkProcessPresentation', () => {
     ]);
     expect(rows.filter((row) => row.type === 'tool' && row.toolName === 'subagent')).toHaveLength(0);
   });
-  it('withholds runtime context-compaction counters from the human work trace', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now,
-      blocks: [{
-        id: 'compaction-commentary', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-        result: {
-          text: 'Context compacted (snip): 79 -> 52 messages, approximately 125287 -> 85642 tokens.',
-          status: 'complete', outputPhase: 'commentary', toolCallIds: [],
-        },
-        toolCalls: [], startedAt: now, completedAt: now + 10,
-      }],
-    }, t);
-    expect(presentation.rows).toHaveLength(0);
-  });
-
   it('keeps both completed checkpoints in the visible history', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
@@ -163,28 +184,7 @@ describe('buildWorkProcessPresentation', () => {
     })]);
   });
 
-  it('withholds unclassified streaming prose before tools arrive', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      summary: 'Agent is working',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-1',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'running',
-          result: { text: 'Hello from the assistant', status: 'streaming', toolCallIds: [] },
-          toolCalls: [],
-          startedAt: now,
-        },
-      ],
-    }, t);
-
-    expect(presentation.rows).toHaveLength(0);
-  });
-
-  it('projects streaming commentary as prose without promoting it into thinking', () => {
+  it('projects streaming commentary as an output row without promoting it into thinking', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'running',
       updatedAt: now,
@@ -194,29 +194,25 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'running',
-          result: {
-            text: 'Inspecting capture metadata',
-            status: 'streaming',
-            toolCallIds: [],
-            outputPhase: 'commentary',
-          },
+          result: { status: 'streaming', toolCallIds: [], outputPhase: 'commentary' },
+          items: [textItem('Inspecting capture metadata', 1, { status: 'streaming' })],
           toolCalls: [],
           startedAt: now,
         },
       ],
     }, t);
 
-    const section = presentation.rows.find((row) => row.type === 'section');
-    expect(section).toMatchObject({
-      type: 'section',
-      proseText: 'Inspecting capture metadata',
-      proseStreaming: true,
+    expect(rowsOfType(presentation.rows, 'output')).toEqual([expect.objectContaining({
+      text: 'Inspecting capture metadata', phase: 'commentary', status: 'running',
+    })]);
+    expect(rowsOfType(presentation.rows, 'thinking')).toHaveLength(0);
+    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
       thinkingLabel: '',
       thinkingExpandable: false,
     });
   });
 
-  it('keeps settled commentary prose even when the loop has no tool calls', () => {
+  it('keeps settled commentary text even when the loop has no tool calls', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'running',
       updatedAt: now + 2000,
@@ -227,12 +223,12 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'complete',
           result: {
-            text: 'Need a few answers first.',
             status: 'complete',
             toolCallIds: ['ask-1'],
             stopReason: 'tool_use',
             outputPhase: 'commentary',
           },
+          items: [textItem('Need a few answers first.', 1)],
           toolCalls: [
             {
               id: 'ask-1',
@@ -240,6 +236,7 @@ describe('buildWorkProcessPresentation', () => {
               status: 'complete',
               argsPreview: JSON.stringify({ questions: [{ prompt: 'Drink?' }] }),
               resultPreview: JSON.stringify({ answers: [{ answer: '茶' }] }),
+              displayOrder: 2,
               startedAt: now,
               completedAt: now + 500,
             },
@@ -253,12 +250,12 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'complete',
           result: {
-            text: 'Thanks — summarizing the parameter combinations next.',
             status: 'complete',
             toolCallIds: [],
             stopReason: 'end_turn',
             outputPhase: 'commentary',
           },
+          items: [textItem('Thanks — summarizing the parameter combinations next.', 3)],
           toolCalls: [],
           startedAt: now + 600,
           completedAt: now + 900,
@@ -267,19 +264,13 @@ describe('buildWorkProcessPresentation', () => {
     }, t);
 
     const sections = presentation.rows.filter((row) => row.type === 'section');
-    expect(sections).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'section',
-        proseText: 'Need a few answers first.',
-      }),
-      expect.objectContaining({
-        type: 'section',
-        proseText: 'Thanks — summarizing the parameter combinations next.',
-      }),
-    ]));
+    expect(sections.map((section) => rowsOfType(section.steps, 'output').map((row) => row.text))).toEqual([
+      ['Need a few answers first.'],
+      ['Thanks — summarizing the parameter combinations next.'],
+    ]);
   });
 
-  it('does not project settled final_answer text into Work Process prose', () => {
+  it('tags settled final_answer text as the answer instead of commentary', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now + 3000,
@@ -290,12 +281,12 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'complete',
           result: {
-            text: 'Checking files.',
             status: 'complete',
             toolCallIds: ['tool-read'],
             stopReason: 'tool_use',
             outputPhase: 'commentary',
           },
+          items: [textItem('Checking files.', 1)],
           toolCalls: [
             {
               id: 'tool-read',
@@ -303,6 +294,7 @@ describe('buildWorkProcessPresentation', () => {
               status: 'complete',
               argsPreview: JSON.stringify({ path: 'a.ts' }),
               resultPreview: JSON.stringify({ ok: true }),
+              displayOrder: 2,
               startedAt: now + 100,
               completedAt: now + 200,
             },
@@ -316,12 +308,12 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'complete',
           result: {
-            text: 'Final answer body only',
             status: 'complete',
             toolCallIds: [],
             stopReason: 'end_turn',
             outputPhase: 'final_answer',
           },
+          items: [textItem('Final answer body only', 3, { phase: 'final_answer' })],
           toolCalls: [],
           startedAt: now + 300,
           completedAt: now + 400,
@@ -329,16 +321,13 @@ describe('buildWorkProcessPresentation', () => {
       ],
     }, t);
 
-    const finalSection = presentation.rows.find((row) => (
-      row.type === 'section' && row.proseText === 'Final answer body only'
-    ));
-    expect(finalSection).toBeUndefined();
-    expect(presentation.rows.some((row) => (
-      row.type === 'section' && row.proseText === 'Checking files.'
-    ))).toBe(true);
+    expect(rowsOfType(presentation.rows, 'output').map(({ text, phase }) => ({ text, phase }))).toEqual([
+      { text: 'Checking files.', phase: 'commentary' },
+      { text: 'Final answer body only', phase: 'final_answer' },
+    ]);
   });
 
-  it('keeps streaming final_answer text out of Work Process prose', () => {
+  it('keeps streaming final_answer text tagged as the answer', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'running',
       updatedAt: now + 3100,
@@ -349,12 +338,12 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'complete',
           result: {
-            text: 'Need a few answers first.',
             status: 'complete',
             toolCallIds: [],
             stopReason: 'end_turn',
             outputPhase: 'commentary',
           },
+          items: [textItem('Need a few answers first.', 1)],
           toolCalls: [],
           startedAt: now,
           completedAt: now + 200,
@@ -365,7 +354,6 @@ describe('buildWorkProcessPresentation', () => {
           title: 'User input requested',
           status: 'complete',
           result: {
-            text: '',
             status: 'complete',
             toolCallIds: ['ask-batch'],
           },
@@ -396,24 +384,21 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'running',
           result: {
-            text: 'Streaming final answer tokens after ask_user.',
             status: 'streaming',
             toolCallIds: [],
             outputPhase: 'final_answer',
           },
+          items: [textItem('Streaming final answer tokens after ask_user.', 2, { phase: 'final_answer', status: 'streaming' })],
           toolCalls: [],
           startedAt: now + 500,
         },
       ],
     }, t);
 
-    expect(presentation.rows.some((row) => (
-      row.type === 'section'
-      && row.proseText === 'Streaming final answer tokens after ask_user.'
-    ))).toBe(false);
-    expect(presentation.rows.some((row) => (
-      row.type === 'section' && row.proseText === 'Need a few answers first.'
-    ))).toBe(true);
+    expect(rowsOfType(presentation.rows, 'output').map(({ text, phase, status }) => ({ text, phase, status }))).toEqual([
+      { text: 'Need a few answers first.', phase: 'commentary', status: 'complete' },
+      { text: 'Streaming final answer tokens after ask_user.', phase: 'final_answer', status: 'running' },
+    ]);
   });
 
   it('uses Thought-for settled labels with duration to the first tool', () => {
@@ -426,15 +411,11 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Read files before answering.', status: 'complete', toolCallIds: ['tool-read'] },
-          thinking: {
-            text: 'raw chain-of-thought that must not be result text',
-            kind: 'raw',
-            source: 'openai-compatible-raw',
-            visibility: 'raw-collapsed',
-
-          },
-          thinkingStatus: 'complete',
+          result: { status: 'complete', toolCallIds: ['tool-read'] },
+          items: [
+            thinkingItem('raw chain-of-thought that must not be result text', 1, rawThinking),
+            textItem('Read files before answering.', 2),
+          ],
           toolCalls: [
             {
               id: 'tool-read',
@@ -442,6 +423,7 @@ describe('buildWorkProcessPresentation', () => {
               status: 'complete',
               argsPreview: JSON.stringify({ path: 'README.md' }),
               resultPreview: JSON.stringify({ content: 'hello' }),
+              displayOrder: 3,
               startedAt: now + 1500,
               completedAt: now + 1600,
             },
@@ -452,15 +434,45 @@ describe('buildWorkProcessPresentation', () => {
       ],
     }, t);
 
-    const section = presentation.rows.find((row) => row.type === 'section');
-    expect(section).toMatchObject({
-      type: 'section',
-      proseText: 'Read files before answering.',
-      thinkingLabel: '已思考 · 1.5s',
-      thinkingPreview: 'raw chain-of-thought that must not be result text',
-      thinkingExpandable: true,
-      thinkingOpenByDefault: false,
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
+      label: '已思考 · 1.5s',
+      preview: 'raw chain-of-thought that must not be result text',
+      expandable: true,
+      openByDefault: false,
+    })]);
+    expect(rowsOfType(presentation.rows, 'output').map((row) => row.text)).toEqual(['Read files before answering.']);
+    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
+      thinkingPreview: '',
+      thinkingLabel: '',
+      thinkingExpandable: false,
     });
+  });
+
+  it('keeps each thinking block of one loop as its own row around the tool between them', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now + 300,
+      blocks: [{
+        id: 'runtime-loop-interleaved', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
+        result: { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary', toolCallIds: ['tool-read'] },
+        items: [thinkingItem('Locate the config first.', 1), thinkingItem('The config confirms the cause.', 3)],
+        toolCalls: [{
+          id: 'tool-read', toolName: 'read_file', status: 'complete', displayOrder: 2,
+          argsPreview: JSON.stringify({ path: 'config.json' }), resultPreview: '{}',
+          startedAt: now + 100, completedAt: now + 200,
+        }],
+        startedAt: now,
+        completedAt: now + 300,
+      }],
+    }, t);
+
+    const section = presentation.rows.find((row) => row.type === 'section');
+    if (section?.type !== 'section') throw new Error('expected section');
+    expect(section.steps.map((step) => step.type)).toEqual(['thinking', 'tool', 'thinking']);
+    expect(rowsOfType(section.steps, 'thinking').map((row) => row.preview)).toEqual([
+      'Locate the config first.',
+      'The config confirms the cause.',
+    ]);
   });
 
   it('uses streaming Thinking label while the loop is active', () => {
@@ -473,21 +485,15 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'running',
-          result: { text: 'Working…', status: 'streaming', toolCallIds: ['tool-glob'] },
-          thinking: {
-            text: 'planning next step',
-            kind: 'summary',
-            source: 'anthropic-thinking',
-            visibility: 'summary',
-
-          },
-          thinkingStatus: 'streaming',
+          result: { status: 'streaming', toolCallIds: ['tool-glob'] },
+          items: [thinkingItem('planning next step', 1, { status: 'streaming' })],
           toolCalls: [
             {
               id: 'tool-glob',
               toolName: 'glob',
               status: 'running',
               argsPreview: JSON.stringify({ pattern: '**/*' }),
+              displayOrder: 2,
               startedAt: now + 100,
             },
           ],
@@ -496,13 +502,12 @@ describe('buildWorkProcessPresentation', () => {
       ],
     }, t);
 
-    const section = presentation.rows.find((row) => row.type === 'section');
-    expect(section).toMatchObject({
-      type: 'section',
-      thinkingLabel: '正在思考',
-      thinkingExpandable: true,
-      thinkingOpenByDefault: true,
-    });
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
+      label: '正在思考',
+      thinkingStatus: 'streaming',
+      expandable: true,
+      openByDefault: true,
+    })]);
   });
 
   it('expands active final-answer thinking by the same lifecycle policy', () => {
@@ -516,28 +521,21 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'running',
           result: {
-            text: '',
             status: 'streaming',
             toolCallIds: [],
             stopReason: 'end_turn',
             outputPhase: 'final_answer',
           },
-          thinking: {
-            text: 'compose a short identity answer',
-            kind: 'raw',
-            source: 'openai-compatible-raw',
-            visibility: 'raw-collapsed',
-          },
-          thinkingStatus: 'streaming',
+          items: [thinkingItem('compose a short identity answer', 1, { ...rawThinking, status: 'streaming' })],
           toolCalls: [],
           startedAt: now,
         },
       ],
     }, t);
-    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
-      thinkingOpenByDefault: true,
-      thinkingLabel: '正在思考',
-    });
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
+      openByDefault: true,
+      label: '正在思考',
+    })]);
   });
 
   it('shows settled thinking while the turn awaits plan review', () => {
@@ -546,18 +544,18 @@ describe('buildWorkProcessPresentation', () => {
       blocks: [{
         id: 'runtime-loop-plan-review', kind: 'llm_turn', title: 'LLM turn', status: 'running',
         result: { status: 'streaming', toolCallIds: ['plan-call'] },
-        thinking: { text: 'Plan is ready', kind: 'summary', source: 'openai-responses-summary', visibility: 'summary' },
-        thinkingStatus: 'complete', startedAt: now, completedAt: now + 100,
-        toolCalls: [{ id: 'plan-call', toolName: 'plan_artifact', status: 'running', startedAt: now + 100,
+        items: [thinkingItem('Plan is ready', 1, { source: 'openai-responses-summary' })],
+        startedAt: now, completedAt: now + 100,
+        toolCalls: [{ id: 'plan-call', toolName: 'plan_artifact', status: 'running', displayOrder: 2, startedAt: now + 100,
           planReview: { planId: 'plan-1', revision: 1, uri: 'session://plans/plan.md',
             hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [], status: 'awaiting',
             handoffOptions: [{ label: 'Execute with General', agent: 'general' }] } }],
       }],
     }, t);
-    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
-      thinkingLabel: expect.stringMatching(/^已思考/),
-      thinkingOpenByDefault: false,
-    });
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
+      label: expect.stringMatching(/^已思考/),
+      openByDefault: false,
+    })]);
   });
 
   it('expands active raw thinking and folds settled process-loop thinking by policy', () => {
@@ -570,20 +568,15 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'running',
-          result: { text: 'Working…', status: 'streaming', toolCallIds: ['tool-glob-raw'] },
-          thinking: {
-            text: 'live raw thinking',
-            kind: 'raw',
-            source: 'openai-compatible-raw',
-            visibility: 'raw-collapsed',
-          },
-          thinkingStatus: 'streaming',
+          result: { status: 'streaming', toolCallIds: ['tool-glob-raw'] },
+          items: [thinkingItem('live raw thinking', 1, { ...rawThinking, status: 'streaming' })],
           toolCalls: [
             {
               id: 'tool-glob-raw',
               toolName: 'glob',
               status: 'running',
               argsPreview: JSON.stringify({ pattern: '**/*' }),
+              displayOrder: 2,
               startedAt: now + 100,
             },
           ],
@@ -591,10 +584,10 @@ describe('buildWorkProcessPresentation', () => {
         },
       ],
     }, t);
-    expect(active.rows.find((row) => row.type === 'section')).toMatchObject({
-      thinkingOpenByDefault: true,
-      thinkingLabel: '正在思考',
-    });
+    expect(rowsOfType(active.rows, 'thinking')).toEqual([expect.objectContaining({
+      openByDefault: true,
+      label: '正在思考',
+    })]);
 
     const settled = buildWorkProcessPresentation({
       status: 'complete',
@@ -605,14 +598,8 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Done.', status: 'complete', toolCallIds: ['tool-glob-raw-done'] },
-          thinking: {
-            text: 'settled raw thinking',
-            kind: 'raw',
-            source: 'openai-compatible-raw',
-            visibility: 'raw-collapsed',
-          },
-          thinkingStatus: 'complete',
+          result: { status: 'complete', toolCallIds: ['tool-glob-raw-done'] },
+          items: [thinkingItem('settled raw thinking', 1, rawThinking)],
           toolCalls: [
             {
               id: 'tool-glob-raw-done',
@@ -620,6 +607,7 @@ describe('buildWorkProcessPresentation', () => {
               status: 'complete',
               argsPreview: JSON.stringify({ pattern: '**/*' }),
               resultPreview: JSON.stringify({ files: ['a.ts'] }),
+              displayOrder: 2,
               startedAt: now + 100,
               completedAt: now + 200,
             },
@@ -629,10 +617,10 @@ describe('buildWorkProcessPresentation', () => {
         },
       ],
     }, t);
-    expect(settled.rows.find((row) => row.type === 'section')).toMatchObject({
-      thinkingOpenByDefault: false,
-      thinkingLabel: '已思考 · 100ms',
-    });
+    expect(rowsOfType(settled.rows, 'thinking')).toEqual([expect.objectContaining({
+      openByDefault: false,
+      label: '已思考 · 100ms',
+    })]);
   });
 
   it('falls back to durationless 已思考 when timestamps are missing', () => {
@@ -645,15 +633,8 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Done.', status: 'complete', toolCallIds: [] },
-          thinking: {
-            text: 'summary only',
-            kind: 'summary',
-            source: 'anthropic-thinking',
-            visibility: 'summary',
-
-          },
-          thinkingStatus: 'complete',
+          result: { status: 'complete', toolCallIds: [] },
+          items: [thinkingItem('summary only', 1)],
           toolCalls: [],
           startedAt: undefined as unknown as number,
           completedAt: undefined,
@@ -661,13 +642,7 @@ describe('buildWorkProcessPresentation', () => {
       ],
     }, t);
 
-    // Without startedAt the loop may not project duration; if section exists, label must not reuse 思考过程.
-    const section = presentation.rows.find((row) => row.type === 'section');
-    if (section?.type === 'section' && section.thinkingLabel) {
-      expect(section.thinkingLabel).toMatch(/^(已思考|已思考 · )/);
-      expect(section.thinkingLabel).not.toBe('思考过程');
-      expect(section.thinkingLabel).not.toMatch(/思考了|深度思考/);
-    }
+    expect(rowsOfType(presentation.rows, 'thinking').map((row) => row.label)).toEqual(['已思考']);
   });
 
   it('aggregates eight consecutive tools into one toolAggregate row', () => {
@@ -820,7 +795,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'error',
-          result: { text: 'Checking git root.', status: 'complete', toolCallIds: ['tool-git'] },
+          result: { status: 'complete', toolCallIds: ['tool-git'] },
           toolCalls: [
             {
               id: 'tool-git',
@@ -865,7 +840,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Inspecting.', status: 'complete', toolCallIds: ['tool-1'] },
+          result: { status: 'complete', toolCallIds: ['tool-1'] },
           toolCalls: [
             {
               id: 'tool-1',
@@ -885,15 +860,8 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Final answer body', status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
-          thinking: {
-            text: 'Closing thoughts before the reply.',
-            kind: 'summary',
-            source: 'anthropic-thinking',
-            visibility: 'summary',
-
-          },
-          thinkingStatus: 'complete',
+          result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
+          items: [thinkingItem('Closing thoughts before the reply.', 1)],
           toolCalls: [],
           startedAt: now + 20,
           completedAt: now + 40,
@@ -905,9 +873,9 @@ describe('buildWorkProcessPresentation', () => {
     const closing = withThinking.rows.filter((row) => row.type === 'section').at(-1);
     expect(closing).toMatchObject({
       type: 'section',
-      thinkingPreview: 'Closing thoughts before the reply.',
-      thinkingExpandable: true,
+      loopId: 'runtime-loop-answer',
       stepCount: 0,
+      steps: [expect.objectContaining({ type: 'thinking', preview: 'Closing thoughts before the reply.', expandable: true })],
     });
 
     const withoutThinking = buildWorkProcessPresentation({
@@ -919,7 +887,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Inspecting.', status: 'complete', toolCallIds: ['tool-2'] },
+          result: { status: 'complete', toolCallIds: ['tool-2'] },
           toolCalls: [
             {
               id: 'tool-2',
@@ -939,7 +907,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Final answer body', status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
+          result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
           toolCalls: [],
           startedAt: now + 20,
           completedAt: now + 40,
@@ -960,15 +928,8 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Stable.', status: 'complete', toolCallIds: ['t1'] },
-          thinking: {
-            text: 'think',
-            kind: 'summary',
-            source: 'anthropic-thinking',
-            visibility: 'summary',
-
-          },
-          thinkingStatus: 'complete',
+          result: { status: 'complete', toolCallIds: ['t1'] },
+          items: [thinkingItem('think', 1), textItem('Stable.', 2)],
           toolCalls: [
             {
               id: 't1',
@@ -976,6 +937,7 @@ describe('buildWorkProcessPresentation', () => {
               status: 'complete',
               argsPreview: JSON.stringify({ pattern: '*' }),
               resultPreview: '{}',
+              displayOrder: 3,
               startedAt: now + 200,
               completedAt: now + 220,
             },
@@ -999,7 +961,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Checked types.', status: 'complete', toolCallIds: ['tool-shell'] },
+          result: { status: 'complete', toolCallIds: ['tool-shell'] },
           toolCalls: [
             {
               id: 'tool-shell',
@@ -1067,7 +1029,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Loaded skill.', status: 'complete', toolCallIds: ['tool-skill'] },
+          result: { status: 'complete', toolCallIds: ['tool-skill'] },
           toolCalls: [
             {
               id: 'tool-skill',
@@ -1125,7 +1087,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Read yaml.', status: 'complete', toolCallIds: ['tool-read'] },
+          result: { status: 'complete', toolCallIds: ['tool-read'] },
           toolCalls: [
             {
               id: 'tool-read',
@@ -1170,7 +1132,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Listed.', status: 'complete', toolCallIds: ['tool-glob'] },
+          result: { status: 'complete', toolCallIds: ['tool-glob'] },
           toolCalls: [
             {
               id: 'tool-glob',
@@ -1217,7 +1179,7 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Read.', status: 'complete', toolCallIds: ['tool-read-lines'] },
+          result: { status: 'complete', toolCallIds: ['tool-read-lines'] },
           toolCalls: [
             {
               id: 'tool-read-lines',
@@ -1335,7 +1297,7 @@ describe('buildWorkProcessPresentation', () => {
         },
         {
           id: 'loop-shell', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-          result: { text: 'ran', status: 'complete', toolCallIds: ['shell-1'] },
+          result: { status: 'complete', toolCallIds: ['shell-1'] },
           toolCalls: [{
             id: 'shell-1', toolName: 'shell', status: 'complete',
             argsPreview: JSON.stringify({ command: 'dir' }),
@@ -1368,7 +1330,7 @@ describe('buildWorkProcessPresentation', () => {
         kind: 'llm_turn',
         title: 'LLM turn',
         status: 'complete',
-        result: { text: 'done', status: 'complete', toolCallIds: ['mem-1', 'py-1'] },
+        result: { status: 'complete', toolCallIds: ['mem-1', 'py-1'] },
         toolCalls: [
           {
             id: 'mem-1',
@@ -1424,7 +1386,7 @@ describe('buildWorkProcessPresentation', () => {
         kind: 'llm_turn',
         title: 'LLM turn',
         status: 'complete',
-        result: { text: 'done', status: 'complete', toolCallIds: ['sk-1', 'mcp-1', 'ts-1', 'out-1'] },
+        result: { status: 'complete', toolCallIds: ['sk-1', 'mcp-1', 'ts-1', 'out-1'] },
         toolCalls: [
           {
             id: 'sk-1',

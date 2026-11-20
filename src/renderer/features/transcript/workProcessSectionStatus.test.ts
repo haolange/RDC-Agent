@@ -16,7 +16,9 @@ const plan: ConversationPlanReview = { planId: 'plan', revision: 1, uri: 'sessio
   decision: { kind: 'reject', feedback: 'Revise the execution contract' }, handoffOptions: [] };
 const loop = (id: string): ConversationWorkBlock => ({ id, title: 'LLM turn', kind: 'llm_turn',
   status: 'complete', startedAt: 1, completedAt: 2, toolCalls: [],
-  result: { text: `Progress ${id}`, status: 'complete', outputPhase: 'commentary', stopReason: 'tool_use', toolCallIds: [] } });
+  result: { status: 'complete', outputPhase: 'commentary', stopReason: 'tool_use', toolCallIds: [] },
+  items: [{ kind: 'text', text: `Progress ${id}`, phase: 'commentary', status: 'complete', displayOrder: 1,
+    providerOutputRef: { protocol: 'test', providerBlockKey: 'text', contentIndex: 0 } }] });
 const review = (id: string, pending = false): ConversationWorkBlock => ({ id: `review-${id}`,
   title: 'Plan review', kind: 'plan_review', status: pending ? 'running' : 'complete', startedAt: 3,
   toolCalls: [{ id, toolName: 'plan_artifact', status: pending ? 'running' : 'complete', startedAt: 3,
@@ -44,8 +46,8 @@ it('keeps pending review lifecycle but does not paint a waiting interaction as a
   const { presentation, document } = render([loop('loop-15'), review('first'), loop('loop-16'), review('second', true)]);
   const sections = presentation.rows.filter((row) => row.type === 'section');
   expect(sections.map((row) => row.status)).toEqual(['complete', 'running']);
-  expect(sections[0].steps.map((step) => step.id)).toEqual(['first']);
-  expect(sections[1].steps.map((step) => step.id)).toEqual(['second']);
+  expect(sections[0].steps.map((step) => step.id)).toEqual(['loop-15:output:0', 'first']);
+  expect(sections[1].steps.map((step) => step.id)).toEqual(['loop-16:output:0', 'second']);
   expect(document.querySelectorAll('.work-process-section > [data-work-node="structure"]')).toHaveLength(2);
   expect(document.querySelector('[data-work-node="activity"]')).toBeNull();
 });
@@ -71,7 +73,7 @@ it('renders a cancelled review neutrally and retains its full reader reference',
   cancelled.toolCalls[0].planReview = { ...plan, status: 'cancelled', decision: undefined };
   const { presentation, document } = render([loop('loop-15'), cancelled]);
   const section = presentation.rows.find(row => row.type === 'section');
-  expect(section?.steps[0]).toMatchObject({ type: 'tool', status: 'cancelled', verb: '计划 · 审阅已取消' });
+  expect(section?.steps.find((step) => step.id === 'cancelled')).toMatchObject({ type: 'tool', status: 'cancelled', verb: '计划 · 审阅已取消' });
   expect(document.querySelector('.status-error')).toBeNull();
   expect(document.querySelector('.status-running')).toBeNull();
   expect(document.querySelector('button[disabled]')).toBeNull();

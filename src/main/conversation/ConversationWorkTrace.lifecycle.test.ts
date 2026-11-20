@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
-import { finalizeTrace, upsertLoopResult, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { finalizeTrace, upsertLoopResult, upsertLoopTextItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
 
-const finish = (trace: ConversationWorkTrace | undefined, id: string) => upsertLoopResult(
-  trace, id, 'Progress update', undefined, undefined, 'complete', 'tool_use', 'commentary',
-);
+const finish = (trace: ConversationWorkTrace | undefined, id: string) => upsertLoopResult(trace, id, { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary' });
 
 describe('work trace loop settlement and interaction ownership', () => {
   it('settles the screenshot sequence without ending the active turn', () => {
@@ -58,7 +56,7 @@ describe('work trace loop settlement and interaction ownership', () => {
       clock.mockReturnValue(200);
       trace = finish(trace, 'loop');
       expect(trace.blocks[0].completedAt).toBe(100);
-      trace = upsertLoopResult(trace, 'loop', 'Progress update continues', undefined, undefined, 'streaming');
+      trace = upsertLoopResult(trace, 'loop', { status: 'streaming' });
       expect(trace.blocks[0].status).toBe('running');
       expect(trace.blocks[0].completedAt).toBeUndefined();
       expect(trace.blocks[0].result?.outputPhase).toBeUndefined();
@@ -71,5 +69,19 @@ describe('work trace loop settlement and interaction ownership', () => {
     trace = finish(trace, 'loop');
     expect(trace.blocks[0].status).toBe('complete');
     expect(trace.status).toBe('running');
+  });
+});
+
+describe('structural sharing', () => {
+  it('copies only the block an update touches and never changes the previous trace', () => {
+    const ref = (index: number) => ({ protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index });
+    let before = upsertLoopTextItem(undefined, 'loop-1', ref(0), 'First loop', 'commentary', 'complete');
+    before = upsertLoopTextItem(before, 'loop-2', ref(1), 'Second', undefined, 'streaming');
+    const frozen = JSON.stringify(before);
+    const after = upsertLoopTextItem(before, 'loop-2', ref(1), 'Second loop', undefined, 'streaming');
+    expect(JSON.stringify(before)).toBe(frozen);
+    expect(after.blocks[0]).toBe(before.blocks[0]);
+    expect(after.blocks[1]).not.toBe(before.blocks[1]);
+    expect(after.blocks[1].items?.[0]).toMatchObject({ text: 'Second loop' });
   });
 });

@@ -184,7 +184,9 @@ assert(conversationTurnRunnerSource.includes('requireCanonicalFinalAnswer(canoni
 assert(!/event\.type === 'tool\.started'[\s\S]{0,240}beginAssistantContentLoop\(\)/u.test(conversationCanonicalSources), 'Tool lifecycle events must not consume the pending assistant loop transition.');
 assert(!conversationCanonicalSources.includes('currentLoopText.trim() || rawResponse || visibleResponse'), 'Conversation terminal content must not fall back to loop text.');
 assert(!conversationCanonicalSources.includes('rawResponse ||'), 'Conversation terminal content must not restore raw provider text fallback.');
-assert(traceCanonicalSource.includes("block.result?.outputPhase === 'final_answer'"), 'Trace reload must read only explicit final_answer blocks.');
+assert(traceCanonicalSource.includes('loopFinalAnswerText(block)')
+  && fs.readFileSync('src/shared/conversation/loopItems.ts', 'utf8').includes("block?.result?.outputPhase !== 'final_answer'"),
+  'Trace reload must read only explicit final_answer blocks through the shared loop rule.');
 assert(openaiCompatibleSource.includes('Provider emitted another semantic Chat Completions choice after finish_reason.'), 'Chat Completions must reject semantic choices after finish_reason.');
 assert(openaiResponsesSource.includes('providerTerminalSeen'), 'Responses must reject events after its terminal event.');
 

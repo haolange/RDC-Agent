@@ -2,7 +2,7 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
+import type { ConversationTextItem, ConversationThinkingItem, ConversationWorkTrace } from '@shared/types/conversation';
 import { WorkProcess } from './WorkProcess';
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
@@ -35,24 +35,26 @@ it('keeps streamed text in the same DOM node when its phase is confirmed', async
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
-  const output = { providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'text:0', contentIndex: 0 },
-    text: 'Checking', status: 'streaming' as const, displayOrder: 1 };
+  const output: ConversationTextItem = { kind: 'text', providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'text:0', contentIndex: 0 },
+    text: 'Checking', status: 'streaming', displayOrder: 1 };
+  const laterThinking: ConversationThinkingItem = { kind: 'thinking',
+    providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'reasoning:1', contentIndex: 1 },
+    thinking: { kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text: 'Later thinking' },
+    status: 'streaming', displayOrder: 2 };
   const trace: ConversationWorkTrace = { status: 'running', updatedAt: 2, blocks: [{
-    id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1, toolCalls: [], outputItems: [output],
+    id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1, toolCalls: [], items: [output],
   }] };
   const render = () => act(async () => root.render(React.createElement(WorkProcess, { trace: { ...trace }, sessionId: 'session', messageId: 'a' })));
   try {
     await render();
     const node = host.querySelector('[data-testid="work-process-output"]');
     expect(node?.textContent).toContain('Checking');
-    trace.blocks[0].thinking = { kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text: 'Later thinking' };
-    trace.blocks[0].thinkingStatus = 'streaming';
-    trace.blocks[0].thinkingDisplayOrder = 2;
+    trace.blocks[0].items = [output, laterThinking];
     await render();
     expect(host.querySelector('[data-testid="work-process-output"]')).toBe(node);
     expect([...host.querySelectorAll('[data-testid="work-process-output"], [data-testid="work-process-thinking"]')]
       .map((entry) => entry.getAttribute('data-testid'))).toEqual(['work-process-output', 'work-process-thinking']);
-    trace.blocks[0].outputItems = [{ ...output, text: 'Checking now', phase: 'commentary', status: 'complete' }];
+    trace.blocks[0].items = [{ ...output, text: 'Checking now', phase: 'commentary', status: 'complete' }, laterThinking];
     trace.blocks[0].toolCalls = [{ id: 'read', toolName: 'read_file', status: 'running', startedAt: 2, executionStartedAt: 2, displayOrder: 3 }];
     await render();
     expect(host.querySelector('[data-testid="work-process-output"]')).toBe(node);

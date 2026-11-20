@@ -1,4 +1,4 @@
-import type { ConversationWorkBlock } from '@shared/types/conversation';
+import type { ConversationThinkingStatus } from '@shared/types/conversation';
 import type { WorkProcessRowStatus } from './workProcessTypes';
 
 export const isActiveWorkProcessStatus = (status: WorkProcessRowStatus): boolean => (
@@ -6,7 +6,7 @@ export const isActiveWorkProcessStatus = (status: WorkProcessRowStatus): boolean
 );
 
 export const isActiveThinkingStatus = (
-  thinkingStatus: ConversationWorkBlock['thinkingStatus'] | undefined,
+  thinkingStatus: ConversationThinkingStatus | undefined,
   rowStatus: WorkProcessRowStatus,
 ): boolean => (
   thinkingStatus === 'streaming'

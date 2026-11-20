@@ -68,17 +68,21 @@ it('finds the first visible event through silent model turns without changing or
 it('keeps started details stable during streaming and excludes future calls while retaining pre-start errors', () => {
   const presentation = buildWorkProcessPresentation({ status: 'running', updatedAt: 10, blocks: [{
     id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
-    thinking: { kind: 'raw', source: 'anthropic-thinking', text: 'Still reasoning', visibility: 'raw-collapsed' }, thinkingStatus: 'streaming',
+    items: [{ kind: 'thinking', status: 'streaming', displayOrder: 1,
+      providerOutputRef: { protocol: 'test', providerBlockKey: 'reasoning', contentIndex: 0 },
+      thinking: { kind: 'raw', source: 'anthropic-thinking', text: 'Still reasoning', visibility: 'raw-collapsed' } }],
     toolCalls: [
-      { id: 'running', toolName: 'read_file', status: 'running', startedAt: 1, executionStartedAt: 8, argsPreview: '{"file_path":"actual.txt"}' },
-      { id: 'future', toolName: 'read_file', status: 'pending', startedAt: 1 },
-      { id: 'denied', toolName: 'shell', status: 'error', startedAt: 1, completedAt: 10, error: 'Permission denied' },
+      { id: 'running', toolName: 'read_file', status: 'running', startedAt: 1, executionStartedAt: 8, displayOrder: 2, argsPreview: '{"file_path":"actual.txt"}' },
+      { id: 'future', toolName: 'read_file', status: 'pending', startedAt: 1, displayOrder: 3 },
+      { id: 'denied', toolName: 'shell', status: 'error', startedAt: 1, completedAt: 10, displayOrder: 4, error: 'Permission denied' },
     ],
   }] }, t);
   const row = presentation.rows.find((entry) => entry.type === 'section');
-  expect(row?.type === 'section' && row.steps.map((entry) => entry.id)).toEqual(['running', 'denied']);
-  expect(row?.type === 'section' && JSON.stringify(row.steps[0])).toContain('actual.txt');
-  expect(row?.type === 'section' && row.steps[1].duration).toBe('');
+  if (row?.type !== 'section') throw new Error('expected section');
+  expect(row.steps.map((entry) => entry.id)).toEqual(['loop:thinking:reasoning:0', 'running', 'denied']);
+  const [, running, denied] = row.steps;
+  expect(JSON.stringify(running)).toContain('actual.txt');
+  expect(denied.duration).toBe('');
 });
 it('gives silent tool sections a node without giving each tool another node', () => {
   const rows: WorkProcessRow[] = [section('silent', [tool('first')]), tool('first'), tool('second'), section('new', [], 'Next step')];
@@ -119,7 +123,7 @@ it('interleaves task snapshots and tools by first visible order even with equal 
 it('keeps a question between its earlier text and later tool in the owning group', () => {
   const presentation = buildWorkProcessPresentation({ status: 'running', updatedAt: 5, blocks: [
     { id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
-      outputItems: [{ providerOutputRef: { protocol: 'test', providerBlockKey: 'text', contentIndex: 0 },
+      items: [{ kind: 'text', providerOutputRef: { protocol: 'test', providerBlockKey: 'text', contentIndex: 0 },
         text: 'Before', phase: 'commentary', status: 'complete', displayOrder: 1 }],
       toolCalls: [{ id: 'read', toolName: 'read_file', status: 'complete', startedAt: 2, displayOrder: 3 }] },
     { id: 'question', kind: 'user_input', parentLoopId: 'loop', title: 'Question', status: 'running', startedAt: 2,

@@ -23,8 +23,8 @@ export function applyPlanReviewRequested(input: {
   const pausedTrace = input.workTrace
     ? {
         ...input.workTrace,
-        blocks: input.workTrace.blocks.map((block) => block.thinkingStatus === 'streaming'
-          ? { ...block, thinkingStatus: 'complete' as const }
+        blocks: input.workTrace.blocks.map((block) => block.items?.some((item) => item.kind === 'thinking' && item.status === 'streaming')
+          ? { ...block, items: block.items.map((item) => item.kind === 'thinking' ? { ...item, status: 'complete' as const } : item) }
           : block),
       }
     : input.workTrace;

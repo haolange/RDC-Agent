@@ -180,6 +180,7 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
 };
 
 const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
+  const { t } = useI18n();
   const agentId = message.agentId;
   const time = formatClockTime(message.createdAt);
   const trace = message.workTrace ?? null;
@@ -187,7 +188,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const isInProgress = status === 'streaming' || status === 'draft';
   const hasContent = Boolean(message.content && message.content.length > 0);
   const traceIsRunning = Boolean(trace && trace.status === 'running');
-  const hasProjectedOutput = Boolean(trace?.blocks.some((block) => block.outputItems?.length));
+  const hasProjectedOutput = Boolean(trace?.blocks.some((block) => block.items?.some((item) => item.kind === 'text')));
   // Work Process remains first, while the assistant answer streams underneath it.
   const showContentBubble = !hasProjectedOutput && (hasContent || isInProgress || traceIsRunning)
     || (status === 'error' && hasContent);
@@ -207,6 +208,9 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
         <div className="conversation-message-stack">
           {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
               <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} />
+          ) : null}
+          {message.workTraceDiscarded ? (
+            <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>
           ) : null}
           {message.attachments && message.attachments.length > 0 ? (
             <MessageAttachments attachments={message.attachments} />

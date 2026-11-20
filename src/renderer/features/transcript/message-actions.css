@@ -11,6 +11,13 @@
   max-width: min(680px, 80%);
 }
 
+/* A reply whose stored work process came from an older version. */
+.conversation-message-trace-note {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
 .message-actions {
   display: inline-flex;
   align-items: center;

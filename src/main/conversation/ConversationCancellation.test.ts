@@ -51,7 +51,7 @@ describe('request cancellation is not rejection or failure', () => {
   });
   it('does not reopen a stopped trace when a late result or tool update arrives', () => {
     const stopped = finalizeTrace(pendingTrace(), 'stopped', undefined, 100);
-    expect(upsertLoopResult(stopped, 'loop', 'late', undefined, undefined, 'streaming')).toEqual(stopped);
+    expect(upsertLoopResult(stopped, 'loop', { status: 'streaming' })).toEqual(stopped);
     expect(upsertRuntimeToolCall(stopped, { id: 'p', toolName: 'plan_artifact', status: 'running' })).toEqual(stopped);
   });
   it.each(['complete', 'error'] as const)('keeps a real %s receipt when approval cancellation arrives late', status => {

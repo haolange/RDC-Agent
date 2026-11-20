@@ -28,7 +28,7 @@ vi.mock('./useDelegationTrace', () => ({ useDelegationTrace: () => ({
     ...(state.configurationError ? { configurationError: 'MODEL_UNAVAILABLE', error: 'Model unavailable' } : {}),
     completedAt: 1000, taskAvailable: true, finalAvailable: state.projectedFinal },
     steps: state.projectedFinal ? [{ id: 'loop', revision: 1, block: { id: 'loop', kind: 'llm_turn', title: 'Loop',
-      status: 'complete', startedAt: 1, toolCalls: [], outputItems: [{ providerOutputRef: {
+      status: 'complete', startedAt: 1, toolCalls: [], items: [{ kind: 'text', providerOutputRef: {
         protocol: 'test', providerBlockKey: 'text', contentIndex: 0 }, text: 'Final child reply',
         phase: 'final_answer', status: 'complete', displayOrder: 1 }] } }] : [], total: state.projectedFinal ? 1 : 0, revision: 1 },
   loading: false, headerLoading: state.headerLoading, hasEarlier: false, loadEarlier: async () => {}, retry: () => {},

@@ -1,5 +1,7 @@
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
+import { loopFinalAnswerText, loopThinkingItems } from '@shared/conversation/loopItems';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import type { RunSummary } from '@shared/types/session';
 import type {
@@ -31,16 +33,9 @@ const toIso = (value: number | string | undefined, fallback = nowIso()): string 
 
 const collectExplicitThinking = (
   blocks: ConversationWorkBlock[] | undefined,
-): Array<{ blockId: string; thinking: NonNullable<ConversationWorkBlock['thinking']> }> => {
-  const collected: Array<{ blockId: string; thinking: NonNullable<ConversationWorkBlock['thinking']> }> = [];
-  const visit = (items: ConversationWorkBlock[] | undefined) => {
-    for (const block of items ?? []) {
-      if (block.thinking) collected.push({ blockId: block.id, thinking: block.thinking });
-    }
-  };
-  visit(blocks);
-  return collected;
-};
+): Array<{ blockId: string; thinking: ThinkingArtifact }> => (blocks ?? []).flatMap((block) => (
+  loopThinkingItems(block).map((item) => ({ blockId: block.id, thinking: item.thinking }))
+));
 
 export function findCanonicalFinalAnswer(
   conversations: ConversationMessage[],
@@ -49,14 +44,8 @@ export function findCanonicalFinalAnswer(
   let finalAnswer: string | null = null;
   const visit = (blocks: ConversationWorkBlock[] | undefined) => {
     for (const block of blocks ?? []) {
-      const resultText = block.outputItems?.length
-        ? block.result?.stopReason === 'end_turn'
-          ? block.outputItems.filter((item) => item.phase === 'final_answer').map((item) => item.text).join('').trim()
-          : ''
-        : block.result?.text?.trim();
-      if (block.result?.outputPhase === 'final_answer' && resultText) {
-        finalAnswer = resultText;
-      }
+      const answer = loopFinalAnswerText(block);
+      if (answer) finalAnswer = answer;
     }
   };
   for (const message of conversations) {

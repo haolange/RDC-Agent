@@ -130,14 +130,14 @@ export function translateCoreToSharedAgentEvent(
       if (ev.type === 'thinking_delta') {
         return buildSharedAgentEvent(
           'assistant.thinking_delta',
-          { text: ev.delta, thinking: toSharedThinkingArtifact(ev.thinking) },
+          { text: ev.delta, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
           context,
         );
       }
       if (ev.type === 'thinking_end') {
         return buildSharedAgentEvent(
           'assistant.thinking_end',
-          { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking) },
+          { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
           context,
         );
       }

@@ -313,7 +313,6 @@ ConversationMessageErroredEvent
 ConversationMessagePatchedEvent
 ConversationMessageStatus
 ConversationMode
-ConversationOutputItem
 ConversationPlanReview
 ConversationPreflightErrorCode
 ConversationReasoningState

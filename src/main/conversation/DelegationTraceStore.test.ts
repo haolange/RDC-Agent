@@ -32,7 +32,7 @@ it('batches child text without combining distinct provider output items', () => 
   delegationTraceStore.event('owner', 'items', identity, event('assistant.delta', { text: 'Second', providerOutputRef: ref(1) }, 4));
   delegationTraceStore.event('owner', 'items', identity, event('assistant.text_end', { text: 'Second', providerOutputRef: ref(1) }, 5));
   const page = delegationTraceStore.read('owner', 'items', 0, 40);
-  expect(page.steps[0].block.outputItems?.map((item) => item.text)).toEqual(['First item', 'Second']);
+  expect(page.steps[0].block.items?.map((item) => item.kind === 'text' && item.text)).toEqual(['First item', 'Second']);
   delegationTraceStore.finish('owner', 'items', identity, 'complete', 'Done');
 });
 
@@ -50,7 +50,7 @@ it('stores a single owned child process with revision updates and separate final
     hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [],
     outputRequirements: 'Return findings', stopConditions: [], requiredSkillIds: [], budget: { maxToolCalls: 4, maxWallTimeMs: 60000 },
   }, completionRequirements: [] }, 'Exact sent prompt');
-  delegationTraceStore.event('owner', 'parent-call', id, event('assistant.thinking_delta', { text: 'Check config' }, 2));
+  delegationTraceStore.event('owner', 'parent-call', id, event('assistant.thinking_delta', { text: 'Check config' , providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 } }, 2));
   delegationTraceStore.event('owner', 'parent-call', id, event('tool.started', {
     toolCallId: 'read', toolName: 'read_file', args: { path: 'config', password: 'private' },
   }, 3));
@@ -137,7 +137,7 @@ it('marks unfinished records interrupted after restart and refuses old records w
     parentToolCallId: 'unfinished', task: 'Inspect', profile: 'general', mode: 'wait',
     childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1,
   });
-  delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('assistant.thinking_delta', { text: 'Visible work' }, 2));
+  delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('assistant.thinking_delta', { text: 'Visible work' , providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 } }, 2));
   delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('tool.started', { toolCallId: 'running', toolName: 'read_file' }, 3));
   const target = path.join(fixture.root, 'delegations', 'old.jsonl');
   fs.writeFileSync(target, '{ old record }\n');
@@ -153,7 +153,7 @@ it('marks unfinished records interrupted after restart and refuses old records w
   const recovered = restarted.read('owner', 'unfinished', 0, 40);
   expect(recovered.steps.length).toBeGreaterThan(0);
   for (const { block } of recovered.steps) {
-    expect(block.thinkingStatus).toBe('complete');
+    expect(block.items?.every((item) => item.status === 'complete')).toBe(true);
     expect(block.status).toBe('error');
     expect(block.completedAt).toBe(interrupted?.completedAt);
     expect(block.toolCalls[0]).toMatchObject({ status: 'error', completedAt: interrupted?.completedAt });
@@ -185,7 +185,7 @@ it.each(['complete', 'failed', 'cancelled'] as const)('settles every owned step 
   const identity = 'child\u0000\u0000';
   delegationTraceStore.start('owner', { parentToolCallId: call, task: 'Inspect', profile: 'general', mode: 'wait',
     childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1 });
-  delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Visible thought' }, 2));
+  delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Visible thought' , providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 } }, 2));
   delegationTraceStore.event('owner', call, identity, event('tool.requested', { toolCall: { id: 'pending', name: 'turn_complete', arguments: {} } }, 3));
   delegationTraceStore.event('owner', call, identity, event('tool.started', { toolCallId: 'started', toolName: 'read_file' }, 4));
   const before = delegationTraceStore.read('owner', call, 0, 0).revision;
@@ -194,12 +194,12 @@ it.each(['complete', 'failed', 'cancelled'] as const)('settles every owned step 
   expect(page.steps.length).toBeGreaterThan(0);
   for (const { block } of page.steps) {
     expect(['running', 'pending']).not.toContain(block.status);
-    expect(block.thinkingStatus).toBe('complete');
+    expect(block.items?.every((item) => item.status === 'complete')).toBe(true);
     expect(block.completedAt).toBe(page.header?.completedAt);
     expect(block.toolCalls.find(tool => tool.id === 'started')).toMatchObject({ status: status === 'cancelled' ? 'cancelled' : 'error', completedAt: page.header?.completedAt });
     expect(block.toolCalls.find(tool => tool.id === 'pending')?.status).toBe('skipped');
   }
-  delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Late' }, 9));
+  delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Late' , providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:1', contentIndex: 1 } }, 9));
   expect(delegationTraceStore.read('owner', call, 0, 40)).toEqual({ ...page, nextCursor: null });
 });
 

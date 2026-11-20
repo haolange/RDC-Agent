@@ -42,7 +42,8 @@ it('settles an orphaned parent turn and its thinking after a plan request is rej
     status: 'streaming', content: '', createdAt: 1, updatedAt: 2,
     workTrace: { status: 'running', updatedAt: 2, blocks: [{
       id: 'loop', kind: 'llm_turn', stage: 'thinking', title: 'Thinking', status: 'running', startedAt: 1,
-      thinkingStatus: 'streaming', thinking: { kind: 'summary', visibility: 'summary', source: 'xai-responses-summary', text: 'Drafting a plan' },
+      items: [{ kind: 'thinking', status: 'streaming', displayOrder: 1, providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
+        thinking: { kind: 'summary', visibility: 'summary', source: 'xai-responses-summary', text: 'Drafting a plan' } }],
       toolCalls: [{ id: 'plan-call', toolName: 'plan_artifact', status: 'running', startedAt: 2,
         planReview: { planId: 'plan', revision: 1, uri: 'session://plans/plan.md', hash: 'a'.repeat(64),
           title: 'Plan', summary: ['Summary'], sections: [], status: 'awaiting', handoffOptions: [] },
@@ -53,7 +54,7 @@ it('settles an orphaned parent turn and its thinking after a plan request is rej
   const recovered = reconcileInterruptedConversationTurn(reconcileDelegatedInteractionRequests('session', message), false, message.updatedAt);
   expect(recovered.status).toBe('error');
   expect(recovered.workTrace?.status).toBe('error');
-  expect(recovered.workTrace?.blocks[0]).toMatchObject({ status: 'error', thinkingStatus: 'complete' });
+  expect(recovered.workTrace?.blocks[0]).toMatchObject({ status: 'error', items: [{ kind: 'thinking', status: 'complete' }] });
   expect(recovered.workTrace?.blocks[0]?.completedAt).toBe(2);
   expect(recovered.workTrace?.blocks[0]?.toolCalls[0]).toMatchObject({ status: 'error', planReview: { status: 'cancelled' } });
   expect(reconcileInterruptedConversationTurn(recovered, false)).toBe(recovered);
