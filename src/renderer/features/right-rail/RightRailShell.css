@@ -56,11 +56,6 @@
   padding: 0;
 }
 
-/* A text-only empty state is a caption line, not a bordered box that reads like an input. */
-.right-rail-empty-state.ui-empty-state.is-layout-compact:not(:has(.ui-empty-state-visual)) {
-  border: 0;
-  background: transparent;
-}
 
 .right-rail-empty-state .ui-empty-state-visual {
   justify-content: center;

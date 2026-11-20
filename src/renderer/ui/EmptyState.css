@@ -49,9 +49,19 @@
   align-self: stretch;
 }
 
+/* Text-only copy stays quiet in place; only a resource empty state with actions gets a bounded surface. */
 .ui-empty-state.is-layout-compact:not(:has(.ui-empty-state-visual)) {
   min-height: 0;
+  padding: var(--space-4) var(--space-3);
+}
+
+.ui-empty-state.is-layout-compact:not(:has(.ui-empty-state-visual)):has(.ui-empty-state-actions) {
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-sm);
   background: var(--token-bg-panel);
+}
+
+.ui-empty-state.is-layout-compact:not(:has(.ui-empty-state-visual)) .ui-empty-state-title {
+  color: var(--token-text-body);
+  font-weight: var(--font-medium);
 }

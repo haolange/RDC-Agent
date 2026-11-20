@@ -164,7 +164,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体，只有文案的空态显示为一行说明文字而非边框盒。Right Rail 各标签的卡片通过可选 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
 
-共享空态区分紧凑区块与填充面板用途。资源空态以有边界的中性实色承载标题、说明和统一动作组；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
+共享空态区分紧凑区块与填充面板用途。带动作组的资源空态以有边界的中性实色承载标题、说明和动作；只有文案的紧凑空态不画边框盒，就地显示一行（或标题加说明）安静文字；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
 
 ## Composer 附件卡
 
