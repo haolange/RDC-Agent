@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({ agents: { definitions: [] } }),
+    getAll: () => ({ agents: { definitions: [] }, appearance: { language: 'zh-CN' } }),
   },
 }));
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
@@ -40,7 +40,7 @@ describe('conversation turn failure classification', () => {
       { turn: 3, noProgressReason: 'runtime-obligation' },
     ));
     expect(diagnostic.code).toBe('CONVERSATION_AGENT_LOOP_STALLED');
-    expect(diagnostic.userMessage).toContain('未完成条件');
+    expect(diagnostic.userMessage).toContain('未完成的条件');
     expect(diagnostic.userMessage).not.toContain('连续三轮');
   });
 
@@ -54,13 +54,13 @@ describe('conversation turn failure classification', () => {
       ),
     );
     expect(diagnostic.code).toBe('CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED');
-    expect(diagnostic.userMessage).toContain('25 轮上限');
+    expect(diagnostic.userMessage).toContain('25 轮的上限');
   });
 
   it('classifies an unclosed direct Task as a local completion failure', () => {
     const diagnostic = createTurnFailedDiagnostic(ROUTE, new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.'));
     expect(diagnostic.code).toBe('CONVERSATION_TASK_COMPLETION_DENIED');
-    expect(diagnostic.userMessage).toContain('未结算的直接 Task');
+    expect(diagnostic.userMessage).toContain('没收尾的任务');
     expect(diagnostic.userMessage).not.toContain('服务商');
   });
 
@@ -77,7 +77,7 @@ describe('conversation turn failure classification', () => {
   it('classifies 429 quota as a rate-limit failure', () => {
     const diagnostic = createTurnFailedDiagnostic(ROUTE, new Error('429 quota exceeded'));
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
-    expect(diagnostic.userMessage).toContain('额度不足或触发了限流');
+    expect(diagnostic.userMessage).toContain('额度不足或被限流');
     expect(diagnostic.technicalMessage).toBe('provider HTTP 429 · attempts 1/1 · 429 quota exceeded');
   });
 
@@ -93,7 +93,8 @@ describe('conversation turn failure classification', () => {
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
-    expect(diagnostic.userMessage).toContain('服务端错误（HTTP 503）');
+    expect(diagnostic.userMessage).toContain('服务端出错');
+    expect(diagnostic.technicalMessage).toContain('503');
     expect(diagnostic.technicalMessage).toBe('provider HTTP 503 · attempts 4/4 · {"error":"boom"}');
   });
 
@@ -107,7 +108,7 @@ describe('conversation turn failure classification', () => {
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
-    expect(diagnostic.userMessage).toContain('服务商没有返回助手正文或结构化工具调用');
+    expect(diagnostic.userMessage).toContain('服务没有返回答复或工具调用');
     expect(diagnostic.technicalMessage).toBe(
       'provider HTTP n/a · attempts 2/2 · Provider stream ended without assistant output or structured tool call.',
     );
@@ -131,8 +132,8 @@ describe('conversation turn failure classification', () => {
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
-    expect(diagnostic.userMessage).toContain('本地上下文检查点');
-    expect(diagnostic.userMessage).toContain('原始会话和调查证据已保留');
+    expect(diagnostic.userMessage).toContain('上下文检查点没有建立');
+    expect(diagnostic.userMessage).toContain('原始会话和调查证据都保留着');
     expect(diagnostic.userMessage).not.toContain('服务商');
     expect(diagnostic.technicalMessage).toContain('COMPACTION_AUTHORITY_TOO_LARGE');
   });
@@ -144,7 +145,7 @@ describe('conversation turn failure classification', () => {
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_ARTIFACT_QUOTA_EXCEEDED');
-    expect(diagnostic.userMessage).toContain('本地会话产物配额');
+    expect(diagnostic.userMessage).toContain('本地会话文件的配额');
     expect(diagnostic.userMessage).not.toContain('服务商');
     expect(diagnostic.technicalMessage).toContain('ARTIFACT_QUOTA_EXCEEDED');
   });
@@ -155,7 +156,7 @@ describe('conversation turn failure classification', () => {
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
-    expect(diagnostic.userMessage).toContain('本地上下文制品');
+    expect(diagnostic.userMessage).toContain('本地上下文文件');
     expect(diagnostic.userMessage).not.toMatch(/账号|额度|服务商/);
     expect(diagnostic.technicalMessage).toContain('ARTIFACT_TOO_LARGE');
   });
@@ -171,7 +172,7 @@ describe('conversation turn failure classification', () => {
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
-    expect(diagnostic.userMessage).toContain('本地调查记录');
+    expect(diagnostic.userMessage).toContain('调查记录无法建立');
     expect(diagnostic.userMessage).not.toContain('服务商');
     expect(diagnostic.technicalMessage).toContain('INVESTIGATION_REF_UNRESOLVED');
   });
@@ -192,8 +193,8 @@ describe('conversation turn failure classification', () => {
     );
     expect(diagnostic.code).toBe('CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION');
     expect(diagnostic.userMessage).toContain('完整性');
-    expect(diagnostic.userMessage).toContain('PROVIDER_STREAM_BLOCK_CLOSED');
-    expect(diagnostic.userMessage).toContain('anthropic/claude-opus-5');
+    expect(diagnostic.technicalMessage).toContain('PROVIDER_STREAM_BLOCK_CLOSED');
+    expect(diagnostic.userMessage).toContain('claude-opus-5');
     expect(diagnostic.userMessage).toContain('与账号、额度或网络无关');
     expect(diagnostic.userMessage).not.toContain('请检查该账号');
   });
@@ -246,7 +247,7 @@ describe('conversation turn failure classification', () => {
       abort,
     );
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
-    expect(diagnostic.userMessage).toContain('过载或容量不足');
+    expect(diagnostic.userMessage).toContain('繁忙或容量不足');
     expect(diagnostic.userMessage).not.toContain('请检查该账号');
     expect(diagnostic.technicalMessage).toBe(
       'provider HTTP n/a · attempts 3/3 · {"type":"error","message":"The model is currently at capacity due to high demand."}',
@@ -307,7 +308,7 @@ describe('conversation turn failure classification', () => {
       { agentId: 'general', providerId: 'grok-account', modelId: 'grok-4.6' },
       original,
     );
-    expect(diagnostic.userMessage).toContain('没有此模型或模型已下线');
+    expect(diagnostic.userMessage).toContain('没有这个模型');
     expect(diagnostic.userMessage).not.toContain('额度或网络');
   });
 
@@ -326,7 +327,7 @@ describe('conversation turn failure classification', () => {
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
-    expect(diagnostic.userMessage).toContain('模型请求失败');
+    expect(diagnostic.userMessage).toContain('请求没有成功');
     expect(diagnostic.technicalMessage).toBe(
       'provider HTTP n/a · attempts 1/1 · {"code":"account_suspended"}',
     );

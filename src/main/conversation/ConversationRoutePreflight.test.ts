@@ -53,6 +53,7 @@ const provider = {
 
 function settingsWith(): AppSettings {
   return {
+    appearance: { language: 'zh-CN' },
     paths: { agentsPath: 'C:/tmp/agents', userRdcRoot: 'C:/tmp/rdc' },
     llm: {
       providers: [provider],
@@ -213,6 +214,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
 
   it('records overlay invalid diagnostics on the blocked path', () => {
     vi.mocked(runtimeLogService.log).mockClear();
+    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
     recordOverlayProfileDiagnostics(
       { projectId: 'proj', session: null, currentRun: null } as never,
       'edit',

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { hasPlanReviewInteraction } from '@shared/conversation/planReviewPresentation';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { Details } from '../../ui/Details';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -225,12 +226,15 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           ) : null}
           {showDiagnosticBlock && message.diagnostic ? (
             <div className="conversation-message-diagnostic" role="alert">
-              <span className="conversation-message-diagnostic-code">
-                {message.diagnostic.code}
-              </span>
               <span className="conversation-message-diagnostic-text">
                 {message.diagnostic.userMessage}
               </span>
+              <Details className="conversation-message-diagnostic-details" summary={t('chat.diagnosticTechnicalDetails')}>
+                <code className="conversation-message-diagnostic-code">{message.diagnostic.code}</code>
+                {message.diagnostic.technicalMessage ? (
+                  <code className="conversation-message-diagnostic-code">{message.diagnostic.technicalMessage}</code>
+                ) : null}
+              </Details>
             </div>
           ) : null}
           {!isInProgress ? (

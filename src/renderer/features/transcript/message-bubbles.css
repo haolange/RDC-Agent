@@ -167,12 +167,17 @@
   font-size: var(--type-label-size);
 }
 
+.conversation-message-diagnostic-details {
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+}
+
 .conversation-message-diagnostic-code {
+  display: block;
+  margin-top: var(--space-1);
   font-family: var(--font-mono);
   font-size: var(--type-caption-size);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.85;
+  overflow-wrap: anywhere;
 }
 
 .conversation-message-diagnostic-text {

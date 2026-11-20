@@ -15,6 +15,7 @@ import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
 import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { diagnosticText } from './diagnosticText';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type {
   OpenedCaptureState,
@@ -320,7 +321,7 @@ export function resolveAgentRoutePreflight(
         agentId,
         code: 'CONVERSATION_LLM_ROUTE_MISSING',
         severity: 'warning',
-        userMessage: `当前 ${label} 链路还没绑定可用模型。请在 Settings 中为 \`${agentId}\` 选择 provider 和 model route。`,
+        userMessage: diagnosticText('routeMissing', { agent: label }),
       }),
     });
   }
@@ -333,7 +334,7 @@ export function resolveAgentRoutePreflight(
         agentId,
         code: 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE',
         severity: 'error',
-        userMessage: `当前 ${label} 链路的 provider 不可用：${providerId}。请检查该服务商的连接状态、账号或密钥后重试。`,
+        userMessage: diagnosticText('providerUnavailable', { agent: label, provider: providerId }),
         providerId,
         modelId,
         technicalMessage: provider?.lastError ?? provider?.unavailableReason,
@@ -348,7 +349,7 @@ export function resolveAgentRoutePreflight(
         agentId,
         code: 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE',
         severity: 'error',
-        userMessage: `Current ${label} route provider is not verified: ${providerId}. Verify the provider in Settings before running agent tools.`,
+        userMessage: diagnosticText('providerUnverified', { agent: label, provider: providerId }),
         providerId,
         modelId,
         technicalMessage: provider.lastError ?? provider.unavailableReason,
@@ -366,7 +367,7 @@ export function resolveAgentRoutePreflight(
         agentId,
         code: 'CONVERSATION_LLM_ROUTE_MISSING',
         severity: 'warning',
-        userMessage: `当前 ${label} 路由的模型不可用：${providerId}/${modelId}。请在 Settings 中刷新模型目录或显式选择同一 provider 的其它模型。`,
+        userMessage: diagnosticText('modelUnavailable', { agent: label, model: modelId }),
         providerId,
         modelId,
         technicalMessage: `MODEL_UNAVAILABLE: ${providerId}/${modelId} is absent, disabled, or unavailable in the effective catalog.${recommendationText ? ` Recommendations: ${recommendationText}.` : ''}`,
@@ -380,7 +381,7 @@ export function resolveAgentRoutePreflight(
     const detail = eligibility === 'executable'
       ? {
           technicalCode: 'MODEL_UNAVAILABLE',
-          userMessage: `当前 ${label} 路由的模型不可执行：${providerId}/${effectiveModelId}。`,
+          userMessage: diagnosticText('modelNotExecutable', { agent: label, model: effectiveModelId }),
           technicalMessage: `MODEL_UNAVAILABLE: ${providerId}/${effectiveModelId} is not Agent-executable.`,
         }
       : describeAgentToolIneligibility(eligibility, providerId, effectiveModelId);
@@ -395,7 +396,7 @@ export function resolveAgentRoutePreflight(
           : 'CONVERSATION_LLM_TOOLS_UNAVAILABLE',
         severity: 'warning',
         userMessage: recommendationText
-          ? `${detail.userMessage} 可改选：${recommendationText}。`
+          ? diagnosticText('modelAlternatives', { reason: detail.userMessage, alternatives: recommendationText })
           : detail.userMessage,
         providerId,
         modelId: effectiveModelId,
@@ -434,9 +435,10 @@ export function recordOverlayProfileDiagnostics(
       agentId,
       code: 'CONVERSATION_PROFILE_OVERLAY_INVALID',
       severity: 'warning',
-      userMessage: continuedWithLowerScope
-        ? `${entry.scope === 'user' ? '用户' : '项目'}的 profile 覆盖无效，已继续使用较低 scope 的有效 profile。${formatAgentManifestDiagnostic(entry)}`
-        : `${entry.scope === 'user' ? '用户' : '项目'}的 profile 覆盖无效，且当前没有可用的较低 scope 路由。${formatAgentManifestDiagnostic(entry)}`,
+      userMessage: diagnosticText(continuedWithLowerScope ? 'profileOverrideFallback' : 'profileOverrideBlocked', {
+        scope: diagnosticText(entry.scope === 'user' ? 'scopeUser' : 'scopeProject'),
+        detail: formatAgentManifestDiagnostic(entry),
+      }),
       technicalMessage: formatAgentManifestDiagnostic(entry),
     }));
   }
