@@ -29,7 +29,7 @@ RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。
 
 Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽屉或自动收起后该接缝不再提供拖拽。
 
-Workbench page shell、Local utilities、composer、transcript 共用 `--workbench-outer-rail-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）。禁止更窄 content-rail 把 composer 挤歪。Work Process 保留左侧内容起始线；可见卡片的右侧边界以既有左侧层级 gutter 校准，再通过 `--work-process-inline-end-inset` 做容器响应式收口，避免根节点宽度与卡片边界产生额外偏差。tool call、commentary、thinking/summary 及同一工作过程内的卡片共享该内容轨道，Composer 外框和运行态视觉不随 Transcript 收口改变。Final 回复继续占满 Transcript 内容列，不继承 Work Process 卡片收口。
+对话是一列：page shell、transcript 与 Composer 共用 `.app-main` 上定义的 `--conversation-column-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）与 `--conversation-inset`（Composer 内边距）。用户气泡右缘对齐 Composer 外框右缘；助手消息（Working、计划卡、正文、诊断）整体内缩 `--conversation-inset`，于是 Working 比 Composer 每侧窄一个内缩，工具卡右缘与 Composer 内容对齐，助手正文左缘与 Composer 文字对齐。不再有 Working 专用的右侧收口变量或更窄的 content-rail。运行记录是主栏底部的抽屉，占用高度而不覆盖消息。
 
 - 用户 prompt：右对齐 raised bubble（`fit-content`、`--token-surface-raised`）。
 - Assistant final answer、Work Process（含 tool 卡片）、loop commentary：full-bleed 透明散文；`.conversation-thread` 共用 `padding-inline: var(--space-3)`。

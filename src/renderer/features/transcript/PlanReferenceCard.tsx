@@ -1,5 +1,4 @@
 import React from 'react';
-import { resolveHandoffLabel } from '@shared/utils/handoffLabels';
 import { useI18n } from '../../i18n';
 import { requestPlanLocation } from '../../lib/transcriptPlanLocation';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
@@ -15,10 +14,9 @@ import './plan-reference-card.css';
  * prompt stays one disclosure away.
  */
 export const PlanReferenceCard: React.FC<{ reference: ConversationPlanReference; prompt: string }> = ({ reference, prompt }) => {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const agentName = useAppSettingsStore((state) => state.settings.agents.definitions.find((agent) => agent.id === reference.agentId)?.name)
     ?? reference.agentId;
-  const target = reference.label ? resolveHandoffLabel({ label: reference.label, labelTranslations: reference.labelTranslations }, language) : agentName;
   const showPlan = () => requestPlanLocation({ target: 'plan', plan: reference });
   return (
     <div className={`plan-reference-card is-${reference.intent}`} data-testid="plan-reference-card"
@@ -33,7 +31,7 @@ export const PlanReferenceCard: React.FC<{ reference: ConversationPlanReference;
       <div className="plan-reference-card__meta">
         <span>{t('chat.planReference.revision', { revision: reference.revision })}</span>
         <span aria-hidden="true">·</span>
-        <span>{t('chat.planReference.target', { agent: reference.intent === 'execute' ? target : agentName })}</span>
+        <span>{t('chat.planReference.target', { agent: agentName })}</span>
       </div>
       {prompt.trim() ? (
         <Details className="plan-reference-card__prompt" summary={t('chat.planReference.prompt')}>

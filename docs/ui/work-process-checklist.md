@@ -71,7 +71,7 @@
 ## Assistant Full-bleed
 
 - 最终答案与 Work Process 含 tool 卡片横跨外轨全宽并与 composer 对齐。
-- page-shell / Local utilities / composer / transcript 共用 `--workbench-outer-rail-width`，禁止再用更窄的 content-rail 把 compose 挤歪。
+- page-shell / transcript / Composer 共用 `--conversation-column-width`；用户气泡右缘对齐 Composer 外框，助手内容按 `--conversation-inset` 内缩并与 Composer 文字对齐；禁止 Working 专用收口或更窄的 content-rail。
 - 仅用户 prompt 使用 raised bubble、fit-content、右对齐。
 - loop nest 用 `--space-3`。
 - 用户 bubble / Work Process / final answer 共用 `.conversation-thread` 的 `padding-inline: --space-3` 离开左右轨/滚动条缝（同一内容列，禁止 WP 独享 gutter）。

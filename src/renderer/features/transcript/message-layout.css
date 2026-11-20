@@ -4,9 +4,6 @@
   --chat-top-hard-stop-height: var(--workbench-chat-top-hard-stop-height, 92px);
   --chat-top-transition-height: var(--workbench-chat-top-transition-height, 72px);
   --chat-top-safe-zone: calc(var(--chat-top-hard-stop-height) + var(--chat-top-transition-height));
-  /* Match composer: page-shell already applies the outer rail inset. */
-  --chat-inline-padding: var(--space-0);
-  --chat-transcript-width: 100%;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -63,7 +60,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-5);
-  padding: calc(var(--space-3) + var(--chat-top-safe-zone)) var(--chat-inline-padding) var(--control-height-lg);
+  padding: calc(var(--space-3) + var(--chat-top-safe-zone)) 0 var(--control-height-lg);
   position: relative;
   z-index: var(--z-base);
 }
@@ -71,7 +68,7 @@
 .chat-messages.chat-messages-empty {
   align-items: stretch;
   gap: 0;
-  padding: var(--control-height-sm) var(--chat-inline-padding) var(--control-height-sm);
+  padding: var(--control-height-sm) 0 var(--control-height-sm);
 }
 
 .message-attachments {
@@ -145,13 +142,12 @@
 }
 
 .conversation-thread {
-  width: min(var(--chat-transcript-width), 100%);
+  width: 100%;
   max-width: 100%;
   margin: 0;
-  /* Shared inline gutters: user bubble, Work Process, and final answer share one column
-     and stay off the rail/scrollbar seams. Do not reintroduce WP-only padding. */
+  /* The thread spans the conversation column edge to edge: the user bubble ends at the Composer's outer
+     edge; assistant content starts at the shared inset, level with Composer text. */
   padding: 0;
-  padding-inline: var(--space-3);
   box-sizing: border-box;
   list-style: none;
   display: flex;
@@ -217,7 +213,7 @@
 
 .conversation-message-user .conversation-message-stack {
   align-items: flex-end;
-  max-width: min(640px, 78%);
+  max-width: min(40rem, 82%);
 }
 
 /* Assistant row: align left, avatar before stack */
@@ -225,10 +221,12 @@
   justify-content: flex-start;
 }
 
-.conversation-message-assistant .conversation-message-stack {
+.conversation-message-assistant .conversation-message-stack,
+.conversation-message-system.is-command .conversation-message-stack {
   align-items: stretch;
   flex: 1 1 auto;
   max-width: 100%;
+  padding-inline: var(--conversation-inset);
 }
 
 /* System notice: centred annotation; slash-command output stretches left. */

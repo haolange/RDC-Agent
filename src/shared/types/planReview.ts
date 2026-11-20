@@ -97,8 +97,6 @@ export interface ConversationPlanReference {
   title: string;
   /** The Agent the message is addressed to: the executing target, or the planner asked to revise. */
   agentId: string;
-  label?: string;
-  labelTranslations?: HandoffLabelTranslations;
 }
 
 export interface PlanReadResult {

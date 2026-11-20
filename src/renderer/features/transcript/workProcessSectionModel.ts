@@ -24,6 +24,17 @@ export interface WorkProcessSectionModel {
 
 const isCommentary = (row: WorkProcessRow): boolean => row.type === 'output' && row.phase === 'commentary';
 
+/** Every action a step took, including Task changes that render as snapshots instead of tool rows. */
+export function countWorkActions(rows: readonly WorkProcessRow[]): number {
+  return rows.reduce((total, row) => {
+    if (row.type === 'section') return total + countWorkActions(row.visibleSteps);
+    if (row.type === 'toolAggregate') return total + row.children.length;
+    if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
+    if (row.type === 'thinking' || row.type === 'output' || row.type === 'summary' || row.type === 'diagnostic') return total;
+    return total + 1;
+  }, 0);
+}
+
 export function workProcessSectionModel(row: SectionRow, t: Translator): WorkProcessSectionModel {
   const leadRows = row.visibleSteps.filter(step => step.type === 'thinking' || step.type === 'output');
   const actionRows = row.visibleSteps.filter(step => step.type !== 'thinking' && step.type !== 'output');
@@ -32,7 +43,8 @@ export function workProcessSectionModel(row: SectionRow, t: Translator): WorkPro
   const lead: WorkProcessSectionLead = thinking && commentary ? 'thinking+commentary'
     : thinking ? 'thinking' : commentary ? 'commentary' : 'actions';
   const running = isTrackActivity(row);
-  const actions = t(row.stepCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: row.stepCount });
+  const actionCount = countWorkActions(actionRows);
+  const actions = t(actionCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: actionCount });
   const actionsLabel = running
     ? t('chat.workProcessSectionRunning', { actions })
     : row.duration ? t('chat.workProcessSectionDone', { actions, duration: row.duration }) : actions;

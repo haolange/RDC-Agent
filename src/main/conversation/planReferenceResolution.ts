@@ -60,8 +60,7 @@ function resolveExecution(request: Extract<PlanReferenceRequest, { intent: 'exec
   return {
     reference: {
       intent: 'execute', planId: handoff.planId, revision: handoff.revision, hash: handoff.planHash, uri: handoff.planUri,
-      title: handoff.planTitle, agentId: handoff.agent, label: handoff.label,
-      ...(handoff.labelTranslations ? { labelTranslations: handoff.labelTranslations } : {}),
+      title: handoff.planTitle, agentId: handoff.agent,
     },
   };
 }

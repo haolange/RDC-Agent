@@ -1,5 +1,5 @@
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationPlanReference } from '@shared/types/planReview';
+import type { ConversationPlanReference, ConversationPlanReview } from '@shared/types/planReview';
 
 /** Internal request between a plan card and the user message that executes or revises that plan revision. */
 export const TRANSCRIPT_LOCATE_PLAN_EVENT = 'transcript-locate-plan';
@@ -20,6 +20,17 @@ export function findPlanLocation(messages: readonly ConversationMessage[], reque
     ? messages.findIndex((message) => message.role === 'user' && !!message.planReference && samePlan(message.planReference, request.plan))
     : messages.findIndex((message) => (message.workTrace?.blocks ?? []).some((block) => block.toolCalls.some((call) =>
       call.planReview && samePlan(call.planReview, request.plan))));
+}
+
+/** The reviewed revision itself, read from the reply that delivered it. */
+export function findPlanReview(messages: readonly ConversationMessage[], plan: PlanRevisionKey): ConversationPlanReview | undefined {
+  for (const message of messages) {
+    for (const block of message.workTrace?.blocks ?? []) {
+      const review = block.toolCalls.find((call) => call.planReview && samePlan(call.planReview, plan))?.planReview;
+      if (review) return review;
+    }
+  }
+  return undefined;
 }
 
 export function requestPlanLocation(request: TranscriptPlanLocationRequest): void {

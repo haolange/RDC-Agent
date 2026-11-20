@@ -106,6 +106,18 @@ describe('composerSendHelpers', () => {
     expect(optimistic.assistantDraftMessage.agentId).not.toBe('ask');
   });
 
+  it('shows a plan handoff as its plan reference from the first frame', () => {
+    const planReference = { intent: 'execute' as const, planId: 'plan', revision: 2, hash: 'a'.repeat(64),
+      uri: 'session://plans/plan.md', title: 'Find the draw', agentId: 'general' };
+    const optimistic = buildOptimisticConversationTurn({
+      requestId: 'req-plan', trimmed: 'Execute the frozen plan.', currentMode: 'general', currentProject: null,
+      currentSession: null, currentRun: null, pendingAttachments: [], selectedAgentId: 'general', planReference,
+    });
+    expect(optimistic.userMessage.planReference).toEqual(planReference);
+    expect(buildOptimisticConversationTurn({ requestId: 'req-plain', trimmed: 'hi', currentMode: 'general', currentProject: null,
+      currentSession: null, currentRun: null, pendingAttachments: [] }).userMessage).not.toHaveProperty('planReference');
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     useConversationStore.getState().reset();

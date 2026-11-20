@@ -37,4 +37,11 @@ describe('Working step leads', () => {
     const running = { ...tool, status: 'running' } as WorkProcessRow;
     expect(workProcessSectionModel(section([running], 'running'), t).actionsLabel).toMatch(/^chat\.workProcessSectionRunning/);
   });
+
+  it('counts Task changes shown as snapshots as actions', () => {
+    const snapshot = { type: 'taskSnapshot', id: 'snap', status: 'complete', change: 'updated', completed: 1, total: 3, items: [], duration: '' } as WorkProcessRow;
+    const model = workProcessSectionModel(section([thinking, snapshot]), t);
+    expect(model.lead).toBe('thinking');
+    expect(model.actionsLabel).toContain('chat.workProcessActionOne{\\"count\\":1}');
+  });
 });

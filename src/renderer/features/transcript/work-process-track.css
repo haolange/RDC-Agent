@@ -99,10 +99,16 @@
 }
 
 /* A step leads with its thinking and commentary; its actions fold behind one quiet line beneath them. */
-.work-process-section-lead {
+.work-process-steps.work-process-section-lead {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Reply text leaves the process gutter and reads at the full assistant width, level with the Working
+   header and the Composer text; commentary stays on the process column. */
+.work-process-section-lead > .work-process-output:not(.kind-output-commentary) {
+  margin-inline-start: calc(var(--work-track-gutter) * -1);
 }
 
 .work-process-section-lead + .work-process-section-actions {

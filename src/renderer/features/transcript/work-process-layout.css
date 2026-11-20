@@ -1,14 +1,9 @@
 /* Work Process transcript presentation - canonical runtime view */
 .work-process {
-  /* The visible tool/content cards begin after the existing work-process rail
-   * gutter. Match that gutter on the far edge instead of shrinking the root
-   * by an unrelated fixed amount. The root and its card edges are different
-   * geometry layers: the root stays left-anchored; cards use this calibrated
-   * end inset. */
-  --work-process-visible-inline-start-inset: var(--space-5);
-  --work-process-inline-end-inset: var(--work-process-visible-inline-start-inset);
+  /* Working fills the assistant stack, which the conversation inset already narrows on both sides, so its
+     cards end level with the Composer's inner content. */
   position: relative;
-  width: calc(100% - var(--work-process-inline-end-inset));
+  width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   overflow: visible;

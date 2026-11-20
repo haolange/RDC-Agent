@@ -1311,9 +1311,11 @@ assert(
   'loop turns should nest under the header status dot with space-3 indent',
 );
 assert(
-  /\.conversation-thread\s*\{[^}]*padding-inline:\s*var\(--space-3\)/.test(cssSource),
-  'transcript thread should keep shared inline gutters away from rail/scrollbar seams',
+  /\.conversation-message-assistant \.conversation-message-stack,[^{]*\{[^}]*padding-inline:\s*var\(--conversation-inset\)/.test(cssSource),
+  'assistant content should start at the shared conversation inset, level with Composer text',
 );
+assert(!/--work-process-inline-end-inset|--chat-transcript-width|--workbench-outer-rail-width/.test(cssSource),
+  'the conversation column has one width and one inset; no Working-only end inset or second rail');
 assert(
   !/\.work-process\s*\{[^}]*padding-inline-end:\s*var\(--space-3\)/.test(cssSource),
   'Work Process must not keep a WP-only right gutter; share the thread gutter instead',

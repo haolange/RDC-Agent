@@ -33,7 +33,7 @@ describe('plan references on user messages', () => {
   it('accepts the declared handoff prompt for the approved, unsent revision and records what it executes', () => {
     expect(resolvePlanReference({ request: execute, sessionId: 's', agentId: 'general', message: '  Execute the plan.\n' }).reference).toEqual({
       intent: 'execute', planId: 'plan', revision: 2, hash, uri: 'session://plans/frozen.md', title: 'Find the draw',
-      agentId: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行计划' },
+      agentId: 'general',
     });
   });
 

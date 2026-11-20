@@ -5,6 +5,7 @@ import { groupImageRows } from './groupImageRows';
 import { isMeaningfulText, getMeaningfulBlockSummary, isNoisyText } from './workProcessBlockText';
 import { createApprovalRow } from './workProcessDecisionRows';
 import { createToolRowForPresentation } from './workProcessToolRows';
+import { countWorkActions } from './workProcessSectionModel';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
 import { buildPresentationUnits, presentationUnitsToDetailRows, type ThinkingItemPresentation } from './workProcessBlockProjection';
 import type { Translator } from '../../i18n/messages';
@@ -129,7 +130,7 @@ export const buildWorkProcessPresentation = (
     rows,
     stepCount,
     toolCount,
-    actionCount: toolCount,
+    actionCount: countWorkActions(rows),
     summary,
     toolEvidence: trace.toolEvidence ? { ...trace.toolEvidence } : undefined,
     duration: formatTraceDuration(blocks),

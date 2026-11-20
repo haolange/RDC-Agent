@@ -8,7 +8,7 @@
 //   POST /api/chat   NDJSON stream. The capability probe's `capability_check` is answered with a structured
 //                    call. An agent turn follows a scenario chosen by a keyword in the latest user message:
 //     (default)  thinking → one `glob` call → streamed answer
-//     qa:loops   thinking → task_create → commentary + glob → thinking → three task_update calls → answer
+//     qa:loops   thinking → task_create → commentary + glob → start two Tasks → complete one, block one → answer
 //     qa:long    five model steps of six parallel `glob` calls each, then a long Markdown answer
 //     qa:plan    (Mission agents) thinking → plan_artifact; the plan gate then pauses the turn
 // Usage: node scripts/qa-ollama-stub.mjs [port]   (default 11434); then connect Settings › Ollama with
@@ -92,15 +92,20 @@ function loopsScenario(state, tools) {
     ] }]])];
   }
   if (state.step === 1) return [...text(['先看看工作区里有什么。']), toolCalls([['glob', { pattern: '*' }]])];
-  if (state.step === 2 && tools.has('task_update')) {
-    const [first, second, third] = [...state.toolResults.join('\n').matchAll(/Created (\S+?):/g)].map((match) => match[1]);
-    if (first && second && third) {
-      return [...thinking(['文件已经列出，', '更新三项任务的状态。']), toolCalls([
-        ['task_update', { taskId: first, status: 'completed' }],
-        ['task_update', { taskId: second, status: 'in_progress' }],
-        ['task_update', { taskId: third, status: 'blocked', statusReason: '等待 capture 导入后才能整理结论。' }],
-      ])];
-    }
+  // A Task settles only after it started, so the stub starts two first and settles them a loop later.
+  const [first, second, third] = [...state.toolResults.join('\n').matchAll(/Created (\S+?):/g)].map((match) => match[1]);
+  if (state.step === 2 && tools.has('task_update') && first && third) {
+    return [...thinking(['文件已经列出，', '先开始第一项和第三项。']), toolCalls([
+      ['task_update', { taskId: first, status: 'in_progress' }],
+      ['task_update', { taskId: third, status: 'in_progress' }],
+    ])];
+  }
+  // Nothing is left running at the end, so the runtime does not ask for another loop.
+  if (state.step === 3 && tools.has('task_update') && first && third) {
+    return [...thinking(['第一项完成了，', '第三项要等 capture。']), toolCalls([
+      ['task_update', { taskId: first, status: 'completed' }],
+      ['task_update', { taskId: third, status: 'blocked', statusReason: '等待 capture 导入后才能整理结论。' }],
+    ])];
   }
   return [...thinking(['信息已经够了，', '可以给出结论。']), ...text(ANSWER)];
 }
