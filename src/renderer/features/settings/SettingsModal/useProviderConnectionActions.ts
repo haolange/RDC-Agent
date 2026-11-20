@@ -1,14 +1,12 @@
 import { getErrorMessage } from './utils';
 import { mergeTestedProviderModels } from './providerModelProjection';
 import {
+  connectionFailureText,
   createProviderConnectionDraft,
   getConnectionDraftSignature,
   getConnectionRequestValues,
 } from './providerConnectionState';
-import {
-  hasProviderConnectionDefinitionChanged,
-  projectProviderModelPreferences,
-} from './providerConnectionRequest';
+import { hasProviderConnectionDefinitionChanged, projectProviderModelPreferences } from './providerConnectionRequest';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LlmProviderEntry, ProviderDefinitionSaveResult } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
@@ -58,7 +56,7 @@ export const useProviderConnectionActions = (
       if (connectionDraft.authMode === 'account') {
         const result = await window.electronAPI.llm.refreshProviderModels(connectionDraft.providerId);
         if (!result.success) {
-          updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed') });
+          updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerTestFailed') });
           return;
         }
         updateConnectionDraft({
@@ -87,7 +85,7 @@ export const useProviderConnectionActions = (
       } as Parameters<typeof window.electronAPI.llm.testProviderDraft>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.testProviderDraft(request);
       if (!result.success) {
-        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed') });
+        updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerTestFailed') });
         return;
       }
       updateConnectionDraft({
@@ -156,7 +154,7 @@ export const useProviderConnectionActions = (
       } as Parameters<typeof window.electronAPI.llm.connectProvider>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.connectProvider(request);
       if (!result.success) {
-        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerSaveFailed'), models: [] });
+        updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerSaveFailed'), models: [] });
         return;
       }
       await reopenSaved(connectionDraft.providerId);

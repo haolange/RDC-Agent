@@ -1,5 +1,5 @@
 import { isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
-import { ProviderConnectionError } from './providerConnectionErrors';
+import { providerConnectionError } from './providerConnectionErrors';
 import { normalizeDiscoveredModels } from './providerConnectionModelUtils';
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { DiscoveryStrategy } from '@shared/types/providerCapability';
@@ -17,7 +17,7 @@ export const getJson = async (url: string, init: RequestInit): Promise<unknown> 
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new ProviderConnectionError(formatHttpError(response.status), response.status);
+      throw httpConnectionError(response.status);
     }
     return await response.json();
   } finally {
@@ -25,17 +25,17 @@ export const getJson = async (url: string, init: RequestInit): Promise<unknown> 
   }
 };
 
-const formatHttpError = (status: number): string => {
+const httpConnectionError = (status: number) => {
   if (status === 401 || status === 403) {
-    return 'API Key 无效或权限不足';
+    return providerConnectionError('credentials-rejected', `The API key was rejected (HTTP ${status}).`, { status }, status);
   }
   if (status === 404) {
-    return '模型发现端点不可用';
+    return providerConnectionError('discovery-unavailable', 'The model discovery endpoint was not found (HTTP 404).', { status }, status);
   }
   if (status >= 500) {
-    return 'Provider 服务暂时不可用';
+    return providerConnectionError('service-unavailable', `The provider service is unavailable (HTTP ${status}).`, { status }, status);
   }
-  return `连接测试失败（HTTP ${status}）`;
+  return providerConnectionError('http-failed', `The connection test failed (HTTP ${status}).`, { status }, status);
 };
 
 export const appendPath = (baseUrl: string, path: string): string =>

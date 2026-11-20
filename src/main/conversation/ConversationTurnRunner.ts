@@ -8,6 +8,7 @@ import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runti
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { diagnosticText } from './diagnosticText';
 import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
 import { canonicalizeSessionContextTurnEntry } from './SessionContextJournal';
 import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
@@ -147,7 +148,7 @@ export async function completeProfileTurn(
         assistantMessage = {
           ...assistantMessage,
           status: 'error',
-          workTrace: finalizeTrace(assistantMessage.workTrace, 'error', '会话状态保存失败'),
+          workTrace: finalizeTrace(assistantMessage.workTrace, 'error', diagnosticText('sessionStateSaveFailed')),
           diagnostic: {
             code: 'CONVERSATION_LLM_REQUEST_FAILED',
             severity: 'error',
@@ -514,9 +515,9 @@ export async function completeProfileTurn(
     ? undefined
     : llmDiagnostic
       ? finalStatus === 'error'
-        ? '回复失败'
-        : '等待模型配置'
-      : '回复已完成';
+        ? diagnosticText('turnFailed')
+        : diagnosticText('turnWaitingModel')
+      : diagnosticText('turnCompleted');
 
   const handoffSuggestions: PlanReviewHandoffSuggestion[] | undefined =
     shouldSnapshotHandoffSuggestions({

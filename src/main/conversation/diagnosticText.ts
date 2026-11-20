@@ -36,6 +36,10 @@ const ZH = {
   requestRejected: '{agent} 使用 {model} 时，服务拒绝了本次请求的工具或参数格式。请换一个模型或稍后重试；如果持续出现，需要开发者修正这个模型的工具定义。',
   requestModelMissing: '{agent} 使用 {model} 时发现账号里没有这个模型，或它已下线。请在设置里换一个可用的模型。',
   requestFailed: '{agent} 使用 {model} 时请求没有成功。请检查账号、模型权限、额度或网络后重试。',
+  turnFailed: '回复失败',
+  turnWaitingModel: '等待模型配置',
+  turnCompleted: '回复已完成',
+  sessionStateSaveFailed: '会话状态保存失败',
 } as const;
 
 export type DiagnosticTextKey = keyof typeof ZH;
@@ -72,6 +76,10 @@ const EN: Record<DiagnosticTextKey, string> = {
   requestRejected: '{agent} sent tools or arguments that {model} rejected. Switch models or try again later; if it keeps happening, the developers need to fix this model\'s tool definitions.',
   requestModelMissing: '{agent} found that {model} is not in the account or was retired. Choose an available model in Settings.',
   requestFailed: '{agent} could not complete the request to {model}. Check the account, model access, quota or network, then try again.',
+  turnFailed: 'Reply failed',
+  turnWaitingModel: 'Waiting for a model',
+  turnCompleted: 'Reply complete',
+  sessionStateSaveFailed: 'Saving the session state failed',
 };
 
 export function diagnosticText(key: DiagnosticTextKey, params: Record<string, string | number> = {}): string {

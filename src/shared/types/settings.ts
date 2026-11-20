@@ -626,6 +626,23 @@ export interface LlmProviderAccountLoginFinishRequest {
   flowId?: string;
 }
 
+/** Connection failures the person can act on; the renderer translates each with its params. */
+export type ProviderConnectionErrorCode =
+  | 'credentials-rejected'
+  | 'discovery-unavailable'
+  | 'service-unavailable'
+  | 'http-failed'
+  | 'no-routable-models'
+  | 'not-in-catalog'
+  | 'unknown-provider'
+  | 'api-key-required'
+  | 'base-url-required'
+  | 'discovery-missing'
+  | 'timeout'
+  | 'failed';
+
+export type ProviderConnectionErrorParams = Record<string, string | number>;
+
 export interface LlmProviderConnectionResult {
   success: boolean;
   provider?: LlmProviderEntry;
@@ -643,6 +660,8 @@ export interface LlmProviderConnectionResult {
     filteredModelCount: number;
   };
   error?: string;
+  errorCode?: ProviderConnectionErrorCode;
+  errorParams?: ProviderConnectionErrorParams;
 }
 
 export type LlmModelCapabilityProbeMode = 'default' | 'max-context' | 'fast' | 'fast-max-context';

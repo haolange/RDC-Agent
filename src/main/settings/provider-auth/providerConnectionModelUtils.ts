@@ -3,7 +3,7 @@ import {
   getProviderModelSummaries,
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
-import { ProviderConnectionError } from './providerConnectionErrors';
+import { ProviderConnectionError, providerConnectionError } from './providerConnectionErrors';
 import type { LlmProviderModel } from '@shared/types/settings';
 
 export function normalizeDiscoveredModels(
@@ -41,7 +41,7 @@ const isExcludedDiscoveredModel = (modelId: string): boolean => {
 
 export const requireModels = (models: LlmProviderModel[]): LlmProviderModel[] => {
   if (models.length === 0) {
-    throw new ProviderConnectionError('Provider 暂未返回可用于 Agent 路由的模型');
+    throw providerConnectionError('no-routable-models', 'The provider returned no models the agent can route to.');
   }
   return models;
 };

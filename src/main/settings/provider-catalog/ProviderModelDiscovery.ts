@@ -12,7 +12,7 @@ import {
 import { resolveGoogleVertexAccessToken } from '../provider-auth/GoogleApplicationCredentials';
 import { createAwsBedrockRequestAuthorizer } from '../provider-auth/AwsBedrockCredentials';
 import { listSapAiCoreDeployments } from '../provider-auth/SapAiCoreCredentials';
-import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
+import { ProviderConnectionError, providerConnectionError } from '../provider-auth/providerConnectionErrors';
 import {
   appendPath,
   appendQueryParam,
@@ -204,7 +204,7 @@ async function validateCodingPlanModels(
     ? toStaticModels(matchedIds)
     : discoveredModels;
   if (validatedModels.length === 0) {
-    throw new ProviderConnectionError('Provider 暂未返回可用于 Agent 路由的模型');
+    throw providerConnectionError('no-routable-models', 'The provider returned no models the agent can route to.');
   }
   const mergedModels = managedModels.length > 0
     ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
@@ -279,7 +279,7 @@ export async function discoverProviderModels(
     throw new ProviderConnectionError(provider.unavailableReason);
   }
   if (!definition) {
-    throw new ProviderConnectionError('Provider 不在内置 catalog 中');
+    throw providerConnectionError('not-in-catalog', 'The provider is not in the built-in catalog.');
   }
   const authSchemaId = getProviderAuthSchemaId(provider.id);
   const hasCredentialResolver = authSchemaResolvesAmbientCredentials(authSchemaId);
@@ -289,7 +289,7 @@ export async function discoverProviderModels(
       : apiKeyDraft
     : '';
   if (provider.authMode === 'api-key' && !apiKey && !hasCredentialResolver) {
-    throw new ProviderConnectionError('请输入 API Key');
+    throw providerConnectionError('api-key-required', 'An API key is required.');
   }
 
   const strategy = resolveDiscoveryStrategy(provider.protocol, definition.discovery.strategy);
@@ -297,7 +297,7 @@ export async function discoverProviderModels(
     if (catalogOwnership !== 'user-managed') {
       return { models: managedModels };
     }
-    throw new ProviderConnectionError('Provider 缺少模型发现配置');
+    throw providerConnectionError('discovery-missing', 'The provider has no model discovery configuration.');
   }
   const baseUrl = (
     baseUrlDraft
@@ -306,7 +306,7 @@ export async function discoverProviderModels(
     || ''
   ).trim().replace(/\/+$/, '');
   if (!baseUrl) {
-    throw new ProviderConnectionError('请填写 Provider Base URL');
+    throw providerConnectionError('base-url-required', 'A base URL is required.');
   }
   if (authSchemaId === 'aws-bedrock') {
     const url = appendPath(baseUrl, '/models');

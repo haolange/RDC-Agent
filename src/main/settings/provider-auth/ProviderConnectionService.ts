@@ -11,7 +11,7 @@ import {
 } from '../provider-catalog/EffectiveModelResolver';
 import { effectiveCatalogService } from '../provider-catalog/EffectiveCatalogService';
 import { discoverProviderModels } from '../provider-catalog/ProviderModelDiscovery';
-import { parseProviderError, ProviderConnectionError } from './providerConnectionErrors';
+import { describeProviderError, ProviderConnectionError, providerConnectionError } from './providerConnectionErrors';
 import {
   resolveProviderConnectionDraft,
   resolveTestDiscoveryAccountId,
@@ -148,7 +148,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -195,7 +195,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -224,7 +224,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -242,7 +242,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -286,7 +286,7 @@ export class ProviderConnectionService {
   private getProvider(providerId: LlmProviderId): LlmProviderEntry {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
-      throw new ProviderConnectionError('未知 Provider');
+      throw providerConnectionError('unknown-provider', 'Unknown provider.');
     }
     return provider;
   }
