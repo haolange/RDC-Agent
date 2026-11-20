@@ -1,4 +1,4 @@
-import { shell } from 'electron';
+import { openExternalHttps } from '../../window/rendererTrust';
 import type {
   LlmProviderAccountDiagnostic,
   LlmProviderAccountLoginFinishRequest,
@@ -533,7 +533,7 @@ export class ProviderAccountAuthService {
     if (!url || !shouldOpenSystemBrowser()) {
       return;
     }
-    await shell.openExternal(url);
+    await openExternalHttps(url);
   }
 }
 

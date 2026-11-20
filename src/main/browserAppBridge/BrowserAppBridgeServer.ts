@@ -4,6 +4,7 @@ import { createServer, request as httpRequest, type IncomingMessage, type Server
 import { request as httpsRequest } from 'https';
 import { extname, isAbsolute, join, normalize, relative, resolve } from 'path';
 import { URL } from 'url';
+import { app } from 'electron';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { rendererEventHub } from './rendererEventHub';
 import {
@@ -288,6 +289,11 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   }
 
   const bridgeOrigin = bridgeUrl ?? 'http://127.0.0.1';
+  // A rebinding name that resolves to loopback still carries its own Host header.
+  if (request.headers.host !== new URL(bridgeOrigin).host) {
+    sendJson(response, 421, { success: false, error: 'Host not allowed' }, undefined);
+    return;
+  }
   const url = new URL(request.url, bridgeOrigin);
 
   if (requestOrigin && !isOriginAllowed(requestOrigin, allowedOrigins)) {
@@ -427,8 +433,9 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   sendJson(response, 404, { success: false, error: 'Not found' }, requestOrigin);
 }
 
+/** Debug-only surface: a packaged build never starts it, whatever the environment says. */
 export function shouldStartBrowserAppBridge(): boolean {
-  return process.env.RDC_AGENT_BROWSER_QA === '1';
+  return !app.isPackaged && process.env.RDC_AGENT_BROWSER_QA === '1';
 }
 
 export async function startBrowserAppBridge(options: BridgeOptions): Promise<string> {
@@ -437,7 +444,7 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   }
 
   if (!shouldStartBrowserAppBridge()) {
-    throw new Error('Browser app bridge starts only when RDC_AGENT_BROWSER_QA=1');
+    throw new Error('Browser app bridge starts only in an unpackaged build with RDC_AGENT_BROWSER_QA=1');
   }
 
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);

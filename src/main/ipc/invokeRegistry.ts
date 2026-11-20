@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
+import { isTrustedRendererUrl } from '../window/rendererTrust';
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown | Promise<unknown>;
 
@@ -14,7 +15,13 @@ export function installIpcInvokeRegistry(): void {
   const nativeHandle = ipcMain.handle.bind(ipcMain);
   ipcMain.handle = ((channel: string, listener: InvokeHandler): void => {
     invokeHandlers.set(channel, listener);
-    nativeHandle(channel, listener as Parameters<typeof ipcMain.handle>[1]);
+    // The Browser QA bridge authenticates separately and calls the stored listener directly.
+    nativeHandle(channel, ((event: IpcMainInvokeEvent, ...args: unknown[]) => {
+      if (!isTrustedRendererUrl(event.senderFrame?.url)) {
+        throw new Error(`IPC_SENDER_REJECTED: ${channel} was invoked from a document other than the app entry.`);
+      }
+      return listener(event, ...args);
+    }) as Parameters<typeof ipcMain.handle>[1]);
   }) as typeof ipcMain.handle;
 
   registryInstalled = true;
