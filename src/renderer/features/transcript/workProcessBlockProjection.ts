@@ -29,6 +29,8 @@ export interface ThinkingItemPresentation {
   preview: string;
   label: string;
   kind: ThinkingArtifact['kind'];
+  /** Names a provider summary so a short summary reads as one, not as missing reasoning. */
+  kindLabel: string;
   visibility: ThinkingArtifact['visibility'];
   status: ConversationThinkingStatus;
   openByDefault: boolean;

@@ -46,25 +46,11 @@ const resolveOutputPhase = (
   return 'final_answer';
 };
 
-const resolveThinkingDurationLabel = (block: ConversationWorkBlock): string => {
-  const start = typeof block.startedAt === 'number' && Number.isFinite(block.startedAt)
-    ? block.startedAt
-    : undefined;
-  if (!start) return '';
-
-  const firstToolStart = block.toolCalls
-    .map((call) => call.startedAt)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
-    .sort((a, b) => a - b)[0];
-  const end = firstToolStart
-    ?? (typeof block.completedAt === 'number' && Number.isFinite(block.completedAt) ? block.completedAt : undefined);
-  return formatDurationMs(start, end);
-};
-
-const resolveSettledThinkingLabel = (block: ConversationWorkBlock, t: Translator): string => {
-  const duration = resolveThinkingDurationLabel(block);
-  return duration ? t('chat.workProcessThoughtFor', { duration }) : t('chat.workProcessThinkingComplete');
-};
+/** "Thought for" only when this block's own reasoning start and settle times are known; never the step's time. */
+const resolveSettledThinkingLabel = (item: ConversationThinkingItem, t: Translator): string =>
+  item.startedAt !== undefined && item.completedAt !== undefined
+    ? t('chat.workProcessThoughtFor', { duration: formatDurationMs(item.startedAt, item.completedAt) })
+    : t('chat.workProcessThinkingComplete');
 
 /**
  * One provider thinking block as a Work Process row. Visible raw, summary and unknown reasoning with text
@@ -83,8 +69,9 @@ const resolveThinkingItem = (
   const status = isActiveBlock ? item.status : 'complete';
   return {
     preview,
-    label: status === 'streaming' ? t('chat.workProcessThinkingStreaming') : resolveSettledThinkingLabel(block, t),
+    label: status === 'streaming' ? t('chat.workProcessThinkingStreaming') : resolveSettledThinkingLabel(item, t),
     kind: thinking.kind,
+    kindLabel: thinking.kind === 'summary' ? t('chat.workProcessThinkingSummary') : '',
     visibility: thinking.visibility,
     status,
     // Expand while the block streams; fold once it settles (the row keeps a user's sticky choice).

@@ -66,6 +66,7 @@ export const zhChat = {
   'chat.workProcessStatusError': '失败',
   'chat.workProcessStatusSkipped': '已跳过',
   'chat.workProcessThinkingStreaming': '正在思考',
+  'chat.workProcessThinkingSummary': '摘要',
   'chat.workProcessThinkingComplete': '已思考',
   'chat.workTraceDiscarded': '这条回复的过程记录来自旧版本，已不再显示。',
   'chat.workProcessThoughtFor': '已思考 · {duration}',

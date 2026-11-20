@@ -82,6 +82,7 @@ export const enChat = {
   'chat.workProcessStatusError': 'Failed',
   'chat.workProcessStatusSkipped': 'Skipped',
   'chat.workProcessThinkingStreaming': 'Thinking',
+  'chat.workProcessThinkingSummary': 'Summary',
   'chat.workProcessThinkingComplete': 'Thought',
   'chat.workTraceDiscarded': 'The work process for this reply was recorded by an older version and is no longer shown.',
   'chat.workProcessThoughtFor': 'Thought for {duration}',

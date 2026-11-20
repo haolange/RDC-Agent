@@ -238,6 +238,10 @@ export interface ConversationThinkingItem {
   thinking: ThinkingArtifact;
   status: ConversationThinkingStatus;
   displayOrder: number;
+  /** When this block's first visible text arrived. */
+  startedAt?: number;
+  /** When it settled after streaming; absent for blocks that arrived already complete. */
+  completedAt?: number;
 }
 
 /** What a model turn produced, in the order it became visible. */

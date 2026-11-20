@@ -122,9 +122,13 @@
   z-index: var(--z-local-1);
 }
 
-.work-process-thinking-source {
-  color: var(--token-text-muted);
+.work-process-thinking-kind {
+  padding: 0 var(--space-1);
+  border: 1px solid var(--token-border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--token-text-caption);
   font-size: var(--type-caption-size);
+  line-height: var(--type-caption-line);
 }
 
 .work-process-thinking-preview {

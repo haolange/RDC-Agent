@@ -212,7 +212,7 @@ it('keeps one event sequence and wording across process densities without invent
         diagnosticSeverity: 'info', status: 'complete', toolCalls: [], startedAt: now + 41, completedAt: now + 42 },
       { id: 'second-turn', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
         result: { status: 'complete', toolCallIds: ['done'], outputPhase: 'commentary' },
-        items: [{ kind: 'thinking', status: 'complete', displayOrder: 3,
+        items: [{ kind: 'thinking', status: 'complete', displayOrder: 3, startedAt: now + 200, completedAt: now + 220,
           providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking', contentIndex: 0 },
           thinking: { kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text: 'Checked the result.' } }],
         toolCalls: [{ id: 'done', toolName: 'turn_complete', status: 'complete', argsPreview: '{}',

@@ -46,7 +46,7 @@ Workbench page shell、Local utilities、composer、transcript 共用 `--workben
 - 结束后：`工作过程` / `Work process` + duration/action meta；
 - 禁止用 `执行完成` 做主标题。
 
-Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展开）→ `已思考 · {duration}` / `Thought for`（完成后默认折叠）；手动开合 sticky 覆盖。禁止 `深度思考` / settled `思考了`。Readable `raw`/`summary`/`unknown` 共用标签；opaque/hidden 永不渲染 CoT 占位句。
+Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展开）→ `已思考 · {duration}` / `Thought for`（完成后默认折叠；时长取该思考块首个可见文字到结束的时间，主进程记录在思考项上，缺任一时刻只显示 `已思考`，不借用步骤耗时）；Provider 摘要类思考在标签后带「摘要」徽标，让很短的摘要不被误读为推理缺失；手动开合 sticky 覆盖。禁止 `深度思考` / settled `思考了`。Readable `raw`/`summary`/`unknown` 共用标签；opaque/hidden 永不渲染 CoT 占位句。
 
 Commentary：markdown 散文，不进 thinking 槽。文本项与工具、Tasks 快照按首次可见顺序排列；无明确 phase 的文本立即中性显示，确认 commentary 或 final 时保留节点与位置。用户折叠工作过程时只收起过程与 commentary 文本；final 与阶段未声明的文本继续可读，且答复在阶段确认前后保持同一位置，不做跳出轨道的横移。做过工具调用的模型段带一行分组标题（"步骤 2  3 个动作 · 12s"／"步骤 2  执行中 · …"，步骤号按显示顺序编号），由它承载轨道节点，纯工具分组不再把节点挂在第一张卡上。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。相邻可见 tool、Tasks 快照与无叙述 section 的边框间距统一 `--space-2`，只由事件列表边界提供；有可见 thinking/commentary 的段落入口及其首 tool 保留 `--space-3`。隐藏或空模型段不补空位，窗口化占位不重复添加间距。≥8 连续 tools 仅在整组终止后聚合成摘要行；运行期间维持原卡片顺序，聚合保留子项身份及用户展开选择。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 label 角色字号。
 

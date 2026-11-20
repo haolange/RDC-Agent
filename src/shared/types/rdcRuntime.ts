@@ -195,6 +195,8 @@ export interface PromptPlan {
 export interface RequestEnvelopeSnapshot {
   id: string;
   createdAt: string;
+  /** Responses-family streams: reasoning event counts and summary part lengths, never text. */
+  reasoningEvents?: import('./reasoning').ReasoningEventSummary;
   completedAt?: string;
   sessionId?: string;
   turnId?: string;

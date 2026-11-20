@@ -84,12 +84,14 @@ export async function consumeResponsesEventStream(input: {
   });
   const toolKey = (outputIndex: number, itemId?: string) => itemId || `index:${outputIndex}`;
 
+  const reasoningEventCounts: Record<string, number> = {};
   for await (const data of parseSSE(response, signal, { providerApi: protocol, ...options })) {
     if (signal.aborted) break;
     const event = parseJsonObject(data);
     if (!event) continue;
 
     const eventType = readString(event.type);
+    if (eventType.startsWith('response.reasoning')) reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
     if (providerTerminalSeen) {
       throw new ProviderStreamProtocolError(
         'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
@@ -123,6 +125,18 @@ export async function consumeResponsesEventStream(input: {
         break;
       }
       case 'response.reasoning_summary_text.done':
+      case 'response.reasoning_summary_part.done': {
+        const identity = items.identityFromEvent(event);
+        const text = eventType === 'response.reasoning_summary_text.done' ? readString(event.text) : readString(readRecord(event.part)?.text);
+        if (text) {
+          sawOutput = true;
+          items.completeSummaryPart(identity, readNumber(event.summary_index) ?? 0, text);
+        } else {
+          items.startReasoning(identity, 'summary');
+        }
+        break;
+      }
+      case 'response.reasoning_summary_part.added':
         items.startReasoning(items.identityFromEvent(event), 'summary');
         break;
       case 'response.reasoning_text.delta': {
@@ -206,6 +220,8 @@ export async function consumeResponsesEventStream(input: {
             items.closeReasoning(identity, reasoningArtifact);
           } else {
             sawOutput = true;
+            // The finished item's summary is the last chance to receive parts the stream never delivered.
+            readResponsesSummaryParts(item).forEach((text, index) => items.completeSummaryPart(identity, index, text));
             items.startReasoning(identity, 'opaque', reasoningArtifact);
             items.closeReasoning(identity, reasoningArtifact);
           }
@@ -291,7 +307,17 @@ export async function consumeResponsesEventStream(input: {
     throw new ProviderEmptyStreamError(protocol);
   }
   items.closeRemaining();
+  const summaryParts = items.summaryPartReports();
+  if (Object.keys(reasoningEventCounts).length || summaryParts.length) {
+    builder.setExecution({ reasoningEvents: { events: reasoningEventCounts, summaryParts } });
+  }
   builder.done(finishReason);
+}
+
+/** `summary[]` of a finished Responses reasoning item, by summary index; empty entries keep their index. */
+function readResponsesSummaryParts(item: Record<string, unknown> | null): string[] {
+  const summary = item?.summary;
+  return Array.isArray(summary) ? summary.map((entry) => readString(readRecord(entry)?.text)) : [];
 }
 
 export function buildResponsesRequestBody(

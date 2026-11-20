@@ -264,7 +264,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
       status: 'complete',
       result: { status: 'complete', toolCallIds: ['think-glob'] },
       items: [
-        thinkingItem(rawThinking('provider-visible raw thinking'), 0),
+        { ...thinkingItem(rawThinking('provider-visible raw thinking'), 0), startedAt: now + 200, completedAt: now + 1700 },
         textItem('Tool result reviewed.', 1),
       ],
       toolCalls: [{ id: 'think-glob', toolName: 'glob', status: 'complete', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), displayOrder: 2, startedAt: now + 200, completedAt: now + 220 }],
@@ -276,7 +276,14 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
 const rawThinkingRow = sectionThinking(rawThinkingSection);
-assert(rawThinkingRow?.label === '已思考 · 0ms', 'raw thinking should use 已思考 · duration settled label');
+assert(rawThinkingRow?.label === '已思考 · 1.5s', 'settled thinking reports its own streaming time, not the step time');
+const untimedThinking = buildWorkProcessPresentation({ status: 'complete', updatedAt: now, blocks: [{
+  id: 'runtime-loop-untimed', kind: 'llm_turn', title: 'LLM turn', status: 'complete', result: { status: 'complete', toolCallIds: ['untimed-glob'] },
+  items: [thinkingItem(rawThinking('arrived complete'), 0)],
+  toolCalls: [{ id: 'untimed-glob', toolName: 'glob', status: 'complete', argsPreview: '{}', displayOrder: 1, startedAt: now, completedAt: now + 5 }],
+  startedAt: now, completedAt: now + 5,
+}] }, t);
+assert(sectionThinking(untimedThinking.rows.find((row) => row.type === 'section'))?.label === '已思考', 'thinking without its own timing never borrows a duration');
 assert(rawThinkingRow.preview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
 assert(rawThinkingRow.openByDefault === false, 'settled process-loop raw thinking should fold by policy');
 
@@ -339,7 +346,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
       status: 'complete',
       result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
       items: [
-        thinkingItem(summaryThinking('The user asks in Chinese. Now answer in Chinese.'), 0),
+        { ...thinkingItem(summaryThinking('The user asks in Chinese. Now answer in Chinese.'), 0), startedAt: now + 225, completedAt: now + 230 },
         textItem('Turn result.', 1, { phase: 'final_answer' }),
       ],
       toolCalls: [],
@@ -357,6 +364,7 @@ assert(
 );
 const summaryThinkingRow = sectionThinking(summaryThinkingSection);
 assert(summaryThinkingRow?.label === '已思考 · 5ms', 'summary thinking should use 已思考 · duration settled label');
+assert(summaryThinkingRow.kindLabel === '摘要', 'a provider summary is labeled as a summary so a short one does not read as missing reasoning');
 assert(summaryThinkingRow.openByDefault === false, 'final-answer quiet thinking stays folded by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
@@ -1081,7 +1089,7 @@ assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic M
 assert(presentationSource.includes("label: status === 'streaming'"), 'thinking labels should follow the thinking lifecycle');
 assert(!presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'a pending plan must not keep settled thinking active');
 assert(presentationSource.includes('resolveSettledThinkingLabel'), 'settled thinking should resolve Thought-for labels centrally');
-assert(presentationSource.includes("t('chat.workProcessThoughtFor', { duration })"), 'settled thinking label should use 已思考 · duration copy');
+assert(presentationSource.includes("t('chat.workProcessThoughtFor', { duration: formatDurationMs(item.startedAt, item.completedAt) })"), 'settled thinking label should use 已思考 · duration copy from the item timing');
 assert(!presentationSource.includes('`思考了 ${duration}`') && !presentationSource.includes('思考了 ${duration}'), 'settled thinking must not use 思考了 duration copy');
 assert(!presentationSource.includes('深度思考'), 'depth-thinking copy must not appear in presentation');
 assert(componentSource.includes('work-process-thinking-icon'), 'thinking folds should show a quiet leading icon');

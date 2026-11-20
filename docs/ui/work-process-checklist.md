@@ -15,7 +15,7 @@
 
 - 标题「工作过程 / Work process」+ meta。
 - 每轮回复各有自己的过程；绿色圆点为已完成。运行中的耗时写“已运行”，终态写“耗时”，不能用“持续”暗示完成后仍在执行。
-- loop thinking 完成后默认折叠「已思考 · {duration} / Thought for」+ 前置 quiet icon。
+- loop thinking 完成后默认折叠「已思考 · {duration} / Thought for」+ 前置 quiet icon；时长只来自思考项自身的起止时刻，摘要类思考带「摘要」徽标。
 - 用户对手动开合 sticky 覆盖自动策略。
 
 ## Commentary

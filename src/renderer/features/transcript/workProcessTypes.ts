@@ -123,7 +123,7 @@ export type WorkProcessRow =
     preview: string;
     label: string;
     kind?: ThinkingArtifact['kind'];
-    source?: string;
+    kindLabel?: string;
     visibility?: ThinkingArtifact['visibility'];
     thinkingStatus?: ConversationThinkingStatus;
     expandable: boolean;

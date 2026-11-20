@@ -3,6 +3,7 @@ import { StreamChannelRefs } from './streamChannelRefs';
 import type { ProviderContinuationArtifact } from '../../core/types';
 import type { ThinkingArtifactSource } from '../../core/types';
 import type { ThinkingContentInput } from '../../reasoning/ReasoningArtifacts';
+import type { ReasoningEventSummary } from '@shared/types/reasoning';
 
 export type ResponsesThinkingMode = 'summary' | 'raw' | 'opaque';
 
@@ -18,8 +19,13 @@ interface ReasoningItemState {
   closed: boolean;
   mode: ResponsesThinkingMode;
   lastSummaryIndex?: number;
+  /** Summary text received so far per summary_index, from deltas and completions alike. */
+  summaryParts: Map<number, string>;
   artifact?: ProviderContinuationArtifact;
 }
+
+/** How one reasoning summary part arrived: streamed length, completed length, and whether completion filled a gap. */
+export type SummaryPartReport = ReasoningEventSummary['summaryParts'][number];
 
 interface TextItemState {
   identity: ResponsesItemIdentity;
@@ -40,6 +46,7 @@ export class ResponsesItemChannels {
   private readonly deepSeekResponses: boolean;
   private readonly itemIndexById = new Map<string, number>();
   private readonly reasoning = new Map<string, ReasoningItemState>();
+  private readonly summaryReports = new Map<string, SummaryPartReport>();
   private readonly texts = new Map<string, TextItemState>();
 
   constructor(input: {
@@ -127,7 +134,53 @@ export class ResponsesItemChannels {
     }
     if (delta) {
       this.builder.appendThinking(this.reasoningRef(state), delta, this.meta(mode, artifact ?? state.artifact));
+      if (mode === 'summary') this.recordSummaryText(state, summaryIndex ?? 0, delta);
     }
+  }
+
+  /**
+   * A completion event (`summary_text.done`, `summary_part.done`, or a finished item's `summary[]`) carries the
+   * whole part. Text already streamed is kept; only what the stream missed is appended: everything when nothing
+   * streamed, the missing suffix when the stream is a prefix. A completion that disagrees with streamed text
+   * cannot rewrite what was already shown, so the streamed text stands.
+   */
+  completeSummaryPart(identity: ResponsesItemIdentity, summaryIndex: number, fullText: string): void {
+    const state = this.reasoningState(identity, 'summary');
+    const report = this.summaryReport(state, summaryIndex);
+    report.completedChars = fullText.length;
+    const streamed = state.summaryParts.get(summaryIndex) ?? '';
+    if (state.closed || !fullText || fullText === streamed || (streamed && !fullText.startsWith(streamed))) return;
+    report.recovered = true;
+    if (!streamed && state.lastSummaryIndex !== undefined && summaryIndex < state.lastSummaryIndex) {
+      // An earlier part that never streamed arrives after later ones: append it as its own paragraph.
+      this.startReasoning(identity, 'summary');
+      this.builder.appendThinking(this.reasoningRef(state), `\n\n${fullText}`, this.meta('summary', state.artifact));
+      state.summaryParts.set(summaryIndex, fullText);
+      return;
+    }
+    const missing = fullText.slice(streamed.length);
+    const streamedChars = report.streamedChars;
+    this.appendReasoning(identity, missing, 'summary', undefined, summaryIndex);
+    report.streamedChars = streamedChars;
+  }
+
+  /** Event-level shape of every reasoning summary part in this response: lengths only, never text. */
+  summaryPartReports(): SummaryPartReport[] {
+    return [...this.summaryReports.values()].sort((left, right) => left.itemKey.localeCompare(right.itemKey) || left.index - right.index);
+  }
+
+  private recordSummaryText(state: ReasoningItemState, summaryIndex: number, text: string): void {
+    state.summaryParts.set(summaryIndex, `${state.summaryParts.get(summaryIndex) ?? ''}${text}`);
+    this.summaryReport(state, summaryIndex).streamedChars += text.length;
+  }
+
+  private summaryReport(state: ReasoningItemState, summaryIndex: number): SummaryPartReport {
+    const key = `${state.key}#${summaryIndex}`;
+    const existing = this.summaryReports.get(key);
+    if (existing) return existing;
+    const created: SummaryPartReport = { itemKey: state.key, index: summaryIndex, streamedChars: 0, recovered: false };
+    this.summaryReports.set(key, created);
+    return created;
   }
 
   updateReasoning(
@@ -231,6 +284,7 @@ export class ResponsesItemChannels {
       started: false,
       closed: false,
       mode,
+      summaryParts: new Map(),
       artifact,
     };
     this.reasoning.set(key, created);
