@@ -1,3 +1,10 @@
+import {
+  appendThinkingText,
+  createThinkingContent,
+  getThinkingText,
+  mergeThinkingContent,
+  type ThinkingContentInput,
+} from '../../reasoning/ReasoningArtifacts';
 import type { EventStream } from '../../core/EventStream';
 import type {
   AssistantMessage,
@@ -10,13 +17,6 @@ import type {
   ToolCall,
   Usage,
 } from '../../core/types';
-import {
-  appendThinkingText,
-  createThinkingContent,
-  getThinkingText,
-  mergeThinkingContent,
-  type ThinkingContentInput,
-} from '../../reasoning/ReasoningArtifacts';
 
 type BlockKind = 'text' | 'thinking' | 'tool_call';
 

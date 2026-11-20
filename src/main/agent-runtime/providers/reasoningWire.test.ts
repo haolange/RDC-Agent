@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { ReasoningControl } from '@shared/types/modelCapability';
 import {
   applyAnthropicReasoning,
   applyGeminiReasoning,
   applyMoonshotReasoning,
+  applyOllamaThink,
   applyOpenAiCompatibleReasoning,
   buildOpenAiResponsesReasoning,
 } from './reasoningWire';
+import type { ReasoningControl } from '@shared/types/modelCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 const openAi56 = {
   kind: 'levels',
@@ -30,12 +32,12 @@ describe('buildOpenAiResponsesReasoning', () => {
     expect(buildOpenAiResponsesReasoning({
       selection: 'xhigh',
       control: reasoningControl,
-    }).reasoning).toMatchObject({ effort: 'xhigh' });
+    }, null).reasoning).toMatchObject({ effort: 'xhigh' });
 
     expect(buildOpenAiResponsesReasoning({
       selection: 'max',
       control: reasoningControl,
-    }).reasoning).toMatchObject({ effort: 'max' });
+    }, null).reasoning).toMatchObject({ effort: 'max' });
   });
 
   it('uses the documented DeepSeek Responses none wire when Off is selected', () => {
@@ -52,10 +54,10 @@ describe('buildOpenAiResponsesReasoning', () => {
       },
     } satisfies ReasoningControl;
 
-    expect(buildOpenAiResponsesReasoning({ selection: 'off', control })).toEqual({
+    expect(buildOpenAiResponsesReasoning({ selection: 'off', control }, null)).toEqual({
       reasoning: { effort: 'none' },
     });
-    expect(buildOpenAiResponsesReasoning({ selection: 'xhigh', control }).reasoning)
+    expect(buildOpenAiResponsesReasoning({ selection: 'xhigh', control }, null).reasoning)
       .toEqual({ effort: 'high' });
   });
 });
@@ -68,7 +70,7 @@ describe('applyAnthropicReasoning', () => {
     applyAnthropicReasoning(body, {
       selection: 'on',
       control: reasoningControl,
-    }, 'summary-events');
+    }, 'anthropic-display');
 
     expect(body.thinking).toMatchObject({
       type: 'enabled',
@@ -84,7 +86,7 @@ describe('applyAnthropicReasoning', () => {
     applyAnthropicReasoning(body, {
       selection: 'on',
       control: reasoningControl,
-    });
+    }, null);
 
     expect(body.thinking).toMatchObject({ type: 'enabled' });
     expect((body.thinking as { budget_tokens?: number }).budget_tokens).toBeUndefined();
@@ -97,7 +99,7 @@ describe('applyAnthropicReasoning', () => {
     applyAnthropicReasoning(body, {
       selection: 'off',
       control: reasoningControl,
-    });
+    }, null);
 
     expect(body.thinking).toEqual({ type: 'disabled' });
   });
@@ -113,7 +115,7 @@ describe('applyAnthropicReasoning', () => {
     applyAnthropicReasoning(body, {
       selection: 'max',
       control: reasoningControl,
-    });
+    }, null);
 
     expect(body.thinking).toMatchObject({ type: 'enabled' });
     expect(body.output_config).toEqual({ effort: 'max' });
@@ -143,7 +145,7 @@ describe('remaining reasoning wire profiles', () => {
       wireProfile: { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high' } },
     } satisfies ReasoningControl;
     const levelConfig: Record<string, unknown> = {};
-    applyGeminiReasoning(levelConfig, { selection: 'high', control: levelControl });
+    applyGeminiReasoning(levelConfig, { selection: 'high', control: levelControl }, null);
     expect(levelConfig).toEqual({ thinkingConfig: { thinkingLevel: 'high' } });
 
     const budgetControl = {
@@ -151,11 +153,44 @@ describe('remaining reasoning wire profiles', () => {
       wireProfile: { kind: 'gemini-thinking-budget', on: 'medium', levels: { medium: 8192 }, offBudget: 0 },
     } satisfies ReasoningControl;
     const enabledBudget: Record<string, unknown> = {};
-    applyGeminiReasoning(enabledBudget, { selection: 'medium', control: budgetControl });
+    applyGeminiReasoning(enabledBudget, { selection: 'medium', control: budgetControl }, null);
     expect(enabledBudget).toEqual({ thinkingConfig: { thinkingBudget: 8192 } });
     const disabledBudget: Record<string, unknown> = {};
-    applyGeminiReasoning(disabledBudget, { selection: 'off', control: budgetControl });
+    applyGeminiReasoning(disabledBudget, { selection: 'off', control: budgetControl }, null);
     expect(disabledBudget).toEqual({ thinkingConfig: { thinkingBudget: 0 } });
+  });
+
+  it('asks Gemini for thought summaries only when the route declares that request', () => {
+    const control = {
+      kind: 'levels', supportsOff: true, levels: ['medium'], defaultSelection: 'medium',
+      wireProfile: { kind: 'gemini-thinking-budget', on: 'medium', levels: { medium: 8192 }, offBudget: 0 },
+    } satisfies ReasoningControl;
+    const visible: Record<string, unknown> = {};
+    applyGeminiReasoning(visible, { selection: 'medium', control }, 'gemini-include-thoughts');
+    expect(visible).toEqual({ thinkingConfig: { thinkingBudget: 8192, includeThoughts: true } });
+    const off: Record<string, unknown> = {};
+    applyGeminiReasoning(off, { selection: 'off', control }, 'gemini-include-thoughts');
+    expect(off).toEqual({ thinkingConfig: { thinkingBudget: 0 } });
+  });
+
+  it('switches Ollama thinking with think only for a known control on a route that declares it', () => {
+    const control = {
+      kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on',
+      wireProfile: { kind: 'openai-compatible', on: 'high', levels: {} },
+    } as unknown as ReasoningControl;
+    const plan = (visibilityRequest?: string) => ({ contracts: { reasoning: { visibilityRequest } } }) as unknown as Pick<RequestPlan, 'contracts'>;
+    const on: Record<string, unknown> = {};
+    applyOllamaThink(on, { selection: 'on', control }, plan('ollama-think'));
+    expect(on).toEqual({ think: true });
+    const off: Record<string, unknown> = {};
+    applyOllamaThink(off, { selection: 'off', control }, plan('ollama-think'));
+    expect(off).toEqual({ think: false });
+    const undeclared: Record<string, unknown> = {};
+    applyOllamaThink(undeclared, { selection: 'on', control }, plan());
+    expect(undeclared).toEqual({});
+    const unknownControl: Record<string, unknown> = {};
+    applyOllamaThink(unknownControl, { selection: 'unknown', control }, plan('ollama-think'));
+    expect(unknownControl).toEqual({});
   });
 
   it('compiles Moonshot thinking on and off explicitly', () => {

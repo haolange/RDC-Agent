@@ -3,8 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
-import type { PreparedTurnContextSummary } from '@shared/types/session';
 import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
 const mock = vi.hoisted(() => ({ controls: { saveState: { saving: false }, retrySave: () => {}, capabilityState: { status: 'ready' } }, choice: false, commit: vi.fn(), clear: vi.fn(), save: vi.fn() }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, string | number>) => key === 'composer.effort.reasoningValue' ? `模型思考：${params?.level}` : key }) }));
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: unknown) => unknown) => select({
@@ -15,10 +15,16 @@ vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: 
 vi.mock('../../hooks/useComposerEffectiveModel', () => ({ useComposerEffectiveModel: () => ({
   effective: { providerId: 'p', modelId: 'model' }, hasChoice: mock.choice, projectId: 'project',
 }) }));
-vi.mock('./useComposerModelPickerOptions', () => ({ useComposerModelPickerOptions: () => ({
-  options: [{ providerId: 'p', providerLabel: 'Provider', modelId: 'model', label: 'Model', aliases: [],
-    contextWindowTokens: 1000, contextWindowLabel: '1k', hasReasoning: true }], loading: false, failedProviders: [], retry: vi.fn(),
-}) }));
+vi.mock('./useComposerModelPickerOptions', () => {
+  const option = { providerId: 'p', providerLabel: 'Provider', modelId: 'model', label: 'Model', aliases: [],
+    contextWindowTokens: 1000, contextWindowLabel: '1k', hasReasoning: true, hasVisionInput: false, hasFastMode: false };
+  return { useComposerModelPickerOptions: () => ({
+    options: [option],
+    providerStates: [{ id: 'p', label: 'Provider', models: [option], notice: null, retrying: false }],
+    loading: false,
+    retry: vi.fn(),
+  }) };
+});
 vi.mock('./ComposerTurnControlsContext', () => ({ useComposerTurnControls: () => mock.controls }));
 vi.mock('./sessionModelOverride', () => ({ commitComposerModelChoice: mock.commit, clearComposerModelChoice: mock.clear }));
 vi.mock('./useComposerEffortControl', () => ({ useComposerEffortControl: () => ({

@@ -4,13 +4,7 @@ import { createHash } from 'node:crypto';
 import YAML from 'yaml';
 import { expect, it, vi } from 'vitest';
 import { EventStream } from '../agent-runtime/core/EventStream';
-import type { ProviderStrategy } from '../agent-runtime/core/ProviderRegistry';
-import type { AssistantMessage, AssistantMessageEvent, Message, Model, Context } from '../agent-runtime/core/types';
-import type { AgentTool } from '../agent-runtime/agent/AgentTool';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { agentLoop } from '../agent-runtime/agent/AgentLoop';
-import { createTestRequestPlan } from './createTestRequestPlan';
 import { PromptPlanBuilder } from '../agent-runtime/prompt/PromptPlanBuilder';
 import { RuntimeToolAssembly } from '../agent-runtime/orchestration/RuntimeToolAssembly';
 import { SubagentRunner } from '../agent-runtime/orchestration/SubagentRunner';
@@ -22,6 +16,12 @@ import { artifactizeToolResult } from '../agent-runtime/tools/ToolResultArtifact
 import { artifactReadTool } from '../agent-runtime/tools/primitives/ArtifactReadTool';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
 import { createInvestigationHarness, writeDraft, baselineWorld, hypothesisClaim, sampleChallenge, sampleCheckpoint, SESSION_ID } from '../investigation/investigationTestFixtures';
+import { createTestRequestPlan } from './createTestRequestPlan';
+import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { AgentTool } from '../agent-runtime/agent/AgentTool';
+import type { AssistantMessage, AssistantMessageEvent, Message, Model, Context } from '../agent-runtime/core/types';
+import type { ProviderStrategy } from '../agent-runtime/core/ProviderRegistry';
 
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP, getAppPath: () => process.cwd() }, safeStorage: { isEncryptionAvailable: () => false } }));
 vi.mock('../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: async () => true }));
@@ -135,7 +135,7 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mis
   try {
     const parentHandle = new TurnHandle({ sessionKey: SESSION_ID, turnId: 'general-execution', generation: 1 });
     parentHandle.eventSink = { sessionId: SESSION_ID, requestId: 'general-request' } as never;
-    parentHandle.runtimePlan = { profileDelegates: ['general'], profileHandoffs: [], enabledProfileIds: ['general', 'debugger'] } as never;
+    parentHandle.runtimePlan = { profileDelegates: ['general'], accessCeiling: 'full', profileHandoffs: [], enabledProfileIds: ['general', 'debugger'] } as never;
     const tools = [artifactReadTool as unknown as AgentTool, ...runner.createSubagentTools('general', SESSION_ID, parentHandle), ...createInvestigationTools(SESSION_ID, { service })];
     const privateNarrative = 'General private exploration history: '.repeat(80);
     await runLoop('general', tools, [() => ({ name: 'subagent', args: { ...makeCapsule('knowledge-scout') } }), () => ({ name: 'subagent', args: { ...makeCapsule('skeptic-review') } }), () => ({ name: 'artifact_read', args: { uri: raw.uri, expectedHash: raw.hash } }), () => ({ name: 'investigation_write', args: { kind: 'checkpoint', mission: 'debugger', title: 'Follow-up conditions', summary: 'Driver Y follow-up remains unverified', record: { ...sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), unresolvedFrontier: 'Driver Y requires device; same camera condition retained.' } } })], [{ role: 'user', content: privateNarrative, timestamp: Date.now() }]);

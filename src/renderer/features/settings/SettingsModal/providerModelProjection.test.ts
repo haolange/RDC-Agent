@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mergeTestedProviderModels, projectProviderModels, updateProviderModelPreference } from './providerModelProjection';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
-import { mergeTestedProviderModels, projectProviderModels, updateProviderModelPreference } from './providerModelProjection';
 
 it('refreshes discovered facts while retaining enabled choices and preferences, including models absent from discovery', () => {
   const result = mergeTestedProviderModels([

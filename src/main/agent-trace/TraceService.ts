@@ -1,17 +1,5 @@
-import type { ActionEvent } from '@shared/types/evidence';
-import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
+import { loopFinalAnswerText, loopThinkingItems } from '@shared/conversation/loopItems';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
-import type { RunSummary } from '@shared/types/session';
-import type {
-  AgentRun,
-  AgentRunPresentation,
-  AgentRunViewModel,
-  TraceStatus,
-} from '@shared/types/agenticTrace';
-import type {
-  RawAuditRef,
-  TraceSessionResult,
-} from '@shared/types/trace';
 import { nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { traceStateStore } from '../agent-runtime/orchestration/TraceStateStore';
@@ -22,6 +10,20 @@ import { traceTreeBuilder } from './TraceTreeBuilder';
 import { projectionBuilder } from './ProjectionBuilder';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import { rightRailProjectionService } from './RightRailProjectionService';
+import type {
+  RawAuditRef,
+  TraceSessionResult,
+} from '@shared/types/trace';
+import type {
+  AgentRun,
+  AgentRunPresentation,
+  AgentRunViewModel,
+  TraceStatus,
+} from '@shared/types/agenticTrace';
+import type { RunSummary } from '@shared/types/session';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
+import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
+import type { ActionEvent } from '@shared/types/evidence';
 
 const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
   if (typeof value === 'string') return value;
@@ -31,16 +33,9 @@ const toIso = (value: number | string | undefined, fallback = nowIso()): string 
 
 const collectExplicitThinking = (
   blocks: ConversationWorkBlock[] | undefined,
-): Array<{ blockId: string; thinking: NonNullable<ConversationWorkBlock['thinking']> }> => {
-  const collected: Array<{ blockId: string; thinking: NonNullable<ConversationWorkBlock['thinking']> }> = [];
-  const visit = (items: ConversationWorkBlock[] | undefined) => {
-    for (const block of items ?? []) {
-      if (block.thinking) collected.push({ blockId: block.id, thinking: block.thinking });
-    }
-  };
-  visit(blocks);
-  return collected;
-};
+): Array<{ blockId: string; thinking: ThinkingArtifact }> => (blocks ?? []).flatMap((block) => (
+  loopThinkingItems(block).map((item) => ({ blockId: block.id, thinking: item.thinking }))
+));
 
 export function findCanonicalFinalAnswer(
   conversations: ConversationMessage[],
@@ -49,14 +44,8 @@ export function findCanonicalFinalAnswer(
   let finalAnswer: string | null = null;
   const visit = (blocks: ConversationWorkBlock[] | undefined) => {
     for (const block of blocks ?? []) {
-      const resultText = block.outputItems?.length
-        ? block.result?.stopReason === 'end_turn'
-          ? block.outputItems.filter((item) => item.phase === 'final_answer').map((item) => item.text).join('').trim()
-          : ''
-        : block.result?.text?.trim();
-      if (block.result?.outputPhase === 'final_answer' && resultText) {
-        finalAnswer = resultText;
-      }
+      const answer = loopFinalAnswerText(block);
+      if (answer) finalAnswer = answer;
     }
   };
   for (const message of conversations) {
@@ -165,11 +154,11 @@ export class TraceService {
       ref: `raw-${event.event_id}`,
     }));
 
-    let profileId = 'general';
+    let profileId: string = DEFAULT_AGENT_ID;
 
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
-      const agentType = run.profileId ?? 'general';
+      const agentType = run.profileId ?? DEFAULT_AGENT_ID;
       profileId = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
 

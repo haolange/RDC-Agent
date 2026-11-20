@@ -1,7 +1,7 @@
 import React from 'react';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 export type AgentAutosaveState = 'idle' | 'saving' | 'saved' | 'error';

@@ -1,3 +1,4 @@
+import { RENDERER_EVENT_CHANNEL as EVENT } from './channels';
 import type { EventSubscriptionApi } from '../types/electron-api';
 import type { RuntimePermissionState } from '../types/runtimePermission';
 import type { RuntimeLogEntry } from '../types/runtimeLog';
@@ -9,7 +10,6 @@ import type {
   SessionScopedPayload,
 } from '../types/session';
 import type { TraceProjectionChangedPayload } from '../types/agenticTrace';
-import { RENDERER_EVENT_CHANNEL as EVENT } from './channels';
 import type { RendererApiTransport } from './transport';
 
 export function createEventSubscriptionApi(transport: RendererApiTransport): EventSubscriptionApi {

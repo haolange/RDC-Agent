@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { KnowledgeSpace } from '@shared/types/knowledge';
 import { appPathService } from '../runtime/AppPathService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { StorageIo } from '../sessions/store/StorageIo';
@@ -14,6 +13,7 @@ import {
   type KnowledgeIndexSnapshot,
 } from './knowledgeLanes';
 import { extractPreview, toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
+import type { KnowledgeSpace } from '@shared/types/knowledge';
 
 export interface KnowledgeIndexDependencies {
   listSpaces(): KnowledgeSpace[];

@@ -43,7 +43,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-medium);
   line-height: var(--leading-normal);
   border-radius: var(--radius-full);
@@ -57,7 +57,7 @@
 
 .ui-badge--accent {
   background: rgb(var(--color-accent-500) / 0.15);
-  color: rgb(var(--color-accent-400));
+  color: var(--token-accent-primary);
 }
 
 .ui-badge--success {

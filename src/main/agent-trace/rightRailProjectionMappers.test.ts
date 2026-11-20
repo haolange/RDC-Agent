@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/types/session';
-import type { TraceArtifactRecord } from '@shared/types/trace';
-import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import { TASK_SCHEMA_VERSION } from '../agent-runtime/tasks/TaskContracts';
 import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
 import { buildRdcContext, buildTaskContext, mapRightRailOutputs, mapRightRailProgress } from './rightRailProjectionMappers';
+import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/types/session';
+import type { TraceArtifactRecord } from '@shared/types/trace';
+import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 
 const task = (id: string, status: TaskRecord['status'], createdAt: number, statusReason?: string): TaskRecord => ({
   schemaVersion: TASK_SCHEMA_VERSION, id, subject: id, description: '', status, statusReason, blockedBy: [], blocks: [],

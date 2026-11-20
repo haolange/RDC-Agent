@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const roots: string[] = [];
 vi.mock('electron', () => ({ app: {} }));

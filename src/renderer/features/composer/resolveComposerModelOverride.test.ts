@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ComposerModelPickerOption } from './composerModelPicker';
 import { resolveComposerModelOverride } from './resolveComposerModelOverride';
+import type { ComposerModelPickerOption } from './composerModelPicker';
 
 function option(
   partial: Pick<ComposerModelPickerOption, 'providerId' | 'modelId'> & Partial<ComposerModelPickerOption>,
@@ -12,6 +12,8 @@ function option(
     contextWindowTokens: null,
     contextWindowLabel: null,
     hasReasoning: false,
+    hasVisionInput: false,
+    hasFastMode: false,
     ...partial,
   };
 }

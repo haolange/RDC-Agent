@@ -1,6 +1,6 @@
-import type { CommandListResult } from '@shared/types/command';
 import React, { useMemo } from 'react';
 import { useI18n } from '../../i18n';
+import type { CommandListResult } from '@shared/types/command';
 
 interface CommandPaletteProps {
   commands: CommandListResult['commands'];

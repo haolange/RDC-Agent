@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ElectronAPI } from '@shared/types/electron';
-import type { RuntimePermissionState } from '@shared/types/runtimePermission';
-import { subscribePermissionState } from './permissionSubscriptions';
 import { useRuntimePermissionStore as store } from '../../stores/runtimePermissionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import { subscribePermissionState } from './permissionSubscriptions';
+import type { ElectronAPI } from '@shared/types/electron';
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 
 afterEach(() => { store.setState({ snapshot: null, pendingMode: null, error: false }); useWorkflowStore.getState().reset(); });

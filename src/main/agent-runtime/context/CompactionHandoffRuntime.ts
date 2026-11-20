@@ -1,15 +1,13 @@
-import type { AssistantMessage } from '../core/types';
-import { encodeAgentModel, configuredRuntimeProvider } from '../providers/ConfiguredRuntimeProvider';
-import { requestEnvelopeBuilder, requestSnapshotStore } from '../prompt';
-import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { COMPACTION_HANDOFF_SYSTEM_PROMPT } from './StructuredHandoffBuilder';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { AssistantMessage } from '../core/types';
 
 const COMPACTION_MAX_OUTPUT_TOKENS = 4096;
 
@@ -52,111 +50,30 @@ export function buildCompactionPromptPlan(transcript: string): PromptPlan {
   };
 }
 
-/** One tool-free compaction call through PromptPlan → RequestEnvelope → adapter. */
+/** One compaction call without tools through PromptPlan → RequestEnvelope → adapter. */
 export async function executeCompactionHandoff(
   input: CompactionHandoffExecution,
 ): Promise<AssistantMessage> {
-  input.signal?.throwIfAborted();
-  const promptPlan = buildCompactionPromptPlan(input.transcript);
-  const turnId = generateEventId('compaction-handoff');
-  const messages = [{
-    role: 'user' as const,
-    content: `Transcript to compact:\n\n${input.transcript}`,
-    timestamp: Date.now(),
-  }];
-  const callIndex = requestSnapshotStore.nextCallIndex(input.sessionId, turnId);
-  const reasoning = resolveAgentRouteCapability(
-    input.provider,
-    input.model.modelId,
-    input.model,
-    input.plan,
-  ).reasoningContract;
-  const compiledCache = promptCacheCompiler.compile({
-    promptPlan,
-    requestPlan: input.plan,
-    tools: [],
-  });
-  const promptCache = {
-    ...compiledCache,
-    enabled: false,
-    reason: 'compaction-handoff-no-cache-write',
-  };
-  const snapshot = requestEnvelopeBuilder.build({
-    promptPlan,
+  const message = await executeAuxiliaryRequest({
+    purpose: 'compaction-handoff',
     sessionId: input.sessionId,
-    turnId,
-    callIndex,
-    route: {
-      providerId: input.plan.providerId,
-      modelId: input.plan.effectiveModelId,
-      protocol: input.plan.route.protocol,
-    },
-    requestPlan: input.plan,
-    messages,
+    plan: input.plan,
+    modelId: input.model.modelId,
+    credentialHandle: input.credentialHandle,
+    promptPlan: buildCompactionPromptPlan(input.transcript),
+    userContent: `Transcript to compact:\n\n${input.transcript}`,
     tools: [],
-    controls: {
-      compactionHandoff: true,
-      reasoningSelection: input.plan.reasoningWire.selection,
-      maxTokens: COMPACTION_MAX_OUTPUT_TOKENS,
-    },
-    reasoning,
-    cache: promptCache,
+    maxTokens: COMPACTION_MAX_OUTPUT_TOKENS,
+    reasoning: resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan).reasoningContract,
+    writesPromptCache: false,
+    signal: input.signal,
   });
-  requestSnapshotStore.write(snapshot);
-
-  const stream = configuredRuntimeProvider.stream(
-    encodeAgentModel(input.plan.providerId, input.model.modelId, {
-      contextWindow: input.plan.contextWindowTokens,
-      maxOutputTokens: input.plan.maxOutputTokens || COMPACTION_MAX_OUTPUT_TOKENS,
-    }),
-    {
-      systemPrompt: promptPlan.systemPrompt,
-      systemPromptSegments: promptPlan.segments,
-      messages,
-      tools: [],
-    },
-    {
-      requestPlan: input.plan,
-      promptCache,
-      credentialHandle: input.credentialHandle,
-      reasoning: input.plan.reasoningWire,
-      temperature: input.plan.temperature,
-      maxTokens: COMPACTION_MAX_OUTPUT_TOKENS,
-      signal: input.signal,
-    },
-  );
-  for await (const _event of stream) {
-    // Drain the stream so terminal errors settle before result().
-  }
-  const message = await stream.result();
   input.signal?.throwIfAborted();
-  requestSnapshotStore.complete(snapshot.id, input.sessionId, turnId, {
-    inputTokens: message.usage.inputTokens,
-    outputTokens: message.usage.outputTokens,
-    cacheReadTokens: message.usage.cacheReadTokens,
-    cacheWriteTokens: message.usage.cacheWriteTokens,
-    cacheHitTokens: message.usage.cacheHitTokens,
-    cacheMissTokens: message.usage.cacheMissTokens,
-    reasoningTokens: message.usage.reasoningTokens,
-  });
   if (message.stopReason !== 'stop') {
     throw new Error(`COMPACTION_INCOMPLETE: provider ended with ${message.stopReason}; original context retained.`);
   }
-  const text = message.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
-    .trim();
-  if (!text) {
+  if (!assistantMessageText(message)) {
     throw new Error('COMPACTION_HANDOFF_EMPTY: the compaction model returned no text.');
   }
   return message;
-}
-
-export function assistantMessageText(message: AssistantMessage): string {
-  return message.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
-    .trim();
 }

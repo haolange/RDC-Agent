@@ -1,6 +1,6 @@
 import { createPublicKey, verify, type JsonWebKey } from 'crypto';
-import type { OAuthFlowState } from './oauthTypes';
 import { fetchJson, parseJwtPayload } from './oauthHttp';
+import type { OAuthFlowState } from './oauthTypes';
 
 /** Verify the provider's signed identity, not just a decoded JWT payload. */
 export async function verifyGrokIdentity(token: string | undefined, flow: OAuthFlowState): Promise<void> {

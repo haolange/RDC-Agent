@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { nowIso } from '@shared/utils/id';
-import type { ArtifactRecord } from '@shared/types/harness';
 import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
+import type { ArtifactRecord } from '@shared/types/harness';
 
 export interface ArtifactStoreSnapshot {
   schemaVersion: '1';

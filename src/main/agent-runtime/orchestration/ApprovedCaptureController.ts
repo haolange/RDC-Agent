@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
+import { sameRdcLifecyclePosition, type RdcLifecyclePoint, type RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
+import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TaskRuntimeEpoch } from '@shared/types/taskExecution';
-import { sameRdcLifecyclePosition, type RdcLifecyclePoint, type RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
-import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { RdcSwitchSnapshot } from '../../rdc/RdcSwitchSnapshot';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
@@ -84,7 +85,7 @@ export class ApprovedCaptureController {
   /** The signed entry point belongs only to the approved owning General turn. */
   restorationBaselineFor(scope: Pick<ToolExecutionContext, 'sessionId' | 'projectId' | 'turnId' | 'agentId' | 'accessCeiling'>) {
     if (scope.sessionId !== this.input.sessionId || scope.projectId !== this.input.projectId
-      || scope.turnId !== this.input.turn.turnId || scope.agentId !== 'general' || scope.accessCeiling !== 'full') return null;
+      || scope.turnId !== this.input.turn.turnId || scope.agentId !== GENERAL_AGENT_ID || scope.accessCeiling !== 'full') return null;
     if (!this.input.turn.isLive(this.input.turn.generation)) return { available: false as const, reason: 'RDC_TURN_NOT_ACTIVE' };
     if (this.initialError || this.original === undefined || !this.baseline) return { available: false as const, reason: 'RDC_INITIAL_STATE_UNVERIFIED' };
     return { available: true as const, original: structuredClone(this.original), receipt: { ...this.baseline } };

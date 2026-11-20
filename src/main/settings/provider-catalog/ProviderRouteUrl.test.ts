@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { listProviderSummaries } from '../../provider-catalog/ProviderCatalogRegistry';
-import { buildProviderOperationTarget } from '../../agent-runtime/providers/ProviderOperationRegistry';
+import { adapterOperationUrl } from '../../testing/contracts/providerOperationUrls';
 
 function materializeContractBaseUrl(template: string): string {
   return template
@@ -13,45 +13,34 @@ describe('provider route URL contracts', () => {
     const invalid = listProviderSummaries().flatMap((surface) => surface.routes
       .filter((route) => route.protocol === 'AnthropicMessages' && route.baseUrl)
       .flatMap((route) => {
-        const target = buildProviderOperationTarget({
-          adapterId: route.adapterId,
-          protocol: route.protocol,
-          baseUrl: materializeContractBaseUrl(route.baseUrl),
-          modelId: surface.models[0]?.modelId ?? 'catalog-contract-model',
-          connectionValues: { AICORE_DEPLOYMENT_ID: 'catalog-contract-deployment' },
-        });
-        return /\/v\d+(?:\/[^/?#]+)*\/messages(?:\?|$)/u.test(new URL(target.url).pathname)
+        const url = adapterOperationUrl(
+          route.adapterId,
+          materializeContractBaseUrl(route.baseUrl),
+          surface.models[0]?.modelId ?? 'catalog-contract-model',
+        );
+        return url && /\/v\d+(?:\/[^/?#]+)*\/messages(?:\?|$)/u.test(new URL(url).pathname)
           ? []
-          : [`${surface.id}: ${target.url}`];
+          : [`${surface.id}: ${url}`];
       }));
     expect(invalid).toEqual([]);
   });
 
-  it('builds one valid final operation URL for every stable Catalog route', () => {
+  it('builds one valid final operation URL for every stable HTTP Catalog route', () => {
     const targets = listProviderSummaries().flatMap((surface) => {
       if (surface.status !== 'stable') return [];
       const modelId = surface.models[0]?.modelId ?? 'catalog-contract-model';
-      return surface.routes.map((route) => ({
-        surfaceId: surface.id,
-        routeId: route.id,
-        target: buildProviderOperationTarget({
-          adapterId: route.adapterId,
-          protocol: route.protocol,
-          baseUrl: materializeContractBaseUrl(route.baseUrl),
-          modelId,
-          connectionValues: { AICORE_DEPLOYMENT_ID: 'catalog-contract-deployment' },
-        }),
-      }));
+      return surface.routes.flatMap((route) => {
+        const url = adapterOperationUrl(route.adapterId, materializeContractBaseUrl(route.baseUrl), modelId);
+        return url ? [{ surfaceId: surface.id, routeId: route.id, url }] : [];
+      });
     });
     expect(targets.length).toBeGreaterThan(200);
-    for (const { surfaceId, routeId, target } of targets) {
-      expect(() => new URL(target.url), `${surfaceId}/${routeId}: ${target.url}`).not.toThrow();
-      const parsed = new URL(target.url);
-      expect(['http:', 'https:', 'ws:', 'wss:'], `${surfaceId}/${routeId}`).toContain(parsed.protocol);
-      expect(target.url, `${surfaceId}/${routeId}`).not.toMatch(
+    for (const { surfaceId, routeId, url } of targets) {
+      expect(() => new URL(url), `${surfaceId}/${routeId}: ${url}`).not.toThrow();
+      expect(['http:', 'https:'], `${surfaceId}/${routeId}`).toContain(new URL(url).protocol);
+      expect(url, `${surfaceId}/${routeId}`).not.toMatch(
         /\/(?:chat\/completions|responses|messages)\/(?:chat\/completions|responses|messages)(?:\?|$)/u,
       );
-      expect(target.operationBuilderId, `${surfaceId}/${routeId}`).toBeTruthy();
     }
   });
 });

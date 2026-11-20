@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { KnowledgeImportResult, KnowledgeLaneHit } from '@shared/types/knowledge';
 import {
   beginSynchronousFlight,
   firstImportedSpaceCard,
   knowledgeExportScopeCounts,
 } from './knowledgeImportExportModel';
+import type { KnowledgeImportResult, KnowledgeLaneHit } from '@shared/types/knowledge';
 
 function hit(cardId: string): KnowledgeLaneHit {
   return {

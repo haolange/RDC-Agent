@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { SessionAttachmentRecord } from '@shared/types/session';
 import { formatBytes } from '../../services/attachmentHelpers';
 import { openAppPath } from '../../hooks/appShellBridge';
 import { MaterialContextViewer } from '../../patterns/MaterialContextViewer';
 import { useConversationStore } from '../../stores/conversationStore';
 import { getAttachmentPreview } from '../../hooks/conversationPreview';
+import type { SessionAttachmentRecord } from '@shared/types/session';
 
 const isImageAttachment = (attachment: SessionAttachmentRecord): boolean =>
   attachment.kind === 'image' || /^image\/(png|jpeg|gif|webp)$/i.test(attachment.mimeType ?? '');

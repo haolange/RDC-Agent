@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { translate, type TranslationKey } from '../i18n/messages';
 import { agentDescription } from './agentDescription';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
 it('translates shipped descriptions and preserves same-id user/project overrides', () => {
   const t = (key: TranslationKey) => translate('zh-CN', key);

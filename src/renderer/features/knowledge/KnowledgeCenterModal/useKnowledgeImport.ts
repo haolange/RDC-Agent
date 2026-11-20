@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../../../i18n';
+import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
+import { knowledgeErrorMessage } from './knowledgeCenterModel';
+import { beginSynchronousFlight } from './knowledgeImportExportModel';
 import type {
   KnowledgeImportResult,
   KnowledgeCandidatesResult,
   KnowledgeCardRecord,
   KnowledgeSpace,
 } from '@shared/types/knowledge';
-import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
-import { knowledgeErrorMessage } from './knowledgeCenterModel';
-import { beginSynchronousFlight } from './knowledgeImportExportModel';
-import { useI18n } from '../../../i18n';
 
 export type KnowledgeImportMode = 'file' | 'paste';
 
@@ -116,7 +116,7 @@ export function useKnowledgeImport(options: {
         ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         ...(filePath ? { filePath } : { source }),
       });
-      if (!request.isCurrent(seq)) return;
+      if (!request.isCurrent(seq) || 'cancelled' in imported) return;
       setResult(imported);
       await refreshInbox();
       if (!request.isCurrent(seq)) return;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { RequestEnvelopeBuilder } from './RequestEnvelopeBuilder';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import { RequestEnvelopeBuilder } from './RequestEnvelopeBuilder';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 describe('RequestEnvelopeBuilder', () => {

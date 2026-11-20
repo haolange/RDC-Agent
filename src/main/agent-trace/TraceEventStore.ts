@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import type { AgentRun, TraceEvent } from '@shared/types/agenticTrace';
-import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { generateEventId, nowIso } from '@shared/utils/id';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../runtime/jsonl';
+import type { AgentRun, TraceEvent } from '@shared/types/agenticTrace';
 
 export class TraceRunStore {
   private runsDir: string;

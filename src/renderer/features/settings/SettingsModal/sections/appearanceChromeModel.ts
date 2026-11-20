@@ -1,5 +1,5 @@
-import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 import { parseRdcThemeV1 } from '@shared/theme/rdcThemeV1';
+import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 
 export type AppearanceTranslate = ReturnType<typeof useI18n>['t'];

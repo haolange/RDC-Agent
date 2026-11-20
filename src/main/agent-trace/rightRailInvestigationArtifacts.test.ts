@@ -1,9 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { InvestigationArtifactManifest } from '@shared/types/renderdocInvestigation';
 import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
-import type { InvestigationIndexEntry } from '../investigation/investigationRecordKeys';
 import {
   SESSION_ID,
   baselineWorld,
@@ -18,6 +16,8 @@ import {
   type InvestigationListSnapshot,
 } from './rightRailInvestigationArtifacts';
 import { mapRightRailOutputs } from './rightRailProjectionMappers';
+import type { InvestigationIndexEntry } from '../investigation/investigationRecordKeys';
+import type { InvestigationArtifactManifest } from '@shared/types/renderdocInvestigation';
 
 const entry = (
   artifactId: string,

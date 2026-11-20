@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import { applyExecutionLimitFacts } from './ExecutionLimitFacts';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
+import { applyExecutionLimitFacts } from './ExecutionLimitFacts';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 const base: PromptPlan = {
   id: 'plan', segments: [], systemPrompt: '', totalTokenEstimate: 0,

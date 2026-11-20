@@ -4,8 +4,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ZodType } from 'zod';
 import { generateShortId } from '@shared/utils/id';
+import { parse as parseYamlDocument } from 'yaml';
 import {
   assertNoUnsupportedSchemaVersion,
   CURRENT_STORE_SCHEMA_VERSION,
@@ -13,7 +13,7 @@ import {
   StorageSchemaError,
   type StorageMigration,
 } from './storageSchema';
-import { parse as parseYamlDocument } from 'yaml';
+import type { ZodType } from 'zod';
 
 const DEEP_MERGE_FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 

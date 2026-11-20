@@ -1,8 +1,8 @@
 import { useProviderProbeBatch } from '../useProviderProbeBatch';
 import { Button } from '../../../../ui/Button';
 import { Details } from '../../../../ui/Details';
-import type { useI18n } from '../../../../i18n';
 import { providerProbeResultText } from './providerProbeResultText';
+import type { useI18n } from '../../../../i18n';
 import './provider-probe-batch.css';
 
 interface Props { providerIds?: string[]; disabled?: boolean; t: ReturnType<typeof useI18n>['t'] }

@@ -1,8 +1,8 @@
+import { AssistantStreamBuilder } from './AssistantStreamBuilder';
+import { StreamChannelRefs } from './streamChannelRefs';
 import type { ProviderContinuationArtifact } from '../../core/types';
 import type { ThinkingArtifactSource } from '../../core/types';
 import type { ThinkingContentInput } from '../../reasoning/ReasoningArtifacts';
-import { AssistantStreamBuilder } from './AssistantStreamBuilder';
-import { StreamChannelRefs } from './streamChannelRefs';
 
 export type ResponsesThinkingMode = 'summary' | 'raw' | 'opaque';
 

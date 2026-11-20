@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { extractSessionArtifactUris, isSessionArtifactUri } from '@shared/types/sessionArtifact';
 import { pathComparisonKey } from '../platform/paths';
 import type { ConversationToolImagePreviewRef, ConversationToolResourceRef } from '@shared/types/conversation';
 import type { ToolCallResult } from '@shared/types/tool';
-import { extractSessionArtifactUris, isSessionArtifactUri } from '@shared/types/sessionArtifact';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)

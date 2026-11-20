@@ -1,7 +1,4 @@
 import { samePath } from '../../platform/paths';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
-import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
-import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 import { assertRdcContextLeaseOwnership, getDelegatedChildSessionId, getRdcContextLease, quarantineRdcContext } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
 import { rdcLifecycleReceipts, type RdcLifecyclePoint } from '../../rdc/RdcLifecycleReceipts';
@@ -21,6 +18,9 @@ import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';
 import { joinFaultedRdcChild } from './RdcRecoveryChildren';
+import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
+import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
+import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type { TurnHandle } from './TurnCoordinator';
 import type { ApprovedCaptureHost } from './ApprovedCaptureController';
 

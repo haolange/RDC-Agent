@@ -1,9 +1,9 @@
 ﻿import fs from 'fs';
 import path from 'path';
 import { resolvedPathKey } from '../../platform/paths';
-import type { TraceArtifactRecord } from '@shared/types/trace';
 import { artifactStore } from '../../reports/ArtifactStore';
 import { storageAdapter } from '../store/StorageAdapter';
+import type { TraceArtifactRecord } from '@shared/types/trace';
 
 export type SessionArtifactSourceKind = 'attachment' | 'output';
 

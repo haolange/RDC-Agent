@@ -79,7 +79,8 @@
         "id": "apiKey",
         "label": "API Key",
         "kind": "secret",
-        "required": true
+        "required": true,
+        "valuePrefix": "sk-ant-"
       }
     ],
     "primarySecretFieldId": "apiKey"
@@ -106,6 +107,7 @@
       "contractOverrides": {
         "reasoning": {
           "semantic": "summary",
+          "visibilityRequest": "anthropic-display",
           "source": "anthropic-extended-thinking-summary",
           "evidence": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking",
           "displayLabel": "Reasoning summary",
@@ -924,7 +926,8 @@
           "wireProfile": {
             "kind": "anthropic",
             "on": "high",
-            "onMode": "adaptive",
+            "onMode": "enabled",
+            "onBudgetTokens": 16000,
             "offMode": "disabled"
           }
         }

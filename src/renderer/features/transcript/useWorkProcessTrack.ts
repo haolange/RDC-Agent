@@ -1,5 +1,5 @@
 import { useLayoutEffect, type RefObject } from 'react';
-import { assignDynStyle, clearDynStyle } from '../../lib/useDynStyle';
+import { assignDynStyles, clearDynStyles } from '../../lib/useDynStyle';
 
 const nodeTarget = '[data-work-node-heading], [data-work-node-prose]';
 
@@ -15,19 +15,25 @@ function firstLineCenter(target: HTMLElement, box: DOMRect): number {
   return box.top + Math.min(line, box.height) / 2;
 }
 
-/** Measure the labelled entrances on this rail, never the height of a card or its descendants. */
+/**
+ * Measure the labelled entrances on this rail, never the height of a card or its descendants. Every
+ * layout read happens before any style write, and observer bursts (streaming text, font loads) collapse
+ * into one measurement per frame.
+ */
 export function useWorkProcessTrack(ref: RefObject<HTMLDivElement | null>, firstId?: string) {
   useLayoutEffect(() => {
     const root = ref.current;
     if (!root) return;
     let logicalStart: number | undefined;
     let connected = true;
+    let frame = 0;
     const measured = new Set<HTMLElement>();
     const measure = () => {
+      frame = 0;
       if (!connected) return;
       const bounds = root.getBoundingClientRect();
+      const placements: Array<readonly [HTMLElement, { top: string; visibility: string }]> = [];
       const centers: number[] = [];
-      const positioned = new Set<HTMLElement>();
       for (const anchor of root.querySelectorAll<HTMLElement>('[data-work-anchor]')) {
         if (anchor.closest('[data-work-track]') !== root || !anchor.getClientRects().length) continue;
         const parent = anchor.parentElement!;
@@ -36,32 +42,41 @@ export function useWorkProcessTrack(ref: RefObject<HTMLDivElement | null>, first
         if (!target) continue;
         const center = firstLineCenter(target, target.getBoundingClientRect());
         const y = center - bounds.top;
-        assignDynStyle(anchor, { top: `${center - parent.getBoundingClientRect().top}px`, visibility: 'visible' });
-        positioned.add(anchor);
+        placements.push([anchor, { top: `${center - parent.getBoundingClientRect().top}px`, visibility: 'visible' }]);
         centers.push(y);
         if (anchor.dataset.workAnchor === firstId) logicalStart = y;
       }
-      for (const old of measured) if (!positioned.has(old)) { clearDynStyle(old); measured.delete(old); }
-      positioned.forEach(anchor => measured.add(anchor));
+      const positioned = new Set(placements.map(([anchor]) => anchor));
+      const stale = [...measured].filter((anchor) => !positioned.has(anchor));
+      stale.forEach((anchor) => measured.delete(anchor));
+      positioned.forEach((anchor) => measured.add(anchor));
       // Keep the measured logical start when windowing removes its DOM row.
       const start = logicalStart ?? centers[0] ?? 0;
       const end = centers.at(-1) ?? start;
-      assignDynStyle(root, { '--work-track-start': `${start}px`, '--work-track-length': `${Math.max(0, end - start)}px` });
+      clearDynStyles(stale);
+      assignDynStyles([
+        ...placements,
+        [root, { '--work-track-start': `${start}px`, '--work-track-length': `${Math.max(0, end - start)}px` }],
+      ]);
     };
-    const observer = new ResizeObserver(measure);
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    const observer = new ResizeObserver(schedule);
     observer.observe(root);
-    const mutations = new MutationObserver(measure);
+    const mutations = new MutationObserver(schedule);
     mutations.observe(root, { childList: true, subtree: true, characterData: true, attributes: true,
       attributeFilter: ['open', 'class', 'data-work-node', 'data-work-node-prose'] });
     const fonts = document.fonts;
-    fonts?.addEventListener?.('loadingdone', measure);
-    void fonts?.ready?.then(measure);
+    fonts?.addEventListener?.('loadingdone', schedule);
+    void fonts?.ready?.then(schedule);
     measure();
     return () => {
       connected = false;
+      if (frame) cancelAnimationFrame(frame);
       observer.disconnect(); mutations.disconnect();
-      fonts?.removeEventListener?.('loadingdone', measure);
-      measured.forEach(clearDynStyle); clearDynStyle(root);
+      fonts?.removeEventListener?.('loadingdone', schedule);
+      clearDynStyles([...measured, root]);
     };
   }, [ref, firstId]);
 }

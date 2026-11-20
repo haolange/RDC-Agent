@@ -65,7 +65,7 @@
 }
 
 .settings-page-skills .settings-help-text {
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   line-height: 1.55;
 }
 
@@ -73,7 +73,7 @@
 .settings-page-policy .settings-help-text {
   margin-top: var(--space-1);
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 @container settings-panel (max-width: 48rem) {

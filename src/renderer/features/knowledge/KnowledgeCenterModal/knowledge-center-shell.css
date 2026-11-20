@@ -97,7 +97,7 @@
 .knowledge-center-brand-title {
   margin: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-lg);
+  font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
 }

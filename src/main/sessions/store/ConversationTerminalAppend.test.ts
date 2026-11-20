@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
-import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 
 describe('bounded terminal append transaction', () => {
   let root = '';

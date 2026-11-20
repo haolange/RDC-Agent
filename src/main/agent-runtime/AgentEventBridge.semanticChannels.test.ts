@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { translateCoreToSharedAgentEvent } from './AgentEventBridge';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -6,7 +7,6 @@ import type {
   ThinkingContent,
   ToolCall,
 } from './core/types';
-import { translateCoreToSharedAgentEvent } from './AgentEventBridge';
 
 describe('run start identity', () => {
   it('uses the resolved profile and rejects a missing identity', () => {

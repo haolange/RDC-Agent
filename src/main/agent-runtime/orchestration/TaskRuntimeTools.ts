@@ -1,13 +1,13 @@
 import { isSubagentScopeId } from '@shared/utils/executionScope';
-import type { AgentTool } from '../agent/AgentTool';
+import { generateEventId, nowMs } from '@shared/utils/id';
 import { createTaskTools, TaskRegistry, createSessionTaskStore, taskStoreForExecutionScope, getDelegatedTaskScope } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
-import { generateEventId, nowMs } from '@shared/utils/id';
-import type { TurnHandle } from './TurnCoordinator';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
 import { bindTaskRootBudget } from './TaskRootBudget';
 import { readLiveTaskBudget } from './TaskRuntimeBudgetView';
-import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
+import type { TurnHandle } from './TurnCoordinator';
+import type { AgentTool } from '../agent/AgentTool';
 
 export function createTaskRuntimeTools(input: {
   sessionId?: string | null;

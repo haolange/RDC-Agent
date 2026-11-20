@@ -1,4 +1,3 @@
-import type { ElectronAPI } from '@shared/types/electron';
 import {
   createRendererApi,
   type RendererApiTransport,
@@ -7,6 +6,7 @@ import {
   type RendererInvokeChannel,
 } from '@shared/renderer-api';
 import { connectBrowserEventStream } from './browserEventStream';
+import type { ElectronAPI } from '@shared/types/electron';
 
 const BRIDGE_MARKER = '__RDC_AGENT_BROWSER_APP_BRIDGE__';
 

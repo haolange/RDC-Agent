@@ -24,7 +24,7 @@ html, body, #root {
 
 body {
   font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   line-height: var(--leading-normal);
   color: var(--token-text-heading);
   background: var(--token-bg-app);

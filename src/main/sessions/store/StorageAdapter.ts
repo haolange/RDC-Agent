@@ -3,6 +3,12 @@
  * 统一管理 userData 下的项目、会话、运行记录与全局 knowledge。
  */
 
+import { ExecutionOfferStore } from '../run/ExecutionOfferStore';
+import { StorageIo } from './StorageIo';
+import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
+import { SessionRecordStore } from './SessionRecordStore';
+import { ConversationHistoryStore } from './ConversationHistoryStore';
+import { SessionContextStore } from './SessionContextStore';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -17,12 +23,6 @@ import type {
 } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
-import { StorageIo } from './StorageIo';
-import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
-import { SessionRecordStore } from './SessionRecordStore';
-import { ConversationHistoryStore } from './ConversationHistoryStore';
-import { SessionContextStore } from './SessionContextStore';
-import { ExecutionOfferStore } from '../run/ExecutionOfferStore';
 import type {
   ConversationHistoryCacheEntry,
   ExistingConversationTurnCommit,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export function useComposerPendingSkills(options: {
   currentProject: ProjectRecord | null;

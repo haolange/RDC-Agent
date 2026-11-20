@@ -10,8 +10,8 @@ import { Spinner } from '../../../ui/Spinner';
 import { useI18n } from '../../../i18n';
 import { Button } from '../../../ui/Button';
 import { Popover } from '../../../ui/Popover';
-import { DeviceTypeIcon } from './DeviceSelectorParts';
 import { DevicePreparationDialog } from '../DevicePreparationDialog';
+import { DeviceTypeIcon } from './DeviceSelectorParts';
 import './DeviceSelector.css';
 import './DeviceDiscovery.css';
 

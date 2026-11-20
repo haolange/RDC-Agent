@@ -1,5 +1,5 @@
-import type { LlmModelCapabilityProbeMode } from '@shared/types/settings';
 import { Button } from '../../../../ui/Button';
+import type { LlmModelCapabilityProbeMode } from '@shared/types/settings';
 import type { ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 
 interface Props extends Pick<ProviderModelCapabilitySummaryProps, 'model' | 'provider' | 't'> {

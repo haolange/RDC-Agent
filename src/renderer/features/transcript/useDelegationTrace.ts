@@ -1,6 +1,6 @@
 import React from 'react';
-import type { DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import type { DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
 
 const empty: DelegationTracePage = { header: null, steps: [], nextCursor: null, total: 0, revision: 0 };
 const PAGE_SIZE = 40;

@@ -1,19 +1,22 @@
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
+import { loopTextItems, sameProviderBlock } from '@shared/conversation/loopItems';
+import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
 import { safeDelegationText as safeText } from './DelegationTraceText';
-import { mergeThinkingPayload, selectCompletedThinking } from './ConversationThinkingArtifacts';
+import { mergeThinkingPayload } from './ConversationThinkingArtifacts';
 import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
-import { attachRuntimeHookDiagnostic, upsertLoopOutputItem, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall, upsertWorkBlock } from './ConversationWorkTrace';
+import {
+  attachRuntimeHookDiagnostic, discardLoopAttempt, settleLoopItems, upsertLoopResult, upsertLoopTextItem, upsertLoopThinkingItem,
+  upsertRuntimeToolApproval, upsertRuntimeToolCall, upsertWorkBlock,
+} from './ConversationWorkTrace';
 import { normalizeTaskSnapshotItems } from './ConversationTaskSnapshot';
 import type { AgentAssistantDeltaPayload, AgentEvent } from '@shared/types/agentRuntime';
-import type { ConversationLoopOutputPhase, ConversationTaskSnapshotItem, ConversationWorkTrace, ConversationWorkBlock } from '@shared/types/conversation';
+import type { ConversationLoopOutputPhase, ConversationTaskSnapshotItem, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 
 export interface DelegatedProjectionState {
   trace: ConversationWorkTrace;
   loop: number;
   loopText: string;
-  thinking?: ThinkingArtifact;
-  thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
   hasTools: boolean;
   nextLoop: boolean;
 }
@@ -32,19 +35,18 @@ function safeThinking(value: ThinkingArtifact | undefined): ThinkingArtifact | u
 
 /** Pure visible-process reducer. Main and child execution use the same canonical block/upsert semantics. */
 export function projectDelegatedEvent(state: DelegatedProjectionState, event: AgentEvent): DelegatedProjectionState {
-  let { trace, loop, loopText, thinking, thinkingStatus, hasTools, nextLoop } = state;
+  let { trace, loop, loopText, hasTools, nextLoop } = state;
   const loopId = () => `loop-${loop}`;
   const beginContent = () => {
     if (!nextLoop) return;
     loop += 1;
     loopText = '';
-    thinking = undefined;
-    thinkingStatus = undefined;
     hasTools = false;
     nextLoop = false;
   };
-  const loopOptions = () => ({ loopId: loopId(), loopResultText: loopText || undefined,
-    loopThinking: thinking, loopThinkingStatus: thinkingStatus });
+  const loopOptions = () => ({ loopId: loopId() });
+  const loopItem = (kind: 'text' | 'thinking', ref: ProviderOutputRef) => trace.blocks.find((block) => block.id === loopId())
+    ?.items?.find((item) => item.kind === kind && sameProviderBlock(item.providerOutputRef, ref));
   const payload = event.payload as Record<string, unknown>;
   if (event.type === 'assistant.delta') {
     const delta = event.payload as AgentAssistantDeltaPayload;
@@ -52,41 +54,38 @@ export function projectDelegatedEvent(state: DelegatedProjectionState, event: Ag
     if (chunk) {
       beginContent();
       loopText += chunk;
-      const previous = trace.blocks.find((block) => block.id === loopId())?.outputItems?.find((item) =>
-        item.providerOutputRef.providerBlockKey === delta.providerOutputRef.providerBlockKey
-        && item.providerOutputRef.contentIndex === delta.providerOutputRef.contentIndex);
-      trace = upsertLoopResult(trace, loopId(), loopText, thinking, thinkingStatus,
-        'streaming', undefined, hasTools ? 'commentary' : undefined);
-      trace = upsertLoopOutputItem(trace, loopId(), delta.providerOutputRef, (previous?.text ?? '') + chunk,
-        delta.phase, 'streaming');
+      const previous = loopItem('text', delta.providerOutputRef);
+      trace = upsertLoopResult(trace, loopId(), { status: 'streaming', outputPhase: hasTools ? 'commentary' : undefined });
+      trace = upsertLoopTextItem(trace, loopId(), delta.providerOutputRef,
+        (previous?.kind === 'text' ? previous.text : '') + chunk, delta.phase, 'streaming');
     }
   } else if (event.type === 'assistant.text_end') {
     const item = event.payload as AgentAssistantDeltaPayload;
-    trace = upsertLoopOutputItem(trace, loopId(), item.providerOutputRef, safeText(item.text), item.phase, 'complete');
+    trace = upsertLoopTextItem(trace, loopId(), item.providerOutputRef, safeText(item.text), item.phase, 'complete');
   } else if (event.type === 'assistant.thinking_delta' || event.type === 'assistant.thinking_end') {
     const incoming = payload.thinking as ThinkingArtifact | undefined;
-    if (incoming?.kind === 'opaque' || incoming?.visibility === 'hidden') return state;
+    const ref = payload.providerOutputRef as ProviderOutputRef | undefined;
+    if (!ref || incoming?.kind === 'opaque' || incoming?.visibility === 'hidden') return state;
     beginContent();
-    thinking = safeThinking(mergeThinkingPayload(thinking,
+    const previous = loopItem('thinking', ref);
+    const thinking = safeThinking(mergeThinkingPayload(previous?.kind === 'thinking' ? previous.thinking : undefined,
       safeThinking(incoming),
       typeof payload.text === 'string' ? safeText(payload.text) : ''));
     if (thinking) {
-      thinkingStatus = event.type === 'assistant.thinking_end' ? 'complete' : 'streaming';
-      trace = upsertLoopResult(trace, loopId(), loopText || undefined, thinking, thinkingStatus,
-        'streaming', undefined, hasTools ? 'commentary' : undefined);
+      trace = upsertLoopThinkingItem(trace, loopId(), ref, thinking,
+        event.type === 'assistant.thinking_end' ? 'complete' : 'streaming');
     }
   } else if (event.type === 'tool.requested') {
     const call = payload.toolCall as { id?: string; name?: string; arguments?: unknown } | undefined;
     if (call?.id && call.name) {
       beginContent();
       hasTools = true;
-      for (const item of trace.blocks.find((block) => block.id === loopId())?.outputItems ?? []) {
-        if (!item.phase) trace = upsertLoopOutputItem(trace, loopId(), item.providerOutputRef, item.text, 'commentary', item.status);
+      for (const item of loopTextItems(trace.blocks.find((block) => block.id === loopId()))) {
+        if (!item.phase) trace = upsertLoopTextItem(trace, loopId(), item.providerOutputRef, item.text, 'commentary', item.status);
       }
       trace = upsertRuntimeToolCall(trace, { id: call.id, toolName: call.name,
         status: 'pending', argsPreview: safeText(call.arguments ?? {}), startedAt: event.timestamp }, loopOptions());
-      if (loopText) trace = upsertLoopResult(trace, loopId(), loopText, thinking, thinkingStatus,
-        'streaming', undefined, 'commentary');
+      if (loopText) trace = upsertLoopResult(trace, loopId(), { status: 'streaming', outputPhase: 'commentary' });
     }
   } else if (event.type === 'tool.started') {
     const toolName = String(payload.toolName ?? 'tool');
@@ -129,26 +128,24 @@ export function projectDelegatedEvent(state: DelegatedProjectionState, event: Ag
   } else if (event.type === 'assistant.completed') {
     beginContent();
     const stopReason = payload.stopReason as import('@shared/types/conversation').ConversationLoopStopReason | undefined;
-    const completedText = typeof payload.text === 'string' ? safeText(payload.text).trim() : '';
-    const completedThinking = safeThinking(selectCompletedThinking(payload.thinking as ThinkingArtifact[] | undefined));
-    thinking = completedThinking ?? thinking;
-    if (thinking) thinkingStatus = 'complete';
-    const outputPhase = hasTools || stopReason === 'tool_use' || stopReason === 'max_tokens'
-      || stopReason === 'aborted' || stopReason === 'refusal' ? 'commentary' : 'final_answer';
-    trace = upsertLoopResult(trace, loopId(), completedText || loopText || undefined, thinking,
-      thinkingStatus, 'complete', stopReason, outputPhase);
-    const existing = trace.blocks.find((block) => block.id === loopId())?.outputItems ?? [];
-    const items = payload.textItems as Array<{ text: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef }> | undefined;
-    for (const item of items ?? existing) {
-      const prior = existing.find((candidate) => candidate.providerOutputRef.providerBlockKey === item.providerOutputRef.providerBlockKey
-        && candidate.providerOutputRef.contentIndex === item.providerOutputRef.contentIndex);
-      const phase = item.phase ?? prior?.phase ?? (stopReason === 'end_turn' && outputPhase === 'final_answer' ? 'final_answer'
-        : stopReason === 'tool_use' ? 'commentary' : undefined);
-      trace = upsertLoopOutputItem(trace, loopId(), item.providerOutputRef, safeText(item.text), phase, 'complete');
-    }
+    // A child has no approvals or user input of its own to wait on, so only tools keep a loop open.
+    const outputPhase = resolveConversationLoopOutputPhase({ stopReason, loopHasTools: hasTools });
+    trace = upsertLoopResult(trace, loopId(), { status: 'complete', stopReason, outputPhase });
+    const textItems = payload.textItems as Array<{ text: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef }> | undefined;
+    const completedThinking = (payload.thinking as ThinkingArtifact[] | undefined)
+      ?.map(safeThinking).filter((artifact): artifact is ThinkingArtifact => Boolean(artifact));
+    trace = settleLoopItems(trace, loopId(), { stopReason, outputPhase }, {
+      textItems: textItems?.map((item) => ({ ...item, text: safeText(item.text) })),
+      thinking: completedThinking,
+    });
     nextLoop = true;
   } else if (event.type === 'diagnostic') {
     const code = String(payload.code ?? event.id);
+    if (code.startsWith('error_recovery_') && payload.phase === 'started') {
+      trace = discardLoopAttempt(trace, loopId());
+      loopText = '';
+      hasTools = false;
+    }
     if (shouldProjectDiagnosticToWorkProcess(code)) {
       const status = payload.phase === 'started' ? 'running' : payload.severity === 'error' ? 'error' : 'complete';
       const hookTrace = code.startsWith('hook.') && typeof payload.toolCallId === 'string'
@@ -170,5 +167,5 @@ export function projectDelegatedEvent(state: DelegatedProjectionState, event: Ag
       status: 'error', diagnosticSeverity: 'error', summary: safeText(payload.error ?? payload.message ?? 'Agent Loop failed.'),
       startedAt: event.timestamp, completedAt: event.timestamp });
   }
-  return { trace, loop, loopText, thinking, thinkingStatus, hasTools, nextLoop };
+  return { trace, loop, loopText, hasTools, nextLoop };
 }

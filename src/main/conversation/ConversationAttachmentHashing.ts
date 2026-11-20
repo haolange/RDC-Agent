@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
 import * as path from 'node:path';
-import type { ConversationAttachmentInput } from '@shared/types/conversation';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
   MAX_ATTACHMENT_TOTAL_BYTES,
 } from './ConversationAttachmentMaterializer';
+import type { ConversationAttachmentInput } from '@shared/types/conversation';
 
 export const MAX_ATTACHMENT_HASH_CONCURRENCY = 4;
 

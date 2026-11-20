@@ -2,13 +2,14 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
-import { RdcCliInvokerService } from './RdcCliInvokerService';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import { ShellInvocationService } from '../tools/ShellInvocationService';
-import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
+import { RdcCliInvokerService } from './RdcCliInvokerService';
 
 const root = process.env.RDC_NATIVE_TOOLS_ROOT;
-const python = process.env.RDC_NATIVE_PYTHON;
-describe.skipIf(!root || !python)('external native parser contract (explicit installation)', () => {
+const files = root ? rdcInstallationFiles(root) : null;
+describe.skipIf(!files)('external native parser contract (explicit installation)', () => {
   it('parses production invoker argv for every supported probe; rejects fictional verbs', async () => {
     const calls: string[][] = [];
     class ParserCapture extends ShellInvocationService {
@@ -31,7 +32,7 @@ describe.skipIf(!root || !python)('external native parser contract (explicit ins
     for (const input of inputs) {
       const command = compileRdcProbe(input, 'qa-parser-session');
       await invoker.executeCLI(command.command, [...command.args, ...(command.needsContext ? ['--daemon-context', 'qa-parser-context'] : [])],
-        { settings: { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: python!, argsPrefix: [path.resolve(root!, 'cli/run_cli.py')] } });
+        { settings: { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: files!.python, argsPrefix: [files!.entry] } });
     }
     const code = [
       'import sys,json,contextlib,io',
@@ -49,7 +50,7 @@ describe.skipIf(!root || !python)('external native parser contract (explicit ins
       ' else: raise AssertionError("invalid command accepted: " + str(argv))',
       'print("native parser cases passed")',
     ].join('\n');
-    const result = spawnSync(python!, ['-c', code, path.resolve(root!), JSON.stringify(calls)], { encoding: 'utf8', windowsHide: true });
+    const result = spawnSync(files!.python, ['-c', code, path.resolve(root!), JSON.stringify(calls)], { encoding: 'utf8', windowsHide: true });
     expect(result.stderr).toBe('');
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(calls).toHaveLength(inputs.length);

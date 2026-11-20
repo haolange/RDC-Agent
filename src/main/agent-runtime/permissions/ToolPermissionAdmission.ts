@@ -1,6 +1,6 @@
+import { PermissionModeChangedError, runtimePermissionStateService, type RuntimePermissionStateService } from './RuntimePermissionStateService';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { AgentPermissionDecision } from './AgentPermissionPolicy';
-import { PermissionModeChangedError, runtimePermissionStateService, type RuntimePermissionStateService } from './RuntimePermissionStateService';
 
 /** A retry stays internal: no result, hook, dispatch budget or effect is repeated. */
 const stale = Symbol('permission-revision-stale');

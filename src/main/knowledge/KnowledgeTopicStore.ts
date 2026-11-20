@@ -2,9 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import type { KnowledgeTopicDocument } from '@shared/types/knowledge';
-import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
 import { openedFileIdentity } from '../platform/fileIdentity';
+import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
+import type { KnowledgeTopicDocument } from '@shared/types/knowledge';
 
 const topicId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/u);
 const name = z.string().trim().min(1).max(120);

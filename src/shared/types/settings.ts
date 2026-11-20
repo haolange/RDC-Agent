@@ -182,6 +182,7 @@ export interface LlmProviderConnectionField {
   required: boolean;
   environmentVariable?: string;
   placeholder?: string;
+  valuePrefix?: string;
 }
 
 export interface LlmProviderConnectionSchema {
@@ -435,7 +436,7 @@ export interface LlmProviderEntry {
   lastTestedAt?: string;
   lastModelRefreshAt?: string;
   lastError?: string;
-  accountLoginConfigured?: boolean;
+  accountLogin?: LlmProviderAccountLogin;
   accountLabel?: string;
   planLabel?: string;
   oauthExpiresAt?: string;
@@ -504,7 +505,7 @@ export interface LlmProviderCatalogEntry {
   baseUrlEditable?: boolean;
   recommendedModels: string[];
   docsUrl?: string;
-  accountLoginConfigured?: boolean;
+  accountLogin?: LlmProviderAccountLogin;
   unavailableReason?: string;
   capabilities?: LlmProviderCapability[];
 }
@@ -609,7 +610,13 @@ export interface LlmProviderDraftRequest {
 export interface LlmProviderAccountLoginStartRequest {
   providerId: LlmProviderId;
   authMode?: LlmProviderAuthMode;
-  accountLoginMode?: LlmProviderAccountLoginMode;
+}
+
+/** How a provider's account sign-in works, projected from its manifest for the connect dialog. */
+export interface LlmProviderAccountLogin {
+  mode: LlmProviderAccountLoginMode;
+  /** The browser flow ends with a code the person pastes back into the app. */
+  codeInput: boolean;
 }
 
 export interface LlmProviderAccountLoginFinishRequest {
@@ -618,6 +625,23 @@ export interface LlmProviderAccountLoginFinishRequest {
   state?: string;
   flowId?: string;
 }
+
+/** Connection failures the person can act on; the renderer translates each with its params. */
+export type ProviderConnectionErrorCode =
+  | 'credentials-rejected'
+  | 'discovery-unavailable'
+  | 'service-unavailable'
+  | 'http-failed'
+  | 'no-routable-models'
+  | 'not-in-catalog'
+  | 'unknown-provider'
+  | 'api-key-required'
+  | 'base-url-required'
+  | 'discovery-missing'
+  | 'timeout'
+  | 'failed';
+
+export type ProviderConnectionErrorParams = Record<string, string | number>;
 
 export interface LlmProviderConnectionResult {
   success: boolean;
@@ -636,6 +660,8 @@ export interface LlmProviderConnectionResult {
     filteredModelCount: number;
   };
   error?: string;
+  errorCode?: ProviderConnectionErrorCode;
+  errorParams?: ProviderConnectionErrorParams;
 }
 
 export type LlmModelCapabilityProbeMode = 'default' | 'max-context' | 'fast' | 'fast-max-context';
@@ -649,7 +675,7 @@ export interface LlmModelCapabilityProbeRequest {
 export interface LlmModelCapabilityProbeResult {
   success: boolean;
   status: 'verified' | 'inconclusive' | 'denied' | 'failed' | 'cancelled';
-  failureKind?: 'entitlement-denied' | 'authentication-failed' | 'quota-exhausted' | 'route-unavailable' | 'unknown';
+  failureKind?: 'entitlement-denied' | 'authentication-failed' | 'quota-exhausted' | 'route-unavailable' | 'tools-unsupported' | 'unknown';
   requestSent: boolean;
   detail?: string;
   detailCode?: 'fast-tier-default' | 'fast-tier-missing' | 'fast-tier-other';

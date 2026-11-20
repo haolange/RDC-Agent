@@ -164,8 +164,23 @@ const ProviderThinkingProjectionSourcesSchema = z.object({
   opaque: ProviderThinkingProjectionSourceSchema.optional(),
 }).strict();
 
+/**
+ * How a route asks for reasoning it will show. Each value is one protocol's request; a route declares
+ * it only when its endpoint accepts that request. Absent means the route asks for nothing extra.
+ */
+export const ReasoningVisibilityRequestSchema = z.enum([
+  'responses-summary',
+  'anthropic-display',
+  'gemini-include-thoughts',
+  'gemini-interactions-summaries',
+  'ollama-think',
+  'sap-include-reasoning',
+]);
+export type ReasoningVisibilityRequest = z.infer<typeof ReasoningVisibilityRequestSchema>;
+
 export const ProviderReasoningContractSchema = z.object({
   semantic: z.enum(['raw', 'summary', 'opaque', 'none', 'unknown']),
+  visibilityRequest: ReasoningVisibilityRequestSchema.optional(),
   source: z.string().min(1),
   evidence: z.string().min(1).optional(),
   displayLabel: z.enum([

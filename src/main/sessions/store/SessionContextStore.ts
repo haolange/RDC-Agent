@@ -1,9 +1,7 @@
-import { isSubagentScopeId } from '@shared/utils/executionScope';
 import * as fs from 'fs';
 import * as path from 'path';
-import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '@shared/utils/jsonl';
-import type { RunContextUsageSummary } from '@shared/types/session';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import { isSubagentScopeId } from '@shared/utils/executionScope';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
 import {
   SESSION_SHELL_STATE_MIGRATIONS,
   CURRENT_USAGE_SCHEMA_VERSION,
@@ -12,6 +10,8 @@ import {
   toSessionShellStateManifest,
   toSessionUsageManifest,
 } from './storageSchema';
+import type { RunContextUsageSummary } from '@shared/types/session';
+import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
 
 
 export class SessionContextStore {

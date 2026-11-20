@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import type { KnowledgeLaneHit, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 import { createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, type KnowledgeViewMode } from './knowledgeCenterModel';
 import { runKnowledgeCenterQuery } from './knowledgeCenterQuery';
+import type { KnowledgeLaneHit, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
 type Page = { revision?: string; total?: number; nextOffset?: number };
 export function useKnowledgeQueryRunner(input: {

@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { AgentTool } from '../../agent/AgentTool';
 import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../primitives/_shared';
 import { COPY_MOVE_MAX_BYTES } from '../primitives/toolLimits';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface CopyFileParams {
   source: string;
@@ -36,6 +36,7 @@ export const copyFileTool: AgentTool<CopyFileParams, CopyFileDetails> = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
+  effects: { reads: ['source'], writes: ['destination'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

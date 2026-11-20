@@ -1,10 +1,10 @@
 import * as fs from 'fs/promises';
-import type { AgentTool } from '../../agent/AgentTool';
 import {
   assertNotSensitiveDeletePath,
   requireMutationWorkspaceRoot,
   safeResolvePath,
 } from '../primitives/_shared';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface DeleteFileParams {
   path: string;
@@ -28,6 +28,7 @@ export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'destructive',
+  effects: { writes: ['path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

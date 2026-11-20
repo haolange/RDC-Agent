@@ -11,6 +11,7 @@ import {
 } from './modelManifestSchema';
 import {
   getProviderAdapterImplementation,
+  PROVIDER_ACCOUNT_FLOW_IDS,
   PROVIDER_AUTH_SCHEMA_IDS,
   PROVIDER_DISCOVERY_POLICY_IDS,
   type ProviderAdapterId,
@@ -32,6 +33,8 @@ const ConnectionFieldSchema = z.object({
   required: z.boolean(),
   environmentVariable: z.string().optional(),
   placeholder: z.string().optional(),
+  /** Case-insensitive prefix every value the provider issues starts with; other stored values are unusable. */
+  valuePrefix: z.string().min(1).optional(),
 }).strict();
 
 const CredentialAlternativeSchema = z.object({
@@ -52,6 +55,23 @@ const ConnectionSchema = z.object({
     prefix: z.string().optional(),
   }).strict()).optional(),
   endpointTemplate: z.string().optional(),
+}).strict();
+
+/**
+ * How a surface signs in with an account: the flow the app runs, how the person authorizes, and which
+ * credential-bundle fields serve requests. The route's base URL applies unless the bundle names its own.
+ */
+const AccountAuthSchema = z.object({
+  flow: z.enum(PROVIDER_ACCOUNT_FLOW_IDS),
+  loginMode: z.enum(['browser', 'device']),
+  /** The browser flow ends with a code the person pastes back into the app. */
+  codeInput: z.boolean(),
+  credential: z.object({
+    /** Bundle fields tried in order for the request credential. */
+    tokenFields: z.array(z.enum(['accessToken', 'apiKey', 'copilotToken'])).min(1),
+    /** Bundle field that, when present, replaces the default route's base URL. */
+    baseUrlField: z.enum(['copilotApiBaseUrl', 'resourceUrl']).optional(),
+  }).strict(),
 }).strict();
 
 const DiscoveryCapabilityMappingSchema = z.object({
@@ -195,7 +215,7 @@ export const ProviderSurfaceManifestSchema = z.object({
     AvailabilitySchema,
   ).optional(),
   baseUrlEditable: z.boolean().optional(),
-  accountLoginConfigured: z.boolean().optional(),
+  accountAuth: AccountAuthSchema.optional(),
   capabilities: z.array(z.enum([
     'chat',
     'tool-calling',
@@ -223,6 +243,8 @@ export const ProviderSurfaceManifestSchema = z.object({
     factSourceId: z.string().min(1),
   }).strict().optional(),
   models: z.array(ModelManifestSchema),
+  /** Lower-case model ids the surface retired; every catalog layer drops them, including persisted rows. */
+  retiredModelIds: z.array(z.string().min(1).regex(/^[^A-Z\s]+$/)).optional(),
   protocolOverrides: z.array(z.object({
     modelId: z.string().min(1),
     protocol: ProviderProtocolSchema.optional(),
@@ -261,5 +283,6 @@ export const ProviderProfileManifestSchema = z.object({
 }).strict();
 
 export type ProviderSurfaceManifest = z.infer<typeof ProviderSurfaceManifestSchema>;
+export type ProviderAccountAuth = z.infer<typeof AccountAuthSchema>;
 export type ProviderIdentityManifest = z.infer<typeof ProviderIdentityManifestSchema>;
 export type ProviderProfileManifest = z.infer<typeof ProviderProfileManifestSchema>;

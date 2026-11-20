@@ -1,6 +1,5 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
-import type { ToolRowModel } from './workProcessToolTypes';
 import { SourcePills, WebPageDestination } from './WorkProcessWebParts';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import { ToolOutcomeSummary } from './ToolOutcomeSummary';
@@ -10,6 +9,7 @@ import {
   FamilyLayerDetail,
   isDedicatedFamily,
 } from './WorkProcessFamilyLayers';
+import type { ToolRowModel } from './workProcessToolTypes';
 
 export type { ToolRowModel } from './workProcessToolTypes';
 

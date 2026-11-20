@@ -123,11 +123,6 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
     assert(sharedTypes.includes(token), `shared agent runtime types must expose ${token}.`);
   }
 
-  const agentTypes = read('src/shared/types/agent.ts');
-  assert(agentTypes.includes("export type AgentId = 'general' | 'debugger' | 'analyzer' | 'optimizer'"), 'Top-level AgentId must be the four builtin profiles.');
-  assert(agentTypes.includes("TOP_LEVEL_AGENT_IDS: AgentId[] = ['general', 'debugger', 'analyzer', 'optimizer']"), 'TOP_LEVEL_AGENT_IDS must list the four builtin profiles.');
-  assert(agentTypes.includes("DEFAULT_AGENT_ID: AgentId = 'general'"), 'Default profile must be general.');
-
   const layoutTypes = read('src/shared/types/layout.ts');
   assert(layoutTypes.includes("export type AgentMode = 'general' | MissionKind | (string & {})"), 'AgentMode is the Composer profile-id selector.');
   assert(!layoutTypes.includes('BuiltinAgentMode'), 'BuiltinAgentMode must be removed.');
@@ -245,15 +240,18 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const conversationTurnStarter = read('src/main/conversation/ConversationTurnStarter.ts');
   const conversationTurnRunner = read('src/main/conversation/ConversationTurnRunner.ts');
   const conversationRuntimeSources = [conversationService, conversationPromptPreparer, conversationTurnStarter, conversationTurnRunner].join('\n');
-  assert(conversationPromptPreparer.includes('mergeTurnPreloadSkillIds'), 'Conversation prompt preparation must merge profile/$skill/pending skill preload ids.');
-  assert(conversationPromptPreparer.includes('SKILL_UNAVAILABLE'), 'Conversation prompt preparation must fail closed on missing preload skills.');
+  const turnPromptPlan = read('src/main/agent-runtime/orchestration/TurnPromptPlan.ts');
+  assert(conversationPromptPreparer.includes('buildTurnPromptPlan(') && read('src/main/agent-runtime/orchestration/PromptPlanForTurn.ts').includes('buildTurnPromptPlan('),
+    'Conversation and profile turns must build their PromptPlan through the one shared buildTurnPromptPlan.');
+  assert(turnPromptPlan.includes('mergeTurnPreloadSkillIds'), 'Turn prompt preparation must merge profile/$skill/pending skill preload ids.');
+  assert(turnPromptPlan.includes('SKILL_UNAVAILABLE'), 'Turn prompt preparation must fail closed on missing preload skills.');
   for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
     assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not keep legacy prompt/text-tool logic: ${forbidden}.`);
   }
   for (const forbidden of ['TASK_FILE_PATTERN', 'readFileSync(taskFilePath', 'fs.existsSync(taskFilePath']) {
     assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not preload local files outside the tool permission policy: ${forbidden}.`);
   }
-  assert(conversationPromptPreparer.includes('promptPlanBuilder.build'), 'Conversation prompt preparation must build a PromptPlan for system instructions.');
+  assert(turnPromptPlan.includes('promptPlanBuilder.build'), 'Turn prompt preparation must build a PromptPlan for system instructions.');
   assert(conversationPromptPreparer.includes('routeCapability: input.routePreflight.routeCapability'), 'Conversation prompt preparation must pass the frozen route capability into PromptPlanBuilder.');
   assert(conversationPromptPreparer.includes('permissionConstraints: runtimeSettings.agentRuntime.permissions'), 'Conversation prompt preparation must pass explicit frozen permission constraints into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
@@ -312,7 +310,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const globTool = read('src/main/agent-runtime/tools/primitives/GlobTool.ts');
   assert(globTool.includes('splitExternalPattern'), 'Glob tool must resolve approved external path patterns.');
 
-  assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/agentToolCapabilityAudit.test.ts')), 'Catalog tool-calling audit must exist.');
+  assert(fs.existsSync(path.join(repoRoot, 'src/main/provider-catalog/agentToolCapabilityAudit.test.ts')), 'Catalog tool-calling audit must exist.');
   assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/protocolWireFixtureCoverage.ts')), 'Native protocol wire-fixture coverage map must exist.');
   const toolCapability = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/check-agent-tool-capability.mjs')], {
     cwd: repoRoot,

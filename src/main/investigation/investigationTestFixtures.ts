@@ -1,5 +1,3 @@
-import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
-import { seedExecutionEvidence } from './investigationExecutionFixtures';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -18,8 +16,10 @@ import {
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
 import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
-import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { formatInvestigationContentHash } from '@shared/types/renderdocInvestigation';
+import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
+import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
+import { seedExecutionEvidence } from './investigationExecutionFixtures';
 import { serializeInvestigationJson } from './investigationHash';
 import { InvestigationArtifactService } from './InvestigationArtifactService';
 import type { InvestigationArtifactServiceDeps } from './investigationArtifactWrite';

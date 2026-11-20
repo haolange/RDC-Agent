@@ -1,8 +1,17 @@
-import { assertRdcContextLeaseOwnership, clearRdcContextLeases, getRdcContextLease, setRdcRuntimeContextForSession, quarantineRdcContext } from './RdcRuntimeContextRegistry';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { assertRdcContextLeaseOwnership, clearRdcContextLeases, getRdcContextLease, setRdcRuntimeContextForSession, quarantineRdcContext } from './RdcRuntimeContextRegistry';
+import { ProjectInputLifecycle, type ProjectInputLifecycleHost } from './captures/ProjectInputLifecycle';
+import { harvestOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
+import { RdcSessionService } from './RdcSessionService';
+import { selectedProbeDeviceId } from './RdcProbeLifecycle';
+import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
+import { rdcDigest } from './RdcExecutionReceipts';
+import { setRdcInteractionLock, runRdcOperation } from './RdcOperationCoordinator';
+import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { OpenProjectInputRequest, ProjectRecord } from '@shared/types/session';
 import type { ReplayDeviceSnapshot } from '@shared/types/device';
-import { ProjectInputLifecycle, type ProjectInputLifecycleHost } from './captures/ProjectInputLifecycle';
+import type { ReplayHistoryStore } from './captures/replay/ReplayHistoryStore';
+
 const mocks = vi.hoisted(() => ({ deviceSubscribers: new Set<(snapshot: ReplayDeviceSnapshot) => void>(), opened: vi.fn(), inspect: vi.fn(), prepare: vi.fn(), close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn(), project: vi.fn(), reference: vi.fn() }));
 vi.mock('./captures/replay/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { getProjectById: mocks.project } }));
@@ -39,14 +48,6 @@ vi.mock('./RdcSessionRuntime', () => ({ RdcSessionRuntime: class {
   snapshotContextForSession() { return this.opened; }
   async clearOpenedCaptureForSession() { if (!this.contextId) return false; await mocks.close(); this.opened = null; this.contextId = null; this.deviceId = null; return true; }
 } }));
-import { harvestOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
-import { RdcSessionService } from './RdcSessionService';
-import { selectedProbeDeviceId } from './RdcProbeLifecycle';
-import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
-import { rdcDigest } from './RdcExecutionReceipts';
-import { setRdcInteractionLock, runRdcOperation } from './RdcOperationCoordinator';
-import { freezeRdcTurnBinding } from './RdcTurnBindings';
-import type { ReplayHistoryStore } from './captures/replay/ReplayHistoryStore';
 const scope = { projectId: 'p', sessionId: 's1' };
 const request = (sessionId = 's1', remote = false): OpenProjectInputRequest => ({ projectId: 'p', sessionId,
   inputId: 'capture', filePath: '/project/capture.rdc', replayDevice: { id: remote ? 'android' : 'local',

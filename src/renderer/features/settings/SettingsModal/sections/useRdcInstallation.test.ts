@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { DEFAULT_SETTINGS } from '../../../../stores/defaultAppSettings';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { useRdcInstallation } from './useRdcInstallation';
+
+const DEFAULT_SETTINGS = createDefaultAppSettings();
 
 const mock = vi.hoisted(() => ({ values: [] as unknown[], cleanup: [] as (() => void)[],
   verify: vi.fn(), save: vi.fn(), select: vi.fn(), resolve: vi.fn(), detect: vi.fn() }));

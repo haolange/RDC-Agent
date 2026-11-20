@@ -1,3 +1,7 @@
+import { InvestigationError } from './investigationErrors';
+import { collectProjectedClaims } from './investigationInvariants';
+import { hashesEqual, serializeInvestigationJson, sha256Prefixed } from './investigationHash';
+import { collectRecordKeys, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
 import type {
   ChallengeRecord,
   ClaimRecord,
@@ -11,10 +15,6 @@ import type {
   InvestigationReport,
   MissionCheckpoint,
 } from '@shared/types/renderdocInvestigation';
-import { InvestigationError } from './investigationErrors';
-import { collectProjectedClaims } from './investigationInvariants';
-import { hashesEqual, serializeInvestigationJson, sha256Prefixed } from './investigationHash';
-import { collectRecordKeys, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
 import type { InvestigationTxnMutation } from './investigationTxn';
 
 export interface InvestigationMutationReader {

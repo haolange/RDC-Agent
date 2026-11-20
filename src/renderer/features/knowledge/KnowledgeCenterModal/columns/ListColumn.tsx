@@ -1,4 +1,3 @@
-import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeLaneHit } from '@shared/types/knowledge';
 import { cn } from '../../../../lib/cn';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
@@ -10,6 +9,7 @@ import { useI18n, type TranslationKey } from '../../../../i18n';
 import { CardBadges } from '../parts/CardBadges';
 import { KnowledgeFilters } from '../parts/KnowledgeFilters';
 import { ConflictRow } from '../parts/ConflictRow';
+import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeLaneHit } from '@shared/types/knowledge';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
 interface ListColumnProps {

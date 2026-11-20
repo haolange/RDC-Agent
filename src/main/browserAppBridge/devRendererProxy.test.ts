@@ -1,5 +1,4 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
-import type { AddressInfo } from 'net';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   isBridgeOwnedPath,
@@ -8,6 +7,7 @@ import {
   shouldProxyToDevRenderer,
   copyDevRendererUpstreamHeaders,
 } from './devRendererProxy';
+import type { AddressInfo } from 'net';
 
 describe('devRendererProxy path mapping', () => {
   it('maps /app onto Vite root and preserves Vite absolute paths', () => {

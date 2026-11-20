@@ -64,7 +64,8 @@
         "id": "apiKey",
         "label": "API Key",
         "kind": "secret",
-        "required": true
+        "required": true,
+        "valuePrefix": "sk-"
       }
     ],
     "primarySecretFieldId": "apiKey"
@@ -91,6 +92,7 @@
       "contractOverrides": {
         "reasoning": {
           "semantic": "summary",
+          "visibilityRequest": "responses-summary",
           "source": "openai-responses-reasoning-summary",
           "evidence": "https://developers.openai.com/api/docs/guides/reasoning",
           "displayLabel": "Reasoning summary",

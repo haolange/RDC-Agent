@@ -1,8 +1,9 @@
 import { expect, it, vi } from 'vitest';
+import { withRdcOpenProgress } from './RdcOpenProgress';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
+
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
-import { withRdcOpenProgress } from './RdcOpenProgress';
 const cli = { command: 'rdc', enabled: true, argsPrefix: [] } as unknown as RdcCliInvokerSettings;
 it.each(['context', 'foreign'])('only forwards real transfer progress from owning %s daemon', async identity => {
   execute.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rdc_tool.daemon.status',

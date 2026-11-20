@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
 import { isValidElement } from 'react';
+import type { ReactNode } from 'react';
 
 /** Flatten react-markdown / rehype-highlight children into plain source text. */
 export function flattenMarkdownText(node: ReactNode): string {

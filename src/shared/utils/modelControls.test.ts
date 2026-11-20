@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '../types/providerCapability';
 import { resolveModelControls } from './modelControls';
+import type { EffectiveModel } from '../types/providerCapability';
 
 const noReasoning = {
   kind: 'none' as const,

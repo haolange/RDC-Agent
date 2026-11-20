@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { CheckPill } from '../../../../ui/CheckPill';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Input } from '../../../../ui/Input';
 import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
+import type { useI18n } from '../../../../i18n';
+import type { AppSettings } from '@shared/types/settings';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

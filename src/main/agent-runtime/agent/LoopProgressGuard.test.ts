@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { AssistantMessage, ToolDefinition, ToolResultMessage } from '../core/types';
 import {
   createToolRoundFingerprint,
   LoopProgressGuard,
 } from './LoopProgressGuard';
+import type { AssistantMessage, ToolDefinition, ToolResultMessage } from '../core/types';
 
 function toolRound(args: Record<string, unknown> = {}): AssistantMessage {
   return {

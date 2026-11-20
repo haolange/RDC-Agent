@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import { useI18n } from '../../../../i18n';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { revokeMcp, trustMcp } from './mcpTrustActions';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
 type McpServerOverview = RdcRuntimeOverview['mcpServers'][number];
 

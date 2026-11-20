@@ -7,8 +7,8 @@ import { Textarea } from '../../../../ui/Textarea';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
 import { ConflictRow } from '../parts/ConflictRow';
-import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
+import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 
 interface WriteConfirmDialogProps {
   write: ReturnType<typeof useKnowledgeWriteConfirm>;

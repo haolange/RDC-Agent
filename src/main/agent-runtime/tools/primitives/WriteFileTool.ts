@@ -7,12 +7,12 @@
  */
 
 import * as fs from 'fs/promises';
-import { requireSuccessfulFileRead } from './fileReadAccess';
 import * as path from 'path';
-import type { AgentTool } from '../../agent/AgentTool';
+import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
+import { requireSuccessfulFileRead } from './fileReadAccess';
 import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
 import { WRITE_FILE_MAX_CONTENT_BYTES } from './toolLimits';
-import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface WriteFileParams {
   path: string;
@@ -47,6 +47,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
+  effects: { writes: ['path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {

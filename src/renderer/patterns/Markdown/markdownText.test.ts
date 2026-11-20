@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { flattenMarkdownText } from './markdownText';
 import { createElement } from 'react';
+import { flattenMarkdownText } from './markdownText';
 
 describe('flattenMarkdownText', () => {
   it('joins nested text nodes', () => {

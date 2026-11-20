@@ -8,6 +8,10 @@ export type AgentAccessCeiling = 'read-only' | 'workspace-write' | 'full';
 export const AGENT_ACCESS_CEILINGS = ['read-only', 'workspace-write', 'full'] as const satisfies readonly AgentAccessCeiling[];
 export const DEFAULT_AGENT_ACCESS_CEILING: AgentAccessCeiling = 'full';
 
+/** Manifest diagnostics the Agents settings page acts on. */
+export const AGENT_PROJECT_UNTRUSTED = 'AGENT_PROJECT_UNTRUSTED';
+export const AGENT_PROJECT_CEILING_NARROWED = 'AGENT_PROJECT_CEILING_NARROWED';
+
 /** Obligation a turn must satisfy before it may declare `turn_complete(completed)`. */
 export type AgentCompletionContract = 'final-answer' | 'investigation-report';
 export const AGENT_COMPLETION_CONTRACTS = ['final-answer', 'investigation-report'] as const satisfies readonly AgentCompletionContract[];
@@ -50,6 +54,11 @@ export function isHandoffOfferedAtTurnEnd(handoff: Pick<AgentHandoffDefinition, 
 
 export function agentAccessCeiling(profile: { accessCeiling?: AgentAccessCeiling } | null | undefined): AgentAccessCeiling {
   return profile?.accessCeiling ?? DEFAULT_AGENT_ACCESS_CEILING;
+}
+
+/** The stricter of two ceilings; a delegated or overriding profile never gains access. */
+export function narrowerAccessCeiling(left: AgentAccessCeiling, right: AgentAccessCeiling): AgentAccessCeiling {
+  return AGENT_ACCESS_CEILINGS.indexOf(left) <= AGENT_ACCESS_CEILINGS.indexOf(right) ? left : right;
 }
 
 export function agentCompletionContract(profile: { completionContract?: AgentCompletionContract } | null | undefined): AgentCompletionContract {
@@ -175,6 +184,12 @@ export interface AgentModelMigrationPreview extends AgentOverrideFileRequest {
   /** Declared values that are not a canonical model id or a supported reasoning level. */
   ignoredValues: string[];
   backupPath: string;
+}
+
+/** A project Agent profile awaiting trust, shown in full before the user trusts these exact bytes. */
+export interface ProjectAgentTrustPreview extends AgentOverrideFileRequest {
+  agentId: string;
+  content: string;
 }
 
 /** Current builtin and override text of one Agent, for the builtin-update comparison. */

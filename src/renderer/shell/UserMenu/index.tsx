@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { AppLanguage, AppSettings, AppTheme, FontScale } from '@shared/types/settings';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ProfileAvatar } from '../../patterns/ProfileAvatar';
 import { Tabs } from '../../ui/Tabs';
 import { Button } from '../../ui/Button';
+import type { AppLanguage, AppSettings, AppTheme, FontScale } from '@shared/types/settings';
 import './UserMenu.css';
 
 interface UserMenuProps {

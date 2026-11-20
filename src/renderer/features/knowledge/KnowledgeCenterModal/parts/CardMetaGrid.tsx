@@ -1,5 +1,5 @@
-import { Details } from '../../../../ui/Details';
 import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail } from '@shared/types/knowledge';
+import { Details } from '../../../../ui/Details';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { Button } from '../../../../ui/Button';

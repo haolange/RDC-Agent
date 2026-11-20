@@ -2,9 +2,9 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
-import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { safeResolvePath, truncateOutput } from './_shared';
 import { TEXT_FILE_MAX_BYTES } from './toolLimits';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 export interface FileAuditParams {
   path: string;

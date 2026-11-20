@@ -1,5 +1,23 @@
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { partitionSystemPrompt } from './promptCacheWire';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { StreamChannelRefs } from './internal/streamChannelRefs';
+import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+import {
+  composeAbortSignals,
+  ensureOk,
+  normalizeError,
+  parseSSE,
+  ProviderEmptyStreamError,
+  ProviderHttpError,
+} from './internal/http';
+import { applyReasoningToAnthropicLikeBody, reasoningVisibilityRequest } from './reasoningWire';
+import { reasoningProjectionSource } from './reasoningProjection';
+import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -13,26 +31,8 @@ import type {
   ThinkingArtifactVisibility,
   ToolDefinition,
 } from '../core/types';
-import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { partitionSystemPrompt } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
-import type { ReasoningVisibility } from '@shared/types/agentRuntime';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
-import { StreamChannelRefs } from './internal/streamChannelRefs';
-import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
-import {
-  composeAbortSignals,
-  ensureOk,
-  normalizeError,
-  parseSSE,
-  ProviderEmptyStreamError,
-  ProviderHttpError,
-} from './internal/http';
-import { applyReasoningToAnthropicLikeBody } from './reasoningWire';
-import { reasoningProjectionSource } from './reasoningProjection';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
@@ -417,7 +417,7 @@ export class AnthropicProvider implements ProviderStrategy {
     }
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
-    applyReasoningToAnthropicLikeBody(body, options.reasoning, options.reasoningVisibility);
+    applyReasoningToAnthropicLikeBody(body, options.reasoning, reasoningVisibilityRequest(options));
     if (context.tools && context.tools.length > 0) {
       body.tools = context.tools.map(toAnthropicTool);
     }

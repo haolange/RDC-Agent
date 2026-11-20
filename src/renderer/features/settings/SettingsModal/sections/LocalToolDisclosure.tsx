@@ -1,6 +1,6 @@
 import { Details } from '../../../../ui/Details';
-import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../../../ui/Icon';
+import type { ReactNode } from 'react';
 
 interface LocalToolDisclosureProps {
   icon: IconName;

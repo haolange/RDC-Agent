@@ -1,10 +1,31 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
+import { isHighImpactChannel, RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
+import { auditArgumentsHash, auditLog, runWithAuditOrigin, type AuditOrigin } from '../runtime/AuditLog';
+import { isTrustedRendererUrl } from '../window/rendererTrust';
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown | Promise<unknown>;
 
 const invokeHandlers = new Map<string, InvokeHandler>();
 let registryInstalled = false;
+
+const ERROR_CODE = /^([A-Z][A-Z0-9_]{2,})(?::|$)/;
+
+/** High-impact calls are audited with their origin and an argument fingerprint, whatever the outcome. */
+async function dispatch(origin: AuditOrigin, channel: string, listener: InvokeHandler, event: IpcMainInvokeEvent, args: unknown[]): Promise<unknown> {
+  return runWithAuditOrigin(origin, async () => {
+    if (!isHighImpactChannel(channel)) return listener(event, ...args);
+    const argumentsSha256 = auditArgumentsHash(args);
+    try {
+      const result = await listener(event, ...args);
+      auditLog.record({ kind: 'ipc', channel, argumentsSha256, outcome: 'ok' });
+      return result;
+    } catch (error) {
+      const code = error instanceof Error ? ERROR_CODE.exec(error.message)?.[1] : undefined;
+      auditLog.record({ kind: 'ipc', channel, argumentsSha256, outcome: 'error', ...(code ? { errorCode: code } : {}) });
+      throw error;
+    }
+  });
+}
 
 export function installIpcInvokeRegistry(): void {
   if (registryInstalled) {
@@ -14,7 +35,13 @@ export function installIpcInvokeRegistry(): void {
   const nativeHandle = ipcMain.handle.bind(ipcMain);
   ipcMain.handle = ((channel: string, listener: InvokeHandler): void => {
     invokeHandlers.set(channel, listener);
-    nativeHandle(channel, listener as Parameters<typeof ipcMain.handle>[1]);
+    // The Browser QA bridge authenticates separately and calls the stored listener directly.
+    nativeHandle(channel, ((event: IpcMainInvokeEvent, ...args: unknown[]) => {
+      if (!isTrustedRendererUrl(event.senderFrame?.url)) {
+        throw new Error(`IPC_SENDER_REJECTED: ${channel} was invoked from a document other than the app entry.`);
+      }
+      return dispatch('desktop', channel, listener, event, args);
+    }) as Parameters<typeof ipcMain.handle>[1]);
   }) as typeof ipcMain.handle;
 
   registryInstalled = true;
@@ -35,7 +62,7 @@ export async function invokeRegisteredIpcChannel(channel: string, args: unknown[
     throw new Error(`No IPC handler registered for ${channel}`);
   }
 
-  return handler(createBrowserInvokeEvent(), ...args);
+  return dispatch('browser-qa', channel, handler, createBrowserInvokeEvent(), args);
 }
 
 export function hasRegisteredIpcChannel(channel: string): boolean {

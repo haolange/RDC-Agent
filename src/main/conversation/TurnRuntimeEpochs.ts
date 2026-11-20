@@ -1,7 +1,7 @@
+import { rdcLifecycleReceipts, type RdcLifecycleReceipt } from '../rdc/RdcLifecycleReceipts';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type { TaskRuntimeEpoch } from '@shared/types/taskExecution';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
-import { rdcLifecycleReceipts, type RdcLifecycleReceipt } from '../rdc/RdcLifecycleReceipts';
 import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
 
 /** Verify the signed transition chain instead of equating the final and initial replay identities. */

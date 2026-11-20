@@ -1,9 +1,5 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import type {
-  KnowledgeReviewRecord,
-  SessionKnowledgeCandidate,
-} from '@shared/types/knowledge';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { StorageIo } from '../sessions/store/StorageIo';
 import { assertNoUnsupportedSchemaVersion } from '../sessions/store/storageSchema';
@@ -22,6 +18,10 @@ import {
   type KnowledgeDurableReview,
   type KnowledgeStateDocument,
 } from './knowledgeStateSchema';
+import type {
+  KnowledgeReviewRecord,
+  SessionKnowledgeCandidate,
+} from '@shared/types/knowledge';
 
 export interface KnowledgeDurableStoreDependencies {
   resolveStatePath(sessionId: string): string;

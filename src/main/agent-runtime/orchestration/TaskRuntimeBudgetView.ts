@@ -1,7 +1,7 @@
-import type { TaskLiveBudgetSnapshot } from '../tasks/TaskBudgetSnapshot';
 import { policyBudgetChain } from './DelegationBudget';
 import { getBoundTaskRootBudgetId } from './TaskRootBudget';
 import { assertSubagentBudgetAllowsChild, type TurnHandle } from './TurnCoordinator';
+import type { TaskLiveBudgetSnapshot } from '../tasks/TaskBudgetSnapshot';
 
 /** Project the actual in-memory enforcement ledgers; do not reserve or rebind them. */
 export function readLiveTaskBudget(turn: TurnHandle | null, rootBudgetId: string): TaskLiveBudgetSnapshot | null {

@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { ThemeVariant } from '@shared/types/settings';
 import { Input } from '../../../../ui/Input';
 import { Button } from '../../../../ui/Button';
 import { IconButton } from '../../../../ui/IconButton';
 import { Icon } from '../../../../ui/Icon';
 import { Popover } from '../../../../ui/Popover';
 import { useDynStyle } from '../../../../lib/useDynStyle';
+import type { ThemeVariant } from '@shared/types/settings';
 import type { AppearanceTranslate } from './appearanceChromeModel';
 
 /**

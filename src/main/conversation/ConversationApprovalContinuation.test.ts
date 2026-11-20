@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
+import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentEvent } from '@shared/types/agentRuntime';
-import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 it('independent review cannot request a human pause or clear another manual approval', () => {
  const state = { assistantMessage: { id: 'm', sessionId: 's', turnId: 't', role: 'assistant', status: 'streaming', content: '', createdAt: 1 } as ConversationMessage };
  const pending = { approval: false, userInput: false, planReview: false, handoff: false };

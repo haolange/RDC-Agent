@@ -1,6 +1,7 @@
+import path from 'node:path';
+import { ipcMain } from 'electron';
 import { nativeMessage } from '../window/nativeI18n';
-import { BrowserWindow, dialog, ipcMain } from 'electron';
-import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
+import { confirmInMainProcess } from '../window/mainConfirmation';
 import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
 import { readKnowledgeImagePreview } from '../knowledge/knowledgeImagePreview';
 import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
@@ -17,9 +18,8 @@ import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import { knowledgeTopicService } from '../knowledge/KnowledgeTopicService';
 import { projectKnowledgeRead } from '../knowledge/KnowledgeReadService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import type { WorkbenchIpcContext } from './workbenchContext';
+import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
-import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
 import {
   KnowledgeCandidateCreateArgsSchema,
   KnowledgeCandidatesArgsSchema,
@@ -39,6 +39,8 @@ import {
   KnowledgeTopicApplyArgsSchema,
   KnowledgeReadArgsSchema,
 } from './validation/knowledgeSchemas';
+import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
+import type { WorkbenchIpcContext } from './workbenchContext';
 
 const knowledgeExportService = new KnowledgeExportService(createDefaultExportDependencies({
   getCard: (spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath),
@@ -94,34 +96,14 @@ async function confirmKnowledgeMutation(
   spaceId: string,
   relativePath: string,
 ): Promise<boolean> {
-  if (process.env.RDC_AGENT_BROWSER_QA === '1') {
-    const owner = BrowserWindow.getFocusedWindow() ?? undefined;
-    if (!owner && process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1') {
-      runtimeLogService.log({
-        scope: 'app',
-        namespace: 'context',
-        severity: 'warning',
-        title: 'Browser QA knowledge mutation auto-confirmed',
-        summary: `${action} was auto-confirmed because Browser QA full access is explicitly enabled.`,
-        raw: { action, spaceId, relativePath },
-      });
-      return true;
-    }
-    if (!owner) return false;
-  }
-  const owner = BrowserWindow.getFocusedWindow() ?? undefined;
-  if (!owner) return false;
-  const result = await dialog.showMessageBox(owner, {
-    type: 'warning',
-    buttons: [nativeMessage('allowOnce'), nativeMessage('cancel')],
-    defaultId: 1,
-    cancelId: 1,
+  return confirmInMainProcess({
+    action,
     title: nativeMessage('knowledgeTitle'),
     message: nativeMessage(action === 'knowledge.write' ? 'knowledgeWrite' : 'knowledgePromote'),
     detail: `${spaceId} / ${relativePath}`,
-    noLink: true,
+    confirmLabel: nativeMessage('allowOnce'),
+    cancelLabel: nativeMessage('cancel'),
   });
-  return result.response === 0;
 }
 
 function consumeKnowledgeToken(
@@ -340,12 +322,9 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     });
     try {
       assertKnownSpaces([input.spaceId]);
-      const space = knowledgeQueryService.listSpaces().find((entry) => entry.spaceId === input.spaceId);
-      const token = ipcApprovalTokenService.issue({
-        action: 'knowledge.write',
-        ...knowledgeSpaceTokenBinding(space, 'import'),
-      });
-      consumeKnowledgeToken(token, 'knowledge.write', input.spaceId, 'import');
+      // Imported cards become context the Agent trusts, so the person confirms in main, not the renderer.
+      const importedFrom = input.filePath ? path.basename(input.filePath) : nativeMessage('pastedText', { count: (input.source ?? '').length });
+      if (!await confirmKnowledgeMutation('knowledge.write', input.spaceId, importedFrom)) return { cancelled: true as const };
       if (input.sessionId) {
         try {
           await knowledgeImportService.migrateSessionDrafts(input.sessionId);

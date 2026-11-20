@@ -1,5 +1,3 @@
-import { executeRdcShell } from '../../../rdc/executeRdcShell';
-import { parseShellRdcInput, type RdcShellInput } from '../../../rdc/RdcShellInput';
 /**
  * ShellTool — spawn a fresh interpreter for each call and persist only cwd.
  */
@@ -7,17 +5,18 @@ import { parseShellRdcInput, type RdcShellInput } from '../../../rdc/RdcShellInp
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
-import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
+import { parseShellRdcInput, type RdcShellInput } from '../../../rdc/RdcShellInput';
+import { executeRdcShell } from '../../../rdc/executeRdcShell';
+import { processSupervisor } from '../../../runtime/ProcessSupervisor';
+import { shellResolver, type ShellKind } from '../../../runtime/ShellResolver';
+import { describeResolvedShell, resolveConfiguredShell } from '../../../runtime/resolveConfiguredShell';
+import { storageAdapter } from '../../../sessions/store/StorageAdapter';
 import {
   SHELL_DEFAULT_TIMEOUT_MS,
   SHELL_MAX_OUTPUT_BYTES,
   SHELL_MAX_TIMEOUT_MS,
 } from './toolLimits';
-import { processSupervisor } from '../../../runtime/ProcessSupervisor';
-import { shellResolver, type ShellKind } from '../../../runtime/ShellResolver';
-import { describeResolvedShell, resolveConfiguredShell } from '../../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../../sessions/store/StorageAdapter';
+import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
 import {
   buildAgentShellEnv,
   createShellTrailerMarker,
@@ -25,6 +24,7 @@ import {
   parseShellTrailer,
   wrapShellCommand,
 } from './shellTrailer';
+import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
 
 interface ShellParams {
   command?: string;

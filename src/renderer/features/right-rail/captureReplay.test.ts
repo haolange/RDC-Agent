@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { CaptureReplayState } from '@shared/types/captureReplay';
 import { acceptsReplayState } from '../../lib/captureReplayIdentity';
 import { CaptureReplayControls } from './CaptureReplayControls';
 import { collectCaptureCallouts, resolveCaptureStatusTone } from './CaptureReplayStatus';
+import type { CaptureReplayState } from '@shared/types/captureReplay';
 
 const scope = { projectId: 'project', sessionId: 'session' };
 const replay: CaptureReplayState = { ...scope, generation: 3, preparation: { targetDeviceId: 'local', phase: 'ready', issue: null }, operationId: null, revision: 8, phase: 'ready', inputId: 'input', captureHash: 'hash', contextId: 'context', replayDeviceId: 'local', requestedEventId: 42, appliedEventId: 42, imageEventId: 21, events: [{ eventId: 21 }, { eventId: 42 }], targets: [], target: null, isFinalOutput: false, image: null, devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null }, interactionLock: null, error: null, warning: null, observation: null };

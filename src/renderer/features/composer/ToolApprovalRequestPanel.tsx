@@ -1,10 +1,10 @@
-import { formatToolApprovalReason } from '../../lib/toolApprovalText';
 import React, { useRef, useState } from 'react';
-import type { PendingToolApprovalRequest } from './toolApprovalRequestModel';
+import { formatToolApprovalReason } from '../../lib/toolApprovalText';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { useToolApprovalSubmit } from './useToolApprovalSubmit';
+import type { PendingToolApprovalRequest } from './toolApprovalRequestModel';
 
 export const ToolApprovalRequestPanel: React.FC<{
   request: PendingToolApprovalRequest;

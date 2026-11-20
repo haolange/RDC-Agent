@@ -1,14 +1,14 @@
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { CaptureReplayState } from '@shared/types/captureReplay';
-import type { RdcRuntimeContext } from '@shared/types/session';
+import { settingsService } from '../settings/settings-core/SettingsService';
 import { replayPngCodec } from './captures/replay/replayPngCodec';
 import { replayLivePreviewStore } from './captures/replay/ReplayLivePreviewStore';
-import { settingsService } from '../settings/settings-core/SettingsService';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
+import type { RdcRuntimeContext } from '@shared/types/session';
+import type { CaptureReplayState } from '@shared/types/captureReplay';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 export interface ReplayLiveWriteTarget {
   sessionId: string;

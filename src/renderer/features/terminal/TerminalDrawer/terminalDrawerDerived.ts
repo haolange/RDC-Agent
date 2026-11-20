@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
-import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import {
   type RuntimeNamespaceFilter,
   type RuntimeSeverityFilter,
   type TerminalScopeFilter,
 } from '../../../stores/terminalStore';
 import { type SelectOption } from '../../../ui/Select';
-import type { useI18n } from '../../../i18n';
 import { formatShortId, stringifyEntryForSearch } from './terminalFormatters';
+import type { useI18n } from '../../../i18n';
+import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

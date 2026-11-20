@@ -3,11 +3,8 @@
  * Builds the same frozen prepareTurnContext plan ConversationTurnStarter uses, without conversation commit.
  */
 
-import type { AgentRole } from '@shared/types/agent';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
 import { generateEventId } from '@shared/utils/id';
+import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import { imageTokenAdjustmentForContent } from '../../conversation/ConversationAttachmentMaterializer';
 import {
   resolveAgentRouteCapability,
@@ -18,11 +15,14 @@ import {
 } from '../../settings/provider-catalog/EffectiveModelResolver';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { compileEffectivePolicy } from '../permissions/PolicyCompiler';
-import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
-import type { TurnPreparationService } from './TurnPreparationService';
-import type { AgentProfileTurnOptions, PreparedAgentTurnContext } from './orchestratorTypes';
 import { newDelegationBudgetExhausted } from './DelegationAdmission';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
+import type { AgentRole } from '@shared/types/agent';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
+import type { TurnPreparationService } from './TurnPreparationService';
+import type { AgentProfileTurnOptions, PreparedAgentTurnContext } from './orchestratorTypes';
 
 export function resolveProfileToolAllowlist(
   allowlist: string[],
@@ -47,6 +47,7 @@ export interface ProfileTurnPreparationInput {
   promptPlan: PromptPlan;
   effectiveProfile: EffectiveAgentProfile | null;
   effectiveProfileIds: string[];
+  delegableProfileIds: string[];
   projectRootPath?: string | null;
   projectId?: string | null;
   sessionId?: string | null;
@@ -138,6 +139,7 @@ export class ProfileTurnPreparation {
       promptPlan: input.promptPlan,
       effectiveProfile: input.effectiveProfile,
       effectiveProfileIds: input.effectiveProfileIds,
+      delegableProfileIds: input.delegableProfileIds,
       toolAllowlist: input.toolAllowlist,
       projectRootPath: input.projectRootPath ?? null,
       projectId: input.projectId ?? null,

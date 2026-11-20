@@ -1,4 +1,3 @@
-import type { AppSettings, AppSettingsPatch, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
 import {
   createProviderEntryFromCatalog,
   getProviderDefaultBaseUrl,
@@ -6,8 +5,9 @@ import {
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../../runtime/AppPathService';
 import { normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
-import { secretStorageService } from './SecretStorageService';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
+import { providerConnectionError } from '../provider-auth/providerConnectionErrors';
+import { secretStorageService } from './SecretStorageService';
 import {
   SETTINGS_SCHEMA_VERSION,
   createDefaultPersistedSettings,
@@ -33,6 +33,7 @@ import {
   readJsonFile,
   writeSettingsAsync,
 } from './settingsServiceHelpers';
+import type { AppSettings, AppSettingsPatch, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
 
 export interface SettingsProviderOpsHost {
   getAll(): AppSettings;
@@ -220,7 +221,7 @@ export class SettingsProviderOps {
     modelPreferences ?? provider.models,
   );
   if (discoveredModels.length === 0) {
-    throw new Error('璇?Provider 鏆傛湭杩斿洖鍙敤妯″瀷');
+    throw providerConnectionError('no-routable-models', 'The provider returned no usable models.');
   }
 
   const hasEnabledModels = discoveredModels.some((model) => model.enabled !== false);

@@ -13,7 +13,7 @@
 .device-discovery-status {
   flex: 1;
   min-width: 0;
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   color: var(--token-text-caption);
   overflow-wrap: anywhere;
 }

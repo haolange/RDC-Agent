@@ -7,12 +7,10 @@
 import * as fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import type { ChildProcess } from 'node:child_process';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../../agent-runtime/core/EventStream';
-import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import {
   AssistantStreamBuilder,
   createProviderOutputRef,
@@ -58,6 +56,8 @@ vi.mock('child_process', () => ({
 }));
 
 import { ProcessSupervisor } from '../../runtime/ProcessSupervisor';
+import type { ChildProcess } from 'node:child_process';
+import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 
 function makeBuilder() {
   const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(

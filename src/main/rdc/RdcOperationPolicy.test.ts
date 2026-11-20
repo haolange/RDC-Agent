@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import type { RdcOperationDefinition } from '@shared/types/tool';
 import { authorizeRdcOperation, validateRdcArguments } from './RdcOperationPolicy';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
+import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
+import type { RdcOperationDefinition } from '@shared/types/tool';
 const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
 function definition(patch: Partial<RdcOperationDefinition> = {}): RdcOperationDefinition { return {
   name: 'rd.texture.query', namespace: 'texture', description: '', scope: 'replay', effects: [], evidence_kind: null, path_inputs: [], prerequisites: [],

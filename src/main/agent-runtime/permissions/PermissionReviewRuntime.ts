@@ -1,13 +1,11 @@
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { RequestPlan } from '@shared/types/providerCapability';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { configuredRuntimeProvider, encodeAgentModel } from '../providers/ConfiguredRuntimeProvider';
-import { requestEnvelopeBuilder, requestSnapshotStore } from '../prompt';
-import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
+import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 
 export interface PermissionReviewVerdict { approved: boolean; reason: string }
 export class PermissionReviewError extends Error {
@@ -78,28 +76,24 @@ export async function executePermissionReview(input: {
     metrics: { systemPrompt: SYSTEM.length, scopedInstructions: 0, skills: 0 },
     stablePrefix: { fingerprint: hashScopedResource(SYSTEM), segmentIds: [segment.id], sourceHashes: [segment.sourceHash],
       tokenEstimate: segment.tokenEstimate, volatileSegmentIds: [] } };
-  const turnId = generateEventId('permission-review');
-  const messages = [{ role: 'user' as const, content, timestamp: Date.now() }];
-  const promptCache = { ...promptCacheCompiler.compile({ promptPlan, requestPlan: input.plan, tools: [] }),
-    enabled: false, reason: 'permission-review-no-cache-write' };
-  const snapshot = requestEnvelopeBuilder.build({ promptPlan, sessionId: input.sessionId, turnId,
-    callIndex: requestSnapshotStore.nextCallIndex(input.sessionId, turnId), requestPlan: input.plan,
-    route: { providerId: input.plan.providerId, modelId: input.plan.effectiveModelId, protocol: input.plan.route.protocol },
-    messages, tools: [], controls: { permissionReview: true, reasoningSelection: input.plan.reasoningWire.selection, maxTokens: 1024 },
-    reasoning: input.reasoning, cache: promptCache });
-  requestSnapshotStore.write(snapshot);
   const request = async () => {
-    const stream = configuredRuntimeProvider.stream(encodeAgentModel(input.plan.providerId, input.plan.effectiveModelId,
-      { contextWindow: input.plan.contextWindowTokens, maxOutputTokens: 1024 }),
-    { systemPrompt: SYSTEM, systemPromptSegments: promptPlan.segments, messages, tools: [] },
-    { requestPlan: input.plan, credentialHandle: input.credentialHandle, promptCache,
-      reasoning: input.plan.reasoningWire, temperature: input.plan.temperature, maxTokens: 1024, signal });
-    for await (const _event of stream) { /* drain through terminal result */ }
-    const message = await stream.result();
-    requestSnapshotStore.complete(snapshot.id, input.sessionId, turnId, message.usage);
+    const message = await executeAuxiliaryRequest({
+      purpose: 'permission-review',
+      sessionId: input.sessionId,
+      plan: input.plan,
+      modelId: input.plan.effectiveModelId,
+      credentialHandle: input.credentialHandle,
+      promptPlan,
+      userContent: content,
+      tools: [],
+      maxTokens: 1024,
+      reasoning: input.reasoning,
+      writesPromptCache: false,
+      signal,
+    });
     signal.throwIfAborted();
-    if (message.stopReason !== 'stop' || message.content.some(block => block.type === 'toolCall')) throw new PermissionReviewError('PERMISSION_REVIEW_INCOMPLETE', 'no terminal tool-free verdict.');
-    return parsePermissionReview(message.content.filter(block => block.type === 'text').map(block => block.text).join(''));
+    if (message.stopReason !== 'stop' || message.content.some(block => block.type === 'toolCall')) throw new PermissionReviewError('PERMISSION_REVIEW_INCOMPLETE', 'no terminal verdict without tool calls.');
+    return parsePermissionReview(assistantMessageText(message));
   };
   let abortListener: (() => void) | undefined;
   try {

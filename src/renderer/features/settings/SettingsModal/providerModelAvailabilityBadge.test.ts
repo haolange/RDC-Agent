@@ -17,6 +17,13 @@ describe('resolveProviderModelAvailabilityBadge', () => {
     })).toBe('loading');
   });
 
+  it('names a failed refresh instead of calling the model unconfirmed', () => {
+    const idle = { availability: 'unknown' as const, enabled: true, loading: false, refreshing: false };
+    expect(resolveProviderModelAvailabilityBadge(idle)).toBe('unverified');
+    expect(resolveProviderModelAvailabilityBadge({ ...idle, refreshError: 'HTTP 503' })).toBe('refresh-failed');
+    expect(resolveProviderModelAvailabilityBadge({ ...idle, refreshing: true, refreshError: 'HTTP 503' })).toBe('loading');
+  });
+
   it('returns available once evidence is present and idle', () => {
     expect(resolveProviderModelAvailabilityBadge({
       availability: 'available',

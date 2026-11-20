@@ -1,9 +1,3 @@
-import type { AgentMode } from '@shared/types/layout';
-import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import type { AgentRunPresentation } from '@shared/types/agenticTrace';
-import type { PendingAttachmentDraft } from '../../types/attachments';
 import { useConversationStore } from '../../stores/conversationStore';
 import { buildConversationConfigurationCommit } from '../../stores/conversationConfigurationCommit';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -11,7 +5,6 @@ import {
   applyConversationTurnResult,
   buildOptimisticConversationTurn,
   removeOptimisticConversationMessages,
-  syncE2EConversationState,
   resolveComposerProfileId,
   toConversationAttachmentInputs,
 } from '../../stores/conversationSendHelpers';
@@ -21,10 +14,16 @@ import {
   useComposerSessionContextStore,
 } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { persistComposerDraftToSession } from './sessionModelOverride';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
-import { inspectHandoffCommit, type ComposerSendOutcome } from './composerHandoffSend';
 import { createConversationRequestId } from '../../services/conversationRequestId';
+import { persistComposerDraftToSession } from './sessionModelOverride';
+import { inspectHandoffCommit, type ComposerSendOutcome } from './composerHandoffSend';
+import type { PendingAttachmentDraft } from '../../types/attachments';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import type { ConversationMessage } from '@shared/types/conversation';
+import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
+import type { AgentMode } from '@shared/types/layout';
 
 export { createConversationRequestId };
 
@@ -270,15 +269,6 @@ export async function sendComposerConversationTurn(options: {
       currentProject?.projectId,
     );
 
-    await syncE2EConversationState({
-      electronAPI,
-      sessionId: turn.session?.sessionId ?? currentSession?.sessionId ?? null,
-      turnId: turn.userMessage.turnId,
-      setConversationMessages,
-      setTracePresentation,
-      setBranchState,
-      shouldApply: () => isOwningSelectionActive(committedSessionId),
-    });
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     return { status: 'accepted', requestId };
   } catch (error) {

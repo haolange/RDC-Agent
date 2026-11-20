@@ -34,7 +34,8 @@ export class TurnPreparationWorkerPool {
   ): Promise<TurnPreparationComputationResult> {
     if (signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
     const workerPath = path.join(__dirname, 'turnPreparationWorker.js');
-    if (process.env.VITEST || !fs.existsSync(workerPath)) {
+    // Only the bundle ships the compiled worker; running from source computes on this thread.
+    if (!fs.existsSync(workerPath)) {
       await new Promise<void>((resolve) => setImmediate(resolve));
       if (signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
       return computeTurnPreparation(input);

@@ -1,13 +1,13 @@
-import { Details } from '../../ui/Details';
 import React, { useEffect, useState } from 'react';
-import { TaskDialog } from '../../ui/TaskDialog';
 import { bareInvestigationHash, type InvestigationReadIpcResult, type InvestigationReport } from '@shared/types/renderdocInvestigation';
-import type { InvestigationArtifactRow } from '@shared/types/trace';
+import { TaskDialog } from '../../ui/TaskDialog';
+import { Details } from '../../ui/Details';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { copyAppText } from '../../hooks/appShellBridge';
-import { readInvestigationArtifact } from './investigationPreviewActions';
-import { RightRailReportView } from './RightRailReportView';
 import { Button } from '../../ui/Button';
+import { RightRailReportView } from './RightRailReportView';
+import { readInvestigationArtifact } from './investigationPreviewActions';
+import type { InvestigationArtifactRow } from '@shared/types/trace';
 import './RightRailInvestigationPreview.css';
 
 type PreviewStatus = 'empty' | 'loading' | 'ready' | 'degraded' | 'error' | 'hash-mismatch';

@@ -1,12 +1,12 @@
-import type {
-  ConversationTurnControls,
-} from '@shared/types/modelCapability';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   contextTierWindowTokens,
   resolveContextTierChoices,
 } from '@shared/utils/contextTiers';
 import { resolveModelControls } from '@shared/utils/modelControls';
+import type {
+  ConversationTurnControls,
+} from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 export const DEFAULT_TURN_CONTROLS: ConversationTurnControls = {
   reasoningLevel: 'off',

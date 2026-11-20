@@ -4,7 +4,6 @@
  */
 
 import * as fs from 'fs';
-import { normalizeSha256, sha256Hex } from '../../runtime/contentHash';
 import * as path from 'path';
 import {
   ARTIFACT_READ_MAX_OUTPUT_BYTES,
@@ -25,6 +24,7 @@ import {
   type SessionArtifactSourceRef,
 } from '@shared/types/sessionArtifact';
 import { generateShortId } from '@shared/utils/id';
+import { normalizeSha256, sha256Hex } from '../../runtime/contentHash';
 import { StorageIo } from '../store/StorageIo';
 import { storageAdapter } from '../store/StorageAdapter';
 import { inspectArtifactJson, readArtifactJsonText, readDefaultToolResultText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';

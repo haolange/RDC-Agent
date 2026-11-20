@@ -1,6 +1,6 @@
+import { verifyContinuationArtifact } from './ContinuationArtifacts';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderContinuationArtifact } from '@shared/types/reasoning';
-import { verifyContinuationArtifact } from './ContinuationArtifacts';
 
 export type ContinuationReplayAction = 'replay' | 'provider-managed' | 'drop';
 export type ContinuationReplayReason =

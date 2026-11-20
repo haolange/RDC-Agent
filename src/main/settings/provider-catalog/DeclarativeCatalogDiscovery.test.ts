@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
-import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import {
   createProviderEntryFromCatalog,
   getLoadedProviderSurface,
   loadProviderSurface,
 } from '../../provider-catalog/ProviderCatalogRegistry';
+import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
+import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import {
   parseDeclarativeCatalog,
   resolveDeclarativeDiscoveryUrl,

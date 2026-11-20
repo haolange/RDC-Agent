@@ -1,21 +1,15 @@
-import type { LLMProviderConfig } from '@shared/types/llm';
-import type { LlmProviderProtocol } from '@shared/types/settings';
 import {
   providerAdapterSupportsProtocol,
   type ProviderAdapterId,
 } from '@shared/provider-catalog/implementationRegistry';
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
+import { getProviderAuthSchemaId } from '../../provider-catalog/ProviderCatalogRegistry';
 import { providerAccountAuthService } from '../../settings/provider-auth/ProviderAccountAuthService';
-import { CLAUDE_ACCOUNT_WIRE_HEADERS } from '../../settings/provider-auth/ClaudeWire';
-import { COPILOT_WIRE_HEADERS } from '../../settings/provider-auth/CopilotWire';
+import {
+  createAwsBedrockRequestAuthorizerFromCredentials,
+  type ProviderRequestAuthorizer,
+} from '../../settings/provider-auth/AwsBedrockCredentials';
+import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 import { AnthropicProvider } from './AnthropicProvider';
 import { AzureOpenAIResponsesProvider } from './AzureOpenAIResponsesProvider';
 import { BedrockConverseProvider } from './BedrockConverseProvider';
@@ -26,12 +20,17 @@ import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
 import { streamWithUnauthorizedRefresh } from './AccountStreamRetry';
-import {
-  createAwsBedrockRequestAuthorizerFromCredentials,
-  type ProviderRequestAuthorizer,
-} from '../../settings/provider-auth/AwsBedrockCredentials';
-import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 import { createGitLabDuoProvider, createSapAiCoreProvider } from './DedicatedAiSdkProviders';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Model,
+  StreamOptions,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { LLMProviderConfig } from '@shared/types/llm';
 
 const CONFIGURED_PROVIDER_API = 'rdc-agent-configured-provider';
 
@@ -124,11 +123,6 @@ function createProviderStrategy(
   connectionValues?: Readonly<Record<string, string>>,
   connectionHeaders: Readonly<Record<string, string>> = {},
 ): ProviderStrategy {
-  const accountHeaders = provider.id === 'github-copilot'
-    ? COPILOT_WIRE_HEADERS
-    : provider.id === 'claude-account'
-      ? CLAUDE_ACCOUNT_WIRE_HEADERS
-      : undefined;
   if (!providerAdapterSupportsProtocol(adapterId, protocol)) {
     throw new Error(`Provider adapter ${adapterId} does not implement ${protocol}.`);
   }
@@ -137,9 +131,7 @@ function createProviderStrategy(
       return new AnthropicProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
-        headers: provider.id === 'kimi-coding-plan'
-          ? { ...connectionHeaders, 'User-Agent': 'RDC-Agent' }
-          : { ...connectionHeaders, ...accountHeaders },
+        headers: connectionHeaders,
       });
     case 'google-interactions':
       return new GoogleInteractionsProvider({
@@ -187,7 +179,7 @@ function createProviderStrategy(
       return new OpenAICompatibleProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
-        headers: { ...connectionHeaders, ...accountHeaders },
+        headers: connectionHeaders,
         ...(requestAuthorizer ? { authorization: 'none', requestAuthorizer } : {}),
         ...(provider.authMode === 'local' ? { allowAnonymous: true } : {}),
       });
@@ -223,7 +215,7 @@ function createProviderStrategy(
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
         accountId: provider.accountId,
-        headers: { ...connectionHeaders, ...accountHeaders },
+        headers: connectionHeaders,
         ...(provider.authMode === 'local' ? { allowAnonymous: true } : {}),
         ...(requestAuthorizer ? { requestAuthorizer } : {}),
       });
@@ -326,7 +318,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
         });
       };
       try {
-        if (decoded.providerId === 'amazon-bedrock' && !latest.apiKey) {
+        if (!latest.apiKey && getProviderAuthSchemaId(decoded.providerId) === 'aws-bedrock') {
           if (!activeLease.awsBedrockCredentials) {
             return missingProviderStream(new Error('Frozen AWS Bedrock credentials are unavailable.'));
           }

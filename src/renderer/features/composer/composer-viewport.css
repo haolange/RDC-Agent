@@ -43,10 +43,10 @@
 
 @media (max-width: 640px) {
   .composer-textarea {
-    font-size: var(--text-base);
+    font-size: var(--type-body-size);
   }
 
   .composer-markdown-input {
-    font-size: var(--text-base);
+    font-size: var(--type-body-size);
   }
 }

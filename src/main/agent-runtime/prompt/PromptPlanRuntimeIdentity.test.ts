@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
+import { refreshPromptPlanRuntimeIdentity } from './PromptPlanRuntimeIdentity';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
-import { refreshPromptPlanRuntimeIdentity } from './PromptPlanRuntimeIdentity';
 
 it('replaces the volatile replay identity while preserving stable instructions and the original plan', () => {
   const plan = { id: 'plan', systemPrompt: 'stable\n\nold identity', totalTokenEstimate: 3,

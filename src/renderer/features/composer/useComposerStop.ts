@@ -1,9 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import type { RunSummary, SessionRecord } from '@shared/types/session';
-import type { PendingAttachmentDraft } from '../../types/attachments';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useConversationStore } from '../../stores/conversationStore';
-import type { useI18n } from '../../i18n';
 import { removeOptimisticConversationMessages } from '../../stores/conversationSendHelpers';
 import {
   restoreLastSentIfCurrentSession,
@@ -13,6 +10,9 @@ import {
 import { stopWorkTrace } from '../../lib/stopWorkTrace';
 import { selectActiveAssistantForTurn } from './composerStopSelection';
 import { reconcileConversationStop } from './composerStopReconciliation';
+import type { useI18n } from '../../i18n';
+import type { PendingAttachmentDraft } from '../../types/attachments';
+import type { RunSummary, SessionRecord } from '@shared/types/session';
 
 export { stopWorkTrace };
 

@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import type { ResolvedTheme } from '@shared/types/settings';
 import { applyChromeTheme } from '../theme/applyChromeTheme';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useLayoutStore } from '../../stores/layoutStore';
+import type { ResolvedTheme } from '@shared/types/settings';
 
 export function useShellBootstrap(options: {
   setIsLoading: (loading: boolean) => void;

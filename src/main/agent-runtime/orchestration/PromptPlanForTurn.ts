@@ -1,27 +1,21 @@
-import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
 /**
  * PromptPlanForTurn — build PromptPlan for Debug sendMessage / profile turns.
  */
 
-import type { AgentId, AgentRole } from '@shared/types/agent';
-import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import {
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
 } from '@shared/constants/agents';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
-import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
-import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
-import { promptPlanBuilder, resolvePromptClock } from '../prompt';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
-import { appPathService } from '../../runtime/AppPathService';
-import { scopedInstructionResolver } from '../../runtime/ScopedInstructionResolver';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
-import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
-import { combineActiveSkillAllowlists, normalizeToolName } from './RuntimeToolPolicy';
+import { buildTurnPromptPlan } from './TurnPromptPlan';
+import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { AgentId, AgentRole } from '@shared/types/agent';
 
 export class PromptPlanForTurn {
   systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
@@ -76,59 +70,24 @@ export class PromptPlanForTurn {
     if (!definition || !definition.enabled) {
       return null;
     }
-    const profileSkills = plan ? [...plan.profileSkills] : definition.skills;
-    const activeDefinition = input.systemPrompt
-      ? { ...definition, instructions: input.systemPrompt, skills: profileSkills }
-      : { ...definition, skills: profileSkills };
-
     const provider = runtimeSettings.llm.providers.find((entry) => entry.id === input.providerId);
-    const routeCapability = resolveAgentRouteCapability(provider, input.modelId, input.capability);
-    const projectRootPath = plan?.projectRootPath ?? input.projectRootPath;
-    const activePaths = [projectRootPath].filter((value): value is string => Boolean(value));
-    const scopedInstructions = projectRootPath
-      ? scopedInstructionResolver.resolveForPaths({
-          userInstructionsPath: appPathService.getUserRdcPaths().instructionsPath,
-          projectRoot: projectRootPath,
-          activePaths,
-        })
-      : { sources: [], totalBytes: 0, diagnostics: [] };
-    const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
-    const preloadSkillIds = mergeTurnPreloadSkillIds({
-      profileSkills,
-      messageText: input.messageText ?? '',
-      pendingSkillIds: [...(input.preloadSkillIds ?? []), ...(approvedExecutionOffer?.requiredSkillIds ?? [])],
-    });
-    const preloadedSkills = [];
-    for (const skillId of preloadSkillIds) {
-      const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, input.agentId);
-      if (!skill) {
-        throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
-      }
-      preloadedSkills.push(skill);
-    }
-    const baseTools = (plan ? [...plan.toolAllowlist] : input.toolAllowlist)
-      .map((toolName) => normalizeToolName(toolName));
-    const tools = combineActiveSkillAllowlists(baseTools, preloadedSkills.map(skill => skill.allowedTools ?? [])) ?? baseTools;
-    const permissionConstraints = plan?.permissionConstraints ?? runtimeSettings.agentRuntime.permissions;
-    const promptClock = resolvePromptClock();
-    return promptPlanBuilder.build({
-      profile: activeDefinition,
+    return buildTurnPromptPlan({
+      agentId: input.agentId,
+      profile: definition,
       profileCatalog: profiles,
-      scopedInstructions,
-      preloadedSkills,
-      skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
-      tools,
-      workDir: projectRootPath ?? '',
+      profileSkills: plan ? plan.profileSkills : definition.skills,
+      ...(input.systemPrompt ? { instructions: input.systemPrompt } : {}),
+      baseTools: plan ? plan.toolAllowlist : input.toolAllowlist,
+      projectRootPath: plan?.projectRootPath ?? input.projectRootPath,
       sessionId: input.sessionId ?? null,
-      approvedExecutionOffer,
-      routeCapability,
+      messageText: input.messageText ?? '',
+      pendingSkillIds: input.preloadSkillIds,
+      permissionConstraints: plan?.permissionConstraints ?? runtimeSettings.agentRuntime.permissions,
+      routeCapability: resolveAgentRouteCapability(provider, input.modelId, input.capability),
       effectiveModel: input.capability,
       requestPlan: input.requestPlan,
-      permissionConstraints,
-      currentDate: promptClock.currentDate,
-      timeZone: promptClock.timeZone,
       contextWindowTokens: input.contextWindowTokens,
-      extraSegments: input.extraSegments ?? [],
-    });
+      extraSegments: input.extraSegments,
+    }).promptPlan;
   }
 }

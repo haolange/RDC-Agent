@@ -3,13 +3,13 @@ import * as os from 'os';
 import * as path from 'path';
 import { createHash } from 'node:crypto';
 import { defaultPythonCommand } from '../../../platform/shell';
-import type { AgentTool } from '../../agent/AgentTool';
-import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
-import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
 import { processSupervisor, type ProcessExitReason } from '../../../runtime/ProcessSupervisor';
 import { settingsService } from '../../../settings/settings-core/SettingsService';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 import { detectImageMagicMime } from '../../../conversation/ConversationAttachmentMaterializer';
+import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
+import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface InterpreterParams {
   code: string;

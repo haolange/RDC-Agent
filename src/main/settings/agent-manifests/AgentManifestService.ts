@@ -1,8 +1,28 @@
 import fs from 'fs';
-import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
+import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import { isSafeAgentProfileId } from '@shared/types/agent';
+import {
+  AGENT_PROJECT_CEILING_NARROWED,
+  AGENT_PROJECT_UNTRUSTED,
+  agentAccessCeiling,
+  narrowerAccessCeiling,
+  type AgentAccessCeiling,
+} from '@shared/types/agentManifest';
+import { AGENT_ROLES } from '@shared/constants/agents';
+import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
+import { appPathService } from '../../runtime/AppPathService';
+import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
+import { resolvedPathKey, samePath } from '../../platform/paths';
+import { isReservedAgentId } from '../settings-core/reservedAgentIds';
+import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
+import { projectAgentTrust } from './ProjectAgentTrust';
+import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type {
   AgentManifestDefinition,
   AgentManifestDiagnostic,
@@ -12,18 +32,6 @@ import type {
   AgentModelOption,
   AgentBuiltinComparison,
 } from '@shared/types/agentManifest';
-import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
-import { AGENT_ROLES } from '@shared/constants/agents';
-import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
-import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
-import { appPathService } from '../../runtime/AppPathService';
-import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
-import { resolvedPathKey, samePath } from '../../platform/paths';
-import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
-import { isReservedAgentId } from '../settings-core/reservedAgentIds';
 
 const toSlug = (value: string): string => {
   const slug = value
@@ -98,6 +106,29 @@ const listAgentManifestFiles = (directory: string): string[] => {
     && !entry.startsWith('.')
     && isSafeAgentProfileId(idFromFileName(entry))
   ));
+};
+
+/** A project profile without a user or builtin profile of the same id never gets process execution. */
+const PROJECT_AGENT_ACCESS_CEILING: AgentAccessCeiling = 'workspace-write';
+
+/**
+ * A project profile may narrow what the profile it overrides can do, never widen it; a new project
+ * profile is held to workspace writes.
+ */
+const clampProjectAccessCeiling = (
+  candidate: ScopedResourceCandidate<AgentManifestDefinition>,
+  lowerScopes: ReadonlyArray<ScopedResourceCandidate<AgentManifestDefinition>>,
+): { candidate: ScopedResourceCandidate<AgentManifestDefinition>; narrowedFrom?: AgentAccessCeiling } => {
+  if (candidate.invalid) return { candidate };
+  const overridden = lowerScopes.filter((entry) => entry.id === candidate.id && !entry.invalid).at(-1);
+  const limit = overridden ? agentAccessCeiling(overridden.value) : PROJECT_AGENT_ACCESS_CEILING;
+  const declared = agentAccessCeiling(candidate.value);
+  const effective = narrowerAccessCeiling(declared, limit);
+  if (effective === declared) return { candidate };
+  return {
+    candidate: { ...candidate, value: { ...candidate.value, accessCeiling: effective } },
+    ...(candidate.value.accessCeiling ? { narrowedFrom: declared } : {}),
+  };
 };
 
 const loadManifestCandidates = (
@@ -224,7 +255,22 @@ export class AgentManifestService {
           );
           continue;
         }
-        candidates.push(loaded.candidate);
+        if (!loaded.candidate.invalid && !projectAgentTrust.isTrusted(projectRoot, loaded.candidate.id, loaded.candidate.sourcePath)) {
+          diagnostics.push({
+            code: AGENT_PROJECT_UNTRUSTED, severity: 'warning', scope: 'project', agentId: loaded.candidate.id,
+            sourcePath: loaded.candidate.sourcePath, message: 'This project brings its own Agent profile; it loads only after you trust it.',
+          });
+          continue;
+        }
+        const clamped = clampProjectAccessCeiling(loaded.candidate, candidates);
+        if (clamped.narrowedFrom) {
+          diagnostics.push({
+            code: AGENT_PROJECT_CEILING_NARROWED, severity: 'warning', scope: 'project', agentId: loaded.candidate.id,
+            sourcePath: loaded.candidate.sourcePath,
+            message: `Access ceiling ${clamped.narrowedFrom} narrowed to ${agentAccessCeiling(clamped.candidate.value)}: a project profile cannot exceed the profile it overrides.`,
+          });
+        }
+        candidates.push(clamped.candidate);
       }
     }
 
@@ -346,6 +392,7 @@ export class AgentManifestService {
         throw new Error('BUILTIN_AGENT_MANIFEST_READONLY: deleting a builtin profile is not allowed.');
       }
       await fs.promises.rm(filePath, { force: true });
+      if (options.scope === 'project') projectAgentTrust.revoke(options.projectRoot!, agentId);
       return {
         definition: this.resolveEffectiveDefinition(paths, agentId, resolutionRoot),
         commitHash: hashManifestContent(`deleted:${agentId}`),
@@ -380,6 +427,8 @@ export class AgentManifestService {
     if (path.basename(filePath) !== ownedFileName) {
       throw new Error(`AGENT_MANIFEST_FILENAME_MISMATCH: write path must be ${ownedFileName}.`);
     }
+    // The user wrote these bytes through Settings; trust exactly them in this project.
+    if (options.scope === 'project') projectAgentTrust.trust(options.projectRoot!, agentId, filePath);
     return {
       definition: this.resolveEffectiveDefinition(paths, agentId, resolutionRoot),
       commitHash: hashManifestContent(content),
@@ -586,9 +635,8 @@ export class AgentManifestService {
       const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
       const providerUnavailable = !isProviderExecutable(provider);
       const modelDisabled = model.enabled === false;
-      const missingVerifiedBudget = !Number.isFinite(model.defaultBudgetTokens) || model.defaultBudgetTokens <= 0;
       const eligibility = classifyAgentToolEligibility(model);
-      const toolExecutable = eligibility === 'executable' && !missingVerifiedBudget;
+      const toolExecutable = eligibility === 'executable';
       const status: AgentModelOption['status'] = providerUnavailable
         ? 'provider-unavailable'
         : modelDisabled
@@ -609,7 +657,7 @@ export class AgentManifestService {
                 ? 'This provider route has no implemented native structured-tool adapter.'
                 : model.unavailableReason ?? 'Model is unavailable for this account and route.'
             : status === 'model-unverified'
-              ? missingVerifiedBudget
+              ? eligibility === 'budget-unknown'
                 ? 'Model has no verified positive context budget and cannot be executed safely.'
                 : eligibility === 'tools-unknown'
                   ? 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.'
@@ -645,9 +693,7 @@ export class AgentManifestService {
         for (const model of snapshot?.models ?? []) {
           if (model.selection?.pickerVisibility === 'internal') continue;
           const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
-          const executable = isAgentToolExecutableModel(model)
-            && Number.isFinite(model.defaultBudgetTokens)
-            && model.defaultBudgetTokens > 0;
+          const executable = isAgentToolExecutableModel(model);
           if (executable || referenced.has(canonicalId)) {
             addOption(fromEffectiveModel(provider, model));
           }
@@ -665,9 +711,7 @@ export class AgentManifestService {
           entry.modelId === model.id || entry.aliases.includes(model.id)
         ));
         if (effective) {
-          const executable = isAgentToolExecutableModel(effective)
-            && Number.isFinite(effective.defaultBudgetTokens)
-            && effective.defaultBudgetTokens > 0;
+          const executable = isAgentToolExecutableModel(effective);
           if (executable || referenced.has(canonicalId)) {
             addOption(fromEffectiveModel(provider, effective));
           }

@@ -1,3 +1,4 @@
+import { mergeToolExecutionActionEvent } from './conversationActionEventMerge';
 import type {
   ConversationMessage,
   ConversationWorkBlock,
@@ -5,7 +6,6 @@ import type {
 } from '@shared/types/conversation';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ToolTraceEntry } from '@shared/types/tool';
-import { mergeToolExecutionActionEvent } from './conversationActionEventMerge';
 
 const cloneWorkTrace = (trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace => (
   trace
@@ -92,9 +92,6 @@ export const applyToolTraceToMessage = (message: ConversationMessage, trace: Too
     }
     block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
     block.result = {
-      text: block.status === 'error'
-        ? 'Tool execution failed.'
-        : 'Requested ' + block.toolCalls.length + ' tool' + (block.toolCalls.length === 1 ? '' : 's') + '.',
       status: 'complete',
       toolCallIds: block.toolCalls.map((toolCall) => toolCall.id),
     };

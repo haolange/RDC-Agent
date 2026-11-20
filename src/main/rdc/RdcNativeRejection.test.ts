@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import { rdcInstallationFiles } from '../platform/rdcLayout';
 import { getRdcContextLease, setRdcRuntimeContextForSession } from './RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';

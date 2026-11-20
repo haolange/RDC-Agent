@@ -1,4 +1,3 @@
-import type { ConversationCancelActiveTurnResult, ConversationMessage } from '@shared/types/conversation';
 import { useConversationStore } from '../../stores/conversationStore';
 import {
   type ActiveTurnContext, type ActiveTurnOwnership, useComposerSessionContextStore,
@@ -7,6 +6,7 @@ import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { stopWorkTrace } from '../../lib/stopWorkTrace';
 import { ACTIVE_ASSISTANT_STATUSES, selectActiveAssistantForTurn } from './composerStopSelection';
+import type { ConversationCancelActiveTurnResult, ConversationMessage } from '@shared/types/conversation';
 
 /** Reconcile main's stop acknowledgement without replacing an already committed terminal. */
 export async function reconcileConversationStop(options: {

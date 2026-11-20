@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   resolvedCapability,
   validateCapabilityResolution,
   resolveCatalogCapability,
 } from './capabilityResolution';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const effectiveModel = (overrides: Partial<EffectiveModel> = {}): EffectiveModel => ({
   providerId: 'provider-b',

@@ -12,19 +12,10 @@
  */
 
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Message,
-  Model,
-  StopReason,
-  StreamOptions,
-  ToolDefinition,
-} from '../core/types';
-import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,
@@ -39,11 +30,20 @@ import {
   ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
-import { applyGeminiReasoning } from './reasoningWire';
+import { applyGeminiReasoning, reasoningVisibilityRequest } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Message,
+  Model,
+  StopReason,
+  StreamOptions,
+  ToolDefinition,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const PROVIDER_API = 'google-gemini';
@@ -300,7 +300,7 @@ export class GeminiProvider implements ProviderStrategy {
     if (typeof options.temperature === 'number') generationConfig.temperature = options.temperature;
     if (typeof options.topP === 'number') generationConfig.topP = options.topP;
     if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
-    applyGeminiReasoning(generationConfig, options.reasoning);
+    applyGeminiReasoning(generationConfig, options.reasoning, reasoningVisibilityRequest(options));
     if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
 
     if (context.tools && context.tools.length > 0) {

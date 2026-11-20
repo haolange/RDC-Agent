@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
-import type {
-  ConversationMessage,
-  ConversationMessageStatus,
-} from '@shared/types/conversation';
-import { WorkProcess } from './WorkProcess';
-import { MessageActions } from './MessageActions';
-import { UserMessageEditForm } from './UserMessageEditForm';
-import { useUserMessageRewrite } from './useUserMessageRewrite';
-import { MessageAttachments } from './MessageAttachments';
-import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
-import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { hasPlanReviewInteraction } from '@shared/conversation/planReviewPresentation';
-import { SystemMessage } from './SystemMessage';
+import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { Details } from '../../ui/Details';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useI18n } from '../../i18n';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { WorkProcess } from './WorkProcess';
+import { MessageActions } from './MessageActions';
+import { UserMessageEditForm } from './UserMessageEditForm';
+import { useUserMessageRewrite } from './useUserMessageRewrite';
+import { MessageAttachments } from './MessageAttachments';
+import { HandoffSuggestionRow } from './HandoffSuggestionRow';
+import { SystemMessage } from './SystemMessage';
+import type {
+  ConversationMessage,
+  ConversationMessageStatus,
+} from '@shared/types/conversation';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
@@ -180,6 +181,7 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
 };
 
 const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
+  const { t } = useI18n();
   const agentId = message.agentId;
   const time = formatClockTime(message.createdAt);
   const trace = message.workTrace ?? null;
@@ -187,7 +189,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const isInProgress = status === 'streaming' || status === 'draft';
   const hasContent = Boolean(message.content && message.content.length > 0);
   const traceIsRunning = Boolean(trace && trace.status === 'running');
-  const hasProjectedOutput = Boolean(trace?.blocks.some((block) => block.outputItems?.length));
+  const hasProjectedOutput = Boolean(trace?.blocks.some((block) => block.items?.some((item) => item.kind === 'text')));
   // Work Process remains first, while the assistant answer streams underneath it.
   const showContentBubble = !hasProjectedOutput && (hasContent || isInProgress || traceIsRunning)
     || (status === 'error' && hasContent);
@@ -208,6 +210,9 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
               <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} />
           ) : null}
+          {message.workTraceDiscarded ? (
+            <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>
+          ) : null}
           {message.attachments && message.attachments.length > 0 ? (
             <MessageAttachments attachments={message.attachments} />
           ) : null}
@@ -221,12 +226,15 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           ) : null}
           {showDiagnosticBlock && message.diagnostic ? (
             <div className="conversation-message-diagnostic" role="alert">
-              <span className="conversation-message-diagnostic-code">
-                {message.diagnostic.code}
-              </span>
               <span className="conversation-message-diagnostic-text">
                 {message.diagnostic.userMessage}
               </span>
+              <Details className="conversation-message-diagnostic-details" summary={t('chat.diagnosticTechnicalDetails')}>
+                <code className="conversation-message-diagnostic-code">{message.diagnostic.code}</code>
+                {message.diagnostic.technicalMessage ? (
+                  <code className="conversation-message-diagnostic-code">{message.diagnostic.technicalMessage}</code>
+                ) : null}
+              </Details>
             </div>
           ) : null}
           {!isInProgress ? (

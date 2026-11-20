@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron';
-import type { RuntimeLogScope } from '@shared/types/runtimeLog';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { RuntimeLogListArgsSchema } from './validation/ipcSchemas';
+import type { RuntimeLogScope } from '@shared/types/runtimeLog';
 
 export function registerRuntimeTerminalHandlers(): void {
   ipcMain.handle('runtimeLog:list', async (_event, ...rawArgs: unknown[]) => {

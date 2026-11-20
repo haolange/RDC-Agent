@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { TaskDialog } from '../../ui/TaskDialog';
-import type { TaskContextPanelViewModel, TaskContextResource } from '@shared/types/trace';
 import { openAppPath } from '../../hooks/appShellBridge';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
+import type { TaskContextPanelViewModel, TaskContextResource } from '@shared/types/trace';
 
 const ResourceMark: React.FC<{ resource: TaskContextResource }> = ({ resource }) => {
   if (resource.kind === 'directory') {

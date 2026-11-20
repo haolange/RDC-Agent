@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentEvent } from '@shared/types/agentRuntime';
 import { AgentToolApprovalRequestService } from '../permissions/AgentToolApprovalRequestService';
 import { AgentUserInputRequestService } from './AgentUserInputRequestService';
 import { withDelegatedInteractionOwner } from './DelegatedInteractionOwner';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const owner = { ownerSessionId: 'parent', childSessionId: 'child', executionId: 'execution-1' };
 const context = { sessionId: 'child', turnId: 'child-turn', agentId: 'general' as const };
 describe('delegated controlled interactions', () => {
   it('projects tool approval to its owner and only accepts that owner once', async () => {
     const service = new AgentToolApprovalRequestService(); const events: AgentEvent[] = [];
-    const pending = withDelegatedInteractionOwner(owner, () => service.request({ agentId: 'general', sessionId: 'child', turnId: 'child-turn', toolCallId: 'tool', toolName: 'shell', reason: 'run scoped command', risk: 'high', context, onEvent: (event) => events.push(event) }));
+    const pending = withDelegatedInteractionOwner(owner, () => service.request({ agentId: 'general', sessionId: 'child', turnId: 'child-turn', toolCallId: 'tool', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'run scoped command', risk: 'high', context, onEvent: (event) => events.push(event) }));
     expect(events[0]).toMatchObject({ sessionId: 'parent', turnId: 'child-turn', payload: { delegatedRequest: { executionId: 'execution-1', childSessionId: 'child', turnId: 'child-turn' } } });
     const approvalId = (events[0].payload as { approvalId: string }).approvalId;
     expect(approvalId).toMatch(/^tool-approval-tool-.+/);

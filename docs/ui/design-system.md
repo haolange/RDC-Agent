@@ -36,7 +36,7 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 | 控件高度 | `--control-height-sm/md/lg` | 28 / 32 / 36 | pill、列表行、导航项、输入框、按钮统一落在此三档 |
 | 圆角 | `--radius-sm/md/lg/xl/full` | 4 / 6 / 8 / 12 / 9999 | 卡片与输入 `md`；按钮与控件 `lg`（`--control-radius`）；Composer 壳 `lg`；pill `full` |
 | 间距 | `--space-*` | 4 基（另有 `--space-0-5` 2px） | panel 内边距 `--space-3`（工作台右栏 inspector 外壳同此）；section 间距 `--space-5`；禁奇数 px |
-| 字号 | `--text-xs/sm/base/md/lg/xl/2xl/3xl/4xl` | 11 / 12 / 14 / 15 / 17 / 19 / 22 / 28 / 36px（medium） | 禁 px 字面量；`data-font-scale` 的 small / large 整体缩放这一组 |
+| 字号 | `--type-<角色>-size` / `-line` | 见下表 | 只引用角色；`data-font-scale` 的 small / large 同时重映射全部角色；caption 是 12px 下限 |
 | 行高 | `--leading-none/tight/snug/normal/relaxed` | 1 / 1.25 / 1.375 / 1.5 / 1.625 | 正文 `normal`，紧凑标题 `tight` |
 | 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | 统一 `--ease-standard`；`--transition-*` 是 `duration + ease` 别名 |
 | 字距 | `--tracking-tight/normal/wide` | -0.02 / 0 / 0.04em | 标题收紧、正文默认、标签加宽 |
@@ -44,15 +44,18 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 
 **排版层级（唯一一套，跨界面通用）**
 
-| 角色 | 组合 | 用于 |
+| 角色 | 字号 / 行高（medium · small · large） | 用于 |
 |------|------|------|
-| `page-title` | `--text-lg` 或 `--text-xl` / 600 | 模态标题（lg）、Settings 页头（xl） |
-| `section-title` | `--text-sm` / 600 | 卡片标题、区块标题、Right Rail 卡头 |
-| `description` | `--text-xs` / `--token-text-caption` | 标题下说明、空态副文案 |
-| `body` | `--text-sm` | 正文、列表主文本 |
-| `mono` | `--font-mono` / `--text-xs` | 路径、命令、hash |
+| `display` | 24/32 · 22/30 · 26/34 | 空工作台等页面主标题 |
+| `title` | 18/26 · 17/24 · 20/28 | 对话框、面板、Settings 页头 |
+| `heading` | 15/24 · 14/22 · 16/26 | 分组、卡片标题 |
+| `body` | 14/22 · 13/20 · 15/24 | 界面正文、列表主文本、输入框 |
+| `reading` | 15/26 · 14/24 · 16/28 | 回复与知识正文 |
+| `label` | 13/20 · 12/18 · 14/22 | 按钮、控件、字段名 |
+| `caption` | 12/18 · 12/18 · 13/20 | 说明、时间、计数（下限） |
+| `code` | 13/20 · 12/18 · 14/22 | 代码、路径、ID（`--font-mono`） |
 
-禁止再出现第四套 section 标题字号。更大的 `--text-2xl` / `3xl` / `4xl` 只用于空工作台标题等展示场景，不用于功能面标题。
+CSS 写法：`font-size: var(--type-label-size); line-height: var(--type-label-line);`。字重用 `--font-*`。门禁拒绝任何非角色字号（包括对角色做缩小计算），原始 `--text-*` 刻度已删除。
 
 ## Primitive → Semantic 迁移对照
 
@@ -69,7 +72,8 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 | `rgb(var(--color-border-default))` | `var(--token-border-default)` |
 | `rgb(var(--color-border-secondary))` | `var(--token-border-card)` |
 | `rgb(var(--color-border-strong))` | `var(--token-border-strong)` |
-| `rgb(var(--color-accent-500))` | 焦点环 `var(--token-border-focus)`；强调文本/图标 `var(--token-accent-primary)` |
+| `rgb(var(--color-accent-500))` | 焦点环 `var(--token-border-focus)` |
+| `rgb(var(--color-accent-ink))` | 强调文本/图标/描边 CTA `var(--token-accent-primary)`、链接 `var(--token-text-link)` |
 | `rgb(var(--color-text-primary))` | `var(--token-text-heading)` |
 | `rgb(var(--color-text-secondary))` | `var(--token-text-body)` |
 | `rgb(var(--color-text-tertiary))` | `var(--token-text-caption)` |
@@ -139,6 +143,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 ## 颜色使用规则
 
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
+- 强调文本、图标与描边 CTA 读 `--token-accent-primary`（primitive `--color-accent-ink`）：`ThemeChromeCompiler` 从 accent-400 出发，沿同一色相向远离背景的方向调亮度，直到在 `bg-1…bg-3` 上都达到 4.5:1；实心 accent 面上的文字/图标读 `--token-text-inverse`（`--color-text-on-accent`），取近黑与近白中对比更高者。Composer Send 同理读 compose 派生的 `--composer-mode-on-accent`。任何主题与自定义 accent 都不再靠人工挑色保证可读。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
 - **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框、send、Effort/Max 滑条、Max 字色、Max mode / Fast 角标开态）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
 - Effort 弹层的 Max mode / Fast mode 是稳定能力槽位，不随模型消失：面板里始终占位；unsupported 显示灰色关闭，fixed 显示灰色开启，selectable 才允许切换。收起胶囊只在对应模式开启时前置图标。
@@ -157,9 +162,9 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 ## 空态
 
-所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体。Right Rail 五卡通过可选 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
+所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体，只有文案的空态显示为一行说明文字而非边框盒。Right Rail 各标签的卡片通过可选 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
 
-共享空态区分紧凑区块与填充面板用途。资源空态以有边界的中性实色承载标题、说明和统一动作组；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
+共享空态区分紧凑区块与填充面板用途。带动作组的资源空态以有边界的中性实色承载标题、说明和动作；只有文案的紧凑空态不画边框盒，就地显示一行（或标题加说明）安静文字；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
 
 ## Composer 附件卡
 
@@ -194,7 +199,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 任务子弹窗（TaskDialog）
 
-导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
+导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog.tsx`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
 
 - 结构固定 `title`（+可选 `description`）/ `body`（唯一滚动区）/ `footer`（右对齐动作，主要动作在最右）。尺寸档位 `sm 420px` / `md 560px` / `lg 760px`，高度上限 `min(88vh, ...)`，`≤640px` 全屏。
 - 层级 `--z-overlay`，背景 `--token-bg-overlay`，阴影 `--token-shadow-modal`。焦点经 `lib/useModalFocus` 捕获；每个弹层在 `lib/overlayStack` 注册，Escape 与 Tab trap **只**作用栈顶层，关闭后焦点回到触发控件。
@@ -244,7 +249,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 | Settings / Composer / Sidebar 弹层 | `Popover` 或 `Menu`（锚定、viewport clamp、Escape 焦点返回） |
 | Knowledge 三列 | `Panel` + `ListRow` + `SearchField` + `Pill` + `EmptyState` + `Tabs` |
 | Composer 底栏 | `Pill` + `Popover` / `Menu`；控件高 `--control-height-sm`（28） |
-| Right Rail 五卡 / Sidebar | `SectionHeader` + `ListRow` + `EmptyState` |
+| Right Rail 标签卡 / Sidebar | `SectionHeader` + `ListRow` + `EmptyState` |
 | 表单校验 | `InlineError`，不用 toast 代替字段错误 |
 
 ## 品牌与图标
@@ -285,7 +290,7 @@ pnpm run typecheck
 | 层依赖、feature 横向、组件直调 IPC、退役目录、global feature 选择器、`is-*` 状态类 | `check:renderer-structure` | 0 |
 | Appearance 双体系、Select 实色、`ColorField`、组件消费者索引 | `check:appearance` | — |
 | Composer energy orbit、Active Signal 参数 | `check:work-process`（对照 CSS 的角度范围、2.85s、1.6s / 200% / 36%） | — |
-| 右栏五卡单轨 | `check:right-rail` | — |
+| 右栏五标签单轨 | `check:right-rail` | — |
 | i18n 双语 key 一致 | `check:i18n` | — |
 | `:hover` 必配 `:focus-visible`、禁无替代 `outline: none` | 无自动门禁 | — |
 
@@ -307,9 +312,9 @@ Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属
 - Composer 编辑／预览使用共享 segmented `Tabs`。Tabs 的 DOM ID 按实例生成；没有对应面板的选择控件不输出 `aria-controls`。编辑器内部焦点由 Composer 外壳呈现，不全局关闭焦点样式。
 - 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。单行长文本使用 `OverflowFade`：保留完整 DOM / `title`，根据真实 overflow、ResizeObserver、字体加载与文本变化决定是否渐隐，空值仍占一行。ColorField 的紧凑布局与隐藏标签由组件自身管理。
 - Provider、Agents、Tools、Appearance 与 Knowledge 的样式按展示职责组织；响应式规则跟随所属组件。CSS 入口仅声明加载关系，不恢复已替代的集中覆盖文件。
-- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用共享中性实色表面、细边框、小圆角及选中态，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 `--text-sm` / `--font-medium`，描述 `--text-xs` / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
+- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用共享中性实色表面、细边框、小圆角及选中态，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 label 角色 / `--font-medium`，描述 caption 角色 / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
 - 交接预载技能与能力配置的候选来自真实解析，可搜索多选；缺失或目标不可用的已选 ID 明示且不丢失，读取失败不显示为「没有技能」。策略资源排在全局运行设置之前，MCP 紧凑空态不遮蔽本机工具。
-- Provider 总览卡片在同一视口下等宽等高；测试连接前 / 中 / 后卡片几何与按钮基线不变；未配置为中性色，只有真实失败才用 error；长错误折成摘要加展开。
+- 模型服务页是列表 + 详情：左侧服务列表先列「已连接 · N」，再按连接方式分组列出可添加的服务（OAuth 登录、第一方直连、云平台、本机等），每行是首字母标记、名称和一行状态（已连接显示「N 个模型可用」，失败显示失败原因标签，未连接显示怎么连：浏览器登录 / 设备码登录 / 需要 API Key / 无需密钥）；行是扁平 `ListRow`，只有选中时出现边框。右侧是所选服务的详情：名称与账号身份、刷新模型 / 断开（或退出登录）、连接字段、连接状态、模型列表，最后是折叠的「诊断信息」（服务标识、接口、协议摘要、单服务能力验证）。保存或登录成功后详情停留在该服务上，从保存后的设置重新读取。未配置为中性色，只有真实失败才用 error。
 
 ### 工作台壳层接线与项目 Capture 面板
 
@@ -366,4 +371,4 @@ Agent 设置的问题摘要使用共享 Button，详情使用大尺寸 TaskDialo
 
 单项与批量回执采用同一套档位文案，分别显示请求与实际档位。标准档、实际档位缺失和 Fast 实测成功各有明确文本，Fast 开关继续表示可请求该档位。订阅目录刷新错误在模型列表可见，缺席型号在所属行解释原因。
 
-Provider 列表和单 Provider 模型列表复用同一紧凑探测面板：准备 → 核对模型/请求数量 → 开始；运行时显示真实进度并提供取消，完成后按需展开逐项结果与重试未通过项。提示说明真实额度消耗和短请求证据边界。结果明细用 Details，动作使用 Button，不增加装饰效果或另一套状态颜色。面板关闭取消所属批次；运行中不能开始第二批。窄屏动作自然换行，模型与失败原因允许断行；键盘焦点、深浅主题和中英文保持同一语义。
+服务列表底部的「批量能力验证」与单服务详情「诊断信息」里的单服务验证复用同一紧凑探测面板，默认都折叠：准备 → 核对模型/请求数量 → 开始；运行时显示真实进度并提供取消，完成后按需展开逐项结果与重试未通过项。提示说明真实额度消耗和短请求证据边界。结果明细用 Details，动作使用 Button，不增加装饰效果或另一套状态颜色。面板关闭取消所属批次；运行中不能开始第二批。窄屏动作自然换行，模型与失败原因允许断行；键盘焦点、深浅主题和中英文保持同一语义。

@@ -54,7 +54,7 @@
 
 .composer-permission-menu-label {
   color: var(--token-text-heading);
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: 1.35;
 }

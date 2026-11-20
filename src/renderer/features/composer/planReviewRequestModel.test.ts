@@ -1,6 +1,6 @@
 import { beforeEach, expect, it } from 'vitest';
-import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
 import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReviewStore';
+import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
 const review = { sessionId: 'session', reviewId: 'attempt', turnId: 'turn', toolCallId: 'call',
   agentId: 'debugger', recovered: true, planReview: { planId: 'plan', revision: 1 } } as PendingPlanReviewRequest;
 beforeEach(() => usePlanReviewStore.getState().reset());

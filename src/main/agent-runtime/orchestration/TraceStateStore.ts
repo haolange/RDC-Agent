@@ -1,14 +1,14 @@
 ﻿import * as fs from 'fs';
 import * as path from 'path';
+import { generateEventId, nowIso } from '@shared/utils/id';
+import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { runScopedStore } from './RunScopedStore';
 import type {
   RequestBranch,
   RequestBranchGroup,
   UserRequest,
   UserRequestRevision,
 } from '@shared/types/trace';
-import { generateEventId, nowIso } from '@shared/utils/id';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
-import { runScopedStore } from './RunScopedStore';
 
 const STORE_FILE = 'agentic-trace-state.json';
 

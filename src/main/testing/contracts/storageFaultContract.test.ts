@@ -10,7 +10,7 @@ import {
   assertNoJsonlDiagnostics,
   readJsonl,
   writeJsonl,
-} from '@shared/utils/jsonl';
+} from '../../runtime/jsonl';
 import { StorageIo } from '../../sessions/store/StorageIo';
 
 describe('storageFaultContract: corrupted JSONL', () => {

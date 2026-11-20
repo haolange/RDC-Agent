@@ -1,13 +1,13 @@
 import { BrowserWindow } from 'electron';
+import { generateEventId, nowMs } from '@shared/utils/id';
+import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { redactCredentialLikeText, redactSecretsDeep } from './secretRedaction';
 import type {
   RuntimeLogEntry,
   RuntimeLogNamespace,
   RuntimeLogScope,
   RuntimeLogSeverity,
 } from '@shared/types/runtimeLog';
-import { generateEventId, nowMs } from '@shared/utils/id';
-import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
-import { redactCredentialLikeText, redactSecretsDeep } from './secretRedaction';
 
 const APP_LOG_LIMIT = 1000;
 const SESSION_LOG_LIMIT = 500;

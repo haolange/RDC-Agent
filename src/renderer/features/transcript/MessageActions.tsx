@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { useClipboardBridge } from '../../hooks/useClipboardBridge';
 import { useI18n } from '../../i18n';
 import { MessageVariantNavigator } from './MessageVariantNavigator';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 interface MessageActionsProps {
   message: ConversationMessage;

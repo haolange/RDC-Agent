@@ -1,9 +1,9 @@
-import { normalizeBranchId } from './ConversationBranchResolver';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { traceService } from '../agent-trace/TraceService';
+import { normalizeBranchId } from './ConversationBranchResolver';
+import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 
 export function persistConversationSnapshot(
     sessionId: string | null | undefined,

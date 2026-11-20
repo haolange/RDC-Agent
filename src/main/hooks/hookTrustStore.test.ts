@@ -17,19 +17,12 @@ const makeRoot = () => {
 afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
 
 describe('hookTrustStore', () => {
-  it('invalidates YAML-only v1 records on first load and rewrites schemaVersion 2', () => {
+  it('reads a store in any other shape as no trust at all', () => {
     const filePath = path.join(makeRoot(), 'hook-trust.json');
     fs.writeFileSync(filePath, JSON.stringify({
       'd:\\project::check': { sourceHash: 'yaml-only', trustedAt: '2026-01-01T00:00:00.000Z' },
     }));
-    const store = readHookTrustStore(filePath);
-    expect(store).toEqual({ schemaVersion: CURRENT_HOOK_TRUST_SCHEMA_VERSION, records: {} });
-    expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual({
-      schemaVersion: CURRENT_HOOK_TRUST_SCHEMA_VERSION,
-      records: {},
-    });
-    expect(JSON.stringify(store)).not.toContain('sourceHash');
-    expect(JSON.stringify(store)).not.toContain('yaml-only');
+    expect(readHookTrustStore(filePath)).toEqual({ schemaVersion: CURRENT_HOOK_TRUST_SCHEMA_VERSION, records: {} });
   });
 
   it('fail-closes unknown higher schemaVersion without rewriting', () => {

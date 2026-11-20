@@ -1,19 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type { RequestPlan } from '@shared/types/providerCapability';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { AssistantMessage, Message } from '../agent-runtime/core/types';
 import { createContinuationArtifact } from '../agent-runtime/reasoning/ContinuationArtifacts';
 import { createProviderStateRef } from '../agent-runtime/reasoning/ProviderStateRefs';
 import { createTestRequestPlan } from '../testing/createTestRequestPlan';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
 import {
   canonicalizeTerminalContextMessages,
   filterSessionContextMessageArtifacts,
   SessionContextJournal,
   type SessionContextTurnEntry,
 } from './SessionContextJournal';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import type { AssistantMessage, Message } from '../agent-runtime/core/types';
+import type { ConversationMessage } from '@shared/types/conversation';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 
 
 afterEach(() => vi.restoreAllMocks());

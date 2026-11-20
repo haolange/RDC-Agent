@@ -1,8 +1,8 @@
 import React from 'react';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { useI18n } from '../../i18n';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { resolveCommandLabel, resolveSystemNoticeTone } from './systemMessagePresentation';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 interface SystemMessageProps {
   message: ConversationMessage;

@@ -2,13 +2,13 @@
  * ToolSearch 纯函数与工厂测试。
  */
 import { describe, expect, it } from 'vitest';
-import type { AgentTool } from '../agent/AgentTool';
 import {
   createToolSearchTool,
   formatToolSearchResult,
   searchTools,
   type ToolSearchToolInfo,
 } from './ToolSearch';
+import type { AgentTool } from '../agent/AgentTool';
 
 function fakeTool(partial: {
   name: string;

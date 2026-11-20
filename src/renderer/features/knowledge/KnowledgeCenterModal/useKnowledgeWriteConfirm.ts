@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { KnowledgeCardRecord, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
-import type { AgentPermissionMode } from '@shared/types/settings';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { diffKnowledgeCard, rollbackBasis } from './knowledgeCardDiff';
@@ -13,6 +11,8 @@ import {
   issueKnowledgeWrite,
   resolveWriteConfirmPack,
 } from './knowledgeWriteConfirm';
+import type { AgentPermissionMode } from '@shared/types/settings';
+import type { KnowledgeCardRecord, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
 export function useKnowledgeWriteConfirm(options: {
   active: boolean;

@@ -32,29 +32,29 @@
 .right-rail-task-row > button:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 0; }
 .right-rail-task-order {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
-  line-height: calc(var(--text-sm) * var(--leading-normal));
+  font-size: var(--type-caption-size);
+  line-height: calc(var(--type-label-size) * var(--leading-normal));
   font-variant-numeric: tabular-nums;
 }
 .right-rail-task-copy { min-width: 0; }
 .right-rail-task-copy strong {
   display: block;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-normal);
   line-height: var(--leading-normal);
   white-space: nowrap;
 }
 .right-rail-task-row .task-status-marker,
 .right-rail-task-row .task-status-marker svg { width: var(--space-3); height: var(--space-3); }
-.right-rail-task-row .task-status-marker { margin-top: calc((var(--text-sm) * var(--leading-normal) - var(--space-3)) / 2); }
+.right-rail-task-row .task-status-marker { margin-top: calc((var(--type-label-size) * var(--leading-normal) - var(--space-3)) / 2); }
 .right-rail-task-row.status-in_progress .right-rail-task-copy strong { color: var(--token-text-heading); font-weight: var(--font-medium); }
 .right-rail-task-row.status-completed .right-rail-task-copy strong,
 .right-rail-task-row.status-cancelled .right-rail-task-copy strong { color: var(--token-text-caption); }
 
 .right-rail-section-meta {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-normal);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

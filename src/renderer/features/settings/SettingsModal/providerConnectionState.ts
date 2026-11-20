@@ -1,9 +1,11 @@
 import type {
+  LlmProviderConnectionResult,
   LlmProviderConnectionField,
   LlmProviderConnectionSchema,
   LlmProviderEntry,
 } from '@shared/types/settings';
 import type { ProviderConnectionDraft } from './types';
+import type { useI18n } from '../../../i18n';
 
 const sortedRecord = (value: Readonly<Record<string, string | boolean>>): Record<string, string | boolean> => (
   Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
@@ -155,7 +157,17 @@ export function createProviderConnectionDraft(provider: LlmProviderEntry): Provi
           models,
         }
       : undefined,
-    accountLoginMode: provider.id === 'grok-account' ? 'browser' : 'device',
     authCode: '',
   };
+}
+
+/** A coded connection failure in the person's language; otherwise the provider's own message or the generic one. */
+export function connectionFailureText(
+  result: Pick<LlmProviderConnectionResult, 'error' | 'errorCode' | 'errorParams'>,
+  t: ReturnType<typeof useI18n>['t'],
+  fallback: 'settings.providerTestFailed' | 'settings.providerSaveFailed',
+): string {
+  return result.errorCode
+    ? t(`settings.providerError.${result.errorCode}` as const, result.errorParams)
+    : result.error ?? t(fallback);
 }

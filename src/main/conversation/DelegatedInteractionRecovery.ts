@@ -1,9 +1,9 @@
-import type { ConversationMessage } from '@shared/types/conversation';
+import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { finalizeTrace } from './ConversationWorkTrace';
-import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 export const INTERRUPTED_CONVERSATION_SUMMARY = '请求在应用退出后中断，需重新发起。';
 

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { AgentTool } from '../../agent/AgentTool';
 import { assertPublicHttpUrl, fetchPinnedPublic } from '../../net/assertPublicHttpUrl';
 import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from './toolLimits';
 import { readWebTextPage, validateWebTextCursor, type WebTextCursor } from './WebTextPage';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface WebFetchParams extends WebTextCursor {
   url: string;
@@ -96,6 +96,7 @@ export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
+  effects: { network: true },
 
   async execute(_toolCallId, params, signal) {
     const result = await fetchPublicText(params, signal);
@@ -122,6 +123,7 @@ export const webSearchTool: AgentTool<WebSearchParams, WebSearchDetails> = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
+  effects: { network: true },
 
   async execute(_toolCallId, params, signal) {
     const query = params.query?.trim();

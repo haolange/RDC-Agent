@@ -1,8 +1,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { WorkProcess } from './WorkProcess';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 vi.mock('../../i18n', () => ({
   useI18n: () => ({
@@ -29,24 +29,39 @@ const gptSummaryTrace: ConversationWorkTrace = {
     title: 'LLM turn',
     status: 'complete',
     result: {
-      text: '我先查看项目文件，再把身份、模型、工具和这个库的用途一起说明。',
       status: 'complete',
       outputPhase: 'commentary',
       toolCallIds: ['tool-glob'],
     },
-    thinking: {
-      text: '**Planning project purpose inspection**',
-      kind: 'summary',
-      source: 'openai-responses-summary',
-      visibility: 'summary',
-    },
-    thinkingStatus: 'complete',
+    items: [
+      {
+        kind: 'thinking',
+        providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'reasoning', contentIndex: 0 },
+        thinking: {
+          text: '**Planning project purpose inspection**',
+          kind: 'summary',
+          source: 'openai-responses-summary',
+          visibility: 'summary',
+        },
+        status: 'complete',
+        displayOrder: 1,
+      },
+      {
+        kind: 'text',
+        providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'message', contentIndex: 0 },
+        text: '我先查看项目文件，再把身份、模型、工具和这个库的用途一起说明。',
+        phase: 'commentary',
+        status: 'complete',
+        displayOrder: 2,
+      },
+    ],
     toolCalls: [{
       id: 'tool-glob',
       toolName: 'glob',
       status: 'complete',
       argsPreview: JSON.stringify({ pattern: '*' }),
       resultPreview: JSON.stringify({ files: ['.rdc-agent/.gitignore'] }),
+      displayOrder: 3,
       startedAt: now + 200,
       completedAt: now + 356,
     }],

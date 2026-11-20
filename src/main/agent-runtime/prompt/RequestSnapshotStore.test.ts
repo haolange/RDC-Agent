@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
-import { RequestSnapshotStore } from './RequestSnapshotStore';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import { RequestSnapshotStore } from './RequestSnapshotStore';
+import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 
 let rootPath = '';
 let store: RequestSnapshotStore;
@@ -189,14 +189,4 @@ describe('RequestSnapshotStore', () => {
     expect(store.listMailboxDeliveries('session-a')).toEqual([delivery]);
   });
 
-  it('reads legacy requests one at a time and retains the frozen plan once per turn', () => {
-    const first = sampleSnapshot({ mailboxDeliveries: [{ executionId: 'first', generation: 1, direction: 'to_child', throughSequence: 1, messageIds: ['one'] }] });
-    const second = sampleSnapshot({ id: 'snap-2', callIndex: 2, mailboxDeliveries: [{ executionId: 'second', generation: 1, direction: 'to_parent', throughSequence: 3, messageIds: ['two'] }] });
-    const dir = path.join(rootPath, 'session-a', 'turn-1');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, '001-snap-1.json'), JSON.stringify(first), 'utf8');
-    fs.writeFileSync(path.join(dir, '002-snap-2.json'), JSON.stringify(second), 'utf8');
-    expect(store.listPromptSegments('session-a')).toEqual(first.promptPlan.segments);
-    expect(store.listMailboxDeliveries('session-a').map((item) => item.executionId)).toEqual(['first', 'second']);
-  });
 });

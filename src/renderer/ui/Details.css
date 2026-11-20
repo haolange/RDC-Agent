@@ -7,7 +7,7 @@
   list-style: none;
   cursor: pointer;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: var(--leading-normal);
   border-radius: var(--radius-sm);
 }

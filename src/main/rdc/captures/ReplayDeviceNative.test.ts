@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { freezeRdcTurnBinding } from '../RdcTurnBindings';
+import { connectSessionReplayDevice, inspectSessionReplayInstallation } from '../RdcRemoteConnection';
+import { RdcNativeFailure } from '../RdcNativeProtocol';
+import { replayDeviceIssue } from './ReplayDeviceIssue';
 import type { ReplayDeviceEntry } from '@shared/types/device';
+
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: {} }));
 vi.mock('../RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
-import { freezeRdcTurnBinding } from '../RdcTurnBindings';
-import { connectSessionReplayDevice, inspectSessionReplayInstallation } from '../RdcRemoteConnection';
-import { replayDeviceIssue } from './ReplayDeviceIssue';
-import { RdcNativeFailure } from '../RdcNativeProtocol';
 const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
 const binding = freezeRdcTurnBinding(cli, [{ name: 'rd.remote.connect', preparation_policy: 'automatic', timeout_policy: { argument: 'timeout_ms', default_timeout_ms: 200000, worker_grace_ms: 85000, transport_grace_ms: 5000, process_grace_ms: 5000 }, input_schema: { properties: { timeout_ms: { type: 'integer' }, options: { properties: {
   transport: { enum: ['adb_android'] },

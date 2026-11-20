@@ -1,5 +1,5 @@
-import { Button } from '../../../ui/Button';
 import React from 'react';
+import { Button } from '../../../ui/Button';
 import Select from '../../../ui/Select';
 import { Popover } from '../../../ui/Popover';
 import { SearchField } from '../../../ui/SearchField';

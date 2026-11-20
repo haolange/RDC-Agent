@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
 import {
   applyContextUsage,
   createEmptyContextUsageProjection,
@@ -14,6 +13,7 @@ import { useConversationStore } from './conversationStore';
 import { useProjectStore } from './projectStore';
 import { useWorkflowStore } from './workflowStore';
 import { useEvidenceStore } from './evidenceStore';
+import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
 
 interface SessionState extends ContextUsageProjectionState {
   runs: RunSummary[];

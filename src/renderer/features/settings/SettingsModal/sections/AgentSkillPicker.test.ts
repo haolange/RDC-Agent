@@ -1,8 +1,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { ComponentProps } from 'react';
 import { AgentSkillPicker } from './AgentSkillPicker';
+import type { ComponentProps } from 'react';
 
 type Props = ComponentProps<typeof AgentSkillPicker>;
 const t: Props['t'] = (key) => key;

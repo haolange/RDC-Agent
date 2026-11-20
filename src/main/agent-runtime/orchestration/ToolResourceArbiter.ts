@@ -1,6 +1,6 @@
 import { rootScopeId } from '@shared/utils/executionScope';
 import { withResourceLifetime } from '../../runtime/ResourceExecutionLifetime';
-import { canonicalRealpath } from '../../hooks/hookTrustFingerprint';
+import { canonicalRealpath } from '../../runtime/fileIdentity';
 import { pathComparisonKey } from '../../platform/paths';
 
 export function toolResourceKey(projectRoot: string | null | undefined, sessionId: string): string {

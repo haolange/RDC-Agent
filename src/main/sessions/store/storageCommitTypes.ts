@@ -1,4 +1,4 @@
-import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationMessage, ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
@@ -47,10 +47,25 @@ export interface TerminalAppendFile {
   append: string;
 }
 
+/**
+ * A work-trace update stored as the blocks it changed. The reader rebuilds the trace from the previous
+ * one, so a long turn appends each streaming block once per change instead of the whole trace.
+ */
+export interface ConversationTraceBlocksPatch {
+  status: ConversationWorkTrace['status'];
+  summary?: string;
+  toolEvidence?: ConversationWorkTrace['toolEvidence'];
+  updatedAt: number;
+  /** Every block id, in trace order. */
+  blockIds: string[];
+  changedBlocks: ConversationWorkBlock[];
+}
+
 export interface ConversationDeltaRecord {
   op: 'delta';
   id: string;
   patch: Partial<ConversationMessage>;
+  traceBlocks?: ConversationTraceBlocksPatch;
   updatedAt: number;
 }
 

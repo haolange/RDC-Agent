@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
 import type { AppSettings } from '@shared/types/settings';
 import type { WorkbenchIpcContext } from './workbenchContext';
+
 
 const fixture = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -43,11 +45,8 @@ vi.mock('../settings/provider-catalog/ProviderCapabilityProbeService', () => ({ 
 vi.mock('../settings/settings-core/ModelsOverrideService', () => ({ modelsOverrideService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: fixture.log } }));
 vi.mock('../runtime/ShellResolver', () => ({ shellResolver: {}, formatShellInterpreterLabel: vi.fn() }));
-
 vi.mock('../window/applicationMenu', () => ({ refreshApplicationMenu: fixture.refreshMenu }));
 vi.mock('../window/productIcon', () => ({ applyProductIcon: fixture.applyIcon }));
-
-import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
 
 describe('appearance settings response', () => {
   it('keeps executable Agent choices after saving appearance without changing providers', async () => {

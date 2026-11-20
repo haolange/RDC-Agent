@@ -4,13 +4,13 @@ import { operationFingerprint } from './RdcOperationCatalog';
 import { isUnchangedShaderResult, validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 import { runRdcOperation } from './RdcOperationCoordinator';
 import { assertRdcDiscovery, RdcShellInputSchema, type RdcShellInput } from './RdcShellInput';
-import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { assertRdcContextLeaseOwnership, quarantineRdcContext } from './RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { modelVisibleRdcFailureDetails, parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
+import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 
 function callableRdcDefinition(definition: RdcOperationDefinition): Record<string, unknown> {

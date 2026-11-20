@@ -1,5 +1,5 @@
-import type { ExecutionOffer } from '@shared/types/executionOffer';
 import { parseInvestigationPlanContract, type InvestigationPlanContract } from '@shared/types/planInvestigation';
+import type { ExecutionOffer } from '@shared/types/executionOffer';
 
 /** Old approved plans remain readable, but cannot claim the newer Mission completion contract. */
 export function approvedInvestigationContract(offer: ExecutionOffer, markdown: string): InvestigationPlanContract | null {

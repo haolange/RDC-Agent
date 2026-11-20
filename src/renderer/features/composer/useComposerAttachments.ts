@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
+import { isBrowserAppSession } from '../../platform/browserSession';
+import { attachmentRejectKey, COMPOSER_MAX_ATTACHMENT_COUNT, isAttachmentStageOverflow } from './attachmentRejectCopy';
+import { descriptorToDraft, filesToStageItems } from './composerAttachmentIngest';
 import type { ConversationAttachmentStageItem } from '@shared/types/conversation';
 import type { useI18n } from '../../i18n';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import { attachmentRejectKey, COMPOSER_MAX_ATTACHMENT_COUNT, isAttachmentStageOverflow } from './attachmentRejectCopy';
-import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
-import { descriptorToDraft, filesToStageItems } from './composerAttachmentIngest';
-import { isBrowserAppSession } from '../../platform/browserSession';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

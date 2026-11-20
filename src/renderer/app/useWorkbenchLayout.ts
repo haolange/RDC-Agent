@@ -1,13 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLayoutStore } from '../stores/layoutStore';
-import { usePanelDrawer } from './usePanelDrawer';
-import { useNarrowViewport } from './useNarrowViewport';
-import { useProjectStore } from '../stores/projectStore';
-import {
-  getResponsiveMinMainWidth,
-  resolveResponsiveSidebarState,
-  resolveSidebarWidths,
-} from '../shell/layoutGeometry';
 import {
   APP_RESIZE_HANDLE_WIDTH,
   LEFT_SIDEBAR_MIN_WIDTH,
@@ -16,6 +7,15 @@ import {
   RIGHT_RAIL_DRAWER_BREAKPOINT,
   WORKBENCH_CHAT_RAIL_MAX_WIDTH,
 } from '@shared/constants/layout';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useProjectStore } from '../stores/projectStore';
+import {
+  getResponsiveMinMainWidth,
+  resolveResponsiveSidebarState,
+  resolveSidebarWidths,
+} from '../shell/layoutGeometry';
+import { usePanelDrawer } from './usePanelDrawer';
+import { useNarrowViewport } from './useNarrowViewport';
 
 type DragSide = 'left' | 'right';
 type RightRailMode = 'hidden' | 'project' | 'session';

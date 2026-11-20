@@ -7,9 +7,11 @@ import {
   type TextStreamPart,
   type ToolSet,
 } from 'ai';
-import type { SharedV3ProviderOptions } from '@ai-sdk/provider';
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { StreamChannelRefs } from './internal/streamChannelRefs';
+import { composeAbortSignals, normalizeError } from './internal/http';
+import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -19,10 +21,8 @@ import type {
   StopReason,
   StreamOptions,
 } from '../core/types';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
-import { StreamChannelRefs } from './internal/streamChannelRefs';
-import { composeAbortSignals, normalizeError } from './internal/http';
-import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
+import type { SharedV3ProviderOptions } from '@ai-sdk/provider';
 
 type RuntimeLanguageModel = Exclude<LanguageModel, string>;
 export interface AiSdkStreamingProviderOptions {

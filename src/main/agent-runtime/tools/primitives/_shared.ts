@@ -12,8 +12,8 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { expandHomePath, samePath, stripLongPathPrefix } from '../../../platform/paths';
-import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { BINARY_SAMPLE_BYTES, TEXT_FILE_MAX_BYTES } from './toolLimits';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 /**
  * 获取 workspace 根目录（绝对路径）。

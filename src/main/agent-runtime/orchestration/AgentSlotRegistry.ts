@@ -6,18 +6,18 @@
  *  - turn 结束：flush() 清空 in-memory messages（磁盘 conversation.jsonl 为权威）
  */
 
+import { AGENT_ROLES } from '@shared/constants/agents';
+import { nowIso } from '@shared/utils/id';
+import { requireExecutionScopeId } from './executionScope';
 import type {
   AgentConfig,
   AgentRole,
   AgentState,
 } from '@shared/types/agent';
-import { AGENT_ROLES } from '@shared/constants/agents';
 import type { LLMAgentRouteConfig } from '@shared/types/llm';
-import { nowIso } from '@shared/utils/id';
 import type { Agent } from '../agent/Agent';
 import type { ContextManager } from '../agent/ContextManager';
 import type { AgentMessage } from '../core/types';
-import { requireExecutionScopeId } from './executionScope';
 
 /** 单个 AgentRole 在内部维护的运行态。 */
 export interface AgentSlot {

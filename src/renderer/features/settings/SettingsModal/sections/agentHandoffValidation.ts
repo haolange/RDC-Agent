@@ -1,5 +1,5 @@
-import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
 import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
+import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
 
 export type AgentHandoffIssueCode =
   | 'label-required'

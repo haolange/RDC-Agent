@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import type { AppSettings } from '@shared/types/settings';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { ProfileAvatar } from '../../../../patterns/ProfileAvatar';
-import type { useI18n } from '../../../../i18n';
 import { SettingsField, SettingsSection } from '../parts';
+import type { useI18n } from '../../../../i18n';
+import type { AppSettings } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';

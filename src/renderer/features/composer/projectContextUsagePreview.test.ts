@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { RunContextUsageSummary } from '@shared/types/session';
-import type { SelectedContextProfile } from './selectedContextProfile';
 import {
   projectContextUsagePreview,
   shouldProjectContextUsagePreview,
 } from './projectContextUsagePreview';
+import type { RunContextUsageSummary } from '@shared/types/session';
+import type { SelectedContextProfile } from './selectedContextProfile';
 
 const usage = (overrides: Partial<RunContextUsageSummary> = {}): RunContextUsageSummary => ({
   runId: 'run-1',

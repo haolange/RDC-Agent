@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildInitialTurnControls,
   hasSelectableFastMode,
@@ -10,6 +9,7 @@ import {
   isMaxContextUnverified,
   sanitizeTurnControls,
 } from '../../lib/turnControlsUtils';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const levelsCapability: EffectiveModel = {
   providerId: 'openai',

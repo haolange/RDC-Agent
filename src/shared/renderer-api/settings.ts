@@ -1,6 +1,6 @@
+import { RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type { ElectronAPI } from '../types/electron';
 import type { LlmApi, MemoryApi, SettingsApi } from '../types/electron-api';
-import { RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type { RendererApiTransport } from './transport';
 
 export function createMemoryApi(transport: RendererApiTransport): MemoryApi {
@@ -83,6 +83,8 @@ export function createSettingsApi(transport: RendererApiTransport): SettingsApi 
     previewAgentModelMigration: (sourcePath) => transport.invoke(INVOKE.settings.previewAgentModelMigration, sourcePath),
     applyAgentModelMigration: (request) => transport.invoke(INVOKE.settings.applyAgentModelMigration, request),
     deleteAgentOverrideFile: (request) => transport.invoke(INVOKE.settings.deleteAgentOverrideFile, request),
+    previewProjectAgentTrust: (sourcePath) => transport.invoke(INVOKE.settings.previewProjectAgentTrust, sourcePath),
+    trustProjectAgent: (request) => transport.invoke(INVOKE.settings.trustProjectAgent, request),
     getAgentBuiltinComparison: (query) => transport.invoke(INVOKE.settings.getAgentBuiltinComparison, query),
     saveProviderDefinition: (request) => transport.invoke(INVOKE.settings.saveProviderDefinition, request),
     getProviderDefinitionCommit: (providerId) => (

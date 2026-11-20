@@ -1,12 +1,12 @@
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import type { PlanReviewProjection } from '@shared/types/planReview';
-import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import { useCaptureStore } from './captureStore';
 import { useConversationStore } from './conversationStore';
 import { usePlanReviewStore } from './planReviewStore';
 import { useWorkflowStore } from './workflowStore';
 import { useSessionStore } from './sessionStore';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
+import type { PlanReviewProjection } from '@shared/types/planReview';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionProjection } from './sessionProjectionModel';
 
 /** Session load and branch switch write conversation and trace through this function. */

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { useConversationStore } from '../../stores/conversationStore';
 import { isRewriteTurnStillCurrent } from './useUserMessageRewrite';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const userMessage: ConversationMessage = {
   id: 'user-new',

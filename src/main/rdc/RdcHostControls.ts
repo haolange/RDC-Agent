@@ -1,9 +1,9 @@
 import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
-import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { PROCESS_TERMINATION_POLICY } from '../runtime/ProcessSupervisor';
 import { ownsRdcInteractionLock } from './RdcOperationCoordinator';
 import { assertRdcContextLeaseOwnership, getRdcContextLease, listRdcContextLeaseSessionIds } from './RdcRuntimeContextRegistry';
+import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 export interface RdcHostControlScope {
   sessionId: string;

@@ -37,7 +37,7 @@ composer-model-effort-pill
 composer-model-effort-popup
 composer-model-item-${option.providerId}-${option.modelId}
 composer-model-popup
-composer-model-provider-${provider.id}
+composer-model-provider-${section.id}
 composer-model-search
 composer-permission-pill
 composer-skill-chip
@@ -55,7 +55,6 @@ conversation-edit-preview
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
-getting-started
 handoff-suggestion-row
 investigation-list
 investigation-preview
@@ -234,13 +233,10 @@ settings-nav-search
 settings-policy-tighten-note
 settings-provider-auth-mode-${mode}
 settings-provider-auth-state
-settings-provider-card-${provider.id}
-settings-provider-connect-${provider.id}
 settings-provider-connect-api-key
 settings-provider-connect-api-key-toggle
 settings-provider-connect-base-url
 settings-provider-connect-body
-settings-provider-connect-dialog
 settings-provider-connect-discovery-diagnostic
 settings-provider-connect-endpoint-preview
 settings-provider-connect-error
@@ -253,11 +249,11 @@ settings-provider-connect-unavailable-hint
 settings-provider-connection-fields
 settings-provider-connection-status
 settings-provider-credential-options
+settings-provider-detail
 settings-provider-disconnect-${provider.id}
 settings-provider-discovery
 settings-provider-discovery-empty
 settings-provider-environment-notice
-settings-provider-error-toggle-${provider.id}
 settings-provider-model-capability-panel-${model.id}
 settings-provider-model-capability-toggle-${model.id}
 settings-provider-model-list
@@ -278,7 +274,9 @@ settings-provider-oauth-steps
 settings-provider-oauth-summary
 settings-provider-oauth-waiting
 settings-provider-probe-batch
+settings-provider-probe-disclosure
 settings-provider-protocol-summary
+settings-provider-row-${provider.id}
 settings-provider-search
 settings-provider-summary
 settings-provider-test-${provider.id}
@@ -306,7 +304,6 @@ sidebar-scroll
 sidebar-user-menu
 sidebar-user-settings-trigger
 terminal-toggle
-titlebar-getting-started
 titlebar-left-panel-toggle
 titlebar-right-panel-toggle
 utility-device-selector-dropdown

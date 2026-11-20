@@ -1,13 +1,14 @@
 import { randomUUID } from 'crypto';
-import type { LlmProviderModel } from '@shared/types/settings';
 import { isAdmittedDiscoveredModel } from '../../provider-catalog/DiscoveryAdmission';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import { NOUS_INFERENCE_BASE_URL, NOUS_OAUTH_CLIENT_ID, NOUS_OAUTH_SCOPE, NOUS_PORTAL_BASE_URL } from './oauthConstants';
 import { createFormBody, fetchJson, fetchOAuthJson, isTestMode, readString, wait } from './oauthHttp';
+import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
 const isAgentRoutableAccountModel = (modelId: string): boolean => isAdmittedDiscoveredModel(modelId);
 
 export async function startNousLogin(
+  providerId: LlmProviderId,
   setFlow: (flow: OAuthFlowState) => void,
   openExternal: (url?: string) => Promise<void>,
   onComplete: (bundle: OAuthSecretBundle) => Promise<void>,
@@ -20,7 +21,7 @@ export async function startNousLogin(
   }) as Record<string, unknown>;
   if (typeof payload.error === 'string') throw new Error(String(payload.error_description ?? payload.error));
   const flow: OAuthFlowState = {
-    providerId: 'nous',
+    providerId,
     flowId: randomUUID(),
     state: randomUUID(),
     deviceCode: readString(payload.device_code),
@@ -46,7 +47,7 @@ export async function startNousLogin(
   return flow;
 }
 
-export async function pollNousDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
+async function pollNousDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
   if (!flow.deviceCode || !flow.clientId || !flow.tokenEndpoint) {
     throw new Error('Nous Portal device authorization is missing client, device code, or token endpoint.');
   }
@@ -71,7 +72,7 @@ export async function pollNousDevice(flow: OAuthFlowState): Promise<OAuthSecretB
     const accessToken = readString(payload.access_token);
     if (!accessToken) throw new Error('Nous Portal OAuth did not return an access token.');
     return {
-      providerId: 'nous',
+      providerId: flow.providerId,
       accessToken,
       apiKey: accessToken,
       refreshToken: readString(payload.refresh_token),

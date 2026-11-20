@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { readRdcHostControls } from './RdcHostControls';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
-import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { clearRdcContextLeases, grantDelegatedLease, quarantineRdcContext, setRdcRuntimeContextForSession } from './RdcRuntimeContextRegistry';
 import { setRdcInteractionLock } from './RdcOperationCoordinator';
+import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 const scope = { sessionId: 'owner', projectId: 'project', contextId: 'context', leaseVersion: 7 };
 function context(timeoutMs = 120000): ToolExecutionContext {

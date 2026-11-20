@@ -1,4 +1,19 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { getLoadedProviderSurface, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
+import {
+  applyDiscoveryAuthority,
+  buildCatalogModelContribution,
+  buildEffectiveCatalogRequest,
+  planEffectiveModelCapabilityProbe,
+  planEffectiveModelRequest,
+  refreshEffectiveCatalogDiscovery,
+  resolveEffectiveModelSelection,
+} from './EffectiveModelResolver';
+import { planModelRequest } from './RequestPlanner';
+import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
@@ -12,21 +27,6 @@ vi.mock('electron', () => ({
     encryptString: (value: string) => Buffer.from(value, 'utf8'),
   },
 }));
-
-import {
-  applyDiscoveryAuthority,
-  buildCatalogModelContribution,
-  buildEffectiveCatalogRequest,
-  planEffectiveModelCapabilityProbe,
-  planEffectiveModelRequest,
-  refreshEffectiveCatalogDiscovery,
-  resolveEffectiveModelSelection,
-} from './EffectiveModelResolver';
-import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
-import { getLoadedProviderSurface, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
-import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { planModelRequest } from './RequestPlanner';
-import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';
 
 const parseKimiCodeCatalog = (payload: unknown) => parseKimiCodeCatalogWithSurface(
   payload,
@@ -68,7 +68,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     const models = mergeEffectiveCatalog(request);
     expect(models.find(model => model.modelId === 'grok-4.3')).toMatchObject({
       availability: 'unavailable',
-      unavailableReason: 'The last successful Grok subscription catalog did not list this model.',
+      unavailableReason: 'The last successful Grok Subscription catalog did not list this model.',
     });
     expect(mergeEffectiveCatalog({ ...request, discovery: undefined }).find(model => model.modelId === 'grok-4.3'))
       .toMatchObject({ availability: 'unknown' });
@@ -364,7 +364,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     expect(completed).toContainEqual({
       modelId: 'gpt-5.6-sol',
       availability: 'unavailable',
-      unavailableReason: 'This account-scoped model was absent from the authoritative provider catalog.',
+      unavailableReason: 'The last successful ChatGPT Account catalog did not list this model.',
     });
   });
 

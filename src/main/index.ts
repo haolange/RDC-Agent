@@ -1,3 +1,10 @@
+import { randomBytes } from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { app, BrowserWindow, dialog, session, shell } from 'electron';
+import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
 import { installApplicationMenu } from './window/applicationMenu';
 import { nativeMessage } from './window/nativeI18n';
 import { providerAccountAuthService } from './settings/provider-auth/ProviderAccountAuthService';
@@ -6,12 +13,6 @@ import { appPathService } from './runtime/AppPathService';
  * Electron Main Process Entry
  */
 
-import { app, BrowserWindow, dialog, session, shell } from 'electron';
-import { randomBytes } from 'crypto';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './sessions/store/StorageAdapter';
@@ -30,7 +31,6 @@ import {
   stopBrowserAppBridge,
 } from './browserAppBridge/BrowserAppBridgeServer';
 import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
-import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
 import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './agent-runtime/orchestration/AgentOrchestrator';
 import { processSupervisor } from './runtime/ProcessSupervisor';
@@ -40,6 +40,7 @@ import {
   resolveWindowCreationOptions,
 } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
+import { isTrustedRendererUrl, trustRendererEntry } from './window/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 import { currentHost } from './platform/host';
@@ -131,7 +132,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === 'development' && process.env.RDC_AGENT_TEST_MODE !== '1';
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
-const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1' || process.env.RDC_AGENT_BROWSER_QA === '1';
+const isBrowserQa = shouldStartBrowserAppBridge();
+const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1' || isBrowserQa;
 if (isHeadlessMode) {
   process.env.RDC_AGENT_HEADLESS = '1';
 }
@@ -193,7 +195,7 @@ function isValidatedDisposableBrowserQaUserData(targetPath: string): boolean {
 }
 
 const explicitUserDataPath = process.env.RDC_AGENT_USER_DATA?.trim();
-const useDisposableBrowserQaUserData = process.env.RDC_AGENT_BROWSER_QA === '1'
+const useDisposableBrowserQaUserData = isBrowserQa
   && !explicitUserDataPath
   && process.env.RDC_AGENT_USE_CANONICAL_USERDATA !== '1';
 const userDataPath = useDisposableBrowserQaUserData
@@ -277,7 +279,6 @@ if (isTestMode || isHeadlessMode) {
 // Main window reference.
 let mainWindow: BrowserWindow | null = null;
 let headlessKeepAliveTimer: NodeJS.Timeout | null = null;
-const allowedNavigationOrigins = new Set<string>();
 
 app.on('second-instance', () => {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -290,13 +291,6 @@ app.on('second-instance', () => {
   mainWindow.focus();
 });
 
-function registerAllowedOrigin(url: string): void {
-  try {
-    allowedNavigationOrigins.add(new URL(url).origin);
-  } catch {
-    // Ignore invalid renderer URLs.
-  }
-}
 
 function emitWindowMaximizedState(): void {
   if (!mainWindow) return;
@@ -400,11 +394,13 @@ function createMainWindow(): void {
   // Load the renderer.
   if (isDev) {
     const rendererUrl = getDevRendererUrl();
-    registerAllowedOrigin(rendererUrl);
+    trustRendererEntry(rendererUrl);
     mainWindow.loadURL(rendererUrl);
   } else {
     // Production mode loads the bundled renderer.
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    const rendererEntry = path.join(__dirname, '../renderer/index.html');
+    trustRendererEntry(pathToFileURL(rendererEntry).href);
+    mainWindow.loadFile(rendererEntry);
   }
 
   // Show after the window is ready.
@@ -489,7 +485,7 @@ app.whenReady().then(async () => {
 
   // Initialize main process services.
   await initializeServices();
-  if (shouldStartBrowserAppBridge()) {
+  if (isBrowserQa) {
     const bridgeUrl = await startBrowserAppBridge({
       devRendererUrl: isDev ? getDevRendererUrl() : null,
       rendererRoot: path.join(__dirname, '../renderer'),
@@ -571,16 +567,15 @@ const requestProcessShutdown = () => {
 process.once('SIGINT', requestProcessShutdown);
 process.once('SIGTERM', requestProcessShutdown);
 
-// Block navigation to unknown origins.
+// Only the app's own entry document may load in a window.
 app.on('web-contents-created', (_event, contents) => {
-  contents.on('will-navigate', (event, navigationUrl) => {
-    const parsedUrl = new URL(navigationUrl);
-    const isAllowedDevOrigin = allowedNavigationOrigins.has(parsedUrl.origin);
-
-    if (!isAllowedDevOrigin && parsedUrl.protocol !== 'file:') {
-      event.preventDefault();
-    }
-  });
+  const refuseUntrusted = (event: { preventDefault(): void }, navigationUrl: string) => {
+    if (!isTrustedRendererUrl(navigationUrl)) event.preventDefault();
+  };
+  // Covers links, redirects and files dropped onto the window.
+  contents.on('will-navigate', refuseUntrusted);
+  contents.on('will-redirect', refuseUntrusted);
+  contents.on('will-attach-webview', (event) => event.preventDefault());
 });
 
 /**

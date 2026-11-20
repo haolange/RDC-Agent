@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import { createProviderConnectionDraft } from './providerConnectionState';
 import { useProviderConnectionActions } from './useProviderConnectionActions';
+import type { LlmProviderEntry } from '@shared/types/settings';
 
 afterEach(() => { Reflect.deleteProperty(window, 'electronAPI'); });
 it.each([true, false])('uses the actual account result after stored-credential verification succeeds=%s', async (success) => {

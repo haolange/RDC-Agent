@@ -1,5 +1,4 @@
 import { BrowserWindow, screen } from 'electron';
-import type { WindowLayoutPreference } from '@shared/types/settings';
 import {
   APP_DEFAULT_WINDOW_HEIGHT,
   APP_DEFAULT_WINDOW_WIDTH,
@@ -7,6 +6,7 @@ import {
   APP_MIN_WINDOW_WIDTH,
 } from '@shared/constants/layout';
 import { settingsService } from '../settings/settings-core/SettingsService';
+import type { WindowLayoutPreference } from '@shared/types/settings';
 
 const SAVE_DEBOUNCE_MS = 250;
 

@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
   app: {
@@ -35,25 +35,25 @@ import { rdcSessionService } from '../../sessions';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
-import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
-import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './RuntimeToolPolicy';
-import { RuntimeToolAssembly } from './RuntimeToolAssembly';
-import { ToolExecutorFactory } from './ToolExecutorFactory';
-import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import { toolValidator } from '../core/ToolValidator';
 import { toolToDefinition } from '../agent/AgentTool';
 import { TaskRegistry, FileTaskStore, createSessionTaskStore, registerDelegatedTaskScope, resolveSessionTasksDir } from '../tasks';
-import { TurnHandle } from './TurnCoordinator';
-import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
-import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
-import type { SkillLoadResult } from '@shared/types/rdcRuntime';
 import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
 import { assertMissionTurnCompletion, enforceMissionTurnReadiness, MissionCompletionError } from '../../investigation/missionCompletionContract';
 import {
   SESSION_ID, baselineWorld, createInvestigationHarness, hypothesisClaim, projectClaim,
   sampleChallenge, sampleCheckpoint, writeDraft, writeReadyReport,
 } from '../../investigation/investigationTestFixtures';
+import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
+import { TurnHandle } from './TurnCoordinator';
+import { ToolExecutorFactory } from './ToolExecutorFactory';
+import { RuntimeToolAssembly } from './RuntimeToolAssembly';
+import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './RuntimeToolPolicy';
+import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
+import type { SkillLoadResult } from '@shared/types/rdcRuntime';
+import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { ResolvedRuntimeTools } from './orchestratorTypes';
 
 function createAssembly(): RuntimeToolAssembly {
   return new RuntimeToolAssembly({

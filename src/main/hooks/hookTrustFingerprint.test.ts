@@ -2,11 +2,11 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { HookDefinition } from '@shared/types/rdcRuntime';
 import {
   computeHookTrustFingerprint,
   resolveExecutableIdentity,
 } from './hookTrustFingerprint';
+import type { HookDefinition } from '@shared/types/rdcRuntime';
 
 const roots: string[] = [];
 const makeRoot = () => {

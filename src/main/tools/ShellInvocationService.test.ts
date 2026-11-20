@@ -1,5 +1,5 @@
-import { processSupervisor, type ProcessExitInfo, type SupervisedProcess } from '../runtime/ProcessSupervisor';
 import { describe, expect, it, vi } from 'vitest';
+import { processSupervisor, type ProcessExitInfo, type SupervisedProcess } from '../runtime/ProcessSupervisor';
 import { resolveExitCode, ShellInvocationService } from './ShellInvocationService';
 
 describe('ShellInvocationService exit codes', () => {

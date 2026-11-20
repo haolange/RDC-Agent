@@ -1,12 +1,30 @@
-import { isProbeAvailabilityDenied } from './ProviderProbeEvidence';
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { modelsOverrideService } from '../settings-core/ModelsOverrideService';
+import { parseCopilotBillingContribution } from '../provider-auth/CopilotBilling';
+import { settingsService } from '../settings-core/SettingsService';
+import {
+  getLoadedProviderSurface,
+  getProviderCatalogRevision,
+  getProviderModelDefinitions,
+  lookupProviderModelDefinition,
+} from '../../provider-catalog/ProviderCatalogRegistry';
+import {
+  isProbeAvailabilityDenied,
+  receiptConfirmsFast,
+  receiptConfirmsModelSwitch,
+  receiptExceedsSmallerTiers,
+} from './ProviderProbeEvidence';
+import { effectiveCatalogService } from './EffectiveCatalogService';
+import { revisionFor } from './effectiveCatalogMerge';
+import { planModelRequest } from './RequestPlanner';
+import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
+import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
+import type { AssistantMessage } from '../../agent-runtime/core/types';
 import type {
   CatalogLayerContribution,
   CatalogModelContribution,
   EffectiveCatalogRequest,
 } from './effectiveCatalogTypes';
-import { effectiveCatalogService } from './EffectiveCatalogService';
-import { revisionFor } from './effectiveCatalogMerge';
-import { modelsOverrideService } from '../settings-core/ModelsOverrideService';
 import type { ModelOverride, CustomModel } from '@shared/provider-catalog/modelsOverrideSchema';
 import type {
   EffectiveCatalogSnapshot,
@@ -25,18 +43,6 @@ import type {
   LlmProviderModel,
   LlmProviderProtocol,
 } from '@shared/types/settings';
-import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { planModelRequest } from './RequestPlanner';
-import { parseCopilotBillingContribution } from '../provider-auth/CopilotBilling';
-import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
-import { settingsService } from '../settings-core/SettingsService';
-import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
-import {
-  getLoadedProviderSurface,
-  getProviderCatalogRevision,
-  getProviderModelDefinitions,
-  lookupProviderModelDefinition,
-} from '../../provider-catalog/ProviderCatalogRegistry';
 
 const CONSERVATIVE_REASONING: ReasoningControl = {
   kind: 'unknown',
@@ -194,8 +200,9 @@ export function buildCatalogModelContribution(
 }
 
 
-function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
-  if (provider.id !== 'github-copilot') return undefined;
+/** Context tiers an account's own billing data grants, when its sign-in stored any. */
+function accountBillingEntitlement(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
+  if (provider.authMode !== 'account') return undefined;
   try {
     const raw = settingsService.getProviderOAuthSecret(provider.id);
     const bundle = JSON.parse(raw) as { copilotModelBilling?: Record<string, unknown> };
@@ -205,7 +212,7 @@ function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLaye
     return {
       source: 'entitlement',
       observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
-      detail: 'GitHub Copilot account billing context tiers',
+      detail: `${provider.label} account billing context tiers`,
       models,
     };
   } catch {
@@ -319,9 +326,7 @@ export function applyDiscoveryAuthority(
     completed.push({
       modelId: definition.modelId,
       availability: 'unavailable',
-      unavailableReason: provider.id === 'grok-account'
-        ? 'The last successful Grok subscription catalog did not list this model.'
-        : 'This account-scoped model was absent from the authoritative provider catalog.',
+      unavailableReason: `The last successful ${surface.label} catalog did not list this model.`,
     });
   }
   return completed;
@@ -446,6 +451,42 @@ export function resolveEffectiveCatalog(
   return effectiveCatalogService.getSnapshot(request);
 }
 
+/** Upper bound on how long a turn waits for a provider's first catalog load. */
+export const FIRST_CATALOG_LOAD_WAIT_MS = 8_000;
+
+/**
+ * Before the first catalog load finishes, every model reads as availability unknown. A turn started in
+ * that window waits for the load (bounded) instead of failing as "unverified"; later loads never block.
+ */
+export async function awaitFirstCatalogLoad(
+  providerId: string,
+  settings: AppSettings,
+  signal?: AbortSignal,
+  timeoutMs = FIRST_CATALOG_LOAD_WAIT_MS,
+): Promise<void> {
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  if (!provider) return;
+  const request = buildEffectiveCatalogRequest(provider);
+  effectiveCatalogService.getSnapshot(request);
+  const pending = effectiveCatalogService.firstLoad(request);
+  if (!pending) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    await Promise.race([
+      pending.then(() => undefined, () => undefined),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+      new Promise<void>((resolve) => {
+        onAbort = resolve;
+        signal?.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+  }
+}
+
 export function buildEffectiveCatalogRequest(
   provider: LlmProviderEntry,
   requestedModelId?: string,
@@ -479,7 +520,7 @@ export function buildEffectiveCatalogRequest(
     fallbackRoute: routeFor(provider),
     catalog,
     overlay,
-    entitlement: copilotEntitlementContribution(provider),
+    entitlement: accountBillingEntitlement(provider),
     user: userContribution(provider),
     userOverride: userOverrideContribution(provider),
     providerAvailability: provider.status === 'unavailable'
@@ -702,41 +743,48 @@ export function planEffectiveModelCapabilityProbe(input: {
     requireAgentToolEligibility: false,
   });
 }
-export function recordEffectivePlanSuccess(
+/** Entitlements read off a response receipt lapse so a changed subscription is noticed again. */
+export const OBSERVED_ENTITLEMENT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Records what a completed response proves about the account. Only receipt facts count: the model that
+ * answered, the service tier or speed the provider reported, and a prompt larger than any smaller tier.
+ * A request succeeding never grants Fast, a binding or a tier on its own.
+ */
+export function recordResponseReceipt(
   providerId: string,
   modelId: string,
   settings: AppSettings,
   plan: RequestPlan,
+  message: AssistantMessage,
 ): void {
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
   const model = resolveEffectiveModel(providerId, modelId, settings);
-  const activeTier = model?.contextTiers.find((tier) => tier.id === plan.activeTierId);
   if (!provider || !model) return;
-  const grantsTier = activeTier?.entitlement === 'unknown'
-    && activeTier.activation.kind !== 'implicit';
+  const activeTier = model.contextTiers.find((tier) => tier.id === plan.activeTierId);
+  const grantsTier = activeTier?.entitlement === 'unknown' && receiptExceedsSmallerTiers(model, activeTier.id, message);
   const fastControl = model.controls.fast;
   const grantsFast = plan.fastMode
     && fastControl.state === 'selectable'
-    && fastControl.entitlement === 'unknown';
-  const activatedBinding = model.executionBindings?.find((binding) => (
+    && fastControl.entitlement === 'unknown'
+    && receiptConfirmsFast(model, plan, message);
+  const switchedBinding = model.executionBindings?.find((binding) => (
     binding.entitlement === 'unknown'
     && plan.appliedBindingIds.includes(binding.id)
     && executionBindingMatchesPlan(binding, plan)
-    && binding.actions.some((action) => (
-      action.kind === 'model-switch' && action.targetModelId === plan.effectiveModelId
-    ))
+    && receiptConfirmsModelSwitch(binding, message)
   ));
-  if (!grantsTier && !grantsFast && !activatedBinding) return;
-  const activated = [
+  if (!grantsTier && !grantsFast && !switchedBinding) return;
+  const proven = [
     grantsTier && activeTier ? `context tier ${activeTier.id}` : '',
     grantsFast ? 'Fast mode' : '',
-    activatedBinding ? `execution binding ${activatedBinding.id}` : '',
+    switchedBinding ? `execution binding ${switchedBinding.id}` : '',
   ].filter(Boolean);
   effectiveCatalogService.recordObserved({
     providerId,
     accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
     protocol: plan.route.protocol,
-  }, `activation:${model.modelId}:${plan.route.protocol}:${plan.appliedBindingIds.join(',') || plan.activeTierId}`, [{
+  }, `receipt:${model.modelId}:${plan.route.protocol}:${plan.appliedBindingIds.join(',') || plan.activeTierId}`, [{
     modelId: model.modelId,
     ...(grantsTier && activeTier
       ? {
@@ -748,16 +796,16 @@ export function recordEffectivePlanSuccess(
     ...(grantsFast && fastControl.state === 'selectable'
       ? { controls: { fast: { ...fastControl, entitlement: 'granted' as const } } }
       : {}),
-    ...(activatedBinding
+    ...(switchedBinding
       ? {
           executionBindings: model.executionBindings?.map((binding) => (
-            binding.id === activatedBinding.id
+            binding.id === switchedBinding.id
               ? { ...binding, entitlement: 'granted' as const }
               : binding
           )),
         }
       : {}),
-  }], `Successful request activated ${activated.join(' and ')}`);
+  }], `Response receipt confirmed ${proven.join(' and ')}`, OBSERVED_ENTITLEMENT_TTL_MS);
 }
 
 export const OBSERVED_TOOL_CALLING_UNSUPPORTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;

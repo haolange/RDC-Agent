@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CompiledPromptCache } from '@shared/types/semanticContext';
-import type { RequestPlan } from '@shared/types/providerCapability';
-import type { Context, Model, StreamOptions } from '../core/types';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { AnthropicProvider } from './AnthropicProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider, __testing as responsesTesting } from './OpenAIResponsesProvider';
+import type { Context, Model, StreamOptions } from '../core/types';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { CompiledPromptCache } from '@shared/types/semanticContext';
 
 const model: Model = {
   id: 'gpt-5.6-sol',

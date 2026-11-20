@@ -1,6 +1,5 @@
 import { enOnboarding } from './locales/en/onboarding';
 import { zhOnboarding } from './locales/zh-CN/onboarding';
-import type { AppLanguage } from '@shared/types/settings';
 import { enApp } from './locales/en/app';
 import { enChat } from './locales/en/chat';
 import { enComposer } from './locales/en/composer';
@@ -41,6 +40,7 @@ import { zhSidebar } from './locales/zh-CN/sidebar';
 import { zhTerminal } from './locales/zh-CN/terminal';
 import { zhTheme } from './locales/zh-CN/theme';
 import { zhUserMenu } from './locales/zh-CN/userMenu';
+import type { AppLanguage } from '@shared/types/settings';
 
 export const englishTranslations = {
   ...enOnboarding,

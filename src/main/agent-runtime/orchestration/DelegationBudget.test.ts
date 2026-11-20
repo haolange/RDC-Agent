@@ -1,5 +1,5 @@
-import { registerPolicyBudgetObserver, flushPolicyBudgetObservers } from './DelegationBudget';
 import { describe, expect, it } from 'vitest';
+import { registerPolicyBudgetObserver, flushPolicyBudgetObservers } from './DelegationBudget';
 import { deriveChildPolicyBudget } from './DelegationBudget';
 import { consumeReservedSubagentSlot, createPolicyBudgetState, reserveDispatchBudget } from './TurnCoordinator';
 

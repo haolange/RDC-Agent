@@ -2,11 +2,11 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentManifestDefinition, AgentDefinitionSaveResult } from '@shared/types/agentManifest';
 import { resolveAgentWriteTargetFromDraft } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
 import { useSettingsModalState } from './useSettingsModalState';
 import { useAgentManifestAutosave } from './useAgentManifestAutosave';
+import type { AppSettings } from '@shared/types/settings';
+import type { AgentManifestDefinition, AgentDefinitionSaveResult } from '@shared/types/agentManifest';
 import type { AgentManifestSaveBatch } from './settingsModalActions';
 
 const definition = (scope: 'project' | 'user'): AgentManifestDefinition => ({

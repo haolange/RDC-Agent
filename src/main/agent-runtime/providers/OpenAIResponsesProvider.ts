@@ -1,15 +1,7 @@
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
+import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { promptCacheHeaders } from './promptCacheWire';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -25,6 +17,14 @@ import {
   toResponsesInput,
 } from './internal/responsesShared';
 import { isReasoningEnabled } from './reasoningWire';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Model,
+  StreamOptions,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { ProviderRequestAuthorizer } from '../../settings/provider-auth/AwsBedrockCredentials';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';

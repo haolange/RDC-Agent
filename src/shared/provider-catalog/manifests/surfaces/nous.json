@@ -40,7 +40,18 @@
   "authModes": [
     "device"
   ],
-  "accountLoginConfigured": true,
+  "accountAuth": {
+    "flow": "nous-device",
+    "loginMode": "device",
+    "codeInput": false,
+    "credential": {
+      "tokenFields": [
+        "accessToken",
+        "apiKey"
+      ],
+      "baseUrlField": "resourceUrl"
+    }
+  },
   "capabilities": [
     "chat",
     "tool-calling",

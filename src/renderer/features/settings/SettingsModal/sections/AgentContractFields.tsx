@@ -8,9 +8,9 @@ import {
   type AgentCompletionContract,
   type AgentManifestDraft,
 } from '@shared/types/agentManifest';
-import type { useI18n } from '../../../../i18n';
 import { Select } from '../../../../ui/Select';
 import { SettingsField } from '../parts';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

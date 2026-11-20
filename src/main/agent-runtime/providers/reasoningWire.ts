@@ -1,8 +1,9 @@
-import type { ReasoningVisibility } from '@shared/types/agentRuntime';
+import type { ReasoningVisibilityRequest } from '@shared/provider-catalog/modelManifestSchema';
 import type {
   NamedReasoningLevel,
   ResolvedReasoningSelection,
 } from '@shared/types/modelCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 function resolveWireLevel(
   reasoning: ResolvedReasoningSelection,
@@ -31,9 +32,21 @@ export function isReasoningEnabled(reasoning: ResolvedReasoningSelection | undef
   return reasoning ? reasoning.selection !== 'off' && reasoning.selection !== 'unknown' : false;
 }
 
+/**
+ * The route's declared request for visible reasoning, and only while reasoning is on. Adapters read this
+ * one fact; they never infer it from the contract semantic or the provider id.
+ */
+export function reasoningVisibilityRequest(options: {
+  reasoning?: ResolvedReasoningSelection;
+  requestPlan?: Pick<RequestPlan, 'contracts'>;
+}): ReasoningVisibilityRequest | null {
+  if (!isReasoningEnabled(options.reasoning)) return null;
+  return options.requestPlan?.contracts.reasoning.visibilityRequest ?? null;
+}
+
 export function buildOpenAiResponsesReasoning(
   reasoning: ResolvedReasoningSelection | undefined,
-  reasoningVisibility?: ReasoningVisibility,
+  visibilityRequest: ReasoningVisibilityRequest | null,
 ): { reasoning?: Record<string, unknown>; include?: string[] } {
   if (!reasoning || reasoning.control.wireProfile.kind !== 'openai-responses') {
     return {};
@@ -54,7 +67,7 @@ export function buildOpenAiResponsesReasoning(
   }
 
   const nextReasoning: Record<string, unknown> = { effort };
-  if (reasoningVisibility === 'summary-events') {
+  if (visibilityRequest === 'responses-summary') {
     nextReasoning.summary = 'auto';
   }
   return {
@@ -100,7 +113,7 @@ export function applyOpenAiCompatibleReasoning(
 export function applyAnthropicReasoning(
   body: Record<string, unknown>,
   reasoning: ResolvedReasoningSelection | undefined,
-  reasoningVisibility?: ReasoningVisibility,
+  visibilityRequest: ReasoningVisibilityRequest | null,
 ): void {
   if (!reasoning || reasoning.control.wireProfile.kind !== 'anthropic') {
     return;
@@ -121,7 +134,7 @@ export function applyAnthropicReasoning(
     if (typeof profile.onBudgetTokens === 'number') {
       thinking.budget_tokens = profile.onBudgetTokens;
     }
-    if (reasoningVisibility === 'summary-events') {
+    if (visibilityRequest === 'anthropic-display') {
       thinking.display = 'summarized';
     }
     body.thinking = thinking;
@@ -136,10 +149,14 @@ export function applyAnthropicReasoning(
 export function applyGeminiReasoning(
   generationConfig: Record<string, unknown>,
   reasoning: ResolvedReasoningSelection | undefined,
+  visibilityRequest: ReasoningVisibilityRequest | null,
 ): void {
   if (!reasoning) {
     return;
   }
+  const withThoughts = (thinkingConfig: Record<string, unknown>) => (
+    visibilityRequest === 'gemini-include-thoughts' ? { ...thinkingConfig, includeThoughts: true } : thinkingConfig
+  );
 
   const wireLevel = resolveWireLevel(reasoning);
   if (reasoning.control.wireProfile.kind === 'gemini-thinking-level') {
@@ -148,7 +165,7 @@ export function applyGeminiReasoning(
     }
     const thinkingLevel = reasoning.control.wireProfile.levels[wireLevel];
     if (thinkingLevel) {
-      generationConfig.thinkingConfig = { thinkingLevel };
+      generationConfig.thinkingConfig = withThoughts({ thinkingLevel });
     }
     return;
   }
@@ -160,7 +177,7 @@ export function applyGeminiReasoning(
     }
     const thinkingBudget = reasoning.control.wireProfile.levels[wireLevel];
     if (typeof thinkingBudget === 'number') {
-      generationConfig.thinkingConfig = { thinkingBudget };
+      generationConfig.thinkingConfig = withThoughts({ thinkingBudget });
     }
   }
 }
@@ -168,7 +185,7 @@ export function applyGeminiReasoning(
 export function applyGoogleInteractionsReasoning(
   generationConfig: Record<string, unknown>,
   reasoning: ResolvedReasoningSelection | undefined,
-  reasoningVisibility?: ReasoningVisibility,
+  visibilityRequest: ReasoningVisibilityRequest | null,
 ): void {
   if (!reasoning || reasoning.control.wireProfile.kind !== 'gemini-thinking-level') return;
   const wireLevel = resolveWireLevel(reasoning);
@@ -176,7 +193,7 @@ export function applyGoogleInteractionsReasoning(
   const thinkingLevel = reasoning.control.wireProfile.levels[wireLevel];
   if (!thinkingLevel) return;
   generationConfig.thinking_level = thinkingLevel;
-  if (reasoningVisibility === 'summary-events') generationConfig.thinking_summaries = 'auto';
+  if (visibilityRequest === 'gemini-interactions-summaries') generationConfig.thinking_summaries = 'auto';
 }
 
 export function applyMoonshotReasoning(
@@ -202,7 +219,7 @@ export function applyMoonshotReasoning(
 export function applyReasoningToAnthropicLikeBody(
   body: Record<string, unknown>,
   reasoning: ResolvedReasoningSelection | undefined,
-  reasoningVisibility?: ReasoningVisibility,
+  visibilityRequest: ReasoningVisibilityRequest | null,
 ): void {
   if (!reasoning) {
     return;
@@ -211,5 +228,16 @@ export function applyReasoningToAnthropicLikeBody(
     applyMoonshotReasoning(body, reasoning);
     return;
   }
-  applyAnthropicReasoning(body, reasoning, reasoningVisibility);
+  applyAnthropicReasoning(body, reasoning, visibilityRequest);
+}
+
+/** Ollama's `think` switches thinking on or off; it is sent only for models whose reasoning control is known. */
+export function applyOllamaThink(
+  body: Record<string, unknown>,
+  reasoning: ResolvedReasoningSelection | undefined,
+  requestPlan: Pick<RequestPlan, 'contracts'> | undefined,
+): void {
+  if (!reasoning || reasoning.selection === 'unknown' || reasoning.control.kind === 'none') return;
+  if (requestPlan?.contracts.reasoning.visibilityRequest !== 'ollama-think') return;
+  body.think = isReasoningEnabled(reasoning);
 }

@@ -1,7 +1,7 @@
 import React from 'react';
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { useI18n } from '../i18n';
 import { buildContextRunMeterModel, type ContextMeterCardModel } from './contextRunMeterModel';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 const METER_UNAVAILABLE = '—';
 

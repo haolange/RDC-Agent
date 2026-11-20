@@ -6,10 +6,10 @@ import {
   type InvestigationMission,
   type InvestigationRecordType,
 } from '@shared/types/renderdocInvestigation';
-import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, InvestigationListCursor, InvestigationListPage } from '@shared/types/trace';
 import { hashesEqual } from '../investigation/investigationHash';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { collectSupersedeChain, type InvestigationIndexEntry } from '../investigation/investigationRecordKeys';
+import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, InvestigationListCursor, InvestigationListPage } from '@shared/types/trace';
 
 const PAGE_SIZE = 50;
 

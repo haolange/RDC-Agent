@@ -5,13 +5,18 @@
 
 import { hashScopedResource } from './ScopedResourceResolver';
 
-const SECRET_KEY = /(?:api[-_]?key|authorization|password|secret|access[-_]?token|refresh[-_]?token)/i;
+const SECRET_KEY = /(?:api[-_]?key|authorization|password|passwd|secret|private[-_]?key|cookie|(?:access|refresh|id|session|auth|bearer|oauth|github)[-_]?token|^token$)/i;
 const PROTECTED_KEY = /^(?:encryptedContent|signature|thoughtSignature|redactedContent|opaqueState|reasoningContent|raw)$/i;
-const SECRET_ASSIGNMENT = /((?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\r\n,;]+)/gi;
+const SECRET_ASSIGNMENT = /((?:api[-_ ]?key|authorization|password|passwd|secret|private[-_ ]?key|(?:access|refresh|id|session|auth|bearer|oauth|github)[-_ ]?token)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\r\n,;]+)/gi;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi;
-const PREFIXED_SECRET = /\b(?:sk|rk|xai|ghp|github_pat|sk-ant)-[A-Za-z0-9_-]{12,}\b/gi;
+/** Provider keys with a dash after the prefix (OpenAI, Anthropic, xAI, Slack). */
+const DASH_PREFIXED_SECRET = /\b(?:sk-ant|sk|rk|xai|xox[abeoprs])-[A-Za-z0-9_-]{12,}/gi;
+/** GitHub tokens: classic `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_` and fine-grained `github_pat_`. */
+const GITHUB_TOKEN = /\b(?:gh[oprsu]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g;
+const AWS_ACCESS_KEY_ID = /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g;
 const GOOGLE_API_KEY = /\bAIza[A-Za-z0-9_-]{20,}\b/g;
 const JWT_TOKEN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
+const PRIVATE_KEY_BLOCK = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g;
 
 export interface RedactionRecord {
   path: string;
@@ -21,11 +26,19 @@ export interface RedactionRecord {
 
 export function redactCredentialLikeText(value: string): string {
   return value
+    .replace(PRIVATE_KEY_BLOCK, '[REDACTED PRIVATE KEY]')
     .replace(SECRET_ASSIGNMENT, '$1[REDACTED]')
     .replace(BEARER_TOKEN, 'Bearer [REDACTED]')
-    .replace(PREFIXED_SECRET, '[REDACTED]')
+    .replace(DASH_PREFIXED_SECRET, '[REDACTED]')
+    .replace(GITHUB_TOKEN, '[REDACTED]')
+    .replace(AWS_ACCESS_KEY_ID, '[REDACTED]')
     .replace(GOOGLE_API_KEY, '[REDACTED]')
     .replace(JWT_TOKEN, '[REDACTED]');
+}
+
+/** A bounded, redacted one-line preview of tool arguments for the visible work process. */
+export function redactedArgumentsPreview(value: unknown, maxChars = 600): string {
+  return (JSON.stringify(redactSecretsDeep(value ?? {}).value) ?? '{}').slice(0, maxChars);
 }
 
 export function redactSecretsDeep(

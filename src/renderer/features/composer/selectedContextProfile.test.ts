@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { resolveSelectedContextProfile } from './selectedContextProfile';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import { resolveSelectedContextProfile } from './selectedContextProfile';
 
 const noReasoning = {
   kind: 'none' as const,

@@ -10,8 +10,6 @@ export type BridgeChannelCapability = 'read' | 'mutation' | 'high-impact' | 'des
 
 export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapability> = {
   'app:getMeta': 'read',
-  'app:hasSeenGettingStarted': 'read',
-  'app:acknowledgeGettingStarted': 'mutation',
   'app:selectAvatar': 'desktop-only',
   'app:getAvatarDataUrl': 'desktop-only',
   'app:openPath': 'mutation',
@@ -122,6 +120,8 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'settings:previewAgentModelMigration': 'read',
   'settings:applyAgentModelMigration': 'high-impact',
   'settings:deleteAgentOverrideFile': 'high-impact',
+  'settings:previewProjectAgentTrust': 'read',
+  'settings:trustProjectAgent': 'high-impact',
   'settings:getAgentBuiltinComparison': 'read',
   'settings:saveProviderDefinition': 'high-impact',
   'settings:getProviderDefinitionCommit': 'read',
@@ -184,6 +184,11 @@ export function resolveBridgeChannelCapability(channel: string): BridgeChannelCa
     throw new Error(`BRIDGE_CAPABILITY_MISSING: ${channel}`);
   }
   return CHANNEL_CAPABILITY[channel];
+}
+
+/** High-impact channels are confirmed and audited on every transport. */
+export function isHighImpactChannel(channel: string): boolean {
+  return hasBridgeChannelCapability(channel) && CHANNEL_CAPABILITY[channel] === 'high-impact';
 }
 
 export function listUnclassifiedInvokeChannels(): string[] {

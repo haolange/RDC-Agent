@@ -4,7 +4,6 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rdcInstallationFiles } from '../platform/rdcLayout';
-import { installationRootOfPython } from './RdcInstallationService';
 
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({
@@ -171,12 +170,12 @@ describe('OwnedRdcDaemonRegistry', () => {
     expect(listOwnedRdcDaemons({ registryPath })).toHaveLength(1);
   });
 
-  it.skipIf(!process.env.RDC_NATIVE_PYTHON)('reaps a real refactored worker after its owner is unavailable', { timeout: 45_000 }, async () => {
+  it.skipIf(!process.env.RDC_NATIVE_TOOLS_ROOT)('reaps a real refactored worker after its owner is unavailable', { timeout: 45_000 }, async () => {
     const root = makeRoot();
     const registryPath = path.join(root, 'owned-rdc-daemons.json');
     const intermediateRoot = path.join(root, 'rdc-tool-intermediate');
-    const python = process.env.RDC_NATIVE_PYTHON!;
-    const installation = installationRootOfPython(python);
+    const installation = process.env.RDC_NATIVE_TOOLS_ROOT!;
+    const { python } = rdcInstallationFiles(installation);
     const worker = spawn(python, ['-m', 'rdc_tool.runtime.worker_main', '--context-id', contextId], {
       cwd: installation,
       windowsHide: true,

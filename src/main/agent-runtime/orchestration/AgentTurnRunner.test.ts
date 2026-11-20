@@ -1,5 +1,5 @@
-import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { describe, expect, it, vi } from 'vitest';
+import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 
 vi.mock('electron', () => ({
   app: {
@@ -27,13 +27,14 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
 }));
 
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
+import { TokenizerService } from '../core/TokenizerService';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { AgentTurnRunner } from './AgentTurnRunner';
 import { isSuccessfulProviderResponse } from './AgentSlotFactory';
 import { resolveExecutionScopeId } from './executionScope';
-import { TokenizerService } from '../core/TokenizerService';
+import { createSubagentBudgetState, turnCoordinator, type SubagentBudgetState } from './TurnCoordinator';
 import type { AssistantMessage, ToolResultMessage } from '../core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
@@ -41,7 +42,6 @@ import type { PreparedAgentRuntime } from './orchestratorTypes';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
-import { createSubagentBudgetState, turnCoordinator, type SubagentBudgetState } from './TurnCoordinator';
 
 function createRunner(): AgentTurnRunner {
   return new AgentTurnRunner({

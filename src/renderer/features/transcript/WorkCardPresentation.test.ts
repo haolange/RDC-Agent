@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
-import { translate } from '../../i18n/messages';
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
+import { translate } from '../../i18n/messages';
 import { WorkCardHeader } from './WorkCardHeader';
 import { WorkDisclosure } from './WorkDisclosure';
 import { DelegationTaskDocument } from './DelegationTaskDocument';
@@ -15,6 +14,8 @@ import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessContent } from './WorkProcessContent';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { ToolAggregateRow } from './ToolAggregateRow';
+
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { count: number }) => `${key}${values ? `:${values.count}` : ''}` }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('p', null, content) }));
@@ -200,21 +201,22 @@ it('keeps one event sequence and wording across process densities without invent
   const presentation = buildWorkProcessPresentation({ status: 'complete', updatedAt: now + 400,
     blocks: [
       { id: 'first-turn', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-        result: { text: '', status: 'complete', toolCallIds: ['glob', 'shell'], outputPhase: 'commentary' },
+        result: { status: 'complete', toolCallIds: ['glob', 'shell'], outputPhase: 'commentary' },
         toolCalls: [
           { id: 'glob', toolName: 'glob', status: 'complete', argsPreview: '{"pattern":"*"}',
-            resultPreview: '0 files', startedAt: now + 10, completedAt: now + 20 },
+            resultPreview: '0 files', displayOrder: 1, startedAt: now + 10, completedAt: now + 20 },
           { id: 'shell', toolName: 'shell.command', status: 'complete', argsPreview: 'Get-ChildItem',
-            resultPreview: 'completed', startedAt: now + 30, completedAt: now + 40 },
+            resultPreview: 'completed', displayOrder: 2, startedAt: now + 30, completedAt: now + 40 },
         ], startedAt: now, completedAt: now + 40 },
       { id: 'diagnostic-hook.completed', kind: 'diagnostic', title: 'Runtime diagnostic', summary: 'Hook rdc-shell-audit: completed',
         diagnosticSeverity: 'info', status: 'complete', toolCalls: [], startedAt: now + 41, completedAt: now + 42 },
       { id: 'second-turn', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-        result: { text: '', status: 'complete', toolCallIds: ['done'], outputPhase: 'commentary' },
-        thinking: { kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text: 'Checked the result.' },
-        thinkingStatus: 'complete',
+        result: { status: 'complete', toolCallIds: ['done'], outputPhase: 'commentary' },
+        items: [{ kind: 'thinking', status: 'complete', displayOrder: 3,
+          providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking', contentIndex: 0 },
+          thinking: { kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text: 'Checked the result.' } }],
         toolCalls: [{ id: 'done', toolName: 'turn_complete', status: 'complete', argsPreview: '{}',
-          resultPreview: 'Turn completion recorded: completed.', startedAt: now + 220, completedAt: now + 245 }],
+          resultPreview: 'Turn completion recorded: completed.', displayOrder: 4, startedAt: now + 220, completedAt: now + 245 }],
         startedAt: now + 200, completedAt: now + 245 },
     ] }, t);
   const render = (density: 'normal' | 'compact') => new DOMParser().parseFromString(renderToStaticMarkup(createElement(
@@ -229,7 +231,7 @@ it('keeps one event sequence and wording across process densities without invent
     expect(document.querySelector('[data-testid="work-process-hook-diagnostic-card"]')?.textContent)
       .not.toContain('Hook rdc-shell-audit: completed');
     expect(document.querySelector('.work-process-thinking-summary')?.textContent).toContain('已思考 · 20ms');
-    expect([...document.querySelectorAll('.work-process-prose')]).toHaveLength(0);
+    expect([...document.querySelectorAll('[data-testid="work-process-output"]')]).toHaveLength(0);
   }
   expect(normal.querySelector('.work-process-steps')?.textContent).toBe(compact.querySelector('.work-process-steps')?.textContent);
   expect([...compact.querySelectorAll('[data-testid="work-process-tool-card"]')].map((card) => card.closest('li')?.getAttribute('data-testid')))

@@ -1,13 +1,13 @@
-import type { CLIResult } from '@shared/types/tool';
-import type { RdcContextLease } from './RdcRuntimeContextRegistry';
+import { createHash } from 'node:crypto';
 import { assertRdcContextLeaseOwnership, getDelegatedChildSessionId, getRdcContextLease } from './RdcRuntimeContextRegistry';
 import { parseRdcNativeResult, type RdcNativeEnvelope } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity, type RdcProcessIdentity } from './RdcProcessIdentity';
 import { runRdcOperation } from './RdcOperationCoordinator';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
-import type { RdcTurnBinding } from './RdcTurnBindings';
-import { createHash } from 'node:crypto';
 import { canonicalJson } from './RdcOperationCatalog';
+import type { RdcTurnBinding } from './RdcTurnBindings';
+import type { RdcContextLease } from './RdcRuntimeContextRegistry';
+import type { CLIResult } from '@shared/types/tool';
 
 export interface RdcSwitchSnapshot {
   contextId: string;

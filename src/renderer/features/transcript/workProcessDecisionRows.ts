@@ -1,10 +1,10 @@
-import type { Translator } from '../../i18n/messages';
 import { type ConversationToolCall, type ConversationWorkBlock } from '@shared/types/conversation';
+import { normalizeAskUserAnswers } from '@shared/utils/askUser';
 import { type WorkProcessRow, type WorkProcessUserInputItem, type WorkProcessRowStatus } from './workProcessTypes';
 import { formatDurationMs, compactText } from './workProcessFormat';
 import { parsePreview } from './workProcessContentText';
-import { normalizeAskUserAnswers } from '@shared/utils/askUser';
 import { getMeaningfulBlockSummary } from './workProcessBlockText';
+import type { Translator } from '../../i18n/messages';
 
 export const createPlanReviewRow = (call: ConversationToolCall): WorkProcessRow => ({
   type: 'planReview',

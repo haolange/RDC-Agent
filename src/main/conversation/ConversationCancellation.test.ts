@@ -1,10 +1,10 @@
-import { translate } from '../../renderer/i18n/messages';
 import { describe, expect, it } from 'vitest';
-import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { translate } from '../../renderer/i18n/messages';
 import { createToolRowForPresentation } from '../../renderer/features/transcript/workProcessToolRows';
+import { stopWorkTrace } from '../../renderer/lib/stopWorkTrace';
+import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
 import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import { applyPlanReviewAnswered } from './ConversationPlanReviewEvents';
-import { stopWorkTrace } from '../../renderer/lib/stopWorkTrace';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 
 const pendingTrace = (): ConversationWorkTrace => upsertRuntimeToolCall(undefined, {
@@ -51,7 +51,7 @@ describe('request cancellation is not rejection or failure', () => {
   });
   it('does not reopen a stopped trace when a late result or tool update arrives', () => {
     const stopped = finalizeTrace(pendingTrace(), 'stopped', undefined, 100);
-    expect(upsertLoopResult(stopped, 'loop', 'late', undefined, undefined, 'streaming')).toEqual(stopped);
+    expect(upsertLoopResult(stopped, 'loop', { status: 'streaming' })).toEqual(stopped);
     expect(upsertRuntimeToolCall(stopped, { id: 'p', toolName: 'plan_artifact', status: 'running' })).toEqual(stopped);
   });
   it.each(['complete', 'error'] as const)('keeps a real %s receipt when approval cancellation arrives late', status => {

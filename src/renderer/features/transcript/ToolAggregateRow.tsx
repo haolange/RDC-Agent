@@ -1,8 +1,8 @@
 import React from 'react';
-import type { WorkProcessRow } from './workProcessTypes';
 import { ToolRow } from './WorkProcessRows';
 import { useHasOpenWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import type { WorkProcessRow } from './workProcessTypes';
 
 type ToolAggregateRowModel = Extract<WorkProcessRow, { type: 'toolAggregate' }>;
 

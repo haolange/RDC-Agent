@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { cn } from '../../../../lib/cn';
-import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
@@ -14,6 +13,7 @@ import { McpResourceTable } from './McpResourceTable';
 import { resourceCardMeta } from './scopedResourceForm';
 import { useRuntimeScopePanel } from './useRuntimeScopePanel';
 import { revealResourceLocation } from './runtimeScopeActions';
+import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
 

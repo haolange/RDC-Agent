@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import { generateEventId, nowIso } from '@shared/utils/id';
+import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
+import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
+import { artifactStore } from './ArtifactStore';
 import type { ArtifactKind, ArtifactRecord } from '@shared/types/harness';
 import type { AgentTool } from '../agent-runtime/agent/AgentTool';
-import { artifactStore } from './ArtifactStore';
-import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
 
 const OUTPUT_KINDS: ArtifactKind[] = ['report', 'screenshot', 'trace', 'shader', 'log', 'data', 'note'];
 
@@ -55,6 +56,7 @@ export function createOutputRegistrationTool(context: OutputRegistrationContext)
       },
     },
     permissionHint: 'session_mutation',
+    effects: { reads: ['path'] },
     spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: false },
     async execute(_toolCallId, params, signal) {
       if (signal?.aborted) throw new Error('Output publication cancelled.');
@@ -67,9 +69,12 @@ export function createOutputRegistrationTool(context: OutputRegistrationContext)
 
       const requestedPath = readRequiredString(params.path, 'path');
       const root = path.resolve(projectRootPath);
-      const sourcePath = path.resolve(root, requestedPath);
-      if (!isInside(root, sourcePath)) {
-        return { content: [{ type: 'text', text: 'Only files inside the active project can be published.' }], isError: true };
+      let sourcePath: string;
+      try {
+        // Rejects symlinks and junctions and re-checks the project boundary after realpath.
+        sourcePath = safeResolvePath(requestedPath, root);
+      } catch {
+        return { content: [{ type: 'text', text: 'Only regular files inside the active project can be published.' }], isError: true };
       }
       if (isProjectInput(root, sourcePath)) {
         return { content: [{ type: 'text', text: 'Project inputs cannot be published as outputs.' }], isError: true };

@@ -1,11 +1,11 @@
-import { Details } from '../../../../ui/Details';
 import React, { type ReactNode } from 'react';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import { Details } from '../../../../ui/Details';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { Input } from '../../../../ui/Input';
 import { Spinner } from '../../../../ui/Spinner';
+import type { LlmProviderEntry } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -16,7 +16,7 @@ interface ProviderAccountOAuthPanelProps {
   connectionAccountConnected: boolean;
   connectionDevicePending: boolean;
   onUpdateConnectionDraft: (patch: Partial<ProviderConnectionDraft>) => void;
-  onStartAccountLogin: (accountLoginMode?: ProviderConnectionDraft['accountLoginMode']) => void | Promise<void>;
+  onStartAccountLogin: () => void | Promise<void>;
   t: Translate;
 }
 
@@ -48,9 +48,9 @@ const Step: React.FC<{ index: number; state: StepState; title: string; descripti
 );
 
 /**
- * Account login as a short step list. Device flow: open page → enter code → wait. Browser
- * flow: complete login in the browser, with automatic callbacks where supported. The footer Connect/Save
- * button remains the single submit; codes never persist to logs.
+ * Account login as a short step list, shaped by the provider's declared sign-in. Device flow: open page →
+ * enter code → wait. Browser flow: sign in, then paste the code or wait for the automatic callback. The
+ * footer Connect/Save button remains the single submit; codes never persist to logs.
  */
 export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps> = ({
   connectionDraft,
@@ -62,21 +62,14 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   t,
 }) => {
   const status = connectionDraft.accountStatus;
-  const isGrokSubscription = connectionProvider.id === 'grok-account';
-  const isOpenRouter = connectionProvider.id === 'openrouter';
   const diagnostic = status?.diagnostic;
-  const selectedMode = isGrokSubscription
-    ? 'browser'
-    : isOpenRouter || connectionProvider.id === 'claude-account' ? 'browser' : 'device';
+  const selectedMode = connectionProvider.accountLogin?.mode ?? 'device';
+  const browserCallback = selectedMode === 'browser' && !connectionProvider.accountLogin?.codeInput;
   const busy = connectionDraft.busy !== 'idle';
   const isAuthorizationPending = connectionDevicePending || busy;
   const isBrowserCodePending = selectedMode === 'browser' && status?.requiresCodeInput === true;
   const redirectUri = status?.redirectUri ?? '';
   const started = Boolean(status?.verificationUri || status?.authUrl || connectionDevicePending || isBrowserCodePending);
-
-  const waitingText = connectionProvider.id === 'github-copilot'
-    ? t('settings.githubAuthorizationPending')
-    : t('settings.oauthDeviceAuthorizationPending');
 
   if (connectionAccountConnected) {
     return (
@@ -91,7 +84,8 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
     );
   }
 
-  const openPageButton = status?.authUrl && (!isGrokSubscription || connectionDevicePending) ? (
+  // A failed callback flow starts over instead of reopening its stale authorization page.
+  const openPageButton = status?.authUrl && (!browserCallback || connectionDevicePending) ? (
     <a
       className="button button-primary button-sm settings-oauth-link-button"
       href={status.authUrl}
@@ -107,7 +101,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
       variant="primary"
       size="sm"
       data-testid="settings-provider-oauth-start"
-      onClick={() => void onStartAccountLogin(selectedMode)}
+      onClick={() => void onStartAccountLogin()}
       disabled={busy || connectionDevicePending}
     >
       {isAuthorizationPending
@@ -119,7 +113,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   return (
     <div className="settings-provider-oauth-panel">
       <div className="settings-provider-notice">
-        {t(isGrokSubscription ? 'settings.grokSubscriptionConnectHint' : 'settings.oauthConnectHint')}
+        {t(browserCallback ? 'settings.oauthBrowserConnectHint' : 'settings.oauthConnectHint')}
       </div>
 
       <ol className="settings-oauth-steps" data-testid="settings-provider-oauth-steps" data-mode={selectedMode}>
@@ -164,7 +158,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
               {connectionDevicePending ? (
                 <div className="settings-oauth-waiting" role="status" data-testid="settings-provider-oauth-waiting">
                   <Spinner size="sm" />
-                  <span>{waitingText}</span>
+                  <span>{t('settings.oauthDeviceAuthorizationPending')}</span>
                 </div>
               ) : null}
             </Step>
@@ -182,7 +176,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
                   <div className="settings-oauth-browser-opened" data-testid="settings-provider-oauth-browser-opened">
                     <Icon name="check" size={14} />
                     <span>{t('settings.oauthBrowserOpened')}</span>
-                    <Button variant="secondary" size="sm" onClick={() => void onStartAccountLogin(selectedMode)} disabled={busy}>
+                    <Button variant="secondary" size="sm" onClick={() => void onStartAccountLogin()} disabled={busy}>
                       {t('settings.reopenBrowser')}
                     </Button>
                   </div>
@@ -192,8 +186,8 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
             <Step
               index={2}
               state={started ? 'active' : 'pending'}
-              title={t(isOpenRouter || isGrokSubscription ? 'settings.oauthStepWait' : 'settings.oauthStepPasteCode')}
-              description={t(isOpenRouter || isGrokSubscription ? 'settings.oauthStepWaitHint' : 'settings.oauthStepPasteCodeHint')}
+              title={t(browserCallback ? 'settings.oauthStepWait' : 'settings.oauthStepPasteCode')}
+              description={t(browserCallback ? 'settings.oauthStepWaitHint' : 'settings.oauthStepPasteCodeHint')}
             >
               {status?.requiresCodeInput ? (
                 <div className="settings-provider-oauth-manual-code">

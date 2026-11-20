@@ -1,8 +1,8 @@
-import type { KnowledgeLaneHit } from '@shared/types/knowledge';
 import { Badge } from '../../../../ui/Badge';
 import { ListRow } from '../../../../ui/ListRow';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
+import type { KnowledgeLaneHit } from '@shared/types/knowledge';
 
 interface ConflictRowProps {
   leftCardId: string;

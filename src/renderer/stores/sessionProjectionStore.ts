@@ -1,7 +1,4 @@
 import { create } from 'zustand';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { AgentRunPresentation } from '@shared/types/agenticTrace';
-import type { ContextSnapshot, OpenedCaptureState, RunContextUsageSummary } from '@shared/types/session';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
 import { useCaptureStore } from './captureStore';
@@ -17,6 +14,9 @@ import {
   updateSessionProjectionMap,
 } from './sessionProjectionModel';
 import { hydrateSessionProjection } from './sessionProjectionHydration';
+import type { ContextSnapshot, OpenedCaptureState, RunContextUsageSummary } from '@shared/types/session';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 interface SessionProjectionStoreState {
   bySessionId: Record<string, import('./sessionProjectionModel').SessionProjection>;

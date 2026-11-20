@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
+import { getRenamePopoverPosition } from './renamePopoverPosition';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type {
   ProjectMenuPopoverState,
   ProjectRenamePopoverState,
   SessionRenamePopoverState,
 } from './types';
-import { getRenamePopoverPosition } from './renamePopoverPosition';
 
 export function useSidebarPopovers() {
   const [renamePopover, setRenamePopover] = useState<SessionRenamePopoverState | null>(null);

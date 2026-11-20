@@ -1,11 +1,11 @@
 import React from 'react';
+import { RenamePopoverPanels } from './RenamePopoverPanels';
+import { useRenamePopover } from './useRenamePopover';
 import type {
   ProjectMenuPopoverState,
   ProjectRenamePopoverState,
   SessionRenamePopoverState,
 } from './types';
-import { RenamePopoverPanels } from './RenamePopoverPanels';
-import { useRenamePopover } from './useRenamePopover';
 
 export { getRenamePopoverPosition } from './renamePopoverPosition';
 export { useSidebarPopovers } from './useSidebarPopovers';

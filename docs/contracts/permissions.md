@@ -6,12 +6,19 @@
 
 Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进程 `AgentPermissionPolicy` 为权威，结合 profile 天花板、permission mode、workspace root、tool metadata、`CompiledPolicy`。可读根、可写根、允许/拒绝命令前缀只在 Custom 生效，在 Settings 的 Custom 规则中编辑；保存等待主进程确认，不乐观生效。
 
-- `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。
+- `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。没有打开项目时不存在 workspace，任何文件读取与 shell 都需审批。
 - `Auto-review`：先执行确定性规则；已验证的低风险操作记录规则批准，其余可审操作提交一次独立、无工具的模型审核。没有有效批准不执行；不自动切人工或 Full access。
-- `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。
-- `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效。Full access 仍不能越过 profile 天花板。
+- `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。capture、Git 元数据和规范 Knowledge 在任何挡位都不是写入目标；写入受保护的配置或凭据路径在 Full access 下仍需用户确认。
+- `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效；网络工具仍需审批。Full access 仍不能越过 profile 天花板。
 
 工具按 observe / record / mutate / execute 分类（`src/shared/constants/toolAccess.ts`）；`read-only` = observe + record，`workspace-write` 再加 mutate，`full` 再加 execute；未知工具与 MCP 按 execute；Full access 权限模式不能抬高 profile 天花板；原生 `shell.rdc` 要求 `full`。
+
+天花板只会收紧，不会被继承或覆盖放宽：
+
+- **子代理**：子代理以 `min(委派回合冻结的天花板, 目标 profile 天花板)` 运行；同步、后台执行都在委派时取父回合 `EffectiveRuntimePlan.accessCeiling` 并随执行携带，缺少冻结计划的委派以 `SUBAGENT_PARENT_PLAN_REQUIRED` 拒绝。
+- **项目 profile**：覆盖 user/builtin 同 id profile 时不得超过被覆盖者的天花板；项目新增的 profile 上限为 `workspace-write`。声明超出上限时按上限运行并给出 `AGENT_PROJECT_CEILING_NARROWED` 诊断。
+
+工具在定义处声明效果（`AgentTool.effects`：读路径参数、写路径参数、glob 前缀参数、是否联网），`AgentPermissionPolicy` 只读这些声明，不按工具名推断。写路径在任何挡位先经 `fileOperationBoundary`（工程内目标经 realpath 且拒绝 symlink）；只读目标拒绝，受保护目标需审批。未声明效果的工具按访问类别：observe / record 自动，mutate / execute 需审批。
 
 Browser QA 代答 `conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 属于 high-impact，只在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时放行。桌面 IPC 不受该环境变量限制。
 
@@ -31,7 +38,7 @@ Work Process 必须展示真实 `Requested approval` / `Approved` / `Denied` / `
 
 Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllowedPathRoots`。
 
-当前 session 的 `{sessionPath}/attachments` 作为 scoped readable root 注入 `AgentPermissionPolicy.sessionAttachmentsRoot`。仅 `READ_ONLY_FILE_TOOLS`（`read_file` / `read_image` / `glob` / `grep`）自动可读；写工具、`code_interpreter` 与跨 session 附件目录不继承。依据是用户亲手附加 = 显式意图；`.rdc`、可执行文件与 SVG 不得进入该目录。
+当前 session 的 `{sessionPath}/attachments` 作为 scoped readable root 注入 `AgentPermissionPolicy.sessionAttachmentsRoot`。仅声明读效果且不写的工具（`read_file` / `read_image` / `glob` / `grep`）自动可读；写工具、`code_interpreter` 与跨 session 附件目录不继承。依据是用户亲手附加 = 显式意图；`.rdc`、可执行文件与 SVG 不得进入该目录。
 
 `read_file` 的显式 `mode: audit` 沿用该工具的冻结可用性与读取权限；`path` 和 `compareWith.path` 分别提取并审批，第一路径在工程内不自动授权第二路径。执行层对两者分别 realpath/根边界校验，且校验各自预期hash；不由模型脚本直接读磁盘，不增加新工具身份或向受限reviewer授予 `read_file`。审计只返回有界字节信息和整文件比较结果，不授予编辑前置读取资格。capture拒绝、8MiB输入上限和取消合同见 runtime-kernel。
 
@@ -42,6 +49,9 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - BrowserWindow：`sandbox: true`。
 - Preload：仅 `contextBridge` + `ipcRenderer` 受控暴露。
 - Permission request：deny-by-default。
+- 导航：窗口只加载应用入口（开发服务器按 origin，打包按精确入口文件）；其它链接、重定向与拖入窗口的本地页面一律拒绝，不附加 webview。
+- IPC：每次 invoke 先核对发送方文档是应用入口，否则 `IPC_SENDER_REJECTED`；Browser QA 桥独立认证后直接调用已登记的处理器。
+- 外部链接：账号与登录页只经 https 打开（`EXTERNAL_URL_REJECTED`）。
 - CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。
 
 ## IPC Schema（Zod）
@@ -69,6 +79,12 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - 对外查询仅 `{ hasSecret, maskedPreview? }`；不得返回明文。
 - 损坏条目 quarantine；文件权限 0600/ACL。
 - Credential 仅进入主进程 opaque lease，不进 manifest / Route / RequestPlan / IPC / Trace。
+- 落盘与可见投影统一走 `src/main/runtime/secretRedaction.ts`：凭据类字段名（api key、authorization、password、secret、private key、cookie、各类 `*_token` 与 `token`）整值替换；文本中识别 Bearer、`sk-`/`sk-ant-`/`xai-`/Slack `xox?-`、GitHub `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`/`github_pat_`、AWS `AKIA`/`ASIA`、Google `AIza`、JWT 与 PEM 私钥块。工作过程里任何工具的 `argsPreview` 都经 `redactedArgumentsPreview`，主回合与子代理不分两条路径。
+
+## 主进程确认与审计
+
+- **主进程确认**：知识写入/提升/导入、记忆写入/删除、计划写入/导出、hook / MCP / 项目 Agent 的 trust，都由主进程原生对话框确认（`src/main/window/mainConfirmation.ts`，默认按钮为取消）；renderer 请求本身不构成批准，没有聚焦窗口时一律不确认。唯一例外是未打包 Browser QA 显式 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 且无窗口，自动确认并写运行日志。取消 trust 返回未变化的状态。
+- **审计日志**：`<userData>/state/audit.jsonl` 只追加、不改写、不裁剪，每行带 `at` 与 `origin`（`desktop` / `browser-qa` / `runtime`）。记录：每次 high-impact IPC 调用（通道、参数 sha256、结果与错误码）；每个工具决定（用户、自动审查或策略拒绝，含工具名、调用 id、参数 sha256、风险）；权限设置的前后值。参数只记指纹不记内容；写入失败报 stderr，不阻断它所记录的决定。
 
 ## RDC Context Lease
 
@@ -82,14 +98,19 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 - Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。任一变化 → `needsRetrust`。
 - builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
-- 旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。
 - 12 canonical events 保持单一 `HookEngine` 路径。见 `ARCHITECTURE.md` 裁决 K。
-- 信任记录存于 `hook-trust.json`（schemaVersion 2），匹配只认 `trustFingerprint`，不接受 YAML-only `sourceHash`。
+- 信任记录存于 `hook-trust.json`（schemaVersion 2），匹配只认 `trustFingerprint`；其他形状的文件读作无信任，要求重新 trust。
+
+## Project Agent Trust
+
+- 随项目到来（clone、pull、解压）的 `.rdc-agent/agents/*.agent.md` 在信任前不加载，同 id 的 user/builtin profile 照常生效；Settings → 智能体的诊断给出 `AGENT_PROJECT_UNTRUSTED`，用户查看完整文件后信任。
+- 信任绑定 `realpath(projectRoot) + agentId + 文件 bytes`（`agent-trust.json`）；在 Settings 之外改动文件即失效。用户通过 Settings 保存、导入或写入的项目 profile 按写入的 bytes 自动信任；删除时撤销。
+- `settings:trustProjectAgent` 只接受主进程当前快照里确有该诊断的文件，并核对用户查看时的 `sourceHash`；文件在查看后变化 → `AGENT_OVERRIDE_CHANGED`。
 
 ## MCP Trust
 
 - Project MCP 与 user 同 ID 时，不可覆盖 user 的 `command` / `args` / `url` / `env`。
-- 可执行指纹变化 → `needsRetrust`；连接前 `assertConnectAllowed`。
+- Project MCP trust fingerprint 与 hook 同构：descriptor + 声明文件 realpath + PATH 解析后的 executable identity + 参数所指文件的 bytes（相对参数按项目真实路径解析）。任一变化 → `needsRetrust`；`assertConnectAllowed` 在连接时重新计算，不信任设置快照。记录存于 `mcp-trust.json`，形状不符读作无信任。
 - MCP 连接池按 `realpath(projectRoot) + projectId + descriptorHash` 分组；失败缓存指数退避（retryable→permanent）；orphan process quarantine 至 supervised.exit。Transport 仅 `stdio` / `streamable-http`；`sse` → `MCP_TRANSPORT_UNSUPPORTED`。
 - Settings 提供显式 trust 面板；Browser 与 Desktop 均通过相同 `rdc-runtime:trustMcp` handler 和主进程 trust 校验。
 
@@ -101,7 +122,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - `ShellCommandRiskAnalyzer`：结构分析 + denied 词边界与路径前缀；最高分档为 `high`，只做审批路由，没有 `critical` 档位。
 - **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + 原生身份/路径等执行检查与操作系统权限。Electron renderer sandbox 不隔离主进程派生的普通 shell；不得宣称存在命令级 OS sandbox。
 - shell.rdc 与 shell.command 互斥。严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning root 的 full 天花板 profile、冻结 binding/catalog、lease、scope/effects、参数与路径。已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。实际执行再次验证，保留串行、取消、恢复及签名证据合同。
-- 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；一个 `git status` 不授权后续 `git reset --hard`。仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。专用 Git 工具仍经原权限入口，shell 不增加 Git 权限。
+- 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；用户允许 `git status` 不授权后续 `git reset --hard`。shell 里的 git 不属于例行命令：仓库配置可以指定 git 运行的程序。仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。专用 Git 工具以命令行配置覆盖 fsmonitor、hooks、外部 diff 与 sshCommand，仓库本地配置声明可执行程序（fsmonitor、hooksPath、textconv、filter、include 等）时拒绝执行；shell 不增加 Git 权限。
 - project 内普通 write_file/edit_file 可按 low risk 自动批准；执行层仍要求 realpath、无链接写入、文本大小及覆盖前同 session 成功读取。capture 输入、Git 元数据与 canonical knowledge 不作为通用写入目标；Agent/Skill/Hook/Policy/MCP/Memory、secret 与环境配置需要明确审核，不获得通用自动编辑许可。
 
 ### 独立权限审核
@@ -134,7 +155,10 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 - `src/main/browserAppBridge/bridgeSecurity.test.ts`
 - `src/shared/renderer-api/createRendererApi.test.ts`
 - `src/main/settings/settings-core/SecretStorageService.test.ts`
+- `src/main/runtime/secretRedaction.test.ts`、`src/main/runtime/AuditLog.test.ts`、`src/main/window/mainConfirmation.test.ts`
 - `src/main/settings/agent-manifests/AgentRuntimeConfigService.test.ts`（MCP trust）
+- `src/main/settings/agent-manifests/AgentManifestService.effectiveCommit.test.ts`（项目 Agent trust 与天花板收紧）
+- `src/main/agent-runtime/orchestration/SubagentRunner.test.ts`（子代理天花板取交集）
 - `src/main/ipc/validation/IpcPayloadGuard.test.ts`
 - `src/main/rdc/RdcRuntimeContextRegistry.test.ts`
 - `src/main/agent-runtime/permissions/*`

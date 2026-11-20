@@ -1,8 +1,8 @@
 /** Windowed messages with measured row heights, including expanded work cards. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { findToolCallMessage } from '../../lib/findToolCallMessage';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const VIRTUALIZE_THRESHOLD = 48;
 

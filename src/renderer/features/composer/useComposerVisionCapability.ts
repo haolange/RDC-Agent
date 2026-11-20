@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import type { SessionRecord } from '@shared/types/session';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
+import type { SessionRecord } from '@shared/types/session';
 
 export function useComposerVisionCapability(agentId: string, currentSession: SessionRecord | null): boolean {
   const { effective } = useComposerEffectiveModel(agentId, currentSession);

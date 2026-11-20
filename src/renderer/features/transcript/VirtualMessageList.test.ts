@@ -2,8 +2,8 @@
 import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { VirtualMessageList, measuredMessageOffsets } from './VirtualMessageList';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 it('positions expanded messages using measured heights', () => {
   expect(measuredMessageOffsets([{ id: 'a' }, { id: 'b' }, { id: 'c' }], new Map([['b', 640]]), 160))

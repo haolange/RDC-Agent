@@ -1,9 +1,10 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
+import { translate } from '../../i18n/messages';
+import { PermissionModeSelector } from './PermissionModeSelector';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { AgentPermissionMode, AppLanguage } from '@shared/types/settings';
-import { translate } from '../../i18n/messages';
 
 const fixture = vi.hoisted(() => ({
   snapshot: { mode: 'default', revision: 1 } as RuntimePermissionState | null,
@@ -16,7 +17,6 @@ vi.mock('../../stores/runtimePermissionStore', () => ({ useRuntimePermissionStor
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: object) => unknown) => select({ setAgentPermissionMode: vi.fn() }) }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: Parameters<typeof translate>[1]) => translate(fixture.language, key) }) }));
 vi.mock('./useComposerMenuRegistry', () => ({ useComposerMenu: () => ({ open: true, close: vi.fn(), toggle: vi.fn(), setRoot: vi.fn(), setTrigger: vi.fn() }) }));
-import { PermissionModeSelector } from './PermissionModeSelector';
 
 afterEach(() => { fixture.snapshot = { mode: 'default', revision: 1 }; fixture.pendingMode = null; fixture.error = false; fixture.language = 'en'; });
 

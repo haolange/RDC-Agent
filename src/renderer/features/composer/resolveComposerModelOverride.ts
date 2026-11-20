@@ -1,5 +1,5 @@
-import type { SessionModelOverride } from '@shared/types/session';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import type { SessionModelOverride } from '@shared/types/session';
 import type { ComposerModelPickerOption } from './composerModelPicker';
 
 export function resolveComposerModelOverride(

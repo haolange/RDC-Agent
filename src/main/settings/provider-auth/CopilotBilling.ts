@@ -1,3 +1,5 @@
+import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
+import { parseOpenAiReasoningControl } from '../provider-catalog/LiveProviderCatalogParsers';
 import type {
   ContextTier,
   EntitlementState,
@@ -5,8 +7,6 @@ import type {
 } from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from '../provider-catalog/effectiveCatalogTypes';
-import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
-import { parseOpenAiReasoningControl } from '../provider-catalog/LiveProviderCatalogParsers';
 
 export interface CopilotModelCapabilityMetadata {
   limits: {

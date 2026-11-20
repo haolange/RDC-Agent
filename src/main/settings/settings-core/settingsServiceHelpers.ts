@@ -1,29 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
-import type {
-  AgentModelSettings,
-  AppRuntimePaths,
-  AppSettings,
-  LayoutPreferences,
-  LlmProviderEntry,
-  ProfileSettings,
-  RuntimeResourceCatalog,
-  ToolingSettings,
-  AgentRuntimeSettings,
-  UiPreferences,
-} from '@shared/types/settings';
 import { sanitizeUiPreferences } from '@shared/theme/uiPreferences';
-import {
-  createProviderEntryFromCatalog,
-  isBuiltinProviderId,
-} from '../../provider-catalog/ProviderCatalogRegistry';
-import { appPathService } from '../../runtime/AppPathService';
-import { agentManifestService } from '../agent-manifests/AgentManifestService';
-import { executionProfileService } from './ExecutionProfileService';
-import { tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
-import { secretStorageService } from './SecretStorageService';
-import { StorageSchemaError } from '../../sessions/store/storageSchema';
 import {
   DEFAULT_APPEARANCE,
   DEFAULT_AGENT_RUNTIME,
@@ -33,6 +11,18 @@ import {
   DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
   EMPTY_PATHS,
+} from '@shared/constants/appSettingsDefaults';
+import {
+  createProviderEntryFromCatalog,
+  isBuiltinProviderId,
+} from '../../provider-catalog/ProviderCatalogRegistry';
+import { appPathService } from '../../runtime/AppPathService';
+import { agentManifestService } from '../agent-manifests/AgentManifestService';
+import { StorageSchemaError } from '../../sessions/store/storageSchema';
+import { executionProfileService } from './ExecutionProfileService';
+import { tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
+import { secretStorageService } from './SecretStorageService';
+import {
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
   SETTINGS_SCHEMA_VERSION,
@@ -58,6 +48,18 @@ import {
   sanitizeUserProvider,
   type ProviderSanitizeOptions,
 } from './settingsProviderSanitize';
+import type {
+  AgentModelSettings,
+  AppRuntimePaths,
+  AppSettings,
+  LayoutPreferences,
+  LlmProviderEntry,
+  ProfileSettings,
+  RuntimeResourceCatalog,
+  ToolingSettings,
+  AgentRuntimeSettings,
+  UiPreferences,
+} from '@shared/types/settings';
 
 export interface HardRebuildResult {
   settings: PersistedSettingsPayload;

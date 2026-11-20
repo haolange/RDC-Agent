@@ -1,9 +1,9 @@
 import path from 'path';
 import { app, nativeImage, nativeTheme, type BrowserWindow, type NativeImage } from 'electron';
-import type { UiPreferences } from '@shared/types/settings';
 import { maskLogoCircleRgba, recolorLogoRgba } from '@shared/theme/recolorLogo';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import type { UiPreferences } from '@shared/types/settings';
 
 let target: BrowserWindow | null = null;
 let source: NativeImage | undefined;

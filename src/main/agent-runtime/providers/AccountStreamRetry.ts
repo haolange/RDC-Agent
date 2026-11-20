@@ -1,6 +1,6 @@
 import { EventStream } from '../core/EventStream';
-import type { AssistantMessage, AssistantMessageEvent } from '../core/types';
 import { ProviderHttpError } from './internal/http';
+import type { AssistantMessage, AssistantMessageEvent } from '../core/types';
 
 export interface AccountStreamRetryInput {
   createAttempt: () => EventStream<AssistantMessageEvent, AssistantMessage>;

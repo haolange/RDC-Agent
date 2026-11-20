@@ -1,11 +1,10 @@
-import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/artifacts/DelegatedArtifactAccess';
 import {
   INVESTIGATION_ARTIFACT_KINDS,
   INVESTIGATION_ARTIFACT_STATUSES,
   resolveInvestigationKind,
   type InvestigationMission,
 } from '@shared/types/renderdocInvestigation';
-import type { AgentTool, AgentToolResult } from '../agent-runtime/agent/AgentTool';
+import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/artifacts/DelegatedArtifactAccess';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { getInvestigationRecordJsonSchema } from './investigationRecordSchemas';
 import { recordKeyOf } from './investigationRecordKeys';
@@ -14,6 +13,7 @@ import {
   type InvestigationArtifactService,
   type InvestigationWriteInput,
 } from './InvestigationArtifactService';
+import type { AgentTool, AgentToolResult } from '../agent-runtime/agent/AgentTool';
 
 export const INVESTIGATION_TOOL_IDS = [
   'investigation_schema',

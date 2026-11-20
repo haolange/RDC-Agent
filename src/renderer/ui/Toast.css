@@ -45,13 +45,13 @@
 
 .ui-toast-title {
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-semibold);
 }
 
 .ui-toast-message {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   line-height: var(--leading-normal);
 }
 

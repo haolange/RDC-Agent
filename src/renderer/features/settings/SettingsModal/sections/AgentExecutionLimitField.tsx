@@ -1,7 +1,7 @@
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { useI18n } from '../../../../i18n';
 import { Input } from '../../../../ui/Input';
 import { SettingsField } from '../parts';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
+import type { useI18n } from '../../../../i18n';
 
 export function AgentExecutionLimitField({ agent, onUpdateAgent, t }: {
   agent: AgentManifestDraft;

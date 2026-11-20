@@ -1,8 +1,8 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import { SessionListItem } from './SessionListItem';
 import { EmptyState } from '../../../ui/EmptyState';
+import { SessionListItem } from './SessionListItem';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export interface SessionListProps {
   project: ProjectRecord;
@@ -39,7 +39,7 @@ export const SessionList: React.FC<SessionListProps> = ({
 
   if (projectSessions.length === 0) {
     return (
-      <EmptyState layout="compact" title={t('sidebar.noSessions')} />
+      <EmptyState layout="compact" className="session-list-empty" title={t('sidebar.noSessions')} />
     );
   }
 

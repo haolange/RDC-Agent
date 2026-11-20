@@ -16,18 +16,18 @@
  *    便于测试时注入临时目录。
  */
 
+import { TaskExecutionRequirementsSchema, TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA, type TaskExecutionRequirements } from '@shared/types/taskExecution';
 import { normalizeSha256 } from '../../runtime/contentHash';
-import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
 import {
   INVALIDATED_REVIEW_GUIDANCE,
   TaskRegistry,
   type TaskRecord,
   type TaskStatus,
 } from './TaskRegistry';
-import type { StartTaskExecutionOptions } from './TaskContracts';
 import { readTaskBudgetSnapshot, type TaskLiveBudgetSnapshot } from './TaskBudgetSnapshot';
+import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
+import type { StartTaskExecutionOptions } from './TaskContracts';
 import type { RequestUsageSnapshot } from '../prompt/RequestUsageSnapshot';
-import { TaskExecutionRequirementsSchema, TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA, type TaskExecutionRequirements } from '@shared/types/taskExecution';
 
 export interface TaskToolExecutionContext {
   startOptions?: (taskId: string) => Omit<StartTaskExecutionOptions, 'mode'> | Promise<Omit<StartTaskExecutionOptions, 'mode'>>;
@@ -495,9 +495,9 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 /** 从未知入参中读取字符串字段；`required` 时为空会抛错。 */
 function readString(params: object, key: string, required: true): string;
-// eslint-disable-next-line no-redeclare
+
 function readString(params: object, key: string, required: false): string | undefined;
-// eslint-disable-next-line no-redeclare
+
 function readString(
   params: object,
   key: string,

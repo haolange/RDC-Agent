@@ -1,8 +1,8 @@
-import type { DevicePreparationPhase, RemoteInstallationReceipt, ReplayDeviceIssue } from '@shared/types/device';
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { unconfirmedDeviceAction, deviceInstallationIdentity, type DeviceInstallationIdentity } from './captures/ReplayDeviceIssue';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
+import type { DevicePreparationPhase, RemoteInstallationReceipt, ReplayDeviceIssue } from '@shared/types/device';
 
 export interface RdcRemoteProgress {
   onPreparationStage?: (stage: DevicePreparationPhase) => void;

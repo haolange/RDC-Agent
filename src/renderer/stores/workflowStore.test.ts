@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import { useWorkflowStore } from './workflowStore';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 
 const rightPanel = {
   progress: [],

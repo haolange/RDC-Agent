@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { CaptureRecoveryStatus, CaptureReplayBindingRequest, CaptureReplayState } from '@shared/types/captureReplay';
-import type { SessionScope } from '@shared/types/session';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { verifyPlanInput } from '../sessions/run/prepareInvestigationPlan';
@@ -14,6 +12,8 @@ import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { readRdcSwitchSnapshot } from './RdcSwitchSnapshot';
 import { rdcLifecycleReceipts, sameRdcLifecyclePosition, type RdcLifecyclePoint } from './RdcLifecycleReceipts';
 import { withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
+import type { SessionScope } from '@shared/types/session';
+import type { CaptureRecoveryStatus, CaptureReplayBindingRequest, CaptureReplayState } from '@shared/types/captureReplay';
 
 function authorize(scope: SessionScope): void {
   if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new Error('REPLAY_SCOPE_DENIED');

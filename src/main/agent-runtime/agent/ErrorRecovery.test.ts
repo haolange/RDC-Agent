@@ -2,8 +2,8 @@
  * ErrorRecovery 单元测试。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
 import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../providers/internal/http';
+import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
 import type { Model } from '../core/types';
 
 const PRIMARY: Model = {

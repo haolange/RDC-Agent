@@ -1,7 +1,7 @@
+import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { LlmAgentRoute } from '@shared/types/settings';
 import type { AppSettings } from '@shared/types/settings';
-import { agentManifestService } from '../agent-manifests/AgentManifestService';
 
 export function compiledRouteFromDefinition(
   definition: Pick<AgentManifestDefinition, 'id' | 'compiledRoute'> | null | undefined,

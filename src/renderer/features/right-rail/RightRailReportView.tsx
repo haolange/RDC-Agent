@@ -1,5 +1,5 @@
-import type { ClaimRecord, InvestigationReport } from '@shared/types/renderdocInvestigation';
 import { useI18n } from '../../i18n';
+import type { ClaimRecord, InvestigationReport } from '@shared/types/renderdocInvestigation';
 
 const prefix = 'control.rightRail.artifacts.preview.report' as const;
 

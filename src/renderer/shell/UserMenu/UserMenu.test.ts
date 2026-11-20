@@ -1,11 +1,13 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SETTINGS } from '../../stores/defaultAppSettings';
-import type { TabsProps } from '../../ui/Tabs';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { enLanguage } from '../../i18n/locales/en/language';
 import { zhLanguage } from '../../i18n/locales/zh-CN/language';
 import { UserMenu } from './index';
+import type { TabsProps } from '../../ui/Tabs';
+
+const DEFAULT_SETTINGS = createDefaultAppSettings();
 
 const controls = vi.hoisted(() => [] as TabsProps[]);
 vi.mock('react-dom', async (original) => ({ ...await original<typeof import('react-dom')>(), createPortal: (node: unknown) => node }));

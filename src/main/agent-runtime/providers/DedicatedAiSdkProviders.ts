@@ -1,13 +1,14 @@
-import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { JSONObject } from '@ai-sdk/provider';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type { StreamOptions } from '../core/types';
 import {
   assertSapAiCoreApiUrl,
   createSapAiCoreDestination,
   parseSapAiCoreServiceKey,
 } from '../../settings/provider-auth/SapAiCoreCredentials';
 import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
+import { reasoningVisibilityRequest } from './reasoningWire';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { JSONObject } from '@ai-sdk/provider';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
+import type { StreamOptions } from '../core/types';
 
 interface DedicatedProviderConfig {
   apiKey: string;
@@ -54,17 +55,14 @@ export function createSapAiCoreProvider(
         deploymentId: optional(config.connectionValues?.AICORE_DEPLOYMENT_ID),
         resourceGroup: optional(config.connectionValues?.AICORE_RESOURCE_GROUP),
         warnOnAmbiguousConfig: false,
-        defaultSettings: {
-          api,
-          includeReasoning: true,
-        },
+        defaultSettings: { api },
       });
       return provider(model.id);
     },
     providerOptions: (options) => ({
       'sap-ai': {
         api,
-        includeReasoning: options.reasoningVisibility !== 'none',
+        includeReasoning: reasoningVisibilityRequest(options) === 'sap-include-reasoning',
         modelParams: toSapModelParams(options),
       },
     }),

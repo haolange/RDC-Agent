@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { useComposerSessionContextStore } from '../stores/composerSessionContextStore';
 import { useProjectStore } from '../stores/projectStore';
+import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 
 export function useHandoffSuggestionActions() {
   return useCallback((suggestion: PlanReviewHandoffSuggestion) => {

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../../runtime/jsonl';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 
 export class RunScopedStore {

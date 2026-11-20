@@ -76,9 +76,10 @@ for (const requiredSection of ['id="progress"', 'id="artifacts"', 'id="outputs"'
   requireText(tracePanel, requiredSection, `SessionRightRail must render ${requiredSection}`);
 }
 if (!/id="progress"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/.test(tracePanel)) {
-  fail('SessionRightRail must render five cards in Progress / Artifacts / Outputs / Context / Capture order');
+  fail('SessionRightRail must offer Progress / Artifacts / Outputs / Context / Capture in that order');
 }
 for (const required of [
+  '<Tabs',
   'EmptyState',
   'RightRailArtifactList',
   'RightRailOutputList',
@@ -96,7 +97,7 @@ for (const required of [
 ]) {
   requireText(tracePanel, required, `SessionRightRail must retain ${required}`);
 }
-for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded', 'useState']) {
+for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded']) {
   forbidText(tracePanel, forbidden, `SessionRightRail must not retain ${forbidden}`);
 }
 forbidText(tracePanel, 'is-empty', 'SessionRightRail sections must keep one card shell regardless of content');
@@ -184,7 +185,7 @@ const rightRailCss = [
   read('src/renderer/features/right-rail/CaptureReplay.css'),
   read('src/renderer/features/right-rail/RightRailEmptyVisuals.css'),
 ].join('\n');
-for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-sm)', 'font-size: var(--text-xs)', '.right-rail-capture-panel', '.capture-replay-device-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
+for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', '.right-rail-capture-panel', '.capture-replay-device-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
   requireText(rightRailCss, required, `Right rail CSS must retain ${required}`);
 }
 for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdc-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {

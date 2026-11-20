@@ -1,4 +1,8 @@
 import path from 'path';
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
+import { nowIso } from '@shared/utils/id';
+import { projectTaskItems } from '../agent-runtime/tasks/taskProjection';
+import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
   ContextPanelViewModel,
@@ -8,13 +12,10 @@ import type {
   TaskContextResource,
   TraceArtifactRecord,
 } from '@shared/types/trace';
-import { nowIso } from '@shared/utils/id';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import type { TaskExecutionRecord } from '../agent-runtime/tasks/TaskContracts';
-import { projectTaskItems } from '../agent-runtime/tasks/taskProjection';
 import type { SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
-import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 
 const toIso = (value: number | undefined): string => value ? new Date(value).toISOString() : nowIso();
 
@@ -106,7 +107,7 @@ export function buildTaskContext(input: {
   permissionMode: string;
 }): ContextPanelViewModel['task'] {
   const latest = input.runs.slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0];
-  const mode = latest?.profileId ?? input.profileId ?? 'general';
+  const mode = latest?.profileId ?? input.profileId ?? DEFAULT_AGENT_ID;
   const profile = agentProfileRegistry.getForMode(mode);
   const resources: TaskContextResource[] = input.attachments.filter((item) => item.kind === 'attachment').map((item) => ({
     id: `attachment:${item.id}`, kind: 'attachment', label: item.title, summary: item.filePath, path: item.filePath, state: 'active',

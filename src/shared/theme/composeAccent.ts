@@ -1,19 +1,22 @@
-import type { ResolvedTheme } from '../types/settings';
 import {
   hexToRgb,
   hslToRgb,
+  inkOn,
   normalizeHexColor,
   rgbToCssTriplet,
   rgbToHex,
   rgbToHsl,
   mixRgb,
 } from './color';
+import type { ResolvedTheme } from '../types/settings';
 
 /** Last-resort compose accent when manifest accent is missing (not a product authority). */
 export const COMPOSE_ACCENT_FALLBACK = '#33d1ff';
 
 export interface ComposeAccentCssVars {
   '--composer-mode-accent': string;
+  /** Near-black or near-white, whichever reads better on the agent accent (Send icon). */
+  '--composer-mode-on-accent': string;
   '--composer-effort-fill-1': string;
   '--composer-effort-fill-2': string;
   '--composer-effort-fill-3': string;
@@ -67,6 +70,7 @@ export function deriveComposeAccentVars(
 
   return {
     '--composer-mode-accent': accent,
+    '--composer-mode-on-accent': `rgb(${rgbToCssTriplet(inkOn(base))})`,
     '--composer-effort-fill-1': fill(1),
     '--composer-effort-fill-2': fill(2),
     '--composer-effort-fill-3': fill(3),

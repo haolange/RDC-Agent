@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type { ReasoningControl } from '@shared/types/modelCapability';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import type { Context, Model } from '../core/types';
 import { OpenAIResponsesProvider, __testing } from './OpenAIResponsesProvider';
 import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from './internal/http';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
+import type { ReasoningControl } from '@shared/types/modelCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { Context, Model } from '../core/types';
 
 const reasoningControl = {
   kind: 'levels',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createInvestigationHarness, recordedExperiment, SESSION_ID } from './investigationTestFixtures';
 import { RdcExecutionReceipts, rdcDigest } from '../rdc/RdcExecutionReceipts';
+import { createInvestigationHarness, recordedExperiment, SESSION_ID } from './investigationTestFixtures';
 import { seedExecutionEvidence } from './investigationExecutionFixtures';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 

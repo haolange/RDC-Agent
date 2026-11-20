@@ -1,7 +1,7 @@
 import React from 'react';
-import type { PendingAttachmentDraft } from '../../types/attachments';
 import { AttachmentCard } from './AttachmentCard';
 import { ComposerSkillChips } from './ComposerSkillChips';
+import type { PendingAttachmentDraft } from '../../types/attachments';
 
 export const ComposerAttachmentTray: React.FC<{
   onMaterialChange: (id: string, material: import('@shared/types/materialContext').MaterialContext) => void;

@@ -1,10 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
-import type { ContextMenuCommandId } from '../../lib/contextMenuCommands';
-import type { ContextMenuItem } from '../../lib/contextMenuItems';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import type { ContextMenuCommandId } from '../../lib/contextMenuCommands';
+import type { ContextMenuItem } from '../../lib/contextMenuItems';
 import './ContextMenu.css';
 
 const VIEWPORT_MARGIN = 8;

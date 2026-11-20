@@ -1,22 +1,23 @@
-import type { CommandUiAction } from '@shared/types/command';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { AgentMode } from '@shared/types/layout';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
 import { translate, type TranslationKey } from '../../i18n';
-const currentText = (key: TranslationKey, params?: Record<string, string | number>) => translate(useAppSettingsStore.getState().settings.appearance.language, key, params);
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
+import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { resolveComposerModelOverride } from './resolveComposerModelOverride';
+import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import {
   isComposerAgentDefaultToken,
   resolveComposerAgentDefaultState,
 } from './composerAgentDefaultModel';
-import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
-import { resolveComposerModelOverride } from './resolveComposerModelOverride';
-import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
-import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { loadComposerModelPickerOptions } from './useComposerModelPickerOptions';
+import type { ConversationMessage } from '@shared/types/conversation';
+import type { CommandUiAction } from '@shared/types/command';
+import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { AgentMode } from '@shared/types/layout';
+
+const currentText = (key: TranslationKey, params?: Record<string, string | number>) => translate(useAppSettingsStore.getState().settings.appearance.language, key, params);
 
 interface SlashCommandContext {
   currentSession: SessionRecord | null;

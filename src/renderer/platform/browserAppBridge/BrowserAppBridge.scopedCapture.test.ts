@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ElectronAPI } from '@shared/types/electron';
 import { installBrowserAppBridge } from './BrowserAppBridge';
+import type { ElectronAPI } from '@shared/types/electron';
 
 const restoreGlobals = () => vi.unstubAllGlobals();
 afterEach(restoreGlobals);

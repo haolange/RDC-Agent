@@ -2,8 +2,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectRecord } from '@shared/types/session';
 import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
+import type { ProjectRecord } from '@shared/types/session';
 import type { StorageHost } from './storageHost';
 
 vi.mock('electron', () => ({ app: {} }));

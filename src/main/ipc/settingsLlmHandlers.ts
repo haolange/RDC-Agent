@@ -1,18 +1,7 @@
-import { registerProviderProbeHandlers } from './providerProbeHandlers';
-import { refreshApplicationMenu } from '../window/applicationMenu';
-import { providerAccountAuthService } from '../settings/provider-auth/ProviderAccountAuthService';
 import { ipcMain } from 'electron';
-import type {
-  AppSettings,
-  AppSettingsPatch,
-  LlmModelCapabilityProbeRequest,
-  LlmProviderAccountLoginStartRequest,
-  LlmProviderAccountLoginFinishRequest,
-  LlmProviderDraftRequest,
-  LlmProviderId,
-  ProviderDefinitionSaveRequest,
-} from '@shared/types/settings';
-import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
+import { providerAccountAuthService } from '../settings/provider-auth/ProviderAccountAuthService';
+import { refreshApplicationMenu } from '../window/applicationMenu';
+import { confirmResourceTrust } from '../window/trustConfirmation';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
 import { resolveCompiledRouteForAgent } from '../settings/provider-catalog/compiledAgentRoutes';
@@ -26,7 +15,7 @@ import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { applyProductIcon } from '../window/productIcon';
 import { formatShellInterpreterLabel, shellResolver } from '../runtime/ShellResolver';
-import type { WorkbenchIpcContext } from './workbenchContext';
+import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
@@ -46,15 +35,27 @@ import {
   LlmProviderIdArgsSchema,
   LlmRefreshProviderModelsArgsSchema,
   SettingsGetAgentDefinitionCommitArgsSchema,
-  SettingsPreviewAgentModelMigrationArgsSchema,
+  SettingsAgentSourcePathArgsSchema,
   SettingsAgentOverrideFileArgsSchema,
   SettingsSaveAgentDefinitionArgsSchema,
   SettingsSaveProviderDefinitionArgsSchema,
   SettingsGetModelsOverrideArgsSchema,
   SettingsSetModelsOverrideArgsSchema,
 } from './validation/settingsLlmSchemas';
+import { registerProviderProbeHandlers } from './providerProbeHandlers';
 import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
-import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
+import type { WorkbenchIpcContext } from './workbenchContext';
+import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
+import type {
+  AppSettings,
+  AppSettingsPatch,
+  LlmModelCapabilityProbeRequest,
+  LlmProviderAccountLoginStartRequest,
+  LlmProviderAccountLoginFinishRequest,
+  LlmProviderDraftRequest,
+  LlmProviderId,
+  ProviderDefinitionSaveRequest,
+} from '@shared/types/settings';
 
 /** Observers of committed settings may fail; the saved file stays authoritative. */
 async function notifyCommitted(notify: () => unknown): Promise<void> {
@@ -316,7 +317,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('settings:previewAgentModelMigration', async (_event, ...rawArgs: unknown[]) => {
-    const [sourcePath] = parseIpcArgs(SettingsPreviewAgentModelMigrationArgsSchema, rawArgs, {
+    const [sourcePath] = parseIpcArgs(SettingsAgentSourcePathArgsSchema, rawArgs, {
       label: 'settings:previewAgentModelMigration',
       maxBytes: 8 * 1024,
     });
@@ -339,6 +340,28 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       maxBytes: 8 * 1024,
     });
     return withEffectiveAgentModelOptions(await settingsService.deleteAgentOverrideFile(request));
+  });
+
+  ipcMain.handle('settings:previewProjectAgentTrust', async (_event, ...rawArgs: unknown[]) => {
+    const [sourcePath] = parseIpcArgs(SettingsAgentSourcePathArgsSchema, rawArgs, {
+      label: 'settings:previewProjectAgentTrust',
+      maxBytes: 8 * 1024,
+    });
+    return settingsService.previewProjectAgentTrust(sourcePath);
+  });
+
+  ipcMain.handle('settings:trustProjectAgent', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(SettingsAgentOverrideFileArgsSchema, rawArgs, {
+      label: 'settings:trustProjectAgent',
+      maxBytes: 8 * 1024,
+    });
+    const preview = settingsService.previewProjectAgentTrust(request.sourcePath);
+    if (!await confirmResourceTrust('agent', preview.agentId, preview.sourcePath)) {
+      return withEffectiveAgentModelOptions(settingsService.getAll());
+    }
+    const settings = settingsService.trustProjectAgent(request);
+    await notifyCommitted(() => context.applyCurrentLlmConfig());
+    return withEffectiveAgentModelOptions(settings);
   });
 
   ipcMain.handle('settings:getAgentBuiltinComparison', async (_event, ...rawArgs: unknown[]) => {

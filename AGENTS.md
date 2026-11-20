@@ -89,7 +89,8 @@
 - **测行为与契约**。测试验证业务行为、数据契约和失败恢复。每个新增或改变的行为一条测试；触发条件不同而机制与预期相同的情形选一个代表。不为假设中的情形补用例，不重复实现细节。
 - **Zero Fake-Pass**。不用 mock、硬编码打桩、跳过编译、注释报错代码或旧缓存结果冒充当前代码路径通过。受控 fixture、真实模型请求、真实 RDC 回放是三种不同的证据，互不替代。改动使原有验证失效后重新跑通。
 - **失败先判对错**。测试失败时对照权威合同判断代码、测试或环境哪一方有误。不为通过测试恢复已撤回的行为，不删除仍有效的负向约束。
-- **覆盖率底线**。`check:coverage-ratchet` 是固定底线，设在实际覆盖率下方几个百分点，只在大幅回退（删掉测试、大块代码无测试）时失败。不为它补测试，也不把底线上调去追当前数字。它失败时说明出了大问题：查原因并报告，不靠补测试过关。
+- **文档引用**。`check:gates` 含 `check-doc-references`：文档里反引号中的仓库路径、相对链接、`文件.ts:行号` 区间与 IPC 通道名都必须仍然存在；改名、删文件或改通道时同步改文档。写「禁止恢复 / 已删除」的行可以点名已退役路径。
+- **覆盖率底线**。`check:coverage-ratchet` 是固定底线，设在实际覆盖率下方几个百分点，只在大幅回退（删掉测试、大块代码无测试）时失败。覆盖率配置只在 `vitest.config.ts` 根级生效（Vitest 不读项目内的 coverage），`test:coverage` / `test:coverage:renderer` 用 `--coverage.include` 指定各自源码集，没有测试导入的文件也计入分母。不为它补测试，也不把底线上调去追当前数字。它失败时说明出了大问题：查原因并报告，不靠补测试过关。
 - **停止扩查**。适用的验证通过后停止；只有新的直接失败才补充修复与验证。
 
 ### 验证命令
@@ -106,7 +107,7 @@
 | 发布配置 | 才执行 pack |
 | 宿主相关行为（`src/main/platform`） | 另加 `pnpm run check:host-platform`；Linux 单元测试由 CI `build` 运行，Windows 由 CI `windows-unit` 运行 |
 
-行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数与分层由 ESLint `max-lines` / `no-restricted-imports` 执行；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
+行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
 
 完整 gates 的历史比较需要基线：`RDC_SYSTEM_DEBT_BASE_REF=<本轮起点提交>`，secrets 与 diff 检查用 `RDC_DIFF_BASE` 指向同一提交；不指定时历史比较被跳过。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
 
@@ -124,7 +125,7 @@
 
 - **结论先行**。第一句给出完成状态、核心根因或最终决断。简单任务几句话说清；复杂任务用清晰的层级和紧凑表格呈现改动与验证结果。
 - **说具体行为**。汇报聚焦于改了哪里的什么契约、解决了什么根因、验证结果如何。不只报 Task 编号或术语，不倾倒搜索过程和终端输出。
-- **验收账本**。现场证据只写入 `docs/product/acceptance-ledger.md`，每次真实运行（一次调查或一次实机验证）一条，不超过 10 行：做了什么、结果、证据位置、人工介入。不写清理流水账、字节数和进程号。
+- **验收账本**。现场证据只写入 `docs/product/acceptance-ledger.md`，每次真实运行（一次调查或一次实机验证）一条，不超过 10 行：做了什么、结果、证据位置、人工介入。不写清理流水账、字节数和进程号。自 2026-11-20 起每条都要有 `- 提交：` 加反引号中的提交 SHA（须在当前历史中）和 `- 证据：` 行（CI 运行链接、反引号中的产物路径，或 `本地：` 加反引号中实际执行的命令），`check:acceptance-ledger` 校验；本地结果不写成 CI 通过。
 
 ## 7. 仓库结构与权威
 

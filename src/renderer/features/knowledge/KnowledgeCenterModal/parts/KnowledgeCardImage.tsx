@@ -1,7 +1,7 @@
-import type { KnowledgeImageRole } from '@shared/types/knowledge';
 import { useI18n } from '../../../../i18n';
 import { knowledgeImageRoleLabelKey, normalizeKnowledgePreviewPath } from '../knowledgeCardImages';
 import { useKnowledgeCardImage } from '../useKnowledgeCardImage';
+import type { KnowledgeImageRole } from '@shared/types/knowledge';
 
 interface KnowledgeCardImageProps {
   spaceId: string;

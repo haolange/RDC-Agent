@@ -1,5 +1,4 @@
 import { appendRuntimePermissionContext } from '../permissions/RuntimePermissionContext';
-import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 /**
  * AgentLoop — transition 状态机式 Agent 主循环。
  *
@@ -16,6 +15,21 @@ import type { RuntimePermissionState } from '@shared/types/runtimePermission';
  */
 
 import { EventStream } from '../core/EventStream';
+import {
+  AgentRecoveryAbortError,
+  ErrorRecovery,
+  type RecoveryAction,
+} from './ErrorRecovery';
+import {
+  AgentLoopTerminationError,
+  LoopProgressGuard,
+  RUNTIME_NO_PROGRESS_INSTRUCTION,
+} from './LoopProgressGuard';
+import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
+import { RuntimeContinuationGuard } from './RuntimeContinuation';
+import { recoveryStartMessage } from './RecoveryDiagnosticText';
+import type { CompressResult } from './ContextManager';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
   AgentEvent,
   AgentMessage,
@@ -29,21 +43,7 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from '../core/types';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import {
-  AgentRecoveryAbortError,
-  ErrorRecovery,
-  type RecoveryAction,
-} from './ErrorRecovery';
-import type { CompressResult } from './ContextManager';
-import {
-  AgentLoopTerminationError,
-  LoopProgressGuard,
-  RUNTIME_NO_PROGRESS_INSTRUCTION,
-} from './LoopProgressGuard';
-import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
-import { RuntimeContinuationGuard } from './RuntimeContinuation';
-import { recoveryStartMessage } from './RecoveryDiagnosticText';
+import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
 export type TransformContextResult = AgentMessage[] | CompressResult;
 
@@ -269,7 +269,7 @@ async function runAgentLoop(
     };
 
     // ---- 单层主循环：transition 状态机 ----
-    // eslint-disable-next-line no-constant-condition
+
     while (true) {
       // 1. 快照 state（transition 字段标记本轮来源，供测试断言）
       // 2. 注入 pending（init 站点携带 pending）

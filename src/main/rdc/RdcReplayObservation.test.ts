@@ -1,6 +1,6 @@
-import { beforeEach, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ execute: vi.fn(), write: vi.fn(), encode: vi.fn() }));
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: mocks.execute } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: { argsPrefix: [], enabled: true, command: 'rdc' } } }) } }));

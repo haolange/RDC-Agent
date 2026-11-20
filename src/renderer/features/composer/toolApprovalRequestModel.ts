@@ -1,5 +1,5 @@
-import type { ConversationMessage } from '@shared/types/conversation';
 import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 export interface PendingToolApprovalRequest {
   sessionId: string | null;

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
 import type {
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
   AgentManifestDraft,
 } from '@shared/types/agentManifest';
-import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
 
 /** Requests differ by instructions; the committed route echoes them so ordering is observable. */
 const draft = (model: string): AgentManifestDraft => ({

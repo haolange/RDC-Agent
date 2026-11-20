@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 import { findProjectedHandoffTargetConflicts, persistAgentHandoff, validateAgentHandoffs } from './agentHandoffValidation';
+import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 
 const definition = (id: string, enabled: boolean): AgentManifestDefinition => ({
   id,

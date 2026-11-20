@@ -1,7 +1,5 @@
 import React, { useMemo, useState, type KeyboardEvent } from 'react';
-import type { AgentModelOption } from '@shared/types/agentManifest';
 import { formatPricePerMillion } from '@shared/utils/cost';
-import type { useI18n } from '../../../../i18n';
 import { Icon } from '../../../../ui/Icon';
 import { Popover } from '../../../../ui/Popover';
 import { SearchField } from '../../../../ui/SearchField';
@@ -10,6 +8,8 @@ import {
   buildAgentModelGroups,
   isAgentModelSelectionInvalid,
 } from './agentModelCascadeModel';
+import type { useI18n } from '../../../../i18n';
+import type { AgentModelOption } from '@shared/types/agentManifest';
 
 export { agentModelOptionAccessibleLabel, isAgentModelSelectionInvalid };
 

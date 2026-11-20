@@ -75,13 +75,7 @@ const flattenRows = (rows) => rows.flatMap((row) => {
 });
 
 const collectVisible = (rows) => rows.flatMap((row) => {
-  if (row.type === 'section') return [
-    row.proseText,
-    row.thinkingLabel,
-    row.thinkingSource,
-    row.thinkingOpenByDefault ? row.thinkingPreview : '',
-    ...collectVisible(row.steps),
-  ].filter(Boolean);
+  if (row.type === 'section') return collectVisible(row.steps);
   if (row.type === 'toolAggregate') return [
     row.summary,
     ...collectVisible(row.children),
@@ -111,8 +105,36 @@ const collectVisible = (rows) => rows.flatMap((row) => {
   if (row.type === 'approval') return [row.verb, row.message, ...row.metaLines];
   if (row.type === 'diagnostic') return [row.message];
   if (row.type === 'summary') return [row.text];
+  if (row.type === 'output') return [row.text];
+  if (row.type === 'thinking') return [row.label, row.openByDefault ? row.preview : ''].filter(Boolean);
   return [];
 });
+
+const outputRef = (kind, displayOrder) => ({ protocol: 'test', providerBlockKey: `${kind}-${displayOrder}`, contentIndex: displayOrder });
+
+/** One provider text block on an llm_turn; defaults to settled commentary. */
+const textItem = (text, displayOrder, overrides = {}) => ({
+  kind: 'text', text, phase: 'commentary', status: 'complete', displayOrder,
+  providerOutputRef: outputRef('text', displayOrder),
+  ...overrides,
+});
+
+/** One provider thinking block on an llm_turn. */
+const thinkingItem = (thinking, displayOrder, status = 'complete') => ({
+  kind: 'thinking', thinking, status, displayOrder,
+  providerOutputRef: outputRef('thinking', displayOrder),
+});
+
+const summaryThinking = (text) => ({ text, kind: 'summary', source: 'anthropic-thinking', visibility: 'summary' });
+const rawThinking = (text) => ({ text, kind: 'raw', source: 'openai-compatible-raw', visibility: 'raw-collapsed' });
+const opaqueThinking = { kind: 'opaque', source: 'openai-responses-encrypted', visibility: 'hidden' };
+
+const stepsOfType = (section, type) => section.steps.filter((row) => row.type === type);
+const rowsOfType = (rows, type) => flattenRows(rows).filter((row) => row.type === type);
+/** A section's single thinking row (sections no longer carry thinking themselves). */
+const sectionThinking = (section) => section?.steps.find((row) => row.type === 'thinking');
+/** Occurrences of text across rows; skips visibleSteps, which regroups the same rows as steps. */
+const occurrences = (rows, text) => JSON.stringify(rows, (key, value) => (key === 'visibleSteps' ? undefined : value)).split(text).length - 1;
 
 assert(
   normalizeWorkProcessText('  line one  \n\n\n\nline two  ') === 'line one\n\nline two',
@@ -149,10 +171,10 @@ const presentation = buildWorkProcessPresentation({
       title: 'LLM turn',
       status: 'complete',
       result: {
-        text: 'Read files before answering.',
         status: 'complete',
         toolCallIds: ['tool-read', 'tool-glob'],
       },
+      items: [textItem('Read files before answering.', 0)],
       toolCalls: [
         {
           id: 'tool-read',
@@ -160,6 +182,7 @@ const presentation = buildWorkProcessPresentation({
           status: 'complete',
           argsPreview: JSON.stringify({ path: 'package.json' }),
           resultPreview: String.raw`{"ok":true,"data":{"content":[{"type":"text","text":"     1->{\n     2->  \"name\": \"rdc-agent\",\n     3->  \"version\": \"1.0.0\",\n     4->  \"description\": \"RenderDoc Debug Agent - Vertical Framework\"`,
+          displayOrder: 1,
           startedAt: now + 400,
           completedAt: now + 500,
         },
@@ -172,6 +195,7 @@ const presentation = buildWorkProcessPresentation({
             ok: true,
             data: { content: [{ type: 'text', text: 'src/main/index.ts\nsrc/main/conversation\nsrc/main/workflow' }] },
           }),
+          displayOrder: 2,
           startedAt: now + 600,
           completedAt: now + 700,
         },
@@ -200,12 +224,20 @@ for (const forbidden of ['Agent Loop complete', 'Generate final answer', 'Final 
 }
 const loopSection = presentation.rows.find((row) => row.type === 'section');
 assert(loopSection?.type === 'section', 'llm turn should render a work-process section');
-assert(loopSection.proseText === 'Read files before answering.', 'tool-backed commentary should render as narrative prose');
-assert(loopSection.thinkingLabel === '', 'commentary must not be promoted into the thinking slot');
-assert(loopSection.thinkingPreview === '', 'commentary must not occupy thinking preview');
+const loopOutputs = stepsOfType(loopSection, 'output');
+assert(
+  loopOutputs.length === 1 && loopOutputs[0].text === 'Read files before answering.' && loopOutputs[0].phase === 'commentary',
+  'tool-backed commentary should render as a narrative output row',
+);
+assert(!('proseText' in loopSection), 'commentary must not also render as section prose');
+assert(stepsOfType(loopSection, 'thinking').length === 0, 'commentary must not be promoted into a thinking row');
 assert(loopSection.stepCount === 2, `expected 2 tool actions in section, got ${loopSection.stepCount}`);
-assert(loopSection.steps.length === 2, `loop section should keep flat tool rows for two tools, got ${loopSection.steps.length}`);
-assert(loopSection.steps.every((row) => row.type === 'tool'), 'loop section tools must be flat tool rows without toolGroup shells');
+const loopToolRows = stepsOfType(loopSection, 'tool');
+assert(loopToolRows.length === 2, `loop section should keep flat tool rows for two tools, got ${loopToolRows.length}`);
+assert(
+  loopSection.steps.map((row) => row.type).join(',') === 'output,tool,tool',
+  'loop section must keep commentary and tools as flat rows in display order without toolGroup shells',
+);
 const globRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'glob');
 const readRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'read_file');
 assert(readRow?.verb === '已读取', 'read_file row should use Chinese semantic verb');
@@ -223,16 +255,12 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Tool result reviewed.', status: 'complete', toolCallIds: ['think-glob'] },
-      thinking: {
-        text: 'provider-visible raw thinking',
-        kind: 'raw',
-        source: 'openai-compatible-raw',
-        visibility: 'raw-collapsed',
-
-      },
-      thinkingStatus: 'complete',
-      toolCalls: [{ id: 'think-glob', toolName: 'glob', status: 'complete', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), startedAt: now + 200, completedAt: now + 220 }],
+      result: { status: 'complete', toolCallIds: ['think-glob'] },
+      items: [
+        thinkingItem(rawThinking('provider-visible raw thinking'), 0),
+        textItem('Tool result reviewed.', 1),
+      ],
+      toolCalls: [{ id: 'think-glob', toolName: 'glob', status: 'complete', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), displayOrder: 2, startedAt: now + 200, completedAt: now + 220 }],
       startedAt: now + 200,
       completedAt: now + 220,
     },
@@ -240,9 +268,10 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
 }, t);
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
-assert(rawThinkingSection.thinkingLabel === '已思考 · 0ms', 'raw thinking should use 已思考 · duration settled label');
-assert(rawThinkingSection.thinkingPreview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
-assert(rawThinkingSection.thinkingOpenByDefault === false, 'settled process-loop raw thinking should fold by policy');
+const rawThinkingRow = sectionThinking(rawThinkingSection);
+assert(rawThinkingRow?.label === '已思考 · 0ms', 'raw thinking should use 已思考 · duration settled label');
+assert(rawThinkingRow.preview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
+assert(rawThinkingRow.openByDefault === false, 'settled process-loop raw thinking should fold by policy');
 
 const activeRawThinkingPresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -253,23 +282,21 @@ const activeRawThinkingPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'running',
-      result: { text: 'Working…', status: 'streaming', toolCallIds: ['think-glob-active'] },
-      thinking: {
-        text: 'provider-visible raw thinking while live',
-        kind: 'raw',
-        source: 'openai-compatible-raw',
-        visibility: 'raw-collapsed',
-      },
-      thinkingStatus: 'streaming',
-      toolCalls: [{ id: 'think-glob-active', toolName: 'glob', status: 'running', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), startedAt: now + 200 }],
+      result: { status: 'streaming', toolCallIds: ['think-glob-active'] },
+      items: [
+        thinkingItem(rawThinking('provider-visible raw thinking while live'), 0, 'streaming'),
+        textItem('Working…', 1),
+      ],
+      toolCalls: [{ id: 'think-glob-active', toolName: 'glob', status: 'running', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), displayOrder: 2, startedAt: now + 200 }],
       startedAt: now + 200,
     },
   ],
 }, t);
 const activeRawThinkingSection = activeRawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(activeRawThinkingSection?.type === 'section', 'active raw thinking loop should render a section');
-assert(activeRawThinkingSection.thinkingLabel === '正在思考', 'active raw thinking should use streaming label');
-assert(activeRawThinkingSection.thinkingOpenByDefault === true, 'active process-loop raw thinking should expand by policy');
+const activeRawThinkingRow = sectionThinking(activeRawThinkingSection);
+assert(activeRawThinkingRow?.label === '正在思考', 'active raw thinking should use streaming label');
+assert(activeRawThinkingRow.openByDefault === true, 'active process-loop raw thinking should expand by policy');
 
 const activeSummaryThinkingPresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -280,22 +307,19 @@ const activeSummaryThinkingPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'running',
-      result: { text: 'Working…', status: 'streaming', toolCallIds: ['think-read-active'] },
-      thinking: {
-        text: 'planning the next tool call',
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-      },
-      thinkingStatus: 'streaming',
-      toolCalls: [{ id: 'think-read-active', toolName: 'read_file', status: 'running', argsPreview: JSON.stringify({ path: 'README.md' }), startedAt: now + 210 }],
+      result: { status: 'streaming', toolCallIds: ['think-read-active'] },
+      items: [
+        thinkingItem(summaryThinking('planning the next tool call'), 0, 'streaming'),
+        textItem('Working…', 1),
+      ],
+      toolCalls: [{ id: 'think-read-active', toolName: 'read_file', status: 'running', argsPreview: JSON.stringify({ path: 'README.md' }), displayOrder: 2, startedAt: now + 210 }],
       startedAt: now + 210,
     },
   ],
 }, t);
 const activeSummaryThinkingSection = activeSummaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(activeSummaryThinkingSection?.type === 'section', 'active summary thinking loop should render a section');
-assert(activeSummaryThinkingSection.thinkingOpenByDefault === true, 'active process-loop summary thinking should expand by policy');
+assert(sectionThinking(activeSummaryThinkingSection)?.openByDefault === true, 'active process-loop summary thinking should expand by policy');
 
 const summaryThinkingPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -306,15 +330,11 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Turn result.', status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
-      thinking: {
-        text: 'The user asks in Chinese. Now answer in Chinese.',
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-
-      },
-      thinkingStatus: 'complete',
+      result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
+      items: [
+        thinkingItem(summaryThinking('The user asks in Chinese. Now answer in Chinese.'), 0),
+        textItem('Turn result.', 1, { phase: 'final_answer' }),
+      ],
       toolCalls: [],
       startedAt: now + 225,
       completedAt: now + 230,
@@ -323,9 +343,14 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
 }, t);
 const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
-assert(summaryThinkingSection.proseText === '', 'answer-only thinking must not duplicate final answer text');
-assert(summaryThinkingSection.thinkingLabel === '已思考 · 5ms', 'summary thinking should use 已思考 · duration settled label');
-assert(summaryThinkingSection.thinkingOpenByDefault === false, 'final-answer quiet thinking stays folded by default');
+assert(
+  occurrences(summaryThinkingPresentation.rows, 'Turn result.') === 1
+    && stepsOfType(summaryThinkingSection, 'output').every((row) => row.phase === 'final_answer'),
+  'answer-only thinking must not duplicate final answer text as commentary or prose',
+);
+const summaryThinkingRow = sectionThinking(summaryThinkingSection);
+assert(summaryThinkingRow?.label === '已思考 · 5ms', 'summary thinking should use 已思考 · duration settled label');
+assert(summaryThinkingRow.openByDefault === false, 'final-answer quiet thinking stays folded by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
 const duplicateSummaryPresentation = buildWorkProcessPresentation({
@@ -337,17 +362,10 @@ const duplicateSummaryPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: '', status: 'complete', toolCallIds: ['duplicate-tool-read'] },
-      thinking: {
-        text: duplicateSummary,
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-
-      },
-      thinkingStatus: 'complete',
+      result: { status: 'complete', toolCallIds: ['duplicate-tool-read'] },
+      items: [thinkingItem(summaryThinking(duplicateSummary), 0)],
       toolCalls: [
-        { id: 'duplicate-tool-read', toolName: 'read_file', status: 'complete', argsPreview: JSON.stringify({ path: 'project-identity' }), startedAt: now + 352, completedAt: now + 356 },
+        { id: 'duplicate-tool-read', toolName: 'read_file', status: 'complete', argsPreview: JSON.stringify({ path: 'project-identity' }), displayOrder: 1, startedAt: now + 352, completedAt: now + 356 },
       ],
       startedAt: now + 352,
       completedAt: now + 356,
@@ -357,25 +375,33 @@ const duplicateSummaryPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Final answer body only.', status: 'complete', toolCallIds: [] },
-      thinking: {
-        text: duplicateSummary,
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-
-      },
-      thinkingStatus: 'complete',
+      result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
+      items: [
+        thinkingItem(summaryThinking(duplicateSummary), 2),
+        textItem('Final answer body only.', 3, { phase: 'final_answer' }),
+      ],
       toolCalls: [],
       startedAt: now + 360,
       completedAt: now + 365,
     },
   ],
 }, t);
+const duplicateSummaryThinking = rowsOfType(duplicateSummaryPresentation.rows, 'thinking');
+assert(
+  duplicateSummaryThinking.length === 1 && duplicateSummaryThinking[0].preview === duplicateSummary,
+  'duplicate provider summary should render once across loops',
+);
 const duplicateSummarySections = duplicateSummaryPresentation.rows.filter((row) => row.type === 'section');
-assert(duplicateSummarySections.length === 1, 'duplicate provider summary should not create repeated Work Process sections');
+assert(
+  duplicateSummarySections.length === 2 && duplicateSummarySections[1].steps.map((row) => row.type).join(',') === 'output',
+  'a repeated provider summary must not add thinking to the answer loop',
+);
 assert(!duplicateSummaryPresentation.rows.some((row) => row.type === 'response'), 'answer-only loops must not create Reply response boundary rows');
-assert(!JSON.stringify(duplicateSummaryPresentation.rows).includes('Final answer body only.'), 'Work Process must not duplicate final answer body text');
+assert(
+  occurrences(duplicateSummaryPresentation.rows, 'Final answer body only.') === 1
+    && duplicateSummarySections[1].steps[0].phase === 'final_answer',
+  'Work Process must carry final answer body text once, as the final_answer output row',
+);
 
 const streamingResponsePresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -386,17 +412,13 @@ const streamingResponsePresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Read memory before answer.', status: 'complete', toolCallIds: ['response-tool-memory'] },
-      thinking: {
-        text: 'Read project memory before answering.',
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-
-      },
-      thinkingStatus: 'complete',
+      result: { status: 'complete', toolCallIds: ['response-tool-memory'] },
+      items: [
+        thinkingItem(summaryThinking('Read project memory before answering.'), 0),
+        textItem('Read memory before answer.', 1),
+      ],
       toolCalls: [
-        { id: 'response-tool-memory', toolName: 'memory_read', status: 'complete', argsPreview: JSON.stringify({ key: 'project-identity' }), startedAt: now + 370, completedAt: now + 375 },
+        { id: 'response-tool-memory', toolName: 'memory_read', status: 'complete', argsPreview: JSON.stringify({ key: 'project-identity' }), displayOrder: 2, startedAt: now + 370, completedAt: now + 375 },
       ],
       startedAt: now + 370,
       completedAt: now + 375,
@@ -416,26 +438,28 @@ const streamingResponsePresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'running',
-      result: { text: 'Streaming final answer tokens.', status: 'streaming', toolCallIds: [] },
-      thinking: {
-        text: 'Now produce the final answer.',
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-
-      },
-      thinkingStatus: 'streaming',
+      result: { status: 'streaming', toolCallIds: [] },
+      items: [
+        thinkingItem(summaryThinking('Now produce the final answer.'), 3, 'streaming'),
+        textItem('Streaming final answer tokens.', 4, { phase: 'final_answer', status: 'streaming' }),
+      ],
       toolCalls: [],
       startedAt: now + 380,
     },
   ],
 }, t);
-assert(streamingResponsePresentation.rows.map((row) => row.type).join(',') === 'section,section', 'final answer streaming should render process section plus quiet thinking-only section');
+assert(streamingResponsePresentation.rows.map((row) => row.type).join(',') === 'section,section', 'final answer streaming should render process section plus the closing thinking section');
 assert(!streamingResponsePresentation.rows.some((row) => row.type === 'response'), 'final answer streaming must not create a Reply boundary row');
-const closingThinking = streamingResponsePresentation.rows.filter((row) => row.type === 'section').at(-1);
-assert(closingThinking?.thinkingOpenByDefault === true, 'active closing thinking should expand by policy while streaming');
-assert(closingThinking?.thinkingPreview === 'Now produce the final answer.', 'closing summary should fold into a thinking-only section');
-assert(!JSON.stringify(closingThinking).includes('Streaming final answer tokens.'), 'streaming final answer text should stay out of Work Process');
+const closingSection = streamingResponsePresentation.rows.filter((row) => row.type === 'section').at(-1);
+const closingThinking = sectionThinking(closingSection);
+assert(closingThinking?.openByDefault === true, 'active closing thinking should expand by policy while streaming');
+assert(closingThinking?.preview === 'Now produce the final answer.', 'closing summary should fold into its own thinking row');
+assert(!JSON.stringify(closingThinking).includes('Streaming final answer tokens.'), 'streaming final answer text must stay out of thinking');
+assert(
+  stepsOfType(closingSection, 'output').map((row) => `${row.phase}:${row.status}:${row.text}`).join('|')
+    === 'final_answer:running:Streaming final answer tokens.',
+  'streaming final answer text should surface only as the closing final_answer output row',
+);
 
 const settledClosingThinkingPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -446,16 +470,13 @@ const settledClosingThinkingPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Read memory before answer.', status: 'complete', toolCallIds: ['response-tool-memory-settled'] },
-      thinking: {
-        text: 'Read project memory before answering settled.',
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-      },
-      thinkingStatus: 'complete',
+      result: { status: 'complete', toolCallIds: ['response-tool-memory-settled'] },
+      items: [
+        thinkingItem(summaryThinking('Read project memory before answering settled.'), 0),
+        textItem('Read memory before answer.', 1),
+      ],
       toolCalls: [
-        { id: 'response-tool-memory-settled', toolName: 'memory_read', status: 'complete', argsPreview: JSON.stringify({ key: 'project-identity' }), startedAt: now + 370, completedAt: now + 375 },
+        { id: 'response-tool-memory-settled', toolName: 'memory_read', status: 'complete', argsPreview: JSON.stringify({ key: 'project-identity' }), displayOrder: 2, startedAt: now + 370, completedAt: now + 375 },
       ],
       startedAt: now + 370,
       completedAt: now + 375,
@@ -466,28 +487,24 @@ const settledClosingThinkingPresentation = buildWorkProcessPresentation({
       title: 'LLM turn',
       status: 'complete',
       result: {
-        text: 'Final answer body.',
         status: 'complete',
         toolCallIds: [],
         stopReason: 'end_turn',
         outputPhase: 'final_answer',
       },
-      thinking: {
-        text: 'Now produce the final answer settled.',
-        kind: 'summary',
-        source: 'anthropic-thinking',
-        visibility: 'summary',
-      },
-      thinkingStatus: 'complete',
+      items: [
+        thinkingItem(summaryThinking('Now produce the final answer settled.'), 3),
+        textItem('Final answer body.', 4, { phase: 'final_answer' }),
+      ],
       toolCalls: [],
       startedAt: now + 380,
       completedAt: now + 390,
     },
   ],
 }, t);
-const settledClosingThinking = settledClosingThinkingPresentation.rows.filter((row) => row.type === 'section').at(-1);
-assert(settledClosingThinking?.thinkingOpenByDefault === false, 'settled closing thinking should fold by policy');
-assert(settledClosingThinking?.thinkingPreview === 'Now produce the final answer settled.', 'settled closing thinking keeps preview behind disclosure');
+const settledClosingThinking = sectionThinking(settledClosingThinkingPresentation.rows.filter((row) => row.type === 'section').at(-1));
+assert(settledClosingThinking?.openByDefault === false, 'settled closing thinking should fold by policy');
+assert(settledClosingThinking?.preview === 'Now produce the final answer settled.', 'settled closing thinking keeps preview behind disclosure');
 
 const activeFinalAnswerThinkingPresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -499,19 +516,12 @@ const activeFinalAnswerThinkingPresentation = buildWorkProcessPresentation({
       title: 'LLM turn',
       status: 'running',
       result: {
-        text: '',
         status: 'streaming',
         toolCallIds: [],
         stopReason: 'end_turn',
         outputPhase: 'final_answer',
       },
-      thinking: {
-        text: 'compose the final answer while streaming',
-        kind: 'raw',
-        source: 'openai-compatible-raw',
-        visibility: 'raw-collapsed',
-      },
-      thinkingStatus: 'streaming',
+      items: [thinkingItem(rawThinking('compose the final answer while streaming'), 0, 'streaming')],
       toolCalls: [],
       startedAt: now + 400,
     },
@@ -519,8 +529,9 @@ const activeFinalAnswerThinkingPresentation = buildWorkProcessPresentation({
 }, t);
 const activeFinalAnswerThinkingSection = activeFinalAnswerThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(activeFinalAnswerThinkingSection?.type === 'section', 'active final-answer thinking should render a section');
-assert(activeFinalAnswerThinkingSection.thinkingOpenByDefault === true, 'active final-answer thinking should expand by policy');
-assert(activeFinalAnswerThinkingSection.thinkingLabel === '正在思考', 'active final-answer thinking should use streaming label');
+const activeFinalAnswerThinkingRow = sectionThinking(activeFinalAnswerThinkingSection);
+assert(activeFinalAnswerThinkingRow?.openByDefault === true, 'active final-answer thinking should expand by policy');
+assert(activeFinalAnswerThinkingRow.label === '正在思考', 'active final-answer thinking should use streaming label');
 
 const opaquePresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -532,20 +543,12 @@ const opaquePresentation = buildWorkProcessPresentation({
       title: 'LLM turn',
       status: 'complete',
       result: {
-        text: 'Provider state retained.',
         status: 'complete',
         toolCallIds: [],
         stopReason: 'end_turn',
         outputPhase: 'final_answer',
       },
-      thinking: {
-        kind: 'opaque',
-        source: 'openai-responses-encrypted',
-        visibility: 'hidden',
-
-
-      },
-      thinkingStatus: 'complete',
+      items: [thinkingItem(opaqueThinking, 0)],
       toolCalls: [],
       startedAt: now + 350,
       completedAt: now + 360,
@@ -571,12 +574,7 @@ const opaqueToolPresentation = buildWorkProcessPresentation({
         stopReason: 'tool_use',
         outputPhase: 'commentary',
       },
-      thinking: {
-        kind: 'opaque',
-        source: 'openai-responses-encrypted',
-        visibility: 'hidden',
-      },
-      thinkingStatus: 'complete',
+      items: [thinkingItem(opaqueThinking, 0)],
       toolCalls: [
         {
           id: 'tool-opaque-search',
@@ -584,6 +582,7 @@ const opaqueToolPresentation = buildWorkProcessPresentation({
           status: 'complete',
           argsPreview: JSON.stringify({ query: 'GPU news' }),
           resultPreview: JSON.stringify({ ok: true, data: { results: [{ url: 'https://example.com' }] } }),
+          displayOrder: 1,
           startedAt: now + 370,
           completedAt: now + 390,
         },
@@ -595,7 +594,30 @@ const opaqueToolPresentation = buildWorkProcessPresentation({
 }, t);
 const opaqueToolRows = flattenRows(opaqueToolPresentation.rows);
 assert(opaqueToolRows.some((row) => row.type === 'tool' && row.toolName === 'web_search'), 'opaque + tools must still surface real tool evidence');
-assert(!opaqueToolRows.some((row) => row.type === 'reasoningIndicator'), 'opaque + tools must not insert a CoT placeholder');
+assert(!opaqueToolRows.some((row) => row.type === 'reasoningIndicator' || row.type === 'thinking'), 'opaque + tools must not insert a CoT placeholder');
+
+const toollessCommentaryPresentation = buildWorkProcessPresentation({
+  status: 'running',
+  updatedAt: now + 9990,
+  blocks: [
+    {
+      id: 'runtime-loop-toolless-commentary',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'commentary' },
+      items: [textItem('Need one answer before continuing.', 0)],
+      toolCalls: [],
+      startedAt: now + 400,
+      completedAt: now + 410,
+    },
+  ],
+}, t);
+assert(
+  rowsOfType(toollessCommentaryPresentation.rows, 'output')
+    .some((row) => row.text === 'Need one answer before continuing.' && row.phase === 'commentary'),
+  'commentary visibility must not require toolCalls on the same loop',
+);
 
 const approvalPresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -686,7 +708,8 @@ const webSearchPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Search the web.', status: 'complete', toolCallIds: ['tool-web-search'] },
+      result: { status: 'complete', toolCallIds: ['tool-web-search'] },
+      items: [textItem('Search the web.', 0)],
       toolCalls: [
         {
           id: 'tool-web-search',
@@ -727,7 +750,8 @@ const webFetchPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Fetch the page.', status: 'complete', toolCallIds: ['tool-web-fetch'] },
+      result: { status: 'complete', toolCallIds: ['tool-web-fetch'] },
+      items: [textItem('Fetch the page.', 0)],
       toolCalls: [
         {
           id: 'tool-web-fetch',
@@ -779,7 +803,8 @@ const shellEnvelopePresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Ran typecheck.', status: 'complete', toolCallIds: ['tool-shell-envelope'] },
+      result: { status: 'complete', toolCallIds: ['tool-shell-envelope'] },
+      items: [textItem('Ran typecheck.', 0)],
       toolCalls: [
         {
           id: 'tool-shell-envelope',
@@ -821,7 +846,8 @@ const skillEnvelopePresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Loaded skill.', status: 'complete', toolCallIds: ['tool-skill-envelope'] },
+      result: { status: 'complete', toolCallIds: ['tool-skill-envelope'] },
+      items: [textItem('Loaded skill.', 0)],
       toolCalls: [
         {
           id: 'tool-skill-envelope',
@@ -867,7 +893,8 @@ const fileGutterPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Read project yaml.', status: 'complete', toolCallIds: ['tool-read-gutter'] },
+      result: { status: 'complete', toolCallIds: ['tool-read-gutter'] },
+      items: [textItem('Read project yaml.', 0)],
       toolCalls: [
         {
           id: 'tool-read-gutter',
@@ -983,31 +1010,30 @@ const userInputSubmitHookSource = scriptRead('src/renderer/features/composer/use
 const toolApprovalPanelSource = scriptRead('src/renderer/features/composer/ToolApprovalRequestPanel.tsx', 'utf8');
 const toolApprovalSubmitHookSource = scriptRead('src/renderer/features/composer/useToolApprovalSubmit.ts', 'utf8');
 const orchestratorSource = scriptRead('src/main/agent-runtime/orchestration/AgentOrchestrator.ts', 'utf8');
+const conversationEventHandlerSource = readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts');
 
-assert(presentationSource.includes('resolveSectionProse'), 'commentary should route through resolveSectionProse');
 assert(
-  /outputPhase\s*===\s*'commentary'/.test(presentationSource)
+  presentationSource.includes('loopTextItems(block).map(') && presentationSource.includes("type: 'output'"),
+  'commentary should project from loop text items into output rows',
+);
+assert(
+  presentationSource.includes('phase: item.phase') && !/phase:\s*'commentary'/.test(presentationSource),
+  'only explicitly classified commentary may render as Work Process narrative: output rows keep the item phase and never stamp one',
+);
+assert(
+  /settleLoopItems\([\s\S]*?\{\s*stopReason,\s*outputPhase\s*\}/.test(conversationEventHandlerSource)
     && !presentationSource.includes('void outputPhase'),
-  'settled commentary prose must follow outputPhase, not void it',
+  'settled commentary must follow the loop outputPhase, not void it',
 );
 assert(
-  !/canShow\s*=\s*[\s\S]*toolCalls\.length\s*>\s*0/.test(presentationSource),
-  'commentary visibility must not require toolCalls on the same loop',
-);
-assert(
-  /canShow\s*=\s*isMeaningfulText\(commentary\)\s*&&\s*outputPhase\s*===\s*'commentary'/.test(presentationSource),
-  'only explicitly classified commentary may enter Work Process prose',
-);
-assert(
-  (() => {
-    const source = readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts');
-    return source.includes('turnHadAskPause')
-      && source.includes('resolveStreamingOutputPhase')
-      && source.includes('upsertLoopOutputItem')
-      && source.includes("outputPhase === 'commentary'")
-      && source.includes("stopReason === 'tool_use'")
-      && /pendingNewLoop\s*=\s*true/.test(source);
-  })(),
+  conversationEventHandlerSource.includes('turnHadAskPause')
+    && conversationEventHandlerSource.includes('resolveStreamingOutputPhase')
+    && conversationEventHandlerSource.includes('upsertLoopTextItem')
+    && conversationEventHandlerSource.includes('upsertLoopThinkingItem')
+    && !conversationEventHandlerSource.includes('upsertLoopOutputItem')
+    && conversationEventHandlerSource.includes("outputPhase === 'commentary'")
+    && conversationEventHandlerSource.includes("stopReason === 'tool_use'")
+    && /pendingNewLoop\s*=\s*true/.test(conversationEventHandlerSource),
   'ask/commentary pauses must set pendingNewLoop and preserve item-scoped streaming output',
 );
 assert(
@@ -1025,7 +1051,6 @@ assert(
   /\.work-process-user-input\s*\{[^}]*border:\s*1px\s+solid\s+var\(--token-border-muted\)/.test(cssSource),
   'Asked rows should use the same card border chrome as tool cards',
 );
-assert(presentationSource.includes('proseText'), 'presentation should expose narrative prose on sections');
 assert(presentationSource.includes('aggregateSectionSteps'), 'presentation should aggregate consecutive tools');
 assert(presentationSource.includes("type: 'toolAggregate'"), 'presentation should expose toolAggregate rows');
 assert(presentationSource.includes('buildToolAggregateSummary'), 'tool aggregate summaries should be built centrally');
@@ -1077,7 +1102,6 @@ for (const forbidden of ['Called tool']) {
 assert(!componentSource.includes('ToolGroupRow'), 'component must not render toolGroup shells');
 assert(componentSource.includes('ToolAggregateRow'), 'component should render tool aggregate rows');
 assert(componentSource.includes('work-process-narrative-stream'), 'component should use narrative stream list class');
-assert(componentSource.includes('work-process-prose'), 'component should render narrative prose');
 assert(!componentSource.includes('ResponseRow'), 'component must not render a Reply response boundary row');
 assert(!scriptExists('src/renderer/features/transcript/WorkProcessResponseRow.tsx'), 'WorkProcessResponseRow must be deleted');
 assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should use the process title translation');
@@ -1118,14 +1142,13 @@ assert(toolRowSource.includes('work-process-tool-card-body-list'), 'collapsed se
 assert(presentationSource.includes('bodyText:'), 'projection must emit bodyText for outcome-first cards');
 assert(scriptExists('src/shared/utils/toolResultPreview.ts'), 'tool result preview builder must exist');
 assert(
-  readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts').includes('buildToolResultPreview'),
+  conversationEventHandlerSource.includes('buildToolResultPreview'),
   'Conversation turn handler must write projection-friendly resultPreview',
 );
 assert(
-  !readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts').includes('.slice(0, 800)'),
+  !conversationEventHandlerSource.includes('.slice(0, 800)'),
   'Conversation turn handler must not blind-slice resultPreview JSON at 800 chars',
 );
-const conversationEventHandlerSource = readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts');
 const diagnosticPolicySource = readSource('src/main/conversation/workProcessDiagnosticPolicy.ts');
 assert(
   conversationEventHandlerSource.includes('shouldProjectDiagnosticToWorkProcess'),
@@ -1179,11 +1202,11 @@ assert(
   'Settings Diagnostics page must remain removed',
 );
 assert(
-  !readSource('src/renderer/features/settings/SettingsModal/types.ts').includes("'diagnostics'"),
+  !readSource('src/renderer/lib/settingsSections.ts').includes("'diagnostics'"),
   'SettingsSection must not restore diagnostics',
 );
 assert(
-  readSource('src/renderer/features/settings/SettingsModal/types.ts').includes("'policy'"),
+  readSource('src/renderer/lib/settingsSections.ts').includes("'policy'"),
   'SettingsSection must include peer policy navigation',
 );
 assert(
@@ -1221,10 +1244,6 @@ assert(
 assert(
   /\.work-process-steps\s*>\s*\.work-process-step:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-2\)/.test(cssSource),
   'adjacent visible tools and task snapshots must share one space-2 boundary',
-);
-assert(
-  /\.work-process-prose\s*\+\s*\.work-process-section-list\s*\{[^}]*margin-top:\s*var\(--space-3\)/.test(cssSource),
-  'thinking/commentary → first tool should use space-3 entrance margin',
 );
 assert(
   !cssSource.includes('.work-process-section + .work-process-section:not(.has-prose)'),
@@ -1287,7 +1306,6 @@ assert(
 );
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
-assert(cssSource.includes('.work-process-prose.is-streaming'), 'prose streaming indicator should exist');
 assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
 assert(!cssSource.includes('.work-process-step-rail'), 'segmented guides and nested rail suppression must be removed');
 assert(cssSource.includes('.work-process-rail-marker.is-running'), 'actual activity owns blue markers');

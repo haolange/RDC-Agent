@@ -1,8 +1,8 @@
 import React from 'react';
-import type { DelegationTaskBody } from '@shared/types/delegationTrace';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
-import { WorkDisclosure } from './WorkDisclosure';
 import { useI18n } from '../../i18n';
+import { WorkDisclosure } from './WorkDisclosure';
+import type { DelegationTaskBody } from '@shared/types/delegationTrace';
 
 const TextList: React.FC<{ items: string[] }> = ({ items }) => <ul>{items.map((item, index) =>
   <li key={index}><MessageMarkdown content={item} /></li>)}</ul>;

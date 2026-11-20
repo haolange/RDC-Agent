@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { LLMProviderConfig } from '@shared/types/llm';
-import type { LlmProviderId } from '@shared/types/settings';
+import { getProviderAuthSchemaId } from '../../provider-catalog/ProviderCatalogRegistry';
 import { settingsService } from '../settings-core/SettingsService';
 import { resolveProviderConnectionHeaders } from './ProviderConnectionSchema';
 import { resolveGoogleVertexAccessToken } from './GoogleApplicationCredentials';
@@ -9,6 +8,8 @@ import {
   resolveAwsBedrockCredentials,
   type AwsBedrockCredentials,
 } from './AwsBedrockCredentials';
+import type { LlmProviderId } from '@shared/types/settings';
+import type { LLMProviderConfig } from '@shared/types/llm';
 
 export type ProviderRuntimeCredentialOperation = 'chat' | 'embed';
 
@@ -95,10 +96,11 @@ export class ProviderRuntimeCredentialService {
     const connectionHeaders = { ...this.dependencies.getConnectionHeaders(providerId, connectionValues) };
     let apiKey = configured.apiKey;
     let awsBedrockCredentials: AwsBedrockCredentials | undefined;
-    if ((providerId === 'google-vertex' || providerId === 'google-vertex-anthropic') && !apiKey) {
+    const authSchemaId = getProviderAuthSchemaId(providerId);
+    if (authSchemaId === 'google-vertex' && !apiKey) {
       apiKey = await this.dependencies.resolveGoogleVertex(connectionValues.GOOGLE_APPLICATION_CREDENTIALS);
     }
-    if (providerId === 'amazon-bedrock' && !apiKey && !hasAwsBedrockBearerToken(connectionValues)) {
+    if (authSchemaId === 'aws-bedrock' && !apiKey && !hasAwsBedrockBearerToken(connectionValues)) {
       awsBedrockCredentials = await this.dependencies.resolveAwsBedrock(connectionValues);
     }
     const createdAt = this.dependencies.now();

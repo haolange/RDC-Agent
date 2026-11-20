@@ -1,10 +1,10 @@
 import path from 'node:path';
-import type { Plugin } from 'vite';
-import { compileProviderCatalog, type CompiledProviderCatalog } from '../../shared/provider-catalog/compiler';
+import { compileProviderCatalog, type CompiledProviderCatalog } from './catalogCompiler';
 import {
   listProviderCatalogManifestFiles,
   loadProviderCatalogManifestInput,
-} from '../../shared/provider-catalog/nodeManifestLoader';
+} from './manifestLoader';
+import type { Plugin } from 'vite';
 
 export const PROVIDER_CATALOG_INDEX_MODULE_ID = 'virtual:rdc-provider-catalog-index';
 const RESOLVED_PROVIDER_CATALOG_INDEX_MODULE_ID = `\0${PROVIDER_CATALOG_INDEX_MODULE_ID}`;

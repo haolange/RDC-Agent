@@ -117,8 +117,10 @@ Missing protocol, context, or reasoning efforts remain manifest-owned or unknown
 
 Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。冲突记录 provenance，不静默覆盖。Unknown model fallback 不创造窗口、Fast、Max mode 或 reasoning 事实。Max mode 的目标 tier 在每次 live overlay 合并后都必须提高完整窗口或正常输入预算；不满足时只阻断 Max mode，默认模型继续可用。 Account discovery 只有在当前认证表面同时证明 endpoint 与协议可执行时才可贡献 route；Grok 订阅只读取 `cli-chat-proxy.grok.com` 的账号目录；不读取或合并公共 xAI `/models`，执行 route 由同一订阅 manifest/Builder catalog 掌管。该 proxy 所需的非秘密客户端协议版本同样属于 route manifest；不得依赖运行机器恰好安装 Grok CLI，也不得在 adapter 中按 hostname 猜测或伪造。
 `catalogRevision` 是 preflight 与冻结 `RequestPlan` 共用的语义 revision：它包含 effective model 的 route、control、availability、selection、quota 等行为事实，但排除 provenance 时间戳与快照生成时间。SWR discovery 只续期相同 evidence 时 revision 必须不变；有效模型事实变化时才使旧 preflight fail-closed。
-Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions. Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface. Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry. HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial. HTTP 429 is transient quota; HTTP 402 is transient quota only when the response explicitly identifies `quota_exceeded` / quota exhaustion / `insufficient_balance`, otherwise it remains unknown. Capability probes attach a bounded retry expiry and never downgrade structural capability.
+Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions. Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface. Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry. HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial. HTTP 429 is transient quota; HTTP 402 is transient quota only when the response explicitly identifies `quota_exceeded` / quota exhaustion / `insufficient_balance`, otherwise it remains unknown. Capability probes attach a bounded retry expiry and never downgrade structural capability. Probes and ordinary replies share one evidence rule (`ProviderProbeEvidence`): only a response receipt grants an entitlement — the switched-to model id that answered, an echoed `service_tier: priority` or reported `speed: fast`, or a prompt larger than every smaller tier. A request that merely succeeded grants nothing; receipt grants expire after seven days so a changed subscription is noticed again.
 
+
+本地 Ollama（`ollama-tags`）：`/api/tags` 列出已安装模型，再逐个读 `/api/show`——`capabilities` 中的 `tools` / `vision` / `thinking` 与 `model_info` 里的 `<arch>.context_length` 是本地运行时自己的事实，经 live observation 投影为工具调用、图像输入与上下文窗口（默认输入预算）。已安装即可用；读不到 `/api/show` 的模型仍列出，能力保持未知，可由显式探测补证。上下文窗口是模型训练上限，Ollama 服务端实际窗口由 `OLLAMA_CONTEXT_LENGTH` 决定，需要用户调大到能容纳 Agent 提示。
 
 ## 凭据与请求事务
 
@@ -150,11 +152,23 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 - Fast 是否生效只认真实回执：Anthropic `speed=fast`、OpenAI/xAI `service_tier=priority` 或实际 Fast model id；请求参数不能充当 entitlement。
 - 多协议模型各协议使用各自的 wire profile；兼容输入档位（如 `minimal/medium`）只在 wire 折叠，不渲染成额外档位。Thinking 开启时无效的采样参数从 wire 删除。
 - canonical wire 保留 `xhigh`，产品统一显示 `Extra`；不存在 Ultra 档位，Ultra 属客户端编排能力，不写为 Provider reasoning 值。
-- 已退役的模型 ID 不保留 alias，历史会话保留原模型记录，继续使用时需重选模型。
+- 已退役的模型 ID 写在 surface 的 `retiredModelIds`（小写）：discovery 解析、Effective Catalog 每一层与已持久化的模型行都丢弃它，不保留 alias；历史会话保留原模型记录，继续使用时需重选模型。
 
 ## Adapter 边界
 
-Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolicyId` 和 `wireProfileId`。现有协议、认证机制、标准 discovery mapping、endpoint、route、model facts、controls、bindings 与 provenance 只改 JSON。
+Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolicyId`、`accountAuth.flow` 和 `wireProfileId`。现有协议、认证机制、标准 discovery mapping、endpoint、route、model facts、controls、bindings 与 provenance 只改 JSON。
+
+代码不按 provider id 分支；surface 之间的差异全部是 manifest 字段：
+
+| 差异 | Manifest 字段 | 代码侧 |
+|---|---|---|
+| 账号登录 | `accountAuth`：`flow`、`loginMode`（browser/device）、`codeInput`、`credential.tokenFields` / `baseUrlField` | `ACCOUNT_AUTH_FLOWS` 按 flow id 注册实现；`ProviderAccountAuthService` 只做通用的 flow 簿记、持久化、刷新归属与状态；连接对话框读投影的 `accountLogin` |
+| 固定请求 header（客户端身份、beta、UA） | `routes[].headers` | 进 `RequestPlan.headers`，各 adapter 统一经 `requestPlanHeaders` 发送；账号目录请求与 discovery 读同一路线 |
+| 环境凭据解析 | `authSchemaId`（`google-vertex` / `aws-bedrock`） | `authSchemaResolvesAmbientCredentials` 与 credential lease 按 schema 选择 resolver |
+| 密钥格式 | `connectionSchema.fields[].valuePrefix` | 不带该前缀的已存密钥视为不可用 |
+| 非标准目录 | `discovery.strategy.parserId` | `ProviderModelDiscovery` 按 parser id 分派 |
+
+`accountAuth` 恰好在提供 `oauth` / `device` 认证模式时声明，编译期校验。
 
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
 
@@ -164,7 +178,9 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 
 最终操作 URL 按 operation builder 构建并逐 route 测试，禁止重复追加 `/chat/completions`、`/responses` 或 Anthropic `/v1`。所有 stable surface 必须具有 adapter、auth schema、endpoint、Connection Test 与 operation URL；无凭据显示 `Unconfigured`，不得显示假 `Available`。
 
-Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入 Effective Catalog；已配置 Refresh 与自动 SWR 共用 `EffectiveCatalogService.refreshDiscovery` 和同一 discovery loader，不再先写回 Provider 设置。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「未验证」。
+Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入 Effective Catalog；已配置 Refresh 与自动 SWR 共用 `EffectiveCatalogService.refreshDiscovery` 和同一 discovery loader，不再先写回 Provider 设置。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「待确认」；刷新失败且可用性未知时显示「刷新失败」并以失败原因为提示，只有刷新完成而账号目录仍未确认时才显示「待确认」。被新配置取代的刷新不落盘、不发布旧结果，但会广播当前配置的快照，以清除旧一代的加载状态。
+
+首轮目录加载期间所有模型都是可用性未知。回合开始时若该 Provider 尚无 discovery 且首轮加载在进行，`awaitFirstCatalogLoad` 最多等待 8 秒再做 preflight；有缓存（即使过期）时从不等待。可用性未知与工具不可执行分属两个诊断码：`CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED` 与 `CONVERSATION_LLM_TOOLS_UNAVAILABLE`。Settings → 智能体、Composer、会话覆盖、preflight 与 RequestPlanner 共用 `isAgentToolExecutableModel`，其中包含正的 `defaultBudgetTokens`（缺失为 `budget-unknown`），不再各自追加条件。
 
 ## HAL Adapter 实现注册
 
@@ -285,7 +301,7 @@ Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/a
 
 ## 显式能力探测与批量生命周期
 
-Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。批次只在主进程内存中存在，准备阶段刷新已保存账号目录并列出请求数量；用户明确开始后串行发送短提示，无工具、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
+Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。批次只在主进程内存中存在，准备阶段刷新已保存账号目录并列出请求数量；用户明确开始后串行发送短提示，只附一个无副作用工具 `capability_check`（真实回合总是带工具，探测按回合的样子检查路线）、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。回复里对该工具的结构化调用是工具调用能力的回执，记为 `toolCalling: supported`；只回文字不改变工具调用状态；HTTP 400 且消息明确说模型不支持工具（如 Ollama 的 `does not support tools`）记为 `unsupported`，不算账号资格拒绝。不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
 
 成功必须有正常终止和文本。Fast 根据实际 binding 分别检查原生 usage.speed、响应 service tier 或响应 model id；请求参数和客户端构造的消息 model 不能冒充服务端回执。Max 的 implicit/client-tier 扩窗必须有明确当前账号目录资格，短请求成功不能独自授予更大窗口；明确 header/body 激活仍沿所属执行契约。组合 binding 独立验证，组合拒绝不撤销两个单项的资格。
 

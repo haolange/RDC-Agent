@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   filterComposerPickerOptions,
-  groupComposerPickerOptions,
   hasPickerReasoning,
   isComposerPickerModel,
   resolvePickerContextWindow,
   toComposerPickerOption,
 } from './composerModelPicker';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 function model(partial: Record<string, unknown> & { modelId: string }): EffectiveModel {
   return {
@@ -93,6 +92,5 @@ describe('composerModelPicker', () => {
     ];
     expect(filterComposerPickerOptions(options, 'sol').map((item) => item.modelId)).toEqual(['gpt-5.6-sol']);
     expect(filterComposerPickerOptions(options, 'kimi').map((item) => item.modelId)).toEqual(['k3']);
-    expect(groupComposerPickerOptions(options)).toHaveLength(2);
   });
 });

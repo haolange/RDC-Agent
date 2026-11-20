@@ -1,14 +1,19 @@
 import bundledCatalogIndex, {
   loadProviderSurface as loadCompiledProviderSurface,
 } from 'virtual:rdc-provider-catalog-index';
-import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
-import { ProviderSurfaceManifestSchema, type ProviderSurfaceManifest } from '@shared/provider-catalog/catalogManifestSchema';
+import {
+  ProviderSurfaceManifestSchema,
+  type ProviderAccountAuth,
+  type ProviderSurfaceManifest,
+} from '@shared/provider-catalog/catalogManifestSchema';
 import {
   PROVIDER_CATALOG_SCHEMA_VERSION,
   type CompiledProviderCatalogIndex,
   type CompiledProviderSurface,
   type ProviderSurfaceSummary,
-} from '@shared/provider-catalog/compiler';
+} from './catalogCompiler';
+import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
+import type { ProviderAuthSchemaId } from '@shared/provider-catalog/implementationRegistry';
 import type {
   BuiltinLlmProviderId,
   LlmProviderAuthMode,
@@ -16,6 +21,7 @@ import type {
   LlmProviderCatalogOwnership,
   LlmProviderEntry,
   LlmProviderModel,
+  LlmProviderProtocol,
 } from '@shared/types/settings';
 
 const loadedSurfaces = new Map<string, ProviderSurfaceManifest>();
@@ -207,6 +213,27 @@ export function getProviderDefaultBaseUrl(id: string): string | undefined {
   return route?.baseUrl.trim().replace(/\/+$/, '');
 }
 
+export function getProviderAuthSchemaId(id: string): ProviderAuthSchemaId | undefined {
+  return summaryById(id)?.authSchemaId;
+}
+
+/** The surface's account sign-in descriptor; null when it has no account login. */
+export function getProviderAccountAuth(id: string): ProviderAccountAuth | null {
+  const accountAuth = summaryById(id)?.accountAuth;
+  return accountAuth ? cloneJson(accountAuth) : null;
+}
+
+/** Fixed request headers the surface's route for this protocol sends with every call. */
+export function getProviderRouteHeaders(id: string, protocol: LlmProviderProtocol): Readonly<Record<string, string>> {
+  const route = summaryById(id)?.routes.find((candidate) => candidate.protocol === protocol);
+  return { ...(route?.headers ?? {}) };
+}
+
+/** A model the surface's manifest retired; every catalog layer drops it. */
+export function isRetiredProviderModel(id: string, modelId: string): boolean {
+  return summaryById(id)?.retiredModelIds?.includes(modelId.trim().toLowerCase()) ?? false;
+}
+
 export function createProviderEntryFromCatalog(id: string): LlmProviderEntry {
   const surface = summaryById(id);
   const route = surface ? defaultRoute(surface) : undefined;
@@ -258,7 +285,9 @@ export function createProviderEntryFromCatalog(id: string): LlmProviderEntry {
     recommendedModels: models.length > 0 ? models.map((model) => model.id) : [...surface.recommendedModels],
     docsUrl: surface.docsUrl,
     status: unavailableReason ? 'unavailable' : 'unconfigured',
-    accountLoginConfigured: surface.accountLoginConfigured,
+    ...(surface.accountAuth
+      ? { accountLogin: { mode: surface.accountAuth.loginMode, codeInput: surface.accountAuth.codeInput } }
+      : {}),
     unavailableReason,
     isConfigured: false,
     capabilities: surface.capabilities ? [...surface.capabilities] : undefined,

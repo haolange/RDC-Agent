@@ -23,7 +23,7 @@ it('canonical background dispatch projects the child approval after parent reply
  const gate = new Promise<void>((resolve) => { release = resolve; });
  const runner = new SubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async (_agent, _text, options) => {
   await gate;
-  const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-turn', toolCallId: 'mutation', toolName: 'shell', reason: 'bounded write', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-turn' }, signal: options?.signal, onEvent: options?.onEvent });
+  const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-turn', toolCallId: 'mutation', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'bounded write', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-turn' }, signal: options?.signal, onEvent: options?.onEvent });
   expect(approved).toBe(true);
   return 'approved';
  } });
@@ -31,7 +31,7 @@ it('canonical background dispatch projects the child approval after parent reply
  runner.setBackgroundStarter((input) => service.start(input));
  const task = await new TaskRegistry(store).createTask('approval execution');
  const parent = new TurnHandle({ sessionKey: 'owner', turnId: 'parent-turn', generation: 1 });
- parent.runtimePlan = { profileDelegates: ['general'] } as never;
+ parent.runtimePlan = { profileDelegates: ['general'], accessCeiling: 'full' } as never;
  parent.eventSink = { sessionId: 'owner', onEvent: (event: AgentEvent) => {
   events.push(event);
   if (event.type === 'approval.requested') {
@@ -59,7 +59,7 @@ it('keeps the immediate parent artifact allowlist when a nested background task 
  const origin = 'owner::subagent::first';
  const releaseTask = registerDelegatedTaskScope(origin, { ownerSessionId: 'owner', rootTaskId: root.id });
  const releaseArtifacts = grantDelegatedArtifactAccess(origin, 'owner', ['session://tool-outputs/allowed.txt']);
- const parent = new TurnHandle({ sessionKey: origin, turnId: 'nested-parent', generation: 1 }); parent.runtimePlan = { profileDelegates: ['general'] } as never;
+ const parent = new TurnHandle({ sessionKey: origin, turnId: 'nested-parent', generation: 1 }); parent.runtimePlan = { profileDelegates: ['general'], accessCeiling: 'full' } as never;
  try {
   const tool = runner.createSubagentTools('general', origin, parent)[0]!;
   const result = await tool.execute('nested-start', { mode: 'background', taskId: childTask.id, goal: 'check', task: 'check', scope: 'subtree', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: ['session://tool-outputs/secret.txt'], requiredSkillIds: [], stopConditions: ['done'], outputRequirements: 'result', budget: { maxToolCalls: 3, maxWallTimeMs: 10000 } });
@@ -83,7 +83,7 @@ it('restores the previous Task execution root before binding a fresh parent requ
  const live = createPolicyBudgetState({ maxToolCalls: 40, maxSubagents: 5, maxChildDepth: 3, maxWallTimeMs: 600000 });
  live.toolCalls = 2;
  const parent = new TurnHandle({ sessionKey: 'retry-owner', turnId: 'resumed-turn', generation: 1, policyBudget: live });
- parent.runtimePlan = { profileDelegates: ['general'] } as never;
+ parent.runtimePlan = { profileDelegates: ['general'], accessCeiling: 'full' } as never;
  const result = await runner.createSubagentTools('general', 'retry-owner', parent)[0]!.execute('retry', { mode: 'background', taskId: task.id, goal: 'check', task: 'check', scope: 'one source', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [], requiredSkillIds: [], stopConditions: ['done'], outputRequirements: 'result', budget: { maxToolCalls: 3, maxWallTimeMs: 10000 } });
  const id = (result.details as { executionId: string }).executionId;
  expect(id).toBeTruthy(); await service.join(id);

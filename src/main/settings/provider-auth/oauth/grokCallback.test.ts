@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setImmediate } from 'node:timers/promises';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { listenGrokCallback } from './grokCallback';
 import type { OAuthFlowState } from './oauthTypes';
 

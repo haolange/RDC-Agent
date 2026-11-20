@@ -1,8 +1,8 @@
 import React from 'react';
-import type { TraceArtifactRecord } from '@shared/types/trace';
 import { useI18n } from '../../i18n';
 import { copyAppText, openAppPath } from '../../hooks/appShellBridge';
 import { Button } from '../../ui/Button';
+import type { TraceArtifactRecord } from '@shared/types/trace';
 
 interface RightRailOutputListProps { current: TraceArtifactRecord[]; previous: TraceArtifactRecord[]; }
 

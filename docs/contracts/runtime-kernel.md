@@ -49,7 +49,7 @@ Scoped Runtime Resolution
   -> Provider Wire Request
 ```
 
-`PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。稳定前缀指纹锚定 prompt-cache。Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。`context-view.json` 写入 `{ schemaVersion: '1', view }`；缺版本裸 view 走 `SESSION_CONTEXT_VIEW_MIGRATIONS`。`shell-state.json` 写入 `{ schemaVersion: '1', state: { cwd } }`，只存 cwd；缺版本或损坏 fail-closed / quarantine，未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`。
+`PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。 会话回合与 profile/子执行回合都经同一 `buildTurnPromptPlan`（`src/main/agent-runtime/orchestration/TurnPromptPlan.ts`）解析分层指令、预载 skill 并按 skill 收窄工具；调用方只负责解析 profile 与冻结事实。能力探测、压缩交接与权限审核这三类不带会话历史、不执行工具的单次请求统一走 `executeAuxiliaryRequest`（`src/main/agent-runtime/prompt/AuxiliaryRequest.ts`），共用请求快照、路由、凭据与缓存规则（只有探测写入 prompt cache），请求被取消则不记录完成。压缩与权限审核不提供工具；探测提供一个无副作用的 `capability_check`，由调用方判读回执。稳定前缀指纹锚定 prompt-cache。Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。`context-view.json` 写入 `{ schemaVersion: '1', view }`；缺版本裸 view 走 `SESSION_CONTEXT_VIEW_MIGRATIONS`。`shell-state.json` 写入 `{ schemaVersion: '1', state: { cwd } }`，只存 cwd；缺版本或损坏 fail-closed / quarantine，未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`。
 
 切模型不自动 compact、不写迁移事务。`ContinuationReplayPolicy` 按 compiled execution identity 决定同绑定回放 / 跨绑定 drop；普通 Send 与 rewrite 在将丢弃 continuation 制品时插入同一条系统通知。optional 制品保留最近 8 个可见 turn；`requirement: required` 制品不受该窗口过期，只随 compaction 边界终止。
 
@@ -81,11 +81,15 @@ Renderer 的 EffectiveCatalog store 只是主进程快照镜像：按 provider/a
 
 语义值：`raw` | `summary` | `opaque` | `none` | `unknown`。声明缺失保持 `unknown`，禁止静默升级。
 
+请求可见推理是路由契约上的独立事实 `reasoning.visibilityRequest`：`responses-summary`（`reasoning.summary: auto`）、`anthropic-display`（`thinking.display: summarized`）、`gemini-include-thoughts`（`thinkingConfig.includeThoughts`）、`gemini-interactions-summaries`（`thinking_summaries: auto`）、`ollama-think`（`think` 开关，仅推理控制已知时发送）、`sap-include-reasoning`。只在推理开启时生效；adapter 只读这一事实，不按语义值或 provider id 推断。Responses / Gemini / SAP / Ollama 协议 profile 声明各自请求，因此网关路由默认继承；路由在 `contractOverrides` 里重新声明语义时，profile 的请求随之失效，除非该路由自己声明。Anthropic 兼容网关只流 raw thinking，不发送 `display`。
+
 每个 wire block 先获得稳定 `ProviderOutputRef`；首次语义声明永久归属 `thinking` | `text` | `tool_call` 之一。kind collision、start 前 delta、close 后 delta、terminal 后语义事件 → fail-closed。禁止按文本相同做跨通道去重。
 
 Provider 请求失败或本地响应提交失败时，本次尚未交给工具执行器的 assistant 流式内容只保留为可见诊断，不进入下一次请求的 Agent 上下文；尤其不能重放没有对应 tool result 的 `tool_call`。仅成功结束的响应才进入正常工具循环。
 
-仅显式 thinking block 可创建 `ThinkingArtifact`；普通 assistant text 永不合成 thinking。每个 assistant text item 保留 `ProviderOutputRef` 与 provider 实际声明的 phase；缺少 phase 时先在原位中性流式呈现，工具调用或正常终止才能确认语义，阶段确认不搬移文本节点。新记录以输出项为文本源，不再双写模型段落的合并 `result.text`；历史记录按原数据读取。显式 commentary 不进入 canonical final；只有正常结束确认的 final 进入正文与 final trace。Responses 同源历史按原项顺序回放已声明的 phase。正常结束但无 canonical final → fail-closed。
+仅显式 thinking block 可创建 `ThinkingArtifact`；普通 assistant text 永不合成 thinking。每个 `llm_turn` 以有序 `items` 记录模型产出：`kind: 'text'`（保留 `ProviderOutputRef` 与 provider 实际声明的 phase）与 `kind: 'thinking'`（每个 provider thinking block 一项，按 output ref 归并增量）。两者与工具调用共用同一 `displayOrder` 序列，先出现的位置终身不变；同一轮里思考、调用工具、再思考，两段思考都保留在原位。缺少 phase 的文本先在原位中性流式呈现，循环结束时由共享规则 `settleTextPhase`（`src/shared/conversation/loopItems.ts`）一次标注：provider 声明优先，`end_turn` 且为终答的循环标 final，`tool_use` 标 commentary，其余保持未声明；主会话、子代理投影、Trace 重载与终答文本 `loopFinalAnswerText` 都走这一规则。没有 `result.text`、单一 thinking 槽或 `outputItems`；存储边界遇到这些旧形状时整条 workTrace 丢弃并标记 `workTraceDiscarded`，正文照常显示，转录区给出一行“过程记录来自旧版本”。
+
+请求中途失败、AgentLoop 开始恢复（`error_recovery_*` started）时，当前未结束循环的文本、思考与从未开始执行的工具调用一并丢弃，重试从头流式，不会重复显示。停止时，最后一个答复循环已流出的非 commentary 文本作为消息正文保留。显式 commentary 不进入 canonical final；只有正常结束确认的 final 进入正文与 final trace。Responses 同源历史按原项顺序回放已声明的 phase。正常结束但无 canonical final → fail-closed。
 
 ## Provider 错误模型契约
 

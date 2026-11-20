@@ -1,6 +1,6 @@
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
-import type { AgentProfile } from '@shared/types/agenticTrace';
 import { TRACE_AGENT_PROFILES, createTraceAgentProfile } from './profileManifest';
+import type { AgentProfile } from '@shared/types/agenticTrace';
 
 export class AgentProfileRegistry {
   private profiles = new Map<string, AgentProfile>(TRACE_AGENT_PROFILES);

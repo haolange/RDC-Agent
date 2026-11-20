@@ -28,8 +28,8 @@ Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 - `icon`（图标预设）
 - `accent`（`#RRGGBB`；驱动 Composer 边框流光、边缘泛光与 Effort 滑条色；Settings → Agents 可编辑）
 - `enabled`
-- `user-invocable`
-- `disable-model-invocation`
+- `user-invocable`（Composer 的 Agent 菜单是否列出它）
+- `disable-model-invocation`（为 `true` 时不能被其他 Agent 委派或调用：回合冻结的 `profileDelegates` 只保留已启用且未设此项的声明 delegates，只有人在 Composer 里选择时才运行）
 - `tools`
 - `agents`
 - `skills`（强制全文 preload；空列表表示不预载，不等于不可发现）

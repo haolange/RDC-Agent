@@ -2,10 +2,10 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createHash } from 'node:crypto';
 import { nativeImage } from 'electron';
-import type { AgentTool } from '../../agent/AgentTool';
-import { safeResolvePath } from './_shared';
 import { assertSafeImageAttachment } from '../../../conversation/ConversationAttachmentMaterializer';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
+import { safeResolvePath } from './_shared';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface ReadImageParams {
   path: string;
@@ -60,6 +60,7 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
     requiresApproval: false,
   },
   permissionHint: 'readonly',
+  effects: { reads: ['path'] },
 
   async execute(toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

@@ -1,18 +1,8 @@
-import type {
-  Context,
-  Message,
-  Model,
-  ProviderContinuationArtifact,
-  StopReason,
-  StreamOptions,
-  ToolDefinition,
-} from '../../core/types';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../../reasoning/ContinuationReplayPolicy';
 import { createProviderStateRef, findLatestProviderState } from '../../reasoning/ProviderStateRefs';
 import { partitionSystemPrompt } from '../promptCacheWire';
-import { buildOpenAiResponsesReasoning } from '../reasoningWire';
+import { buildOpenAiResponsesReasoning, reasoningVisibilityRequest } from '../reasoningWire';
 import { reasoningProjectionSource } from '../reasoningProjection';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './AssistantStreamBuilder';
 import { ResponsesItemChannels } from './responsesItemChannels';
@@ -22,6 +12,16 @@ import {
   ProviderEmptyStreamError,
 } from './http';
 import { finalizeProviderUsage } from './normalizeCacheUsage';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type {
+  Context,
+  Message,
+  Model,
+  ProviderContinuationArtifact,
+  StopReason,
+  StreamOptions,
+  ToolDefinition,
+} from '../../core/types';
 
 export const RESPONSES_REASONING_INCLUDE = 'reasoning.encrypted_content';
 
@@ -354,7 +354,7 @@ export function buildResponsesRequestBody(
   }
   if (typeof options.temperature === 'number') body.temperature = options.temperature;
   if (typeof options.topP === 'number') body.top_p = options.topP;
-  const reasoningPayload = buildOpenAiResponsesReasoning(options.reasoning, options.reasoningVisibility);
+  const reasoningPayload = buildOpenAiResponsesReasoning(options.reasoning, reasoningVisibilityRequest(options));
   if (reasoningPayload.reasoning) {
     body.reasoning = reasoningPayload.reasoning;
   }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import { findCanonicalFinalAnswer, resolveHistoryTurnProfileId } from './TraceService';
+import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 
 function block(id: string, text: string, outputPhase: 'commentary' | 'final_answer'): ConversationWorkBlock {
   return {
@@ -10,8 +10,15 @@ function block(id: string, text: string, outputPhase: 'commentary' | 'final_answ
     kind: 'llm_turn',
     title: 'LLM turn',
     status: 'complete',
-    result: {
+    items: [{
+      kind: 'text',
+      providerOutputRef: { protocol: 'test', providerBlockKey: `${id}:text`, contentIndex: 0 },
       text,
+      phase: outputPhase,
+      status: 'complete',
+      displayOrder: 1,
+    }],
+    result: {
       status: 'complete',
       stopReason: 'end_turn',
       outputPhase,
@@ -62,14 +69,15 @@ describe('TraceService canonical channel reload', () => {
 
   it('reads only confirmed final items from a mixed-phase model response', () => {
     const mixed = block('mixed', 'Checking.Final answer.', 'final_answer');
-    mixed.outputItems = [
-      { providerOutputRef: { protocol: 'test', providerBlockKey: 'a', contentIndex: 0 },
+    mixed.items = [
+      { kind: 'text', providerOutputRef: { protocol: 'test', providerBlockKey: 'a', contentIndex: 0 },
         text: 'Checking.', phase: 'commentary', status: 'complete', displayOrder: 1 },
-      { providerOutputRef: { protocol: 'test', providerBlockKey: 'b', contentIndex: 1 },
+      { kind: 'text', providerOutputRef: { protocol: 'test', providerBlockKey: 'b', contentIndex: 1 },
         text: 'Final answer.', phase: 'final_answer', status: 'complete', displayOrder: 2 },
     ];
     expect(findCanonicalFinalAnswer([assistant('Final answer.', [mixed])], 'run-1')).toBe('Final answer.');
-    mixed.result!.stopReason = 'max_tokens';
+    // A loop that did not settle as a final answer contributes nothing.
+    mixed.result!.outputPhase = 'commentary';
     expect(findCanonicalFinalAnswer([assistant('', [mixed])], 'run-1')).toBeNull();
   });
 });

@@ -20,7 +20,7 @@
 .settings-modal-title {
   min-width: 0;
   color: var(--token-text-heading);
-  font-size: var(--text-xl);
+  font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: 1.25;
   letter-spacing: 0;
@@ -29,7 +29,7 @@
 .settings-modal-subtitle {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1.45;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -67,6 +67,6 @@
   }
 
   .settings-modal-title {
-    font-size: var(--text-lg);
+    font-size: var(--type-title-size);
   }
 }

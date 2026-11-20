@@ -2,19 +2,15 @@
  * AgentTurnRunner — runs one prepared agent turn; slot construction lives in AgentSlotFactory.
  */
 
-import type { AgentRole } from '@shared/types/agent';
-import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
-import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
-import { permissionReviewAuthority, permissionReviewCaptureBaseline, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
 import { createHash } from 'node:crypto';
-import { delegatedArtifactReferences } from '../../sessions/artifacts/DelegatedArtifactAccess';
-import type { ContextUsageBreakdownEntry } from '@shared/types/session';
-import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
-import type { EffectiveModel } from '@shared/types/providerCapability';
+import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { permissionReviewAuthority, permissionReviewCaptureBaseline, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
+import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
+import { delegatedArtifactReferences } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { TokenizerService } from '../core/TokenizerService';
-import type { ToolExecutor } from '../agent/AgentLoop';
 import {
   claimStructuredToolCallingEvidence,
   describeRouteCapabilityDiagnostic,
@@ -27,14 +23,6 @@ import {
   type AgentEventBridgeContext,
 } from '../AgentEventBridge';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
-import { cancelTurnInteractionRequests } from './cancelTurnInteractionRequests';
-import type {
-  AgentEvent as CoreAgentEvent,
-  Message,
-  StreamOptions,
-  ToolDefinition,
-  UserMessage,
-} from '../core/types';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import {
   recordObservedToolCallingSupport,
@@ -42,6 +30,7 @@ import {
 } from '../../settings/provider-catalog/EffectiveModelResolver';
 import { debuggerLlmService } from '../../sessions/run/DebuggerLlmService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
+import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
 import {
   turnCoordinator,
   createSubagentBudgetState,
@@ -50,26 +39,38 @@ import {
 } from './TurnCoordinator';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
 import { requireExecutionScopeId } from './executionScope';
-import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
 import {
   isMcpPrefixedToolName,
   partitionDeferredTools,
 } from './deferredTools';
+import { listUnfinishedDirectTasks, settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
+import { cancelTurnInteractionRequests } from './cancelTurnInteractionRequests';
+import { completionBudgetEvidence } from './CompletionBudgetEvidence';
+import { createOrReuseAgentSlot, isSuccessfulProviderResponse, reportedUsageFields, type AgentSlotRequest } from './AgentSlotFactory';
+import { ApprovedCaptureController } from './ApprovedCaptureController';
+import { createApprovedCaptureHost } from './ApprovedCaptureHost';
+import type { TurnCompletionReadinessValidator, TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
 import type {
   AgentTurnOptions,
   PreparedAgentRuntime,
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
-import type { TurnCompletionReadinessValidator, TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
-import { listUnfinishedDirectTasks, settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
-import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
-import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
-import { completionBudgetEvidence } from './CompletionBudgetEvidence';
-import { createOrReuseAgentSlot, isSuccessfulProviderResponse, reportedUsageFields, type AgentSlotRequest } from './AgentSlotFactory';
-import { ApprovedCaptureController } from './ApprovedCaptureController';
-import { createApprovedCaptureHost } from './ApprovedCaptureHost';
+import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
+import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type {
+  AgentEvent as CoreAgentEvent,
+  Message,
+  StreamOptions,
+  ToolDefinition,
+  UserMessage,
+} from '../core/types';
+import type { ToolExecutor } from '../agent/AgentLoop';
+import type { AgentRole } from '@shared/types/agent';
+import type { ContextUsageBreakdownEntry } from '@shared/types/session';
 
 export interface AgentTurnRunnerDeps {
   validateCompletion: TurnCompletionValidator;
@@ -329,7 +330,7 @@ export class AgentTurnRunner {
     turnHandle.promptPlan = promptPlan;
     const approvedCapture = preparedRuntime.approvedExecution?.investigation?.captureScope;
     if (approvedCapture) {
-      if (!input.sessionId || !input.projectId || input.agentId !== 'general' || !preparedRuntime.approvedExecution?.investigation) {
+      if (!input.sessionId || !input.projectId || input.agentId !== GENERAL_AGENT_ID || !preparedRuntime.approvedExecution?.investigation) {
         throw new Error('RDC_CAPTURE_SCOPE_INVALID: approved capture work requires the owning General session.');
       }
       const approved = preparedRuntime.approvedExecution;

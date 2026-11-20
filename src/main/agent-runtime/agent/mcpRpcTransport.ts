@@ -1,5 +1,5 @@
-import type { ChildProcess } from 'child_process';
 import { z } from 'zod';
+import type { ChildProcess } from 'child_process';
 
 interface JsonRpcResponse {
   jsonrpc: '2.0';

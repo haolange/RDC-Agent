@@ -1,14 +1,14 @@
+import { compareConversationMessages } from '@shared/conversation/conversationBranchResolver';
+import {
+  createEmptyContextUsageProjection,
+  type ContextUsageProjectionState,
+} from './contextUsageProjectionModel';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 import type { ReasoningSummary, WorkflowState } from '@shared/types/workflow';
-import { compareConversationMessages } from '@shared/conversation/conversationBranchResolver';
-import {
-  createEmptyContextUsageProjection,
-  type ContextUsageProjectionState,
-} from './contextUsageProjectionModel';
 
 export interface SessionProjection {
   allMessages: ConversationMessage[];

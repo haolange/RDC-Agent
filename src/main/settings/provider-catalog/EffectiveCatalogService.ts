@@ -1,7 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { LlmProviderProtocol } from '@shared/types/settings';
 import { appPathService } from '../../runtime/AppPathService';
 import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
 import { CatalogProjectionClock } from './CatalogProjectionClock';
@@ -26,6 +24,8 @@ import {
   type PersistedCatalogState,
   type TransientQuotaEntry,
 } from './effectiveCatalogTypes';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
 const EMPTY_STATE: PersistedCatalogState = {
   schemaVersion: EFFECTIVE_CATALOG_SCHEMA_VERSION,
@@ -184,6 +184,16 @@ export class EffectiveCatalogService {
     return this.refreshes.has(key) ? this.createSnapshot(request) : snapshot;
   }
 
+  /**
+   * The refresh a caller may wait for: only the first load of a route that has no discovery yet.
+   * A stale cache already answers; waiting for its revalidation would only delay the turn.
+   */
+  firstLoad(request: EffectiveCatalogRequest): Promise<EffectiveCatalogSnapshot> | null {
+    const key = cacheKey(request.providerId, request.accountId, request.protocol);
+    if (this.resolveDiscovery(request)) return null;
+    return this.refreshes.get(key) ?? null;
+  }
+
   private bindRequest(key: string, request: EffectiveCatalogRequest): string {
     const { generation, changed } = this.projectionClock.bind(key, request);
     if (changed) { this.refreshes.delete(key); this.clearKeyRefreshState(key); }
@@ -294,7 +304,7 @@ export class EffectiveCatalogService {
     void (async () => {
       try {
         const loaded = await loader();
-        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.createSnapshot(this.latestRequests.get(key)!);
+        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.discardRefresh(key);
         const observedAt = this.now();
         const expiresAt = new Date(observedAt.getTime() + this.discoveryTtlMs).toISOString();
         const { entitlement, ...discovery } = loaded;
@@ -328,7 +338,7 @@ export class EffectiveCatalogService {
         this.refreshBackoff.delete(key);
         this.persistState();
       } catch (error) {
-        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.createSnapshot(this.latestRequests.get(key)!);
+        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.discardRefresh(key);
         this.lastErrors.set(key, {
           message: error instanceof Error ? error.message : String(error),
           authenticationRejected: (error instanceof ProviderConnectionError && error.httpStatus === 401)
@@ -343,6 +353,13 @@ export class EffectiveCatalogService {
       return snapshot;
     })().then(resolveRefresh, rejectRefresh);
     return refresh;
+  }
+
+  /** A superseded refresh still tells subscribers so a spinner from the old generation clears. */
+  private discardRefresh(key: string): EffectiveCatalogSnapshot {
+    const snapshot = this.createSnapshot(this.latestRequests.get(key)!);
+    this.emit(snapshot);
+    return snapshot;
   }
 
   recordObserved(

@@ -1,6 +1,6 @@
+import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import type { AgentMessage } from '../core/types';
 import type { CompressResult } from '../agent/ContextManager';
-import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 
 export interface ContextCheckpoint {
   uri: string;

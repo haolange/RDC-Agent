@@ -1,8 +1,8 @@
 /**
  * /skills — 列出或执行当前工作区的 Markdown Skills。
  */
-import type { CommandDefinition } from '@shared/types/command';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
+import type { CommandDefinition } from '@shared/types/command';
 
 export const skillsCommand: CommandDefinition = {
   id: 'skills',

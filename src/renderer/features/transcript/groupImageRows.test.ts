@@ -1,9 +1,10 @@
-import { translate } from '../../i18n/messages';
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { expect, it } from 'vitest';
+import { translate } from '../../i18n/messages';
 import { groupImageRows } from './groupImageRows';
 import { aggregateSectionSteps } from './workProcessToolAggregate';
 import type { WorkProcessRow } from './workProcessTypes';
+
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 const image = (id: string, status = 'complete', toolName = 'read_image') => ({
   type: 'tool', id, status, toolName, target: id, duration: '1ms',
 } as Extract<WorkProcessRow, { type: 'tool' }>);

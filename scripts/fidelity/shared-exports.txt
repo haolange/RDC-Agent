@@ -103,7 +103,6 @@ APP_MIN_MAIN_WIDTH
 APP_MIN_WINDOW_HEIGHT
 APP_MIN_WINDOW_WIDTH
 APP_RESIZE_HANDLE_WIDTH
-appendJsonl
 AppLanguage
 applyContrastPair
 AppMetaApi
@@ -131,7 +130,6 @@ ArtifactSourceRef
 ArtifactStatus
 assertChannelCapabilityCoverage
 assertHexOrNull
-assertNoJsonlDiagnostics
 assignDefaultCaptureRoles
 AssistantMessageDiagnostic
 AssistantMessageNode
@@ -234,11 +232,7 @@ CompiledChromeCssVars
 compiledChromeToInlineStyle
 CompiledPolicy
 CompiledPromptCache
-CompiledProviderCatalog
-CompiledProviderCatalogIndex
-CompiledProviderSurface
 CompiledRdcProbe
-compileProviderCatalog
 compileRdcProbe
 compileThemeChrome
 CompletionArtifactRef
@@ -313,7 +307,6 @@ ConversationMessageErroredEvent
 ConversationMessagePatchedEvent
 ConversationMessageStatus
 ConversationMode
-ConversationOutputItem
 ConversationPlanReview
 ConversationPreflightErrorCode
 ConversationReasoningState
@@ -349,7 +342,6 @@ ConversationWorkBlock
 ConversationWorkBlockKind
 ConversationWorkBlockStatus
 ConversationWorkTrace
-countJsonl
 createAppMetaApi
 createAppShellApi
 createCaptureApi
@@ -388,7 +380,6 @@ createWorkflowApi
 CustomModel
 CustomModelSchema
 DebugSessionStartRequest
-dedicatedToolCallingFactSourceIds
 DEFAULT_AGENT_ACCESS_CEILING
 DEFAULT_AGENT_COMPLETION_CONTRACT
 DEFAULT_AGENT_ID
@@ -491,7 +482,6 @@ ExperimentStatus
 ExperimentVisualValidation
 extractDollarSkillRefs
 extractSessionArtifactUris
-filterJsonl
 filterToolsWithinCeiling
 FinalResponseNode
 findForkForMessage
@@ -608,7 +598,6 @@ isRdcLeaseToolName
 isReasoningSelection
 isRendererEventChannel
 isRendererInvokeChannel
-isRetiredModel
 isSafeAgentProfileId
 isSessionArtifactCategory
 isSessionArtifactizedEnvelope
@@ -621,8 +610,6 @@ isToolWithinCeiling
 isTopLevelAgentId
 isTransientScopeId
 isWorldStateMutated
-JsonlDiagnostic
-JsonlReadResult
 JsonObject
 JsonObjectSchema
 JsonPreview
@@ -692,7 +679,6 @@ LayoutPreferences
 LEFT_SIDEBAR_COLLAPSED_WIDTH
 LEFT_SIDEBAR_DEFAULT_WIDTH
 LEFT_SIDEBAR_MIN_WIDTH
-listProviderCatalogManifestFiles
 listUnclassifiedInvokeChannels
 LLM_PROVIDER_CATEGORY_DEFINITIONS
 LLM_PROVIDER_PROTOCOL_DEFINITIONS
@@ -737,7 +723,6 @@ LlmProviderProtocolDescriptor
 LlmSettings
 LLMStreamEvent
 LLMToolCallDelta
-loadProviderCatalogManifestInput
 LogPreview
 maskLogoCircleRgba
 MaterialContext
@@ -792,8 +777,6 @@ ModelRouteOption
 ModelRouteOptionSchema
 ModelRouteRecommendation
 ModelRouteSchema
-MODELS_DEV_IDENTITY_COUNT
-MODELS_DEV_SNAPSHOT_SHA256
 ModelSelection
 ModelSelectionSchema
 ModelsOverride
@@ -828,7 +811,6 @@ parsePlanTaskRequirements
 parseRdcThemeV1
 parseSessionArtifactUri
 parseUnresolvedItems
-parseYaml
 PhaseGroupNode
 PhaseKind
 PLAN_EXECUTION_REFERENCES_HEADING
@@ -884,9 +866,7 @@ ProtocolWireFixtureCoverage
 PROVIDER_ADAPTER_IDS
 PROVIDER_ADAPTER_IMPLEMENTATIONS
 PROVIDER_AUTH_SCHEMA_IDS
-PROVIDER_CATALOG_SCHEMA_VERSION
 PROVIDER_DISCOVERY_POLICY_IDS
-provider-catalog/index.ts::*
 ProviderAccountKey
 ProviderAdapterId
 providerAdapterIdForProtocol
@@ -896,7 +876,6 @@ ProviderAuthSchemaId
 ProviderAvailability
 ProviderCacheContract
 ProviderCacheContractSchema
-ProviderCatalogCompileInput
 ProviderContinuationArtifact
 ProviderContractBundle
 ProviderContractBundlePatch
@@ -912,7 +891,6 @@ ProviderErrorInfo
 ProviderIdentityManifest
 ProviderIdentityManifestSchema
 ProviderLifecycleStatus
-ProviderModelSummary
 ProviderOperationBuilderId
 ProviderOutputRef
 ProviderOverride
@@ -938,7 +916,6 @@ ProviderSurfaceManifest
 ProviderSurfaceManifestSchema
 ProviderSurfaceRoute
 ProviderSurfaceRouteSchema
-ProviderSurfaceSummary
 ProviderThinkingProjectionSource
 ProviderThinkingProjectionSourceSchema
 ProviderToolLoopContract
@@ -968,8 +945,6 @@ RdcRuntimeContext
 RdcRuntimeOverview
 RdcThemeV1ParseResult
 RdcThemeV1Payload
-readJsonl
-readYaml
 REASONING_SELECTIONS
 ReasoningConfidence
 ReasoningControl
@@ -1138,19 +1113,15 @@ SidebarLayoutPreference
 SKILL_ARMED_BY_PROFILE
 skillCallEntry
 SkillCallEntry
-SkillExecutionContext
-SkillExecutionResult
 skillLane
 SkillLoadResult
 SkillMetadata
-SkillParameter
 SkillSelectionOption
 SkillSelectionProjection
 splitCanonicalAgentModelId
 splitPlanAppendix
 StatePlan
 StreamingPlan
-stringifyYaml
 stripRdcLeaseToolsFromAllowlist
 StructuredHandoff
 StructuredHandoffDerivation
@@ -1281,5 +1252,3 @@ WorldStatePatch
 WorldStateReplay
 WorldStateShaderReplacement
 WorldStateValidity
-writeJsonl
-writeYaml

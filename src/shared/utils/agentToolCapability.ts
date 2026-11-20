@@ -2,10 +2,10 @@ import {
   PROVIDER_ADAPTER_IMPLEMENTATIONS,
   PROVIDER_ADAPTER_IDS,
 } from '../provider-catalog/implementationRegistry';
+import { isEffectiveModelPickerSelectable } from './effectiveModelPicker';
 import type { CapabilityState, EffectiveAvailability } from '../types/providerCapability';
 import type { LlmProviderProtocol } from '../types/settings';
 import type { EffectiveModelPickerCandidate } from './effectiveModelPicker';
-import { isEffectiveModelPickerSelectable } from './effectiveModelPicker';
 
 export type AgentToolCallingEvidence = CapabilityState['state'];
 
@@ -13,6 +13,7 @@ export type AgentToolEligibility =
   | 'executable'
   | 'availability-unknown'
   | 'tools-unknown'
+  | 'budget-unknown'
   | 'unsupported'
   | 'unavailable'
   | 'disabled'
@@ -22,6 +23,8 @@ export type AgentToolEligibility =
 export interface AgentToolEligibilityCandidate extends EffectiveModelPickerCandidate {
   toolCalling?: Pick<CapabilityState, 'state'> | null;
   route?: { protocol?: string | LlmProviderProtocol } | null;
+  /** Input budget the planner sizes requests with; without one no request can be planned. */
+  defaultBudgetTokens?: number;
 }
 
 export function hasImplementedStructuredToolAdapter(protocol: string | undefined): boolean {
@@ -47,13 +50,14 @@ export function classifyAgentToolEligibility(
   if (model.selection?.pickerVisibility === 'internal') return 'internal';
   if (!hasImplementedStructuredToolAdapter(model.route?.protocol)) return 'no-adapter';
   if (model.toolCalling?.state === 'unsupported') return 'unsupported';
+  if (!(Number.isFinite(model.defaultBudgetTokens) && (model.defaultBudgetTokens ?? 0) > 0)) return 'budget-unknown';
   if (model.toolCalling?.state !== 'supported') return 'tools-unknown';
   return 'executable';
 }
 
 /**
- * Agent / Composer / session-override executable gate.
- * Settings catalog visibility stays on `isEffectiveModelPickerSelectable`.
+ * The one executable gate for Settings → Agents, the Composer picker, session overrides, route preflight
+ * and the request planner. Settings catalog visibility stays on `isEffectiveModelPickerSelectable`.
  */
 export function isAgentToolExecutableModel(model: AgentToolEligibilityCandidate): boolean {
   return isEffectiveModelPickerSelectable(model)
@@ -97,6 +101,13 @@ export function describeAgentToolIneligibility(
       technicalCode: 'MODEL_TOOLS_UNVERIFIED',
       userMessage: `当前模型 ${route} 的 provider route 尚未证实 native tool calling，因此未纳入 Agent 可执行模型。请改选同一 provider 下已验证支持工具的模型。`,
       technicalMessage: `MODEL_TOOLS_UNVERIFIED: ${route} toolCalling.state is unknown.`,
+    };
+  }
+  if (eligibility === 'budget-unknown') {
+    return {
+      technicalCode: 'MODEL_BUDGET_UNKNOWN',
+      userMessage: `当前模型 ${route} 的上下文窗口尚未确认，无法规划请求。请刷新模型目录，或在模型覆盖里填写上下文窗口。`,
+      technicalMessage: `MODEL_BUDGET_UNKNOWN: ${route} has no positive defaultBudgetTokens.`,
     };
   }
   if (eligibility === 'no-adapter') {

@@ -1,17 +1,19 @@
 import { randomUUID } from 'crypto';
-import type { LlmProviderModel } from '@shared/types/settings';
-import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from '../CopilotWire';
+import { COPILOT_EDITOR_HEADERS } from '../CopilotWire';
 import { parseCopilotModelCatalog } from '../CopilotBilling';
 import { isAdmittedDiscoveredModel } from '../../provider-catalog/DiscoveryAdmission';
 import { getProviderModelDefinitions } from '../../../provider-catalog/ProviderCatalogRegistry';
-import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import { accountDefaultRoute } from './accountRoute';
 import { GITHUB_COPILOT_CLIENT_ID } from './oauthConstants';
 import { fetchJson, isTestMode, wait } from './oauthHttp';
+import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
+import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
 const isAgentRoutableAccountModel = (modelId: string): boolean => isAdmittedDiscoveredModel(modelId);
 
 export async function startGitHubCopilotLogin(
+  providerId: LlmProviderId,
   setFlow: (flow: OAuthFlowState) => void,
   openExternal: (url?: string) => Promise<void>,
   onComplete: (bundle: OAuthSecretBundle) => Promise<void>,
@@ -23,7 +25,7 @@ export async function startGitHubCopilotLogin(
     body: JSON.stringify({ client_id: GITHUB_COPILOT_CLIENT_ID, scope: 'read:user' }),
   }) as { device_code?: string; user_code?: string; verification_uri?: string; expires_in?: number; interval?: number };
   const flow: OAuthFlowState = {
-    providerId: 'github-copilot',
+    providerId,
     flowId: randomUUID(),
     state: randomUUID(),
     deviceCode: payload.device_code,
@@ -40,7 +42,7 @@ export async function startGitHubCopilotLogin(
   return flow;
 }
 
-export async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
+async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
   if (!flow.deviceCode) throw new Error('GitHub device code is missing.');
   let intervalSeconds = flow.intervalSeconds ?? 5;
   let delayBeforePoll = !isTestMode();
@@ -67,10 +69,10 @@ export async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecre
     }) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
     if (!copilot.token) throw new Error('GitHub Copilot did not return an API token.');
     return {
-      providerId: 'github-copilot',
+      providerId: flow.providerId,
       accessToken: payload.access_token,
       copilotToken: copilot.token,
-      copilotApiBaseUrl: copilot.endpoints?.api ?? 'https://api.githubcopilot.com',
+      copilotApiBaseUrl: copilot.endpoints?.api,
       expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1000).toISOString() : undefined,
       accountLabel: 'GitHub Copilot',
     };
@@ -78,7 +80,7 @@ export async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecre
 }
 
 export async function refreshCopilotBundle(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
-  if (!bundle.accessToken) return bundle;
+  if (!bundle.accessToken) throw new Error('GitHub Copilot account access token is missing. Sign in again.');
   const copilot = await fetchJson('https://api.github.com/copilot_internal/v2/token', {
     method: 'GET',
     headers: { Accept: 'application/json', Authorization: `token ${bundle.accessToken}`, ...COPILOT_EDITOR_HEADERS },
@@ -87,20 +89,21 @@ export async function refreshCopilotBundle(bundle: OAuthSecretBundle): Promise<O
   return {
     ...bundle,
     copilotToken: copilot.token,
-    copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com',
+    copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl,
     expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1000).toISOString() : bundle.expiresAt,
   };
 }
 
 export async function discoverCopilotCatalog(bundle: OAuthSecretBundle): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
   if (!bundle.copilotToken) throw new Error('GitHub Copilot API token is missing.');
-  const baseUrl = (bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
+  const route = accountDefaultRoute(bundle.providerId);
+  const baseUrl = (bundle.copilotApiBaseUrl ?? route.baseUrl).replace(/\/+$/, '');
   const payload = await fetchJson(`${baseUrl}/models`, {
     method: 'GET',
-    headers: { Accept: 'application/json', Authorization: `Bearer ${bundle.copilotToken}`, ...COPILOT_WIRE_HEADERS },
+    headers: { Accept: 'application/json', Authorization: `Bearer ${bundle.copilotToken}`, ...route.headers },
   });
   const parsed = parseCopilotModelCatalog(payload, baseUrl);
-  const internalModelIds = new Set(getProviderModelDefinitions('github-copilot')
+  const internalModelIds = new Set(getProviderModelDefinitions(bundle.providerId)
     .filter((model) => model.selection.pickerVisibility === 'internal')
     .map((model) => model.modelId));
   const allModels = parsed.models.filter((model) => isAgentRoutableAccountModel(model.id));

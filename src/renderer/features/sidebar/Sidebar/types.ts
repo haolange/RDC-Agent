@@ -1,7 +1,7 @@
+import { useSessionStore } from '../../../stores/sessionStore';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { CaptureDescriptor } from '@shared/types/session';
 import type { RightRailTarget } from '../../../stores/projectStore';
-import { useSessionStore } from '../../../stores/sessionStore';
 
 export type { RightRailTarget };
 

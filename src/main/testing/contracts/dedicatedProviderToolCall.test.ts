@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
 import { createTestRequestPlan } from '../createTestRequestPlan';
-import type { Context, Model } from '../../agent-runtime/core/types';
 import { AzureOpenAIResponsesProvider } from '../../agent-runtime/providers/AzureOpenAIResponsesProvider';
 import { BedrockConverseProvider } from '../../agent-runtime/providers/BedrockConverseProvider';
 import { MistralProvider } from '../../agent-runtime/providers/MistralProvider';
+import type { Context, Model } from '../../agent-runtime/core/types';
+import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
+import type { LlmProviderProtocol } from '@shared/types/settings';
 
 const context: Context = {
   systemPrompt: 'Use tools precisely.',

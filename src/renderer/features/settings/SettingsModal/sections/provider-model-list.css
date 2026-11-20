@@ -13,7 +13,7 @@
 .settings-model-list-no-match {
   padding: var(--space-3);
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   text-align: center;
 }
 
@@ -28,7 +28,7 @@
   flex-direction: column;
   gap: var(--space-0-5);
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .settings-provider-discovery-empty {
@@ -41,7 +41,7 @@
   border: 1px dashed var(--token-border-muted);
   border-radius: var(--radius-md);
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .settings-model-list:empty::before {
@@ -51,7 +51,7 @@
   border: 1px dashed var(--token-border-muted);
   border-radius: var(--radius-md);
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   text-align: center;
 }
 

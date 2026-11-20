@@ -1,20 +1,20 @@
-import { Details } from '../../../../ui/Details';
 import React, { useState } from 'react';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import { resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { Details } from '../../../../ui/Details';
+import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
+import { testModelCapability } from './providerCatalogActions';
+import { ProviderModelProbe } from './ProviderModelProbe';
+import { ProviderModelPreferences } from './ProviderModelPreferences';
+import { ProviderModelDetails } from './ProviderModelDetails';
+import { providerProbeResultText } from './providerProbeResultText';
+import type { useI18n } from '../../../../i18n';
 import type {
   LlmModelCapabilityProbeMode,
   LlmModelCapabilityProbeResult,
   LlmProviderEntry,
   LlmProviderModel,
 } from '@shared/types/settings';
-import { resolveContextTierChoices } from '@shared/utils/contextTiers';
-import type { useI18n } from '../../../../i18n';
-import { testModelCapability } from './providerCatalogActions';
-import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
-import { ProviderModelProbe } from './ProviderModelProbe';
-import { ProviderModelPreferences } from './ProviderModelPreferences';
-import { ProviderModelDetails } from './ProviderModelDetails';
-import { providerProbeResultText } from './providerProbeResultText';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

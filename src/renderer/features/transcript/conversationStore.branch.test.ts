@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
 import { useConversationStore } from '../../stores/conversationStore';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const now = 1_700_000_000_000;
 

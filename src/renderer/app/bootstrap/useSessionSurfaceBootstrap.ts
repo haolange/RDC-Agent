@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import type { ActionEvent } from '@shared/types/evidence';
 import { hydrateMessagesWithActionEvents } from '../../services/conversationTimeline';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useConversationStore } from '../../stores/conversationStore';
@@ -7,6 +6,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import type { ActionEvent } from '@shared/types/evidence';
 
 export function useSessionSurfaceBootstrap(shellReady: boolean): void {
   const currentProject = useProjectStore((state) => state.currentProject);

@@ -1,6 +1,10 @@
 import { isSubagentScopeId } from '@shared/utils/executionScope';
-import type { AgentRole } from '@shared/types/agent';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import { cacheHitRatePercent } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
+import { workflowProjectionPublisher } from '../../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { storageAdapter } from '../store/StorageAdapter';
+import { planEffectiveModelRequest } from '../../settings/provider-catalog/EffectiveModelResolver';
+import { settingsService } from '../../settings/settings-core/SettingsService';
+import { resolveCompactionPercentForSession } from '../../settings/settings-core/compactionPercent';
 import type {
   ContextUsageBreakdownEntry,
   ContextUsageBreakdownId,
@@ -8,12 +12,8 @@ import type {
   RunContextUsageRequest,
   RunContextUsageSummary,
 } from '@shared/types/session';
-import { cacheHitRatePercent } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
-import { workflowProjectionPublisher } from '../../agent-runtime/orchestration/WorkflowProjectionPublisher';
-import { storageAdapter } from '../store/StorageAdapter';
-import { planEffectiveModelRequest } from '../../settings/provider-catalog/EffectiveModelResolver';
-import { settingsService } from '../../settings/settings-core/SettingsService';
-import { resolveCompactionPercentForSession } from '../../settings/settings-core/compactionPercent';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { AgentRole } from '@shared/types/agent';
 
 /** 一次 LLM call 的成本明细（美元）。 */
 export interface LlmUsageCost {

@@ -3,8 +3,8 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
-import { ScopedRuntimeService } from './ScopedRuntimeService';
 import { HookEngine } from '../hooks/HookEngine';
+import { ScopedRuntimeService } from './ScopedRuntimeService';
 import { appPathService } from './AppPathService';
 
 let home = '';

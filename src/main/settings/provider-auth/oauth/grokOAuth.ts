@@ -1,5 +1,3 @@
-import type { LlmProviderAccountDiagnostic, LlmProviderAccountLoginMode } from '@shared/types/settings';
-import type { GrokOAuthMetadata } from './oauthTypes';
 import {
   GROK_OAUTH_REQUESTED_SCOPES,
   GROK_OPENID_CONFIGURATION_URL,
@@ -9,7 +7,10 @@ import {
   parseProviderError,
   readString,
   readStringArray,
+  renderAccountDiagnosticMessage,
 } from './oauthHttp';
+import type { LlmProviderAccountDiagnostic, LlmProviderAccountLoginMode } from '@shared/types/settings';
+import type { GrokOAuthMetadata } from './oauthTypes';
 
 export const readOAuthError = (payload: unknown): { error?: string; detail?: string } => {
   const record = payload && typeof payload === 'object' && !Array.isArray(payload)
@@ -41,9 +42,6 @@ export const createGrokOAuthDiagnostic = (
   checklist: options.checklist ?? GROK_LOGIN_CHECKLIST,
 });
 
-export const renderGrokOAuthDiagnosticMessage = (diagnostic: LlmProviderAccountDiagnostic): string => [
-  diagnostic.summary, diagnostic.detail,
-].filter(Boolean).join(' ');
 
 export const createGrokOAuthFailureDiagnostic = (
   stage: LlmProviderAccountDiagnostic['stage'],
@@ -67,7 +65,7 @@ export const createGrokOAuthFailureDiagnostic = (
 
 export class GrokOAuthDiagnosticError extends Error {
   constructor(readonly diagnostic: LlmProviderAccountDiagnostic) {
-    super(renderGrokOAuthDiagnosticMessage(diagnostic));
+    super(renderAccountDiagnosticMessage(diagnostic));
   }
 }
 

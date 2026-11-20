@@ -4,7 +4,7 @@
  *
  * Rules (see docs/ui/design-system.md):
  *  - feature / ui / patterns / shell CSS must reference semantic tokens
- *    (`--token-*`, `--text-*`, `--space-*`, `--radius-*`, `--control-*`, component vars)
+ *    (`--token-*`, `--type-*`, `--space-*`, `--radius-*`, `--control-*`, component vars)
  *    instead of primitive `--color-*` namespaces or literal values.
  *  - token definition file (design-system.css) may reference primitives.
  *    styles/global/* is not exempt.
@@ -64,9 +64,14 @@ const RULES = [
     message: 'hardcoded hex color; use design tokens',
   },
   {
-    id: 'font-size-px',
-    pattern: /font-size:\s*\d+(?:\.\d+)?px/,
-    message: 'font-size must use var(--text-*)',
+    id: 'font-size-role',
+    pattern: /font-size:(?!\s*(?:var\(--type-[a-z]+-size\)|var\(--[a-z-]+-font-size\)|inherit\b|100%|(?:0?\.9\d*|1(?:\.\d+)?)em\b))/,
+    message: 'font-size must use a typography role var(--type-*-size); readable text never shrinks below caption',
+  },
+  {
+    id: 'raw-type-scale',
+    pattern: /var\(--text-[a-z0-9]+\)/,
+    message: 'the raw --text-* scale is gone; use a typography role var(--type-*-size)',
   },
   {
     id: 'spacing-px',

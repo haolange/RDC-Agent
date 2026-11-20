@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { buildEffectiveRuntimePlan } from '../EffectiveRuntimePlan';
-import { compilePolicyFromRestrictive } from '../permissions/PolicyCompiler';
+import { compileFixturePolicy } from '../../testing/policyFixture';
 import { freezeRdcTurnBinding, getRdcTurnBinding, rdcBindingFingerprint } from '../../rdc/RdcTurnBindings';
-import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';
+import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 it('rebuilds the next request from frozen authority and refuses catalog or prior-plan drift', () => {
   const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
@@ -28,7 +28,7 @@ it('rebuilds the next request from frozen authority and refuses catalog or prior
       reasoningContract: createNoneReasoningContract('test'), supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported',
       toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
     requestPlan: { executionIdentity: { fingerprint: 'request' } }, promptPlan: previousPrompt,
-    policy: compilePolicyFromRestrictive({}), rdcBindingFingerprint: rdcBindingFingerprint(previousBinding) });
+    policy: compileFixturePolicy({}), rdcBindingFingerprint: rdcBindingFingerprint(previousBinding) });
   const args = { sessionId: 's', projectId: 'p', permissionRevision: 2, previousPlan, previousPrompt, previousBinding, lease, catalog };
   const result = prepareRdcRuntimeEpoch(args);
   expect(result.plan.fingerprint).not.toBe(previousPlan.fingerprint);

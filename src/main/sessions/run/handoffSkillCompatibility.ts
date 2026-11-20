@@ -1,9 +1,9 @@
-import { approvedExecutionOfferForAgent } from './handoffSkills';
-import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist, resolveAgentToolAllowlistFromDefinition } from '../../agent-runtime/orchestration/RuntimeToolPolicy';
 import { agentAccessCeiling, type AgentManifestDefinition } from '@shared/types/agentManifest';
 import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist, resolveAgentToolAllowlistFromDefinition } from '../../agent-runtime/orchestration/RuntimeToolPolicy';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
+import { approvedExecutionOfferForAgent } from './handoffSkills';
 import { planArtifactWriter } from './sessionPlanArtifact';
 
 /** Compare explicit contracts only. Never add methods or infer them from prose. */

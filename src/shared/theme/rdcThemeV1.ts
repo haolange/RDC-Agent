@@ -1,6 +1,6 @@
-import type { ThemeChromeConfig, ThemeVariant } from '../types/settings';
 import { sanitizeThemeChrome } from './sanitize';
 import { isThemePresetId } from './presets';
+import type { ThemeChromeConfig, ThemeVariant } from '../types/settings';
 
 export const RDC_THEME_V1_PREFIX = 'rdc-theme-v1:';
 

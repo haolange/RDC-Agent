@@ -1,5 +1,4 @@
 import type {
-  LlmProviderAccountLoginMode,
   LlmProviderAccountStatus,
   LlmProviderAuthMode,
   LlmProviderCatalogResponse,
@@ -8,15 +7,7 @@ import type {
   LlmProviderProtocol,
 } from '@shared/types/settings';
 
-export type SettingsSection =
-  | 'general'
-  | 'appearance'
-  | 'models'
-  | 'skills'
-  | 'agents'
-  | 'tools'
-  | 'hooks'
-  | 'policy';
+export type { SettingsSection } from '../../../lib/settingsSections';
 
 export type ProviderConnectionBusyState = 'idle' | 'testing' | 'saving';
 
@@ -46,7 +37,6 @@ export interface ProviderConnectionDraft {
   discoveryAccountId: string | null;
   models: LlmProviderModel[];
   accountStatus?: LlmProviderAccountStatus;
-  accountLoginMode: LlmProviderAccountLoginMode;
   authCode: string;
 }
 

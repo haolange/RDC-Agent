@@ -1,4 +1,6 @@
-import type { RequestPlan } from '@shared/types/providerCapability';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { findLatestProviderState } from '../reasoning/ProviderStateRefs';
+import { applyGoogleInteractionsReasoning, reasoningVisibilityRequest } from './reasoningWire';
 import type {
   Context,
   Message,
@@ -6,9 +8,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
-import { findLatestProviderState } from '../reasoning/ProviderStateRefs';
-import { applyGoogleInteractionsReasoning } from './reasoningWire';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 export function buildGoogleInteractionsUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/u, '');
@@ -44,7 +44,7 @@ export function buildGoogleInteractionsRequest(
   applyGoogleInteractionsReasoning(
     generationConfig,
     options.reasoning,
-    options.reasoningVisibility,
+    reasoningVisibilityRequest(options),
   );
   if (Object.keys(generationConfig).length > 0) body.generation_config = generationConfig;
 

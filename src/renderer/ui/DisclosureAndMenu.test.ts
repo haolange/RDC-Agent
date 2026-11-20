@@ -2,9 +2,9 @@
 import { act, createElement, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { popOverlayLayer, pushOverlayLayer } from '../lib/overlayStack';
 import { Details } from './Details';
 import { ContextMenu } from './ContextMenu';
-import { popOverlayLayer, pushOverlayLayer } from '../lib/overlayStack';
 
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;

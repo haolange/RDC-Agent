@@ -1,5 +1,3 @@
-import type { RequestPlan } from '@shared/types/providerCapability';
-import type { StopReason } from '../core/types';
 import { createProviderStateRef } from '../reasoning/ProviderStateRefs';
 import {
   AssistantStreamBuilder,
@@ -9,6 +7,8 @@ import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { ProviderHttpError } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { GoogleInteractionsStepState } from './GoogleInteractionsStepState';
+import type { StopReason } from '../core/types';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 const PROVIDER_API = 'google-interactions';
 

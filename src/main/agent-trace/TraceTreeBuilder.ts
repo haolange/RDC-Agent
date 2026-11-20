@@ -1,3 +1,4 @@
+import { generateEventId } from '@shared/utils/id';
 import type {
   TraceEvent,
   TraceNode,
@@ -8,7 +9,6 @@ import type {
   ErrorNode,
 } from '@shared/types/agenticTrace';
 import type { AgentProfile } from '@shared/types/agenticTrace';
-import { generateEventId } from '@shared/utils/id';
 
 const isTraceNode = (payload: unknown): payload is TraceNode => (
   typeof payload === 'object'

@@ -1,15 +1,17 @@
+import { aggregateSectionSteps } from './workProcessToolAggregate';
+import { projectLlmTurn } from './workProcessLlmProjection';
+import { pushStandaloneBlock } from './workProcessStandaloneProjection';
 import type { Translator } from '../../i18n/messages';
 import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
   ConversationReasoningState,
+  ConversationThinkingItem,
+  ConversationThinkingStatus,
   ConversationWorkBlock,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { PresentationUnit } from './workProcessUnits';
-import { aggregateSectionSteps } from './workProcessToolAggregate';
-import { projectLlmTurn } from './workProcessLlmProjection';
-import { pushStandaloneBlock } from './workProcessStandaloneProjection';
 import type { WorkProcessRow } from './workProcessTypes';
 
 export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
@@ -23,38 +25,19 @@ export interface BlockProjectionContext {
   blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
 }
 
+export interface ThinkingItemPresentation {
+  preview: string;
+  label: string;
+  kind: ThinkingArtifact['kind'];
+  visibility: ThinkingArtifact['visibility'];
+  status: ConversationThinkingStatus;
+  openByDefault: boolean;
+}
+
 export interface LoopProjectionDeps {
   resolveOutputPhase: (block: ConversationWorkBlock, hasVisibleProcessEvidence: boolean) => ConversationLoopOutputPhase;
   resolveReasoningState: (block: ConversationWorkBlock) => ConversationReasoningState;
-  resolveSectionProse: (
-    block: ConversationWorkBlock,
-    outputPhase: ConversationLoopOutputPhase,
-  ) => {
-    proseText: string;
-    proseStreaming: boolean;
-  };
-  resolveSectionThinking: (
-    block: ConversationWorkBlock,
-    hasVisibleEvidence: boolean,
-  ) => {
-    preview: string;
-    label: string;
-    kind?: ThinkingArtifact['kind'];
-    source?: string;
-    visibility?: ThinkingArtifact['visibility'];
-    status?: ConversationWorkBlock['thinkingStatus'];
-    expandable: boolean;
-    openByDefault: boolean;
-  };
-  resolveResponseThinking: (block: ConversationWorkBlock) => {
-    preview: string;
-    label: string;
-    kind?: ThinkingArtifact['kind'];
-    visibility?: ThinkingArtifact['visibility'];
-    status?: ConversationWorkBlock['thinkingStatus'];
-    expandable: boolean;
-    openByDefault: boolean;
-  };
+  resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => ThinkingItemPresentation | null;
   isNonFinalStopReason: (stopReason?: ConversationLoopStopReason) => boolean;
   normalizeThinkingDedupKey: (value: string) => string;
   createApprovalRow: (block: ConversationWorkBlock) => WorkProcessRow;
@@ -125,8 +108,17 @@ export function markLastSectionOpen(rows: WorkProcessRow[]): void {
   if (lastSection.type === 'section' && lastSection.status !== 'complete') lastSection.defaultOpen = true;
 }
 
+/** Steps are numbered in display order, so a heading reads "步骤 N" however loops were grouped. */
+function numberSections(rows: WorkProcessRow[]): void {
+  let ordinal = 0;
+  for (const row of rows) {
+    if (row.type === 'section') row.ordinal = ++ordinal;
+  }
+}
+
 export function presentationUnitsToDetailRows(units: PresentationUnit[]): WorkProcessRow[] {
   const rows = units.flatMap((unit) => unit.kind === 'loop' || unit.kind === 'standalone' ? unit.rows : []);
+  numberSections(rows);
   markLastSectionOpen(rows);
   return rows;
 }

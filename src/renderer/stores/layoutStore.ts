@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import type { AppSettings } from '@shared/types/settings';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
-import type { AgentMode } from '@shared/types/layout';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -14,6 +12,8 @@ import {
   TERMINAL_MAX_HEIGHT,
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
+import type { AppSettings } from '@shared/types/settings';
+import type { AgentMode } from '@shared/types/layout';
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 

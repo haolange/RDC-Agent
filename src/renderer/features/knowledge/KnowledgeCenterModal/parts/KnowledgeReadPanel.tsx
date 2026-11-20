@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { KnowledgeReadRequest, KnowledgeReadResult } from '@shared/types/knowledge';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
 import { Tabs } from '../../../../ui/Tabs';
 import { useI18n } from '../../../../i18n';
 import { KnowledgeMarkdown } from './KnowledgeMarkdown';
+import type { KnowledgeReadRequest, KnowledgeReadResult } from '@shared/types/knowledge';
 
 type Selection = Pick<KnowledgeReadRequest, 'mode' | 'heading' | 'headingLine' | 'startLine' | 'endLine'>;
 export function KnowledgeReadPanel({ reading, onRead, busy }: { reading: KnowledgeReadResult; onRead: (selection: Selection) => Promise<void>; busy: boolean }) {

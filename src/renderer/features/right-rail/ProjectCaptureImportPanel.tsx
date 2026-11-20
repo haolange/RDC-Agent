@@ -1,15 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import type { ProjectInputRecord } from '@shared/types/session';
-import { importProjectInputs, refreshProjectInputs, removeProjectInput } from './projectCaptureActions';
 import { useProjectStore } from '../../stores/projectStore';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { EmptyState } from '../../ui/EmptyState';
 import { IconButton } from '../../ui/IconButton';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
-import './CaptureReplay.css';
 import { useI18n } from '../../i18n';
+import { importProjectInputs, refreshProjectInputs, removeProjectInput } from './projectCaptureActions';
 import { ProjectCaptureReferenceDialog } from './ProjectCaptureReferenceDialog';
+import type { ProjectInputRecord } from '@shared/types/session';
+import './CaptureReplay.css';
 
 const formatSize = (size: number): string => {
   if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;

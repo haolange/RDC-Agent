@@ -2,10 +2,10 @@
 import { act, createElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MaterialContextEditor } from './MaterialContextEditor';
-import { MaterialContextViewer } from './MaterialContextViewer';
 import { TaskDialog } from '../ui/TaskDialog';
 import { isTopOverlayLayer } from '../lib/overlayStack';
+import { MaterialContextEditor } from './MaterialContextEditor';
+import { MaterialContextViewer } from './MaterialContextViewer';
 
 vi.mock('../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 

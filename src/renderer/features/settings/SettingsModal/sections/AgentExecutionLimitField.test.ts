@@ -2,9 +2,9 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 import { getChangedAgentManifestDrafts } from '../agentManifestAutosaveState';
+import { AgentExecutionLimitField } from './AgentExecutionLimitField';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
 it('saves a deliberate future limit through the manifest draft and rejects invalid limits', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

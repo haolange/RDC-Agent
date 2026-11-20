@@ -1,15 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { resolveDelegatedArtifactRead } from '../sessions/artifacts/DelegatedArtifactAccess';
-import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
-import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { grantDelegatedArtifactAccess } from '../sessions/artifacts/DelegatedArtifactAccess';
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {} }));
 vi.mock('../conversation/SessionContextJournal', () => ({ sessionContextJournal: {} }));
 import { materializeRecordedRdcRequest } from './RecordedRdcRequest';
+import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
+import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
 
 const hash = 'a'.repeat(64);
 const uri = 'session://tool-outputs/call.json';

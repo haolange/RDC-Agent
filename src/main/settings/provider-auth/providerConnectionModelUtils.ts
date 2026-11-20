@@ -2,9 +2,9 @@ import {
   getProviderModelDefinitions,
   getProviderModelSummaries,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import type { LlmProviderModel } from '@shared/types/settings';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
-import { ProviderConnectionError } from './providerConnectionErrors';
+import { ProviderConnectionError, providerConnectionError } from './providerConnectionErrors';
+import type { LlmProviderModel } from '@shared/types/settings';
 
 export function normalizeDiscoveredModels(
   values: unknown[],
@@ -41,7 +41,7 @@ const isExcludedDiscoveredModel = (modelId: string): boolean => {
 
 export const requireModels = (models: LlmProviderModel[]): LlmProviderModel[] => {
   if (models.length === 0) {
-    throw new ProviderConnectionError('Provider 暂未返回可用于 Agent 路由的模型');
+    throw providerConnectionError('no-routable-models', 'The provider returned no models the agent can route to.');
   }
   return models;
 };
@@ -144,13 +144,9 @@ export const mergeManagedModelAvailability = (
   return merged;
 };
 
-export const selectSupportedCodingPlanModels = (
-  providerId: string,
-  models: LlmProviderModel[],
-): LlmProviderModel[] => (
-  providerId === 'volcengine-coding-plan'
-    ? models.filter((model) => model.enabled !== false && model.availability === 'available')
-    : models
+/** A coding plan exposes only the models its subscription currently serves. */
+export const selectAvailableCodingPlanModels = (models: LlmProviderModel[]): LlmProviderModel[] => (
+  models.filter((model) => model.enabled !== false && model.availability === 'available')
 );
 
 export const buildManagedAliasIndex = (providerId: string): Map<string, readonly string[]> => {

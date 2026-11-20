@@ -1,6 +1,4 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { Details } from '../../../../ui/Details';
 import { Input } from '../../../../ui/Input';
@@ -9,6 +7,8 @@ import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import { envToText, textToEnv } from './toolEnvText';
 import { useRdcInstallation } from './useRdcInstallation';
+import type { useI18n } from '../../../../i18n';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 interface Props {
   rdcCliDraft: RdcCliInvokerSettings;

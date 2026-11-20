@@ -5,11 +5,11 @@
  * 激活后由调用方 COW 更新 Agent runtime revision（见 Agent.setTools / LoopRuntimeState）。
  */
 
-import type { ToolDefinition } from '../core/types';
 import {
   isDeferredToolName,
   partitionDeferredTools,
 } from './deferredTools';
+import type { ToolDefinition } from '../core/types';
 
 export interface DeferredActivationRecord {
   toolSignature: string;

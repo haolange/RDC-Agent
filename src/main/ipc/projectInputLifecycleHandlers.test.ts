@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
 import type { WorkbenchIpcContext } from './workbenchContext';
+
 
 const mocks = vi.hoisted(() => ({
   changed: undefined as undefined | ((event: string, filename: string | null) => void),
@@ -37,8 +39,6 @@ vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
   getAll: () => ({ appearance: { language: mocks.language } }),
 } }));
-
-import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
 
 describe('project input file watching', () => {
   beforeEach(() => {

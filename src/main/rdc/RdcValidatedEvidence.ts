@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
-import type { RdcOperationDefinition } from '@shared/types/tool';
-import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
 import { canonicalJson } from './RdcOperationCatalog';
+import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 export type RdcValidatedEvidence =
   | { kind: 'measurement'; method: 'event_durations' | 'counters' | 'image' | 'frame_timing'; conditionsFingerprint: string; values: unknown }

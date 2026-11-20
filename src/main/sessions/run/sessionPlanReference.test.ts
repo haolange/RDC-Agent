@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { resolvePlanReference } from './sessionPlanReference';
+import type { ConversationMessage } from '@shared/types/conversation';
 const reference = { sessionId: 'parent', planId: 'p', revision: 2, uri: 'session://plans/plan-frozen.md', expectedHash: 'a'.repeat(64) };
 const message = { role: 'assistant', agentId: 'debugger', turnId: 'turn', workTrace: { blocks: [{ toolCalls: [{ id: 'call', toolName: 'plan_artifact', planReview: { planId: 'p', revision: 2, uri: reference.uri, hash: reference.expectedHash } }] }] } } as ConversationMessage;
 describe('historical plan provenance', () => {

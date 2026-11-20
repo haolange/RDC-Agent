@@ -52,30 +52,50 @@ export function useDynStyle(decls: DynStyleDecls): { 'data-dyn-style': string } 
   return { 'data-dyn-style': id };
 }
 
-/**
- * Imperative counterpart for DOM measurements (textarea autosize, canvas host sizing).
- * Attaches/reuses `data-dyn-style` on the element and updates the shared constructable sheet.
- */
-export function assignDynStyle(el: HTMLElement, decls: DynStyleDecls): void {
+/** Registers one element's declarations; reports whether the shared sheet must be rebuilt. */
+function register(el: HTMLElement, decls: DynStyleDecls): boolean {
   let id = el.getAttribute('data-imp-dyn-style');
   if (!id) {
     id = `imp${++imperativeSeq}`;
     el.setAttribute('data-imp-dyn-style', id);
   }
   const body = toDecl(decls);
-  if (!body) {
-    registry.delete(id);
-  } else {
-    registry.set(id, body);
-  }
-  flush();
+  if (registry.get(id) === (body || undefined)) return false;
+  if (!body) registry.delete(id);
+  else registry.set(id, body);
+  return true;
+}
+
+function unregister(el: HTMLElement): boolean {
+  const id = el.getAttribute('data-imp-dyn-style');
+  if (!id) return false;
+  el.removeAttribute('data-imp-dyn-style');
+  return registry.delete(id);
+}
+
+/**
+ * Imperative counterpart for DOM measurements (textarea autosize, canvas host sizing).
+ * Attaches/reuses `data-dyn-style` on the element and updates the shared constructable sheet.
+ */
+export function assignDynStyle(el: HTMLElement, decls: DynStyleDecls): void {
+  if (register(el, decls)) flush();
+}
+
+/** Applies many elements' declarations with one sheet rebuild; measure everything before calling it. */
+export function assignDynStyles(entries: Iterable<readonly [HTMLElement, DynStyleDecls]>): void {
+  let changed = false;
+  for (const [el, decls] of entries) changed = register(el, decls) || changed;
+  if (changed) flush();
 }
 
 /** Clear imperative dyn-style registration for an element (does not remove React dyn-style). */
 export function clearDynStyle(el: HTMLElement): void {
-  const id = el.getAttribute('data-imp-dyn-style');
-  if (!id) return;
-  registry.delete(id);
-  el.removeAttribute('data-imp-dyn-style');
-  flush();
+  if (unregister(el)) flush();
+}
+
+/** Clears many elements' registrations with one sheet rebuild. */
+export function clearDynStyles(elements: Iterable<HTMLElement>): void {
+  let changed = false;
+  for (const el of elements) changed = unregister(el) || changed;
+  if (changed) flush();
 }

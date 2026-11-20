@@ -155,7 +155,7 @@ if (fs.existsSync(sharedExportsPath)) {
   }
 }
 
-const settingsTypes = read('src/renderer/features/settings/SettingsModal/types.ts');
+const settingsTypes = read('src/renderer/lib/settingsSections.ts');
 if (settingsTypes.includes("'diagnostics'")) {
   fail('SettingsSection must not restore diagnostics navigation.');
 }

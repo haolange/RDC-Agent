@@ -1,12 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { installationRootOfPython, resolveRdcInstallation } from './RdcInstallationService';
-import { parseRdcNativeResult } from './RdcNativeProtocol';
-import { rdcCliInvokerService } from './RdcCliInvokerService';
-import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import {
   probeProcess,
@@ -16,6 +11,11 @@ import {
   type ProcessLiveness,
   type ProcessTermination,
 } from '../platform/process';
+import { installationRootOfPython, resolveRdcInstallation } from './RdcInstallationService';
+import { parseRdcNativeResult } from './RdcNativeProtocol';
+import { rdcCliInvokerService } from './RdcCliInvokerService';
+import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 export const APP_RDC_CONTEXT_ID = /^rdc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REGISTRY_SCHEMA = 1;

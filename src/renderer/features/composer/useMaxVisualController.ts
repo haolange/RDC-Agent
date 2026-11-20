@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { ReasoningSelection } from '@shared/types/modelCapability';
 import {
   isMaxTierLevel,
   type MaxVisualPhase,
@@ -17,6 +16,7 @@ import {
   createIdleMaxTimeline,
   visualNow,
 } from './maxVisualTimelineActions';
+import type { ReasoningSelection } from '@shared/types/modelCapability';
 
 export type { ExitingMaxPhase } from './maxVisualExitController';
 

@@ -1,11 +1,11 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
-import type { AgentShellSettings, CodeInterpreterSettings, RdcCliInvokerSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
 import { RdcCliInvokerSettingsFields } from './RdcCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
 import { LocalToolDisclosure } from './LocalToolDisclosure';
-import { Button } from '../../../../ui/Button';
+import type { useI18n } from '../../../../i18n';
+import type { AgentShellSettings, CodeInterpreterSettings, RdcCliInvokerSettings } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';

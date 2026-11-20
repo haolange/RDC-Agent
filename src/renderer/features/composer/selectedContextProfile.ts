@@ -1,6 +1,4 @@
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   contextTierBudgetTokens,
   contextTierPromptCap,
@@ -10,6 +8,8 @@ import {
 } from '@shared/utils/contextTiers';
 import { resolveCompactionThresholdTokens } from '@shared/utils/contextBudget';
 import { resolveModelControls } from '@shared/utils/modelControls';
+import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
 
 export interface SelectedContextProfile {
   providerId: string;

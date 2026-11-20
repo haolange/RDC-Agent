@@ -2,11 +2,11 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { appPathService } from './AppPathService';
 import { HookEngine } from '../hooks/HookEngine';
 import { McpTrustService } from '../settings/settings-core/McpTrustService';
 import { RequestSnapshotStore } from '../agent-runtime/prompt/RequestSnapshotStore';
 import { TraceService } from '../agent-trace/TraceService';
+import { appPathService } from './AppPathService';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -32,7 +32,7 @@ describe('app state paths after startup', () => {
     hooks.load(userHooks, undefined, path.join(root, 'builtin'));
     hooks.trustUserHook('audit');
     expect(fs.existsSync(path.join(root, 'hook-trust.json'))).toBe(true);
-    expect(mcp.isTrusted(root, 'audit', 'hash')).toBe(false);
+    expect(mcp.isTrusted(root, { id: 'audit', name: 'audit', description: '', transport: 'stdio', enabledByDefault: true, scope: 'project', command: 'echo' })).toBe(false);
     expect(snapshots.list('session')).toEqual([]);
     expect(trace.getRun('missing')).toBeNull();
     expect(fs.existsSync(path.join(root, 'traces', 'runs'))).toBe(true);

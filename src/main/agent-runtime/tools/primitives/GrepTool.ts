@@ -66,6 +66,7 @@ export const grepTool: AgentTool<GrepParams, GrepDetails> = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
   permissionHint: 'readonly',
+  effects: { reads: ['cwd', 'path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     throwIfAborted(signal);

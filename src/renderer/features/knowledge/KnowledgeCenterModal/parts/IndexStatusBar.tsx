@@ -3,8 +3,8 @@ import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { IconButton } from '../../../../ui/IconButton';
 import { useI18n } from '../../../../i18n';
-import type { KnowledgeIndexOverview } from '@shared/types/knowledge';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
+import type { KnowledgeIndexOverview } from '@shared/types/knowledge';
 
 interface IndexStatusBarProps {
   index: KnowledgeIndexOverview | null;

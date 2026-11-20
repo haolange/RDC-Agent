@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 import { ModelsOverrideSchema } from '@shared/provider-catalog/modelsOverrideSchema';
 import { ProviderProtocolSchema } from '@shared/provider-catalog/modelManifestSchema';
+import { ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 const LlmProviderAuthModeSchema = z.enum(['none', 'api-key', 'local', 'account', 'environment']);
 
@@ -48,7 +48,6 @@ export const LlmProviderAccountLoginStartArgsSchema = z.tuple([
   z.object({
     providerId: ipcNonEmptyString(200, 'providerId'),
     authMode: LlmProviderAuthModeSchema.optional(),
-    accountLoginMode: z.enum(['browser', 'device']).optional(),
   }).strict(),
 ]);
 
@@ -96,7 +95,7 @@ const agentOverrideFileRequest = z.object({
   sourceHash: z.string().regex(/^[0-9a-f]{64}$/u),
 }).strict();
 
-export const SettingsPreviewAgentModelMigrationArgsSchema = z.tuple([z.string().min(1).max(4096)]);
+export const SettingsAgentSourcePathArgsSchema = z.tuple([z.string().min(1).max(4096)]);
 export const SettingsAgentOverrideFileArgsSchema = z.tuple([agentOverrideFileRequest]);
 
 export const SettingsSaveAgentDefinitionArgsSchema = z.tuple([

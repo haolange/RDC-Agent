@@ -1,18 +1,17 @@
+import { getErrorMessage } from './utils';
+import { mergeTestedProviderModels } from './providerModelProjection';
+import {
+  connectionFailureText,
+  createProviderConnectionDraft,
+  getConnectionDraftSignature,
+  getConnectionRequestValues,
+} from './providerConnectionState';
+import { hasProviderConnectionDefinitionChanged, projectProviderModelPreferences } from './providerConnectionRequest';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LlmProviderEntry, ProviderDefinitionSaveResult } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
 import type { ProviderConnectionDraft } from './types';
-import { getErrorMessage } from './utils';
 import type { useProviderConnectionDraft } from './useProviderConnectionDraft';
-import { mergeTestedProviderModels } from './providerModelProjection';
-import {
-  getConnectionDraftSignature,
-  getConnectionRequestValues,
-} from './providerConnectionState';
-import {
-  hasProviderConnectionDefinitionChanged,
-  projectProviderModelPreferences,
-} from './providerConnectionRequest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type DraftApi = Pick<
@@ -32,6 +31,13 @@ export const useProviderConnectionActions = (
 
   const modelPreferences = () => projectProviderModelPreferences(connectionDraft);
 
+  /** After a successful save or sign-in the detail stays on the provider, re-read from saved settings. */
+  const reopenSaved = async (providerId: string): Promise<void> => {
+    const settings = await refreshLocalSettings(providerId);
+    const saved = settings.llm.providers.find((entry) => entry.id === providerId);
+    setConnectionDraft(saved ? createProviderConnectionDraft(saved) : null);
+  };
+
   const saveModelPreferences = async (): Promise<void> => {
     if (!connectionDraft) return;
     const provider = providerDrafts.find((entry) => entry.id === connectionDraft.providerId);
@@ -40,8 +46,7 @@ export const useProviderConnectionActions = (
       ...provider,
       models: connectionDraft.models.map((model) => ({ ...model })),
     });
-    await refreshLocalSettings(connectionDraft.providerId);
-    setConnectionDraft(null);
+    await reopenSaved(connectionDraft.providerId);
   };
 
   const handleTestProviderDraft = async () => {
@@ -51,7 +56,7 @@ export const useProviderConnectionActions = (
       if (connectionDraft.authMode === 'account') {
         const result = await window.electronAPI.llm.refreshProviderModels(connectionDraft.providerId);
         if (!result.success) {
-          updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed') });
+          updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerTestFailed') });
           return;
         }
         updateConnectionDraft({
@@ -80,7 +85,7 @@ export const useProviderConnectionActions = (
       } as Parameters<typeof window.electronAPI.llm.testProviderDraft>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.testProviderDraft(request);
       if (!result.success) {
-        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed') });
+        updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerTestFailed') });
         return;
       }
       updateConnectionDraft({
@@ -120,15 +125,13 @@ export const useProviderConnectionActions = (
           : await window.electronAPI.llm.startProviderAccountLogin({
             providerId: connectionDraft.providerId,
             authMode: connectionDraft.authMode,
-            accountLoginMode: connectionDraft.accountLoginMode,
           });
         if (!status.connected && status.state !== 'pending') {
           updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
           return;
         }
         if (status.connected) {
-          await refreshLocalSettings(connectionDraft.providerId);
-          setConnectionDraft(null);
+          await reopenSaved(connectionDraft.providerId);
           return;
         }
         updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
@@ -151,11 +154,10 @@ export const useProviderConnectionActions = (
       } as Parameters<typeof window.electronAPI.llm.connectProvider>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.connectProvider(request);
       if (!result.success) {
-        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerSaveFailed'), models: [] });
+        updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerSaveFailed'), models: [] });
         return;
       }
-      await refreshLocalSettings(connectionDraft.providerId);
-      setConnectionDraft(null);
+      await reopenSaved(connectionDraft.providerId);
     } catch (error) {
       updateConnectionDraft({
         busy: 'idle',
@@ -164,14 +166,13 @@ export const useProviderConnectionActions = (
     }
   };
 
-  const handleStartAccountLogin = async (accountLoginMode = connectionDraft?.accountLoginMode) => {
+  const handleStartAccountLogin = async () => {
     if (!connectionDraft) return;
     updateConnectionDraft({ busy: 'saving', error: '' });
     try {
       const status = await window.electronAPI.llm.startProviderAccountLogin({
         providerId: connectionDraft.providerId,
         authMode: connectionDraft.authMode,
-        accountLoginMode,
       });
       updateConnectionDraft({
         busy: 'idle',
@@ -179,8 +180,7 @@ export const useProviderConnectionActions = (
         accountStatus: status,
       });
       if (status.connected) {
-        await refreshLocalSettings(connectionDraft.providerId);
-        setConnectionDraft(null);
+        await reopenSaved(connectionDraft.providerId);
       }
     } catch (error) {
       updateConnectionDraft({

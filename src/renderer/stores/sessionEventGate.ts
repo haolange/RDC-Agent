@@ -1,5 +1,5 @@
-import type { SessionScope } from '@shared/types/session';
 import { useProjectStore } from './projectStore';
+import type { SessionScope } from '@shared/types/session';
 
 export function isActiveSessionEvent(sessionId: string | null | undefined): boolean {
   const active = useProjectStore.getState().currentSession?.sessionId;

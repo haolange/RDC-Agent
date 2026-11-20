@@ -1,9 +1,9 @@
-import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
-import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
+import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
+import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import {
   parseChatGptAccountCatalog,
   parseClaudeAccountCatalog,
@@ -11,6 +11,7 @@ import {
   parseClinePassCatalog,
   parseGrokBuilderCatalog as parseGrokBuilderCatalogWithSurface,
   parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface,
+  parseOllamaInstalledModels,
   parseOpenCodeGoCatalog as parseOpenCodeGoCatalogWithSurface,
   parseOpenRouterAccountCatalog as parseOpenRouterAccountCatalogWithSurface,
 } from './LiveProviderCatalogParsers';
@@ -30,6 +31,8 @@ function surface(name: string) {
 }
 
 const KIMI_SURFACE = surface('kimi-coding-plan');
+/** The ChatGPT surface's lifecycle facts alone, for parser cases that exercise rows without manifest models. */
+const CHATGPT_RETIREMENTS = { models: [], retiredModelIds: surface('chatgpt-account').retiredModelIds };
 const GROK_SURFACE = surface('grok-account');
 const parseGrokBuilderCatalog = (payload: unknown) => parseGrokBuilderCatalogWithSurface(payload, GROK_SURFACE);
 const OPENCODE_GO_SURFACE = surface('opencode-go');
@@ -287,7 +290,7 @@ describe('live Provider Catalog parsers', () => {
   });
 
   it('parses account-visible ChatGPT ids without duplicating manifest controls', () => {
-    const parsed = parseChatGptAccountCatalog(fixture('chatgpt-account.json'));
+    const parsed = parseChatGptAccountCatalog(fixture('chatgpt-account.json'), CHATGPT_RETIREMENTS);
     expect(parsed.models.map((model) => model.id)).toEqual([
       'gpt-5.6-luna',
       'gpt-5.6-sol',
@@ -310,7 +313,7 @@ describe('live Provider Catalog parsers', () => {
   it.each([undefined, ['text'], ['text', 'image']])('keeps ChatGPT structure manifest-owned for modalities %j', (input_modalities) => {
     const parsed = parseChatGptAccountCatalog({ models: [
       { slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities },
-    ] });
+    ] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0].visionInput).toBeUndefined();
     expect(parsed.contributions[0].toolCalling).toBeUndefined();
     expect(parsed.contributions[0].structuredOutput).toBeUndefined();
@@ -321,7 +324,7 @@ describe('live Provider Catalog parsers', () => {
       { slug: 'hidden-model', visibility: 'hide', supported_in_api: true },
       { slug: 'unavailable-model', visibility: 'list', supported_in_api: false },
       { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true },
-    ] });
+    ] }, CHATGPT_RETIREMENTS);
     expect(parsed.models).toEqual([]);
   });
 
@@ -329,7 +332,7 @@ describe('live Provider Catalog parsers', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
       slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000, max_context_window: 872_000,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0].contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000 }),
       expect.objectContaining({ id: 'max', maxPromptTokens: 872_000, entitlement: 'granted' }),
@@ -340,7 +343,7 @@ describe('live Provider Catalog parsers', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
       slug: 'future-live-model', visibility: 'list', supported_in_api: true,
       context_window: 256_000, max_context_window: 1_000_000,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0]).toMatchObject({
       modelId: 'future-live-model',
       contextTiers: [
@@ -437,7 +440,7 @@ describe('live Provider Catalog parsers', () => {
     const parsed = parseChatGptAccountCatalog({ models: [{
       slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(parsed.contributions[0].contextTiers?.[0]).toEqual(expect.objectContaining({
       maxPromptTokens: 272_000,
     }));
@@ -446,7 +449,7 @@ describe('live Provider Catalog parsers', () => {
     const withOutput = parseChatGptAccountCatalog({ models: [{
       slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
       context_window: 272_000, max_output_tokens: 16_384,
-    }] });
+    }] }, CHATGPT_RETIREMENTS);
     expect(withOutput.contributions[0].contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, maxOutputTokens: 16_384 }),
     ]);
@@ -488,5 +491,41 @@ it('aligns fixed Max entitlement with the explicitly observed default window', a
   expect(parsed.contributions.find(m => m.modelId === 'kimi-for-coding')).toMatchObject({
     controls: { maxContext: { state: 'fixed', entitlement: 'granted' } },
     contextTiers: [{ id: 'default', entitlement: 'granted' }],
+  });
+});
+
+describe('local Ollama installed models', () => {
+  const tags = { models: [
+    { name: 'qwen3:4b', model: 'qwen3:4b', details: { family: 'qwen3' } },
+    { name: 'llava:7b', model: 'llava:7b' },
+    { name: 'mystery:1b', model: 'mystery:1b' },
+  ] };
+  const shows = new Map<string, unknown>([
+    ['qwen3:4b', { capabilities: ['completion', 'tools', 'thinking'], model_info: { 'general.architecture': 'qwen3', 'qwen3.context_length': 40960 } }],
+    ['llava:7b', { capabilities: ['completion', 'vision'], model_info: { 'llama.context_length': 4096 } }],
+  ]);
+
+  it('takes availability, tool calling, image input and context window from the runtime\'s own facts', () => {
+    const parsed = parseOllamaInstalledModels(tags, shows, surface('ollama'));
+    const byId = new Map(parsed.contributions.map((model) => [model.modelId, model]));
+    expect(parsed.models.map((model) => model.id)).toEqual(['llava:7b', 'mystery:1b', 'qwen3:4b']);
+    expect(byId.get('qwen3:4b')).toMatchObject({
+      availability: 'available',
+      toolCalling: { state: 'supported' },
+      visionInput: { state: 'unsupported' },
+      defaultBudgetTokens: 40960,
+      contextTiers: [{ maxPromptTokens: 40960 }],
+      controls: { reasoning: { kind: 'toggle', supportsOff: true, defaultSelection: 'on' } },
+    });
+    expect(byId.get('llava:7b')).toMatchObject({ toolCalling: { state: 'unsupported' }, visionInput: { state: 'supported' } });
+    expect(byId.get('llava:7b')).not.toHaveProperty('controls');
+  });
+
+  it('keeps a model whose facts could not be read listed with unknown capabilities', () => {
+    const mystery = parseOllamaInstalledModels(tags, shows, surface('ollama')).contributions
+      .find((model) => model.modelId === 'mystery:1b');
+    expect(mystery).toMatchObject({ availability: 'available' });
+    expect(mystery).not.toHaveProperty('toolCalling');
+    expect(mystery).not.toHaveProperty('defaultBudgetTokens');
   });
 });

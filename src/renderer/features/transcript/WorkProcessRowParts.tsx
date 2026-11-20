@@ -1,6 +1,8 @@
 import React from 'react';
-import { WorkCardHeader } from './WorkCardHeader';
 import { useI18n } from '../../i18n';
+import { Button } from '../../ui/Button';
+import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { WorkCardHeader } from './WorkCardHeader';
 import { getRowStatusLabel } from './workProcessStatus';
 import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
@@ -13,8 +15,6 @@ import {
 } from './WorkProcessToolCardParts';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { usePlanReader } from './PlanReaderHost';
-import { Button } from '../../ui/Button';
-import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { isTrackActivity } from './workProcessTrack';
 
 const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }> = ({ plan }) => {

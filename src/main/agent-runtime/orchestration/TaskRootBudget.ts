@@ -1,5 +1,5 @@
-import type { TaskRegistry } from '../tasks';
 import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
+import type { TaskRegistry } from '../tasks';
 import type { PolicyBudgetState } from './TurnCoordinator';
 
 interface RootBindingState {

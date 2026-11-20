@@ -8,14 +8,8 @@ import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../..
  * in AgentTurnRunner; permissions stay in AgentPermissionPolicy.
  */
 
-import type {
-  AgentConfig,
-  AgentRole,
-  AgentState,
-} from '@shared/types/agent';
-import type { MCPServerStatusSummary } from '@shared/types/mcp';
-import type { LLMConfig } from '@shared/types/llm';
-import type { LlmProviderId } from '@shared/types/settings';
+import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
+import { delegableProfileIds } from './delegableProfiles';
 import {
   AGENT_DISPLAY_NAMES,
   AgentSlotRegistry,
@@ -58,8 +52,15 @@ import {
   type PreparedAgentTurnContext,
   type TurnHandle,
 } from './AgentOrchestrator.deps';
-import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
+import type {
+  AgentConfig,
+  AgentRole,
+  AgentState,
+} from '@shared/types/agent';
+import type { MCPServerStatusSummary } from '@shared/types/mcp';
+import type { LLMConfig } from '@shared/types/llm';
+import type { LlmProviderId } from '@shared/types/settings';
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
   private readonly slots = new AgentSlotRegistry();
@@ -226,6 +227,7 @@ export class AgentOrchestrator {
       const effectiveProfileIds = options?.effectiveProfileIds?.length
         ? options.effectiveProfileIds
         : effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id);
+      const delegableIds = options?.delegableProfileIds ?? delegableProfileIds(effectiveProfiles);
       const config: AgentConfig = {
         ...fallbackConfig,
         modelProvider: frozenRequestPlan?.providerId
@@ -330,6 +332,7 @@ export class AgentOrchestrator {
           promptPlan,
           effectiveProfile,
           effectiveProfileIds: [...effectiveProfileIds],
+          delegableProfileIds: [...delegableIds],
           projectRootPath: options?.projectRootPath ?? null,
           projectId: options?.projectId ?? null,
           sessionId: isSubagentSession ? null : (options?.sessionId ?? null),

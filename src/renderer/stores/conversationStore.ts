@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { ConversationMessage } from '@shared/types/conversation';
 import {
   ACTIVE_ASSISTANT_STATUSES,
   initialConversationState,
@@ -8,6 +7,7 @@ import {
   sortConversationMessages,
   type ConversationState,
 } from './conversationStoreModel';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 export { shouldRejectActivePatchForMonotonicStop } from './conversationStoreModel';
 

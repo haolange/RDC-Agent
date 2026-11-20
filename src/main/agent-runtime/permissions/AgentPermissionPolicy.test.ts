@@ -2,21 +2,31 @@ import * as os from 'os';
 import * as path from 'path';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { directoryLinkType } from '../../platform/paths';
-import { currentHost } from '../../platform/host';
-import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
-import type { AgentTool } from '../agent/AgentTool';
-import type { ToolCall } from '../core/types';
-import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import '../../rdc/rdcShellPermission';
-import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
-import { compilePolicyFromRestrictive } from './PolicyCompiler';
+import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
-import { DEFAULT_RDC_CLI_INVOKER } from '../../settings/settings-core/settingsDefaults';
+import { compileFixturePolicy } from '../../testing/policyFixture';
+import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
+import { currentHost } from '../../platform/host';
+import { directoryLinkType } from '../../platform/paths';
+
+import { readFileTool as productionReadFile } from '../tools/primitives/ReadFileTool';
+import { readImageTool as productionReadImage } from '../tools/primitives/ReadImageTool';
+import { globTool as productionGlob } from '../tools/primitives/GlobTool';
+import { grepTool as productionGrep } from '../tools/primitives/GrepTool';
+import { writeFileTool as productionWriteFile } from '../tools/primitives/WriteFileTool';
+import { editFileTool as productionEditFile } from '../tools/primitives/EditFileTool';
+import { webSearchTool as productionWebSearch } from '../tools/primitives/WebTools';
+import { deleteFileTool as productionDeleteFile } from '../tools/file/DeleteFileTool';
+import { moveFileTool as productionMoveFile } from '../tools/file/MoveFileTool';
+import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { ToolCall } from '../core/types';
+import type { AgentTool } from '../agent/AgentTool';
+import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
+
 const ownership = vi.hoisted(() => ({ lease: vi.fn() }));
 vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: ownership.lease, getRdcContextLease: () => null }));
-
 const { mockSettings } = vi.hoisted(() => ({
   mockSettings: {
     paths: { userRdcRoot: 'D:\\AppWorkspace' },
@@ -31,18 +41,15 @@ const { mockSettings } = vi.hoisted(() => ({
     },
   },
 }));
-
 const fixtureRoot = path.join(os.tmpdir(), 'rdc-agent-permission-tests');
 const workspaceRoot = path.join(fixtureRoot, 'workspace');
 const externalRoot = path.join(fixtureRoot, 'external');
 const readableRoot = path.join(fixtureRoot, 'shared');
-
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: () => mockSettings,
   },
 }));
-
 vi.mock('../../runtime/resolveConfiguredShell', () => ({
   resolveConfiguredShell: () => ({
     executable: currentHost().isWindows ? 'pwsh' : '/bin/bash',
@@ -51,11 +58,24 @@ vi.mock('../../runtime/resolveConfiguredShell', () => ({
   }),
 }));
 
+/** Fixtures keep the production effect declarations; the policy reads effects, never names. */
+const PRODUCTION_EFFECTS: Record<string, AgentTool['effects']> = {
+  read_file: productionReadFile.effects,
+  read_image: productionReadImage.effects,
+  glob: productionGlob.effects,
+  grep: productionGrep.effects,
+  write_file: productionWriteFile.effects,
+  edit_file: productionEditFile.effects,
+  web_search: productionWebSearch.effects,
+  delete_file: productionDeleteFile.effects,
+};
+
 const readFileTool: AgentTool = {
   name: 'read_file',
   description: 'read file',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'readonly',
+  effects: PRODUCTION_EFFECTS.read_file,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
@@ -64,6 +84,7 @@ const webSearchTool: AgentTool = {
   description: 'search web',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'readonly',
+  effects: PRODUCTION_EFFECTS.web_search,
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
@@ -82,16 +103,17 @@ const deleteFileTool: AgentTool = {
   description: 'delete',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'destructive',
+  effects: PRODUCTION_EFFECTS.delete_file,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
 it('classifies replay lifecycle separately from read-only probe queries', () => {
   const service = new AgentPermissionPolicyService();
-  const tool: AgentTool = { ...readFileTool, name: 'rdc_probe' };
+  const tool: AgentTool = { ...readFileTool, name: 'rdc_probe', effects: undefined };
   const decision = (action: string, mode: AgentPermissionMode, ceiling: 'full' | 'read-only', policy = {}) => service.evaluate({
     ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
     tool, toolCall: { type: 'toolCall', id: 'probe', name: 'rdc_probe', arguments: { action } },
-    accessCeiling: ceiling, compiledPolicy: compilePolicyFromRestrictive(policy),
+    accessCeiling: ceiling, compiledPolicy: compileFixturePolicy(policy),
   });
   expect(decision('probe', 'auto-review', 'read-only').action).toBe('allow');
   expect(decision('capture_select', 'full-access', 'read-only').action).toBe('deny');
@@ -250,7 +272,7 @@ describe('structured RDC semantic risk', () => {
   const evaluate = (arguments_: Record<string, unknown>, mode: AgentPermissionMode = 'auto-review', floor = false) => service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
     agentId: 'general', tool: shellTool, toolCall: { id: 'rdc-query', type: 'toolCall', name: 'shell', arguments: arguments_ },
     projectRootPath: workspaceRoot, ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
-    compiledPolicy: compilePolicyFromRestrictive(floor ? { approvalFloorByTool: { shell: 'user' } } : {}),
+    compiledPolicy: compileFixturePolicy(floor ? { approvalFloorByTool: { shell: 'user' } } : {}),
   });
   it.each([{ kind: 'search', query: 'export.texture get_details', limit: 8 }, { kind: 'describe', operation: 'rd.texture.get_details' }, { kind: 'list' }])('reviews a valid frozen catalog query as low risk: %j', discovery => {
     expect(evaluate({ rdc: { discovery } })).toMatchObject({ action: 'auto_review', risk: 'low' });
@@ -319,7 +341,7 @@ describe('AgentPermissionPolicyService network tools', () => {
     expect(decision.risk).toBe('medium');
   });
 
-  it('allows network tools in custom mode after explicit policy selection', () => {
+  it('keeps network tools under approval in custom mode', () => {
     mockSettings.agentRuntime.permissions.mode = 'custom';
 
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
@@ -328,7 +350,7 @@ describe('AgentPermissionPolicyService network tools', () => {
       projectRootPath: 'D:\\Projects\\Demo',
     });
 
-    expect(decision.action).toBe('allow');
+    expect(decision.action).toBe('ask_user');
   });
 });
 
@@ -379,7 +401,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('denies tools listed in compiledPolicy.deniedTools even in full-access', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({ deniedTools: ['shell'] });
+    const compiledPolicy = compileFixturePolicy({ deniedTools: ['shell'] });
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
       tool: shellTool,
       toolCall: {
@@ -396,7 +418,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('enforces compiled approval floors even in full-access mode', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({
+    const compiledPolicy = compileFixturePolicy({
       approvalFloorByTool: { read_file: 'user' },
     });
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
@@ -409,7 +431,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('raises allow baseline to auto_review via floor without short-circuiting baseline', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({
+    const compiledPolicy = compileFixturePolicy({
       approvalFloorByTool: { read_file: 'auto_review' },
     });
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
@@ -422,7 +444,7 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
   });
 
   it('does not weaken deny when floor is lower', () => {
-    const compiledPolicy = compilePolicyFromRestrictive({
+    const compiledPolicy = compileFixturePolicy({
         deniedTools: ['shell'],
       approvalFloorByTool: { shell: 'auto_review' },
     });
@@ -449,6 +471,7 @@ describe('AgentPermissionPolicyService floor × mode lattice', () => {
     description: 'write file',
     parameters: { type: 'object', properties: {} },
     permissionHint: 'mutation',
+    effects: PRODUCTION_EFFECTS.write_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   };
 
@@ -459,8 +482,8 @@ describe('AgentPermissionPolicyService floor × mode lattice', () => {
     mockSettings.agentRuntime.permissions.allowedCommandPrefixes = [];
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
     const compiledPolicy = floor === 'none'
-      ? compilePolicyFromRestrictive({})
-      : compilePolicyFromRestrictive({ approvalFloorByTool: { write_file: floor } });
+      ? compileFixturePolicy({})
+      : compileFixturePolicy({ approvalFloorByTool: { write_file: floor } });
     return service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
       tool: writeFileTool,
       toolCall: {
@@ -550,6 +573,15 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
     expect(decision.action).not.toBe('deny');
   });
 
+  it('reviews shell git because repository config can name programs git runs', () => {
+    const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
+      tool: shellTool,
+      toolCall: { type: 'toolCall', id: 'tc-shell', name: 'shell', arguments: { command: 'git status' } },
+      projectRootPath: workspaceRoot,
+    });
+    expect(decision.action).not.toBe('allow');
+  });
+
   it('denies path-prefixed /bin/rm against denied prefix rm', () => {
     mockSettings.agentRuntime.permissions.mode = 'custom';
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = ['rm'];
@@ -633,6 +665,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     description: 'write',
     parameters: { type: 'object', properties: {} },
     permissionHint: 'mutation',
+    effects: PRODUCTION_EFFECTS.write_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   };
   const editFileTool: AgentTool = {
@@ -640,6 +673,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     description: 'edit',
     parameters: { type: 'object', properties: {} },
     permissionHint: 'mutation',
+    effects: PRODUCTION_EFFECTS.edit_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   };
   const codeInterpreterTool: AgentTool = {
@@ -661,6 +695,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
       description: name,
       parameters: { type: 'object', properties: {} },
       permissionHint: 'readonly',
+      effects: PRODUCTION_EFFECTS[name],
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     };
   }
@@ -859,6 +894,53 @@ describe('file routing across permission modes', () => {
       expect(decision.action).toBe('deny');
       expect(decision.reason).toContain(command.startsWith('rdc') ? 'RDC_VIA_COMMAND_DENIED' : 'SHELL_FILE_TOOL_BYPASS');
     }
+  });
+});
+
+describe('AgentPermissionPolicyService declared effects', () => {
+  const service = new AgentPermissionPolicyService();
+  const settings = (mode: AgentPermissionMode): AgentPermissionSettings => ({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] });
+  const call = (name: string, args: Record<string, unknown>): ToolCall => ({ type: 'toolCall', id: `tc-${name}`, name, arguments: args });
+  const moveFileTool: AgentTool = { name: 'move_file', description: 'move', parameters: { type: 'object', properties: {} },
+    permissionHint: 'mutation', effects: productionMoveFile.effects, execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) };
+
+  it('refuses moving a capture in every mode, including full access', () => {
+    for (const mode of ['default', 'full-access'] as const) {
+      const decision = service.evaluate({ ...permissionInput(settings(mode)), tool: moveFileTool,
+        toolCall: call('move_file', { source: 'frame.rdc', destination: 'frame-old.rdc' }), projectRootPath: workspaceRoot });
+      expect(decision).toMatchObject({ action: 'deny', reason: expect.stringContaining('FILE_WRITE_PROTECTED') });
+    }
+  });
+
+  it('keeps protected configuration writes under approval in full access', () => {
+    const decision = service.evaluate({ ...permissionInput(settings('full-access')), tool: deleteFileTool,
+      toolCall: call('delete_file', { path: '.rdc-agent/policies/team.policy.yml' }), projectRootPath: workspaceRoot });
+    expect(decision).toMatchObject({ action: 'ask_user', risk: 'high' });
+  });
+
+  it('gives a conversation without a project no workspace', () => {
+    const read = service.evaluate({ ...permissionInput(settings('default')), tool: readFileTool,
+      toolCall: call('read_file', { path: 'notes.txt' }), projectRootPath: null });
+    const shell = service.evaluate({ ...permissionInput(settings('default')), tool: shellTool,
+      toolCall: call('shell', { command: 'ls' }), projectRootPath: null });
+    expect(read.action).toBe('ask_user');
+    expect(shell.action).toBe('ask_user');
+  });
+
+  it('treats a parent-directory reference in a routine command as an external path', () => {
+    const decision = service.evaluate({ ...permissionInput(settings('default')), tool: shellTool,
+      toolCall: call('shell', { command: 'ls ../..' }), projectRootPath: workspaceRoot });
+    expect(decision.action).toBe('ask_user');
+  });
+
+  it('reviews a tool that declares no effects by its access level', () => {
+    const undeclared = (name: string): AgentTool => ({ name, description: name, parameters: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) });
+    const evaluate = (name: string) => service.evaluate({ ...permissionInput(settings('default')), tool: undeclared(name),
+      toolCall: call(name, {}), projectRootPath: workspaceRoot }).action;
+    expect(evaluate('task_list')).toBe('allow');
+    expect(evaluate('memory_write')).toBe('ask_user');
+    expect(evaluate('unregistered_tool')).toBe('ask_user');
   });
 });
 

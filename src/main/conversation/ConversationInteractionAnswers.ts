@@ -1,3 +1,6 @@
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import type {
   ConversationAnswerPlanReviewRequest,
   ConversationAnswerPlanReviewResult,
@@ -6,9 +9,6 @@ import type {
   ConversationAnswerUserInputRequest,
   ConversationAnswerUserInputResult,
 } from '@shared/types/conversation';
-import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 
 export function answerConversationUserInput(
   request: ConversationAnswerUserInputRequest,

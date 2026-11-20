@@ -1,11 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AppSettings } from '@shared/types/settings';
-
-vi.mock('../agent-manifests/AgentManifestService', () => ({
-  agentManifestService: {
-    resolveEffectiveSnapshot: vi.fn(),
-  },
-}));
 
 import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import {
@@ -13,6 +6,13 @@ import {
   compiledRoutesFromDefinitions,
   resolveCompiledRouteForAgent,
 } from './compiledAgentRoutes';
+import type { AppSettings } from '@shared/types/settings';
+
+vi.mock('../agent-manifests/AgentManifestService', () => ({
+  agentManifestService: {
+    resolveEffectiveSnapshot: vi.fn(),
+  },
+}));
 
 describe('compiledAgentRoutes leftover isolation', () => {
   it('reads compiledRoute and never leftover agentRoutes', () => {

@@ -1,11 +1,10 @@
-import { IconButton } from '../../ui/IconButton';
-import { Icon } from '../../ui/Icon';
 import { ProductLogo } from '../../ui/ProductLogo';
+import type { ReactNode } from 'react';
 import './TitleBar.css';
 
 export interface TitleBarProps {
-  onGettingStarted?: () => void;
-  gettingStartedLabel?: string;
+  /** Workbench utilities (replay device, terminal) shown before the panel toggles. */
+  utilities?: ReactNode;
   effectiveLeftCollapsed: boolean;
   effectiveRightCollapsed: boolean;
   isRightRailVisible: boolean;
@@ -29,8 +28,7 @@ export interface TitleBarProps {
 }
 
 export function TitleBar({
-  onGettingStarted,
-  gettingStartedLabel,
+  utilities,
   effectiveLeftCollapsed,
   effectiveRightCollapsed,
   isRightRailVisible,
@@ -82,8 +80,7 @@ export function TitleBar({
         </button>
       </div>
       <div className="app-titlebar-right no-drag">
-        {onGettingStarted && <IconButton label={gettingStartedLabel ?? ''} onClick={onGettingStarted}
-          data-testid="titlebar-getting-started"><Icon name="help" size={18} /></IconButton>}
+        {utilities}
         {isRightRailVisible && (
           <button
             type="button"

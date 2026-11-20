@@ -7,7 +7,7 @@
 
 .knowledge-center-markdown {
   color: var(--token-text-body);
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   line-height: var(--leading-normal);
   overflow-wrap: anywhere;
 }
@@ -30,7 +30,7 @@
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-height-sm);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
 }
 
 .knowledge-center-relation-kind {
@@ -91,7 +91,7 @@
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--token-border-muted);
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .knowledge-conflict-pane-grid {
@@ -105,12 +105,12 @@
   display: grid;
   grid-template-columns: 3.5rem minmax(0, 1fr);
   gap: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .knowledge-conflict-pane-grid dt {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   line-height: 1.7;
 }
 

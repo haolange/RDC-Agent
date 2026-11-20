@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { ContextTier, EffectiveModel } from '../types/providerCapability';
 import {
   contextTierBudgetTokens,
   contextTierOutputTokens,
@@ -8,6 +7,7 @@ import {
   resolveContextTierChoices,
   resolvePlanningOutputTokens,
 } from './contextTiers';
+import type { ContextTier, EffectiveModel } from '../types/providerCapability';
 
 const tier = (
   id: string,

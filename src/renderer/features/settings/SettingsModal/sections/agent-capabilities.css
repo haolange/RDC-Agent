@@ -8,7 +8,7 @@
 .settings-capability-note {
   margin: 0;
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   line-height: 1.6;
 }
 
@@ -34,7 +34,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--token-text-heading);
-  font-size: var(--text-base);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -43,7 +43,7 @@
 .settings-capability-group-head span {
   flex: 0 0 auto;
   color: var(--token-text-caption);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }
 
 .settings-capability-bucket {
@@ -58,7 +58,7 @@
 
 .settings-capability-bucket-title {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-medium);
   letter-spacing: 0.02em;
 }

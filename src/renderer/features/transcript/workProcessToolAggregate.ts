@@ -1,6 +1,6 @@
+import { groupImageRows } from './groupImageRows';
 import type { Translator } from '../../i18n/messages';
 import type { WorkProcessRow, WorkProcessRowStatus, WorkProcessToolGroupKind } from './workProcessTypes';
-import { groupImageRows } from './groupImageRows';
 
 const TOOL_AGGREGATE_THRESHOLD = 8;
 

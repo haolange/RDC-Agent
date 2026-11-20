@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReviewStore';
-import { applyDeclaredHandoffOnClient } from './sessionAgentId';
 import { useComposerSessionContextStore, type HandoffSuggestionRequest } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { applyDeclaredHandoffOnClient } from './sessionAgentId';
 import type { ComposerSendOutcome, HandoffSendPayload } from './composerHandoffSend';
 
 interface Delivery {

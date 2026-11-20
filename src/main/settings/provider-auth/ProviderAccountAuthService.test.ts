@@ -1,8 +1,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getProviderModelDefinitions } from '../../provider-catalog/ProviderCatalogRegistry';
 import { ProviderAccountAuthService } from './ProviderAccountAuthService';
 
@@ -253,9 +253,8 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     } finally { release?.(); service.dispose(); }
   });
 
-  it('rejects device mode and incompatible or unreachable metadata with an actionable failure', async () => {
+  it('rejects incompatible or unreachable metadata with an actionable failure', async () => {
     const service = new ProviderAccountAuthService();
-    expect((await service.startLogin({ providerId: 'grok-account', accountLoginMode: 'device' })).state).toBe('failed');
     mockFetchJson({ ...grokMetadata, scopes_supported: ['openid'] });
     expect((await service.startLogin({ providerId: 'grok-account' })).error).toContain('scope');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network unavailable')));
@@ -597,7 +596,7 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
       },
     );
 
-    const status = await service.startLogin({ providerId: 'nous', accountLoginMode: 'device' });
+    const status = await service.startLogin({ providerId: 'nous' });
 
     expect(status).toMatchObject({
       state: 'pending',

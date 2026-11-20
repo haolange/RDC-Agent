@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 import { resolveCommandLabel, resolveSystemNoticeTone } from './systemMessagePresentation';
+import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 
 const baseMessage = (): ConversationMessage => ({
   id: 'msg-1',

@@ -1,9 +1,9 @@
-import type { ConversationToolCall } from '@shared/types/conversation';
-import type { ToolCallResult } from '@shared/types/tool';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { extractConversationToolResourceRefs, extractToolImagePreviews } from './ConversationToolResourceRefs';
+import type { ToolCallResult } from '@shared/types/tool';
+import type { ConversationToolCall } from '@shared/types/conversation';
 
 /** Shared projection for streamed and stopped-turn canonical tool completions. */
 export function buildConversationToolCompletion(

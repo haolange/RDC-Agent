@@ -11,19 +11,10 @@
  */
 
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Message,
-  Model,
-  StopReason,
-  StreamOptions,
-  ToolDefinition,
-} from '../core/types';
-import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,
@@ -37,9 +28,19 @@ import {
   parseJsonLines,
   ProviderEmptyStreamError,
 } from './internal/http';
-import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { reasoningProjectionSource } from './reasoningProjection';
+import { applyOllamaThink } from './reasoningWire';
+import type {
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Message,
+  Model,
+  StopReason,
+  StreamOptions,
+  ToolDefinition,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
 const DEFAULT_BASE_URL = 'http://localhost:11434';
@@ -255,6 +256,7 @@ export class OllamaProvider implements ProviderStrategy {
     if (typeof options.temperature === 'number') optionsBlock.temperature = options.temperature;
     if (typeof options.topP === 'number') optionsBlock.top_p = options.topP;
     if (typeof options.maxTokens === 'number') optionsBlock.num_predict = options.maxTokens;
+    applyOllamaThink(body, options.reasoning, options.requestPlan);
     if (Object.keys(optionsBlock).length > 0) body.options = optionsBlock;
 
     if (context.tools && context.tools.length > 0) {

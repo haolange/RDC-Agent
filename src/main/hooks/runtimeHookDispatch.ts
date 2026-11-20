@@ -1,6 +1,6 @@
-import type { HookEvent } from '@shared/types/rdcRuntime';
 import { appPathService } from '../runtime/AppPathService';
 import { hookEngine, type HookContext, type HookExecutionResult } from './HookEngine';
+import type { HookEvent } from '@shared/types/rdcRuntime';
 
 export async function runRuntimeHooks(
   event: HookEvent,

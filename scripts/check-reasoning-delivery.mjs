@@ -104,7 +104,13 @@ assert(geminiCap.reasoningContract.semantic === 'unknown', 'Gemini display seman
 
 const ollamaCap = resolveAgentRouteCapability(ollama, 'test-model', effectiveModel(ollama, 'test-model'));
 assert(ollamaCap.reasoningDelivery === 'stream-full', 'Ollama must use stream-full delivery');
-assert(ollamaCap.reasoningContract.semantic === 'unknown', 'Ollama-compatible reasoning must not be inferred as raw');
+assert(
+  ollamaCap.reasoningContract.semantic === 'raw'
+    && ollamaCap.reasoningContract.source === 'provider-docs:ollama-thinking'
+    && Boolean(ollamaCap.reasoningContract.evidence)
+    && ollamaCap.reasoningContract.visibilityRequest === 'ollama-think',
+  'Ollama reasoning must be the manifest-declared, documented raw contract with the think request, never inferred',
+);
 
 assert(resolveAgentRouteCapability(deepseek, 'deepseek-reasoner', effectiveModel(deepseek, 'deepseek-reasoner')).reasoningContract.semantic === 'raw', 'Direct DeepSeek reasoning_content is documented raw reasoning');
 assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding', effectiveModel(kimi, 'kimi-for-coding')).reasoningContract.semantic === 'raw', 'Kimi Coding Plan must be raw, never Anthropic summary');
@@ -184,7 +190,9 @@ assert(conversationTurnRunnerSource.includes('requireCanonicalFinalAnswer(canoni
 assert(!/event\.type === 'tool\.started'[\s\S]{0,240}beginAssistantContentLoop\(\)/u.test(conversationCanonicalSources), 'Tool lifecycle events must not consume the pending assistant loop transition.');
 assert(!conversationCanonicalSources.includes('currentLoopText.trim() || rawResponse || visibleResponse'), 'Conversation terminal content must not fall back to loop text.');
 assert(!conversationCanonicalSources.includes('rawResponse ||'), 'Conversation terminal content must not restore raw provider text fallback.');
-assert(traceCanonicalSource.includes("block.result?.outputPhase === 'final_answer'"), 'Trace reload must read only explicit final_answer blocks.');
+assert(traceCanonicalSource.includes('loopFinalAnswerText(block)')
+  && fs.readFileSync('src/shared/conversation/loopItems.ts', 'utf8').includes("block?.result?.outputPhase !== 'final_answer'"),
+  'Trace reload must read only explicit final_answer blocks through the shared loop rule.');
 assert(openaiCompatibleSource.includes('Provider emitted another semantic Chat Completions choice after finish_reason.'), 'Chat Completions must reject semantic choices after finish_reason.');
 assert(openaiResponsesSource.includes('providerTerminalSeen'), 'Responses must reject events after its terminal event.');
 

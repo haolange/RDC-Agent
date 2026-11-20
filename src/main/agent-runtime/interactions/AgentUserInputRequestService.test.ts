@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { agentUserInputRequestService } from './AgentUserInputRequestService';
 import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
-import { agentUserInputRequestService } from './AgentUserInputRequestService';
 
 const eventContext = {
   runId: 'run-ask-user-test',

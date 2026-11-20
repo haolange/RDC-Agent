@@ -83,7 +83,7 @@ export const contracts = {
     states: 'open/closed、嵌套、异步内容增长、窄/低视口；顶层 Escape 与触发器焦点返回。',
     layout: 'Popover 锚定视口安全边界；TaskDialog 固定标题和动作，正文占余高并滚动。',
     motion: '使用现有模态/浮层时长；不改变 Composer 外沿溢出或遮罩。',
-    consumers: '模型参数、ColorField、Settings/Knowledge/上手指南与项目弹层。',
+    consumers: '模型参数、ColorField、Settings/Knowledge 与项目弹层。',
   },
   'OverflowFade / EmptyState': {
     avoid: '不按字数截断；错误和正文不渐隐；空态不能伪装读取失败或不支持。',

@@ -1,18 +1,16 @@
 import { ipcMain } from 'electron';
-import type {
-  ConversationAnswerToolApprovalRequest,
-  ConversationAnswerPlanReviewRequest,
-  ConversationAnswerUserInputRequest,
-  ConversationCancelActiveTurnRequest,
-  ConversationRewriteFromMessageRequest,
-  ConversationSendRequest,
-  ConversationSendResult,
-} from '@shared/types/conversation';
-import type { ConversationSwitchBranchRequest } from '@shared/types/conversationBranch';
 import { conversationService } from '../conversation/ConversationService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
-import type { WorkbenchIpcContext } from './workbenchContext';
-import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
+import { attachmentStagingService } from '../conversation/AttachmentStagingService';
+import {
+  assertAttachmentPreviewPath,
+  readAttachmentFilePreviewDataUrl,
+} from '../conversation/attachmentPreview';
+import { NATIVE_IMAGE_MIME_TYPES } from '../conversation/attachmentClassify';
+import { delegationTraceStore } from '../conversation/DelegationTraceStore';
+import { toRejectedSendResult } from '../conversation/conversationSendRejection';
+import { requireActiveSessionOwner } from './sessionOwnerGate';
 import {
   ConversationAnswerPlanReviewArgsSchema,
   ConversationAnswerToolApprovalArgsSchema,
@@ -31,16 +29,18 @@ import {
   ConversationSwitchBranchArgsSchema,
   ConversationUndoLastTurnArgsSchema,
 } from './validation/conversationSchemas';
-import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
-import { attachmentStagingService } from '../conversation/AttachmentStagingService';
-import {
-  assertAttachmentPreviewPath,
-  readAttachmentFilePreviewDataUrl,
-} from '../conversation/attachmentPreview';
-import { NATIVE_IMAGE_MIME_TYPES } from '../conversation/attachmentClassify';
-import { requireActiveSessionOwner } from './sessionOwnerGate';
-import { delegationTraceStore } from '../conversation/DelegationTraceStore';
-import { toRejectedSendResult } from '../conversation/conversationSendRejection';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import type { WorkbenchIpcContext } from './workbenchContext';
+import type { ConversationSwitchBranchRequest } from '@shared/types/conversationBranch';
+import type {
+  ConversationAnswerToolApprovalRequest,
+  ConversationAnswerPlanReviewRequest,
+  ConversationAnswerUserInputRequest,
+  ConversationCancelActiveTurnRequest,
+  ConversationRewriteFromMessageRequest,
+  ConversationSendRequest,
+  ConversationSendResult,
+} from '@shared/types/conversation';
 
 export function registerConversationHandlers(context: WorkbenchIpcContext): void {
   attachmentStagingService.clearAll();

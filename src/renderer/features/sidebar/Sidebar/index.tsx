@@ -1,12 +1,13 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../../i18n';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
+import { useProjectStore } from '../../../stores/projectStore';
 import { ProjectGroup } from './ProjectGroup';
 import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
 import { useProjectTree } from './useProjectTree';
-import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import { ProjectAddDialog } from './ProjectAddDialog';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import './Sidebar.css';
 import './sidebar-chrome.css';
 
@@ -24,6 +25,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
   const popovers = useSidebarPopovers();
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
   const [addingProject, setAddingProject] = useState(false);
+  const addProjectRequest = useProjectStore((state) => state.addProjectRequest);
+  useEffect(() => {
+    if (addProjectRequest > 0) setAddingProject(true);
+  }, [addProjectRequest]);
   const selection = useProjectSelection({
     ensureProjectExpanded: tree.ensureProjectExpanded,
     loadProjectSessionList: tree.loadProjectSessionList,

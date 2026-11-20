@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import type { Context } from '../core/types';
 import {
   createProviderStateRef,
   findLatestProviderState,
   providerStateReuseReason,
   verifyProviderStateRef,
 } from './ProviderStateRefs';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { Context } from '../core/types';
 
 function plan(
   modelId: string,

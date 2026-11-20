@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
-import type { KnowledgeCardDetail, KnowledgeImageRef, KnowledgeSpace } from '@shared/types/knowledge';
 import {
   KNOWLEDGE_PACKAGE_SCHEMA,
   type KnowledgeExportRequest,
@@ -17,6 +16,7 @@ import {
   utf8ToZip,
   zipKnowledgeFiles,
 } from './knowledgeZip';
+import type { KnowledgeCardDetail, KnowledgeImageRef, KnowledgeSpace } from '@shared/types/knowledge';
 
 export interface KnowledgeExportDependencies {
   getCard(spaceId: string, relativePath: string): Promise<KnowledgeCardDetail | null>;

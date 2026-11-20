@@ -11,8 +11,8 @@ vi.mock('../../../sessions/artifacts/SessionArtifactResolver', () => ({
 }));
 
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
-import { artifactReadTool } from './ArtifactReadTool';
 import { grantDelegatedArtifactAccess } from '../../../sessions/artifacts/DelegatedArtifactAccess';
+import { artifactReadTool } from './ArtifactReadTool';
 
 describe('ArtifactReadTool', () => {
   beforeEach(() => { read.mockReset(); recordedRequest.mockReset(); });

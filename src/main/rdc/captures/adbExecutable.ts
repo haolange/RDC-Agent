@@ -3,8 +3,8 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { samePath } from '../../platform/paths';
 import { rdcInstallationFiles } from '../../platform/rdcLayout';
-import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { configuredInstallationRoot } from '../RdcInstallationService';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 /** Reads the selected Tools installation, never searches PATH or another SDK. */
 export class AdbExecutableCache {

@@ -1,4 +1,3 @@
-import type { AgentRole } from '@shared/types/agent';
 import { agentAccessCeiling, DEFAULT_AGENT_ACCESS_CEILING, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import {
   BUILTIN_AGENT_TOOL_ID_SET,
@@ -9,6 +8,7 @@ import {
 import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
 import { executionProfileService } from '../../settings/settings-core/ExecutionProfileService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
+import type { AgentRole } from '@shared/types/agent';
 
 export { diagnoseManifestToolTokens, expandCanonicalToolToken };
 

@@ -1,8 +1,8 @@
 /**
  * /tools — 列出或描述可用工具。
  */
-import type { CommandDefinition } from '@shared/types/command';
 import { BUILTIN_AGENT_TOOL_IDS } from '@shared/constants/agentToolTokens';
+import type { CommandDefinition } from '@shared/types/command';
 
 export const toolsCommand: CommandDefinition = {
   id: 'tools',

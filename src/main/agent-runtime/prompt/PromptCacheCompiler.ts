@@ -1,7 +1,7 @@
+import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
-import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 
 export interface PromptCacheCompileInput {
   promptPlan: PromptPlan;

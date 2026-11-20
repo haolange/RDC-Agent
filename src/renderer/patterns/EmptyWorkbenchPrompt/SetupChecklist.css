@@ -1,0 +1,94 @@
+.setup-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+}
+
+.setup-checklist-title {
+  margin: 0;
+  color: var(--token-text-body);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  font-weight: var(--font-semibold);
+}
+
+.setup-checklist-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-checklist-step {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-raised);
+}
+
+.setup-checklist-step[data-state='active'] {
+  border-color: var(--token-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--token-accent-primary) 18%, transparent);
+}
+
+.setup-checklist-step[data-state='pending'] {
+  opacity: 0.78;
+}
+
+.setup-checklist-index {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--token-border-strong);
+  border-radius: var(--radius-full);
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-semibold);
+}
+
+.setup-checklist-step[data-state='active'] .setup-checklist-index {
+  border-color: transparent;
+  background: var(--token-accent-primary);
+  color: var(--token-text-inverse);
+}
+
+.setup-checklist-step[data-state='done'] .setup-checklist-index {
+  border-color: transparent;
+  background: var(--token-status-success);
+  color: var(--token-text-inverse);
+}
+
+.setup-checklist-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.setup-checklist-step-title {
+  color: var(--token-text-heading);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--font-medium);
+}
+
+.setup-checklist-step-body {
+  color: var(--token-text-caption);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+}
+
+.setup-checklist-copy > .button {
+  margin-top: var(--space-2);
+}

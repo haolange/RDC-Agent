@@ -1,5 +1,5 @@
-import type { TranslationKey } from '../../../i18n';
 import { LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
+import type { TranslationKey } from '../../../i18n';
 import type {
   LlmProviderCategory,
   LlmProviderEntry,

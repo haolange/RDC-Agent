@@ -1,11 +1,11 @@
+import { createDefaultChromeThemes } from './presets';
+import { sanitizeChromeThemes } from './sanitize';
 import type {
   AppLanguage,
   AppTheme,
   FontScale,
   UiPreferences,
 } from '../types/settings';
-import { createDefaultChromeThemes } from './presets';
-import { sanitizeChromeThemes } from './sanitize';
 
 const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];

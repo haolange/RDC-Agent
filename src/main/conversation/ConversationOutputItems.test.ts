@@ -1,4 +1,6 @@
 import { expect, it, vi } from 'vitest';
+
+vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 import { createAgentEventHandler, type AgentEventHandlerDeps, type TurnStreamState } from './ConversationTurnAgentEventHandler';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
@@ -13,14 +15,14 @@ function fixture() {
   const commit = (_type: string, patch: Partial<ConversationMessage>) => { state.assistantMessage = { ...state.assistantMessage, ...patch }; };
   const deps = {
     host: { emitConversationEvent: vi.fn() }, sessionId: 'session',
-    input: { preparedTurn: { runtime: { routeCapability: { reasoningDelivery: 'stream-full' } } } },
+    input: { context: { projectId: 'project', currentRun: null }, preparedTurn: { runtime: { routeCapability: { reasoningDelivery: 'stream-full' } } } },
     turnStreamState: state, commitAssistantMessage: commit,
     commitVisibleAssistantText: () => {}, commitThinkingTrace: (workTrace: ConversationWorkTrace) => { state.assistantMessage.workTrace = workTrace; },
     beginAssistantContentLoop: () => {}, currentLoopId: () => 'loop',
     markLoopCommentary: () => { state.currentLoopOutputPhase = 'commentary'; },
     resolveStreamingOutputPhase: () => state.currentLoopOutputPhase,
     recordProviderOutputRefs: (refs: ProviderOutputRef[] = []) => { state.currentLoopProviderOutputRefs.push(...refs); },
-    currentLoopOptions: () => ({ loopId: 'loop', loopResultText: state.currentLoopText }),
+    currentLoopOptions: () => ({ loopId: 'loop', loopProviderOutputRefs: state.currentLoopProviderOutputRefs }),
     pendingContinuation: { approval: false, userInput: false, planReview: false, handoff: false },
     hasPendingContinuation: () => false,
   } as unknown as AgentEventHandlerDeps;
@@ -32,15 +34,18 @@ function fixture() {
 }
 
 const ref = (index: number): ProviderOutputRef => ({ protocol: 'OpenAIResponses', providerBlockKey: `text:${index}`, contentIndex: index });
+const thinkingRef = (index: number): ProviderOutputRef => ({ protocol: 'OpenAIResponses', providerBlockKey: `thinking:${index}`, contentIndex: index });
+const loopBlock = (state: TurnStreamState) => state.assistantMessage.workTrace!.blocks.find((block) => block.id === 'loop')!;
+const textItems = (state: TurnStreamState) => loopBlock(state).items!.filter((item) => item.kind === 'text');
 
 it('streams distinct text items after thinking and confirms only final items', () => {
   const { state, send } = fixture();
   const thinking = { kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text: 'Thinking' };
-  send('assistant.thinking_end', { thinking, text: 'Thinking' });
+  send('assistant.thinking_end', { thinking, text: 'Thinking', providerOutputRef: thinkingRef(9) });
   send('assistant.delta', { providerOutputRef: ref(0), text: 'Checking', phase: 'commentary' });
   send('assistant.delta', { providerOutputRef: ref(1), text: 'First ' });
   send('assistant.delta', { providerOutputRef: ref(1), text: 'answer' });
-  const items = () => state.assistantMessage.workTrace!.blocks.find((block) => block.id === 'loop')!.outputItems!;
+  const items = () => textItems(state);
   expect(items().map((item) => item.text)).toEqual(['Checking', 'First answer']);
   expect(items()[1].phase).toBeUndefined();
   expect(state.canonicalOutput.finalAnswerText).toBe('');
@@ -50,15 +55,14 @@ it('streams distinct text items after thinking and confirms only final items', (
   ] });
   expect(items().map((item) => item.phase)).toEqual(['commentary', 'final_answer']);
   expect(state.canonicalOutput.finalAnswerText).toBe('First answer');
-  expect(state.assistantMessage.workTrace!.blocks[0].result?.text).toBeUndefined();
 });
 
 it('resolves unknown text as commentary on a tool event without changing its position', () => {
   const { state, send } = fixture();
   send('assistant.delta', { providerOutputRef: ref(0), text: 'Checking' });
-  const before = state.assistantMessage.workTrace!.blocks[0].outputItems![0];
+  const before = textItems(state)[0];
   send('tool.requested', { toolCall: { id: 'tool', name: 'read_file', arguments: {} }, providerOutputRef: ref(1) });
-  const after = state.assistantMessage.workTrace!.blocks[0].outputItems![0];
+  const after = textItems(state)[0];
   expect(after).toMatchObject({ text: 'Checking', phase: 'commentary', displayOrder: before.displayOrder });
   expect(state.canonicalOutput.finalAnswerText).toBe('');
 });
@@ -67,9 +71,24 @@ it('records visible thinking after an earlier text item without changing its ord
   const { state, send } = fixture();
   send('assistant.delta', { providerOutputRef: ref(0), text: 'Earlier text' });
   send('assistant.thinking_end', { thinking: { kind: 'summary', source: 'anthropic-thinking',
-    visibility: 'summary', text: 'Later thinking' }, text: 'Later thinking' });
-  const loop = state.assistantMessage.workTrace!.blocks.find((block) => block.id === 'loop')!;
-  expect(loop.outputItems![0].displayOrder).toBeLessThan(loop.thinkingDisplayOrder!);
+    visibility: 'summary', text: 'Later thinking' }, text: 'Later thinking', providerOutputRef: thinkingRef(1) });
+  expect(loopBlock(state).items!.map((item) => item.kind)).toEqual(['text', 'thinking']);
+});
+
+it('keeps every thinking block of a loop in place instead of the last one replacing the first', () => {
+  const { state, send } = fixture();
+  const summary = (text: string) => ({ kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text });
+  send('assistant.thinking_delta', { thinking: summary('Plan the read'), text: 'Plan the read', providerOutputRef: thinkingRef(0) });
+  send('assistant.thinking_end', { thinking: summary('Plan the read'), text: 'Plan the read', providerOutputRef: thinkingRef(0) });
+  send('tool.requested', { toolCall: { id: 'tool', name: 'read_file', arguments: {} }, providerOutputRef: ref(1) });
+  send('tool.started', { toolCallId: 'tool', toolName: 'read_file', args: {} });
+  send('assistant.thinking_end', { thinking: summary('Check what came back'), text: 'Check what came back', providerOutputRef: thinkingRef(2) });
+  const thinkingItems = loopBlock(state).items!.filter((item) => item.kind === 'thinking');
+  expect(thinkingItems.map((item) => item.kind === 'thinking' && item.thinking.text)).toEqual(['Plan the read', 'Check what came back']);
+  expect(thinkingItems.map((item) => item.status)).toEqual(['complete', 'complete']);
+  const toolOrder = loopBlock(state).toolCalls[0].displayOrder!;
+  expect(thinkingItems[0].displayOrder).toBeLessThan(toolOrder);
+  expect(thinkingItems[1].displayOrder).toBeGreaterThan(toolOrder);
 });
 
 it.each(['max_tokens', 'refusal', 'error', 'aborted'] as const)(
@@ -80,7 +99,21 @@ it.each(['max_tokens', 'refusal', 'error', 'aborted'] as const)(
       textItems: [{ providerOutputRef: ref(0), text: 'Partial output' }] });
     const loop = state.assistantMessage.workTrace!.blocks.find((block) => block.id === 'loop')!;
     expect(loop.result?.stopReason).toBe(stopReason);
-    expect(loop.outputItems?.[0]).toMatchObject({ text: 'Partial output', status: 'complete' });
+    expect(loop.items?.[0]).toMatchObject({ kind: 'text', text: 'Partial output', status: 'complete' });
     expect(state.canonicalOutput.finalAnswerText).toBe('');
   },
 );
+
+it('drops a failed attempt\'s partial text and undeclared tools when the provider request is retried', () => {
+  const { state, send } = fixture();
+  send('assistant.delta', { providerOutputRef: ref(0), text: 'Half of an ans' });
+  send('tool.requested', { toolCall: { id: 'never-run', name: 'read_file', arguments: {} }, providerOutputRef: ref(1) });
+  send('diagnostic', { code: 'error_recovery_retry', phase: 'started', severity: 'info', message: 'Retrying' });
+  expect(loopBlock(state).items ?? []).toEqual([]);
+  expect(loopBlock(state).toolCalls).toEqual([]);
+  send('assistant.delta', { providerOutputRef: { ...ref(0), responseId: 'retry' }, text: 'A whole answer' });
+  send('assistant.completed', { stopReason: 'end_turn', text: 'A whole answer',
+    textItems: [{ providerOutputRef: { ...ref(0), responseId: 'retry' }, text: 'A whole answer' }] });
+  expect(textItems(state).map((item) => item.text)).toEqual(['A whole answer']);
+  expect(state.canonicalOutput.finalAnswerText).toBe('A whole answer');
+});

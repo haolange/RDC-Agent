@@ -1,22 +1,11 @@
-import { RuntimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { RuntimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { EventStream } from '../core/EventStream';
-import type { ProviderStrategy } from '../core/ProviderRegistry';
-import type {
-  AgentEvent,
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Message,
-  Model,
-  StreamOptions,
-  ToolResultMessage,
-} from '../core/types';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { assertMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 import { SESSION_ID, baselineWorld, createInvestigationHarness, observedClaim, projectClaim, sampleCheckpoint, writeDraft, writeReadyReport } from '../../investigation/investigationTestFixtures';
@@ -29,6 +18,17 @@ import {
   AgentLoopTerminationError,
   RUNTIME_NO_PROGRESS_INSTRUCTION,
 } from './LoopProgressGuard';
+import type {
+  AgentEvent,
+  AssistantMessage,
+  AssistantMessageEvent,
+  Context,
+  Message,
+  Model,
+  StreamOptions,
+  ToolResultMessage,
+} from '../core/types';
+import type { ProviderStrategy } from '../core/ProviderRegistry';
 
 const TEST_MODEL: Model = {
   id: 'test-model',

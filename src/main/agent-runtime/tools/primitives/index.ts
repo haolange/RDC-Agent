@@ -16,7 +16,8 @@ export { assertTextReadable, truncateOutput } from './_shared';
 export { matchShellHardDeny } from './shellHardDeny';
 export * from './toolLimits';
 
-import type { AgentTool } from '../../agent/AgentTool';
+import { deleteFileTool, moveFileTool, copyFileTool } from '../file';
+import { notebookEditTool } from '../system';
 import { shellTool } from './ShellTool';
 import { readFileTool } from './ReadFileTool';
 import { artifactReadTool } from './ArtifactReadTool';
@@ -28,8 +29,7 @@ import { globTool } from './GlobTool';
 import { grepTool } from './GrepTool';
 import { gitAddTool, gitCommitTool, gitDiffTool, gitLogTool, gitStatusTool, gitUnstageTool } from './GitTool';
 import { webFetchTool, webSearchTool } from './WebTools';
-import { deleteFileTool, moveFileTool, copyFileTool } from '../file';
-import { notebookEditTool } from '../system';
+import type { AgentTool } from '../../agent/AgentTool';
 
 /** 获取所有内置 primitive 工具。 */
 export function getPrimitiveTools(): AgentTool[] {

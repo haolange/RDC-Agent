@@ -2,8 +2,8 @@
 import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
-import { useCommandPalette } from './useCommandPalette';
 import { useCommandPaletteStore } from '../stores/commandPaletteStore';
+import { useCommandPalette } from './useCommandPalette';
 
 describe('command palette controller lifecycle', () => {
   it('installs one keyboard listener in StrictMode and removes it on unmount', () => {

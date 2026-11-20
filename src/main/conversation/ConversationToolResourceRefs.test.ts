@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ToolCallResult } from '@shared/types/tool';
 import { extractConversationToolResourceRefs } from './ConversationToolResourceRefs';
+import type { ToolCallResult } from '@shared/types/tool';
 
 const success = (details: Record<string, unknown>): ToolCallResult => ({
   ok: true,

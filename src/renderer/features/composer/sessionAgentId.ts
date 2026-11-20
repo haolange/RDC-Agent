@@ -1,8 +1,8 @@
-import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { getElectronApi } from '../../platform/getElectronApi';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { applySessionRecordToStore } from './sessionModelOverride';
+import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 
 export async function persistSessionAgentId(
   sessionId: string | null | undefined,

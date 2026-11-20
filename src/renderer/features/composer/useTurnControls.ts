@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { persistSessionTurnControls } from './sessionModelOverride';
-import { useProjectStore } from '../../stores/projectStore';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { clampReasoningSelection } from '@shared/types/modelCapability';
-import type { SessionRecord } from '@shared/types/session';
+import { useProjectStore } from '../../stores/projectStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { buildInitialTurnControls, sanitizeTurnControls } from '../../lib/turnControlsUtils';
@@ -12,8 +9,11 @@ import {
   resolveTurnControlsForCapabilityChange,
 } from '../../lib/turnControlHelpers';
 import { resolvedCapability } from '../../lib/capabilityResolution';
-import { useEffectiveModelCapability } from './useEffectiveModelCapability';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { useEffectiveModelCapability } from './useEffectiveModelCapability';
+import { persistSessionTurnControls } from './sessionModelOverride';
+import type { SessionRecord } from '@shared/types/session';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
 
 const IDLE_SAVE: { saving: boolean; error?: string } = { saving: false };
 

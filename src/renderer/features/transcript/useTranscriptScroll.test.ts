@@ -8,7 +8,6 @@ import type { ConversationMessage } from '@shared/types/conversation';
 
 it('follows streaming and resized content, respects a reader scrolling away, and releases observation', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  Object.defineProperty(navigator, 'webdriver', { configurable: true, value: true });
   const disconnect = vi.fn();
   let resize!: ResizeObserverCallback;
   vi.stubGlobal('ResizeObserver', class {
@@ -46,7 +45,6 @@ it('follows streaming and resized content, respects a reader scrolling away, and
     await act(async () => root.unmount());
     expect(disconnect).toHaveBeenCalledTimes(1);
     host.remove();
-    Reflect.deleteProperty(navigator, 'webdriver');
     vi.restoreAllMocks(); vi.unstubAllGlobals();
   }
 });

@@ -1,16 +1,16 @@
-import { allowsBudgetPause } from './missionBudgetPause';
-import { type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
 import {
   type InvestigationMission,
   type InvestigationReport,
   type MissionCheckpoint,
 } from '@shared/types/renderdocInvestigation';
+import { type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
+import { allowsBudgetPause } from './missionBudgetPause';
 import { InvestigationArtifactService, investigationArtifactService } from './InvestigationArtifactService';
-import type { InvestigationReadResult } from './investigationArtifactWrite';
 import { InvestigationError } from './investigationErrors';
 import { hashesEqual } from './investigationHash';
 import { assertOptimizerExperimentClose, assertReportContractPresent } from './investigationInvariants';
 import { openReportChallenges } from './reportChallengeEligibility';
+import type { InvestigationReadResult } from './investigationArtifactWrite';
 
 export const MISSION_COMPLETION_DENIED = 'MISSION_COMPLETION_DENIED';
 

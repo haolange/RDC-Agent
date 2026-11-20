@@ -1,3 +1,14 @@
+import {
+  getReasoningSelectionOrder,
+  type ReasoningControl,
+  type ReasoningSelection,
+} from '@shared/types/modelCapability';
+import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { formatTokenCount } from '@shared/utils/tokens';
+import { formatPricePerMillion } from '@shared/utils/cost';
+import { getProviderProtocolLabel } from './utils';
+import type { useI18n } from '../../../i18n';
+import type { LlmProviderEntry } from '@shared/types/settings';
 import type {
   CapabilityEvidenceSource,
   CapabilityState,
@@ -7,17 +18,6 @@ import type {
   EntitlementState,
   TierActivation,
 } from '@shared/types/providerCapability';
-import {
-  getReasoningSelectionOrder,
-  type ReasoningControl,
-  type ReasoningSelection,
-} from '@shared/types/modelCapability';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
-import { formatTokenCount } from '@shared/utils/tokens';
-import { formatPricePerMillion } from '@shared/utils/cost';
-import type { useI18n } from '../../../i18n';
-import { getProviderProtocolLabel } from './utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

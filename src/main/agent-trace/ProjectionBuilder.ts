@@ -1,3 +1,4 @@
+import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
 import type {
   TraceNode,
   TimelineProjection,
@@ -17,7 +18,6 @@ import type {
   AgentRun,
 } from '@shared/types/agenticTrace';
 import type { ToolManifest } from '@shared/types/agenticTrace';
-import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
 
 const rendererForNode = (node: TraceNode, manifest?: ToolManifest): string => {
   switch (node.kind) {

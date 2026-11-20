@@ -1,11 +1,11 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import type { ToolExecutionContext } from '../../agent/AgentTool';
+import { afterEach, describe, expect, it } from 'vitest';
 import { readFileTool } from './ReadFileTool';
 import { READ_FILE_MAX_OUTPUT_BYTES } from './toolLimits';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));

@@ -1,9 +1,9 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage, ConversationToolCall } from '@shared/types/conversation';
 import { resolveComposerPendingRequest } from './pendingRequestSelection';
 import { ComposerPendingRequest } from './ComposerPendingRequest';
+import type { ConversationMessage, ConversationToolCall } from '@shared/types/conversation';
 
 vi.mock('./ToolApprovalRequestPanel', () => ({ ToolApprovalRequestPanel: () => 'approval panel' }));
 vi.mock('./PlanReviewRequestPanel', () => ({ PlanReviewRequestPanel: () => 'plan panel' }));

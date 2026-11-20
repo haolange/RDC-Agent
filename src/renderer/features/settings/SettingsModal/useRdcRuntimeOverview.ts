@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 import { useProjectStore } from '../../../stores/projectStore';
 import { observeScopedRequest } from './scopedSkillSelection';
 import { fenceOverviewSetter } from './runtimeOverviewProjection';
+import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
 export const useRdcRuntimeOverview = (open: boolean) => {
   const projectRoot = useProjectStore((state) => state.currentProject?.rootPath);

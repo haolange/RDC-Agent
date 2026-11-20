@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ConversationToolImagePreviewRef } from '@shared/types/conversation';
 import { getToolImagePreview } from './conversationPreview';
+import type { ConversationToolImagePreviewRef } from '@shared/types/conversation';
 
 let active = 0;
 const queue: Array<() => void> = [];

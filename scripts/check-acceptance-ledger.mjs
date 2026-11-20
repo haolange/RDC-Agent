@@ -281,6 +281,36 @@ for (const row of parsed.rows) {
   }
 }
 
+// Dated sections from LEDGER_BINDING_SINCE on are bound to evidence: each names the commit it verified
+// (`- 提交：\`<sha>\`` reachable from HEAD) and its evidence (`- 证据：` with a CI run URL, an artifact
+// path in backticks, or `本地：` and the command that ran). Earlier sections are history and stay as written.
+const LEDGER_BINDING_SINCE = '2026-11-20';
+const SECTION_RE = /^## (\d{4}-\d{2}-\d{2})：/;
+const EVIDENCE_RE = /https:\/\/github\.com\/[^\s)]+\/actions\/runs\/\d+|`[^`]+\.(?:json|png|log|txt|md|zip)`|本地[:：]\s*`[^`]+`/;
+{
+  const lines = markdown.split(/\r?\n/);
+  const sections = [];
+  lines.forEach((line, index) => {
+    const match = line.match(SECTION_RE);
+    if (match) sections.push({ date: match[1], start: index, title: line });
+  });
+  sections.forEach((section, position) => {
+    if (section.date < LEDGER_BINDING_SINCE) return;
+    const body = lines.slice(section.start + 1, sections[position + 1]?.start ?? lines.length);
+    const where = `${LEDGER_REL}:${section.start + 1}`;
+    const commits = body.flatMap((line) => [...line.matchAll(/^\s*-\s*提交[:：].*?`([0-9a-f]{7,40})`/g)].map((match) => match[1]));
+    if (commits.length === 0) fail(`${where} "${section.title}" names no commit (- 提交：\`<sha>\`).`);
+    for (const sha of commits) {
+      const resolved = resolveCommit(sha);
+      if (!resolved || !ancestors.has(resolved)) fail(`${where} commit ${sha} is not in git rev-list HEAD.`);
+    }
+    const evidence = body.filter((line) => /^\s*-\s*证据[:：]/.test(line));
+    if (evidence.length === 0 || !evidence.some((line) => EVIDENCE_RE.test(line))) {
+      fail(`${where} "${section.title}" has no evidence line with a CI run URL, an artifact path or 本地：\`<command>\`.`);
+    }
+  });
+}
+
 const authorityFiles = ['ARCHITECTURE.md', 'DESIGN.md', 'AGENTS.md'].filter((rel) => existsSync(path.join(repoRoot, rel)));
 for (const rel of authorityFiles) {
   const lines = read(rel).split(/\r?\n/);

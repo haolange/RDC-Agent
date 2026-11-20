@@ -1,9 +1,9 @@
-import type { PlanReviewStateDocument, RecoverableApprovedHandoff } from '@shared/types/planReview';
 import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
 import { resolveVisibleConversationMessages } from '../../conversation/ConversationBranchResolver';
 import { assertDeclaredHandoffForPlan } from '../../conversation/applyDeclaredHandoff';
 import { storageAdapter } from '../store/StorageAdapter';
 import { readReferencedPlan } from './sessionPlanReference';
+import type { PlanReviewStateDocument, RecoverableApprovedHandoff } from '@shared/types/planReview';
 
 /** An accepted user request after approval may already have consumed the intended action. */
 export function hasRequestAfterApproval(sessionId: string, approval: PlanReviewStateDocument): boolean {

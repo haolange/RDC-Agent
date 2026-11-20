@@ -1,16 +1,15 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, it, vi } from 'vitest';
-import { sendComposerConversationTurn } from './composerSendFlow';
-import { inspectHandoffCommit } from './composerHandoffSend';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { restoreLastSentIfCurrentSession, useComposerSessionContextStore as context } from '../../stores/composerSessionContextStore';
-const mock = vi.hoisted(() => ({ configure: vi.fn(), apply: vi.fn(), sync: vi.fn(), persist: vi.fn() }));
+import { inspectHandoffCommit } from './composerHandoffSend';
+import { sendComposerConversationTurn } from './composerSendFlow';
+const mock = vi.hoisted(() => ({ configure: vi.fn(), apply: vi.fn(), persist: vi.fn() }));
 vi.mock('../../stores/conversationConfigurationCommit', () => ({ buildConversationConfigurationCommit: mock.configure }));
 vi.mock('../../hooks/useComposerEffectiveModel', () => ({ readComposerEffectiveModel: () => null }));
 vi.mock('./sessionModelOverride', () => ({ persistComposerDraftToSession: mock.persist }));
 vi.mock('../../stores/conversationSendApply', () => ({ applyConversationTurnResult: mock.apply }));
-vi.mock('../../stores/conversationSendE2E', () => ({ syncE2EConversationState: mock.sync }));
 const send = vi.fn(); const history = vi.fn(); const prompt = vi.fn(); const attachments = vi.fn(); const skills = vi.fn();
 function options(preserveDraft = true): Parameters<typeof sendComposerConversationTurn>[0] {
   return { electronAPI: { settings: { getEffectiveCatalog: vi.fn() }, conversation: { sendMessage: send, getHistory: history } } as never,
@@ -25,7 +24,7 @@ function options(preserveDraft = true): Parameters<typeof sendComposerConversati
 }
 beforeEach(() => {
   vi.clearAllMocks(); mock.configure.mockResolvedValue({ configurationCommit: { agentId: 'general' } });
-  mock.apply.mockResolvedValue(undefined); mock.sync.mockResolvedValue(undefined);
+  mock.apply.mockResolvedValue(undefined);
   context.setState({ activeTurn: null, lastSent: null });
   useConversationStore.getState().setConversationMessages([]);
   useProjectStore.setState({ currentProject: { projectId: 'p' } as never, currentSession: { sessionId: 's' } as never });

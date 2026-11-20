@@ -1,5 +1,8 @@
-import { isRetiredModel } from '@shared/provider-catalog/modelLifecycle';
 import { createHash } from 'crypto';
+import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
+import { isRetiredProviderModel } from '../../provider-catalog/ProviderCatalogRegistry';
+import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import type {
   CapabilityEvidence,
   ContextTier,
@@ -9,9 +12,6 @@ import type {
 } from '@shared/types/providerCapability';
 import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
-import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
-import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
-import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
 import type {
   CatalogLayerContribution,
   EffectiveCatalogRequest,
@@ -318,7 +318,7 @@ function applyLayer(
     return;
   }
   for (const patch of layer.models) {
-    if (isRetiredModel(request.providerId, patch.modelId)) continue;
+    if (isRetiredProviderModel(request.providerId, patch.modelId)) continue;
     const direct = models.get(patch.modelId);
     const matched = direct ? [patch.modelId, direct] as const : [...models.entries()].find(([, candidate]) => (
       candidate.aliases.includes(patch.modelId)
@@ -358,7 +358,7 @@ function applyLayer(
       custom: _custom,
       ...ordinaryFields
     } = patch;
-    const aliases = rawAliases?.filter(alias => !isRetiredModel(request.providerId, alias));
+    const aliases = rawAliases?.filter(alias => !isRetiredProviderModel(request.providerId, alias));
     const patchLayer: CatalogLayerContribution = factSource
       ? {
           ...layer,

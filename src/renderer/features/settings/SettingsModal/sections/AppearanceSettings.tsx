@@ -1,4 +1,9 @@
 import React from 'react';
+import { Switch } from '../../../../ui/Switch';
+import { Tabs } from '../../../../ui/Tabs';
+import { SettingsField, SettingsSection } from '../parts';
+import { ChromeThemeCard } from './AppearanceChromeParts';
+import type { useI18n } from '../../../../i18n';
 import type {
   AppSettings,
   AppTheme,
@@ -6,11 +11,6 @@ import type {
   ThemeChromeConfig,
   ThemeVariant,
 } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
-import { Switch } from '../../../../ui/Switch';
-import { Tabs } from '../../../../ui/Tabs';
-import { SettingsField, SettingsSection } from '../parts';
-import { ChromeThemeCard } from './AppearanceChromeParts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

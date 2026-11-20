@@ -1,8 +1,8 @@
 import os from 'os';
 import { nowMs } from '@shared/utils/id';
 import { requiresCommandInterpreter } from '../platform/shell';
-import type { CLIResult } from '@shared/types/tool';
 import { processSupervisor, type SupervisedProcess } from '../runtime/ProcessSupervisor';
+import type { CLIResult } from '@shared/types/tool';
 
 export interface ShellInvocationRequest {
   command: string;

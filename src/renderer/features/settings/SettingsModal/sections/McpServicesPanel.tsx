@@ -1,7 +1,5 @@
-import { Details } from '../../../../ui/Details';
 import React from 'react';
-import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
-import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
+import { Details } from '../../../../ui/Details';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Badge, type BadgeTone } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
@@ -11,6 +9,8 @@ import { McpTrustBadge, McpTrustPanel, mcpTrustState } from './McpTrustPanel';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 import { formFromContent } from './scopedResourceForm';
 import { useMcpStatus } from './useMcpStatus';
+import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
+import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 
 type BadgeKind = 'connected' | 'error' | 'loading' | 'disconnected';
 

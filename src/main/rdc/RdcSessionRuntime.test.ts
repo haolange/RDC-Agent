@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { rdcCliInvokerService } from './RdcCliInvokerService';
+import { freezeRdcTurnBinding } from './RdcTurnBindings';
+import { RdcSessionRuntime } from './RdcSessionRuntime';
+import { remotePreparationBindingIdentity } from './RdcRemoteConnection';
+import { clearRdcContextLeases, getRdcContextLease, grantDelegatedLease, revokeDelegatedLease } from './RdcRuntimeContextRegistry';
 import type { OpenProjectInputRequest } from '@shared/types/session';
+
 const nativeStop = vi.hoisted(() => vi.fn());
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: nativeStop, loadCatalog: vi.fn(async () => ({ tools: [] })) } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: { enabled: true, command: 'rdc', argsPrefix: [], env: {} } } }) } }));
@@ -8,11 +14,6 @@ vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn
 vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));
 const ownership = vi.hoisted(() => ({ remember: vi.fn(), forget: vi.fn() }));
 vi.mock('./OwnedRdcDaemonRegistry', () => ({ rememberOwnedRdcDaemon: ownership.remember, forgetOwnedRdcDaemon: ownership.forget }));
-import { rdcCliInvokerService } from './RdcCliInvokerService';
-import { freezeRdcTurnBinding } from './RdcTurnBindings';
-import { RdcSessionRuntime } from './RdcSessionRuntime';
-import { remotePreparationBindingIdentity } from './RdcRemoteConnection';
-import { clearRdcContextLeases, getRdcContextLease, grantDelegatedLease, revokeDelegatedLease } from './RdcRuntimeContextRegistry';
 const request: OpenProjectInputRequest = { projectId: 'project', sessionId: 'session', inputId: 'same-file', filePath: '/capture.rdc',
   replayDevice: { id: 'local', type: 'local', label: 'Local', transport: 'local', status: 'online' } };
 const scope = { projectId: 'project', sessionId: 'session' };

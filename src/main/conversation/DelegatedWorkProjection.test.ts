@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import type { AgentEvent } from '@shared/types/agentRuntime';
 import { createDelegatedProjectionState, projectDelegatedEvent } from './DelegatedWorkProjection';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const event = (id: string, type: AgentEvent['type'], payload: object, timestamp: number): AgentEvent => ({
   id, type, timestamp, payload: payload as AgentEvent['payload'],
@@ -25,6 +25,7 @@ it('projects visible loop and tool status while excluding hidden reasoning and c
   let state = createDelegatedProjectionState();
   state = projectDelegatedEvent(state, event('hidden', 'assistant.thinking_delta', {
     thinking: { kind: 'raw', source: 'unknown', visibility: 'hidden', text: 'secret thought' },
+    providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
   }, 1));
   expect(state.trace.blocks).toHaveLength(0);
   state = projectDelegatedEvent(state, event('delta', 'assistant.delta', { text: 'Checking config.',
@@ -36,9 +37,8 @@ it('projects visible loop and tool status while excluding hidden reasoning and c
     toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done' } },
   }, 4));
   const block = state.trace.blocks[0];
-  expect(block?.outputItems?.[0].text).toContain('Checking config.');
-  expect(block?.result?.text).toBeUndefined();
-  expect(block?.thinking).toBeUndefined();
+  expect(block?.items?.map((item) => item.kind)).toEqual(['text']);
+  expect(block?.items?.[0]).toMatchObject({ kind: 'text', text: expect.stringContaining('Checking config.') });
   expect(block?.toolCalls[0]).toMatchObject({ id: 'read', toolName: 'read_file', status: 'complete' });
   expect(block?.toolCalls[0]?.argsPreview).not.toContain('private');
 });
@@ -59,9 +59,10 @@ it('keeps child text identities, task snapshots and tools in first-visible order
   }, 5));
   const loop = state.trace.blocks.find((block) => block.kind === 'llm_turn')!;
   const task = state.trace.blocks.find((block) => block.kind === 'task_snapshot')!;
-  expect(loop.outputItems?.map((item) => item.phase)).toEqual(['commentary', 'commentary']);
-  expect([loop.outputItems![0].displayOrder, task.displayOrder, loop.toolCalls[0].displayOrder,
-    loop.outputItems![1].displayOrder]).toEqual([1, 2, 3, 4]);
+  const text = loop.items!.filter((item) => item.kind === 'text');
+  expect(text.map((item) => item.phase)).toEqual(['commentary', 'commentary']);
+  expect([text[0].displayOrder, task.displayOrder, loop.toolCalls[0].displayOrder,
+    text[1].displayOrder]).toEqual([1, 2, 3, 4]);
 });
 
 it('places tool Hook events on their exact call and keeps unowned diagnostics in order', () => {

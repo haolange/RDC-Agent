@@ -2,9 +2,9 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { ElectronAPI } from '@shared/types/electron';
-import { useCommandCatalog } from './useCommandCatalog';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
+import { useCommandCatalog } from './useCommandCatalog';
+import type { ElectronAPI } from '@shared/types/electron';
 
 it('updates descriptions without fetching again and distinguishes read failures from empty lists', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

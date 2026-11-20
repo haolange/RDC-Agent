@@ -1,15 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { AgentAssistantDeltaPayload, AgentEvent } from '@shared/types/agentRuntime';
-import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
-import { finalizeTrace } from './ConversationWorkTrace';
 import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
-import type { DelegationTaskBody } from '@shared/types/delegationTrace';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { safeDelegationText as safeText } from './DelegationTraceText';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { safeDelegationText as safeText } from './DelegationTraceText';
+import { finalizeTrace } from './ConversationWorkTrace';
 import { createDelegatedProjectionState, projectDelegatedEvent, type DelegatedProjectionState } from './DelegatedWorkProjection';
+import type { DelegationTaskBody } from '@shared/types/delegationTrace';
+import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
+import type { AgentAssistantDeltaPayload, AgentEvent } from '@shared/types/agentRuntime';
 
 type TraceEntry =
   | { kind: 'start'; header: DelegationTraceHeader }

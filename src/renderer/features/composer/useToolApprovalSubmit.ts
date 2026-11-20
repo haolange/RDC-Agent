@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import { findPendingToolApproval, type PendingToolApprovalRequest } from './toolApprovalRequestModel';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { findPendingToolApproval, type PendingToolApprovalRequest } from './toolApprovalRequestModel';
 
 export const useToolApprovalSubmit = () => useCallback(async (
   request: PendingToolApprovalRequest,

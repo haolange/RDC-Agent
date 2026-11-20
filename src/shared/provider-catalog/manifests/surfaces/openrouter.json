@@ -48,7 +48,8 @@
         "id": "apiKey",
         "label": "API Key",
         "kind": "secret",
-        "required": true
+        "required": true,
+        "valuePrefix": "sk-or-"
       }
     ],
     "primarySecretFieldId": "apiKey"
@@ -65,7 +66,17 @@
       "state": "unknown"
     }
   },
-  "accountLoginConfigured": true,
+  "accountAuth": {
+    "flow": "openrouter-oauth",
+    "loginMode": "browser",
+    "codeInput": false,
+    "credential": {
+      "tokenFields": [
+        "apiKey",
+        "accessToken"
+      ]
+    }
+  },
   "capabilities": [
     "chat",
     "model-discovery"
@@ -127,7 +138,9 @@
         "-legacy$",
         "-experimental$"
       ],
-      "requireCapabilities": ["toolCalling"],
+      "requireCapabilities": [
+        "toolCalling"
+      ],
       "requireContextWindow": true,
       "excludeExperimental": true
     }

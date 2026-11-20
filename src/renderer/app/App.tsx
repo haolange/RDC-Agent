@@ -1,20 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { GettingStartedDialog } from '../features/onboarding/GettingStartedDialog';
-import { useGettingStarted } from '../hooks/useGettingStarted';
 import { DebuggerPage } from '../features/transcript/DebuggerPage';
 import { UserMenu } from '../shell/UserMenu';
 import { TitleBar } from '../shell/TitleBar';
 import { SettingsModal } from '../features/settings/SettingsModal';
 import { KnowledgeCenterModal } from '../features/knowledge/KnowledgeCenterModal';
 import { useComposer } from '../features/composer/useComposer';
-import { CommandPaletteController } from './CommandPaletteController';
-import { NotificationToast } from './NotificationToast';
-import { AppProviders } from './AppProviders';
 import { AppShell } from '../shell/AppShell';
-import { WorkbenchShell } from './WorkbenchShell';
-import { useWorkbenchLayout } from './useWorkbenchLayout';
-import { useAppBootstrap } from './bootstrap/useAppBootstrap';
-import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -22,10 +13,18 @@ import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
 import { useWindowControls } from '../hooks/useWindowControls';
-import type { ResolvedTheme } from '@shared/types/settings';
-import { resolveActiveChrome } from './theme/applyChromeTheme';
 import { ProductLogo } from '../ui/ProductLogo';
 import { useSettingsNavigationStore } from '../stores/settingsNavigationStore';
+import { WorkbenchUtilities } from './WorkbenchUtilities';
+import { resolveActiveChrome } from './theme/applyChromeTheme';
+import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
+import { useAppBootstrap } from './bootstrap/useAppBootstrap';
+import { useWorkbenchLayout } from './useWorkbenchLayout';
+import { WorkbenchShell } from './WorkbenchShell';
+import { AppProviders } from './AppProviders';
+import { NotificationToast } from './NotificationToast';
+import { CommandPaletteController } from './CommandPaletteController';
+import type { ResolvedTheme } from '@shared/types/settings';
 
 const App: React.FC = () => {
   const { t } = useI18n();
@@ -38,11 +37,12 @@ const App: React.FC = () => {
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
   const [shellReady, setShellReady] = useState(false);
   const agentSettingsRequest = useSettingsNavigationStore((state) => state.agentRequest);
+  const settingsSectionRequest = useSettingsNavigationStore((state) => state.sectionRequest);
   const clearAgentSettingsRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
 
   useEffect(() => {
-    if (agentSettingsRequest) setSettingsModalOpen(true);
-  }, [agentSettingsRequest]);
+    if (agentSettingsRequest || settingsSectionRequest) setSettingsModalOpen(true);
+  }, [agentSettingsRequest, settingsSectionRequest]);
 
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentRun = useSessionStore((state) => state.currentRun);
@@ -75,7 +75,6 @@ const App: React.FC = () => {
   const showNotice = useCallback((message: string) => {
     setShellNotice(message);
   }, []);
-  const gettingStarted = useGettingStarted(!isLoading, showNotice);
 
   const applyAppearancePreference = useCallback((mutation: () => Promise<void>) => {
     void mutation().catch((error: unknown) => {
@@ -162,8 +161,8 @@ const App: React.FC = () => {
     <AppProviders>
       <AppShell
         titleBar={<TitleBar
-          onGettingStarted={gettingStarted.show}
-          gettingStartedLabel={t('onboarding.title')}
+          utilities={<WorkbenchUtilities isTerminalOpen={isTerminalOpen} activityAlertSeverity={activityAlertSeverity}
+            onToggleTerminal={() => toggleTerminalOpen()} />}
           effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
           effectiveRightCollapsed={layout.effectiveRightCollapsed}
           isRightRailVisible={layout.isRightRailVisible}
@@ -203,7 +202,6 @@ const App: React.FC = () => {
           bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
           workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
           shellNotice={shellNotice}
-          activityAlertSeverity={activityAlertSeverity}
           nickname={nickname}
           avatarPath={avatarPath}
           composer={composer}
@@ -217,7 +215,6 @@ const App: React.FC = () => {
             const rect = element.getBoundingClientRect();
             setUserMenuAnchor((current) => current ? null : { element, rect });
           }}
-          onToggleTerminal={() => toggleTerminalOpen()}
           onStartDrag={layout.startDragging}
         />}
         overlays={<>
@@ -237,7 +234,6 @@ const App: React.FC = () => {
           onFontScaleChange={(fontScale) => applyAppearancePreference(() => setFontScale(fontScale))}
         />
 
-        {gettingStarted.open && <GettingStartedDialog onClose={gettingStarted.close} />}
         <SettingsModal
           open={settingsModalOpen}
           settings={settings}

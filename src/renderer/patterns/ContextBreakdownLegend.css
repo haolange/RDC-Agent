@@ -11,7 +11,7 @@
   background: transparent;
   color: var(--token-text-caption);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
   text-align: left;
   cursor: pointer;
@@ -88,7 +88,7 @@
 .context-breakdown-group-header {
   padding: var(--space-4) var(--space-5) var(--space-2);
   color: var(--token-text-placeholder);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption-size);
   font-weight: var(--font-medium);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -138,7 +138,7 @@
   flex: 1 1 auto;
   min-width: 0;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -148,7 +148,7 @@
 .context-breakdown-count {
   flex: 0 0 auto;
   color: var(--token-text-placeholder);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   line-height: 1;
   white-space: nowrap;
 }
@@ -156,7 +156,7 @@
 .context-breakdown-tokens {
   flex: 0 0 auto;
   color: var(--token-text-heading);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
   font-weight: var(--font-medium);
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -169,5 +169,5 @@
   padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--token-border-subtle);
   color: var(--token-text-placeholder);
-  font-size: var(--text-sm);
+  font-size: var(--type-label-size);
 }

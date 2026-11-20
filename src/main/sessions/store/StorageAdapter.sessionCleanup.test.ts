@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { prepareTerminalAppend } from './ConversationTerminalAppend';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
-import { prepareTerminalAppend } from './ConversationTerminalAppend';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-cleanup-'));
 afterAll(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
@@ -430,6 +430,8 @@ describe('StorageAdapter terminal transaction', () => {
       storageAdapter.commitConversationTerminal(session.sessionId, base.requestId, base.turnId,
         { ...assistant, content: 'final', status: 'complete', updatedAt: base.createdAt + 21 },
         { ...makeTerminalContextEntry(), turnId: base.turnId, userMessageId: `user-${turn}`, assistantMessageId: assistant.id });
+      // Compaction runs after the event that crossed the threshold, as it does between real streaming events.
+      await new Promise((resolve) => setImmediate(resolve));
     }
     const history = storageAdapter.readConversationHistory(session.sessionId);
     const raw = fs.readFileSync(path.join(session.sessionPath, 'conversation.jsonl'), 'utf8').trim().split('\n');

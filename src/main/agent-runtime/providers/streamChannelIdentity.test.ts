@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import type { AssistantMessage, Context, Model } from '../core/types';
 import { AzureOpenAIResponsesProvider, __testing as azureTesting } from './AzureOpenAIResponsesProvider';
 import { BedrockConverseProvider } from './BedrockConverseProvider';
 import { GeminiProvider } from './GeminiProvider';
@@ -13,6 +8,11 @@ import { MistralProvider } from './MistralProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider, __testing as openaiTesting } from './OpenAIResponsesProvider';
+import type { AssistantMessage, Context, Model } from '../core/types';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 
 const context: Context = {
   systemPrompt: 'Stay precise.',

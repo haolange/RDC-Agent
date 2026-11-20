@@ -2,9 +2,9 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 import { AgentsSettings } from './AgentsSettings';
 import { createNewAgent } from './agentDraftFactory';
-import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 
 vi.mock('../useScopedSkillSelection', () => ({ useScopedSkillSelection: () => ({}) }));
 vi.mock('./AgentManifestEditor', () => ({ AgentManifestEditor: ({ selectedAgent }: { selectedAgent: { id: string } }) =>
@@ -27,7 +27,8 @@ it('waits for drafts, opens the target scope once, and reports a missing target 
     onAgentManifestDraftsChange: () => undefined, onRetrySaveAgentManifests: () => undefined,
     onImportAgentManifest: () => undefined, agentManifestSaveState: 'idle', agentManifestSaveMessage: '',
     canProject: true, currentProjectId: 'project-a', t,
-    onAgentModelsChange: vi.fn(async () => undefined), onPreviewAgentModelMigration: vi.fn(), onCommitAgentOverrideFile: vi.fn(), onLoadAgentBuiltinComparison: vi.fn() }));
+    onAgentModelsChange: vi.fn(async () => undefined), onPreviewAgentModelMigration: vi.fn(), onCommitAgentOverrideFile: vi.fn(), onLoadAgentBuiltinComparison: vi.fn(),
+    onPreviewProjectAgentTrust: vi.fn(), onTrustProjectAgent: vi.fn() }));
   try {
     useSettingsNavigationStore.getState().openAgent('target');
     await act(async () => render(false));

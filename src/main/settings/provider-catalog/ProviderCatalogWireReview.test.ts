@@ -1,12 +1,12 @@
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
-import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { LlmProviderProtocol } from '@shared/types/settings';
+import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
+import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import { applyAnthropicReasoning, applyOpenAiCompatibleReasoning, buildOpenAiResponsesReasoning } from '../../agent-runtime/providers/reasoningWire';
 import { applyRequestPlanBody } from '../../agent-runtime/providers/requestPlanWire';
 import { planModelRequest } from './RequestPlanner';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 
 const catalog = compileProviderCatalog(loadProviderCatalogManifestInput(
   resolve(__dirname, '../../../shared/provider-catalog/manifests'),
@@ -32,9 +32,9 @@ function effective(providerId: string, modelId: string, protocol?: LlmProviderPr
 
 function wire(plan: RequestPlan): Record<string, unknown> {
   const body: Record<string, unknown> = { model: plan.effectiveModelId, top_p: 0.97, temperature: 0.6 };
-  applyAnthropicReasoning(body, plan.reasoningWire);
+  applyAnthropicReasoning(body, plan.reasoningWire, null);
   applyOpenAiCompatibleReasoning(body, plan.reasoningWire);
-  Object.assign(body, buildOpenAiResponsesReasoning(plan.reasoningWire));
+  Object.assign(body, buildOpenAiResponsesReasoning(plan.reasoningWire, null));
   return applyRequestPlanBody(body, plan);
 }
 
@@ -145,7 +145,8 @@ describe('reviewed provider catalog request paths', () => {
     if (!account.ok) throw new Error(account.message);
     expect(account.plan.fastMode).toBe(false);
     expect(wire(account.plan)).not.toHaveProperty('speed');
-    expect(account.plan.headers).not.toHaveProperty('anthropic-beta');
+    expect(account.plan.headers['anthropic-beta']).not.toContain('fast-mode-2026-02-01');
+    expect(account.plan.headers['anthropic-beta']).toContain('oauth-2025-04-20');
   });
 
   for (const surfaceId of ['glm-global-coding-plan']) {

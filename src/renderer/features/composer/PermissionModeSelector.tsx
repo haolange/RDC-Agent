@@ -1,13 +1,13 @@
 import React, { useCallback } from 'react';
-import type { AgentPermissionMode } from '@shared/types/settings';
 import { useI18n } from '../../i18n';
-import type { TranslationKey } from '../../i18n';
 import { Icon } from '../../ui/Icon';
 import { Pill } from '../../ui/Pill';
 import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
 import { Button } from '../../ui/Button';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerMenu } from './useComposerMenuRegistry';
+import type { TranslationKey } from '../../i18n';
+import type { AgentPermissionMode } from '@shared/types/settings';
 
 const PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
 

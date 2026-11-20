@@ -1,10 +1,10 @@
 import React from 'react';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Switch } from '../../../../ui/Switch';
 import { resolveProviderModelAvailabilityBadge } from '../providerModelAvailabilityBadge';
 import { ProviderModelCapabilitySummary } from './ProviderModelCapabilitySummary';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -36,11 +36,13 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
   t,
 }) => {
   const availability = effectiveModel?.availability ?? model.availability ?? 'unknown';
+  const refreshError = snapshot?.lastRefreshError ?? (loadFailed ? t('settings.providers.modelRefreshFailedReason') : undefined);
   const badge = resolveProviderModelAvailabilityBadge({
     availability,
     enabled: model.enabled,
     loading,
     refreshing: snapshot?.refreshing === true,
+    refreshError,
   });
   const isUnavailable = badge === 'unavailable';
   const isUnverified = badge === 'unverified';
@@ -50,16 +52,22 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
       ? t('settings.providers.modelDisabled')
       : badge === 'loading'
         ? t('settings.providers.modelLoading')
-        : badge === 'unverified'
-          ? t('settings.providers.modelUnverified')
-          : t('settings.providers.modelAvailable');
+        : badge === 'refresh-failed'
+          ? t('settings.providers.modelRefreshFailed')
+          : badge === 'unverified'
+            ? t('settings.providers.modelUnverified')
+            : t('settings.providers.modelAvailable');
   const statusTitle = isUnavailable
     ? (model.availabilityReason || t('settings.providers.modelUnavailableReason'))
-    : undefined;
+    : badge === 'refresh-failed'
+      ? refreshError
+      : badge === 'unverified'
+        ? t('settings.providers.modelUnverifiedReason')
+        : undefined;
 
   return (
     <div
-      className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}${isUnavailable || !model.enabled ? ' settings-model-row--disabled' : ''}${isUnverified ? ' settings-model-row--unverified' : ''}`}
+      className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}${isUnavailable || !model.enabled ? ' settings-model-row--disabled' : ''}${isUnverified || badge === 'refresh-failed' ? ' settings-model-row--unverified' : ''}`}
       data-testid={`settings-provider-model-row-${model.id}`}
       data-availability-badge={badge}
       aria-disabled={isUnavailable}

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { withRdcRemoteProgress } from './RdcRemoteProgress';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
+
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
-import { withRdcRemoteProgress } from './RdcRemoteProgress';
 const cli = { command: 'rdc', enabled: true, argsPrefix: [] } as unknown as RdcCliInvokerSettings;
 const envelope = (kind: string, data: unknown) => ({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: kind, data }) });
 const status = (patch: Record<string, unknown> = {}, contextId = 'context') => envelope('rdc_tool.daemon.status', { state: {

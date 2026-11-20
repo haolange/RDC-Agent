@@ -84,7 +84,17 @@
   "authModes": [
     "oauth"
   ],
-  "accountLoginConfigured": true,
+  "accountAuth": {
+    "flow": "copilot-device",
+    "loginMode": "device",
+    "codeInput": false,
+    "credential": {
+      "tokenFields": [
+        "copilotToken"
+      ],
+      "baseUrlField": "copilotApiBaseUrl"
+    }
+  },
   "capabilities": [
     "chat",
     "tool-calling",
@@ -99,21 +109,45 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.githubcopilot.com",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "headers": {
+        "Editor-Version": "vscode/1.107.0",
+        "Editor-Plugin-Version": "copilot-chat/0.35.0",
+        "X-GitHub-Api-Version": "2025-04-01",
+        "Copilot-Integration-Id": "vscode-chat",
+        "Openai-Intent": "conversation-agent",
+        "X-Initiator": "agent"
+      }
     },
     {
       "id": "OpenAIResponses",
       "protocol": "OpenAIResponses",
       "adapterId": "openai-responses",
       "baseUrl": "https://api.githubcopilot.com",
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "headers": {
+        "Editor-Version": "vscode/1.107.0",
+        "Editor-Plugin-Version": "copilot-chat/0.35.0",
+        "X-GitHub-Api-Version": "2025-04-01",
+        "Copilot-Integration-Id": "vscode-chat",
+        "Openai-Intent": "conversation-agent",
+        "X-Initiator": "agent"
+      }
     },
     {
       "id": "AnthropicMessages",
       "protocol": "AnthropicMessages",
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.githubcopilot.com/v1",
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "headers": {
+        "Editor-Version": "vscode/1.107.0",
+        "Editor-Plugin-Version": "copilot-chat/0.35.0",
+        "X-GitHub-Api-Version": "2025-04-01",
+        "Copilot-Integration-Id": "vscode-chat",
+        "Openai-Intent": "conversation-agent",
+        "X-Initiator": "agent"
+      }
     }
   ],
   "discovery": {

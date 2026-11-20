@@ -11,6 +11,7 @@
         "compatibilityGroup": "ollama:OllamaOpenAICompatibleChatCompletions",
         "reasoning": {
           "semantic": "raw",
+          "visibilityRequest": "ollama-think",
           "source": "provider-docs:ollama-thinking",
           "evidence": "https://docs.ollama.com/capabilities/thinking",
           "displayLabel": "Raw reasoning",

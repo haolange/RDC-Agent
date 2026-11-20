@@ -2,8 +2,8 @@ import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
   ConversationDiagnosticSeverity,
+  ConversationThinkingStatus,
   ConversationToolExecutionEvidence,
-  ConversationWorkBlock,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 
@@ -125,7 +125,7 @@ export type WorkProcessRow =
     kind?: ThinkingArtifact['kind'];
     source?: string;
     visibility?: ThinkingArtifact['visibility'];
-    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
+    thinkingStatus?: ConversationThinkingStatus;
     expandable: boolean;
     openByDefault: boolean;
   }
@@ -269,19 +269,9 @@ export type WorkProcessRow =
   | {
     type: 'section';
     id: string;
+    /** 1-based position among the turn's steps, assigned once the rows are assembled. */
+    ordinal?: number;
     status: WorkProcessRowStatus;
-    /** Loop commentary rendered as markdown prose (never in the thinking slot). */
-    proseText: string;
-    proseStreaming: boolean;
-    thinkingPreview: string;
-    thinkingLabel: string;
-    thinkingKind?: ThinkingArtifact['kind'];
-    thinkingSource?: string;
-    thinkingVisibility?: ThinkingArtifact['visibility'];
-    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
-    thinkingExpandable: boolean;
-    /** Policy hint: expand while loop is live; fold after settle. UI may sticky-override. */
-    thinkingOpenByDefault: boolean;
     /** Activity of task lifecycle calls represented by their snapshots rather than separate tool rows. */
     hasActiveTools?: boolean;
     stepCount: number;

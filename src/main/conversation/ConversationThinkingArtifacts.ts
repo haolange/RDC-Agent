@@ -19,12 +19,3 @@ export function mergeThinkingPayload(
     text: `${current?.text ?? ''}${delta}`,
   });
 }
-
-export function selectCompletedThinking(thinking: ThinkingArtifact[] | undefined): ThinkingArtifact | undefined {
-  if (!Array.isArray(thinking) || thinking.length === 0) return undefined;
-  for (let index = thinking.length - 1; index >= 0; index -= 1) {
-    const candidate = thinking[index];
-    if (candidate.continuation || candidate.text) return cloneThinkingArtifact(candidate);
-  }
-  return undefined;
-}

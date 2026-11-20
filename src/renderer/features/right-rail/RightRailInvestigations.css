@@ -19,6 +19,6 @@
 .right-rail-compact-row:focus-visible { background: var(--token-bg-muted); }
 .right-rail-compact-icon { display: inline-flex; color: var(--token-text-caption); }
 .right-rail-compact-icon svg { width: var(--space-4); height: var(--space-4); fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
-.right-rail-compact-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-base); }
+.right-rail-compact-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--type-body-size); }
 .right-rail-browse-all.button { width: 100%; margin-top: var(--space-1); color: var(--token-text-caption); }
 .right-rail-resource-detail { display: grid; gap: var(--space-2); overflow-wrap: anywhere; }

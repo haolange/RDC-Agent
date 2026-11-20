@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
-import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { TranslationKey, useI18n } from '../../../../i18n';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { Icon } from '../../../../ui/Icon';
 import { IconButton } from '../../../../ui/IconButton';
 import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
 import { Textarea } from '../../../../ui/Textarea';
-import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
 import { SettingsField } from '../parts';
+import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
 import {
   AGENT_HANDOFF_ISSUE_KEYS,
   IMMEDIATE_HANDOFF_ISSUE_CODES,
   persistAgentHandoff,
   type AgentHandoffIssue,
 } from './agentHandoffValidation';
+import type { TranslationKey, useI18n } from '../../../../i18n';
+import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type Field = AgentHandoffIssue['field'];

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ThinkingArtifact } from '@shared/types/reasoning';
 import { beginAssistantContentLoopIfPending, type ConversationLoopRuntimeState } from './ConversationLoopRuntimeState';
-import { upsertLoopResult, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { upsertLoopResult, upsertLoopTextItem, upsertLoopThinkingItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
 
 const toolLoopThinking: ThinkingArtifact = {
   text: 'I should read memory before answering.',
@@ -19,28 +19,20 @@ const finalLoopThinking: ThinkingArtifact = {
 
 };
 
+const thinkingRef = (index: number) => ({ protocol: 'test', providerBlockKey: `thinking:${index}`, contentIndex: index });
+const textRef = (index: number) => ({ protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index });
+
 describe('conversation loop runtime state', () => {
   it('keeps tool events on the tool loop and moves post-tool thinking to the next loop', () => {
     let state: ConversationLoopRuntimeState = {
       loopSeq: 1,
       currentLoopText: 'Need memory before answering.',
-      currentLoopThinking: toolLoopThinking,
-      currentLoopThinkingStatus: 'complete',
       loopHasTools: true,
       pendingNewLoop: true,
       visibleResponse: '',
     };
-    let trace = upsertLoopResult(
-      undefined,
-      'runtime-loop-1',
-      state.currentLoopText,
-      state.currentLoopThinking,
-      state.currentLoopThinkingStatus,
-      'complete',
-      'tool_use',
-      'commentary',
-      'summary',
-    );
+    let trace = upsertLoopResult(undefined, 'runtime-loop-1', { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary', reasoningState: 'summary' });
+    trace = upsertLoopThinkingItem(trace, 'runtime-loop-1', thinkingRef(0), toolLoopThinking, 'complete');
 
     trace = upsertRuntimeToolCall(trace, {
       id: 'tool-memory',
@@ -50,43 +42,28 @@ describe('conversation loop runtime state', () => {
       completedAt: 200,
     }, {
       loopId: `runtime-loop-${state.loopSeq}`,
-      loopResultText: state.currentLoopText,
-      loopThinking: state.currentLoopThinking,
-      loopThinkingStatus: state.currentLoopThinkingStatus,
     });
 
     state = beginAssistantContentLoopIfPending(state);
     expect(state).toMatchObject({
       loopSeq: 2,
       currentLoopText: '',
-      currentLoopThinking: undefined,
-      currentLoopThinkingStatus: undefined,
       loopHasTools: false,
       pendingNewLoop: false,
       visibleResponse: '',
     });
 
-    state.currentLoopThinking = finalLoopThinking;
-    state.currentLoopThinkingStatus = 'streaming';
-    trace = upsertLoopResult(
-      trace,
-      `runtime-loop-${state.loopSeq}`,
-      undefined,
-      state.currentLoopThinking,
-      state.currentLoopThinkingStatus,
-      'streaming',
-    );
+    trace = upsertLoopThinkingItem(trace, `runtime-loop-${state.loopSeq}`, thinkingRef(1), finalLoopThinking, 'streaming');
 
     expect(trace.blocks.map((block) => block.id)).toEqual(['runtime-loop-1', 'runtime-loop-2']);
     expect(trace.blocks[0]).toMatchObject({
       id: 'runtime-loop-1',
-      thinking: { text: toolLoopThinking.text },
+      items: [{ kind: 'thinking', thinking: { text: toolLoopThinking.text } }],
       toolCalls: [{ id: 'tool-memory', toolName: 'memory_read', status: 'complete' }],
     });
     expect(trace.blocks[1]).toMatchObject({
       id: 'runtime-loop-2',
-      thinking: { text: finalLoopThinking.text },
-      thinkingStatus: 'streaming',
+      items: [{ kind: 'thinking', thinking: { text: finalLoopThinking.text }, status: 'streaming' }],
       toolCalls: [],
     });
     expect(JSON.stringify(trace.blocks[0])).not.toContain(finalLoopThinking.text);
@@ -96,24 +73,13 @@ describe('conversation loop runtime state', () => {
     let state: ConversationLoopRuntimeState = {
       loopSeq: 1,
       currentLoopText: 'Need a few answers first.',
-      currentLoopThinking: toolLoopThinking,
-      currentLoopThinkingStatus: 'complete',
       loopHasTools: false,
       // ask_user is not loop-scoped, but ConversationService sets this on pause complete.
       pendingNewLoop: true,
       visibleResponse: '',
     };
-    let trace = upsertLoopResult(
-      undefined,
-      'runtime-loop-1',
-      state.currentLoopText,
-      state.currentLoopThinking,
-      state.currentLoopThinkingStatus,
-      'complete',
-      'end_turn',
-      'commentary',
-      'summary',
-    );
+    let trace = upsertLoopTextItem(undefined, 'runtime-loop-1', textRef(0), 'Need a few answers first.', 'commentary', 'complete');
+    trace = upsertLoopResult(trace, 'runtime-loop-1', { status: 'complete', stopReason: 'end_turn', outputPhase: 'commentary', reasoningState: 'summary' });
 
     state = beginAssistantContentLoopIfPending(state);
     expect(state).toMatchObject({
@@ -123,55 +89,27 @@ describe('conversation loop runtime state', () => {
       visibleResponse: '',
     });
 
-    state.currentLoopText = 'Thanks — here is the final answer.';
-    trace = upsertLoopResult(
-      trace,
-      `runtime-loop-${state.loopSeq}`,
-      state.currentLoopText,
-      undefined,
-      undefined,
-      'complete',
-      'end_turn',
-      'final_answer',
-      'none',
-    );
+    trace = upsertLoopTextItem(trace, `runtime-loop-${state.loopSeq}`, textRef(1), 'Thanks — here is the final answer.', 'final_answer', 'complete');
+    trace = upsertLoopResult(trace, `runtime-loop-${state.loopSeq}`, { status: 'complete', stopReason: 'end_turn', outputPhase: 'final_answer', reasoningState: 'none' });
 
     expect(trace.blocks.map((block) => block.id)).toEqual(['runtime-loop-1', 'runtime-loop-2']);
     expect(trace.blocks[0]).toMatchObject({
       id: 'runtime-loop-1',
-      result: expect.objectContaining({ text: 'Need a few answers first.', outputPhase: 'commentary' }),
+      items: [{ kind: 'text', text: 'Need a few answers first.' }],
+      result: expect.objectContaining({ outputPhase: 'commentary' }),
     });
     expect(trace.blocks[1]).toMatchObject({
       id: 'runtime-loop-2',
-      result: expect.objectContaining({
-        text: 'Thanks — here is the final answer.',
-        outputPhase: 'final_answer',
-      }),
+      items: [{ kind: 'text', text: 'Thanks — here is the final answer.' }],
+      result: expect.objectContaining({ outputPhase: 'final_answer' }),
     });
   });
 
   it('clears stale outputPhase when streaming resumes on the same loop without an explicit phase', () => {
-    let trace = upsertLoopResult(
-      undefined,
-      'runtime-loop-1',
-      'Ask commentary before questions.',
-      undefined,
-      undefined,
-      'complete',
-      'tool_use',
-      'commentary',
-      'none',
-    );
+    let trace = upsertLoopResult(undefined, 'runtime-loop-1', { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary', reasoningState: 'none' });
     expect(trace.blocks[0]?.result?.outputPhase).toBe('commentary');
 
-    trace = upsertLoopResult(
-      trace,
-      'runtime-loop-1',
-      'Ask commentary before questions. Final answer after answers.',
-      undefined,
-      undefined,
-      'streaming',
-    );
+    trace = upsertLoopResult(trace, 'runtime-loop-1', { status: 'streaming' });
     expect(trace.blocks[0]?.result?.outputPhase).toBeUndefined();
     expect(trace.blocks[0]?.result?.stopReason).toBeUndefined();
     expect(trace.blocks[0]?.result?.status).toBe('streaming');

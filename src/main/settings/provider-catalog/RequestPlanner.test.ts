@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import { resolveModelControls } from '@shared/utils/modelControls';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { planModelRequest } from './RequestPlanner';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const reasoning = {
   kind: 'levels' as const,

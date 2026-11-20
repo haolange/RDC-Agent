@@ -1,34 +1,20 @@
-import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagnostic';
-import type {
-  ConversationAttachmentInput,
-  ConversationMessage,
-  ConversationSendRequest,
-  ConversationTurnResult,
-} from '@shared/types/conversation';
-import type { SessionAttachmentRecord } from '@shared/types/session';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
 import path from 'node:path';
+import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagnostic';
+import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
-import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
 import { resolveCompactionPercentForSettings } from '../settings/settings-core/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { traceService } from '../agent-trace/TraceService';
+import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
 import { createDefaultBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import { createDraftWorkTrace, finalizeTrace } from './ConversationWorkTrace';
 import { materializeAgentUserInput, resolvePendingAttachmentDescriptors } from './ConversationAttachmentMaterializer';
-import type {
-  ConversationBranchTurnContext,
-  PreparedConversationPrompt,
-  ResolvedConversationContext,
-} from './ConversationRoutePreflight';
-import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
 import {
   createConversationMessage,
   isActiveRun,
@@ -38,12 +24,26 @@ import {
   resolveConversationAgentId,
   resolveEnabledAgentDefinition,
 } from './ConversationRoutePreflight';
-import type { CompleteProfileTurnInput } from './ConversationTurnRunner';
-import type { PolicyBudgetState } from '../agent-runtime/orchestration/TurnCoordinator';
 import {
   createContinuationDropNotice,
   shouldAnnounceContinuationDrop,
 } from './ConversationContinuationNotice';
+import type { CompleteProfileTurnInput } from './ConversationTurnRunner';
+import type { PolicyBudgetState } from '../agent-runtime/orchestration/TurnCoordinator';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { SessionAttachmentRecord } from '@shared/types/session';
+import type {
+  ConversationAttachmentInput,
+  ConversationMessage,
+  ConversationSendRequest,
+  ConversationTurnResult,
+} from '@shared/types/conversation';
+import type {
+  ConversationBranchTurnContext,
+  PreparedConversationPrompt,
+  ResolvedConversationContext,
+} from './ConversationRoutePreflight';
 
 export interface ConversationTurnStarterHost {
   getPreparingRequestByRequestId(requestId: string): {
@@ -125,6 +125,7 @@ export async function startProfileTurn(
   if (surfaceProviderId) {
     const surface = await loadProviderSurface(surfaceProviderId);
     if (!surface) throw new Error(`PROVIDER_UNAVAILABLE: ${surfaceProviderId} is not in the compiled Catalog.`);
+    await awaitFirstCatalogLoad(surfaceProviderId, settingsService.getAll(), preparationController.signal);
   }
   throwIfPreparationCancelled();
 
@@ -305,6 +306,7 @@ export async function startProfileTurn(
     promptPlan: preparedPrompt.promptPlan,
     effectiveProfile: preparedPrompt.effectiveProfile,
     effectiveProfileIds: preparedPrompt.effectiveProfileIds,
+    delegableProfileIds: preparedPrompt.delegableProfileIds,
     toolAllowlist: preparedPrompt.allowedToolNames,
     projectRootPath: preparedPrompt.projectRootPath,
     projectId: context.projectId,

@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
 import { CONVERSATION_COMPACTION_DELTA_THRESHOLD } from './storageCommitTypes';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-conversation-io-'));
 
@@ -179,6 +179,7 @@ describe('StorageAdapter conversation streaming I/O', () => {
           ...base, content: `update-${index}`, updatedAt: index + 1,
         });
       }
+      await new Promise((resolve) => setImmediate(resolve));
       expect(blockedOnce).toBe(true);
       expect(warning).toHaveBeenCalledTimes(1);
       expect(storageAdapter.conversationPendingDeltaCounts.get(session.sessionId)).toBe(CONVERSATION_COMPACTION_DELTA_THRESHOLD);
@@ -190,6 +191,7 @@ describe('StorageAdapter conversation streaming I/O', () => {
           ...base, content: `update-${index}`, updatedAt: index + 1,
         });
       }
+      await new Promise((resolve) => setImmediate(resolve));
       expect(warning).toHaveBeenCalledTimes(1);
       expect(writeSpy).toHaveBeenCalledTimes(2);
       expect(fs.readFileSync(conversationPath, 'utf8').split('\n').filter(Boolean)).toHaveLength(1);
@@ -198,5 +200,34 @@ describe('StorageAdapter conversation streaming I/O', () => {
       writeSpy.mockRestore();
       warning.mockRestore();
     }
+  });
+
+  it('appends only the work blocks an update changed and replays them into the full trace', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const { upsertLoopTextItem } = await import('../../conversation/ConversationWorkTrace');
+    await storageAdapter.initializeWorkspace();
+    const projectRoot = path.join(tempRoot, 'project-root-trace-blocks');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'trace-blocks');
+    const ref = (index: number) => ({ protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index });
+    let trace = upsertLoopTextItem(undefined, 'loop-1', ref(0), 'A long finished loop', 'commentary', 'complete');
+    trace = upsertLoopTextItem(trace, 'loop-2', ref(1), 'Str', undefined, 'streaming');
+    const base = makeMessage({ id: 'assistant-blocks', content: '', sessionId: session.sessionId, projectId: project.projectId, workTrace: trace });
+    storageAdapter.appendConversationMessage(session.sessionId, base);
+
+    trace = upsertLoopTextItem(trace, 'loop-2', ref(1), 'Streaming on', undefined, 'streaming');
+    storageAdapter.appendConversationMessage(session.sessionId, { ...base, workTrace: trace, updatedAt: 2 });
+
+    const conversationPath = storageAdapter.getConversationPath(session.sessionId);
+    const lastRecord = JSON.parse(fs.readFileSync(conversationPath, 'utf8').trim().split('\n').at(-1)!);
+    expect(lastRecord.patch.workTrace).toBeUndefined();
+    expect(lastRecord.traceBlocks.blockIds).toEqual(['loop-1', 'loop-2']);
+    expect(lastRecord.traceBlocks.changedBlocks.map((block: { id: string }) => block.id)).toEqual(['loop-2']);
+
+    storageAdapter.conversationHistoryCache.delete(session.sessionId);
+    const replayed = storageAdapter.readConversationHistory(session.sessionId)[0]!.workTrace!;
+    expect(replayed.blocks.map((block) => block.items?.[0]?.kind === 'text' && block.items[0].text))
+      .toEqual(['A long finished loop', 'Streaming on']);
   });
 });

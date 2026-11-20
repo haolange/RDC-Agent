@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SetStateAction } from 'react';
 import { fenceOverviewSetter } from './runtimeOverviewProjection';
+import type { SetStateAction } from 'react';
 
 describe('runtime overview mutation projection fence', () => {
   it('lets a submitted write finish but discards its stale onChanged result', async () => {

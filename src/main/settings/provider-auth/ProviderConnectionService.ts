@@ -2,6 +2,25 @@ import {
   getProviderAuthModeAvailability,
   isBuiltinProviderId,
 } from '../../provider-catalog/ProviderCatalogRegistry';
+import { settingsService } from '../settings-core/SettingsService';
+import {
+  buildEffectiveCatalogRequest,
+  applyDiscoveryAuthority,
+  refreshEffectiveCatalogDiscovery,
+  toDiscoveryModelContributions,
+} from '../provider-catalog/EffectiveModelResolver';
+import { effectiveCatalogService } from '../provider-catalog/EffectiveCatalogService';
+import { discoverProviderModels } from '../provider-catalog/ProviderModelDiscovery';
+import { describeProviderError, ProviderConnectionError, providerConnectionError } from './providerConnectionErrors';
+import {
+  resolveProviderConnectionDraft,
+  resolveTestDiscoveryAccountId,
+} from './ProviderConnectionDraft';
+import { providerAccountAuthService } from './ProviderAccountAuthService';
+import type {
+  DiscoveryLoader,
+  EffectiveCatalogRequest,
+} from '../provider-catalog/effectiveCatalogTypes';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
@@ -12,31 +31,12 @@ import type {
   LlmProviderEntry,
   LlmProviderId,
 } from '@shared/types/settings';
-import { settingsService } from '../settings-core/SettingsService';
-import { providerAccountAuthService } from './ProviderAccountAuthService';
-import {
-  buildEffectiveCatalogRequest,
-  applyDiscoveryAuthority,
-  refreshEffectiveCatalogDiscovery,
-  toDiscoveryModelContributions,
-} from '../provider-catalog/EffectiveModelResolver';
-import type {
-  DiscoveryLoader,
-  EffectiveCatalogRequest,
-} from '../provider-catalog/effectiveCatalogTypes';
-import { effectiveCatalogService } from '../provider-catalog/EffectiveCatalogService';
-import { parseProviderError, ProviderConnectionError } from './providerConnectionErrors';
-import {
-  resolveProviderConnectionDraft,
-  resolveTestDiscoveryAccountId,
-} from './ProviderConnectionDraft';
-import { discoverProviderModels } from '../provider-catalog/ProviderModelDiscovery';
 
 export {
   mergeManagedModelAvailability,
   normalizeDiscoveredModels,
   normalizeCodingPlanModelMatchKey,
-  selectSupportedCodingPlanModels,
+  selectAvailableCodingPlanModels,
 } from './providerConnectionModelUtils';
 export {
   parseGoogleVertexPublisherModels,
@@ -148,7 +148,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -195,7 +195,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -224,7 +224,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -242,7 +242,7 @@ export class ProviderConnectionService {
       return {
         success: false,
         models: [],
-        error: parseProviderError(error),
+        ...describeProviderError(error),
       };
     }
   }
@@ -259,7 +259,7 @@ export class ProviderConnectionService {
         error: 'Provider does not support account login.',
       });
     }
-    if (availability?.state === 'unavailable' || !provider.accountLoginConfigured) {
+    if (availability?.state === 'unavailable' || !provider.accountLogin) {
       return Promise.resolve({
         providerId: request.providerId,
         state: 'unavailable',
@@ -286,7 +286,7 @@ export class ProviderConnectionService {
   private getProvider(providerId: LlmProviderId): LlmProviderEntry {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
-      throw new ProviderConnectionError('未知 Provider');
+      throw providerConnectionError('unknown-provider', 'Unknown provider.');
     }
     return provider;
   }

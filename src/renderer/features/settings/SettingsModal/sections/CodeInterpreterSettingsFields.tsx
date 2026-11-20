@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import type { CodeInterpreterSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import { envToText, splitArgs, textToEnv } from './toolEnvText';
+import type { useI18n } from '../../../../i18n';
+import type { CodeInterpreterSettings } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 

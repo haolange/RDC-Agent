@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildCapabilityChips,
   buildCapabilityEvidenceSummary,
@@ -10,6 +9,7 @@ import {
   formatReasoningDefault,
   snapshotMatchesProvider,
 } from './modelCapabilitySummaryUtils';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const t = (key: string, params?: Record<string, string | number>): string => {
   const labels: Record<string, string> = {

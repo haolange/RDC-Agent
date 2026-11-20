@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { TaskRecord, TaskStatus } from './TaskRegistry';
-import type { TaskExecutionRecord } from './TaskContracts';
 import { TASK_SCHEMA_VERSION } from './TaskContracts';
 import { createdAtFromTaskId, orderTasks, projectTaskItems } from './taskProjection';
+import type { TaskRecord, TaskStatus } from './TaskRegistry';
+import type { TaskExecutionRecord } from './TaskContracts';
 
 const task = (
   id: string,

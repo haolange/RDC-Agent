@@ -170,8 +170,6 @@ export interface ElectronAPI {
   };
 
   appShell: {
-    hasSeenGettingStarted: () => Promise<boolean>;
-    acknowledgeGettingStarted: () => Promise<void>;
     selectAvatar: () => Promise<string | null>;
     getAvatarDataUrl: (avatarPath: string) => Promise<string | null>;
     openPath: (targetPath: string) => Promise<{
@@ -301,7 +299,7 @@ export interface ElectronAPI {
       sessionId?: string;
       source?: string;
       filePath?: string;
-    }) => Promise<KnowledgeImportResult>;
+    }) => Promise<KnowledgeImportResult | { cancelled: true }>;
     image: (request: {
       spaceId: string;
       relativePath: string;
@@ -401,6 +399,8 @@ export interface ElectronAPI {
     previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
     applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
     deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
+    previewProjectAgentTrust: (sourcePath: string) => Promise<import('./agentManifest').ProjectAgentTrustPreview>;
+    trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
     getAgentBuiltinComparison: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<import('./agentManifest').AgentBuiltinComparison>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;

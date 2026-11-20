@@ -1,13 +1,12 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import type { ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import {
   applyConversationTurnResult,
   buildOptimisticConversationTurn,
   resolveComposerProfileId,
-  syncE2EConversationState,
 } from '../../stores/conversationSendHelpers';
 import { useConversationStore } from '../../stores/conversationStore';
+import type { ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 
 const makeMessage = (
   id: string,
@@ -230,38 +229,5 @@ describe('composerSendHelpers', () => {
 
     expect(upsertConversationMessages).toHaveBeenCalledWith([userMessage, assistantDraftMessage]);
     expect(setConversationMessages).not.toHaveBeenCalled();
-  });
-
-  it('does not let stale terminal sync overwrite a newer active branch', async () => {
-    Object.defineProperty(globalThis, 'navigator', {
-      value: { webdriver: true },
-      configurable: true,
-    });
-    const electronAPI = makeElectronApi();
-    const assistantDone = {
-      ...makeMessage('assistant-old', 'turn-old', 'assistant', 'done'),
-      status: 'complete' as const,
-    };
-    vi.mocked(electronAPI.conversation.getHistory).mockResolvedValue({
-      messages: [assistantDone],
-      planReview: { sessionId: 'session-1', projectionVersion: 1, review: null, recoverable: null },
-      branchState,
-    });
-    const setConversationMessages = vi.fn();
-    const setTracePresentation = vi.fn();
-
-    await syncE2EConversationState({
-      electronAPI,
-      sessionId: 'session-1',
-      turnId: 'turn-old',
-      setConversationMessages,
-      setTracePresentation,
-      setBranchState: vi.fn(),
-      shouldApply: () => false,
-    });
-
-    expect(electronAPI.conversation.getHistory).toHaveBeenCalledTimes(1);
-    expect(setConversationMessages).not.toHaveBeenCalled();
-    expect(setTracePresentation).not.toHaveBeenCalled();
   });
 });

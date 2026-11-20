@@ -1,3 +1,9 @@
+import { isHexColor, normalizeHexColor } from './color';
+import {
+  createDefaultChromeThemes,
+  getPresetChrome,
+  isThemePresetId,
+} from './presets';
 import type {
   ChromeThemesConfig,
   ThemeChromeConfig,
@@ -5,12 +11,6 @@ import type {
   ThemePresetId,
   ThemeVariant,
 } from '../types/settings';
-import { isHexColor, normalizeHexColor } from './color';
-import {
-  createDefaultChromeThemes,
-  getPresetChrome,
-  isThemePresetId,
-} from './presets';
 
 function sanitizeFonts(candidate: unknown, fallback: ThemeChromeFonts): ThemeChromeFonts {
   if (!candidate || typeof candidate !== 'object') {

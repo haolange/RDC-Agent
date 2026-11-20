@@ -1,18 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
+import { canonicalRealpath } from '../runtime/fileIdentity';
 import { resolveHookCwd, resolveHookSpawn } from './hookResolve';
-import { canonicalRealpath, computeHookTrustFingerprint } from './hookTrustFingerprint';
+import { computeHookTrustFingerprint } from './hookTrustFingerprint';
 import {
   hookTrustKey,
   readHookTrustStore,
   writeHookTrustStore,
   type HookTrustStoreV2,
 } from './hookTrustStore';
+import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;

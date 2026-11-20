@@ -1,7 +1,7 @@
-import type { TurnHandle } from '../agent-runtime/orchestration/TurnCoordinator';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { planArtifactWriter } from '../sessions/run/sessionPlanArtifact';
+import type { TurnHandle } from '../agent-runtime/orchestration/TurnCoordinator';
 
 /** A plan gate ends its owning turn; it is neither a model final answer nor Mission completion. */
 export function verifyApprovedPlanExit(sessionId: string | null | undefined, turnId: string,

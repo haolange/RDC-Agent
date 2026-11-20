@@ -1,3 +1,5 @@
+import { InvestigationError } from './investigationErrors';
+import { assertNoOpaqueProviderPayload } from './investigationRecordSchemas';
 import type {
   ArtifactSourceRef,
   InvestigationArtifactKind,
@@ -8,9 +10,7 @@ import type {
   WorldState,
 } from '@shared/types/renderdocInvestigation';
 import type { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import { InvestigationError } from './investigationErrors';
 import type { InvestigationLookup } from './investigationInvariants';
-import { assertNoOpaqueProviderPayload } from './investigationRecordSchemas';
 import type { InvestigationPersistBoundary, InvestigationTxnRole } from './investigationTxn';
 
 export interface InvestigationWriteInput {

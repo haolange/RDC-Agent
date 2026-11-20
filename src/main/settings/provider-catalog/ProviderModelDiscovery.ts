@@ -1,32 +1,18 @@
+import { authSchemaResolvesAmbientCredentials } from '@shared/provider-catalog/implementationRegistry';
 import {
+  getProviderAuthSchemaId,
   getProviderCatalogOwnership,
   getProviderDefaultBaseUrl,
+  getProviderRouteHeaders,
   loadProviderSurface,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { ProviderSurfaceDefinition } from '@shared/types/providerCapability';
-import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import {
-  parseDeclarativeCatalog,
-  resolveDeclarativeDiscoveryUrl,
-  toDeclarativeCatalogContributions,
-} from './DeclarativeCatalogDiscovery';
-import {
-  parseClineCatalog,
-  parseClinePassCatalog,
-  parseFreeModelCatalog,
-  parseKimiCodeCatalog,
-  parseOpenCodeGoCatalog,
-  parseOpenRouterAccountCatalog,
-  type ParsedLiveCatalog,
-} from './LiveProviderCatalogParsers';
 import {
   resolveProviderConnectionHeaders,
 } from '../provider-auth/ProviderConnectionSchema';
 import { resolveGoogleVertexAccessToken } from '../provider-auth/GoogleApplicationCredentials';
 import { createAwsBedrockRequestAuthorizer } from '../provider-auth/AwsBedrockCredentials';
 import { listSapAiCoreDeployments } from '../provider-auth/SapAiCoreCredentials';
-import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
+import { ProviderConnectionError, providerConnectionError } from '../provider-auth/providerConnectionErrors';
 import {
   appendPath,
   appendQueryParam,
@@ -42,7 +28,7 @@ import {
   normalizeCodingPlanModelMatchKey,
   requireManagedModels,
   requireModels,
-  selectSupportedCodingPlanModels,
+  selectAvailableCodingPlanModels,
   toStaticModels,
 } from '../provider-auth/providerConnectionModelUtils';
 import {
@@ -56,6 +42,24 @@ import {
   resolveGoogleVertexPublisherModelsUrl,
   resolveVolcengineCodingPlanModelsUrl,
 } from '../provider-auth/providerConnectionUrls';
+import {
+  parseClineCatalog,
+  parseClinePassCatalog,
+  parseFreeModelCatalog,
+  parseKimiCodeCatalog,
+  parseOllamaInstalledModels,
+  parseOpenCodeGoCatalog,
+  parseOpenRouterAccountCatalog,
+  type ParsedLiveCatalog,
+} from './LiveProviderCatalogParsers';
+import {
+  parseDeclarativeCatalog,
+  resolveDeclarativeDiscoveryUrl,
+  toDeclarativeCatalogContributions,
+} from './DeclarativeCatalogDiscovery';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
+import type { ProviderSurfaceDefinition } from '@shared/types/providerCapability';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
 type ManifestProjectedCatalogParser = (
   payload: unknown,
@@ -84,7 +88,8 @@ function resolveDiscoveryStrategy(
   if (!discovery) return null;
   const parserId = discovery.kind === 'custom-parser' ? discovery.parserId : undefined;
   if (parserId === 'kimi-code-catalog' || parserId === 'openrouter-catalog' || parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'cline-pass-catalog' || parserId === 'google-vertex-models'
-    || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments') return parserId;
+    || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments'
+    || parserId === 'volcengine-coding-plan-models') return parserId;
   if (parserId === 'freemodel-catalog') return parserId;
   if (parserId === 'google-ai-studio' || parserId === 'azure-deployment' || parserId === 'ollama-tags') return parserId;
   if (parserId === 'anthropic' || parserId === 'anthropic-candidate-validation') return 'anthropic-candidate-validation';
@@ -114,7 +119,7 @@ function createDiscoveryHeaders(
     return {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
-      ...(provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : {}),
+      ...getProviderRouteHeaders(provider.id, provider.protocol),
       ...connectionHeaders,
     };
   }
@@ -199,17 +204,15 @@ async function validateCodingPlanModels(
     ? toStaticModels(matchedIds)
     : discoveredModels;
   if (validatedModels.length === 0) {
-    throw new ProviderConnectionError('Provider 暂未返回可用于 Agent 路由的模型');
+    throw providerConnectionError('no-routable-models', 'The provider returned no models the agent can route to.');
   }
   const mergedModels = managedModels.length > 0
     ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
       aliasesByModelId,
     })
     : validatedModels;
-  const models = selectSupportedCodingPlanModels(providerId, mergedModels);
-  const filteredModelCount = providerId === 'volcengine-coding-plan'
-    ? Math.max(0, mergedModels.length - models.length)
-    : 0;
+  const models = selectAvailableCodingPlanModels(mergedModels);
+  const filteredModelCount = mergedModels.length - models.length;
   return {
     models,
     discoveryDiagnostic: {
@@ -276,18 +279,17 @@ export async function discoverProviderModels(
     throw new ProviderConnectionError(provider.unavailableReason);
   }
   if (!definition) {
-    throw new ProviderConnectionError('Provider 不在内置 catalog 中');
+    throw providerConnectionError('not-in-catalog', 'The provider is not in the built-in catalog.');
   }
-  const hasCredentialResolver = provider.id === 'google-vertex'
-    || provider.id === 'google-vertex-anthropic'
-    || provider.id === 'amazon-bedrock';
+  const authSchemaId = getProviderAuthSchemaId(provider.id);
+  const hasCredentialResolver = authSchemaResolvesAmbientCredentials(authSchemaId);
   const apiKey = provider.authMode === 'api-key'
-    ? (provider.id === 'google-vertex' || provider.id === 'google-vertex-anthropic') && !apiKeyDraft
+    ? authSchemaId === 'google-vertex' && !apiKeyDraft
       ? await resolveGoogleVertexAccessToken(connectionValues.GOOGLE_APPLICATION_CREDENTIALS)
       : apiKeyDraft
     : '';
   if (provider.authMode === 'api-key' && !apiKey && !hasCredentialResolver) {
-    throw new ProviderConnectionError('请输入 API Key');
+    throw providerConnectionError('api-key-required', 'An API key is required.');
   }
 
   const strategy = resolveDiscoveryStrategy(provider.protocol, definition.discovery.strategy);
@@ -295,7 +297,7 @@ export async function discoverProviderModels(
     if (catalogOwnership !== 'user-managed') {
       return { models: managedModels };
     }
-    throw new ProviderConnectionError('Provider 缺少模型发现配置');
+    throw providerConnectionError('discovery-missing', 'The provider has no model discovery configuration.');
   }
   const baseUrl = (
     baseUrlDraft
@@ -304,9 +306,9 @@ export async function discoverProviderModels(
     || ''
   ).trim().replace(/\/+$/, '');
   if (!baseUrl) {
-    throw new ProviderConnectionError('请填写 Provider Base URL');
+    throw providerConnectionError('base-url-required', 'A base URL is required.');
   }
-  if (provider.id === 'amazon-bedrock') {
+  if (authSchemaId === 'aws-bedrock') {
     const url = appendPath(baseUrl, '/models');
     const unsignedHeaders = { Accept: 'application/json' };
     const headers = apiKey
@@ -478,9 +480,7 @@ export async function discoverProviderModels(
       contributions,
     };
   }
-  if (
-    provider.id === 'volcengine-coding-plan'
-  ) {
+  if (strategy === 'volcengine-coding-plan-models') {
     // Both Anthropic and OpenAI Coding Plan protocols share the same /models surface.
     // Always resolve through the Coding Plan helper so OpenAI never hits a wrong
     // `baseUrl + /models` shape when the draft base is still the Anthropic `/api/coding`.
@@ -505,10 +505,11 @@ export async function discoverProviderModels(
         : discoveredModels,
     };
   }
-  const url = strategy === 'ollama-tags'
-    ? appendPath(new URL(baseUrl).origin, '/api/tags')
-    : appendPath(baseUrl, '/models');
   const headers = createDiscoveryHeaders(provider, apiKey, connectionValues);
+  if (strategy === 'ollama-tags') {
+    return discoverOllamaInstalledModels(new URL(baseUrl).origin, headers, definition);
+  }
+  const url = appendPath(baseUrl, '/models');
   const payload = await getJson(url, {
     method: 'GET',
     headers,
@@ -521,4 +522,29 @@ export async function discoverProviderModels(
       })
       : discoveredModels,
   };
+}
+
+/**
+ * Lists the models installed in a local Ollama runtime and reads each one's `/api/show` facts
+ * (capabilities, trained context length). A model whose facts cannot be read stays listed with unknown
+ * capabilities rather than failing discovery.
+ */
+async function discoverOllamaInstalledModels(
+  origin: string,
+  headers: HeadersInit,
+  surface: ProviderSurfaceDefinition,
+): Promise<ModelDiscoveryResult> {
+  const tags = await getJson(appendPath(origin, '/api/tags'), { method: 'GET', headers });
+  const names = parseModelsPayload('ollama-tags', tags).map((model) => model.id);
+  const shows = await Promise.allSettled(names.map(async (name) => [name, await getJson(appendPath(origin, '/api/show'), {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: name }),
+  })] as const));
+  const parsed = parseOllamaInstalledModels(
+    tags,
+    new Map(shows.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))),
+    surface,
+  );
+  return { models: requireModels(parsed.models), contributions: parsed.contributions };
 }

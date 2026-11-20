@@ -1,5 +1,5 @@
-import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { hasPlanReviewInteraction } from '@shared/conversation/planReviewPresentation';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 /** Turn-end suggestions are a property of each handoff's surface, not of a profile id. */
 export function shouldSnapshotHandoffSuggestions(input: {

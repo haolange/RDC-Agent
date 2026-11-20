@@ -3,6 +3,8 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { formatInvestigationContentHash, type ClaimRecord } from '@shared/types/renderdocInvestigation';
 import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
+import { toolToDefinition } from '../agent-runtime/agent/AgentTool';
+import { toolValidator } from '../agent-runtime/core/ToolValidator';
 import { InvestigationError } from './investigationErrors';
 import { serializeInvestigationJson } from './investigationHash';
 import {
@@ -26,8 +28,6 @@ import {
   writeDraft,
   writeReadyReport,
 } from './investigationTestFixtures';
-import { toolToDefinition } from '../agent-runtime/agent/AgentTool';
-import { toolValidator } from '../agent-runtime/core/ToolValidator';
 import { createInvestigationTools } from './InvestigationTools';
 
 function indexPath(sessionPath: string): string {

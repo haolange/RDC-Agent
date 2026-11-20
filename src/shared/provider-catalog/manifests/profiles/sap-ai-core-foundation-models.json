@@ -11,6 +11,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "sap-include-reasoning",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "unknown",

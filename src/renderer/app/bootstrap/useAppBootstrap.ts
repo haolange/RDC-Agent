@@ -1,9 +1,9 @@
-import type { ResolvedTheme } from '@shared/types/settings';
 import { useCatalogBootstrap } from './useCatalogBootstrap';
 import { useProjectInputsBootstrap } from './useProjectInputsBootstrap';
 import { useSessionRestoreBootstrap } from './useSessionRestoreBootstrap';
 import { useSessionSurfaceBootstrap } from './useSessionSurfaceBootstrap';
 import { useShellBootstrap } from './useShellBootstrap';
+import type { ResolvedTheme } from '@shared/types/settings';
 
 export function useAppBootstrap(options: {
   setIsLoading: (loading: boolean) => void;

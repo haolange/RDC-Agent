@@ -155,6 +155,16 @@ export const PROVIDER_AUTH_SCHEMA_IDS = [
   'user-endpoint',
 ] as const;
 
+/** Account sign-in flows the app implements; a surface names the one it uses in `accountAuth.flow`. */
+export const PROVIDER_ACCOUNT_FLOW_IDS = [
+  'chatgpt-oauth',
+  'claude-oauth',
+  'copilot-device',
+  'grok-oauth',
+  'nous-device',
+  'openrouter-oauth',
+] as const;
+
 export const PROVIDER_DISCOVERY_POLICY_IDS = [
   'none',
   'account-catalog',
@@ -175,7 +185,14 @@ export const PROVIDER_DISCOVERY_POLICY_IDS = [
   'openrouter-catalog',
   'opencode-go-catalog',
   'sap-ai-core-deployments',
+  'volcengine-coding-plan-models',
 ] as const;
 
 export type ProviderAuthSchemaId = typeof PROVIDER_AUTH_SCHEMA_IDS[number];
+/** Auth schemas that resolve credentials from the environment when no key was entered. */
+export function authSchemaResolvesAmbientCredentials(id: ProviderAuthSchemaId | undefined): boolean {
+  return id === 'google-vertex' || id === 'aws-bedrock';
+}
+
+export type ProviderAccountFlowId = typeof PROVIDER_ACCOUNT_FLOW_IDS[number];
 export type ProviderDiscoveryPolicyId = typeof PROVIDER_DISCOVERY_POLICY_IDS[number];

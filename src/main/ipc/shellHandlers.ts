@@ -1,10 +1,9 @@
-import { nativeMessage } from '../window/nativeI18n';
 import fs from 'fs';
 import path from 'path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from 'electron';
+import { nativeMessage } from '../window/nativeI18n';
 
 import { appPathService } from '../runtime/AppPathService';
-import { acknowledgeGettingStarted, hasSeenGettingStarted } from '../runtime/GettingStartedState';
 import { samePath } from '../platform/paths';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema, SaveFileArgsSchema } from './validation/commonIpcSchemas';
@@ -62,14 +61,6 @@ function getSenderWindow(event: IpcMainInvokeEvent): BrowserWindow | null {
 }
 
 export function registerShellHandlers(): void {
-  ipcMain.handle('app:hasSeenGettingStarted', (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:hasSeenGettingStarted', maxBytes: 1024 });
-    return hasSeenGettingStarted();
-  });
-  ipcMain.handle('app:acknowledgeGettingStarted', (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:acknowledgeGettingStarted', maxBytes: 1024 });
-    acknowledgeGettingStarted();
-  });
   ipcMain.handle('dialog:selectRdcFiles', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectRdcFiles', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({

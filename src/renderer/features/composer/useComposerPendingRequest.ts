@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useConversationStore } from '../../stores/conversationStore';
-import { resolveComposerPendingRequest } from './pendingRequestSelection';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { resolveComposerPendingRequest } from './pendingRequestSelection';
 
 export function useComposerPendingRequest() {
   const messages = useConversationStore((state) => state.conversationMessages);

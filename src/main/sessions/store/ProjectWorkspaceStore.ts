@@ -1,15 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId, nowMs, sanitizeToken } from '@shared/utils/id';
-import { writeYaml } from '@shared/utils/yaml';
-import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
+import { writeYaml } from '../../runtime/yaml';
 import { appPathService } from '../../runtime/AppPathService';
-import type { ProjectRegistry, SelectionState } from './storageTypes';
-import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSchema';
-import { withDirectoryFileLockSync } from './directoryFileLock';
 import { hashCaptureFile } from '../../rdc/captures/replay/captureContentHash';
 import { safePath } from '../../rdc/captures/replay/replayFileSafety';
 import { createExternalCaptureReference, verifyExternalCaptureReference } from '../../rdc/captures/ExternalCaptureReference';
+import { withDirectoryFileLockSync } from './directoryFileLock';
+import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSchema';
+import type { ProjectRegistry, SelectionState } from './storageTypes';
+import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
 
 
 export class ProjectWorkspaceStore {

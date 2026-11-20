@@ -15,6 +15,12 @@ import {
   isCausalOrCounterfactualClaim,
   type ClaimRecord,
 } from '@shared/types/renderdocInvestigation';
+import {
+  CANONICAL_SKILL_IDS,
+  GENERAL_SKILL_IDS,
+  isSkillVisibleToProfile,
+  MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
+} from '@shared/constants/canonicalSkills';
 import { InvestigationError } from '../investigation/investigationErrors';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
 import {
@@ -47,12 +53,6 @@ import {
   isAllowedMissionCompletionStatus,
   MissionCompletionError,
 } from '../investigation/missionCompletionContract';
-import {
-  CANONICAL_SKILL_IDS,
-  GENERAL_SKILL_IDS,
-  isSkillVisibleToProfile,
-  MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
-} from '@shared/constants/canonicalSkills';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 

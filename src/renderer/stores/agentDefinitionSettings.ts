@@ -1,10 +1,10 @@
+import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 import type {
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
   AgentManifestDefinition,
 } from '@shared/types/agentManifest';
-import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 import type { AppSettings, LlmAgentRoute } from '@shared/types/settings';
 
 export interface AgentDefinitionRollback {

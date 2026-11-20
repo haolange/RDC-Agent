@@ -15,6 +15,17 @@
  * 上层若接入特定 MCP 服务器有特殊框架需求，可以在此基础上扩展。
  */
 
+import {
+  processSupervisor,
+  type SupervisedProcess,
+} from '../../runtime/ProcessSupervisor';
+import { type AgentTool, type AgentToolResult } from './AgentTool';
+import {
+  postJsonRpc,
+  postStreamableJsonRpc,
+  StdioRpcClient,
+} from './mcpRpcTransport';
+import { buildMcpPrefixedName, decodeMcpNameSegment } from './mcpToolNames';
 import type { ChildProcess } from 'child_process';
 
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
@@ -24,17 +35,6 @@ import type {
   TextContent,
   ToolDefinition,
 } from '../core/types';
-import { type AgentTool, type AgentToolResult } from './AgentTool';
-import {
-  processSupervisor,
-  type SupervisedProcess,
-} from '../../runtime/ProcessSupervisor';
-import {
-  postJsonRpc,
-  postStreamableJsonRpc,
-  StdioRpcClient,
-} from './mcpRpcTransport';
-import { buildMcpPrefixedName, decodeMcpNameSegment } from './mcpToolNames';
 
 const MCP_ENV_ALLOWLIST = [
   'PATH',

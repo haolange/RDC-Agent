@@ -1,15 +1,13 @@
-import { registerCaptureReplayReadHandlers } from './captureReplayReadHandlers';
 import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
-import type { OpenProjectInputRequest, SessionScope, SessionScopedPayload } from '@shared/types/session';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { rdcSessionService } from '../sessions';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
-import type { WorkbenchIpcContext } from './workbenchContext';
-import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { replayDeviceIssue } from '../rdc/captures/ReplayDeviceIssue';
 import { captureRecoveryStatus, restorePreviousCapture } from '../rdc/RdcCaptureRecovery';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { registerCaptureReplayReadHandlers } from './captureReplayReadHandlers';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   CaptureOpenProjectInputArgsSchema,
@@ -19,6 +17,8 @@ import {
   SessionScopeArgsSchema,
   DevicePreparationArgsSchema,
 } from './validation/captureDeviceSchemas';
+import type { WorkbenchIpcContext } from './workbenchContext';
+import type { OpenProjectInputRequest, SessionScope, SessionScopedPayload } from '@shared/types/session';
 
 const envelope = <T>(scope: SessionScope, payload: T): SessionScopedPayload<T> => ({
   projectId: scope.projectId,

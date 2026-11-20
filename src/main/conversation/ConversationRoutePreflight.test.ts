@@ -1,4 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
+import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
+import { runtimeLogService } from '../runtime/RuntimeLogService';
+import {
+  findEffectiveAgentProfile,
+  recordOverlayProfileDiagnostics,
+  resolveAgentRoutePreflight,
+  resolveConversationAgentId,
+} from './ConversationRoutePreflight';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
@@ -14,38 +25,23 @@ const { editProfile } = vi.hoisted(() => ({
     },
   },
 }));
-
 vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
     getAll: vi.fn(),
   },
 }));
-
 vi.mock('../settings/agent-manifests/AgentManifestService', () => ({
   agentManifestService: {
     getEffectiveProfiles: vi.fn(() => [editProfile]),
     resolveEffectiveSnapshot: vi.fn(() => ({ profiles: [editProfile], diagnostics: [] })),
   },
 }));
-
 vi.mock('../settings/provider-catalog/EffectiveModelResolver', () => ({
   resolveEffectiveModelSelection: vi.fn(),
 }));
-
 vi.mock('../runtime/RuntimeLogService', () => ({
   runtimeLogService: { log: vi.fn() },
 }));
-
-import { settingsService } from '../settings/settings-core/SettingsService';
-import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
-import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
-import {
-  findEffectiveAgentProfile,
-  recordOverlayProfileDiagnostics,
-  resolveAgentRoutePreflight,
-  resolveConversationAgentId,
-} from './ConversationRoutePreflight';
-import { runtimeLogService } from '../runtime/RuntimeLogService';
 
 const provider = {
   id: 'cline-pass',
@@ -57,6 +53,7 @@ const provider = {
 
 function settingsWith(): AppSettings {
   return {
+    appearance: { language: 'zh-CN' },
     paths: { agentsPath: 'C:/tmp/agents', userRdcRoot: 'C:/tmp/rdc' },
     llm: {
       providers: [provider],
@@ -217,6 +214,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
 
   it('records overlay invalid diagnostics on the blocked path', () => {
     vi.mocked(runtimeLogService.log).mockClear();
+    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
     recordOverlayProfileDiagnostics(
       { projectId: 'proj', session: null, currentRun: null } as never,
       'edit',

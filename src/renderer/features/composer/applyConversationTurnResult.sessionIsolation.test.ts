@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConversationTurnResult } from '@shared/types/conversation';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { applyConversationTurnResult } from '../../stores/conversationSendHelpers';
+import type { ConversationTurnResult } from '@shared/types/conversation';
 
 const baseTurn = (): ConversationTurnResult => ({
   requestId: 'req-stop',

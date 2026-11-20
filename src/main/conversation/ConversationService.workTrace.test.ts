@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   attachRuntimeHookDiagnostic,
   finalizeTrace,
-  sanitizeStoredWorkTrace,
   upsertWorkBlock,
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
+  upsertLoopThinkingItem,
 } from './ConversationWorkTrace';
 import { applyPlanReviewRequested } from './ConversationPlanReviewEvents';
+import { readStoredWorkTrace, sanitizeStoredWorkTrace } from './StoredWorkTrace';
 
 describe('ConversationService work trace tool approvals', () => {
   it('keeps a question owned by the model loop across later updates', () => {
@@ -104,16 +105,21 @@ describe('ConversationService work trace tool approvals', () => {
         kind: 'llm_turn' as const,
         title: 'LLM turn',
         status: 'complete' as const,
-        thinking: {
-          text: 'reasoning',
-          kind: 'raw' as const,
-          source: 'anthropic-thinking' as const,
-          visibility: 'raw-collapsed' as const,
-
+        items: [{
+          kind: 'thinking' as const,
           providerOutputRef: thinkingRef,
-        },
-        result: {
+          thinking: { text: 'reasoning', kind: 'raw' as const, source: 'anthropic-thinking' as const, visibility: 'raw-collapsed' as const },
+          status: 'complete' as const,
+          displayOrder: 1,
+        }, {
+          kind: 'text' as const,
+          providerOutputRef: textRef,
           text: 'answer',
+          phase: 'final_answer' as const,
+          status: 'complete' as const,
+          displayOrder: 2,
+        }],
+        result: {
           status: 'complete' as const,
           outputPhase: 'final_answer' as const,
           providerOutputRefs: [textRef],
@@ -140,6 +146,16 @@ describe('ConversationService work trace tool approvals', () => {
         result: { ...trace.blocks[0].result, providerOutputRefs: [thinkingRef] },
       }],
     })).toBeNull();
+  });
+
+  it('reads a process record in the older single-thinking shape as discarded, not as a trace', () => {
+    const legacy = {
+      status: 'complete' as const, updatedAt: 100,
+      blocks: [{ id: 'loop', kind: 'llm_turn' as const, title: 'LLM turn', status: 'complete' as const, toolCalls: [],
+        startedAt: 1, thinking: { text: 'old', kind: 'raw', source: 'unknown', visibility: 'raw-collapsed' } }],
+    } as unknown as Parameters<typeof readStoredWorkTrace>[0];
+    expect(readStoredWorkTrace(legacy)).toEqual({ workTrace: null, workTraceDiscarded: true });
+    expect(readStoredWorkTrace(null)).toEqual({ workTrace: null });
   });
 
   it('nests approval.requested and approval.answered under the matching tool call', () => {
@@ -289,11 +305,8 @@ describe('ConversationService work trace tool approvals', () => {
   });
 
   it('settles visible thinking when a plan enters human review', () => {
-    const trace = upsertWorkBlock(undefined, 'runtime-loop-1', {
-      kind: 'llm_turn', title: 'Thinking', status: 'running',
-      thinking: { text: 'Preparing the plan', kind: 'summary', source: 'openai-responses-summary', visibility: 'summary' },
-      thinkingStatus: 'streaming', toolCalls: [],
-    });
+    const trace = upsertLoopThinkingItem(undefined, 'runtime-loop-1', { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
+      { text: 'Preparing the plan', kind: 'summary', source: 'openai-responses-summary', visibility: 'summary' }, 'streaming');
     const paused = applyPlanReviewRequested({
       payload: {
         toolCallId: 'plan-call',
@@ -305,22 +318,17 @@ describe('ConversationService work trace tool approvals', () => {
       },
       workTrace: trace,
     });
-    expect(paused?.blocks.find((block) => block.id === 'runtime-loop-1')?.thinkingStatus).toBe('complete');
+    expect(paused?.blocks.find((block) => block.id === 'runtime-loop-1')?.items?.[0]?.status).toBe('complete');
     expect(paused?.blocks.flatMap((block) => block.toolCalls).find((call) => call.id === 'plan-call'))
       .toMatchObject({ status: 'running', planReview: { status: 'awaiting' } });
   });
 
   it('closes a streaming Thinking block when persistence fails', () => {
-    const trace = upsertWorkBlock(undefined, 'llm-turn-1', {
-      kind: 'llm_turn',
-      title: 'Thinking',
-      status: 'running',
-      thinkingStatus: 'streaming',
-      toolCalls: [],
-    });
+    const trace = upsertLoopThinkingItem(undefined, 'llm-turn-1', { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
+      { text: 'Working', kind: 'raw', source: 'unknown', visibility: 'raw-collapsed' }, 'streaming');
     const failed = finalizeTrace(trace, 'error', '会话状态保存失败');
     expect(failed).toMatchObject({ status: 'error', summary: '会话状态保存失败' });
-    expect(failed.blocks[0]).toMatchObject({ status: 'error', thinkingStatus: 'complete' });
+    expect(failed.blocks[0]).toMatchObject({ status: 'error', items: [{ kind: 'thinking', status: 'complete' }] });
   });
 
   it('does not terminalize TaskRegistry lifecycle blocks when a turn completes', () => {

@@ -1,5 +1,14 @@
 # Acceptance Ledger
 
+## 2026-11-20：收敛计划收尾（云端 Linux，无 GPU、无模型账号）
+
+- 提交：`38c8db34`
+- 证据：本地：`pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run test:coverage:renderer && pnpm run check:gates && pnpm run build`（node 3821 通过/6 跳过，覆盖率 lines 80.76%；renderer 878 通过，51.82%；gates、build 通过）。GitHub Actions 未在本条核对。
+- 证据：本地：`RDC_NATIVE_TOOLS_ROOT=<Linux 候选> RDC_NATIVE_CAPTURE=<vkcube_lavapipe.rdc> RDC_NATIVE_ALLOW_MUTATION=1 npx vitest run src/main/rdc`，Read、Parser、守护进程回收、A-B-A（着色器替换改变像素→回滚恢复→主进程回执验证）、Rejection after 通过；候选为 dde8822 构建，未经发行打包。
+- 证据：本地：`node scripts/qa-ollama-stub.mjs` + 一次性 Browser QA：连接 Ollama → 选择器列出模型（上下文、推理）→ 思考 → glob → 流式答复，请求带 `think=true`；`node scripts/qa-readability.mjs` 深/浅色、720px 0 问题。
+- 未验证：真实模型（本机不能运行模型服务，云端无账号）；经产品 UI 在 lavapipe 上打开 capture——RDC-Tool doctor 要求发行打包，而仓库回执中 dde8822 的 `tree_sha256` 与 `scripts/native_source_digest.py` 的结果不一致，无法如实生成 Linux 回执。
+- 人工介入：无。
+
 ## 2026-11-19：Linux 运行面冒烟与 lavapipe 回放（云端，无 GPU）
 
 - 环境：云端 Linux 容器，无 GPU、无设备、无模型账号；Xvfb、Mesa lavapipe。产品为当前分支 `claude/inspiring-carson-rkhfje` 构建，以 Browser QA 无头启动（root 容器需 `ELECTRON_DISABLE_SANDBOX=1`），一次性隔离 userData。

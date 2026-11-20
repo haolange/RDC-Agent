@@ -1,5 +1,8 @@
 import { Readable } from 'node:stream';
+import { createReadStream, statSync } from 'fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { hashAttachmentContents } from './ConversationAttachmentHashing';
 
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs');
@@ -9,9 +12,6 @@ vi.mock('fs', async () => {
     statSync: vi.fn(),
   };
 });
-
-import { createReadStream, statSync } from 'fs';
-import { hashAttachmentContents } from './ConversationAttachmentHashing';
 
 const attachment = (index: number) => ({
   sourcePath: `C:/attachments/${index}.txt`,

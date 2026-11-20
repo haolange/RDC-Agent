@@ -1,8 +1,8 @@
-import { PermissionModeChangedError } from './RuntimePermissionStateService';
 import { expect, it, vi } from 'vitest';
+import { PermissionModeChangedError } from './RuntimePermissionStateService';
 import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestService';
 import { PermissionReviewError } from './PermissionReviewRuntime';
-const base = { agentId: 'general', sessionId: 'session', turnId: 'turn', toolCallId: 'call', toolName: 'shell',
+const base = { agentId: 'general', sessionId: 'session', turnId: 'turn', toolCallId: 'call', toolName: 'shell', argumentsSha256: 'a'.repeat(64),
   risk: 'medium', reason: 'Owned replay change', context: { sessionId: 'session', turnId: 'turn', agentId: 'general' },
   action: { tool: 'shell', arguments: { rdc: {} }, reason: 'Owned replay change' } } as const;
 it('approves rule-safe actions without requesting a model verdict', async () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
-import type { ToolResultMessage } from '../agent-runtime/core/types';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
 import { finalizeTrace, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import type { ConversationWorkTrace } from '@shared/types/conversation';
+import type { ToolResultMessage } from '../agent-runtime/core/types';
 
 it('retains image references when a terminal receipt creates the tool row', () => {
   const imagePreviews = [{ previewId: 'preview-a', fileName: 'plot.png', mimeType: 'image/png' }];

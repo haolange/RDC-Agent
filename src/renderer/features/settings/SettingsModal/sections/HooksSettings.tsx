@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 import { useI18n } from '../../../../i18n';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
@@ -9,6 +8,7 @@ import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
 import { getRdcOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 import { formFromContent } from './scopedResourceForm';
+import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 
 type HookOverview = RdcRuntimeOverview['hooks'][number];
 type HookTrustState = 'trusted' | 'needs-retrust' | 'untrusted' | 'builtin';

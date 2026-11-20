@@ -1,6 +1,7 @@
 {
   "$comment": "Renderer 契约清单：check-* 脚本读取本文件定位被锁定的文件与锚点。目录重组或文件移动时只改本文件；新增锚点须先在本文件登记。",
   "files": {
+    "lib.settingsSections": "src/renderer/lib/settingsSections.ts",
     "ui.select": "src/renderer/ui/Select/index.tsx",
     "workProcessTrackCss": "src/renderer/features/transcript/work-process-track.css",
     "styles.designSystem": "src/renderer/styles/design-system.css",
@@ -208,7 +209,7 @@
     "composer.toolApprovalModel": "src/renderer/features/composer/toolApprovalRequestModel.ts",
     "transcriptWorkCardHeader": "src/renderer/features/transcript/WorkCardHeader.tsx",
     "transcriptWorkDisclosure": "src/renderer/features/transcript/WorkDisclosure.tsx",
-    "settings.providerConnectDialog": "src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx",
+    "settings.providerDetail": "src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx",
     "settings.localToolDisclosure": "src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx",
     "knowledge.spacesColumn": "src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx",
     "patterns.materialContextEditor": "src/renderer/patterns/MaterialContextEditor.tsx",

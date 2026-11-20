@@ -21,7 +21,7 @@
 | `conversation:*` stream | `event.sessionId` | upsert active conversation | `sessionProjectionStore.projectSession` |
 | `trace:projectionChanged` | `payload.sessionId` | `setTracePresentation` | cache workflow.trace |
 | workflow 状态 | 无 push | `workflow.getState` / restore → `setWorkflowState` | 无 push |
-| `run:statusChanged` / usage | `runId` 或 `sessionId` | 已有 currentRun/session 比对 | ignore / cache |
+| `workflow:runStatusChanged` / `workflow:runUsageChanged` | `runId` 或 `sessionId` | 已有 currentRun/session 比对 | ignore / cache |
 | tool / evidence patches | turn 所属 `sessionId` 或 message 归属 | 仅更新 active message | cache |
 
 **禁止**未门控直接 `upsertConversationMessage` / `setTracePresentation` / `setWorkflowState`。门禁：`pnpm run check:session-projection`。

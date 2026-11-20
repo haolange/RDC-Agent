@@ -1,9 +1,9 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
+import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const fingerprint = z.string().regex(/^[a-f0-9]{24}$/);

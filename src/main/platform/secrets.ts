@@ -34,7 +34,7 @@ export function hardenSecretFile(filePath: string, host: HostDescriptor = curren
   } catch {
     // Windows may ignore POSIX mode bits; ACL hardening is best-effort below.
   }
-  if (host.isWindows && process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test') {
+  if (host.isWindows) {
     try {
       spawnSync('icacls', [filePath, '/inheritance:r', '/grant:r', `${process.env.USERNAME}:F`], {
         windowsHide: true,

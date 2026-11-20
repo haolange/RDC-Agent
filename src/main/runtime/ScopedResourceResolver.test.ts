@@ -1,6 +1,6 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { hashScopedResource, ScopedResourceResolver } from './ScopedResourceResolver';
-import { createHash } from 'node:crypto';
 
 // Frozen historical serializer: this oracle must not follow implementation changes.
 const historicalSerialize = (value: unknown): string => {

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import { describe, expect, it } from 'vitest';
+import { CANONICAL_TOOL_TOKEN_EXPANSIONS, REJECTED_TOOL_TOKENS } from '@shared/constants/agentToolTokens';
 import {
   combineActiveSkillAllowlists,
   diagnoseManifestToolTokens,
@@ -10,7 +11,6 @@ import {
   isToolAllowedByFrozenAllowlist,
   resolveAgentToolAllowlistFromDefinition,
 } from './RuntimeToolPolicy';
-import { CANONICAL_TOOL_TOKEN_EXPANSIONS, REJECTED_TOOL_TOKENS } from '@shared/constants/agentToolTokens';
 
 const DEBUGGER_LOOP_SKILLS = [
   'renderdoc-execution',

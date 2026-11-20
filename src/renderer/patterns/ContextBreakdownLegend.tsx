@@ -1,12 +1,12 @@
 import React from 'react';
-import type { ContextUsageBreakdownEntry } from '@shared/types/session';
-import { useI18n } from '../i18n';
 import { formatTokenCount } from '@shared/utils/tokens';
+import { useI18n } from '../i18n';
 import {
   CONTEXT_BREAKDOWN_GROUPS,
   COUNT_SUFFIX_KEYS,
   SEGMENT_LABEL_KEYS,
 } from './contextBreakdownMeta';
+import type { ContextUsageBreakdownEntry } from '@shared/types/session';
 
 export const ContextBreakdownLegend: React.FC<{
   entries: ContextUsageBreakdownEntry[];

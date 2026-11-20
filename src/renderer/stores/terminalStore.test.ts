@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import { useTerminalStore } from './terminalStore';
+import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
 const entry = (sessionId: string): RuntimeLogEntry => ({
   id: `entry-${sessionId}`,

@@ -1,9 +1,9 @@
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import {
   resolveCompactionThresholdTokens,
   resolveTurnOutputTokens,
 } from '@shared/utils/contextBudget';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 export interface ContextUsageSelectedProfile {
   contextWindowTokens: number;

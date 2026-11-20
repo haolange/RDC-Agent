@@ -1,8 +1,8 @@
 import { redo, redoDepth, undo, undoDepth } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
 import { sanitizePastedText } from './contextMenuSanitize';
-import type { ContextMenuTarget } from './contextMenuTarget';
 import { resolveReadonlySurface } from './contextMenuTarget';
+import type { ContextMenuTarget } from './contextMenuTarget';
 
 export type ContextMenuCommandId =
   | 'undo'

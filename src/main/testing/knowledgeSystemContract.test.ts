@@ -10,7 +10,6 @@ import {
   CANONICAL_TOOL_TOKEN_EXPANSIONS,
 } from '@shared/constants/agentToolTokens';
 import { AGENT_WORKBENCH_TOOL_CATALOG } from '@shared/constants/agentWorkbenchCatalog';
-import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { createKnowledgeTools } from '../knowledge/KnowledgeTools';
 import { createDisposableCandidateService } from '../knowledge/KnowledgeCandidateService';
 import { createDisposableImportService } from '../knowledge/KnowledgeImportService';
@@ -26,6 +25,7 @@ import {
   intersectSkillAllowedTools,
 } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { isDeferredToolName, partitionDeferredTools } from '../agent-runtime/orchestration/deferredTools';
+import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 
 const FIVE_DEFERRED = [
   'knowledge_browse',

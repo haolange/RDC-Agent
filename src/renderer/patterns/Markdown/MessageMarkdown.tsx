@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import Markdown from 'react-markdown';
-import type { Components, Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeHighlight from 'rehype-highlight';
@@ -9,6 +8,7 @@ import { normalizeAssistantMarkdown } from './normalizeAssistantMarkdown';
 import { MarkdownCodeBlock } from './MarkdownCodeBlock';
 import { MarkdownMermaid } from './MarkdownMermaid';
 import { flattenMarkdownText } from './markdownText';
+import type { Components, Options } from 'react-markdown';
 import './markdownHighlight';
 import 'katex/dist/katex.min.css';
 

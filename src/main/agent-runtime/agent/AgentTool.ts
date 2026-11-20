@@ -51,6 +51,21 @@ export interface AgentToolSpec {
   readonly requiresApproval: boolean;
 }
 
+/**
+ * What a call can touch, declared once by the tool. Permission review reads these
+ * facts and never infers them from a tool name. Paths are dotted argument keys.
+ */
+export interface AgentToolEffects {
+  /** Arguments naming filesystem locations the call reads. */
+  readonly reads?: readonly string[];
+  /** Arguments naming filesystem locations the call creates, changes, moves or deletes. */
+  readonly writes?: readonly string[];
+  /** Argument holding a glob whose fixed prefix is a read location. */
+  readonly readPattern?: string;
+  /** The call reaches the network. */
+  readonly network?: boolean;
+}
+
 export interface AgentToolResult<TDetails = unknown> {
   content: (TextContent | ImageContent)[];
   isError?: boolean;
@@ -68,6 +83,7 @@ export interface AgentTool<
   readonly pollable?: boolean;
   readonly permissionHint?: AgentToolPermissionHint;
   readonly spec?: AgentToolSpec;
+  readonly effects?: AgentToolEffects;
 
   /** Reject semantically invalid arguments before permission review or execution. */
   validateArgs?(args: TParams): void;

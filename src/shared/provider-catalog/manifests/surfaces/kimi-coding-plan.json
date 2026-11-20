@@ -119,6 +119,9 @@
           }
         },
         "compatibilityGroup": "kimi-coding-plan:AnthropicMessages"
+      },
+      "headers": {
+        "User-Agent": "RDC-Agent"
       }
     },
     {

@@ -11,6 +11,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "gemini-include-thoughts",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "thought-signature",

@@ -23,14 +23,14 @@
   }
 
   .empty-workbench-content[data-variant='no-project'] .empty-workbench-title {
-    font-size: var(--text-3xl);
+    font-size: var(--type-display-size);
   }
 
   .empty-workbench-title {
-    font-size: var(--text-2xl);
+    font-size: var(--type-display-size);
   }
 
   .empty-workbench-subtitle {
-    font-size: var(--text-sm);
+    font-size: var(--type-label-size);
   }
 }

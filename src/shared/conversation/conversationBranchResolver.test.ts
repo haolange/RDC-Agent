@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import {
   compareConversationMessages,
@@ -8,6 +6,8 @@ import {
   getConcreteForkBranches,
   shouldShowForkNavigatorForMessage,
 } from './conversationBranchResolver';
+import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 
 const msg = (
   id: string,

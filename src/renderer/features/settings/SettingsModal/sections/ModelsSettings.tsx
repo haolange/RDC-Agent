@@ -1,8 +1,8 @@
 import React from 'react';
+import { ProvidersSettings } from './ProvidersSettings';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogCategory } from '../types';
 import type { useI18n } from '../../../../i18n';
-import { ProvidersSettings } from './ProvidersSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -11,9 +11,9 @@ interface ModelsSettingsProps {
   providerCatalog: LlmProviderEntry[];
   providerCatalogCategories: ProviderCatalogCategory[];
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
-  onRefreshProviderModels: (provider: LlmProviderEntry) => void | Promise<void>;
-  onDisconnectProvider: (provider: LlmProviderEntry) => void | Promise<void>;
   onOpenProviderConnection: (provider: LlmProviderEntry) => void;
+  selectedProviderId: string | null;
+  detail: React.ReactNode;
   t: Translate;
 }
 

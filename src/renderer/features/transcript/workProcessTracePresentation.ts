@@ -1,13 +1,13 @@
-import type { Translator } from '../../i18n/messages';
+import { type ConversationWorkBlock, type ConversationReasoningState, type ConversationLoopStopReason, type ConversationLoopOutputPhase, type ConversationThinkingItem, type ConversationWorkTrace } from '@shared/types/conversation';
+import { lastLoopThinking } from '@shared/conversation/loopItems';
 import { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat';
 import { groupImageRows } from './groupImageRows';
-import { type ConversationWorkBlock, type ConversationReasoningState, type ConversationLoopStopReason, type ConversationLoopOutputPhase, type ConversationWorkTrace } from '@shared/types/conversation';
 import { isMeaningfulText, getMeaningfulBlockSummary, isNoisyText } from './workProcessBlockText';
-import { type ThinkingArtifact } from '@shared/types/reasoning';
 import { createApprovalRow } from './workProcessDecisionRows';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
-import { buildPresentationUnits, presentationUnitsToDetailRows, markLastSectionOpen } from './workProcessBlockProjection';
+import { buildPresentationUnits, presentationUnitsToDetailRows, markLastSectionOpen, type ThinkingItemPresentation } from './workProcessBlockProjection';
+import type { Translator } from '../../i18n/messages';
 
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
 
@@ -17,11 +17,12 @@ const normalizeThinkingDedupKey = (value: string): string => (
 
 const resolveReasoningState = (block: ConversationWorkBlock): ConversationReasoningState => {
   if (block.reasoningState) return block.reasoningState;
-  if (!block.thinking) return 'none';
-  if (block.thinking.kind === 'raw') return 'raw';
-  if (block.thinking.kind === 'summary') return 'summary';
-  if (block.thinking.kind === 'unknown') return 'unknown';
-  if (block.thinking.kind === 'opaque') return 'opaque';
+  const thinking = lastLoopThinking(block);
+  if (!thinking) return 'none';
+  if (thinking.kind === 'raw') return 'raw';
+  if (thinking.kind === 'summary') return 'summary';
+  if (thinking.kind === 'unknown') return 'unknown';
+  if (thinking.kind === 'opaque') return 'opaque';
   return 'none';
 };
 
@@ -33,8 +34,8 @@ const resolveOutputPhase = (
   block: ConversationWorkBlock,
   _hasVisibleProcessEvidence: boolean,
 ): ConversationLoopOutputPhase => {
-  // Runtime phase is authoritative. Unknown streaming text is treated as final-side
-  // withheld output so it can never flash as Work Process prose.
+  // Runtime phase is authoritative. Before it settles, a loop without tools reads as the
+  // answering loop; its text items stream in place and take their phase when the loop settles.
   if (block.result?.outputPhase) return block.result.outputPhase;
   if (block.toolCalls.length > 0 || isNonFinalStopReason(block.result?.stopReason)) {
     return 'commentary';
@@ -43,23 +44,6 @@ const resolveOutputPhase = (
     return 'final_answer';
   }
   return 'final_answer';
-};
-
-const resolveSectionProse = (
-  block: ConversationWorkBlock,
-  outputPhase: ConversationLoopOutputPhase,
-): { proseText: string; proseStreaming: boolean } => {
-  // Commentary is narrative prose — never promoted into the thinking slot.
-  // Final answers render only in the assistant body, never as WP prose.
-  const commentary = normalizeWorkProcessText(block.result?.text ?? '');
-  const resultStatus = block.result?.status
-    ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
-  const isStreaming = resultStatus === 'streaming';
-  const canShow = isMeaningfulText(commentary) && outputPhase === 'commentary';
-  return {
-    proseText: canShow ? commentary : '',
-    proseStreaming: canShow && isStreaming,
-  };
 };
 
 const resolveThinkingDurationLabel = (block: ConversationWorkBlock): string => {
@@ -82,87 +66,36 @@ const resolveSettledThinkingLabel = (block: ConversationWorkBlock, t: Translator
   return duration ? t('chat.workProcessThoughtFor', { duration }) : t('chat.workProcessThinkingComplete');
 };
 
-const resolveSectionThinking = (
+/**
+ * One provider thinking block as a Work Process row. Visible raw, summary and unknown reasoning with text
+ * becomes a row; opaque or hidden reasoning never renders, not even as a placeholder.
+ */
+const resolveThinkingItem = (
   block: ConversationWorkBlock,
-  hasVisibleEvidence: boolean,
+  item: ConversationThinkingItem,
   t: Translator,
-): {
-  preview: string;
-  label: string;
-  kind?: ThinkingArtifact['kind'];
-  source?: string;
-  visibility?: ThinkingArtifact['visibility'];
-  status?: ConversationWorkBlock['thinkingStatus'];
-  expandable: boolean;
-  openByDefault: boolean;
-} => {
+): ThinkingItemPresentation | null => {
+  const { thinking } = item;
+  if (thinking.kind === 'opaque' || thinking.visibility === 'hidden') return null;
+  const preview = normalizeWorkProcessText(thinking.text ?? '');
+  if (!preview) return null;
   const isActiveBlock = block.status === 'running' || block.status === 'pending';
-  const thinking = block.thinking;
-  const reasoningState = resolveReasoningState(block);
-
-  if (hasVisibleEvidence && thinking && ['raw', 'summary', 'unknown'].includes(reasoningState)) {
-    const preview = normalizeWorkProcessText(thinking.text ?? '');
-    if (preview) {
-      const status = isActiveBlock ? block.thinkingStatus ?? 'streaming' : 'complete';
-      const isSummary = reasoningState === 'summary' || (thinking.kind === 'summary' && thinking.visibility === 'summary');
-      const isRaw = reasoningState === 'raw' || (thinking.kind === 'raw' && thinking.visibility === 'raw-collapsed');
-      const isUnknown = reasoningState === 'unknown' || thinking.kind === 'unknown';
-      if (isSummary || isRaw || isUnknown) {
-        return {
-          preview,
-          label: status === 'streaming'
-            ? t('chat.workProcessThinkingStreaming')
-            : resolveSettledThinkingLabel(block, t),
-          kind: thinking.kind,
-          source: '',
-          visibility: thinking.visibility,
-          status,
-          expandable: true,
-          // Policy hint for UI: expand while the loop is live; fold after settle.
-          // summary / raw / unknown share the same lifecycle (user sticky lives in the row).
-          openByDefault: status === 'streaming',
-        };
-      }
-    }
-  }
-
-  // No provider thinking and no commentary promotion — empty thinking slot.
-  return { preview: '', label: '', expandable: false, openByDefault: false };
-};
-
-const resolveResponseThinking = (
-  block: ConversationWorkBlock,
-  t: Translator,
-): {
-  preview: string;
-  label: string;
-  kind?: ThinkingArtifact['kind'];
-  visibility?: ThinkingArtifact['visibility'];
-  status?: ConversationWorkBlock['thinkingStatus'];
-  expandable: boolean;
-  openByDefault: boolean;
-} => {
-  // Final-answer / closing thinking shares the same lifecycle policy as process loops:
-  // expand while the section is live, fold after settle (UI may sticky-override).
-  const resolved = resolveSectionThinking(block, Boolean(block.thinking), t);
-  if (!resolved.expandable) return { ...resolved, label: '', openByDefault: false };
+  const status = isActiveBlock ? item.status : 'complete';
   return {
-    preview: resolved.preview,
-    label: resolved.label,
-    kind: resolved.kind,
-    visibility: resolved.visibility,
-    status: resolved.status,
-    expandable: true,
-    openByDefault: resolved.openByDefault,
+    preview,
+    label: status === 'streaming' ? t('chat.workProcessThinkingStreaming') : resolveSettledThinkingLabel(block, t),
+    kind: thinking.kind,
+    visibility: thinking.visibility,
+    status,
+    // Expand while the block streams; fold once it settles (the row keeps a user's sticky choice).
+    openByDefault: status === 'streaming',
   };
 };
 
 const getLoopProjectionDeps = (t: Translator) => ({
   resolveOutputPhase,
   resolveReasoningState,
-  resolveSectionProse,
-  resolveSectionThinking: (block: ConversationWorkBlock, visible: boolean) => resolveSectionThinking(block, visible, t),
-  resolveResponseThinking: (block: ConversationWorkBlock) => resolveResponseThinking(block, t),
+  resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => resolveThinkingItem(block, item, t),
   isNonFinalStopReason,
   normalizeThinkingDedupKey,
   createApprovalRow: (block: ConversationWorkBlock) => createApprovalRow(block, t),

@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react';
-import { cn } from '../../lib/cn';
-import type {
-  ReasoningControl,
-  ReasoningSelection,
-} from '@shared/types/modelCapability';
 import {
   REASONING_SELECTIONS,
   clampReasoningSelection,
   getReasoningSelectionOrder,
+} from '@shared/types/modelCapability';
+import { cn } from '../../lib/cn';
+import type { ReactNode } from 'react';
+import type {
+  ReasoningControl,
+  ReasoningSelection,
 } from '@shared/types/modelCapability';
 
 export function resolveSelectedLevel(

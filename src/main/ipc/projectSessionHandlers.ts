@@ -1,19 +1,20 @@
-import { nativeMessage } from '../window/nativeI18n';
 import { dialog, ipcMain } from 'electron';
-import type {
-  ProjectInputRecord,
-  RunSummary,
-  SessionRecord,
-} from '@shared/types/session';
-import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { attachmentStagingService } from '../conversation/AttachmentStagingService';
+import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
+import { conversationService } from '../conversation/ConversationService';
+import { applyDeclaredHandoff } from '../conversation/applyDeclaredHandoff';
+import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
+import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
-import type { WorkbenchIpcContext } from './workbenchContext';
-import { requireActiveSessionOwner } from './sessionOwnerGate';
-import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import { attachmentStagingService } from '../conversation/AttachmentStagingService';
+import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
+import { nativeMessage } from '../window/nativeI18n';
+import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import { resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import { settingsService } from '../settings/settings-core/SettingsService';
+import { rdcSessionService } from '../sessions';
 import {
   ProjectAddArgsSchema,
   ProjectInputsImportArgsSchema,
@@ -33,17 +34,16 @@ import {
   SessionSetAgentIdArgsSchema,
   SessionSetModelOverrideArgsSchema,
 } from './validation/projectSessionSchemas';
-import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
-import { conversationService } from '../conversation/ConversationService';
-import { applyDeclaredHandoff } from '../conversation/applyDeclaredHandoff';
-import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
-import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
-import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
-import { resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
-import { settingsService } from '../settings/settings-core/SettingsService';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { requireActiveSessionOwner } from './sessionOwnerGate';
 import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
-import { rdcSessionService } from '../sessions';
+import type { WorkbenchIpcContext } from './workbenchContext';
+import type {
+  ProjectInputRecord,
+  RunSummary,
+  SessionRecord,
+} from '@shared/types/session';
 
 const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
   'planning',

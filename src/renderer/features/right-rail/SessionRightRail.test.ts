@@ -61,33 +61,44 @@ describe('session rail projection composition', () => {
     } finally { act(() => root.unmount()); state.tracePresentation = null; host.remove(); }
   });
 
-  it('retains five card shells through empty, populated, degraded and cleared projections', () => {
+  it('shows one section per tab through empty, populated, degraded and cleared projections', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const host = document.createElement('div'); const root = createRoot(host);
     const render = () => act(() => root.render(createElement(SessionRightRail)));
-    const ids = () => [...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid'));
-    const expected = ['progress', 'artifacts', 'outputs', 'context', 'capture'].map((id) => `right-rail-${id}`);
+    const tabs = ['progress', 'artifacts', 'outputs', 'context', 'capture'];
+    const visit = (onTab: (id: string) => void) => tabs.forEach((id, index) => {
+      act(() => host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!.click());
+      expect([...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid'))).toEqual([`right-rail-${id}`]);
+      onTab(id);
+    });
     try {
       state.tracePresentation = null; render();
-      expect(ids()).toEqual(expected);
-      expect(host.querySelectorAll('[aria-expanded]')).toHaveLength(0);
+      expect([...host.querySelectorAll('[role="tab"]')].map((node) => node.textContent)).toEqual(
+        tabs.map((id) => `control.rightRail.${id}.title`));
+      visit(() => expect(host.querySelectorAll('[aria-expanded]')).toHaveLength(0));
       state.tracePresentation = { rightPanel: {
         progress: [{ id: 'task', sessionId: 'session', order: 1, title: 'A blocked task', status: 'blocked', blockerSummary: 'Needs input' }],
         artifacts: { rows: [], storeDegraded: true, totalCount: 0 },
         outputs: { current: [{ id: 'output', displayName: 'A long output name', path: '/output', status: 'failed' }], previous: [] },
         context: { task: { resources: [{ id: 'resource', kind: 'skill', label: 'A loaded skill', summary: 'Scope retained' }] } },
       } }; render();
-      expect(ids()).toEqual(expected);
-      expect(host.textContent).toContain('A blocked task');
-      expect(host.textContent).not.toContain('Needs input');
-      expect(host.textContent).toContain('control.rightRail.artifacts.storeDegraded');
-      expect(host.textContent).toContain('A loaded skill');
-      const missing = [...host.querySelectorAll('button')].find((button) => button.textContent === 'control.rightRail.outputs.missing');
-      expect(missing?.disabled).toBe(true);
+      visit((id) => {
+        if (id === 'progress') {
+          expect(host.textContent).toContain('A blocked task');
+          expect(host.textContent).not.toContain('Needs input');
+        }
+        if (id === 'artifacts') expect(host.textContent).toContain('control.rightRail.artifacts.storeDegraded');
+        if (id === 'outputs') {
+          const missing = [...host.querySelectorAll('button')].find((button) => button.textContent === 'control.rightRail.outputs.missing');
+          expect(missing?.disabled).toBe(true);
+        }
+        if (id === 'context') expect(host.textContent).toContain('A loaded skill');
+      });
       state.tracePresentation = null; render();
-      expect(ids()).toEqual(expected);
-      expect(host.textContent).not.toContain('A blocked task');
-      expect(host.textContent).not.toContain('A loaded skill');
+      visit(() => {
+        expect(host.textContent).not.toContain('A blocked task');
+        expect(host.textContent).not.toContain('A loaded skill');
+      });
     } finally { act(() => root.unmount()); state.tracePresentation = null; }
   });
 });

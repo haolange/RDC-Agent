@@ -1,8 +1,8 @@
 import React from 'react';
-import type { AgentMode, ModeIconKey } from '@shared/types/layout';
 import { ListRow } from '../../../../ui/ListRow';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { OverflowFade } from '../../../../ui/OverflowFade';
+import type { AgentMode, ModeIconKey } from '@shared/types/layout';
 import './AgentListItem.css';
 
 interface AgentListItemProps {

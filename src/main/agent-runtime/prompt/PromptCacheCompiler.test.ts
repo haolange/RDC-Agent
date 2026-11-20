@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { CachePlan, RequestPlan } from '@shared/types/providerCapability';
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { PromptCacheCompiler } from './PromptCacheCompiler';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { CachePlan, RequestPlan } from '@shared/types/providerCapability';
 
 const promptPlan = (stableContent = 'Stable instructions'): PromptPlan => {
   const volatileContent = 'Current date: 2026-07-19';

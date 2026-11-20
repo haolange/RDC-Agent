@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
-import type { AgentTimelineEntry } from '@shared/types/agent';
-import type { ActionEvent } from '@shared/types/evidence';
-import type { WorkflowState } from '@shared/types/workflow';
 import { hydrateMessagesWithActionEvents, mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import type { WorkflowState } from '@shared/types/workflow';
+import type { ActionEvent } from '@shared/types/evidence';
+import type { AgentTimelineEntry } from '@shared/types/agent';
 
 export function useSessionRestoreBootstrap(shellReady: boolean): void {
   const currentSession = useProjectStore((state) => state.currentSession);

@@ -1,5 +1,5 @@
-import type { LlmModelCapabilityProbeMode } from '@shared/types/settings';
 import { getElectronApi } from '../../../../platform/getElectronApi';
+import type { LlmModelCapabilityProbeMode } from '@shared/types/settings';
 
 export function testModelCapability(request: {
   providerId: string;

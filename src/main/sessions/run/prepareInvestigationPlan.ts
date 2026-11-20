@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { z } from 'zod';
-import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
-import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
 import { hashCaptureFile } from '../../rdc/captures/replay/captureContentHash';
 import { safePath } from '../../rdc/captures/replay/replayFileSafety';
 import { verifyExternalCaptureReference } from '../../rdc/captures/ExternalCaptureReference';
 import { selectedProbeDeviceId } from '../../rdc/RdcProbeLifecycle';
+import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
+import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
 import type { CaptureReplayState } from '@shared/types/captureReplay';
 
 const proposalSchema = z.object({

@@ -1,3 +1,6 @@
+import { resolveAgentWriteTargetFromDraft, toAgentManifestEditorDraft } from '@shared/types/agentManifest';
+import { applyAgentDefinitionSaveResults, selectSubmittableAgentManifestDrafts } from './agentManifestAutosaveState';
+import { getErrorMessage } from './utils';
 import type {
   AgentModelSettings,
   AppSettings,
@@ -11,12 +14,9 @@ import type {
   AgentManifestDraft,
   AgentOverrideFileRequest,
 } from '@shared/types/agentManifest';
-import { resolveAgentWriteTargetFromDraft, toAgentManifestEditorDraft } from '@shared/types/agentManifest';
-import { applyAgentDefinitionSaveResults, selectSubmittableAgentManifestDrafts } from './agentManifestAutosaveState';
 import type { useI18n } from '../../../i18n';
 import type { useProviderConnection } from './useProviderConnection';
 import type { useSettingsModalState } from './useSettingsModalState';
-import { getErrorMessage } from './utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type ModalState = ReturnType<typeof useSettingsModalState>;
@@ -186,6 +186,14 @@ export function createSettingsModalActions({
     adoptAgentSettings(nextSettings);
   };
 
+  const previewProjectAgentTrust = (sourcePath: string) => (
+    window.electronAPI.settings.previewProjectAgentTrust(sourcePath)
+  );
+
+  const handleTrustProjectAgent = async (request: AgentOverrideFileRequest): Promise<void> => {
+    adoptAgentSettings(await window.electronAPI.settings.trustProjectAgent(request));
+  };
+
   const loadAgentBuiltinComparison = (draft: AgentManifestDraft) => {
     const write = resolveAgentWriteTargetFromDraft(draft, currentProjectId);
     return window.electronAPI.settings.getAgentBuiltinComparison({
@@ -227,6 +235,8 @@ export function createSettingsModalActions({
     handleAgentModelsChange,
     previewAgentModelMigration,
     handleCommitAgentOverrideFile,
+    previewProjectAgentTrust,
+    handleTrustProjectAgent,
     loadAgentBuiltinComparison,
     handleSaveToolsConfig,
     handleSavePersonalization,

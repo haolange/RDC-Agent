@@ -1,5 +1,5 @@
-import type { AgentDefinitionSaveResult, AgentManifestDraft } from '@shared/types/agentManifest';
 import { toAgentManifestEditorDraft } from '@shared/types/agentManifest';
+import type { AgentDefinitionSaveResult, AgentManifestDraft } from '@shared/types/agentManifest';
 
 export const serializeAgentManifestDraft = (draft: AgentManifestDraft): string => JSON.stringify({
   id: draft.id,

@@ -116,6 +116,7 @@ export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_ROUTE_MISSING'
   | 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
   | 'CONVERSATION_LLM_TOOLS_UNAVAILABLE'
+  | 'CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED'
   | 'CONVERSATION_LLM_REQUEST_FAILED'
   | 'CONVERSATION_CONTEXT_COMPACTION_FAILED'
   | 'CONVERSATION_ARTIFACT_QUOTA_EXCEEDED'
@@ -204,7 +205,6 @@ export interface ConversationToolApproval {
 }
 
 export interface ConversationLoopResult {
-  text?: string;
   status: ConversationLoopResultStatus;
   stopReason?: ConversationLoopStopReason;
   outputPhase?: ConversationLoopOutputPhase;
@@ -212,14 +212,28 @@ export interface ConversationLoopResult {
   toolCallIds: string[];
 }
 
-/** One provider text item, retained at its first visible position throughout the turn. */
-export interface ConversationOutputItem {
+/** One provider text block, kept at its first visible position for the whole turn. */
+export interface ConversationTextItem {
+  kind: 'text';
   providerOutputRef: ProviderOutputRef;
   text: string;
+  /** Provider-declared phase, or the one the runtime stamps once when the loop settles. */
   phase?: ConversationLoopOutputPhase;
   status: 'streaming' | 'complete';
   displayOrder: number;
 }
+
+/** One provider thinking block; a loop may stream several, each in its own place. */
+export interface ConversationThinkingItem {
+  kind: 'thinking';
+  providerOutputRef: ProviderOutputRef;
+  thinking: ThinkingArtifact;
+  status: ConversationThinkingStatus;
+  displayOrder: number;
+}
+
+/** What a model turn produced, in the order it became visible. */
+export type ConversationLoopItem = ConversationTextItem | ConversationThinkingItem;
 
 export interface ConversationWorkBlock {
   id: string;
@@ -237,14 +251,11 @@ export interface ConversationWorkBlock {
   summary?: string;
   /** Diagnostic blocks only: preserves runtime severity through storage and renderer projection. */
   diagnosticSeverity?: ConversationDiagnosticSeverity;
-  thinking?: ThinkingArtifact;
-  thinkingStatus?: ConversationThinkingStatus;
-  /** First visible thinking event in the same sequence as tool calls and output items. */
-  thinkingDisplayOrder?: number;
   /** llm_turn only: how provider reasoning was delivered for this loop. */
   reasoningState?: ConversationReasoningState;
   result?: ConversationLoopResult;
-  outputItems?: ConversationOutputItem[];
+  /** llm_turn only: text and thinking in visible order, sharing one display sequence with tool calls. */
+  items?: ConversationLoopItem[];
   toolCalls: ConversationToolCall[];
   startedAt: number;
   completedAt?: number;
@@ -282,6 +293,8 @@ export interface ConversationMessage {
   status?: ConversationMessageStatus;
   updatedAt?: number;
   workTrace?: ConversationWorkTrace | null;
+  /** The stored process record was written by an older version and is no longer shown. */
+  workTraceDiscarded?: boolean;
   diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];
   createdAt: number;

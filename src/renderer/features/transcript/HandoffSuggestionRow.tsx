@@ -1,9 +1,9 @@
 import React from 'react';
-import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
 import { useHandoffSuggestionActions } from '../../hooks/useHandoffSuggestionActions';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useI18n } from '../../i18n';
+import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 
 export const HandoffSuggestionRow: React.FC<{
   suggestions: PlanReviewHandoffSuggestion[];

@@ -1,10 +1,4 @@
 import { generateShortId } from '@shared/utils/id';
-import type {
-  KnowledgeCardRecord,
-  KnowledgeReviewRecord,
-  KnowledgeSpace,
-  SessionKnowledgeCandidate,
-} from '@shared/types/knowledge';
 import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
 import { KnowledgeAssetsMissingError, KnowledgeCandidateRequiresIntentError } from './knowledgeErrors';
 import {
@@ -13,6 +7,12 @@ import {
   type KnowledgeDurableStore,
 } from './KnowledgeDurableStore';
 import { knowledgeQueryService } from './KnowledgeQueryService';
+import type {
+  KnowledgeCardRecord,
+  KnowledgeReviewRecord,
+  KnowledgeSpace,
+  SessionKnowledgeCandidate,
+} from '@shared/types/knowledge';
 
 export type { SessionKnowledgeCandidate };
 

@@ -203,7 +203,7 @@ describe('knowledge mutation approval boundaries', () => {
     expect(writeMocks.write).not.toHaveBeenCalled();
   });
 
-  it('imports into the chosen space without a second write dialog', async () => {
+  it('imports into the chosen space only after the person confirms in main', async () => {
     const imported = {
       candidateCreated: false as const,
       verified: false as const,
@@ -215,16 +215,21 @@ describe('knowledge mutation approval boundaries', () => {
       }],
     };
     vi.mocked(knowledgeImportService.importToSpace).mockResolvedValueOnce(imported);
-    const result = await handlers.get('knowledge:import')!({}, {
-      spaceId: 'user',
-      source: 'case_id: same\ntitle: Same\nsymptoms: darker',
-    });
-    expect(result).toEqual(imported);
+    const request = { spaceId: 'user', source: 'case_id: same\ntitle: Same\nsymptoms: darker' };
+
+    // No window to confirm in: nothing is written.
+    await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual({ cancelled: true });
+    expect(knowledgeImportService.importToSpace).not.toHaveBeenCalled();
+
+    electronState.focused = {};
+    vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false });
+    await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual({ cancelled: true });
+    expect(knowledgeImportService.importToSpace).not.toHaveBeenCalled();
+
+    vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 0, checkboxChecked: false });
+    await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual(imported);
     expect(knowledgeImportService.migrateSessionDrafts).not.toHaveBeenCalled();
-    expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith({
-      spaceId: 'user',
-      source: 'case_id: same\ntitle: Same\nsymptoms: darker',
-    });
+    expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith(request);
     expect(writeMocks.write).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,7 @@
 import React from 'react';
+import { Button } from '../../../../ui/Button';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { Button } from '../../../../ui/Button';
 import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];

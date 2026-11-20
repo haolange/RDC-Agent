@@ -1,8 +1,3 @@
-import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
-import type { ConversationDiagnosticSeverity } from '@shared/types/conversation';
-import type { ProviderReasoningContract } from '@shared/types/rdcRuntime';
-import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import { createFailClosedProviderContracts, createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import {
   hasImplementedStructuredToolAdapter,
@@ -10,6 +5,11 @@ import {
 } from '@shared/utils/agentToolCapability';
 import { classifyProviderError } from '../providers/internal/errorClassifier';
 import { ProviderHttpError } from '../providers/internal/http';
+import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
+import type { ConversationDiagnosticSeverity } from '@shared/types/conversation';
+import type { ProviderReasoningContract } from '@shared/types/rdcRuntime';
+import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 
 export interface RouteCapabilityDiagnostic {
   code:

@@ -1,10 +1,11 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { translate } from '../../i18n/messages';
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 import { describe, expect, it, vi } from 'vitest';
+import { translate } from '../../i18n/messages';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import { ToolOutcomeSummary } from './ToolOutcomeSummary';
+
+const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t }) }));
 

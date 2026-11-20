@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { SettingsSection } from './types';
 import { matchSettingsSearchEntries, SETTINGS_SEARCH_INDEX } from './settingsSearchIndex';
+import type { SettingsSection } from './types';
 
 const titles: Record<string, string> = {
   'settings.general': 'General',

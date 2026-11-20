@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentMessage, AssistantMessage, UserMessage } from '../core/types';
 import { RecoverableContextWindow } from './RecoverableContextWindow';
+import type { AgentMessage, AssistantMessage, UserMessage } from '../core/types';
 
 const user = (content: string): UserMessage => ({ role: 'user', content, timestamp: 1 });
 const assistant = (text: string): AssistantMessage => ({ role: 'assistant', content: [{ type: 'text', text }], model: 'fixture', provider: 'fixture', usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, timestamp: 2, stopReason: 'stop' });

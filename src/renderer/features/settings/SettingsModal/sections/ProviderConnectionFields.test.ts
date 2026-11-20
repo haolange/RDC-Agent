@@ -1,8 +1,8 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import { createProviderConnectionDraft } from '../providerConnectionState';
 import { ProviderConnectionFields } from './ProviderConnectionFields';
+import type { LlmProviderEntry } from '@shared/types/settings';
 
 function elements(node: React.ReactNode): React.ReactElement<Record<string, unknown>>[] {
   return React.Children.toArray(node).flatMap((child) => {

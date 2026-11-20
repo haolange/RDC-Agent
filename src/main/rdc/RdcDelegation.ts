@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { PromptSegment } from '@shared/types/rdcRuntime';
-import { hashScopedResource } from '../runtime/ScopedResourceResolver';
 import { charsToTokens } from '@shared/utils/tokens';
+import { hashScopedResource } from '../runtime/ScopedResourceResolver';
+import type { PromptSegment } from '@shared/types/rdcRuntime';
 
 const RdcDelegationSchema = z.object({ rdc: z.object({ requiresLease: z.literal(true) }).strict() }).strict();
 

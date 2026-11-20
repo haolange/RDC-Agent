@@ -1,9 +1,9 @@
-import type { ReplayDeviceIssue, SessionDevicePreparation } from '@shared/types/device';
 import { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
-import type { TranslationKey } from '../i18n';
 import { Button } from '../ui/Button';
 import { Details } from '../ui/Details';
+import type { TranslationKey } from '../i18n';
+import type { ReplayDeviceIssue, SessionDevicePreparation } from '@shared/types/device';
 import './DevicePreparationStatus.css';
 
 export const DEVICE_PHASE_KEYS: Record<SessionDevicePreparation['phase'], TranslationKey> = {

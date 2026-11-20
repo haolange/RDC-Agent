@@ -1,8 +1,8 @@
-import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
-import type { PlanReviewDecision } from '@shared/types/planReview';
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { supersedePreviousPlanReviews, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import type { PlanReviewDecision } from '@shared/types/planReview';
+import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 
 export function isPlanReviewApprovalPayload(payload: { kind?: string; toolName?: string }): boolean {
   return payload.kind === 'plan_review' || normalizeToolName(String(payload.toolName ?? '')) === 'plan_artifact';
@@ -23,8 +23,8 @@ export function applyPlanReviewRequested(input: {
   const pausedTrace = input.workTrace
     ? {
         ...input.workTrace,
-        blocks: input.workTrace.blocks.map((block) => block.thinkingStatus === 'streaming'
-          ? { ...block, thinkingStatus: 'complete' as const }
+        blocks: input.workTrace.blocks.map((block) => block.items?.some((item) => item.kind === 'thinking' && item.status === 'streaming')
+          ? { ...block, items: block.items.map((item) => item.kind === 'thinking' ? { ...item, status: 'complete' as const } : item) }
           : block),
       }
     : input.workTrace;

@@ -20,7 +20,7 @@ Agent loop 不把“耗尽 turns”或“重复相同工具轮次”当作完成
 
 ### 首次使用与本机安装
 
-上手指南是四步图文操作教程，首次 bootstrap 后展示，标题栏问号可重开。每页解释操作入口、动作与完成预期；本地教学图与 HTML 双语标注分离，标明示意而非当前配置。桌面左文右图、窄屏上图下文，沿用 TaskDialog 与固定底部导航。关闭/完成只确认已阅读，标记写 Electron 应用状态目录；不创建 Project、不保存 Provider、不执行模型请求。Builtin 直接读取随应用打包的文件，不写 user seed。
+首次使用不弹引导：空工作台按当前配置列出仍缺的准备项（RDC 工具、模型服务、项目），每项直达对应设置或添加项目，全部完成后消失；不记录已读状态，不创建 Project、不保存 Provider、不执行模型请求。Builtin 直接读取随应用打包的文件，不写 user seed。
 
 Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。主进程按宿主布局（`src/main/platform/rdcLayout.ts`，与 RDC-Tool `HOST_LAYOUTS` 一致）从根目录派生同安装捆绑 Python 与 CLI，安装根由捆绑 Python 路径去掉布局后缀得到，验证 catalog 后由 Settings 边界保存。检测只读已配置位置，Windows 另读安装器默认 `%LOCALAPPDATA%/Programs/rdc-tool`，Linux 只检查已配置或选择的根目录；用户确认前不执行候选。根目录不是第二份持久配置。失败保留原配置；未配置 RDC 不阻塞 General。
 
@@ -30,7 +30,7 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 1. **单一真相**：Session / Conversation / branch / journal 是会话历史权威；Agent slot 是执行配置与缓存，不是私有历史。
 2. **冻结执行**：`EffectiveRuntimePlan`（`schemaVersion: 3`，含 `planId` / fingerprint 与冻结工具/策略约束面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用冻结约束；主进程 mode/revision 在工具准入和每次 Provider 请求前采样，不进入冻结权限约束。
-3. **主进程权威**：权限、secret、MCP trust、Shell、RDC CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
+3. **主进程权威**：权限、secret、MCP trust、Shell、RDC CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。需要人确认的变更（trust、知识/记忆/计划写入）由主进程原生对话框确认；安全决定只追加写入 `state/audit.jsonl`。
 4. **Scope 固定**：用户资源 `~/.rdc-agent`，项目资源 `<project-root>/.rdc-agent`（用户点保存的计划在 `plans/<sessionId>/`）；无配置 workspace root、无旧目录 fallback、无静默迁移。
 5. **Provider 事实分层**：Manifest 是**基线真值**（baseline truth），Discovery 是**候选验证**（candidate validation），用户覆盖（`models.json`）是**显式覆盖，自带 provenance**（explicit override with provenance），三者合并为 EffectiveCatalog。模型/协议/控件基线事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery 与 user-override。用户覆盖不得触及 route.protocol、authSchemaId、adapterId、compatibilityGroup、carrier 等安全/延续性字段。
    `catalogRevision` 只冻结 Effective Catalog 的可执行/可选择语义；刷新仅更新 provenance 时间戳时 revision 稳定，route、control、availability、quota 等有效语义变化时才更新。
@@ -89,7 +89,8 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - **Capability unknown**：`toolCalling.state === unknown` → text-only，不进入 Agent/Composer 可执行集合；仅 `supported` 且具备已实现 structured-tool adapter 才 `native-structured`。`unsupported` 保持明确拒绝诊断，不复用到 unknown。
 - **输出通道**：`ProviderOutputRef` 一经声明永久归属 `thinking` | `text` | `tool_call` 之一；ref 承载 provider 侧 block 身份，已关闭的 block 不复用，多 part / 多 item 映射到不同 ref；普通 assistant text 永不合成 thinking。输出项的 provider phase 独立保留并在同源 Responses 历史中回放；未确认阶段的文本以中性状态原位流式呈现，只有正常结束确认的 `final_answer` 进入 canonical 正文。
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不进入 renderer / IPC 明文 / Trace / RequestPlan。
-- **Browser Bridge (debug-only)**: only `RDC_AGENT_BROWSER_QA=1` (launcher browser/browser-dev) starts it. The authoritative entry is the one-time `/qa?qaBootstrap=...` URL printed by the launcher; successful bootstrap mints an HttpOnly `SameSite=Strict` cookie (with `Secure` for HTTPS) and redirects to clean `/app` on the **same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge (including HMR WebSocket); the browser never opens the Vite port and never carries bridge auth or a challenge in a URL query. Cookie-authenticated `/invoke`, `/events`, and `/api/*` require `Origin` equal to the bridge origin. Dev proxy strips `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*` before forwarding to Vite. Programmatic clients may use an explicit Bearer header. Channel capability is a closed `Record<RendererInvokeChannel, BridgeChannelCapability>` in `src/shared/renderer-api/channelCapabilities.ts`; TypeScript forces every new channel to be classified; unknown channels fail closed. `high-impact` additionally requires `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; `desktop-only` is always denied. Browser and Desktop share the single `src/shared/renderer-api` ElectronAPI factory and channel manifest. This surface is never part of the release default path. See docs/contracts/permissions.md and docs/architecture/browser-qa-surface.md.
+- **Browser Bridge (debug-only)**: only `RDC_AGENT_BROWSER_QA=1` (launcher browser/browser-dev) in an unpackaged build starts it; a packaged build never starts it, and every request must carry the bridge's own `Host`. The authoritative entry is the one-time `/qa?qaBootstrap=...` URL printed by the launcher; successful bootstrap mints an HttpOnly `SameSite=Strict` cookie (with `Secure` for HTTPS) and redirects to clean `/app` on the **same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge (including HMR WebSocket); the browser never opens the Vite port and never carries bridge auth or a challenge in a URL query. Cookie-authenticated `/invoke`, `/events`, and `/api/*` require `Origin` equal to the bridge origin. Dev proxy strips `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*` before forwarding to Vite. Programmatic clients may use an explicit Bearer header. Channel capability is a closed `Record<RendererInvokeChannel, BridgeChannelCapability>` in `src/shared/renderer-api/channelCapabilities.ts`; TypeScript forces every new channel to be classified; unknown channels fail closed. `high-impact` additionally requires `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; `desktop-only` is always denied. Browser and Desktop share the single `src/shared/renderer-api` ElectronAPI factory and channel manifest. This surface is never part of the release default path. See docs/contracts/permissions.md and docs/architecture/browser-qa-surface.md.
+- **项目自带资源**：项目 Agent profile、hook、MCP 都要显式 trust 才生效，trust 绑定文件/可执行 bytes，变化即失效；项目 profile 与子代理只能收紧天花板（子代理取父回合与自身的较严者）。
 - **MCP project**：同 ID 不覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust；运行时连接按 `projectRoot + descriptorHash` 建立独立 ref-counted pool，handoff 只属于当前 Turn terminal result。
 - **MCP transport**：仅 `stdio` / `streamable-http`；`sse` 配置 fail-closed（`MCP_TRANSPORT_UNSUPPORTED`）。Pool identity：`realpath + projectId + descriptorHash`；失败缓存指数退避；orphan pool quarantine。
 - **RDC**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 CLI 与应用固定生命周期对接。Mission 只读面与 `rdc_probe` 见裁决 J。
@@ -125,13 +126,24 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - `docs/architecture/` — [`README.md`](docs/architecture/README.md)（模块地图与数据流入口）、[`browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)（Browser QA 与桌面 channel 矩阵，debug-only）、[`rdc-runtime.md`](docs/architecture/rdc-runtime.md)（RDC 操作契约、lease、回放身份）、[`host-platform.md`](docs/architecture/host-platform.md)（宿主平台模块、能力契约、门禁、Linux 密钥策略）
 - `docs/workflows/` — [`README.md`](docs/workflows/README.md)；当前执行计划为 [`vertical-investigation-convergence.md`](docs/workflows/vertical-investigation-convergence.md)
 
+### 进程间与主进程依赖方向
+
+ESLint `no-restricted-imports` 强制以下方向（`eslint.config.mjs`）：
+
+- `src/shared` 在每个进程里运行：不 import Node 内建模块（`fs`、`crypto`、`node:*` …），也不 import `main` / `renderer` / `preload`。只在主进程用的工具（JSONL、YAML 文件读写、Provider manifest 编译器与 loader）放在 `src/main`；随机数用 Web Crypto。
+- `src/main/platform` 与 `src/main/provider-catalog` 是叶子：不 import 其它主进程域。
+- `src/main/ipc` 是最外层适配器：只有 `src/main/index.ts` 与 `src/main/browserAppBridge` 调用它；被多个域共用的原语（如单次审批 token）放在 `src/main/runtime`。
+- 生产代码不 import `src/main/testing`。
+
+import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
+
 ### Renderer 架构
 
 视觉定位与 Token 规则由 [`DESIGN.md`](DESIGN.md) 及其 UI 主题文档维护；本文件规定工程分层与运行时约束。
 
 **渲染层分层**：`ui`（无业务原子/分子组件）→ `patterns`（跨 feature 复合，可读 store，不写 store、不直调 IPC）→ `features`（产品面，不横向 import 其它 feature）→ `app` / `shell`（编排与窗口 chrome）。`stores` / `services` / `hooks` / `lib` / `platform` 为被依赖层，不反向 import `features` / `ui` / `patterns` / `app` / `shell`。组件（`.tsx`）不直调 `window.electronAPI`。门禁：`pnpm run check:renderer-structure` + ESLint `no-restricted-imports`。
 
-顶层目录：`app/`（App、bootstrap、WorkbenchShell、theme、contextMenu）、`shell/`（AppShell、TitleBar、ResizeHandle、UserMenu）、`features/`（`transcript` / `composer` / `right-rail` / `sidebar` / `settings` / `knowledge` / `terminal` / `captures` / `onboarding`，CSS 共置）、`patterns/`（含 Markdown）、`ui/`、`stores/`、`services/`、`hooks/`、`lib/`、`platform/`、`i18n.ts`（当前语言 React hook）、`i18n/`（`messages.ts` 纯翻译 + `locales/{en,zh-CN}/<feature>.ts`）、`styles/`（`design-*.css` 与 `global.css`、`global/`；`responsive.css` 仅放真 `@media`）。不存在 `pages/`、`styles/tokens/*`、`styles/base/`、`src/renderer/components`。
+顶层目录：`app/`（App、bootstrap、WorkbenchShell、theme、contextMenu）、`shell/`（AppShell、TitleBar、ResizeHandle、UserMenu）、`features/`（`transcript` / `composer` / `right-rail` / `sidebar` / `settings` / `knowledge` / `terminal` / `captures`，CSS 共置）、`patterns/`（含 Markdown）、`ui/`、`stores/`、`services/`、`hooks/`、`lib/`、`platform/`、`i18n.ts`（当前语言 React hook）、`i18n/`（`messages.ts` 纯翻译 + `locales/{en,zh-CN}/<feature>.ts`）、`styles/`（`design-*.css` 与 `global.css`、`global/`；`responsive.css` 仅放真 `@media`）。不存在 `pages/`、`styles/tokens/*`、`styles/base/`、`src/renderer/components`。
 
 组件按职责和状态所有权划分：feature 专属效果与交互留在所属 feature；只有多个独立消费者共享的行为才上提为 pattern。Pattern 的业务写入经调用方传入回调，不通过取出 store action 间接写入。展示组件接收最小数据与动作；跨 feature 组合由 app 完成。组件样式就近维护，全局 CSS 只承载基础与全局布局；不使用数字分段文件或旧路径转发。结构重组保持已有视觉、交互与 IPC/持久化契约。
 
@@ -237,7 +249,7 @@ Knowledge 位于 `src/main/knowledge/`。主进程服务：`KnowledgeQueryServic
 
 ### J. Mission 工具面
 
-工具按 `observe` / `record` / `mutate` / `execute` 分类，天花板决定工具类，不按 profile id 维护第二份白名单：`read-only` 只留 observe 与 record；`workspace-write` 增加 mutate；`full` 才允许 execute（含原生 `shell.rdc`）；未知工具与 MCP 按 execute 处理。Profile `access-ceiling` 在 (1) profile allowlist 解析（token 展开后过滤）、(2) 冻结 EffectiveRuntimePlan executor、(3) AgentPermissionPolicy hard deny、(4) tool activation 四处同时执行；Full access 不能绕过。内置三 Mission 声明 `read-only` 与 `completion-contract: investigation-report`。
+工具按 `observe` / `record` / `mutate` / `execute` 分类，天花板决定工具类，不按 profile id 维护第二份白名单：`read-only` 只留 observe 与 record；`workspace-write` 增加 mutate；`full` 才允许 execute（含原生 `shell.rdc`）；未知工具与 MCP 按 execute 处理。Profile `access-ceiling` 在 (1) profile allowlist 解析（token 展开后过滤）、(2) 冻结 EffectiveRuntimePlan executor、(3) AgentPermissionPolicy hard deny、(4) tool activation 四处同时执行；Full access 不能绕过。内置三 Mission 声明 `read-only` 与 `completion-contract: investigation-report`。工具在定义处声明效果（读/写路径参数、联网），权限策略只读声明，不按工具名推断；未声明效果的 mutate / execute 工具需审批。
 
 Mission runtime allowlist：
 
@@ -263,7 +275,7 @@ Mission 的禁止面：`shell`、`code_interpreter`、`write` / `edit` / `git` /
 
 ### K. Hook Trust Fingerprint
 
-Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity（`hook-trust.json` schemaVersion 2）。任一变化 → `needsRetrust`；仅 YAML 的旧记录首次加载失效并要求 retrust。user/project 必须显式 trust；builtin 默认信任，内容变化随仓库发布。12 canonical events 走单一 `HookEngine` 路径。
+Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity（`hook-trust.json` schemaVersion 2）。任一变化 → `needsRetrust`；其他形状的信任文件读作无信任。Project MCP 与项目 Agent profile 的 trust 复用同一文件身份（`src/main/runtime/fileIdentity.ts`）。user/project 必须显式 trust；builtin 默认信任，内容变化随仓库发布。12 canonical events 走单一 `HookEngine` 路径。
 
 ### L. Mission Completion Contract
 

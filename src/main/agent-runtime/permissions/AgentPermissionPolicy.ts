@@ -1,30 +1,30 @@
 import * as os from 'os';
+import * as path from 'path';
+import { isToolWithinCeiling, toolAccessOf } from '@shared/constants/toolAccess';
+import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { expandHomePath } from '../../platform/paths';
 import { defaultShellKind } from '../../platform/shell';
+import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
+import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
+import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
+import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
+import { safeResolvePath } from '../tools/primitives/_shared';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
-import * as path from 'path';
+import {
+  matchesDeniedCommandPrefix,
+  shellCommandRiskAnalyzer,
+} from './ShellCommandRiskAnalyzer';
+import {
+  isToolDeniedByPolicy,
+  resolvePolicyApprovalFloor,
+} from './PolicyCompiler';
+import { fileOperationBoundary } from './FileOperationBoundary';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { AgentTool, ToolExecutionContext } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
-import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
-import {
-  matchesDeniedCommandPrefix,
-  shellCommandRiskAnalyzer,
-} from './ShellCommandRiskAnalyzer';
-import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
 import type { ShellKind } from '../../runtime/ShellResolver';
-import {
-  isToolDeniedByPolicy,
-  resolvePolicyApprovalFloor,
-} from './PolicyCompiler';
-import { isToolWithinCeiling } from '@shared/constants/toolAccess';
-import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
-import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
-import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
-import { safeResolvePath } from '../tools/primitives/_shared';
-import { fileOperationBoundary } from './FileOperationBoundary';
 
 /**
  * Agent permission risk classifier for tool / shell calls.
@@ -77,23 +77,12 @@ export interface AgentPermissionDecisionInput {
   /** Current session attachments directory; readable by read-only file tools only. */
   sessionAttachmentsRoot?: string | null;
   /**
-   * Frozen plan knowledge read roots. Merged only into READ_ONLY_FILE_TOOLS.
+   * Frozen plan knowledge read roots. Merged only into tools that declare read effects.
    * Never written into persisted permissionConstraints.readableRoots.
    */
   knowledgeReadRoots?: readonly string[];
 }
 
-export const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
-const MUTATION_TOOLS = new Set([
-  'write_file',
-  'edit_file',
-  'copy_file',
-  'move_file',
-  'delete_file',
-  'notebook_edit',
-  'code_interpreter',
-]);
-const NETWORK_TOOL_NAMES = new Set(['web_fetch', 'web_search']);
 const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
   'dir',
   'ls',
@@ -102,10 +91,6 @@ const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
   'pwd',
   'echo',
   'write-output',
-  'git status',
-  'git diff',
-  'git show',
-  'git log',
 ];
 
 const POSIX_ROUTINE_COMMAND_PREFIXES = [
@@ -114,10 +99,6 @@ const POSIX_ROUTINE_COMMAND_PREFIXES = [
   'echo',
   'which',
   'where',
-  'git status',
-  'git diff',
-  'git show',
-  'git log',
 ];
 const DANGEROUS_COMMAND_PATTERNS = [
   /\brm\b/i,
@@ -151,11 +132,12 @@ function resolveConfiguredRoot(value: string): string {
   return path.resolve(expandHomePath(value));
 }
 
-function resolveToolTarget(value: string, workspaceRoot: string): string {
+/** Without an open project there is no workspace: relative paths resolve where the tool would, and count as external. */
+function resolveToolTarget(value: string, workspaceRoot: string | null): string {
   const expanded = expandHomePath(value);
   return path.isAbsolute(expanded)
     ? path.resolve(expanded)
-    : path.resolve(workspaceRoot, expanded);
+    : path.resolve(workspaceRoot ?? process.cwd(), expanded);
 }
 
 function isWithinRoot(target: string, root: string): boolean {
@@ -164,8 +146,8 @@ function isWithinRoot(target: string, root: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
-function isInsideWorkspace(target: string, workspaceRoot: string): boolean {
-  return isWithinRoot(target, workspaceRoot);
+function isInsideWorkspace(target: string, workspaceRoot: string | null): boolean {
+  return workspaceRoot !== null && isWithinRoot(target, workspaceRoot);
 }
 
 function extractStringArg(toolCall: ToolCall, key: string): string {
@@ -182,46 +164,59 @@ function inferPathTargetFromGlobPattern(pattern: string): string {
   return sepIndex > 0 ? expanded.slice(0, sepIndex) : path.parse(expanded).root;
 }
 
-function extractPathTargets(toolName: string, toolCall: ToolCall): string[] {
-  if (
-    toolName === 'read_file'
-    || toolName === 'read_image'
-    || toolName === 'write_file'
-    || toolName === 'edit_file'
-    || toolName === 'delete_file'
-  ) {
-    const filePath = extractStringArg(toolCall, 'path');
-    if (toolName === 'read_file') {
-      const comparison = toolCall.arguments.compareWith;
-      const comparisonPath = comparison && typeof comparison === 'object' && !Array.isArray(comparison)
-        && 'path' in comparison && typeof comparison.path === 'string' ? comparison.path : '';
-      return [filePath, comparisonPath].filter(Boolean);
+function argumentAt(toolCall: ToolCall, key: string): string {
+  let value: unknown = toolCall.arguments;
+  for (const segment of key.split('.')) {
+    value = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>)[segment] : undefined;
+  }
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/** Filesystem targets named by the tool's declared effects; a glob prefix counts only when no location is given. */
+function effectTargets(tool: AgentTool, toolCall: ToolCall): { reads: string[]; writes: string[] } {
+  const effects = tool.effects;
+  const reads = (effects?.reads ?? []).map((key) => argumentAt(toolCall, key)).filter(Boolean);
+  const writes = (effects?.writes ?? []).map((key) => argumentAt(toolCall, key)).filter(Boolean);
+  if (reads.length === 0 && effects?.readPattern) {
+    const patternTarget = inferPathTargetFromGlobPattern(argumentAt(toolCall, effects.readPattern));
+    if (patternTarget) reads.push(patternTarget);
+  }
+  return { reads, writes };
+}
+
+function declaresReads(tool: AgentTool): boolean {
+  return Boolean(tool.effects?.reads?.length || tool.effects?.readPattern);
+}
+
+/**
+ * Capture inputs, Git metadata and canonical knowledge are never generic write targets in any
+ * mode; protected configuration and credential paths need specific approval even under full access.
+ */
+function classifyWriteTargets(
+  writes: readonly string[],
+  workspaceRoot: string | null,
+  context?: ToolExecutionContext,
+): { denied: string } | { protectedTarget: boolean } {
+  let protectedTarget = false;
+  for (const target of writes) {
+    let resolved = resolveToolTarget(target, workspaceRoot);
+    if (workspaceRoot && isInsideWorkspace(resolved, workspaceRoot)) {
+      try {
+        resolved = safeResolvePath(target, workspaceRoot, context);
+      } catch (error) {
+        return { denied: error instanceof Error ? error.message : String(error) };
+      }
     }
-    return filePath ? [filePath] : [];
+    const boundary = fileOperationBoundary(resolved);
+    if (boundary.readOnly) return { denied: `FILE_WRITE_PROTECTED: ${boundary.reason}` };
+    protectedTarget ||= boundary.protected;
   }
-  if (toolName === 'notebook_edit') {
-    const notebookPath = extractStringArg(toolCall, 'notebook_path');
-    return notebookPath ? [notebookPath] : [];
-  }
-  if (toolName === 'copy_file' || toolName === 'move_file') {
-    return [
-      extractStringArg(toolCall, 'source'),
-      extractStringArg(toolCall, 'destination'),
-    ].filter(Boolean);
-  }
-  if (toolName === 'glob' || toolName === 'grep') {
-    const cwd = extractStringArg(toolCall, 'cwd') || extractStringArg(toolCall, 'path');
-    if (cwd) return [cwd];
-    const patternTarget = toolName === 'glob'
-      ? inferPathTargetFromGlobPattern(extractStringArg(toolCall, 'pattern'))
-      : '';
-    return patternTarget ? [patternTarget] : [];
-  }
-  return [];
+  return { protectedTarget };
 }
 
 function commandUsesExternalPath(command: string, workspaceRoot: string, roots: string[]): boolean {
   const normalized = command.replace(/\\/g, '/');
+  if (/(^|[\s"'=:])\.\.(?:\/|$|[\s"';|&])/.test(normalized)) return true;
   const home = os.homedir().replace(/\\/g, '/');
   const workspace = workspaceRoot.replace(/\\/g, '/');
   const mentionsHome = normalized.includes('~/') || normalized.toLowerCase().includes(home.toLowerCase());
@@ -347,10 +342,7 @@ export class AgentPermissionPolicyService {
     const permissions = { ...input.permissionConstraints, mode: input.permissionState.mode };
     const mode = permissions.mode;
     const toolName = normalizeToolName(input.toolCall.name);
-    const workspaceRoot = path.resolve(
-      input.projectRootPath
-      || process.cwd(),
-    );
+    const workspaceRoot = input.projectRootPath ? path.resolve(input.projectRootPath) : null;
 
     const ceiling = agentAccessCeiling({ accessCeiling: input.accessCeiling });
     if (!toolName.endsWith('*') && !isToolWithinCeiling(toolName, ceiling)) {
@@ -408,10 +400,15 @@ export class AgentPermissionPolicyService {
     permissions: AgentPermissionSettings,
     mode: AgentPermissionMode,
     toolName: string,
-    workspaceRoot: string,
+    workspaceRoot: string | null,
   ): AgentPermissionDecision {
+    const { reads, writes } = effectTargets(input.tool, input.toolCall);
+    const writeClass = classifyWriteTargets(writes, workspaceRoot, input.executionContext);
+    if ('denied' in writeClass) return denied(writeClass.denied);
     if (mode === 'full-access') {
-      return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
+      return writeClass.protectedTarget
+        ? { action: 'ask_user', reason: 'Protected configuration or credential-related write requires specific authorization, including under full access.', risk: 'high', temporaryPathRoots: ['*'] }
+        : { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }
 
     const customRules = mode === 'custom' ? permissions : {
@@ -438,8 +435,11 @@ export class AgentPermissionPolicyService {
       ...(sessionAttachmentsRoot ? [sessionAttachmentsRoot] : []),
     ];
 
-    if (READ_ONLY_FILE_TOOLS.has(toolName)) {
-      const targets = extractPathTargets(toolName, input.toolCall).map((target) => resolveToolTarget(target, workspaceRoot));
+    if (declaresReads(input.tool) && writes.length === 0 && !input.tool.effects?.writes?.length) {
+      if (!workspaceRoot && reads.length === 0) {
+        return request(mode, `No project is open, so "${input.toolCall.name}" has no workspace to read within.`, 'medium');
+      }
+      const targets = reads.map((target) => resolveToolTarget(target, workspaceRoot));
       const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
       if (externalTargets.length === 0) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
@@ -460,7 +460,9 @@ export class AgentPermissionPolicyService {
       }
       return request(
         mode,
-        `Read access is outside the workspace: ${externalTargets.join(', ')}`,
+        workspaceRoot
+          ? `Read access is outside the workspace: ${externalTargets.join(', ')}`
+          : `No project is open; reading requires approval: ${externalTargets.join(', ')}`,
         'medium',
         externalTargets,
       );
@@ -476,6 +478,9 @@ export class AgentPermissionPolicyService {
       if (analysis.risk === 'high' || isDangerousCommand(command)) {
         return request(mode, `Shell command requires review: ${command}`, 'high');
       }
+      if (!workspaceRoot) {
+        return request(mode, `No project is open, so the shell has no workspace to run within: ${command}`, 'medium');
+      }
       if (commandUsesExternalPath(command, workspaceRoot, configuredReadableRoots)) {
         return request(mode, `Shell command references paths outside the workspace: ${command}`, 'medium');
       }
@@ -485,22 +490,17 @@ export class AgentPermissionPolicyService {
       return request(mode, `Shell command is not in the routine command set: ${command}`, 'medium');
     }
 
-    if (MUTATION_TOOLS.has(toolName) || input.tool.permissionHint === 'mutation' || input.tool.permissionHint === 'destructive') {
-      const targets = extractPathTargets(toolName, input.toolCall).map((target) => resolveToolTarget(target, workspaceRoot));
+    if (input.tool.effects?.writes?.length || input.tool.permissionHint === 'mutation' || input.tool.permissionHint === 'destructive') {
+      const targets = [...reads, ...writes].map((target) => resolveToolTarget(target, workspaceRoot));
       const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
-      if (['write_file', 'edit_file'].includes(toolName) && input.projectRootPath && externalTargets.length === 0 && targets.length) {
-        try {
-          const resolved = targets.map(target => safeResolvePath(target, workspaceRoot, input.executionContext));
-          const boundaries = resolved.map(fileOperationBoundary);
-          if (boundaries.some(boundary => boundary.readOnly)) return denied('FILE_WRITE_PROTECTED: capture inputs, Git metadata and canonical knowledge are not generic write targets.');
-          return request(mode, boundaries.some(boundary => boundary.protected)
-            ? 'Protected configuration or credential-related write requires specific authorization.' : 'Bounded workspace text edit; runtime read-before-edit and path checks remain enforced.',
-          boundaries.some(boundary => boundary.protected) ? 'high' : 'low');
-        } catch (error) { return denied(error instanceof Error ? error.message : String(error)); }
+      if (input.tool.effects?.writes?.length && externalTargets.length === 0 && targets.length > 0) {
+        return writeClass.protectedTarget
+          ? request(mode, `Tool "${input.toolCall.name}" writes protected configuration or credential-related paths and requires specific authorization.`, 'high')
+          : request(mode, `Tool "${input.toolCall.name}" changes workspace files; runtime read-before-edit and path checks remain enforced.`, 'low');
       }
       if (mode === 'custom' && externalTargets.length > 0) {
         const allowedTargets = externalTargets.filter((target) => configuredWritableRoots.some((root) => isWithinRoot(target, root)));
-        if (allowedTargets.length === externalTargets.length) {
+        if (allowedTargets.length === externalTargets.length && !writeClass.protectedTarget) {
           return { action: 'allow', risk: 'medium', temporaryPathRoots: allowedTargets };
         }
       }
@@ -514,8 +514,13 @@ export class AgentPermissionPolicyService {
       );
     }
 
-    if (NETWORK_TOOL_NAMES.has(toolName) && mode !== 'custom') {
-      return request(mode, `Network tool "${input.toolCall.name}" requires approval in the current permission mode.`, 'medium');
+    if (input.tool.effects?.network) {
+      return request(mode, `Network tool "${input.toolCall.name}" requires approval: fetched content and requested URLs leave this machine.`, 'medium');
+    }
+
+    const access = toolAccessOf(toolName);
+    if (access === 'mutate' || access === 'execute') {
+      return request(mode, `Tool "${input.toolCall.name}" ${access === 'execute' ? 'runs a process or external integration' : 'changes workspace or user resources'}.`, 'medium');
     }
 
     return { action: 'allow', risk: 'low', temporaryPathRoots: [] };

@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { AgentTool } from '../../agent/AgentTool';
 import { assertFileSizeCap, assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../primitives/_shared';
 import { NOTEBOOK_MAX_BYTES } from '../primitives/toolLimits';
+import type { AgentTool } from '../../agent/AgentTool';
 
 interface NotebookEditParams {
   notebook_path: string;
@@ -32,6 +32,7 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
+  effects: { writes: ['notebook_path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

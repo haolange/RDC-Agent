@@ -3,8 +3,6 @@
  */
 
 import { BrowserWindow, nativeTheme } from 'electron';
-import type { ActionEvent } from '@shared/types/evidence';
-import type { SessionRecord } from '@shared/types/session';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
@@ -15,6 +13,7 @@ import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { applyProductIcon } from '../window/productIcon';
 import { sessionResumeService } from '../sessions/store/SessionResumeService';
+import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import { registerMemoryHandlers } from './memoryHandlers';
 import { registerInvestigationHandlers } from './investigationHandlers';
 import { registerKnowledgeHandlers } from './knowledgeHandlers';
@@ -33,7 +32,8 @@ import { registerWorkflowHandlers } from './workflowHandlers';
 import { registerTraceHandlers } from './traceHandlers';
 import { registerRdcRuntimeHandlers } from './rdcRuntimeHandlers';
 import { assertRendererIpcParity, installIpcInvokeRegistry } from './invokeRegistry';
-import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import type { SessionRecord } from '@shared/types/session';
+import type { ActionEvent } from '@shared/types/evidence';
 import type {
   ProjectSelectionResult,
   RunLifecyclePatch,

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { EffectiveCatalogRequest } from './effectiveCatalogTypes';
 import { revisionFor } from './effectiveCatalogMerge';
+import type { EffectiveCatalogRequest } from './effectiveCatalogTypes';
 
 /** Configuration identity excludes renewed evidence and audit timestamps. */
 function configurationFacts(value: unknown): unknown {

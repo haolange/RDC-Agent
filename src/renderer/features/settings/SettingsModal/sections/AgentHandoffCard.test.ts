@@ -2,8 +2,8 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { AgentHandoffDefinition } from '@shared/types/agentManifest';
 import { AgentHandoffCard } from './AgentHandoffCard';
+import type { AgentHandoffDefinition } from '@shared/types/agentManifest';
 
 it('edits and clears optional locale labels while retaining them through default-label edits', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

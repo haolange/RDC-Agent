@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import type { KnowledgeCardRecord } from '@shared/types/knowledge';
 import { issueKnowledgeWrite } from './knowledgeWriteConfirm';
+import type { KnowledgeCardRecord } from '@shared/types/knowledge';
 
 it('routes a human retirement through the promote approval and retired lifecycle', async () => {
   const after: KnowledgeCardRecord = {

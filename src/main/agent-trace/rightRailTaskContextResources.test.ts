@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { collectSessionTaskContextResources } from './rightRailTaskContextResources';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 import type { PromptSegment } from '@shared/types/rdcRuntime';
-import { collectSessionTaskContextResources } from './rightRailTaskContextResources';
 
 const message = (blocks: ConversationWorkBlock[]): ConversationMessage => ({
   id: 'assistant-1', turnId: 'turn-1', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: '', status: 'streaming', createdAt: 1, updatedAt: 1,

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationAskUserQuestion, ConversationMessage } from '@shared/types/conversation';
 import {
   applyCustomDraft,
   applyOptionDraft,
@@ -12,6 +11,7 @@ import {
   type PendingUserInputRequest,
   type UserInputAnswerDrafts,
 } from './userInputRequestModel';
+import type { ConversationAskUserQuestion, ConversationMessage } from '@shared/types/conversation';
 
 const questions: ConversationAskUserQuestion[] = [
   {

@@ -34,8 +34,8 @@ vi.mock('../platform/process', () => ({
   isolatedChildSpawnOptions: () => ({}),
 }));
 
-import { withProcessExecutionOwner } from './ResourceExecutionLifetime';
 import { ToolResourceArbiter } from '../agent-runtime/orchestration/ToolResourceArbiter';
+import { withProcessExecutionOwner } from './ResourceExecutionLifetime';
 import { ProcessSupervisor } from './ProcessSupervisor';
 
 describe('ProcessSupervisor bounded join', () => {

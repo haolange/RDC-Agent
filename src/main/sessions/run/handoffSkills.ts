@@ -1,8 +1,8 @@
-import { planReviewStateStore } from './PlanReviewStateStore';
+import { z } from 'zod';
 import { storageAdapter } from '../store/StorageAdapter';
+import { planReviewStateStore } from './PlanReviewStateStore';
 import { executionOfferMatches } from './ExecutionOfferStore';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
-import { z } from 'zod';
 
 const completionReceiptSchema = z.object({
   offerId: z.string().uuid().optional(), planUri: z.string().min(1),

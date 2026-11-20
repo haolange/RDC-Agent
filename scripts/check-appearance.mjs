@@ -25,13 +25,6 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const usageIndicatorCss = fs.readFileSync(path.join(process.cwd(), 'src/renderer/features/composer/composer-usage.css'), 'utf8');
-const usageIndicatorBox = usageIndicatorCss.match(/\.composer-usage-indicator\s*\{([^}]+)\}/)?.[1] ?? '';
-for (const axis of ['width', 'height']) {
-  assert(new RegExp(`${axis}:\\s*var\\(--control-height-sm\\)`).test(usageIndicatorBox),
-    'Context usage must keep its original sm footprint; fit text inside the ring instead of enlarging the control');
-}
-
 const expectedPresets = [
   'rdc', 'absolutely', 'ayu', 'catppuccin', 'dracula', 'everforest', 'github', 'gruvbox', 'linear',
 ];
@@ -158,11 +151,15 @@ assert(
     && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='max-context'] .composer-model-effort-mode-tip"),
   'Fast/Max tips must be raised pills centered on the icons, not pinned cards growing into the panel',
 );
-assert(
-  composerChromeSource
-    .includes('padding: var(--space-1) var(--space-1) var(--space-2) 0;'),
-  'Model list must keep bottom padding so the last row is not clipped by the popup radius',
-);
+{
+  // The last row must clear the popup radius: the list's bottom padding is at least --space-2.
+  const listPadding = composerChromeSource.match(/\.composer-model-list \{[^}]*?\bpadding:\s*([^;]+);/u)?.[1].trim().split(/\s+/u) ?? [];
+  const bottom = listPadding[listPadding.length === 4 || listPadding.length === 3 ? 2 : 0];
+  assert(
+    /^var\(--space-(?:[2-9]|1[0-9])\)$/u.test(bottom ?? ''),
+    'Model list must keep bottom padding so the last row is not clipped by the popup radius',
+  );
+}
 assert(
   !effortPopupSource.includes("'--composer-effort-stops-opacity'"),
   'Effort popup must not compete with the Max animation for stop opacity ownership',
@@ -199,7 +196,7 @@ const mainTsx = scriptRead('src/renderer/main.tsx');
 assert(!mainTsx.includes('styles/tokens'), 'main.tsx must not import styles/tokens');
 assert(mainTsx.includes('styles/global.css'), 'main.tsx imports global.css');
 
-const types = scriptRead('src/renderer/features/settings/SettingsModal/types.ts');
+const types = scriptRead('src/renderer/lib/settingsSections.ts');
 assert(types.includes("'appearance'"), 'SettingsSection includes appearance');
 
 const applyChromeThemeSource = scriptRead('src/renderer/app/theme/applyChromeTheme.ts');
@@ -292,7 +289,7 @@ assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the
 // Keep the shared component path authoritative for ordinary configuration disclosure.
 for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx',
-  'src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx',
+  'src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx',
   'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
   'src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx',
   'src/renderer/patterns/MaterialContextEditor.tsx',

@@ -1,9 +1,9 @@
-import type { SessionScope } from '@shared/types/session';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, type RdcNativeEnvelope } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity, type RdcProcessIdentity } from './RdcProcessIdentity';
 import { assertRdcContextLeaseOwnership, quarantineRdcContext } from './RdcRuntimeContextRegistry';
 import { validateRdcSwitchSnapshot } from './RdcSwitchSnapshot';
+import type { SessionScope } from '@shared/types/session';
 import type { RdcTurnBinding } from './RdcTurnBindings';
 
 /** Close a replay and file whose native success payloads do not carry a context identity. */

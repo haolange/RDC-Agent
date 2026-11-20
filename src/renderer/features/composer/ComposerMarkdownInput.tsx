@@ -5,8 +5,8 @@ import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/vi
 import { Prec, type Extension } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
 import { registerCodeMirrorView } from '../../lib/contextMenuCommands';
-import { useComposerMarkdownSizing } from './useComposerMarkdownSizing';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { useComposerMarkdownSizing } from './useComposerMarkdownSizing';
 import './ComposerMarkdownInput.css';
 
 export type ComposerMarkdownMode = 'write' | 'preview';
@@ -28,7 +28,7 @@ const composerEditorTheme = EditorView.theme({
     height: '100%',
     backgroundColor: 'transparent',
     color: 'var(--token-text-body)',
-    /* Inherit host (= .composer-textarea → --text-base); never --text-md. */
+    /* Inherit host (= .composer-textarea → --type-body-size); never a larger role. */
     fontSize: 'inherit',
     lineHeight: 'inherit',
   },

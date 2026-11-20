@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Superseded PR pushes are cancelled; every main and tag run completes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -50,14 +51,10 @@ jobs:
           RDC_SYSTEM_DEBT_BASE_REF: ${{ steps.base.outputs.sha }}
           RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:gates
-      - run: pnpm run check:provider-catalog
-      - run: pnpm run check:scoped-resources
-      - run: pnpm run check:project-instructions
-      - run: pnpm run check:prompt-plan-snapshot
-      - run: pnpm run check:skills
-      - run: pnpm run check:hooks
-      - run: pnpm run check:memory-policy
-      - run: pnpm run check:contracts
+      # The focused check:* vitest scripts (scoped resources, project instructions, prompt plan
+      # snapshot, skills, hooks, memory policy, contracts, catalog compiler) run inside
+      # test:coverage above; only their non-vitest halves run here.
+      - run: node scripts/check-agent-tool-capability.mjs
       - run: pnpm run check:request-cache-profile
       - name: Check git diff whitespace
         env:

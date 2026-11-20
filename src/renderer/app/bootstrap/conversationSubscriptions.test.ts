@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { subscribeConversation } from './conversationSubscriptions';
 import type { ElectronAPI } from '@shared/types/electron';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
-import { subscribeConversation } from './conversationSubscriptions';
 
 const state = vi.hoisted(() => ({
   currentSession: 'a',

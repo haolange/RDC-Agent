@@ -1,8 +1,8 @@
 import { promises as fs } from 'node:fs';
-import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { KnowledgeAssetsMissingError } from './knowledgeErrors';
 import { resolveWithinRoot } from './knowledgeFs';
 import { isKnowledgeImagePathAllowed, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
+import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 
 /** Check the authoritative space files, not renderer-provided image preview state. */
 export async function assertKnowledgeImagesAvailable(

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import {
   createContinuationArtifact,
   toContinuationMetadata,
 } from './ContinuationArtifacts';
 import { decideContinuationReplay } from './ContinuationReplayPolicy';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 
 type Policy = ProviderContractBundle['reasoning']['continuation'];
 type ArtifactPolicy = ProviderContractBundle['toolLoop']['artifactPolicy'];

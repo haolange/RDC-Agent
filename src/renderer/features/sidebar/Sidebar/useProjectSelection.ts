@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../../stores/projectStore';
-import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { ProjectSelectionHandlerOpsContext } from './projectSelectionContext';
 import {
   handleAddProjectOp,
   handleOpenExplorerOp,
@@ -15,6 +13,8 @@ import {
   handleSessionRemoveOp,
 } from './projectSelectionSessionOps';
 import { useProjectSelectionLoaders } from './useProjectSelectionLoaders';
+import type { ProjectSelectionHandlerOpsContext } from './projectSelectionContext';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 interface UseProjectSelectionOptions {
   ensureProjectExpanded: (projectId: string) => void;

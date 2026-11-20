@@ -1,14 +1,14 @@
 import React, { useCallback, useRef, useState } from 'react';
-import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
-import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import { formatTokenCount } from '@shared/utils/tokens';
+import { formatUsdCost } from '@shared/utils/cost';
+import { useI18n } from '../i18n';
 import {
   awaitsExecutionContextWindow,
   resolveDisplayedPromptBudget,
   type ContextUsageSelectedProfile,
 } from './contextUsageDisplay';
-import { formatTokenCount } from '@shared/utils/tokens';
-import { formatUsdCost } from '@shared/utils/cost';
-import { useI18n } from '../i18n';
+import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 
@@ -110,7 +110,6 @@ export const ContextUsageIndicator: React.FC<{
         className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' || awaitingWindow ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
         data-estimated={showEstimatedRing ? 'true' : undefined}
-        data-value-length={valueText.length > 4 ? 'long' : valueText.length === 4 ? 'medium' : undefined}
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}

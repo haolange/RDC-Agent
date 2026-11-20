@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import type { ThemeChromeConfig, ThemePresetId, ThemeVariant } from '@shared/types/settings';
 import { THEME_PRESET_CATALOG, getPresetChrome } from '@shared/theme/presets';
 import { serializeRdcThemeV1 } from '@shared/theme/rdcThemeV1';
 import { useDynStyle } from '../../../../lib/useDynStyle';
@@ -8,6 +7,7 @@ import { ColorField } from '../../../../ui/ColorField';
 import { Select } from '../../../../ui/Select';
 import { AppearanceFontField } from './AppearanceFontField';
 import { ThemeImportDialog } from './ThemeImportDialog';
+import type { ThemeChromeConfig, ThemePresetId, ThemeVariant } from '@shared/types/settings';
 import type { AppearanceTranslate } from './appearanceChromeModel';
 
 export type { AppearanceTranslate };

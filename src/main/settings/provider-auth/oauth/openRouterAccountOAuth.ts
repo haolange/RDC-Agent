@@ -1,20 +1,21 @@
 import { randomUUID } from 'crypto';
 import { createServer } from 'http';
-import type { LlmProviderModel } from '@shared/types/settings';
 import { getLoadedProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { parseOpenRouterAccountCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
 import { buildOpenRouterAuthorizationUrl, buildOpenRouterExchange, createPkcePair, parseOpenRouterExchange } from '../../provider-catalog/LiveProviderOAuthContracts';
+import { fetchJson } from './oauthHttp';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
-import { fetchJson } from './oauthHttp';
+import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
 export async function startOpenRouterLogin(
+  providerId: LlmProviderId,
   setFlow: (flow: OAuthFlowState) => void,
   startCallbackServer: (flow: OAuthFlowState, challenge: string) => Promise<void>,
 ): Promise<OAuthFlowState> {
   const { verifier, challenge } = createPkcePair();
   const flow: OAuthFlowState = {
-    providerId: 'openrouter',
+    providerId,
     flowId: randomUUID(),
     state: randomUUID(),
     codeVerifier: verifier,
@@ -36,7 +37,7 @@ export async function exchangeOpenRouterCode(flow: OAuthFlowState, code: string)
   });
   const exchange = parseOpenRouterExchange(payload);
   return {
-    providerId: 'openrouter',
+    providerId: flow.providerId,
     apiKey: exchange.apiKey,
     accountId: exchange.userId ?? `openrouter-${randomUUID()}`,
     authorizationMode: 'browser',
@@ -52,7 +53,7 @@ export async function discoverOpenRouterCatalog(bundle: OAuthSecretBundle): Prom
     method: 'GET',
     headers: { Accept: 'application/json', Authorization: `Bearer ${bundle.apiKey}` },
   });
-  const surface = getLoadedProviderSurface('openrouter');
+  const surface = getLoadedProviderSurface(bundle.providerId);
   if (!surface) throw new Error('OpenRouter compiled surface is unavailable.');
   const parsed = parseOpenRouterAccountCatalog(payload, surface);
   if (parsed.models.length === 0) throw new Error('OpenRouter OAuth catalog returned no agent-routable models.');

@@ -1,19 +1,22 @@
+import { randomUUID } from 'node:crypto';
 import { settingsService } from '../settings/settings-core/SettingsService';
+import { shellInvocationService } from '../tools/ShellInvocationService';
+import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import { closeOwnedRemoteCapture } from './RdcCaptureClose';
-import { shellInvocationService } from '../tools/ShellInvocationService';
 /**
  * RdcSessionService - RDC runtime context state and fixed native CLI lifecycle.
  */
 
-import { randomUUID } from 'node:crypto';
 import { withRdcOpenProgress } from './RdcOpenProgress';
 import { withRdcRemoteProgress, type RdcRemoteProgress } from './RdcRemoteProgress';
 import { assertRemotePreparationContract, connectSessionReplayDevice, inspectSessionReplayInstallation, remotePreparationBindingIdentity, revalidateSessionReplayDevice, type RdcRemoteConnection, type RemoteInstallationInspection } from './RdcRemoteConnection';
-import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { setRdcRuntimeContextForSession, getDelegatedChildSessionId } from './RdcRuntimeContextRegistry';
+import { forgetOwnedRdcDaemon, rememberOwnedRdcDaemon } from './OwnedRdcDaemonRegistry';
+import { hostRdcIntermediateRoot, RDC_INTERMEDIATE_ROOT_ENV } from './withRdcHostRuntimeEnv';
 import type {
   CaptureDescriptor,
   ContextSnapshot,
@@ -27,9 +30,6 @@ import type {
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { RdcTurnBinding } from './RdcTurnBindings';
-import { setRdcRuntimeContextForSession, getDelegatedChildSessionId } from './RdcRuntimeContextRegistry';
-import { forgetOwnedRdcDaemon, rememberOwnedRdcDaemon } from './OwnedRdcDaemonRegistry';
-import { hostRdcIntermediateRoot, RDC_INTERMEDIATE_ROOT_ENV } from './withRdcHostRuntimeEnv';
 
 interface PreviewLoadResult {
   preview: OpenedCapturePreview | null;

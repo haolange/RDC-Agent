@@ -1,5 +1,5 @@
 import { ipcMain, shell } from 'electron';
-import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
+import { confirmResourceTrust } from '../window/trustConfirmation';
 import { hookEngine } from '../hooks/HookEngine';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { scopedRuntimeService } from '../runtime/ScopedRuntimeService';
@@ -18,15 +18,18 @@ import {
   ScopedResourceImportArgsSchema,
   ScopedResourceWriteArgsSchema,
 } from './validation/rdcRuntimeSchemas';
+import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
 
-function mutateHookTrust(
+async function mutateHookTrust(
   projectRoot: string | undefined | null,
   hookId: string,
   mutate: (hookId: string, trustRoot?: string) => void,
+  confirm?: (hook: ReturnType<typeof hookEngine.list>[number]) => Promise<boolean>,
 ) {
   const overviewRoot = projectRoot || undefined;
   hookEngine.load(scopedRuntimeService.overview(overviewRoot).userPaths.hooksPath, overviewRoot);
   const hook = hookEngine.list().find((entry) => entry.definition.id === hookId);
+  if (confirm && hook && !await confirm(hook)) return scopedRuntimeService.overview(overviewRoot);
   // Same rule as renderer resolveHookTrustProjectRoot: only project-scope mutations receive a root.
   const trustRoot = hook?.scope === 'project' ? overviewRoot : undefined;
   mutate(hookId, trustRoot);
@@ -101,7 +104,8 @@ export function registerRdcRuntimeHandlers(): void {
     });
     return mutateHookTrust(projectRoot, hookId, (id, trustRoot) => {
       hookEngine.trustHook(id, trustRoot);
-    });
+    }, (hook) => confirmResourceTrust('hook', hook.definition.id,
+      `${hook.sourcePath}\n${[hook.definition.command, ...hook.definition.args].join(' ')}`));
   });
 
   ipcMain.handle('rdc-runtime:revokeHook', (_event, ...rawArgs: unknown[]) => {
@@ -115,11 +119,16 @@ export function registerRdcRuntimeHandlers(): void {
     });
   });
 
-  ipcMain.handle('rdc-runtime:trustMcp', (_event, ...rawArgs: unknown[]) => {
+  ipcMain.handle('rdc-runtime:trustMcp', async (_event, ...rawArgs: unknown[]) => {
     const [projectRoot, descriptorId] = parseIpcArgs(RdcRuntimeTrustMcpArgsSchema, rawArgs, {
       label: 'rdc-runtime:trustMcp',
       maxBytes: 8 * 1024,
     });
+    const overview = scopedRuntimeService.overview(projectRoot);
+    const server = overview.mcpServers.find((entry) => entry.id === descriptorId);
+    if (server && !await confirmResourceTrust('mcp', server.id, `${server.sourcePath ?? ''}\n${server.command ?? server.transport}`)) {
+      return overview;
+    }
     return scopedRuntimeService.trustProjectMcp(projectRoot, descriptorId);
   });
 

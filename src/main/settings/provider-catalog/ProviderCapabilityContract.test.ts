@@ -1,6 +1,11 @@
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
+import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import type { LlmProviderEntry, LlmProviderProtocol } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
@@ -10,11 +15,6 @@ vi.mock('electron', () => ({
   },
   safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (value: string) => Buffer.from(value) },
 }));
-
-import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
-import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
-import { resolveContextTierChoices } from '@shared/utils/contextTiers';
-import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 
 interface FrozenEffectiveModel {
   providerId: string;

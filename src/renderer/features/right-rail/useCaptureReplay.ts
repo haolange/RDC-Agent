@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CaptureReplaySelection, CaptureReplayState } from '@shared/types/captureReplay';
 import { useSessionDevicePreparation } from '../../hooks/useSessionDevicePreparation';
 import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 import { getReplaySelection, type CaptureScope } from './capturePanelActions';
+import type { CaptureReplaySelection, CaptureReplayState } from '@shared/types/captureReplay';
 
 export function useCaptureReplay(scope: CaptureScope) {
   const { state, error, actionFailure } = useSessionDevicePreparation(scope);

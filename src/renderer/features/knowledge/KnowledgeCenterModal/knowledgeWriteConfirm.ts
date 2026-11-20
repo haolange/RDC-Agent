@@ -5,8 +5,8 @@ import {
   type KnowledgePackConflict,
   type KnowledgeQueryRequest,
 } from '@shared/types/knowledge';
-import type { AgentPermissionMode } from '@shared/types/settings';
 import { knowledgeQueryKey, type KnowledgeWriteAction } from './knowledgeCenterModel';
+import type { AgentPermissionMode } from '@shared/types/settings';
 
 function missingChapters(chapters: KnowledgeCardRecord['chapters']): string[] {
   return KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => !chapters?.[chapter]?.trim());

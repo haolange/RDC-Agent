@@ -2,9 +2,9 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
+import { MessageBubble } from './MessageBubble';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { PlanReviewStatus } from '@shared/types/planReview';
-import { MessageBubble } from './MessageBubble';
 vi.mock('./WorkProcess', () => ({ WorkProcess: () => createElement('div', null, 'work-process') }));
 vi.mock('./MessageActions', () => ({ MessageActions: () => null }));
 vi.mock('./HandoffSuggestionRow', () => ({ HandoffSuggestionRow: () => createElement('button', null, 'Continue handoff') }));

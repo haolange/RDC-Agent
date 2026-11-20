@@ -1,12 +1,12 @@
 import React from 'react';
-import type { WorkProcessPresentation } from './workProcessTypes';
-import type { WorkProcessRow } from './workProcessTypes';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessTrackContext } from './WorkProcessRailIcon';
 import { firstTrackEvent } from './workProcessTrack';
 import { useWorkProcessTrack } from './useWorkProcessTrack';
+import type { WorkProcessRow } from './workProcessTypes';
+import type { WorkProcessPresentation } from './workProcessTypes';
 import './work-process-track.css';
 
 /** The same process body is used by the parent Working Process and an opened delegation. */

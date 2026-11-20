@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import openrouterManifest from '@shared/provider-catalog/manifests/surfaces/openrouter.json';
 import {
   normalizeCacheUsage,
   finalizeProviderUsage,
@@ -12,7 +13,6 @@ import type {
   OAuthAuth,
   ProviderAuth,
 } from '../../settings/settings-core/CredentialStoreInterface';
-import openrouterManifest from '@shared/provider-catalog/manifests/surfaces/openrouter.json';
 
 // =====================================================================
 // 4. normalizeCacheUsage with cacheWriteLongTokens

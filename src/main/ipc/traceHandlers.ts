@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron';
 import { traceService } from '../agent-trace/TraceService';
-import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { TraceGetProjectionArgsSchema } from './validation/traceSchemas';
+import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerTraceHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;

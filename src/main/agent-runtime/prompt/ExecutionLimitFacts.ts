@@ -1,6 +1,6 @@
-import type { PromptPlan } from '@shared/types/rdcRuntime';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { applyRuntimeFact } from './RuntimeFactSegment';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 export function applyExecutionLimitFacts(plan: PromptPlan, limits: {
   policyMaxTurns?: number;

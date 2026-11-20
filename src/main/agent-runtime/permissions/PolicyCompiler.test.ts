@@ -1,19 +1,15 @@
-import { describe, expect, it } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import {
-  compilePolicyFromRestrictive,
-  isToolDeniedByPolicy,
-  resolvePolicyApprovalFloor,
-  compileEffectivePolicy,
-} from './PolicyCompiler';
+import { describe, expect, it } from 'vitest';
+import { compileFixturePolicy } from '../../testing/policyFixture';
+import { isToolDeniedByPolicy, resolvePolicyApprovalFloor, compileEffectivePolicy } from './PolicyCompiler';
 
 describe('PolicyCompiler', () => {
   it('defaults to one child level without capping explicit policy limits', () => {
-    expect(compilePolicyFromRestrictive({}).maxChildDepth).toBe(1);
-    expect(compilePolicyFromRestrictive({ limits: { maxChildDepth: 0 } }).maxChildDepth).toBe(0);
-    expect(compilePolicyFromRestrictive({ limits: { maxChildDepth: 2 } }).maxChildDepth).toBe(2);
+    expect(compileFixturePolicy({}).maxChildDepth).toBe(1);
+    expect(compileFixturePolicy({ limits: { maxChildDepth: 0 } }).maxChildDepth).toBe(0);
+    expect(compileFixturePolicy({ limits: { maxChildDepth: 2 } }).maxChildDepth).toBe(2);
   });
 
   it('takes the strictest explicit child depth across enabled policies', () => {
@@ -41,7 +37,7 @@ describe('PolicyCompiler', () => {
   });
 
   it('compiles deniedTools, approval floors, and limits', () => {
-    const compiled = compilePolicyFromRestrictive({
+    const compiled = compileFixturePolicy({
       deniedTools: ['Shell', 'web-search'],
       approval: 'mutation',
       approvalFloorByTool: { read_file: 'user' },
@@ -61,7 +57,7 @@ describe('PolicyCompiler', () => {
   });
 
   it('compiles contextCompactionPercent and lets project policy only tighten it', () => {
-    expect(compilePolicyFromRestrictive({
+    expect(compileFixturePolicy({
       limits: { contextCompactionPercent: 70 },
     }).contextCompactionPercent).toBe(70);
 
@@ -117,19 +113,19 @@ describe('PolicyCompiler', () => {
   });
 
   it('fail-closed on invalid policy fields', () => {
-    expect(() => compilePolicyFromRestrictive({
+    expect(() => compileFixturePolicy({
       deniedTools: [1 as unknown as string],
     })).toThrow(/POLICY_INVALID/);
-    expect(() => compilePolicyFromRestrictive({
+    expect(() => compileFixturePolicy({
       approval: 'maybe' as 'none',
     })).toThrow(/POLICY_INVALID/);
-    expect(() => compilePolicyFromRestrictive({
+    expect(() => compileFixturePolicy({
       limits: { maxTurns: -1 },
     })).toThrow(/POLICY_INVALID/);
-    expect(() => compilePolicyFromRestrictive({
+    expect(() => compileFixturePolicy({
       limits: { maxTurns: 1.5 },
     })).toThrow(/non-negative integer/);
-    expect(() => compilePolicyFromRestrictive({
+    expect(() => compileFixturePolicy({
       limits: { maxOutputBytes: 10 },
     })).toThrow(/unknown limit/);
   });

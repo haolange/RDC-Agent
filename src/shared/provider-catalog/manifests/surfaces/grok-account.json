@@ -99,7 +99,17 @@
   "authModes": [
     "oauth"
   ],
-  "accountLoginConfigured": true,
+  "accountAuth": {
+    "flow": "grok-oauth",
+    "loginMode": "browser",
+    "codeInput": false,
+    "credential": {
+      "tokenFields": [
+        "accessToken",
+        "apiKey"
+      ]
+    }
+  },
   "capabilities": [
     "chat",
     "tool-calling",
@@ -123,6 +133,7 @@
         "compatibilityGroup": "xai:OpenAIResponses",
         "reasoning": {
           "semantic": "summary",
+          "visibilityRequest": "responses-summary",
           "source": "xai-responses-reasoning-summary",
           "evidence": "https://docs.x.ai/developers/model-capabilities/text/reasoning",
           "displayLabel": "Reasoning summary",

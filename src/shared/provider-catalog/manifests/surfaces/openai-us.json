@@ -80,6 +80,7 @@
       "contractOverrides": {
         "reasoning": {
           "semantic": "summary",
+          "visibilityRequest": "responses-summary",
           "source": "openai-responses-reasoning-summary",
           "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
           "displayLabel": "Reasoning summary",

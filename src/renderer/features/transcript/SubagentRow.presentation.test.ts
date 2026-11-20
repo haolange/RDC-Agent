@@ -3,8 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import { SubagentRow } from './SubagentRow';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
+import { SubagentRow } from './SubagentRow';
 
 const state = vi.hoisted(() => ({ expanded: false, taskLoading: false, taskError: false, headerLoading: false, headerMissing: false,
   configurationError: false, workOpen: false, finalOpen: false, projectedFinal: false }));
@@ -28,7 +28,7 @@ vi.mock('./useDelegationTrace', () => ({ useDelegationTrace: () => ({
     ...(state.configurationError ? { configurationError: 'MODEL_UNAVAILABLE', error: 'Model unavailable' } : {}),
     completedAt: 1000, taskAvailable: true, finalAvailable: state.projectedFinal },
     steps: state.projectedFinal ? [{ id: 'loop', revision: 1, block: { id: 'loop', kind: 'llm_turn', title: 'Loop',
-      status: 'complete', startedAt: 1, toolCalls: [], outputItems: [{ providerOutputRef: {
+      status: 'complete', startedAt: 1, toolCalls: [], items: [{ kind: 'text', providerOutputRef: {
         protocol: 'test', providerBlockKey: 'text', contentIndex: 0 }, text: 'Final child reply',
         phase: 'final_answer', status: 'complete', displayOrder: 1 }] } }] : [], total: state.projectedFinal ? 1 : 0, revision: 1 },
   loading: false, headerLoading: state.headerLoading, hasEarlier: false, loadEarlier: async () => {}, retry: () => {},

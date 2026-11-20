@@ -1,6 +1,4 @@
 import React, { useCallback, useMemo } from 'react';
-import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import {
   findForkForVisibleUserMessage,
   getConcreteForkBranches,
@@ -9,6 +7,8 @@ import {
 import { switchConversationBranch } from '../../hooks/conversationPreview';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useI18n } from '../../i18n';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 interface MessageVariantNavigatorProps {
   message: ConversationMessage;

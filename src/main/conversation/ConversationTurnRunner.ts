@@ -1,34 +1,19 @@
-import type {
-  ConversationLoopOutputPhase,
-  ConversationMessage,
-  ConversationMessageDiagnostic,
-  ConversationStreamEvent,
-  ConversationThinkingStatus,
-  ConversationTurnResult,
-  ConversationWorkTrace,
-} from '@shared/types/conversation';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import type { AgentRole } from '@shared/types/agent';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
-import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
-import type { RunSummary, SessionAttachmentRecord } from '@shared/types/session';
 import { nowMs } from '@shared/utils/id';
-import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
-import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import { stoppedReplyText } from '@shared/conversation/loopItems';
 import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
-import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { diagnosticText } from './diagnosticText';
+import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
 import { canonicalizeSessionContextTurnEntry } from './SessionContextJournal';
-import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
 import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
 import { finalizeTrace, upsertWorkBlock } from './ConversationWorkTrace';
 import { attachToolExecutionEvidence } from './ConversationToolEvidence';
-import type { ConversationLoopContinuationState } from '@shared/conversation/loopOutputPhase';
 import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
 import { verifyApprovedPlanExit } from './approvedPlanExit';
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
@@ -36,19 +21,35 @@ import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
-import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
 import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
+import {
+  getAgentLabel,
+  isActiveRun,
+  recordLlmDiagnostic,
+} from './ConversationRoutePreflight';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
   PreparedConversationPrompt,
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
-import {
-  getAgentLabel,
-  isActiveRun,
-  recordLlmDiagnostic,
-} from './ConversationRoutePreflight';
+import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
+import type { ConversationLoopContinuationState } from '@shared/conversation/loopOutputPhase';
+import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
+import type { RunSummary, SessionAttachmentRecord } from '@shared/types/session';
+import type { ProviderOutputRef } from '@shared/types/reasoning';
+import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { AgentRole } from '@shared/types/agent';
+import type {
+  ConversationLoopOutputPhase,
+  ConversationMessage,
+  ConversationMessageDiagnostic,
+  ConversationStreamEvent,
+  ConversationTurnResult,
+  ConversationWorkTrace,
+} from '@shared/types/conversation';
 
 export interface CompleteProfileTurnInput {
     context: ResolvedConversationContext;
@@ -147,7 +148,7 @@ export async function completeProfileTurn(
         assistantMessage = {
           ...assistantMessage,
           status: 'error',
-          workTrace: finalizeTrace(assistantMessage.workTrace, 'error', '会话状态保存失败'),
+          workTrace: finalizeTrace(assistantMessage.workTrace, 'error', diagnosticText('sessionStateSaveFailed')),
           diagnostic: {
             code: 'CONVERSATION_LLM_REQUEST_FAILED',
             severity: 'error',
@@ -222,7 +223,7 @@ export async function completeProfileTurn(
     );
     commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
-      content: assistantMessage.content,
+      content: assistantMessage.content || stoppedReplyText(stoppedTrace?.blocks ?? []),
       workTrace: finalizeTrace(stoppedTrace, 'stopped'),
     });
   };
@@ -275,8 +276,6 @@ export async function completeProfileTurn(
   // Assistant turns are split into LLM loop turns. The loop result is model output;
   let currentLoopText = '';
   let currentLoopProviderOutputRefs: ProviderOutputRef[] = [];
-  let currentLoopThinking: ThinkingArtifact | undefined;
-  let currentLoopThinkingStatus: ConversationThinkingStatus | undefined;
   let loopSeq = 1;
   let loopHasTools = false;
   let pendingNewLoop = false;
@@ -308,8 +307,6 @@ export async function completeProfileTurn(
   const seenCompactionSummaries = new Set<string>();
   const turnStreamState = {} as import('./ConversationTurnAgentEventHandler').TurnStreamState;
   Object.defineProperty(turnStreamState, 'currentLoopText', { get: () => currentLoopText, set: (value) => { currentLoopText = value; } });
-  Object.defineProperty(turnStreamState, 'currentLoopThinking', { get: () => currentLoopThinking, set: (value) => { currentLoopThinking = value; } });
-  Object.defineProperty(turnStreamState, 'currentLoopThinkingStatus', { get: () => currentLoopThinkingStatus, set: (value) => { currentLoopThinkingStatus = value; } });
   Object.defineProperty(turnStreamState, 'currentLoopProviderOutputRefs', { get: () => currentLoopProviderOutputRefs, set: (value) => { currentLoopProviderOutputRefs = value; } });
   Object.defineProperty(turnStreamState, 'loopHasTools', { get: () => loopHasTools, set: (value) => { loopHasTools = value; } });
   Object.defineProperty(turnStreamState, 'visibleResponse', { get: () => visibleResponse, set: (value) => { visibleResponse = value; } });
@@ -338,26 +335,19 @@ export async function completeProfileTurn(
   const routePreflight = input.routePreflight;
   const currentLoopOptions = () => ({
     loopId: currentLoopId(),
-    loopResultText: currentLoopText.trim() || undefined,
     loopProviderOutputRefs: currentLoopProviderOutputRefs,
-    loopThinking: currentLoopThinking,
-    loopThinkingStatus: currentLoopThinkingStatus,
   });
   const beginAssistantContentLoop = () => {
     const previousLoopSeq = loopSeq;
     const next = beginAssistantContentLoopIfPending({
       loopSeq,
       currentLoopText,
-      currentLoopThinking,
-      currentLoopThinkingStatus,
       loopHasTools,
       pendingNewLoop,
       visibleResponse,
     });
     loopSeq = next.loopSeq;
     currentLoopText = next.currentLoopText;
-    currentLoopThinking = next.currentLoopThinking;
-    currentLoopThinkingStatus = next.currentLoopThinkingStatus;
     loopHasTools = next.loopHasTools;
     pendingNewLoop = next.pendingNewLoop;
     visibleResponse = next.visibleResponse;
@@ -525,9 +515,9 @@ export async function completeProfileTurn(
     ? undefined
     : llmDiagnostic
       ? finalStatus === 'error'
-        ? '回复失败'
-        : '等待模型配置'
-      : '回复已完成';
+        ? diagnosticText('turnFailed')
+        : diagnosticText('turnWaitingModel')
+      : diagnosticText('turnCompleted');
 
   const handoffSuggestions: PlanReviewHandoffSuggestion[] | undefined =
     shouldSnapshotHandoffSuggestions({

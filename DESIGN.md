@@ -10,6 +10,13 @@
 
 组件 CSS 只使用语义 token 与刻度变量；primitive `--color-*`、hex 字面量、px 字号 / 间距 / 圆角、`!important` 与字面量 `blur(...)` 一律禁止，豁免仅限 token 定义层与全局 chrome 层。规则细节与迁移对照见 design-system.md，门禁：`pnpm run check:design-tokens`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。组件结构和依赖方向遵循 ARCHITECTURE.md 的 Renderer 架构。
 
+## 可读性与信息卫生
+
+- **字号下限**：可读文本不小于 12px。组件只引用排版角色（display / title / heading / body / reading / label / caption / code），不引用原始字号；正文 14px（紧凑 13px），控件与字段名 13px，说明 12px，回复与知识正文 15px。等宽字体只给代码、路径与数值。门禁 `pnpm run check:design-tokens` 拒绝非角色字号。
+- **信息卫生**：界面只说用户能理解的话。内部 ID、协议名、错误码、Provider 标识与探测细节只出现在折叠的「诊断信息 / 技术详情」里；主进程产生的诊断按当前语言给出，不夹杂另一种语言。
+- **首次使用**：不弹引导对话框。空工作台按真实配置列出仍缺的准备项（RDC 工具、模型服务、项目），每项直达对应设置或动作，全部完成后自然消失。
+- **画布**：设计稿在 Design 画布维护（工作台、首页清单、模型选择器、设置、知识中心、开发者面板、设计系统板），实现以画布为准。
+
 ## 权限切换反馈
 
 权限选择显示正在保存与主进程确认的生效状态，不把乐观选择当作已执行授权；提示尚未开始的工具使用新权限、已启动命令继续。切换保留卡片身份、展开状态、草稿与焦点。规格见 workbench-and-transcript.md「权限挡位切换」。

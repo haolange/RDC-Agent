@@ -1,11 +1,6 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import type {
-  AttachmentRejectCode,
-  ComposerAttachmentDescriptor,
-  ConversationAttachmentStageItem,
-} from '@shared/types/conversation';
 import { appPathService } from '../runtime/AppPathService';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
@@ -15,6 +10,11 @@ import {
   classifyAttachmentBytes,
 } from './attachmentClassify';
 import { createCardThumbnail, toDataUrl } from './attachmentPreview';
+import type {
+  AttachmentRejectCode,
+  ComposerAttachmentDescriptor,
+  ConversationAttachmentStageItem,
+} from '@shared/types/conversation';
 
 export interface StagedAttachmentRecord {
   descriptor: ComposerAttachmentDescriptor;

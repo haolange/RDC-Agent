@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+import { assertTerminalContextOwnership } from './ConversationTurnTerminal';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+
 
 const storage = vi.hoisted(() => ({
   readConversationHistory: vi.fn(),
@@ -10,8 +12,6 @@ const storage = vi.hoisted(() => ({
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: storage }));
 vi.mock('../agent-runtime/orchestration/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: {} }));
 vi.mock('../agent-trace/TraceService', () => ({ traceService: {} }));
-
-import { assertTerminalContextOwnership } from './ConversationTurnTerminal';
 
 function message(id: string, role: 'user' | 'assistant', turnId: string, createdAt: number): ConversationMessage {
   return { id, role, turnId, createdAt, branchId: 'branch-edit', content: '' } as ConversationMessage;

@@ -1,9 +1,9 @@
-import type { CaptureReplayState } from '@shared/types/captureReplay';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
-import type { CaptureScope } from './capturePanelActions';
 import { CaptureReplayControls } from './CaptureReplayControls';
 import { useCapturePreview } from './useCapturePreview';
+import type { CaptureScope } from './capturePanelActions';
+import type { CaptureReplayState } from '@shared/types/captureReplay';
 
 type CaptureWorkspaceProps = {
   scope: CaptureScope; state: CaptureReplayState | null;

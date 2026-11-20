@@ -1,20 +1,20 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
-import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
-import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
-import type { EffectiveModel, CatalogModelRoute } from '@shared/types/providerCapability';
-import type { LlmProviderProtocol } from '@shared/types/settings';
 import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
+import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
+import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import {
   parseDeclarativeCatalog,
   toDeclarativeCatalogContributions,
 } from './DeclarativeCatalogDiscovery';
-import type { CatalogModelContribution, EffectiveCatalogRequest } from './effectiveCatalogTypes';
 import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import { parseChatGptAccountCatalog } from './LiveProviderCatalogParsers';
 import { planModelRequest } from './RequestPlanner';
+import type { CatalogModelContribution, EffectiveCatalogRequest } from './effectiveCatalogTypes';
+import type { LlmProviderProtocol } from '@shared/types/settings';
+import type { EffectiveModel, CatalogModelRoute } from '@shared/types/providerCapability';
+import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
 
 const compiledCatalog = compileProviderCatalog(loadProviderCatalogManifestInput(
   resolve(__dirname, '../../../shared/provider-catalog/manifests'),
@@ -169,7 +169,7 @@ describe('catalog output planning', () => {
         context_window: 272_000,
         max_context_window: 272_000,
       }],
-    });
+    }, { models: [] });
     const [model] = mergeModels({
       providerId: 'chatgpt-account',
       protocol: 'OpenAIResponses',
@@ -188,7 +188,7 @@ describe('catalog output planning', () => {
 
   it.each([undefined, ['text'], ['text', 'image']])('preserves manifest vision through ChatGPT discovery %j', (input_modalities) => {
     const definition = compiledCatalog.surfaces.get('chatgpt-account')!.surface.models.find((model) => model.modelId === 'gpt-5.6-sol')!;
-    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] });
+    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] }, { models: [] });
     const [model] = mergeModels({
       providerId: 'chatgpt-account', protocol: 'OpenAIResponses', baseUrl: definition.route.baseUrl!,
       catalog: [definition], discovery: live.contributions,
@@ -206,7 +206,7 @@ describe('catalog output planning', () => {
         supported_in_api: true,
         context_window: 272_000,
       }],
-    });
+    }, { models: [] });
     const [model] = mergeModels({
       providerId: 'chatgpt-account',
       protocol: 'OpenAIResponses',

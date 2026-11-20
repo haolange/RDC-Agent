@@ -1,12 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { executeCompactionHandoff } from './CompactionHandoffRuntime';
 import type { AssistantMessage } from '../core/types';
 import type { CompactionHandoffExecution } from './CompactionHandoffRuntime';
+
 const mock = vi.hoisted(() => ({ stream: vi.fn(), write: vi.fn(), complete: vi.fn() }));
 vi.mock('../providers/ConfiguredRuntimeProvider', () => ({ configuredRuntimeProvider: { stream: mock.stream }, encodeAgentModel: () => 'frozen-route' }));
-vi.mock('../prompt', () => ({ requestEnvelopeBuilder: { build: (value: unknown) => ({ id: 'snapshot', value }) }, requestSnapshotStore: { nextCallIndex: () => 1, write: mock.write, complete: mock.complete } }));
+vi.mock('../prompt/RequestEnvelopeBuilder', () => ({ requestEnvelopeBuilder: { build: (value: unknown) => ({ id: 'snapshot', value }) } }));
+vi.mock('../prompt/RequestSnapshotStore', () => ({ requestSnapshotStore: { nextCallIndex: () => 1, write: mock.write, complete: mock.complete } }));
 vi.mock('../prompt/PromptCacheCompiler', () => ({ promptCacheCompiler: { compile: () => ({ enabled: true }) } }));
 vi.mock('../capabilities/RouteCapabilityResolver', () => ({ resolveAgentRouteCapability: () => ({ reasoningContract: {} }) }));
-import { executeCompactionHandoff } from './CompactionHandoffRuntime';
 const input = { sessionId: 'session', provider: { id: 'account' }, model: { modelId: 'model' }, plan: { providerId: 'account', effectiveModelId: 'model', contextWindowTokens: 32768, route: { protocol: 'OpenAIResponses' }, reasoningWire: { selection: 'low' } }, credentialHandle: 'opaque', transcript: 'Original user correction: preserve highlights; hypothesis unverified.' } as CompactionHandoffExecution;
 const message = (stopReason: AssistantMessage['stopReason']): AssistantMessage => ({ role: 'assistant', content: [{ type: 'text', text: 'Partial generated state' }], stopReason, model: 'model', provider: 'account', timestamp: 0, usage: { inputTokens: 100, outputTokens: 40, totalTokens: 140 } });
 beforeEach(() => { vi.clearAllMocks(); });

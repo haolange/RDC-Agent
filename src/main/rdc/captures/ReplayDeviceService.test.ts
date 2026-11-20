@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ReplayDeviceEntry } from '@shared/types/device';
 import {
   AdbServerProtocolError,
   AdbServerUnreachableError,
@@ -12,6 +11,7 @@ import {
   POLL_BASE_MS,
   POLL_MAX_MS,
 } from './replayDeviceDiff';
+import type { ReplayDeviceEntry } from '@shared/types/device';
 
 function makeDevice(overrides: Partial<ReplayDeviceEntry> = {}): ReplayDeviceEntry {
   return {

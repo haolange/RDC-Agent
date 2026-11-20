@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { stringify } from 'yaml';
-import type { ProjectPlanFrontmatter } from '@shared/types/planReview';
 import { storageAdapter } from '../store/StorageAdapter';
+import type { ProjectPlanFrontmatter } from '@shared/types/planReview';
 import type { StorageIo } from '../store/StorageIo';
 
 export function assertPlanWritePath(targetPath: string): string {

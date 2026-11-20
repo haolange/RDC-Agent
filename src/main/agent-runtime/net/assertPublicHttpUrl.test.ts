@@ -1,13 +1,13 @@
+import { lookup } from 'dns/promises';
+import * as http from 'http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { assertPublicHttpUrl, fetchPinnedPublic } from './assertPublicHttpUrl';
 import type { LookupAddress } from 'dns';
+
 
 vi.mock('dns/promises', () => ({
   lookup: vi.fn(),
 }));
-
-import { lookup } from 'dns/promises';
-import { assertPublicHttpUrl, fetchPinnedPublic } from './assertPublicHttpUrl';
-import * as http from 'http';
 
 /** `vi.mocked(lookup)` binds the single-address overload; cast arrays for `{ all: true }`. */
 function mockLookupAddresses(addresses: LookupAddress[]): void {

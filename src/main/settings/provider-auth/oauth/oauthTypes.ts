@@ -4,16 +4,8 @@ import type {
   LlmProviderId,
 } from '@shared/types/settings';
 
-export type AccountProviderId =
-  | 'claude-account'
-  | 'chatgpt-account'
-  | 'github-copilot'
-  | 'grok-account'
-  | 'nous'
-  | 'openrouter';
-
 export interface OAuthFlowState {
-  providerId: AccountProviderId;
+  providerId: LlmProviderId;
   flowId: string;
   state: string;
   codeVerifier?: string;
@@ -42,7 +34,7 @@ export interface OAuthFlowState {
 }
 
 export interface OAuthSecretBundle {
-  providerId: AccountProviderId;
+  providerId: LlmProviderId;
   accessToken?: string;
   refreshToken?: string;
   apiKey?: string;
@@ -72,11 +64,3 @@ export interface GrokOAuthMetadata {
   codeChallengeMethodsSupported: string[];
   tokenEndpointAuthMethodsSupported: string[];
 }
-
-export const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountProviderId =>
-  providerId === 'claude-account'
-  || providerId === 'chatgpt-account'
-  || providerId === 'github-copilot'
-  || providerId === 'grok-account'
-  || providerId === 'nous'
-  || providerId === 'openrouter';

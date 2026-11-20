@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { RequestPlan } from '@shared/types/providerCapability';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import type { Context, Model } from '../core/types';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
+import type { Context, Model } from '../core/types';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 const model: Model = {
   id: 'openai.gpt-test',
