@@ -27,6 +27,13 @@ const assert = (condition, message) => {
 };
 
 const readSource = (relativePath) => scriptRead(relativePath);
+
+// The transcript scrolls only because the page shell bounds its height; losing this rule makes the
+// conversation grow past the viewport with nothing able to scroll it.
+const pageShellRule = readSource('src/renderer/styles/global/app-shell-columns.css').match(/\.main-page-shell \{([^}]*)\}/)?.[1] ?? '';
+for (const declaration of ['flex: 1;', 'min-height: 0;', 'overflow: hidden;', 'flex-direction: column;']) {
+  assert(pageShellRule.includes(declaration), `.main-page-shell must keep "${declaration}" so .chat-messages stays the transcript scroller`);
+}
 const activeSignalSource = readSource('src/renderer/ui/ActiveSignalText.tsx');
 const activeSignalStyles = readSource('src/renderer/styles/design-motion.css');
 const activeSignalHelper = readSource('src/renderer/features/transcript/workProcessActiveSignal.ts');

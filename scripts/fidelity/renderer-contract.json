@@ -11,6 +11,7 @@
     "styles.designReducedMotion": "src/renderer/styles/design-reduced-motion.css",
     "styles.breakpoints": "src/renderer/styles/global/breakpoints.css",
     "styles.appShell": "src/renderer/styles/global/app-shell.css",
+    "styles.appShellColumns": "src/renderer/styles/global/app-shell-columns.css",
     "shell.appShellCss": "src/renderer/shell/AppShell.css",
     "shell.appShellMiscCss": "src/renderer/shell/AppShell.misc.css",
     "shell.resizeHandleCss": "src/renderer/shell/ResizeHandle.css",
