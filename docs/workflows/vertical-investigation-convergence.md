@@ -300,7 +300,7 @@ M1–M3 通过后，调查方法不再改动。本节处理五个遗留问题：
 | instructions：core 四份文本、文件工具路由、Agent 正文、项目指令、预载 Skill、Skill 目录、工具能力表 | `PromptPlanBuilder.ts:100-177`，回合开始时冻结 | 不变 |
 | instructions：`runtime:facts`、`runtime:profile-limits`、`runtime:approved-execution-offer`、`runtime:request-plan`、`runtime:execution-limits` | `PromptPlanBuilder.ts:179-266`、`TurnPreparationService.ts:189` | 不变 |
 | instructions：`runtime:identity` | `PromptPlanRuntimeIdentity.ts:8-17` | 获批的 capture 切换或现场恢复后变，之后保持 |
-| instructions：`runtime:continuation` | `RuntimeContinuation.ts:23-32`，`AgentLoop.ts:671` 追加在末尾 | 只出现在"终答被运行时义务退回"后的那一次请求 |
+| instructions：`runtime:continuation` | `RuntimeContinuationGuard.next`（`RuntimeContinuation.ts`）给出指令，`AgentLoop.ts` 的 `runtimeContinuationInstruction` 追加在末尾 | 只出现在"终答被运行时义务退回"后的那一次请求 |
 | instructions：`runtime:permission` | `RuntimePermissionContext.ts:9-20`，每次请求追加在末尾 | 用户切换权限挡位时变 |
 | input：历史消息 | 会话 journal；工具返回只追加不改写（`AgentLoop.ts:358-362`） | 只在末尾追加；压缩时重写窗口（`RecoverableContextWindow.ts:53-100`），之后稳定 |
 | input：临时尾消息 | 无进展提示、余量提醒（`AgentLoop.ts:298-310,380-386`），不落盘 | 只影响当次请求的末尾 |

@@ -199,7 +199,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 任务子弹窗（TaskDialog）
 
-导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
+导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog.tsx`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
 
 - 结构固定 `title`（+可选 `description`）/ `body`（唯一滚动区）/ `footer`（右对齐动作，主要动作在最右）。尺寸档位 `sm 420px` / `md 560px` / `lg 760px`，高度上限 `min(88vh, ...)`，`≤640px` 全屏。
 - 层级 `--z-overlay`，背景 `--token-bg-overlay`，阴影 `--token-shadow-modal`。焦点经 `lib/useModalFocus` 捕获；每个弹层在 `lib/overlayStack` 注册，Escape 与 Tab trap **只**作用栈顶层，关闭后焦点回到触发控件。
