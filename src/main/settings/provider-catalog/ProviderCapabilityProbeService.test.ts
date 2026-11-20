@@ -1,4 +1,10 @@
-import { buildProbeFailurePatch, buildProbeSuccessPatch, classifyCapabilityProbeFailure } from './ProviderProbeEvidence';
+import {
+  buildProbeFailurePatch,
+  buildProbeSuccessPatch,
+  classifyCapabilityProbeFailure,
+  receiptConfirmsFast,
+  receiptExceedsSmallerTiers,
+} from './ProviderProbeEvidence';
 import { describe, expect, it, vi } from 'vitest';
 import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared/types/providerCapability';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
@@ -457,4 +463,35 @@ it('allows an explicit retry of an account-scoped probe denial while keeping ord
   const ordinary = dependencies(model({ availability: 'unavailable' }));
   await expect(new ProviderCapabilityProbeService(ordinary.value).test(request)).resolves.toMatchObject({ requestSent: false });
   expect(ordinary.execute).not.toHaveBeenCalled();
+});
+
+describe('response receipt evidence', () => {
+  const fastModel = model({
+    controls: { ...model().controls, fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' } },
+    executionBindings: [{
+      id: 'fast:priority', when: { fast: true }, entitlement: 'unknown',
+      actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+    }],
+    contextTiers: [
+      { id: 'default', label: 'Default', maxPromptTokens: 272_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+      { id: 'long', label: 'Long', maxPromptTokens: 1_000_000, activation: { kind: 'explicit' } as never, entitlement: 'unknown' },
+    ],
+  } as Partial<EffectiveModel>);
+  const fastPlan = { appliedBindingIds: ['fast:priority'], bodyPatch: { service_tier: 'priority' } } as unknown as RequestPlan;
+  const reply = (overrides: Partial<AssistantMessage>) => ({
+    role: 'assistant', content: [], model: 'model-a', provider: 'provider-a', stopReason: 'stop', timestamp: 0,
+    usage: { inputTokens: 1_000, outputTokens: 10, totalTokens: 1_010 }, ...overrides,
+  }) as AssistantMessage;
+
+  it('proves Fast only when the provider echoes the priority tier, not because the request succeeded', () => {
+    expect(receiptConfirmsFast(fastModel, fastPlan, reply({}))).toBe(false);
+    expect(receiptConfirmsFast(fastModel, fastPlan, reply({ execution: { serviceTier: 'default' } }))).toBe(false);
+    expect(receiptConfirmsFast(fastModel, fastPlan, reply({ execution: { serviceTier: 'priority' } }))).toBe(true);
+  });
+
+  it('proves a larger context tier only with a prompt that no smaller tier could hold', () => {
+    expect(receiptExceedsSmallerTiers(fastModel, 'long', reply({}))).toBe(false);
+    expect(receiptExceedsSmallerTiers(fastModel, 'long', reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }))).toBe(true);
+    expect(receiptExceedsSmallerTiers(fastModel, 'default', reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }))).toBe(false);
+  });
 });

@@ -30,7 +30,7 @@ import { runtimePermissionStateService } from '../permissions/RuntimePermissionS
 import { requestEnvelopeBuilder, requestSnapshotStore } from '../prompt';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
 import { configuredRuntimeProvider, encodeAgentModel } from '../providers/ConfiguredRuntimeProvider';
-import { recordEffectivePlanSuccess, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import { recordResponseReceipt, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
@@ -223,7 +223,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     },
     onResponse: (requestId, message) => {
       if (!requestId || !isSuccessfulProviderResponse(message)) return;
-      recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
+      recordResponseReceipt(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan, message);
       requestSnapshotStore.complete(requestId, executionScopeId, turnSignature || undefined, {
         inputTokens: message.usage.inputTokens,
         outputTokens: message.usage.outputTokens,

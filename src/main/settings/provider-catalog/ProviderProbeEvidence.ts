@@ -118,6 +118,52 @@ export function buildProbeFailurePatch(
 }
 
 
+type BindingAction = NonNullable<EffectiveModel['executionBindings']>[number]['actions'][number];
+
+function receiptConfirmsAction(action: BindingAction, message: AssistantMessage): boolean {
+  if (action.kind === 'model-switch') return message.execution?.modelId === action.targetModelId;
+  if (action.kind === 'request-patch') {
+    if (action.patch.service_tier === 'priority') return message.execution?.serviceTier === 'priority';
+    if (action.patch.speed === 'fast') return message.usage.speed === 'fast';
+  }
+  return false;
+}
+
+/**
+ * Whether the response itself shows the Fast path ran: the switched-to model answered, the priority
+ * tier was echoed back, or the provider reported fast speed. A request that merely succeeded proves none.
+ */
+export function receiptConfirmsFast(model: EffectiveModel, plan: RequestPlan, message: AssistantMessage): boolean {
+  const bindingActions = model.executionBindings
+    ?.filter((binding) => plan.appliedBindingIds.includes(binding.id) && binding.when.fast === true)
+    .flatMap((binding) => binding.actions) ?? [];
+  if (bindingActions.some((action) => receiptConfirmsAction(action, message))) return true;
+  if (plan.bodyPatch.service_tier === 'priority') return message.execution?.serviceTier === 'priority';
+  if (plan.bodyPatch.speed === 'fast') return message.usage.speed === 'fast';
+  return false;
+}
+
+/** A model-switch binding is proven only when the target model is the one that answered. */
+export function receiptConfirmsModelSwitch(binding: NonNullable<EffectiveModel['executionBindings']>[number], message: AssistantMessage): boolean {
+  return binding.actions.some((action) => action.kind === 'model-switch' && receiptConfirmsAction(action, message));
+}
+
+/**
+ * A larger context tier is proven only by a prompt that would not fit any smaller tier; a short
+ * request succeeding says nothing about the window.
+ */
+export function receiptExceedsSmallerTiers(model: EffectiveModel, tierId: string, message: AssistantMessage): boolean {
+  const limitOf = (tier: EffectiveModel['contextTiers'][number]) => tier.maxPromptTokens ?? tier.maxTotalTokens;
+  const active = model.contextTiers.find((tier) => tier.id === tierId);
+  const activeLimit = active ? limitOf(active) : undefined;
+  if (activeLimit === undefined) return false;
+  const smaller = model.contextTiers
+    .filter((tier) => tier.id !== tierId)
+    .map(limitOf)
+    .filter((limit): limit is number => limit !== undefined && limit < activeLimit);
+  return smaller.length > 0 && message.usage.inputTokens > Math.max(...smaller);
+}
+
 /** A short successful request cannot prove a larger implicit/client-only context. */
 export function probeConfirmation(
   request: LlmModelCapabilityProbeRequest, target: ResolvedProbeTarget, plan: RequestPlan, message: AssistantMessage,
@@ -126,17 +172,7 @@ export function probeConfirmation(
     return { detail: `Provider did not complete the minimal response (${message.stopReason}).` };
   }
   if (request.mode === 'fast' || request.mode === 'fast-max-context') {
-    const actions = target.model.executionBindings?.filter(b => plan.appliedBindingIds.includes(b.id) && b.when.fast === true)
-      .flatMap(b => b.actions) ?? [];
-    const confirmed = actions.some(action => {
-      if (action.kind === 'model-switch') return message.execution?.modelId === action.targetModelId;
-      if (action.kind === 'request-patch') {
-        if (action.patch.service_tier === 'priority') return message.execution?.serviceTier === 'priority';
-        if (action.patch.speed === 'fast') return message.usage.speed === 'fast';
-      }
-      return false;
-    });
-    if (!confirmed) {
+    if (!receiptConfirmsFast(target.model, plan, message)) {
       if (plan.bodyPatch.service_tier === 'priority') {
         const tier = message.execution?.serviceTier;
         if (tier === 'default') return { detailCode: 'fast-tier-default', detail: 'The provider reported default; actual Fast processing is unconfirmed.' };
