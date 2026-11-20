@@ -20,7 +20,7 @@ Agent loop 不把“耗尽 turns”或“重复相同工具轮次”当作完成
 
 ### 首次使用与本机安装
 
-上手指南是四步图文操作教程，首次 bootstrap 后展示，标题栏问号可重开。每页解释操作入口、动作与完成预期；本地教学图与 HTML 双语标注分离，标明示意而非当前配置。桌面左文右图、窄屏上图下文，沿用 TaskDialog 与固定底部导航。关闭/完成只确认已阅读，标记写 Electron 应用状态目录；不创建 Project、不保存 Provider、不执行模型请求。Builtin 直接读取随应用打包的文件，不写 user seed。
+首次使用不弹引导：空工作台按当前配置列出仍缺的准备项（RDC 工具、模型服务、项目），每项直达对应设置或添加项目，全部完成后消失；不记录已读状态，不创建 Project、不保存 Provider、不执行模型请求。Builtin 直接读取随应用打包的文件，不写 user seed。
 
 Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。主进程按宿主布局（`src/main/platform/rdcLayout.ts`，与 RDC-Tool `HOST_LAYOUTS` 一致）从根目录派生同安装捆绑 Python 与 CLI，安装根由捆绑 Python 路径去掉布局后缀得到，验证 catalog 后由 Settings 边界保存。检测只读已配置位置，Windows 另读安装器默认 `%LOCALAPPDATA%/Programs/rdc-tool`，Linux 只检查已配置或选择的根目录；用户确认前不执行候选。根目录不是第二份持久配置。失败保留原配置；未配置 RDC 不阻塞 General。
 

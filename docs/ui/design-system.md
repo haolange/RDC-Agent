@@ -36,7 +36,7 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 | 控件高度 | `--control-height-sm/md/lg` | 28 / 32 / 36 | pill、列表行、导航项、输入框、按钮统一落在此三档 |
 | 圆角 | `--radius-sm/md/lg/xl/full` | 4 / 6 / 8 / 12 / 9999 | 卡片与输入 `md`；按钮与控件 `lg`（`--control-radius`）；Composer 壳 `lg`；pill `full` |
 | 间距 | `--space-*` | 4 基（另有 `--space-0-5` 2px） | panel 内边距 `--space-3`（工作台右栏 inspector 外壳同此）；section 间距 `--space-5`；禁奇数 px |
-| 字号 | `--text-xs/sm/base/md/lg/xl/2xl/3xl/4xl` | 11 / 12 / 14 / 15 / 17 / 19 / 22 / 28 / 36px（medium） | 禁 px 字面量；`data-font-scale` 的 small / large 整体缩放这一组 |
+| 字号 | `--type-<角色>-size` / `-line` | 见下表 | 只引用角色；`data-font-scale` 的 small / large 同时重映射全部角色；caption 是 12px 下限 |
 | 行高 | `--leading-none/tight/snug/normal/relaxed` | 1 / 1.25 / 1.375 / 1.5 / 1.625 | 正文 `normal`，紧凑标题 `tight` |
 | 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | 统一 `--ease-standard`；`--transition-*` 是 `duration + ease` 别名 |
 | 字距 | `--tracking-tight/normal/wide` | -0.02 / 0 / 0.04em | 标题收紧、正文默认、标签加宽 |
@@ -44,15 +44,18 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 
 **排版层级（唯一一套，跨界面通用）**
 
-| 角色 | 组合 | 用于 |
+| 角色 | 字号 / 行高（medium · small · large） | 用于 |
 |------|------|------|
-| `page-title` | `--text-lg` 或 `--text-xl` / 600 | 模态标题（lg）、Settings 页头（xl） |
-| `section-title` | `--text-sm` / 600 | 卡片标题、区块标题、Right Rail 卡头 |
-| `description` | `--text-xs` / `--token-text-caption` | 标题下说明、空态副文案 |
-| `body` | `--text-sm` | 正文、列表主文本 |
-| `mono` | `--font-mono` / `--text-xs` | 路径、命令、hash |
+| `display` | 24/32 · 22/30 · 26/34 | 空工作台等页面主标题 |
+| `title` | 18/26 · 17/24 · 20/28 | 对话框、面板、Settings 页头 |
+| `heading` | 15/24 · 14/22 · 16/26 | 分组、卡片标题 |
+| `body` | 14/22 · 13/20 · 15/24 | 界面正文、列表主文本、输入框 |
+| `reading` | 15/26 · 14/24 · 16/28 | 回复与知识正文 |
+| `label` | 13/20 · 12/18 · 14/22 | 按钮、控件、字段名 |
+| `caption` | 12/18 · 12/18 · 13/20 | 说明、时间、计数（下限） |
+| `code` | 13/20 · 12/18 · 14/22 | 代码、路径、ID（`--font-mono`） |
 
-禁止再出现第四套 section 标题字号。更大的 `--text-2xl` / `3xl` / `4xl` 只用于空工作台标题等展示场景，不用于功能面标题。
+CSS 写法：`font-size: var(--type-label-size); line-height: var(--type-label-line);`。字重用 `--font-*`。门禁拒绝任何非角色字号（包括对角色做缩小计算），原始 `--text-*` 刻度已删除。
 
 ## Primitive → Semantic 迁移对照
 
@@ -307,7 +310,7 @@ Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属
 - Composer 编辑／预览使用共享 segmented `Tabs`。Tabs 的 DOM ID 按实例生成；没有对应面板的选择控件不输出 `aria-controls`。编辑器内部焦点由 Composer 外壳呈现，不全局关闭焦点样式。
 - 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。单行长文本使用 `OverflowFade`：保留完整 DOM / `title`，根据真实 overflow、ResizeObserver、字体加载与文本变化决定是否渐隐，空值仍占一行。ColorField 的紧凑布局与隐藏标签由组件自身管理。
 - Provider、Agents、Tools、Appearance 与 Knowledge 的样式按展示职责组织；响应式规则跟随所属组件。CSS 入口仅声明加载关系，不恢复已替代的集中覆盖文件。
-- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用共享中性实色表面、细边框、小圆角及选中态，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 `--text-sm` / `--font-medium`，描述 `--text-xs` / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
+- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用共享中性实色表面、细边框、小圆角及选中态，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 label 角色 / `--font-medium`，描述 caption 角色 / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
 - 交接预载技能与能力配置的候选来自真实解析，可搜索多选；缺失或目标不可用的已选 ID 明示且不丢失，读取失败不显示为「没有技能」。策略资源排在全局运行设置之前，MCP 紧凑空态不遮蔽本机工具。
 - Provider 总览卡片在同一视口下等宽等高；测试连接前 / 中 / 后卡片几何与按钮基线不变；未配置为中性色，只有真实失败才用 error；长错误折成摘要加展开。
 

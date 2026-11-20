@@ -11,11 +11,9 @@
 - 原生应用菜单在语言设置成功保存后刷新；新打开的原生对话框读取当前语言，审批身份、按钮序号与取消行为保持。系统自带按钮、菜单 role 和文件浏览器内容遵循操作系统语言。语言选项始终使用自称 `简体中文` / `English`。
 - 验收覆盖双向切换、历史重载、运行与终态、审批、聚合摘要、窄屏、字号和键盘；Browser 与原生 Electron 分开记录，隔离 UI fixture 不作为模型或 RDC 执行证据。
 
-## 上手指南
+## 准备清单
 
-首次 bootstrap 后展示四步图文教程：准备开始、连接模型、创建项目、启用 RDC。每页包含导语、至多三条操作与一条完成预期；桌面采用文字栏优先的左文右图布局，步骤编号固定对齐，介绍区块间距紧凑，720px 以下上图下文。正文可滚动而底部导航固定。标题栏右上角问号重新打开，重开从第一步开始。使用 TaskDialog、现有 Button/IconButton、overlay stack 和焦点返回；步骤切换沿用 motion token 的短位移与淡入，无自动播放。说明不内嵌业务配置、不探测环境、不创建项目或调用模型。关闭/完成只记录应用 UI 已阅读状态，不标记配置成功。深浅主题、窄屏、键盘与双语使用同一组件。
-
-四张本地教学配图位于 onboarding/assets，随 renderer 构建离线分发。以实际工作台、供应商设置及项目入口为依据，通过 Image Gen 生成统一的中性底色、正视简化界面：工作台三入口；供应商凭据到模型选择；项目加号到文件夹再到项目栏；zip 到解压目录再到验证。生成要求为无文字、无品牌标识、无装饰光效；模型页二次移除生成的标识。编号、按钮名称和说明均为 HTML/i18n，图片提供替代文本；图卡始终标明“操作示意／非当前配置状态”。成功符号只解释完成预期，不投影用户真实配置。项目加号直接打开文件夹选择器，不虚构中间创建菜单；Tools 选择文件夹而非 exe。
+不弹引导对话框。空工作台在仍有准备项未完成时，在标题下列出三项：RDC 工具、模型服务、项目，状态全部读自当前配置（`useWorkbenchSetup`），不记录"已读"。第一个未完成项带主按钮，其余为次按钮；动作直达：RDC 工具与模型服务经 `settingsNavigationStore.openSection` 打开对应设置分区，项目经 `projectStore.requestAddProject` 打开侧栏的添加项目对话框。全部完成后清单消失，恢复三张 Agent 卡。
 
 RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。高级项仅呈现启用、超时和环境；验证错误展示实际原因。普通 General 任务不要求 RDC 已配置。
 
@@ -50,7 +48,7 @@ Workbench page shell、Local utilities、composer、transcript 共用 `--workben
 
 Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展开）→ `已思考 · {duration}` / `Thought for`（完成后默认折叠）；手动开合 sticky 覆盖。禁止 `深度思考` / settled `思考了`。Readable `raw`/`summary`/`unknown` 共用标签；opaque/hidden 永不渲染 CoT 占位句。
 
-Commentary：markdown 散文，不进 thinking 槽。文本项与工具、Tasks 快照按首次可见顺序排列；无明确 phase 的文本立即中性显示，确认 commentary 或 final 时保留节点与位置。用户折叠工作过程时收起对应过程内容，已确认 final 继续可读。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。相邻可见 tool、Tasks 快照与无叙述 section 的边框间距统一 `--space-2`，只由事件列表边界提供；有可见 thinking/commentary 的段落入口及其首 tool 保留 `--space-3`。隐藏或空模型段不补空位，窗口化占位不重复添加间距。≥8 连续 tools 仅在整组终止后聚合成摘要行；运行期间维持原卡片顺序，聚合保留子项身份及用户展开选择。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 `--text-sm`。
+Commentary：markdown 散文，不进 thinking 槽。文本项与工具、Tasks 快照按首次可见顺序排列；无明确 phase 的文本立即中性显示，确认 commentary 或 final 时保留节点与位置。用户折叠工作过程时只收起过程与 commentary 文本；final 与阶段未声明的文本继续可读，且答复在阶段确认前后保持同一位置，不做跳出轨道的横移。做过工具调用的模型段带一行分组标题（"3 个动作 · 12s"／"执行中 · …"），由它承载轨道节点，纯工具分组不再把节点挂在第一张卡上。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。相邻可见 tool、Tasks 快照与无叙述 section 的边框间距统一 `--space-2`，只由事件列表边界提供；有可见 thinking/commentary 的段落入口及其首 tool 保留 `--space-3`。隐藏或空模型段不补空位，窗口化占位不重复添加间距。≥8 连续 tools 仅在整组终止后聚合成摘要行；运行期间维持原卡片顺序，聚合保留子项身份及用户展开选择。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 label 角色字号。
 
 Tasks 在主回合内每次真实创建或更新各留下独立历史卡，按事件 ID 保序去重，卡内列表冻结为变更提交当刻的逐项状态；一批创建只产生一张「添加待办」，更新显示「已更新待办」。旧记录没有事件种类时用「任务列表」，不得把旧卡改写为最新状态。卡头右端为完成数和固定箭头，不使用 `0ms`；列表用状态图形呈现待办、进行中、完成、受阻和取消，原因仅在所属项详情展开时显示，默认无副标题或底部 tips，行内不叠加卡壳。每张卡初次出现默认展开，后续活动不自动收起旧卡；用户手动开合优先并跨分页／窗口化保持。右栏 Progress 仍是带序号的最新列表；其任务定位优先找到最后一张包含该任务的历史卡。父回复结束后的后台变更只更新子代理卡和右栏，不在旧回复中倒插历史卡。
 
