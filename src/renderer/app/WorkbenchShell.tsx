@@ -3,7 +3,6 @@ import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
 import { PlanReaderHost } from '../features/transcript/PlanReaderHost';
 import { WorkbenchReadingLayoutContext } from '../lib/WorkbenchReadingLayout';
 import { RightRail } from '../features/right-rail/RightRail';
-import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/sidebar/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
 import { Composer } from '../features/composer/Composer';
@@ -33,7 +32,6 @@ export interface WorkbenchShellProps {
   bothSidebarsCollapsed: boolean;
   workbenchRailMaxWidth: string;
   shellNotice: string | null;
-  activityAlertSeverity: 'error' | 'warning' | 'running' | null;
   nickname: string;
   avatarPath: string | undefined;
   composer: ComposerController;
@@ -43,7 +41,6 @@ export interface WorkbenchShellProps {
   onOpenKnowledgeCenter: () => void;
   isUserMenuOpen: boolean;
   onUserMenuToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  onToggleTerminal: () => void;
   onStartDrag: (side: DragSide, startWidth: number) => (event: React.PointerEvent<HTMLDivElement>) => void;
 }
 
@@ -64,7 +61,6 @@ export function WorkbenchShell({
   bothSidebarsCollapsed,
   workbenchRailMaxWidth,
   shellNotice,
-  activityAlertSeverity,
   nickname,
   avatarPath,
   composer,
@@ -74,7 +70,6 @@ export function WorkbenchShell({
   onOpenKnowledgeCenter,
   isUserMenuOpen,
   onUserMenuToggle,
-  onToggleTerminal,
   onStartDrag,
 }: WorkbenchShellProps) {
   const workArea = useRef<HTMLElement>(null);
@@ -141,25 +136,6 @@ export function WorkbenchShell({
               {shellNotice}
             </div>
           )}
-          <div className="main-floating-utilities">
-            <DeviceSelector />
-            <button
-              type="button"
-              className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'is-active' : ''} ${activityAlertSeverity ? `terminal-${activityAlertSeverity}` : ''}`}
-              onClick={onToggleTerminal}
-              data-testid="terminal-toggle"
-              aria-label={isTerminalOpen ? t('terminal.close') : t('terminal.open')}
-              title={isTerminalOpen ? t('terminal.close') : t('terminal.open')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 17l6-6-6-6" />
-                <path d="M12 19h8" />
-              </svg>
-              {activityAlertSeverity && (
-                <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />
-              )}
-            </button>
-          </div>
           <div className="main-page-shell">{mainPage}</div>
         </div>
         {showMainPromptBar && (

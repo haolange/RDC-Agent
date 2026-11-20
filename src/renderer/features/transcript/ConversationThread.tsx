@@ -4,6 +4,7 @@ import {
   useConversationStore,
 } from '../../stores/conversationStore';
 import { EmptyWorkbenchPrompt } from '../../patterns/EmptyWorkbenchPrompt';
+import { useWorkbenchSetup } from '../../hooks/useWorkbenchSetup';
 import { VirtualMessageList } from './VirtualMessageList';
 import { MessageBubble } from './MessageBubble';
 import type { ConversationMessage } from '@shared/types/conversation';
@@ -16,6 +17,7 @@ interface ConversationThreadProps {
 export const ConversationThread: React.FC<ConversationThreadProps> = ({ mode }) => {
   // Write-side sort already applied in conversationStore; selector stays shallow-stable.
   const orderedMessages = useConversationStore(selectOrderedConversationMessages);
+  const setup = useWorkbenchSetup();
 
   const renderMessage = useCallback(
     (message: ConversationMessage) => <MessageBubble message={message} />,
@@ -28,7 +30,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({ mode }) 
         className="conversation-thread conversation-thread-empty"
         data-testid="conversation-thread"
       >
-        <EmptyWorkbenchPrompt mode={mode} />
+        <EmptyWorkbenchPrompt mode={mode} setup={setup} />
       </div>
     );
   }

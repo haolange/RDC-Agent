@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../../i18n';
 import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
+import { useProjectStore } from '../../../stores/projectStore';
 import { ProjectGroup } from './ProjectGroup';
 import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
@@ -24,6 +25,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
   const popovers = useSidebarPopovers();
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
   const [addingProject, setAddingProject] = useState(false);
+  const addProjectRequest = useProjectStore((state) => state.addProjectRequest);
+  useEffect(() => {
+    if (addProjectRequest > 0) setAddingProject(true);
+  }, [addProjectRequest]);
   const selection = useProjectSelection({
     ensureProjectExpanded: tree.ensureProjectExpanded,
     loadProjectSessionList: tree.loadProjectSessionList,

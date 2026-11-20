@@ -55,7 +55,6 @@ conversation-edit-preview
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
-getting-started
 handoff-suggestion-row
 investigation-list
 investigation-preview
@@ -306,7 +305,6 @@ sidebar-scroll
 sidebar-user-menu
 sidebar-user-settings-trigger
 terminal-toggle
-titlebar-getting-started
 titlebar-left-panel-toggle
 titlebar-right-panel-toggle
 utility-device-selector-dropdown

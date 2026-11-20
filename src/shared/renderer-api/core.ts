@@ -23,8 +23,6 @@ export function createAppMetaApi(transport: RendererApiTransport): AppMetaApi {
 
 export function createAppShellApi(transport: RendererApiTransport): AppShellApi {
   return {
-    hasSeenGettingStarted: () => transport.invoke(INVOKE.shell.hasSeenGettingStarted),
-    acknowledgeGettingStarted: () => transport.invoke(INVOKE.shell.acknowledgeGettingStarted),
     selectAvatar: () => transport.invoke(INVOKE.shell.selectAvatar),
     getAvatarDataUrl: (avatarPath) => transport.invoke(INVOKE.shell.getAvatarDataUrl, avatarPath),
     openPath: (targetPath) => transport.invoke(INVOKE.shell.openPath, targetPath),

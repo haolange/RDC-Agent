@@ -29,7 +29,10 @@ interface ProjectState {
   currentSession: SessionRecord | null;
   rightRailTarget: RightRailTarget;
   projectInputs: ProjectInputRecord[];
+  /** Bumped to ask the sidebar to open its add-project dialog. */
+  addProjectRequest: number;
 
+  requestAddProject: () => void;
   setProjects: (projects: ProjectRecord[]) => void;
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentProject: (project: ProjectRecord | null) => void;
@@ -40,6 +43,8 @@ interface ProjectState {
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
+  addProjectRequest: 0,
+  requestAddProject: () => set((state) => ({ addProjectRequest: state.addProjectRequest + 1 })),
   projects: [],
   sessions: [],
   currentProject: null,

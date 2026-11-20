@@ -5,12 +5,16 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ModeGlyph } from '../../ui/ModeGlyph';
+import { SetupChecklist } from './SetupChecklist';
+import type { WorkbenchSetupStep } from '../../hooks/useWorkbenchSetup';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentMode } from '@shared/types/layout';
 import './EmptyWorkbenchPrompt.css';
 
 interface EmptyWorkbenchPromptProps {
   mode: AgentMode;
+  /** First-run steps from live configuration; shown until every one is done. */
+  setup: WorkbenchSetupStep[];
 }
 
 type EmptyVariant = 'no-project' | 'session-empty';
@@ -66,12 +70,13 @@ const EmptyToolCard: React.FC<{
   );
 };
 
-export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode }) => {
+export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode, setup }) => {
   const { t } = useI18n();
   const currentProject = useProjectStore((state) => state.currentProject);
   const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
 
   const variant: EmptyVariant = currentProject ? 'session-empty' : 'no-project';
+  const setupPending = setup.some((step) => !step.done);
 
   const hero = HERO_COPY[variant];
   const subtitle = t(hero.subtitle);
@@ -89,16 +94,18 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
           <p className="empty-workbench-subtitle">{subtitle}</p>
         </div>
 
-        <div className="empty-workbench-tool-grid" aria-label={t('emptyWorkbench.toolsLabel')}>
-          {FOCUS_MODES.map((toolMode: FocusMode) => (
-            <EmptyToolCard
-              key={toolMode}
-              toolMode={toolMode}
-              agentDefinitions={agentDefinitions}
-              t={t}
-            />
-          ))}
-        </div>
+        {setupPending ? <SetupChecklist steps={setup} /> : (
+          <div className="empty-workbench-tool-grid" aria-label={t('emptyWorkbench.toolsLabel')}>
+            {FOCUS_MODES.map((toolMode: FocusMode) => (
+              <EmptyToolCard
+                key={toolMode}
+                toolMode={toolMode}
+                agentDefinitions={agentDefinitions}
+                t={t}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

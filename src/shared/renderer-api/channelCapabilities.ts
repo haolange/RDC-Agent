@@ -10,8 +10,6 @@ export type BridgeChannelCapability = 'read' | 'mutation' | 'high-impact' | 'des
 
 export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapability> = {
   'app:getMeta': 'read',
-  'app:hasSeenGettingStarted': 'read',
-  'app:acknowledgeGettingStarted': 'mutation',
   'app:selectAvatar': 'desktop-only',
   'app:getAvatarDataUrl': 'desktop-only',
   'app:openPath': 'mutation',

@@ -1,8 +1,6 @@
 export const RENDERER_INVOKE_CHANNEL = {
   shell: {
     getAppMeta: 'app:getMeta',
-    hasSeenGettingStarted: 'app:hasSeenGettingStarted',
-    acknowledgeGettingStarted: 'app:acknowledgeGettingStarted',
     selectAvatar: 'app:selectAvatar',
     getAvatarDataUrl: 'app:getAvatarDataUrl',
     openPath: 'app:openPath',

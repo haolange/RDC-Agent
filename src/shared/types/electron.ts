@@ -170,8 +170,6 @@ export interface ElectronAPI {
   };
 
   appShell: {
-    hasSeenGettingStarted: () => Promise<boolean>;
-    acknowledgeGettingStarted: () => Promise<void>;
     selectAvatar: () => Promise<string | null>;
     getAvatarDataUrl: (avatarPath: string) => Promise<string | null>;
     openPath: (targetPath: string) => Promise<{

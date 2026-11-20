@@ -32,6 +32,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const runtime = useRdcRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
   const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
+  const sectionRequest = useSettingsNavigationStore((state) => state.sectionRequest);
+  const clearSectionRequest = useSettingsNavigationStore((state) => state.clearSectionRequest);
   const clearAgentRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
   const {
     t,
@@ -81,6 +83,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   useEffect(() => {
     if (open && agentRequest) setActiveSection('agents');
   }, [open, agentRequest, setActiveSection]);
+  useEffect(() => {
+    if (!open || !sectionRequest) return;
+    setActiveSection(sectionRequest.section);
+    clearSectionRequest(sectionRequest.sequence);
+  }, [open, sectionRequest, setActiveSection, clearSectionRequest]);
 
   if (!open) return null;
 
