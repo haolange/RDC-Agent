@@ -426,4 +426,3 @@ describe('EffectiveRuntimePlan', () => {
     expect(plan.profileDelegates).toEqual(['verifier']);
   });
 });
-
