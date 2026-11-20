@@ -11,6 +11,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "responses-summary",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "reasoning-item",

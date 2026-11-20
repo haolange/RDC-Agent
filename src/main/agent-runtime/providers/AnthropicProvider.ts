@@ -28,7 +28,7 @@ import {
   ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
-import { applyReasoningToAnthropicLikeBody } from './reasoningWire';
+import { applyReasoningToAnthropicLikeBody, reasoningVisibilityRequest } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
@@ -417,7 +417,7 @@ export class AnthropicProvider implements ProviderStrategy {
     }
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
-    applyReasoningToAnthropicLikeBody(body, options.reasoning, options.reasoningVisibility);
+    applyReasoningToAnthropicLikeBody(body, options.reasoning, reasoningVisibilityRequest(options));
     if (context.tools && context.tools.length > 0) {
       body.tools = context.tools.map(toAnthropicTool);
     }

@@ -38,7 +38,7 @@ type PlanInput = {
   reasoning: Pick<
     ProviderReasoningContract,
     'semantic' | 'displayLabel' | 'carrier' | 'artifactFormat' | 'artifactVersion' | 'compatibilityGroup' | 'continuation'
-  >;
+  > & Partial<Pick<ProviderReasoningContract, 'visibilityRequest'>>;
   toolLoop: Pick<ProviderToolLoopContract, 'artifactPolicy' | 'artifactScope' | 'ordering'>;
 };
 
@@ -108,6 +108,7 @@ const responsesPlan = createPlan({
   modelId: 'gpt-5.5',
   reasoning: {
     semantic: 'summary',
+    visibilityRequest: 'responses-summary',
     displayLabel: 'Reasoning summary',
     carrier: 'reasoning-item',
     artifactFormat: 'openai-responses-reasoning',

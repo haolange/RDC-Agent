@@ -15,7 +15,7 @@ describe('Kimi K2.8 Preview reasoning from the maintained catalog', () => {
     const anthropic = createReasoningControl({ ...model.controls.reasoning, defaultSelection: 'max' });
     expect(clampReasoningSelection('off', anthropic)).toBe('off');
     const anthropicBody: Record<string, unknown> = { model: model.modelId };
-    applyAnthropicReasoning(anthropicBody, { selection: 'off', control: anthropic });
+    applyAnthropicReasoning(anthropicBody, { selection: 'off', control: anthropic }, null);
     expect(anthropicBody).toEqual({ model: 'kimi-for-coding', thinking: { type: 'disabled' } });
 
     const chat = createReasoningControl({

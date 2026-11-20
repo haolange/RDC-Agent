@@ -11,6 +11,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "summary",
+          "visibilityRequest": "gemini-interactions-summaries",
           "source": "google-interactions-thought-steps",
           "evidence": "https://ai.google.dev/gemini-api/docs/thinking",
           "displayLabel": "Reasoning summary",

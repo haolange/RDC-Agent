@@ -81,6 +81,8 @@ Renderer 的 EffectiveCatalog store 只是主进程快照镜像：按 provider/a
 
 语义值：`raw` | `summary` | `opaque` | `none` | `unknown`。声明缺失保持 `unknown`，禁止静默升级。
 
+请求可见推理是路由契约上的独立事实 `reasoning.visibilityRequest`：`responses-summary`（`reasoning.summary: auto`）、`anthropic-display`（`thinking.display: summarized`）、`gemini-include-thoughts`（`thinkingConfig.includeThoughts`）、`gemini-interactions-summaries`（`thinking_summaries: auto`）、`ollama-think`（`think` 开关，仅推理控制已知时发送）、`sap-include-reasoning`。只在推理开启时生效；adapter 只读这一事实，不按语义值或 provider id 推断。Responses / Gemini / SAP / Ollama 协议 profile 声明各自请求，因此网关路由默认继承；路由在 `contractOverrides` 里重新声明语义时，profile 的请求随之失效，除非该路由自己声明。Anthropic 兼容网关只流 raw thinking，不发送 `display`。
+
 每个 wire block 先获得稳定 `ProviderOutputRef`；首次语义声明永久归属 `thinking` | `text` | `tool_call` 之一。kind collision、start 前 delta、close 后 delta、terminal 后语义事件 → fail-closed。禁止按文本相同做跨通道去重。
 
 Provider 请求失败或本地响应提交失败时，本次尚未交给工具执行器的 assistant 流式内容只保留为可见诊断，不进入下一次请求的 Agent 上下文；尤其不能重放没有对应 tool result 的 `tool_call`。仅成功结束的响应才进入正常工具循环。

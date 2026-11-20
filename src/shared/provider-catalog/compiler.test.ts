@@ -159,6 +159,25 @@ describe('Provider Catalog compiler', () => {
     expect(custom?.routes.every((route) => route.contracts.reasoning.semantic === 'unknown')).toBe(true);
   });
 
+  it('asks for visible reasoning only where the route that declares the semantic says so', () => {
+    const catalog = compileProviderCatalog(input());
+    const request = (surfaceId: string, protocol: string) => catalog.surfaces.get(surfaceId)?.surface.routes
+      .find((route) => route.protocol === protocol)?.contracts.reasoning.visibilityRequest;
+    // A Responses gateway inherits the protocol's summary request from its profile.
+    expect(request('opencode-go', 'OpenAIResponses')).toBe('responses-summary');
+    // DeepSeek redeclares raw reasoning on Responses, so the profile's request does not leak through.
+    expect(request('deepseek', 'OpenAIResponses')).toBeUndefined();
+    expect(request('anthropic', 'AnthropicMessages')).toBe('anthropic-display');
+    // Anthropic-compatible gateways stream raw thinking and are never sent the display parameter.
+    expect(request('deepseek', 'AnthropicMessages')).toBeUndefined();
+  });
+
+  it('gives Haiku 4.5 budgeted thinking, since it predates adaptive thinking', () => {
+    const haiku = compileProviderCatalog(input()).surfaces.get('anthropic')?.surface.models
+      .find((model) => model.modelId === 'claude-haiku-4-5-20251001');
+    expect(haiku?.controls.reasoning.wireProfile).toMatchObject({ kind: 'anthropic', onMode: 'enabled', onBudgetTokens: 16000 });
+  });
+
   it('exposes protocols only through precise model route matrices', () => {
     const catalog = compileProviderCatalog(input());
     expect(catalog.index.surfaces.every((surface) => !('userSelectableRoute' in surface))).toBe(true);

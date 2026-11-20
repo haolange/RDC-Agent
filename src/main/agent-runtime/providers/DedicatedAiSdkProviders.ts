@@ -8,6 +8,7 @@ import {
   parseSapAiCoreServiceKey,
 } from '../../settings/provider-auth/SapAiCoreCredentials';
 import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
+import { reasoningVisibilityRequest } from './reasoningWire';
 
 interface DedicatedProviderConfig {
   apiKey: string;
@@ -54,17 +55,14 @@ export function createSapAiCoreProvider(
         deploymentId: optional(config.connectionValues?.AICORE_DEPLOYMENT_ID),
         resourceGroup: optional(config.connectionValues?.AICORE_RESOURCE_GROUP),
         warnOnAmbiguousConfig: false,
-        defaultSettings: {
-          api,
-          includeReasoning: true,
-        },
+        defaultSettings: { api },
       });
       return provider(model.id);
     },
     providerOptions: (options) => ({
       'sap-ai': {
         api,
-        includeReasoning: options.reasoningVisibility !== 'none',
+        includeReasoning: reasoningVisibilityRequest(options) === 'sap-include-reasoning',
         modelParams: toSapModelParams(options),
       },
     }),

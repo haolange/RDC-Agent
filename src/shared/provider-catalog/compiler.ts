@@ -105,6 +105,19 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 
+/**
+ * A route that redeclares what its reasoning is also owns how it is requested: changing the semantic
+ * drops the profile's visibility request unless the route declares its own.
+ */
+function mergeReasoningContract(
+  base: ProviderContractBundle['reasoning'],
+  patch: ProviderContractBundlePatch['reasoning'],
+): ProviderContractBundle['reasoning'] {
+  const merged = { ...base, ...patch };
+  if (patch?.semantic !== undefined && patch.visibilityRequest === undefined) delete merged.visibilityRequest;
+  return merged;
+}
+
 function mergeProviderContracts(
   base: ProviderContractBundle,
   patch: ProviderContractBundlePatch,
@@ -112,7 +125,7 @@ function mergeProviderContracts(
   return ProviderContractBundleSchema.parse({
     ...base,
     ...patch,
-    reasoning: { ...base.reasoning, ...patch.reasoning },
+    reasoning: mergeReasoningContract(base.reasoning, patch.reasoning),
     state: { ...base.state, ...patch.state },
     cache: { ...base.cache, ...patch.cache },
     toolLoop: { ...base.toolLoop, ...patch.toolLoop },

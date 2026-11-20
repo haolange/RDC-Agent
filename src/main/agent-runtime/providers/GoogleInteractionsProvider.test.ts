@@ -37,6 +37,7 @@ function plan(
     compatibilityGroup: 'google-ai-studio:GoogleInteractions',
     reasoning: {
       semantic: 'summary',
+      visibilityRequest: 'gemini-interactions-summaries',
       source: 'google-interactions-thought-steps',
       displayLabel: 'Reasoning summary',
       carrier: 'thought-signature',

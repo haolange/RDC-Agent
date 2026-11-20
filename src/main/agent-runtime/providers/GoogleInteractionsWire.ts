@@ -8,7 +8,7 @@ import type {
 } from '../core/types';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { findLatestProviderState } from '../reasoning/ProviderStateRefs';
-import { applyGoogleInteractionsReasoning } from './reasoningWire';
+import { applyGoogleInteractionsReasoning, reasoningVisibilityRequest } from './reasoningWire';
 
 export function buildGoogleInteractionsUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/u, '');
@@ -44,7 +44,7 @@ export function buildGoogleInteractionsRequest(
   applyGoogleInteractionsReasoning(
     generationConfig,
     options.reasoning,
-    options.reasoningVisibility,
+    reasoningVisibilityRequest(options),
   );
   if (Object.keys(generationConfig).length > 0) body.generation_config = generationConfig;
 

@@ -787,7 +787,7 @@ describe('providerWireFixture fail-closed stream invariants', () => {
           levels: { low: 'low', medium: 'medium', high: 'high' },
         },
       },
-    });
+    }, null);
     expect(openAiResponses.reasoning).toMatchObject({ effort: 'high' });
 
     const body: Record<string, unknown> = { model: 'fixture-chat', stream: true };

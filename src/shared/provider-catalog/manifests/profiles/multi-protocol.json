@@ -68,6 +68,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "responses-summary",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "reasoning-item",
@@ -296,6 +297,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "gemini-include-thoughts",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "thought-signature",
@@ -354,6 +356,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "gemini-include-thoughts",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "thought-signature",
@@ -525,6 +528,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "sap-include-reasoning",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "unknown",
@@ -579,6 +583,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "sap-include-reasoning",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "unknown",
@@ -690,6 +695,7 @@
         "compatibilityGroup": "none",
         "reasoning": {
           "semantic": "unknown",
+          "visibilityRequest": "responses-summary",
           "source": "profile-explicit-unknown",
           "displayLabel": "Provider reasoning",
           "carrier": "reasoning-item",

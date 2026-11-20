@@ -39,7 +39,7 @@ import {
   ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
-import { applyGeminiReasoning } from './reasoningWire';
+import { applyGeminiReasoning, reasoningVisibilityRequest } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
@@ -300,7 +300,7 @@ export class GeminiProvider implements ProviderStrategy {
     if (typeof options.temperature === 'number') generationConfig.temperature = options.temperature;
     if (typeof options.topP === 'number') generationConfig.topP = options.topP;
     if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
-    applyGeminiReasoning(generationConfig, options.reasoning);
+    applyGeminiReasoning(generationConfig, options.reasoning, reasoningVisibilityRequest(options));
     if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
 
     if (context.tools && context.tools.length > 0) {

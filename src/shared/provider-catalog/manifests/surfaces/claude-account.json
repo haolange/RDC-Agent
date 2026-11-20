@@ -60,6 +60,7 @@
       "contractOverrides": {
         "reasoning": {
           "semantic": "summary",
+          "visibilityRequest": "anthropic-display",
           "source": "anthropic-extended-thinking-summary",
           "evidence": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking",
           "displayLabel": "Reasoning summary",

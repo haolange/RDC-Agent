@@ -32,9 +32,9 @@ function effective(providerId: string, modelId: string, protocol?: LlmProviderPr
 
 function wire(plan: RequestPlan): Record<string, unknown> {
   const body: Record<string, unknown> = { model: plan.effectiveModelId, top_p: 0.97, temperature: 0.6 };
-  applyAnthropicReasoning(body, plan.reasoningWire);
+  applyAnthropicReasoning(body, plan.reasoningWire, null);
   applyOpenAiCompatibleReasoning(body, plan.reasoningWire);
-  Object.assign(body, buildOpenAiResponsesReasoning(plan.reasoningWire));
+  Object.assign(body, buildOpenAiResponsesReasoning(plan.reasoningWire, null));
   return applyRequestPlanBody(body, plan);
 }
 
