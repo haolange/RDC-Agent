@@ -12,6 +12,7 @@ const executable = {
   availability: 'available' as const,
   selection: { pickerVisibility: 'primary' as const },
   toolCalling: { state: 'supported' as const },
+  defaultBudgetTokens: 200_000,
   route: { protocol: 'OpenAICompatibleChatCompletions' },
 };
 
@@ -30,6 +31,7 @@ describe('agentToolCapability', () => {
       ...executable,
       toolCalling: { state: 'unknown' },
     })).toBe('tools-unknown');
+    expect(classifyAgentToolEligibility({ ...executable, defaultBudgetTokens: 0 })).toBe('budget-unknown');
     expect(isAgentToolExecutableModel({
       ...executable,
       toolCalling: { state: 'unknown' },

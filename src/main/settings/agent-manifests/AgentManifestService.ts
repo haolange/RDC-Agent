@@ -635,9 +635,8 @@ export class AgentManifestService {
       const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
       const providerUnavailable = !isProviderExecutable(provider);
       const modelDisabled = model.enabled === false;
-      const missingVerifiedBudget = !Number.isFinite(model.defaultBudgetTokens) || model.defaultBudgetTokens <= 0;
       const eligibility = classifyAgentToolEligibility(model);
-      const toolExecutable = eligibility === 'executable' && !missingVerifiedBudget;
+      const toolExecutable = eligibility === 'executable';
       const status: AgentModelOption['status'] = providerUnavailable
         ? 'provider-unavailable'
         : modelDisabled
@@ -658,7 +657,7 @@ export class AgentManifestService {
                 ? 'This provider route has no implemented native structured-tool adapter.'
                 : model.unavailableReason ?? 'Model is unavailable for this account and route.'
             : status === 'model-unverified'
-              ? missingVerifiedBudget
+              ? eligibility === 'budget-unknown'
                 ? 'Model has no verified positive context budget and cannot be executed safely.'
                 : eligibility === 'tools-unknown'
                   ? 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.'
@@ -694,9 +693,7 @@ export class AgentManifestService {
         for (const model of snapshot?.models ?? []) {
           if (model.selection?.pickerVisibility === 'internal') continue;
           const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
-          const executable = isAgentToolExecutableModel(model)
-            && Number.isFinite(model.defaultBudgetTokens)
-            && model.defaultBudgetTokens > 0;
+          const executable = isAgentToolExecutableModel(model);
           if (executable || referenced.has(canonicalId)) {
             addOption(fromEffectiveModel(provider, model));
           }
@@ -714,9 +711,7 @@ export class AgentManifestService {
           entry.modelId === model.id || entry.aliases.includes(model.id)
         ));
         if (effective) {
-          const executable = isAgentToolExecutableModel(effective)
-            && Number.isFinite(effective.defaultBudgetTokens)
-            && effective.defaultBudgetTokens > 0;
+          const executable = isAgentToolExecutableModel(effective);
           if (executable || referenced.has(canonicalId)) {
             addOption(fromEffectiveModel(provider, effective));
           }

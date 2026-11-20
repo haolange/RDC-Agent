@@ -14,7 +14,7 @@ import path from 'node:path';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
-import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
 import { resolveCompactionPercentForSettings } from '../settings/settings-core/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
@@ -125,6 +125,7 @@ export async function startProfileTurn(
   if (surfaceProviderId) {
     const surface = await loadProviderSurface(surfaceProviderId);
     if (!surface) throw new Error(`PROVIDER_UNAVAILABLE: ${surfaceProviderId} is not in the compiled Catalog.`);
+    await awaitFirstCatalogLoad(surfaceProviderId, settingsService.getAll(), preparationController.signal);
   }
   throwIfPreparationCancelled();
 

@@ -10,6 +10,7 @@ vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({ agentOrches
 vi.mock('../provider-catalog/ProviderCatalogRegistry', () => ({ loadProviderSurface: async () => ({}) }));
 vi.mock('../settings/settings-core/compactionPercent', () => ({ resolveCompactionPercentForSettings: () => 80 }));
 vi.mock('../settings/provider-catalog/EffectiveModelResolver', () => ({
+  awaitFirstCatalogLoad: async () => undefined,
   resolveEffectiveModel: () => fixture.model,
   planEffectiveModelRequest: ({ controls }: { controls: Parameters<typeof planModelRequest>[0]['controls'] }) => {
     fixture.preparedControls = controls;

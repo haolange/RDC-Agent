@@ -389,7 +389,10 @@ export function resolveAgentRoutePreflight(
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
-        code: 'CONVERSATION_LLM_TOOLS_UNAVAILABLE',
+        // Unknown availability is a catalog state, not a tools verdict; keep them apart for the UI and logs.
+        code: eligibility === 'availability-unknown'
+          ? 'CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED'
+          : 'CONVERSATION_LLM_TOOLS_UNAVAILABLE',
         severity: 'warning',
         userMessage: recommendationText
           ? `${detail.userMessage} 可改选：${recommendationText}。`

@@ -78,7 +78,21 @@ describe('EffectiveCatalogService', () => {
     expect(last.projectionVersion).toBeGreaterThan(first.projectionVersion);
   });
 
-  it('discards an old configuration refresh before persisting or publishing its result', async () => {
+  it('offers only the first load of an uncached route for a turn to wait on', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00Z') });
+    let finish!: (value: { models: [] }) => void;
+    service.setDiscoveryLoaderResolver(() => () => new Promise(resolve => { finish = resolve; }));
+    expect(service.firstLoad(request())).toBeNull();
+    service.getSnapshot(request());
+    const pending = service.firstLoad(request());
+    expect(pending).not.toBeNull();
+    finish({ models: [] });
+    await expect(pending).resolves.toMatchObject({ refreshing: false });
+    expect(service.firstLoad(request())).toBeNull();
+  });
+
+  it('discards an old configuration refresh: nothing persisted, only the current snapshot published', async () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath });
     let finish!: (value: { models: { modelId: string; label: string }[] }) => void;
@@ -87,7 +101,11 @@ describe('EffectiveCatalogService', () => {
     const head = service.getSnapshot(current);
     const listener = vi.fn(); service.subscribe(listener);
     finish({ models: [{ modelId: 'model-a', label: 'Old' }] }); await pending;
-    expect(listener).not.toHaveBeenCalled();
+    // Subscribers hear that the superseded refresh ended, with the current configuration's models.
+    expect(listener).toHaveBeenCalledTimes(1);
+    const published = listener.mock.calls[0]![0] as { refreshing: boolean; models: Array<{ label: string }> };
+    expect(published.refreshing).toBe(false);
+    expect(published.models.map((model) => model.label)).not.toContain('Old');
     expect(service.getSnapshot(current).scopeGeneration).toBe(head.scopeGeneration);
     expect(fs.existsSync(statePath)).toBe(false);
   });

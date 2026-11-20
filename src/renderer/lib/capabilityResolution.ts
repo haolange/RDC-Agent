@@ -26,7 +26,7 @@ export function resolveCatalogCapability(
 ): CapabilityResolutionState {
   const model = projection?.snapshot?.models.find((entry) => entry.modelId === expected.modelId) ?? null;
   const eligibility = model ? classifyAgentToolEligibility(model) : undefined;
-  const unresolved = !model || eligibility === 'availability-unknown' || eligibility === 'tools-unknown';
+  const unresolved = !model || eligibility === 'availability-unknown' || eligibility === 'tools-unknown' || eligibility === 'budget-unknown';
   if (!projection || ((projection.loading || projection.snapshot?.refreshing) && unresolved)) {
     return { status: 'loading' };
   }

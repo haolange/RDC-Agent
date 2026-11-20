@@ -452,6 +452,42 @@ export function resolveEffectiveCatalog(
   return effectiveCatalogService.getSnapshot(request);
 }
 
+/** Upper bound on how long a turn waits for a provider's first catalog load. */
+export const FIRST_CATALOG_LOAD_WAIT_MS = 8_000;
+
+/**
+ * Before the first catalog load finishes, every model reads as availability unknown. A turn started in
+ * that window waits for the load (bounded) instead of failing as "unverified"; later loads never block.
+ */
+export async function awaitFirstCatalogLoad(
+  providerId: string,
+  settings: AppSettings,
+  signal?: AbortSignal,
+  timeoutMs = FIRST_CATALOG_LOAD_WAIT_MS,
+): Promise<void> {
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  if (!provider) return;
+  const request = buildEffectiveCatalogRequest(provider);
+  effectiveCatalogService.getSnapshot(request);
+  const pending = effectiveCatalogService.firstLoad(request);
+  if (!pending) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    await Promise.race([
+      pending.then(() => undefined, () => undefined),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+      new Promise<void>((resolve) => {
+        onAbort = resolve;
+        signal?.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+  }
+}
+
 export function buildEffectiveCatalogRequest(
   provider: LlmProviderEntry,
   requestedModelId?: string,
