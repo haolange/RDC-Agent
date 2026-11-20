@@ -11,15 +11,20 @@ import { SettingsScopeBar } from '../parts';
 import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
 import { AgentAutosaveStatus } from './AgentAutosaveStatus';
 import { AgentListItem } from './AgentListItem';
-import { AgentManifestEditor, type AgentProvenanceScope } from './AgentManifestEditor';
+import { AgentManifestEditor } from './AgentManifestEditor';
+import type { AgentProvenanceScope } from './agentConfigStatus';
 import { uniqueResourceId } from './uniqueResourceId';
+import { createNewAgent, draftScope, toSlug, visibleDrafts, type AgentScope } from './agentDraftFactory';
 import { useScopedSkillSelection } from '../useScopedSkillSelection';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
+import { AgentDefaultModelSection } from './AgentDefaultModelSection';
+import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
+import { AgentModelMigrationDialog } from './AgentModelMigrationDialog';
+import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-type AgentScope = 'user' | 'project';
 
-interface AgentsSettingsProps {
+interface AgentsSettingsProps extends AgentModelCommands {
   settings: AppSettings;
   agentManifestDrafts: AgentManifestDraft[];
   agentManifestContextReady: boolean;
@@ -35,54 +40,6 @@ interface AgentsSettingsProps {
   t: Translate;
 }
 
-const visibleDrafts = (drafts: AgentManifestDraft[]): AgentManifestDraft[] =>
-  drafts.filter((draft) => !draft.delete);
-
-const toSlug = (value: string): string =>
-  value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'agent';
-
-/** Read-only scope filter: `writeScope` mirrors the definition provenance (builtin drafts write to user). */
-const draftScope = (draft: AgentManifestDraft): AgentScope => (draft.writeScope === 'project' ? 'project' : 'user');
-
-export const createNewAgent = (
-  existing: AgentManifestDraft[],
-  t: Translate,
-  scope: AgentScope,
-  currentProjectId: string | null,
-): AgentManifestDraft => {
-  const base = 'custom-agent';
-  let index = 1;
-  let id = base;
-  const ids = new Set(existing.map((entry) => entry.id));
-  while (ids.has(id)) {
-    index += 1;
-    id = `${base}-${index}`;
-  }
-  return {
-    id,
-    fileName: `${id}.agent.md`,
-    name: t('settings.agentDefaultName'),
-    description: t('settings.agentDefaultDescription'),
-    argumentHint: t('settings.agentDefaultArgumentHint'),
-    target: 'rdc-agent',
-    models: [],
-    icon: 'spark',
-    accent: '#33d1ff',
-    disableModelInvocation: false,
-    userInvocable: false,
-    tools: [],
-    skills: [],
-    mcpServers: [],
-    agents: [],
-    handoffs: [],
-    metadata: {},
-    instructions: t('settings.agentDefaultInstructions'),
-    enabled: true,
-    writeScope: scope,
-    writeProjectId: scope === 'project' ? currentProjectId ?? undefined : undefined,
-  };
-};
-
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   settings,
   agentManifestDrafts,
@@ -96,8 +53,10 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   canProject,
   currentProjectId,
   t,
+  ...modelCommands
 }) => {
   const [scope, setScope] = useState<AgentScope>('user');
+  const models = useAgentModelControls(settings, modelCommands, t);
   const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
   const clearAgentRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
   const [missingAgentId, setMissingAgentId] = useState<string | null>(null);
@@ -122,9 +81,11 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
     }
     clearAgentRequest(agentRequest.sequence);
   }, [activeDrafts, agentManifestContextReady, agentRequest, clearAgentRequest]);
-  const provenanceScope: AgentProvenanceScope | null = selectedAgent
-    ? settings.agents.definitions.find((definition) => definition.id === selectedAgent.id)?.provenance?.scope ?? null
+  const selectedDefinition = selectedAgent
+    ? settings.agents.definitions.find((definition) => definition.id === selectedAgent.id) ?? null
     : null;
+  const provenanceScope: AgentProvenanceScope | null = selectedDefinition?.provenance?.scope ?? null;
+  const builtinUpdate = provenanceScope === 'builtin' ? undefined : selectedDefinition?.builtinUpdate;
 
   const updateAgent = (patch: Partial<AgentManifestDraft>) => {
     if (!selectedAgent) return;
@@ -152,6 +113,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         id: nextId,
         fileName: `${nextId}.agent.md`,
         name: uniqueResourceId(`${selectedAgent.name} Copy`, current.map((agent) => agent.name)),
+        basedOn: undefined,
       };
       setSelectedAgentId(nextId);
       return [...current, duplicate];
@@ -168,8 +130,8 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
     onAgentManifestDraftsChange((current) => current.map((agent) => (
       agent.id === target.id ? { ...agent, delete: true, enabled: false } : agent
     )));
-    const next = scopedDrafts.find((agent) => agent.id !== target.id);
-    setSelectedAgentId(next?.id ?? '');
+    // Removing an override brings the builtin back under the same id, so the selection stays.
+    if (!builtinUpdate) setSelectedAgentId(scopedDrafts.find((agent) => agent.id !== target.id)?.id ?? '');
     setPendingDelete(null);
   };
 
@@ -193,7 +155,15 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         />
       </div>
 
-      <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics} t={t} />
+      <AgentDefaultModelSection
+        settings={settings}
+        error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
+        onChange={models.setDefaultBinding}
+        t={t}
+      />
+      <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics}
+        onMigrate={(issue) => models.openOverrideAction('migrate', issue)}
+        onDeleteOverride={(issue) => models.openOverrideAction('delete', issue)} t={t} />
       {missingAgentId ? <p role="alert">{t('settings.agentNavigationNotFound', { id: missingAgentId })}</p> : null}
       <div className="settings-manifest-layout">
         <div className="settings-manifest-list-column">
@@ -254,9 +224,13 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
             settings={settings}
             selectedAgent={selectedAgent}
             provenanceScope={provenanceScope}
+            builtinUpdate={builtinUpdate}
             onUpdateAgent={updateAgent}
+            onModelBindingChange={(binding) => models.setAgentBinding(selectedAgent.id, binding)}
+            modelError={models.modelError?.target === selectedAgent.id ? models.modelError.message : null}
             onDuplicateAgent={duplicateAgent}
             onDeleteAgent={deleteAgent}
+            onShowBuiltinDiff={() => models.showBuiltinDiff(selectedAgent, builtinUpdate?.status === 'updated')}
             onRetrySaveAgentManifests={onRetrySaveAgentManifests}
             agentManifestSaveState={agentManifestSaveState}
             agentManifestSaveMessage={agentManifestSaveMessage}
@@ -269,15 +243,32 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           </div>
         )}
       </div>
+      {models.builtinDiff ? (
+        <AgentBuiltinDiffDialog
+          state={models.builtinDiff}
+          onClose={models.closeBuiltinDiff}
+          onRestore={() => { models.closeBuiltinDiff(); deleteAgent(); }}
+          t={t}
+        />
+      ) : null}
+      {models.overrideAction ? (
+        <AgentModelMigrationDialog
+          target={models.overrideAction}
+          options={settings.agents.modelOptions}
+          onConfirm={models.confirmOverrideAction}
+          onClose={models.closeOverrideAction}
+          t={t}
+        />
+      ) : null}
       {pendingDelete ? (
         <ConfirmationDialog
-          title={t('settings.deleteAgentTitle')}
-          message={t('settings.deleteAgentConfirm', { name: pendingDelete.name || pendingDelete.id })}
+          title={t(builtinUpdate ? 'settings.agentRestoreBuiltinTitle' : 'settings.deleteAgentTitle')}
+          message={t(builtinUpdate ? 'settings.agentRestoreBuiltinConfirm' : 'settings.deleteAgentConfirm', { name: pendingDelete.name || pendingDelete.id })}
           details={[
             { label: t('settings.agentName'), value: pendingDelete.name || pendingDelete.id },
             { label: t('settings.resourceFieldId'), value: pendingDelete.id },
           ]}
-          confirmLabel={t('dialog.delete')}
+          confirmLabel={t(builtinUpdate ? 'settings.agentRestoreBuiltin' : 'dialog.delete')}
           cancelLabel={t('dialog.cancel')}
           onCancel={() => setPendingDelete(null)}
           onConfirm={confirmDeleteAgent}

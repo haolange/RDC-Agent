@@ -1,6 +1,6 @@
 import os from 'os';
-import path from 'path';
 import { nowMs } from '@shared/utils/id';
+import { requiresCommandInterpreter } from '../platform/shell';
 import type { CLIResult } from '@shared/types/tool';
 import { processSupervisor, type SupervisedProcess } from '../runtime/ProcessSupervisor';
 
@@ -42,7 +42,7 @@ export class ShellInvocationService {
       };
     }
 
-    const needsShell = process.platform === 'win32' && ['.bat', '.cmd'].includes(path.extname(command).toLowerCase());
+    const needsShell = requiresCommandInterpreter(command);
     const supervised = processSupervisor.spawn('shell', command, request.args ?? [], {
       cwd: request.cwd || undefined,
       env: {
@@ -55,7 +55,6 @@ export class ShellInvocationService {
       timeoutMs: request.timeoutMs,
       ringBufferBytes: request.outputBufferBytes,
       abortSignal: request.abortSignal,
-      isolateProcessGroup: process.platform !== 'win32',
     });
 
     const procId = supervised.id;

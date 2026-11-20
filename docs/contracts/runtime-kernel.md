@@ -252,7 +252,7 @@ RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）
 
 ## 通用 Harness 与声明续跑
 
-General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
+General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 共用 investigation-planning 的计划结构，按规模填写：正文写给用户读，执行引用放进 `plan_artifact` 的结构化字段或正文末尾的 `## Execution references`，标题、摘要与正文里的内部引用由 `plan_artifact` 以 `PLAN_BODY_INTERNAL_REFERENCE` 拒绝；Knowledge 相似性仅是检查线索。
 
 Plan 经 session artifact plans 类别版本化：同意前覆盖 `session://plans/plan.md`，同意后冻结 `plan-<ISO>-<hash8>.md`，历史文件不迁移或删除。批准写入 execution offer；prepareTurn 仅当 hash 与 target 匹配时预载声明 Skill。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。 Mission 额度耗尽但未完成时可通过 `budget_paused` 结束 turn，绝不提升领域报告状态；准入条件见「Task 执行、消息与资源生命周期」中 `turn_complete` 一节。
 
@@ -362,7 +362,7 @@ Small/Big Loop、专业委派和补证方向由实际加载的 Skill 与模型�
 
 超阈值的原生 RDC `shell` 回执保留完整 session artifact 引用和文件 hash；模型可见摘要从同一主进程校验后的结果提取四项 execution identity、原生 result kind/ok/trace。Pixel History 另投影目标、事件、历史/片元/通过/有效 shader 数量和少量通过的 primitive ID。摘要仅是可追溯的事实索引，不替代完整 payload；身份不一致时显式报错，不生成看似可信的正常摘要。
 
-Capsule 的 `profile` 选择 Agent 身份，不提供自由 `model` / `reasoningLevel`。子执行从目标 Agent 配置解析模型和推理档位，不继承父会话覆盖；缺失或不可用时明确失败，不回退父模型。`sourceRefs`、`challengeRefs`、`inputArtifactRefs` 只接受已有受控 URI；自然语言质疑属于 hypotheses/negativePaths。工具搜索无匹配只证明当前筛选无匹配。
+Capsule 的 `profile` 选择 Agent 身份，不提供自由 `model` / `reasoningLevel`。子执行按目标 Agent 从 Settings → Agents 解析模型和推理档位（本 Agent 设置优先，其余字段取默认），不继承父会话覆盖；缺失或不可用时明确失败，不回退父模型。`sourceRefs`、`challengeRefs`、`inputArtifactRefs` 只接受已有受控 URI；自然语言质疑属于 hypotheses/negativePaths。工具搜索无匹配只证明当前筛选无匹配。
 
 压缩先验证原始来源，再持久保存候选，检查取消后原子安装窗口，安装后才发布 after-compact。此前 Provider response ID 不进入新窗口，以免 stateful adapter 绕过可移植续做状态；后续新响应仍可按已验证路由正常续接。签名/加密 reasoning 不进入可读摘要，原始用户历史不删除。原始文本与权威状态无法放入专用调用安全预算时暂停并保留原内容；未声称无限长度或无损压缩。
 
@@ -379,7 +379,7 @@ Task 状态文件的提交保持同一候选文件与原子 rename。短暂 EPER
 
 文件路由表独立于灾难 shellHardDeny 表，均在权限模式和自定义允许前缀之前求值；Full access 不能绕过。有效工具集合有对应工具时，shell.command 文件读写/搜索返回 SHELL_FILE_TOOL_BYPASS，命令行 RDC 返回 RDC_VIA_COMMAND_DENIED。edit_file 和覆盖已有文件的 write_file 必须先在同一 session 成功 read_file 同一 realpath，否则 READ_BEFORE_EDIT_REQUIRED。已读状态跨 turn、仅内存持有，重启须重读；子 session 不继承。新建文件免先读。
 
-Agent 只绑定同安装捆绑 python.exe 的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
+Agent 只绑定同安装捆绑 Python（按宿主布局，见 docs/architecture/host-platform.md）的绝对路径与 cli/run_cli.py；旧 bat 和 PowerShell 转发返回 RDC_BAT_REJECTED，不迁移、不 fallback。旧配置仍可打开修正，但不能执行。
 
 主子可见工作过程共享终态收束：完成、失败和停止冻结所属 loop 与思考状态；未执行工具标为 skipped，已启动但无回执的工具明确失败，不推造成功。独立 Task 生命周期不因父执行完成而终止。模型输入包装不承担产品标题或正文的结构契约。
 

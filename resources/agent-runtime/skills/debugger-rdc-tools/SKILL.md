@@ -8,20 +8,21 @@ audience:
 
 # Debugger RDC-Tool
 
-Debugger 可按需只读本手册及引用，在计划前核对参数、输出、采证和调用成本；规划阶段的事件树用 `rdc_probe` 的 `event_list`（offset/limit 分页，`pagination.truncated=false` 才完整）和 `event_search`（名称、ActionFlags、事件范围）；执行仍须通过 execute handoff 将手册绑定给 General 并真实预载。先读 `$rdc-tool-shell` 的发现、身份、错误、输出和副作用规则，再按 Plan 的区分检查读取 [工具参考](references/tools.md) 中对应条目。成员清单是知识覆盖范围，不是运行时权限白名单。
+定位渲染错误时挑选 RDC 操作用这本手册。Debugger 规划时只读，用 `rdc_probe` 的 `event_list`（offset/limit 分页，`pagination.truncated=false` 才完整）和 `event_search`（名称、ActionFlags、事件范围）看事件树；执行由 General 经交接预载后进行。通用的调用和结果规则见 `$rdc-tool-shell`，每个操作的参数见 [工具参考](references/tools.md)。
 
 ## 选择路径
 
-1. 用 action tree、pass、search、details、parent chain 和状态变化点缩小 First Bad Event。`rd.event.get_action_tree(event_id=...)` 只读该节点及其子树，不返回前后相邻事件；相邻事件用 `rd.event.search_actions(query.event_id_min/event_id_max)` 限定范围，再读 details / parent chain。树结果核对根节点分页、深度、节点预算和截断字段；大树被制品化或只读取了首段时，先缩小原生查询，不把未读到当作事件不存在。
-2. 像素异常从当前事件输出目标开始；用户未给坐标时，先通过受控导出与 `read_image` 找候选区域，再按 `$pixel-forensics` 核对源纹理尺寸及事件映射。视觉区域难以精确落到单点时，可用 `rd.texture.get_region_values` 读取原生纹理上的有界矩形及其数值，再结合目标点与邻近控制点选择检查；核对返回的事件、subresource、坐标和 `values_status`，不能把亮度或区域统计单独当作异常或因果证据。配对 pixel value / region / history / stats / histogram；显式 texture 与当前输出目标互斥。观察到的写入记录不自动证明因果。
-   候选区域属于哪个对象尚未确定时，按 `$pixel-forensics` 从对象侧核对：`rd.texture.render_overlay` 的 Drawcall 高亮或 `rd.texture.diff` 的事件前后差异给出该 draw 的实际覆盖。
-   在批量写入调查记录前，优先做能排除候选解释的最小只读配对：从 action search / history 确认可用事件，在同一原生纹理、subresource 和坐标取得事件前后目标点与邻近控制点；再核对 history 中各片元的 valid、passed、shader-out、pre/post-mod。参考图条件不匹配只阻断跨图定量比较，不阻断同 capture 内的这条取证路径。若原生回执缺字段或读数相互矛盾，保留 unknown 并记录具体缺口，不以猜测值设计 shader 干预。
-3. 在候选事件读取必要 pipeline sections、bindings、constant buffers、vertex/index、post-transform mesh 和 shader source/reflection；失败不代为空绑定。Pixel History 给出同事件 surviving `primitive_id` 而几何或材质归属未知时，先按像素、事件、输出目标和 primitive 尝试 `rd.shader.debug_start`，再按 topology/index binding 用 `rd.mesh.get_drawcall_mesh_config` 的有界顶点或 index 范围核对几何与绑定。只查可区分假设的少量片元，不批量导出 draw。primitive 是片元归属线索，draw 级 shader/binding 不自动证明材质身份；同一 replay 的索引、顶点属性、纹理/常量和 shader 路径闭合时才提高归属。远端 debug 不支持、mesh 截断或语义不明，保留具体 unknown 并继续其他只读检查。
-4. shader debugger 或替换只用于 Plan 中的区分检查。`rd.shader.get_source` 的 `source_available=false` 只说明原始调试源码缺失；如返回 `fallback_args`，按其指定的 target 读取反汇编并检查该次 `edit_plan`；默认展示用反汇编的只读 edit plan 不代表没有可编辑路径。没有源码时，在可编辑的中间表示上做单项修改：只改一处，其余逻辑保持原样。`allowed_edit_inputs` 是可选输入形式，`allowed_ops` 只限制结构化便利操作；两者不得混淆。读取真实 edit plan 和能力后再 compile/replace；没有区分性因果假设和安全恢复路径仍不得干预。每个 counterfactual 都记录真实 replacement，并按 A-B-A（baseline→variant→restored）回滚与恢复观察。
+1. **缩小事件区间**。用 action tree、pass、search、details、parent chain 和状态变化点找 First Bad Event。`rd.event.get_action_tree(event_id=...)` 只读该节点及子树；相邻事件用 `rd.event.search_actions` 的 `event_id_min`／`event_id_max` 限定范围。核对分页、深度、节点预算和截断，没读到的不当作不存在。
+2. **从像素出发**。从当前事件的输出目标开始；用户没给坐标时，先受控导出再 `read_image` 找候选区域，坐标映射按 `$pixel-forensics` 核对。区域难以落到单点时，用 `rd.texture.get_region_values` 读原生纹理上的有界矩形，再选目标点和邻近控制点。配对使用 pixel value／region／history／stats／histogram；亮度或区域统计本身不是异常或因果证据。
+   - 候选区域属于哪个对象还不确定时，从对象侧核对：`rd.texture.render_overlay` 的 Drawcall 高亮或 `rd.texture.diff` 的事件前后差异给出 draw 的实际覆盖。
+   - 批量写记录前，先做能排除解释的最小只读配对：同一原生纹理、subresource 和坐标上，取事件前后的目标点与控制点，再看 history 里各片元的 valid、passed、shader-out、pre/post-mod。回执缺字段或读数矛盾时保留 unknown，不以猜测值设计干预。
+3. **读候选事件的输入**。按需读 pipeline sections、bindings、constant buffers、vertex/index、post-transform mesh 和 shader source/reflection；失败不当成空绑定。Pixel History 给出 surviving `primitive_id` 而归属未知时，先试 `rd.shader.debug_start`，再用 `rd.mesh.get_drawcall_mesh_config` 的有界范围核对；索引、顶点属性、纹理／常量和 shader 路径在同一回放里闭合，才提高归属等级。
+4. **干预**。shader debugger 和替换只用于计划里的区分检查。`rd.shader.get_source` 返回 `source_available=false` 时，按 `fallback_args` 指定的 target 读反汇编和该次 `edit_plan`；展示用反汇编的只读 edit plan 不代表没有可编辑路径。没有源码时，在可编辑的中间表示上只改一处，其余保持原样。`allowed_edit_inputs` 是可选的输入形式，`allowed_ops` 只限制结构化便利操作。每个反事实实验记录真实 replacement，按 baseline → variant → restored 撤销和恢复。
+   - 需要工作文件构建变体时，用 `rd.export.shader_bundle`（`disassembly_target` 与编辑视图一致）导出，核对 manifest 后做最小 diff，再用 `rd.shader.compile.source_path` 验证。
+5. **导出最小证据**。只导出支撑当前 Claim 的内容；unsupported 不是空结果。
 
-需要工作文件以独立构建变体时，使用正式 `rd.export.shader_bundle` 并显式设置与编辑视图一致的 `disassembly_target`。核对 manifest 的实际 target、source_encoding、edit_plan 及文件 hash/大小，再在工程内读取全文、生成最小 diff，并以 `rd.shader.compile.source_path` 独立验证。长文本优先正式导出，避免模型手抄或寻找产品内部制品存储路径。合并构建与替换接口不等于独立事前编译回执；冻结计划要求事前构建时，先用可读工作文件完成该步骤，不能静默跳过前置。
-5. 只导出能支撑当前 Claim 的最小证据。OBJ 仅接受工具定义声明的 post-VS 位置和 primitive indices；unsupported 不是空模型。
+结果里把直接读取、工具投影和推断分开。某项检查排除了一个解释时，写明适用的事件、subresource 和参数；不能定位就选下一项检查。
 
-结果中把直接读取、工具投影和推断分开。像素历史、管线差异或 debug step 能排除某个假设时说明适用事件、subresource 和参数；不能定位时选下一项区分检查继续；确实无法继续才按 unresolved 交付当前候选区间。
-
-定位时用 `rd.event.get_api_calls` 检查真实类型化参数，用 `rd.resource.get_details` 的初始化关联追到 chunk；首次使用不是创建证据。`rd.event.get_resource_usage` 查询事件的资源绑定摘要，`rd.resource.get_usage` 从已知资源追踪其使用事件，两者回答不同问题；某次查询失败后按实际失败和恢复合同判断另一项是否仍可用，不重复已知相同失败。顶点输入、完整 viewport/scissor、blend/stencil、push constants 和资源状态从所需 pipeline sections 读取。实际 sampler 与 descriptor store 范围用于区分空槽、错误视图及未访问描述符。初始/当前内容对比先核对来源，读取恢复规则统一遵循共享手册。
+- `rd.event.get_api_calls` 看真实的类型化参数；`rd.resource.get_details` 的初始化关联追到 chunk，首次使用不是创建证据。
+- `rd.event.get_resource_usage` 回答"这个事件绑定了哪些资源"，`rd.resource.get_usage` 回答"这个资源在哪些事件被用到"；一项失败后按实际失败判断另一项是否可用。
+- 顶点输入、viewport/scissor、blend/stencil、push constants 和资源状态从所需的 pipeline sections 读；实际的 sampler 与 descriptor 范围用来区分空槽、错误视图和未访问的描述符。

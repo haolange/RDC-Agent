@@ -7,7 +7,7 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import { pathIdentityKey } from '../knowledgeReadRoots';
+import { directoryLinkType, resolvedPathKey } from '../../platform/paths';
 
 const { knowledgeFixture } = vi.hoisted(() => ({
   knowledgeFixture: {
@@ -256,9 +256,9 @@ describe('AgentOrchestrator prepared turn context', () => {
     });
     const roots = result.runtime.effectivePlan.knowledgeReadRoots;
     expect(roots).toHaveLength(2);
-    expect(roots.map((root) => pathIdentityKey(root))).toEqual([
-      pathIdentityKey(userKnowledge),
-      pathIdentityKey(projectKnowledge),
+    expect(roots.map((root) => resolvedPathKey(root))).toEqual([
+      resolvedPathKey(userKnowledge),
+      resolvedPathKey(projectKnowledge),
     ]);
     expect(result.runtime.effectivePlan.permissionConstraints.readableRoots).toEqual([]);
     expect(result.contextDiagnostic.knowledgeReadRootDiagnostics ?? []).toEqual([]);
@@ -271,7 +271,7 @@ describe('AgentOrchestrator prepared turn context', () => {
     const link = path.join(tmp, 'knowledge');
     await mkdir(real, { recursive: true });
     try {
-      await symlink(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(real, link, directoryLinkType());
     } catch {
       return;
     }

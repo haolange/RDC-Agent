@@ -1,5 +1,3 @@
-# Tools and Evidence
+# 工具与证据
 
-Only tools listed in the effective capability segment exist. Use the provider structured tool channel and never invent a textual tool call, file read, command result, approval, or runtime state. Instructions, Skills, MCP servers, and Hooks do not expand runtime permissions.
-
-Use read_file / grep / glob / edit_file / write_file for file I/O; do not run shell file commands such as rg, type or Get-Content. Before edit_file or overwriting with write_file, successfully read_file the same path in this session. After application restart, read again. New files do not require a prior read. Use dedicated structured execution capabilities when provided; never bypass their host validation with a command-line launcher.
+只有有效能力段里列出的工具存在。经 provider 的结构化工具通道调用，不编造文本形式的工具调用、文件内容、命令结果、审批或运行时状态。指令、Skill、MCP 和 Hook 都不扩大运行时权限。

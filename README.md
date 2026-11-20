@@ -85,7 +85,7 @@ Conclusion
 - **真实运行过程**：Work Process 展示实际执行过程和 provider reasoning 语义；不伪造隐藏思维链，也不把模型自报当成证据。
 - **设备与回放**：本地回放与 Android 设备路径由 RDC / RenderDoc 环境决定；“已连接”不等于每一种 capture 都能在每一台 GPU 上成功 replay。
 
-当前发布面是 **Windows-only**。RDC-Agent 不捆绑你的 `.rdc` 文件、Provider 密钥或 RenderDoc 安装；你需要自行配置 RDC-Tool CLI、Provider / Model，以及对应的设备环境。
+当前发布面是 **Windows-only**；源码可在 Windows 与 Linux（x64）上运行（宿主差异见 [`docs/architecture/host-platform.md`](docs/architecture/host-platform.md)）。RDC-Agent 不捆绑你的 `.rdc` 文件、Provider 密钥或 RenderDoc 安装；你需要自行配置 RDC-Tool CLI、Provider / Model，以及对应的设备环境。
 
 ## 为什么它适合严肃的图形调试
 
@@ -100,11 +100,11 @@ Conclusion
 
 当前源码版本 **0.6.0-rc.5 按未签名预发布通道交付**；可下载版本以 [Releases](https://github.com/haolange/RDC-Agent/releases) 为准。Windows 可能提示未知发布者，受管理电脑可能阻止运行。仅从本仓库 Releases 下载并核对 SHA-256；不要关闭安全防护。稳定正式版仍保留签名要求。
 
-RDC 调查另从 [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases) 下载自包含 zip，解压后在 Settings → Tools 检测安装或选择 `rdc-tool` 根目录，再验证并应用；不需要另装 Python。默认安装目录为 `%LOCALAPPDATA%/Programs/rdc-tool`。通用 Code Interpreter 是单独的可选配置。
+RDC 调查另从 [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases) 下载自包含 zip，解压后在 Settings → Tools 检测安装或选择 `rdc-tool` 根目录，再验证并应用；不需要另装 Python。Windows 默认安装目录为 `%LOCALAPPDATA%/Programs/rdc-tool`；Linux 上选择解压后的根目录。通用 Code Interpreter 是单独的可选配置。
 
 以下命令只供源码开发：
 
-环境要求：Windows、Node.js `>=22.13.0`、pnpm `11.7.0`，以及已安装并可由 Settings 配置的 RDC-Tool CLI。
+环境要求：Windows 或 Linux（x64）、Node.js `>=22.13.0`、pnpm `11.7.0`，以及已安装并可由 Settings 配置的 RDC-Tool CLI。Linux 保存 Provider 密钥需要已解锁的系统钥匙环（GNOME Keyring 或 KWallet）。
 
 ```powershell
 pnpm install

@@ -214,6 +214,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
           promptPlan,
           requestPlan: requestOptions.requestPlan,
           tools: requestContext.tools ?? [],
+          affinityScopeId: executionScopeId,
         }),
       });
       requestSnapshotStore.write(snapshot);

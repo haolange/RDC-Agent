@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { pathComparisonKey } from '../platform/paths';
 import type { ConversationToolImagePreviewRef, ConversationToolResourceRef } from '@shared/types/conversation';
 import type { ToolCallResult } from '@shared/types/tool';
 import { extractSessionArtifactUris, isSessionArtifactUri } from '@shared/types/sessionArtifact';
@@ -37,10 +38,7 @@ const stringValue = (record: Record<string, unknown>, key: string): string | nul
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 };
 
-const normalizePathIdentity = (value: string): string => {
-  const normalized = path.normalize(value).replaceAll('\\', '/');
-  return process.platform === 'win32' ? normalized.toLocaleLowerCase() : normalized;
-};
+const normalizePathIdentity = (value: string): string => pathComparisonKey(path.normalize(value).replaceAll('\\', '/'));
 
 const pathRef = (value: string, kind: 'file' | 'directory'): ConversationToolResourceRef => ({
   id: kind + ':' + normalizePathIdentity(value),

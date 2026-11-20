@@ -9,7 +9,6 @@ export type CapabilityUnavailableReason =
 
 export type CapabilityResolutionState =
   | { status: 'unconfigured' }
-  | { status: 'syncing-route' }
   | { status: 'loading' }
   | { status: 'ready'; model: EffectiveModel }
   | { status: 'refreshing'; model: EffectiveModel }

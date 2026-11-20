@@ -3,14 +3,13 @@ import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import { toAgentManifestEditorDraft, type AgentManifestDefinition } from '@shared/types/agentManifest';
 import type {
   AppSettings,
-  LlmAgentRoute,
   LlmProviderEntry,
   RdcCliInvokerSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
 } from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
-import { cloneProvider, cloneRoute } from './utils';
+import { cloneProvider } from './utils';
 
 export function canInitializeAgentEditor(definitions: AgentManifestDefinition[], currentProjectId?: string | null) {
   return Boolean(currentProjectId?.trim()) || !definitions.some((definition) => definition.provenance?.scope === 'project');
@@ -24,7 +23,6 @@ export const useSettingsModalState = (
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const [accountDraft, setAccountDraft] = useState(settings.profile);
   const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
-  const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
   const [rdcCliDraft, setRdcCliDraft] = useState<RdcCliInvokerSettings>(settings.tooling.rdcCli);
   const [codeInterpreterDraft, setCodeInterpreterDraft] = useState<CodeInterpreterSettings>(
     settings.tooling.codeInterpreter,
@@ -67,7 +65,6 @@ export const useSettingsModalState = (
     setAccountDraft(settings.profile);
     const providers = settings.llm.providers.map(cloneProvider);
     setProviderDrafts(providers);
-    setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
     setRdcCliDraft(settings.tooling.rdcCli);
     setCodeInterpreterDraft(settings.tooling.codeInterpreter);
     setShellDraft(settings.tooling.shell);
@@ -90,8 +87,6 @@ export const useSettingsModalState = (
     setAccountDraft,
     providerDrafts,
     setProviderDrafts,
-    agentRouteDrafts,
-    setAgentRouteDrafts,
     rdcCliDraft,
     setRdcCliDraft,
     codeInterpreterDraft,

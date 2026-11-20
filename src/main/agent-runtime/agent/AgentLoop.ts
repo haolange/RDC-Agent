@@ -42,7 +42,7 @@ import {
   RUNTIME_NO_PROGRESS_INSTRUCTION,
 } from './LoopProgressGuard';
 import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
-import { appendRuntimeContinuation, RuntimeContinuationGuard } from './RuntimeContinuation';
+import { RuntimeContinuationGuard } from './RuntimeContinuation';
 import { recoveryStartMessage } from './RecoveryDiagnosticText';
 
 export type TransformContextResult = AgentMessage[] | CompressResult;
@@ -308,11 +308,11 @@ async function runAgentLoop(
           '</runtime_turn_budget>',
         ].join('\n')
         : undefined;
-      const ephemeralInstruction = [runtimeNoProgressInstruction, turnBudgetInstruction]
+      // Request-local host facts ride at the end of the request so the cached prefix stays intact.
+      const ephemeralInstruction = [runtimeContinuationInstruction, runtimeNoProgressInstruction, turnBudgetInstruction]
         .filter((instruction): instruction is string => Boolean(instruction))
         .join('\n\n') || undefined;
       runtimeNoProgressInstruction = undefined;
-      const continuationInstruction = runtimeContinuationInstruction;
       runtimeContinuationInstruction = undefined;
       const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
         context,
@@ -321,7 +321,6 @@ async function runAgentLoop(
         stream,
         ephemeralInstruction,
         remainingTurns > 1,
-        continuationInstruction,
       );
       newMessages.push(assistantMessage);
 
@@ -448,7 +447,6 @@ async function streamAssistantResponseWithRecovery(
   stream: EventStream<AgentEvent, Message[]>,
   ephemeralInstruction?: string,
   allowToolUse = true,
-  continuationInstruction?: string,
 ): Promise<{ message: AssistantMessage }> {
   const recovery = config.errorRecovery;
   const CIRCUIT_BREAKER_LIMIT = 3;
@@ -478,7 +476,6 @@ async function streamAssistantResponseWithRecovery(
         stream,
         ephemeralInstruction,
         allowToolUse,
-        continuationInstruction,
       );
       // 成功时重置断路器
       consecutiveCompactionFailures = 0;
@@ -627,12 +624,14 @@ async function streamAssistantResponse(
   stream: EventStream<AgentEvent, Message[]>,
   ephemeralInstruction?: string,
   allowToolUse = true,
-  continuationInstruction?: string,
 ): Promise<AssistantMessage> {
   // 1. 可选的上下文变换（压缩 / 剪裁）
   let messages: AgentMessage[] = context.messages;
   const pendingMailbox = await config.beforeRequestMessages?.();
   if (pendingMailbox?.messages.length) messages = [...messages, ...pendingMailbox.messages];
+  // The compacted window covers durable history only; the request-local tail is appended after it,
+  // so the next request still matches the installed window and the tail never counts as user input.
+  if (config.transformContext) messages = await applyTransformContext(messages, config, stream);
   if (ephemeralInstruction) {
     messages = [
       ...messages,
@@ -643,15 +642,11 @@ async function streamAssistantResponse(
       },
     ];
   }
-
-  // Mailbox and corrective instructions participate in the same request budget.
-  if (config.transformContext) messages = await applyTransformContext(messages, config, stream);
   // 2. 转换为 LLM Message[]
   const llmMessages = config.convertToLlm(messages);
   let resolvedMaxTokens = config.streamOptions.maxTokens;
   if (config.resolveMaxTokens) {
-    const budgetMessages = continuationInstruction ? [...llmMessages, { role: 'user' as const, content: continuationInstruction, timestamp: Date.now() }] : llmMessages;
-    const dynamicMaxTokens = config.resolveMaxTokens(budgetMessages);
+    const dynamicMaxTokens = config.resolveMaxTokens(llmMessages);
     if (dynamicMaxTokens == null || dynamicMaxTokens <= 0) {
       throw new Error(
         'CONTEXT_CANNOT_FIT: remaining context window cannot admit any output tokens.',
@@ -668,7 +663,6 @@ async function streamAssistantResponse(
     messages: llmMessages,
     tools: allowToolUse ? context.runtime?.current.activeTools ?? context.tools : [],
   };
-  if (continuationInstruction) llmContext = appendRuntimeContinuation(llmContext, continuationInstruction);
 
   // 4. 解析 API key（优先动态获取）
   const dynamicKey = config.getApiKey

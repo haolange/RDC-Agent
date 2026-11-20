@@ -98,7 +98,8 @@ function runFixture(dir: string, extraArgs: string[] = [], env: NodeJS.ProcessEn
     path.join(dir, 'registry.json'),
     '--skip-hard-forbids',
     ...extraArgs,
-  ], { cwd: dir, env: { CI: '', ...env } });
+  // The gate's base ref must not leak from the caller into a fixture repository without git.
+  ], { cwd: dir, env: { CI: '', RDC_SYSTEM_DEBT_BASE_REF: '', ...env } });
 }
 
 describe('system debt ratchet CLI', () => {

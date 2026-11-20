@@ -3,6 +3,8 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { currentHost } from '../../../platform/host';
+import { windowsPowerShellPath } from '../../../platform/shell';
 
 const cwdBySession = vi.hoisted(() => new Map<string, string>());
 
@@ -101,9 +103,9 @@ describe('shellTrailer', () => {
   });
 
   it('preserves a complete PowerShell formatting stream', { timeout: 15_000 }, () => {
-    if (process.platform !== 'win32') return;
+    if (!currentHost().isWindows) return;
     const wrapped = wrapPowerShellCommand("@([pscustomobject]@{Name='alpha';Count=1}, [pscustomobject]@{Name='beta';Count=2}) | Format-Table -AutoSize", 'RDC_FORMAT');
-    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(wrapped, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 });
+    const result = spawnSync(windowsPowerShellPath(), ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(wrapped, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 });
     expect(result.status).toBe(0);
     const parsed = parseShellTrailer(result.stdout, 'RDC_FORMAT');
     expect(parsed.trailer?.exit).toBe(0);
@@ -135,7 +137,7 @@ describe('ShellTool', () => {
       projectId: null,
       sessionId: null,
     };
-    const command = process.platform === 'win32'
+    const command = currentHost().isWindows
       ? 'Write-Output hello-rdc'
       : 'printf %s hello-rdc';
     const result = await shellTool.execute(
@@ -165,7 +167,7 @@ describe('ShellTool', () => {
       projectId: null,
       sessionId: null,
     };
-    const command = process.platform === 'win32' ? 'Get-Location' : 'pwd';
+    const command = currentHost().isWindows ? 'Get-Location' : 'pwd';
     const result = await shellTool.execute(
       's-cwd',
       { command, timeout: 20_000 },
@@ -255,11 +257,11 @@ describe('ShellTool', () => {
       sessionId: 'sess_shell_cwd',
     };
     cwdBySession.set('sess_shell_cwd', path.join(os.tmpdir(), 'outside-project'));
-    const cd = process.platform === 'win32' ? 'Set-Location nested' : 'cd nested';
+    const cd = currentHost().isWindows ? 'Set-Location nested' : 'cd nested';
     const first = await shellTool.execute('s-persist-1', { command: cd, timeout: 20_000 }, undefined, undefined, context);
     expect(first.isError).not.toBe(true);
     expect(cwdBySession.get('sess_shell_cwd')).toBe(path.resolve(nested));
-    const loc = process.platform === 'win32' ? 'Get-Location' : 'pwd';
+    const loc = currentHost().isWindows ? 'Get-Location' : 'pwd';
     const second = await shellTool.execute('s-persist-2', { command: loc, timeout: 20_000 }, undefined, undefined, context);
     expect(second.details?.cwd).toBe(path.resolve(nested));
   });
@@ -285,7 +287,7 @@ describe('ShellTool', () => {
   });
 
   it('decodes Windows native OEM stdout without U+FFFD', { timeout: 30_000 }, async () => {
-    if (process.platform !== 'win32') return;
+    if (!currentHost().isWindows) return;
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-oem-'));
     roots.push(root);
     const context: ToolExecutionContext = {
@@ -307,7 +309,7 @@ describe('ShellTool', () => {
     expect(result.isError).not.toBe(true);
   });
   it('preserves PowerShell Unicode and caller-selected UTF-8 native output', { timeout: 30_000 }, async () => {
-    if (process.platform !== 'win32') return;
+    if (!currentHost().isWindows) return;
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-utf8-'));
     roots.push(root);
     const result = await shellTool.execute('s-utf8', {

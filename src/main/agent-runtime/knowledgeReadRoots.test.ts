@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { directoryLinkType, resolvedPathKey } from '../platform/paths';
 import {
   isKnowledgeReadFileTool,
-  pathIdentityKey,
   resolveKnowledgeReadRoots,
 } from './knowledgeReadRoots';
 
@@ -45,8 +45,8 @@ describe('resolveKnowledgeReadRoots', () => {
       projectKnowledgePath: projectKnowledge,
     });
     expect(resolved.roots).toHaveLength(2);
-    expect(pathIdentityKey(resolved.roots[0])).toBe(pathIdentityKey(userKnowledge));
-    expect(pathIdentityKey(resolved.roots[1])).toBe(pathIdentityKey(projectKnowledge));
+    expect(resolvedPathKey(resolved.roots[0])).toBe(resolvedPathKey(userKnowledge));
+    expect(resolvedPathKey(resolved.roots[1])).toBe(resolvedPathKey(projectKnowledge));
     expect(resolved.diagnostics).toEqual([]);
   });
 
@@ -70,7 +70,7 @@ describe('resolveKnowledgeReadRoots', () => {
     const link = path.join(tmp, 'knowledge');
     await mkdir(real, { recursive: true });
     try {
-      await symlink(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(real, link, directoryLinkType());
     } catch {
       return;
     }
@@ -104,6 +104,6 @@ describe('resolveKnowledgeReadRoots', () => {
       projectKnowledgePath: mixedCase,
     });
     expect(resolved.roots).toHaveLength(1);
-    expect(pathIdentityKey(resolved.roots[0])).toBe(pathIdentityKey(knowledge));
+    expect(resolvedPathKey(resolved.roots[0])).toBe(resolvedPathKey(knowledge));
   });
 });

@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { directoryLinkType } from '../../platform/paths';
 import { SessionArtifactResolver } from './SessionArtifactResolver';
 import { SESSION_ARTIFACT_QUOTA_FILENAME, resetSessionArtifactQuotaLedger } from './SessionArtifactQuota';
 import { StorageIo } from '../store/StorageIo';
@@ -455,7 +456,7 @@ describe('SessionArtifactResolver', () => {
     fs.mkdirSync(categoryRoot, { recursive: true });
     const link = path.join(categoryRoot, 'escaped');
     try {
-      fs.symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+      fs.symlinkSync(outside, link, directoryLinkType());
     } catch {
       return;
     }

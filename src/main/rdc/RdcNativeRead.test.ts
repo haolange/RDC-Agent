@@ -4,6 +4,8 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
+import { samePath } from '../platform/paths';
 import { getRdcContextLease, setRdcRuntimeContextForSession } from './RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
@@ -24,8 +26,8 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
     const captureHash = () => createHash('sha256').update(readFileSync(capture!)).digest('hex');
     const inputHash = captureHash();
     const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, timeoutMs: 30000, workingDirectory: root!,
-      command: path.join(root!, 'binaries/windows/x64/python/python.exe'),
-      argsPrefix: [path.join(root!, 'cli/run_cli.py')],
+      command: rdcInstallationFiles(root!).python,
+      argsPrefix: [rdcInstallationFiles(root!).entry],
       env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
     const processes: Array<Record<string, unknown>> = [];
     const stageResults: Array<{ exitCode: number; envelope: Record<string, unknown> }> = [];
@@ -84,10 +86,10 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
       const loaded = workerState.loaded_runtime as Record<string, unknown>;
       expect(worker.pid).toBe(original.processIdentity.worker.pid);
       expect(loaded).toMatchObject({ status: 'observed', configured_paths_match: true });
-      for (const [key, relative] of [['native', 'binaries/windows/x64/renderdoc.dll'], ['binding', 'binaries/windows/x64/pymodules/renderdoc.pyd']]) {
+      const installed = rdcInstallationFiles(root!);
+      for (const [key, expectedPath] of [['native', installed.nativeLibrary], ['binding', installed.bindingModule]] as const) {
         const component = loaded[key] as { path: string; on_disk: { sha256: string } };
-        const expectedPath = path.resolve(root!, relative);
-        expect(path.resolve(component.path).toLowerCase()).toBe(expectedPath.toLowerCase());
+        expect(samePath(component.path, expectedPath)).toBe(true);
         expect(component.on_disk.sha256).toBe(createHash('sha256').update(readFileSync(expectedPath)).digest('hex'));
       }
       expect(original.replaySessionId).toBe(opened.data.session_id);

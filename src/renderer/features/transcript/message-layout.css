@@ -138,7 +138,6 @@
   text-overflow: ellipsis;
 }
 
-@import './message-bubbles.css';
 
 .message-attachment-pill-meta {
   font-size: var(--text-xs);

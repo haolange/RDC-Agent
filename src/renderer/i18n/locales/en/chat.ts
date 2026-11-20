@@ -288,6 +288,7 @@ export const enChat = {
   'chat.planReviewReadFull': 'Read full plan',
   'chat.planReviewImplement': 'Implement this plan?',
   'chat.planReviewRevision': 'Revision {revision}',
+  'chat.planReviewExecutionReferences': 'Execution references',
   'chat.planReviewExport': 'Download plan',
   'chat.planReviewSave': 'Save to project',
   'chat.planReviewCopy': 'Copy plan',

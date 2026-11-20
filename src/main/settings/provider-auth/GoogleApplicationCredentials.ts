@@ -2,6 +2,7 @@ import { createSign } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { roamingAppDataDir } from '../../platform/paths';
 
 const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 const DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
@@ -95,7 +96,7 @@ export async function exchangeGoogleCredentialDocument(
 
 function defaultCredentialPaths(): string[] {
   const configured = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
-  const appData = process.env.APPDATA?.trim();
+  const appData = roamingAppDataDir();
   return [
     configured,
     appData ? path.join(appData, 'gcloud', 'application_default_credentials.json') : '',

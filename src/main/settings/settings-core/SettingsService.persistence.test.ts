@@ -15,6 +15,7 @@ vi.mock('electron', () => ({
   },
   safeStorage: {
     isEncryptionAvailable: () => electronMock.encryptionAvailable,
+    getSelectedStorageBackend: () => 'gnome_libsecret',
     decryptString: (buffer: Buffer) => {
       const text = buffer.toString('utf8');
       if (!text.startsWith('enc:')) {
@@ -435,18 +436,8 @@ describe('SettingsService provider persistence', () => {
       { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
     ]);
 
-    const general = initialized.agents.definitions.find((definition) => definition.id === 'general');
-    expect(general).toBeDefined();
-    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = general!;
-    await service.saveAgentDefinition({
-      draft: {
-        ...draft,
-        models: ['volcengine-coding-plan:glm-5.2'],
-        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
-      },
-      clientRevision: 1,
-      scope: 'user',
-    });
+    expect(initialized.agents.definitions.some((definition) => definition.id === 'general')).toBe(true);
+    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'volcengine-coding-plan:glm-5.2' } } } });
 
     expect(service.getAll().llm.agentRoutes).toContainEqual({
       agentId: 'general',
@@ -503,18 +494,8 @@ describe('SettingsService provider persistence', () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     const initialized = service.initialize();
-    const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
-    expect(ask).toBeDefined();
-    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
-    await service.saveAgentDefinition({
-      draft: {
-        ...draft,
-        models: ['missing-provider:missing-model'],
-        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
-      },
-      clientRevision: 1,
-      scope: 'user',
-    });
+    expect(initialized.agents.definitions.some((definition) => definition.id === 'general')).toBe(true);
+    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'missing-provider:missing-model' } } } });
     expect(service.getAll().llm.agentRoutes).toContainEqual({
       agentId: 'general', providerId: 'missing-provider', modelId: 'missing-model',
     });
@@ -527,12 +508,12 @@ describe('SettingsService provider persistence', () => {
     const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
     const settingsBeforeSave = fs.readFileSync(initialized.paths.settingsPath, 'utf8');
 
     const first = service.saveAgentDefinition({
       draft: {
         ...draft,
-        models: ['deepseek:model-a'],
         instructions: `${draft.instructions}\nPersist an explicit user route override.`,
       },
       clientRevision: 100,
@@ -541,7 +522,6 @@ describe('SettingsService provider persistence', () => {
     const middle = service.saveAgentDefinition({
       draft: {
         ...draft,
-        models: ['deepseek:model-b'],
         instructions: `${draft.instructions}\nPersist an explicit user route override.`,
       },
       clientRevision: 200,
@@ -550,7 +530,6 @@ describe('SettingsService provider persistence', () => {
     const newest = service.saveAgentDefinition({
       draft: {
         ...draft,
-        models: ['deepseek:model-c'],
         instructions: `${draft.instructions}\nPersist an explicit user route override.`,
       },
       clientRevision: 300,
@@ -570,7 +549,7 @@ describe('SettingsService provider persistence', () => {
       agentId: 'general', providerId: 'deepseek', modelId: 'model-c',
     });
     const saved = service.getAll().agents.definitions.find((definition) => definition.id === 'general');
-    expect(saved?.models).toEqual(['deepseek:model-c']);
+    expect(saved?.compiledRoute).toEqual({ agentId: 'general', providerId: 'deepseek', modelId: 'model-c' });
     expect(fs.readdirSync(initialized.paths.agentsPath).some((entry) => entry.endsWith('.tmp'))).toBe(false);
     const persisted = JSON.parse(fs.readFileSync(initialized.paths.settingsPath, 'utf8')) as { llm: Record<string, unknown> };
     expect(persisted.llm).not.toHaveProperty('agentRoutes');
@@ -585,10 +564,10 @@ describe('SettingsService provider persistence', () => {
     const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
     const committed = await service.saveAgentDefinition({
       draft: {
         ...draft,
-        models: ['deepseek:model-c'],
         instructions: `${draft.instructions}\nPersist an explicit user route override.`,
       },
       clientRevision: 300,
@@ -598,7 +577,7 @@ describe('SettingsService provider persistence', () => {
       .mockRejectedValueOnce(new Error('simulated atomic rename failure'));
 
     const failed = await service.saveAgentDefinition({
-      draft: { ...draft, models: ['deepseek:model-d'] },
+      draft: { ...draft},
       clientRevision: 400,
       scope: 'user',
     });
@@ -610,8 +589,8 @@ describe('SettingsService provider persistence', () => {
       route: { agentId: 'general', providerId: 'deepseek', modelId: 'model-c' },
     });
     expect(failed.lastSuccessful?.commitHash).toBe(committed.commitHash);
-    expect(service.getAll().agents.definitions.find((definition) => definition.id === 'general')?.models)
-      .toEqual(['deepseek:model-c']);
+    expect(service.getAll().agents.definitions.find((definition) => definition.id === 'general')?.compiledRoute)
+      .toEqual({ agentId: 'general', providerId: 'deepseek', modelId: 'model-c' });
     saveSpy.mockRestore();
   });
 

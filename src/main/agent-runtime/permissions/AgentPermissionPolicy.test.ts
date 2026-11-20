@@ -2,6 +2,8 @@ import * as os from 'os';
 import * as path from 'path';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { directoryLinkType } from '../../platform/paths';
+import { currentHost } from '../../platform/host';
 import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
@@ -43,8 +45,8 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
 
 vi.mock('../../runtime/resolveConfiguredShell', () => ({
   resolveConfiguredShell: () => ({
-    executable: process.platform === 'win32' ? 'pwsh' : '/bin/bash',
-    kind: process.platform === 'win32' ? 'pwsh' : 'bash',
+    executable: currentHost().isWindows ? 'pwsh' : '/bin/bash',
+    kind: currentHost().isWindows ? 'pwsh' : 'bash',
     version: 'test',
   }),
 }));
@@ -575,7 +577,7 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
       },
       projectRootPath: workspaceRoot,
     });
-    if (process.platform === 'win32') {
+    if (currentHost().isWindows) {
       expect(decision.action).toBe('deny');
       expect(decision.reason).toMatch(/hard-denied/i);
       return;
@@ -742,8 +744,8 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     const memoryLink = path.join(knowledge, 'to-memory');
     const agentsLink = path.join(knowledge, 'to-agents');
     try {
-      await symlink(memory, memoryLink, process.platform === 'win32' ? 'junction' : 'dir');
-      await symlink(agents, agentsLink, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(memory, memoryLink, directoryLinkType());
+      await symlink(agents, agentsLink, directoryLinkType());
     } catch {
       await rm(tmp, { recursive: true, force: true });
       return;

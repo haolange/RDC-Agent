@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const saveDefinition = vi.fn();
 const readDefinition = vi.fn();
 const readCommitHash = vi.fn();
-const routeFromDefinition = vi.fn((definition: { id: string }) => ({
-  agentId: definition.id,
+const routeForAgent = vi.fn((agentId: string) => ({
+  agentId,
   providerId: 'openai',
   modelId: 'gpt',
 }));
@@ -20,7 +20,7 @@ vi.mock('../agent-manifests/AgentManifestService', () => ({
     saveDefinition: (...args: unknown[]) => saveDefinition(...args),
     readDefinition: (...args: unknown[]) => readDefinition(...args),
     readCommitHash: (...args: unknown[]) => readCommitHash(...args),
-    routeFromDefinition: (definition: { id: string }) => routeFromDefinition(definition),
+    routeForAgent: (agentId: string) => routeForAgent(agentId),
   },
 }));
 
@@ -38,7 +38,6 @@ const draft = (id = 'general'): AgentManifestDraft => ({
   description: '',
   argumentHint: '',
   target: 'rdc-agent',
-  models: ['openai:gpt'],
   icon: 'message-orbit',
   accent: '#33d1ff',
   disableModelInvocation: false,
@@ -62,19 +61,19 @@ describe('SettingsAgentOps scope isolation', () => {
     readCommitHash.mockResolvedValue('hash');
     saveDefinition.mockImplementation(async (_paths: unknown, nextDraft: AgentManifestDraft) => ({
       definition: { ...nextDraft, filePath: 'C:/tmp.agent.md', builtin: false },
-      commitHash: `commit-${nextDraft.models[0]}`,
+      commitHash: `commit-${nextDraft.name}`,
     }));
   });
 
   it('does not let a user revision supersede a project revision of the same agentId', async () => {
     const ops = new SettingsAgentOps();
     const user = await ops.saveAgentDefinition({
-      draft: { ...draft(), models: ['openai:user'] },
+      draft: { ...draft(), name: 'user' },
       clientRevision: 1,
       scope: 'user',
     });
     const project = await ops.saveAgentDefinition({
-      draft: { ...draft(), models: ['openai:project'] },
+      draft: { ...draft(), name: 'project' },
       clientRevision: 1,
       scope: 'project',
       projectId: 'proj_a',

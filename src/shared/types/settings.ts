@@ -540,6 +540,19 @@ export interface RuntimeResourceCatalog {
   diagnostics: SettingsDiagnostic[];
 }
 
+/** One Agent's model choice; an omitted field falls back to the default binding. */
+export interface AgentModelBinding {
+  /** Canonical `provider:model`. */
+  model?: string;
+  reasoningLevel?: ReasoningSelection;
+}
+
+/** Which model and reasoning level each Agent uses. Stored in user settings only; projects cannot set models. */
+export interface AgentModelSettings {
+  default: AgentModelBinding;
+  byAgent: Record<string, AgentModelBinding>;
+}
+
 export interface AppSettings {
   appearance: UiPreferences;
   layout: LayoutPreferences;
@@ -547,6 +560,7 @@ export interface AppSettings {
   tooling: ToolingSettings;
   agentRuntime: AgentRuntimeSettings;
   llm: LlmSettings;
+  agentModels: AgentModelSettings;
   agents: AgentManifestSettings;
   resourceCatalog: RuntimeResourceCatalog;
   paths: AppRuntimePaths;
@@ -576,6 +590,8 @@ export type AppSettingsPatch = Partial<{
   agents: Partial<{
     globalInstructions: string;
   }>;
+  /** Replaces the whole Agent model settings. */
+  agentModels: AgentModelSettings;
 }>;
 
 export interface LlmProviderDraftRequest {

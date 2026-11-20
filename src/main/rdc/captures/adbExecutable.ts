@@ -1,6 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { samePath } from '../../platform/paths';
+import { rdcInstallationFiles } from '../../platform/rdcLayout';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import { configuredInstallationRoot } from '../RdcInstallationService';
 
@@ -24,7 +26,7 @@ export class AdbExecutableCache {
       if (!path.isAbsolute(override)) throw new Error('RDC_TOOL_ANDROID_ADB_PATH must be an absolute path.');
       executable = override;
     } else {
-      const binaryRoot = path.join(root, 'binaries', 'windows', 'x64');
+      const binaryRoot = rdcInstallationFiles(root).runtimeDir;
       const manifest = JSON.parse(await fs.readFile(path.join(binaryRoot, 'manifest.runtime.json'), 'utf8')) as {
         bundled_tools?: { adb?: { path?: string } }; files: Array<{ path: string; sha256: string }>;
       };
@@ -32,7 +34,7 @@ export class AdbExecutableCache {
       if (!relative || path.isAbsolute(relative)) throw new Error('ADB_MISSING: selected RDC-Tool has no bundled ADB metadata. Verify or repair the installation.');
       executable = path.resolve(binaryRoot, relative);
       if (!executable.startsWith(`${binaryRoot}${path.sep}`)) throw new Error('ADB_INVALID: bundled ADB path escapes the installation.');
-      if ((await fs.realpath(executable)).toLowerCase() !== executable.toLowerCase()) throw new Error('ADB_INVALID: bundled ADB must not redirect outside its installation.');
+      if (!samePath(await fs.realpath(executable), executable)) throw new Error('ADB_INVALID: bundled ADB must not redirect outside its installation.');
       const record = manifest.files.find((item) => item.path === relative);
       const bytes = await fs.readFile(executable);
       if (!record || createHash('sha256').update(bytes).digest('hex') !== record.sha256) {

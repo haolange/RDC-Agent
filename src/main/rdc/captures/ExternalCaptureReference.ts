@@ -1,7 +1,8 @@
-import { promises as fs } from 'node:fs';
+import { promises as fs, type BigIntStats } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { ProjectInputRecord } from '@shared/types/session';
+import { openedFileIdentity } from '../../platform/fileIdentity';
 import { hashCaptureFile } from './replay/captureContentHash';
 import { safePath } from './replay/replayFileSafety';
 
@@ -13,20 +14,19 @@ export async function createExternalCaptureReference(filePath: string): Promise<
   const absolute = path.resolve(filePath);
   await safePath(path.parse(absolute).root, absolute);
   const canonical = await fs.realpath(absolute);
-  const before = await fs.lstat(canonical, { bigint: true });
-  if (!before.isFile() || before.isSymbolicLink() || before.nlink > 1n) throw new Error('CAPTURE_UNSAFE_FILE');
+  const link = await fs.lstat(canonical, { bigint: true });
+  if (!link.isFile() || link.isSymbolicLink() || link.nlink > 1n) throw new Error('CAPTURE_UNSAFE_FILE');
+  // Identity is compared between handle stats only; see openedFileIdentity.
   const handle = await fs.open(canonical, 'r');
+  let before: BigIntStats;
   try {
-    const opened = await handle.stat({ bigint: true });
-    if (opened.dev !== before.dev || opened.ino !== before.ino || opened.ctimeNs !== before.ctimeNs) {
-      throw new Error('CAPTURE_CHANGED_DURING_HASH');
-    }
+    before = await handle.stat({ bigint: true });
     const header = Buffer.alloc(4);
     const { bytesRead } = await handle.read(header, 0, 4, 0);
     if (bytesRead !== 4 || header.toString('ascii') !== 'RDOC') throw new Error('CAPTURE_REFERENCE_INVALID_RDC');
   } finally { await handle.close(); }
   const hashed = await hashCaptureFile(canonical);
-  const after = await fs.lstat(canonical, { bigint: true });
+  const after = await openedFileIdentity(canonical);
   if (before.dev !== after.dev || before.ino !== after.ino || before.ctimeNs !== after.ctimeNs) {
     throw new Error('CAPTURE_CHANGED_DURING_HASH');
   }

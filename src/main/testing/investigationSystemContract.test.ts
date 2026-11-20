@@ -73,7 +73,7 @@ describe('investigation system contract', () => {
   });
 
   it('keeps execution quotas with the Harness and plan phase figures as adjustable estimates', () => {
-    const method = readRepo('resources/agent-runtime/skills/renderdoc-execution/SKILL.md');
+    const method = readRepo('resources/agent-runtime/skills/investigation-planning/SKILL.md');
     expect(method).toContain('额度权威在 Harness');
     expect(method).toMatch(/task_get\.budgetSnapshot/);
     expect(method).toContain('用户明确规定的限制');
@@ -948,9 +948,9 @@ describe('investigation system contract', () => {
 
   it('investigation.contract.mission.completion', () => {
     expect.hasAssertions();
-    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(22);
+    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(23);
     expect(GENERAL_SKILL_IDS).toHaveLength(9);
-    expect(CANONICAL_SKILL_IDS).toHaveLength(31);
+    expect(CANONICAL_SKILL_IDS).toHaveLength(32);
     const runner = readRepo('src/main/agent-runtime/orchestration/AgentTurnRunner.ts');
     const conversation = readRepo('src/main/conversation/ConversationTurnRunner.ts');
     expect(runner).toMatch(/validateCompletion/);

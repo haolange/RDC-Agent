@@ -31,7 +31,7 @@
 | 点 | 分类 | 说明 |
 | --- | --- | --- |
 | Browser Bridge 未 QA / 无 bearer / Origin / 未知或未注册 channel | Security | debug-only；canonical renderer manifest + handler registry fail-closed |
-| `safeStorage` 不可用 / secret IPC 明文 | Security | 禁止明文存储与跨层暴露 |
+| `safeStorage` 不可用 / secret IPC 明文 | Security | 禁止明文存储与跨层暴露；Linux `basic_text` / `unknown` 后端视为不可用，提示安装并解锁钥匙环 |
 | Provider secret 文件不可读（如 `EACCES`） | Availability（凭据操作仍 fail-closed） | 报文件访问失败并保留原件；只有内容确实损坏才隔离，缺文件按空配置处理。启动阶段失败经正常资源释放后以非零状态退出，不留活锁 |
 | Project MCP 覆盖 user executable / 未 trust | Security | `needsRetrust` + `assertConnectAllowed` |
 | IPC Zod 非法 payload / approvalToken 重放 | Security | **全量** handler `parseIpcArgs`；单次消费 token |
@@ -66,7 +66,7 @@
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |
-| Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 活 pid 永不抢锁；可识别的死 pid 锁经独占回收标记串行回收，owner 无法读取或回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
+| Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
 | Session attachments.json | Integrity | 写入 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
 | Session shell-state.json | Integrity | 写入 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本 / 损坏 quarantine 或 `STORAGE_SCHEMA`；未知更高 `schemaVersion` 不 quarantine |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |

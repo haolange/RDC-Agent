@@ -1,9 +1,5 @@
 import type { KnowledgeCardRecord } from '@shared/types/knowledge';
-
-export interface KnowledgeDiffLine {
-  kind: 'same' | 'add' | 'remove';
-  text: string;
-}
+import { diffLines, type DiffLine } from '@shared/utils/lineDiff';
 
 const COMPARE_FIELDS: Array<keyof KnowledgeCardRecord> = [
   'title',
@@ -13,29 +9,11 @@ const COMPARE_FIELDS: Array<keyof KnowledgeCardRecord> = [
   'caseId',
 ];
 
-function lineDiff(before: string, after: string): KnowledgeDiffLine[] {
-  const left = before.split(/\r?\n/);
-  const right = after.split(/\r?\n/);
-  const lines: KnowledgeDiffLine[] = [];
-  const max = Math.max(left.length, right.length);
-  for (let index = 0; index < max; index += 1) {
-    const prev = left[index];
-    const next = right[index];
-    if (prev === next) {
-      if (next != null) lines.push({ kind: 'same', text: next });
-      continue;
-    }
-    if (prev != null) lines.push({ kind: 'remove', text: prev });
-    if (next != null) lines.push({ kind: 'add', text: next });
-  }
-  return lines;
-}
-
 export function diffKnowledgeCard(
   before: KnowledgeCardRecord | null,
   after: KnowledgeCardRecord,
-): KnowledgeDiffLine[] {
-  const lines: KnowledgeDiffLine[] = [];
+): DiffLine[] {
+  const lines: DiffLine[] = [];
   for (const field of COMPARE_FIELDS) {
     const prev = before ? String(before[field] ?? '') : '';
     const next = String(after[field] ?? '');
@@ -49,7 +27,7 @@ export function diffKnowledgeCard(
     if (beforeScope) lines.push({ kind: 'remove', text: `scope: ${beforeScope}` });
     lines.push({ kind: 'add', text: `scope: ${afterScope}` });
   }
-  lines.push(...lineDiff(before?.body ?? '', after.body));
+  lines.push(...diffLines(before?.body ?? '', after.body));
   return lines;
 }
 

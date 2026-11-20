@@ -10,6 +10,8 @@ import { spawnSync, type SpawnSyncOptions } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { currentHost, type HostDescriptor } from '../platform/host';
+import { shellCandidates } from '../platform/shell';
 
 export type ShellKind = 'pwsh' | 'windows-powershell' | 'zsh' | 'bash' | 'sh';
 
@@ -21,7 +23,7 @@ export interface ResolvedShell {
 }
 
 export interface ShellResolverDeps {
-  platform: NodeJS.Platform;
+  host: HostDescriptor;
   env: NodeJS.ProcessEnv;
   homedir: () => string;
   existsSync: (filePath: string) => boolean;
@@ -68,7 +70,7 @@ export function parseShellVersionMajor(version: string): number | null {
 
 function defaultDeps(): ShellResolverDeps {
   return {
-    platform: process.platform,
+    host: currentHost(),
     env: process.env,
     homedir: () => os.homedir(),
     existsSync: (filePath) => fs.existsSync(filePath),
@@ -77,13 +79,9 @@ function defaultDeps(): ShellResolverDeps {
   };
 }
 
-function basenameWithoutExt(executable: string, platform: NodeJS.Platform): string {
-  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+function basenameWithoutExt(executable: string, host: HostDescriptor): string {
+  const pathApi = host.isWindows ? path.win32 : path.posix;
   return pathApi.basename(executable).replace(/\.exe$/i, '').toLowerCase();
-}
-
-function joinForPlatform(platform: NodeJS.Platform, ...segments: string[]): string {
-  return (platform === 'win32' ? path.win32 : path.posix).join(...segments);
 }
 
 export class ShellResolver {
@@ -140,42 +138,24 @@ export class ShellResolver {
   }
 
   private listAutoCandidates(): string[] {
-    const { platform, env, homedir } = this.deps;
-    if (platform === 'win32') {
-      const programFiles = env.ProgramFiles || 'C:\\Program Files';
-      const systemRoot = env.SystemRoot || 'C:\\Windows';
-      return [
-        joinForPlatform(platform, programFiles, 'PowerShell', '7', 'pwsh.exe'),
-        ...this.listWhereMatches('pwsh'),
-        joinForPlatform(platform, homedir(), '.dotnet', 'tools', 'pwsh.exe'),
-        joinForPlatform(platform, systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-        joinForPlatform(platform, systemRoot, 'Sysnative', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-        joinForPlatform(platform, systemRoot, 'System32', 'powershell.exe'),
-        joinForPlatform(platform, systemRoot, 'Sysnative', 'powershell.exe'),
-        '/bin/bash',
-        '/bin/sh',
-      ];
-    }
-    const preferred = this.resolvePreferredPosixShell();
-    const defaults = [
-      '/bin/zsh',
-      '/bin/bash',
-      '/bin/sh',
-      '/usr/bin/zsh',
-      '/usr/bin/bash',
-      '/usr/bin/sh',
-    ];
-    return preferred ? [preferred, ...defaults.filter((entry) => entry !== preferred)] : defaults;
+    const { host, env, homedir } = this.deps;
+    return shellCandidates({
+      host,
+      env,
+      homedir: homedir(),
+      pwshOnPath: this.listWhereMatches('pwsh'),
+      preferredPosix: host.isWindows ? null : this.resolvePreferredPosixShell(),
+    });
   }
 
   private resolvePreferredPosixShell(): string | null {
     const raw = this.deps.env.SHELL?.trim();
     if (!raw) return null;
-    return POSIX_ALLOWED_BASENAMES.has(basenameWithoutExt(raw, this.deps.platform)) ? raw : null;
+    return POSIX_ALLOWED_BASENAMES.has(basenameWithoutExt(raw, this.deps.host)) ? raw : null;
   }
 
   private assertSupportedPosix(executable: string): void {
-    const base = basenameWithoutExt(executable, this.deps.platform);
+    const base = basenameWithoutExt(executable, this.deps.host);
     if ((UNSUPPORTED_POSIX_SHELLS as readonly string[]).includes(base)) {
       throw new ShellUnavailableError(
         `${base} is not a POSIX-compatible shell for agent commands. Configure zsh, bash, or sh.`,
@@ -184,7 +164,7 @@ export class ShellResolver {
   }
 
   private listWhereMatches(command: string): string[] {
-    if (this.deps.platform !== 'win32') return [];
+    if (!this.deps.host.isWindows) return [];
     const result = this.deps.spawnSync('where.exe', [command], this.spawnOptions());
     if (result.status !== 0 || !result.stdout) return [];
     return String(result.stdout)
@@ -241,7 +221,7 @@ export class ShellResolver {
   }
 
   private inferKind(executable: string): ShellKind | null {
-    const base = basenameWithoutExt(executable, this.deps.platform);
+    const base = basenameWithoutExt(executable, this.deps.host);
     if (base === 'pwsh') return 'pwsh';
     if (base === 'powershell') return 'windows-powershell';
     if (base === 'zsh') return 'zsh';

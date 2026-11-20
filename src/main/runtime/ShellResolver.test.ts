@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { describeHost } from '../platform/host';
 import type { ShellResolverDeps } from './ShellResolver';
 import {
   ShellResolver,
@@ -18,7 +19,7 @@ function createResolver(overrides: {
   const files = overrides.files ?? {};
   const probes = overrides.probes ?? {};
   return new ShellResolver({
-    platform: overrides.platform ?? 'win32',
+    host: describeHost(overrides.platform ?? 'win32', 'x64'),
     env: {
       ProgramFiles: 'C:\\Program Files',
       SystemRoot: 'C:\\Windows',

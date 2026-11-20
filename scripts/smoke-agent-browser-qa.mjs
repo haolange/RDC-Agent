@@ -153,6 +153,8 @@ async function waitForBridgeFromChild(userDataPath) {
       cwd: repoRoot,
       env: { ...process.env, RDC_AGENT_USER_DATA: userDataPath, RDC_AGENT_HOME: path.join(userDataPath, '.rdc-agent') },
       stdio: ['ignore', 'pipe', 'pipe'],
+      // On POSIX the launcher leads its own process group, so stopping it also reaps Electron.
+      detached: process.platform !== 'win32',
     },
   );
 
@@ -183,7 +185,6 @@ async function waitForBridgeFromChild(userDataPath) {
   }
 
   if (!qaUrl) {
-    child.kill();
     fail(`Timed out waiting for BrowserAppBridge bootstrap /qa log (${TIMEOUT_MS}ms)`);
     return { child, qaUrl: null };
   }
@@ -191,8 +192,9 @@ async function waitForBridgeFromChild(userDataPath) {
 }
 
 async function stopChildTree(child) {
-  if (!child || child.exitCode != null || !child.pid) return;
+  if (!child?.pid) return;
   if (process.platform === 'win32') {
+    if (child.exitCode != null) return;
     await new Promise((resolve) => {
       const killer = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
         stdio: 'ignore',
@@ -202,15 +204,28 @@ async function stopChildTree(child) {
     });
     return;
   }
-  child.kill('SIGTERM');
-  await new Promise((resolve) => {
-    const timeout = setTimeout(resolve, 5_000);
-    child.once('exit', () => {
-      clearTimeout(timeout);
-      resolve();
-    });
-  });
-  if (child.exitCode == null) child.kill('SIGKILL');
+  // The launcher may already have exited while Electron in its group still runs.
+  const signalGroup = (signal) => {
+    try {
+      process.kill(-child.pid, signal);
+    } catch (error) {
+      if (error?.code !== 'ESRCH') throw error;
+    }
+  };
+  const groupAlive = () => {
+    try {
+      process.kill(-child.pid, 0);
+      return true;
+    } catch (error) {
+      return error?.code === 'EPERM';
+    }
+  };
+  signalGroup('SIGTERM');
+  const deadline = Date.now() + 5_000;
+  while (groupAlive() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  if (groupAlive()) signalGroup('SIGKILL');
 }
 
 async function removeSmokeUserData(smokeUserData) {

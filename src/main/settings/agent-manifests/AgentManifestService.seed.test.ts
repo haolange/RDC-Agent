@@ -21,7 +21,7 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 describe('AgentManifestService effective builtin snapshot', () => {
   it('projects provider connection state without confusing derived enabled=false with user disablement', () => {
     const settings = {
-      directoryPath: '', definitions: [{ id: 'general', models: ['provider:model'] }],
+      directoryPath: '', definitions: [{ id: 'general' }],
       modelOptions: [], globalInstructions: '', diagnostics: [],
     } as unknown as AgentManifestSettings;
     const base = {
@@ -29,7 +29,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
       enabled: false, isConfigured: false, models: [{ id: 'model', enabled: true }],
     } as unknown as LlmProviderEntry;
     const project = (provider: LlmProviderEntry) => agentManifestService
-      .projectEffectiveModelOptions(settings, [provider], [], []).modelOptions[0];
+      .projectEffectiveModelOptions(settings, [provider], [{ agentId: 'general', providerId: 'provider', modelId: 'model' }], []).modelOptions[0];
 
     expect(project({ ...base, status: 'unconfigured' })).toMatchObject({
       status: 'provider-unavailable', providerIssue: 'unconfigured',
@@ -92,7 +92,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
       ],
     } as LlmProviderEntry;
     const definitions = [{
-      id: 'edit', models: ['github-copilot/claude-sonnet-5'],
+      id: 'edit',
     }] as AgentManifestSettings['definitions'];
     const settings = {
       directoryPath: '', definitions, modelOptions: [], globalInstructions: '', diagnostics: [],
@@ -158,7 +158,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
     } as unknown as LlmProviderEntry;
     const settings = {
       directoryPath: '',
-      definitions: [{ id: 'edit', models: ['github-copilot/unverified-budget'] }],
+      definitions: [{ id: 'edit' }],
       modelOptions: [], globalInstructions: '',
     } as unknown as AgentManifestSettings;
     const catalog = {
@@ -204,7 +204,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
     } as unknown as LlmProviderEntry;
     const settings = {
       directoryPath: '',
-      definitions: [{ id: 'edit', models: ['kimi-coding-plan/kimi-for-coding-highspeed'] }],
+      definitions: [{ id: 'edit' }],
       modelOptions: [],
       globalInstructions: '',
     } as unknown as AgentManifestSettings;
@@ -324,7 +324,6 @@ describe('AgentManifestService effective builtin snapshot', () => {
         description: 'x',
         argumentHint: '',
         target: 'rdc-agent',
-        models: [],
         icon: 'nodes',
         accent: '#33d1ff',
         disableModelInvocation: false,

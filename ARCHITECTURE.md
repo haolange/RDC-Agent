@@ -6,11 +6,11 @@
 
 RDC-Agent 是通用 agent workbench，并一等公民支持 RenderDoc `.rdc`。它是日常 agent 工作台，完成阅读、规划、编辑、搜索、工具调用、handoff、memory 与 subagent 编排，同时保留 capture 打开、replay 上下文、RDC 原生操作、诊断与 RenderDoc 调查等垂直能力。
 
-**发布面是 Windows-only。** `electron-builder.json` 只保留 `win`；POSIX launcher wrapper（`.sh`）仅供 Ubuntu CI 的 node 面准备。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；唯一例外是显式 `RDC_AGENT_RELEASE_CHANNEL=prerelease`、package 带预发布后缀且 tag（如有）与该版本完全一致，只能发布为明确披露未签名的 GitHub prerelease。本地 `pnpm run pack` 不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。发行候选同时提供 Windows zip 与 NSIS。
+**发布面是 Windows-only。** `electron-builder.json` 只保留 `win`。**运行面是 Windows 与 Linux（x64）**：宿主相关行为只在 `src/main/platform`（[`docs/architecture/host-platform.md`](docs/architecture/host-platform.md)），由 ESLint 宿主平台门禁约束；POSIX launcher wrapper（`.sh`）用于 Linux 源码运行与 Ubuntu CI 准备。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；唯一例外是显式 `RDC_AGENT_RELEASE_CHANNEL=prerelease`、package 带预发布后缀且 tag（如有）与该版本完全一致，只能发布为明确披露未签名的 GitHub prerelease。本地 `pnpm run pack` 不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。发行候选同时提供 Windows zip 与 NSIS。
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）fail-closed 剔除。用户附件 vision-input（读图）属 agent chat 能力，与生成 media 无关。
 
-产品不是固定模式向导。默认顶层入口为 `general` / `debugger` / `analyzer` / `optimizer`；另有 `generator` / `verifier` / `knowledge-scout` / `report-writer` / `shader-analyst` / `pass-analyst` / `resource-analyst` / `pixel-analyst` 八个默认内部 builtin。全部经同一 `builtin < user < project` 整资源解析与 Agents 设置管理；内部 profile 默认不出现在用户入口。历史 ask/plan/edit 及 S0 specialist id 一律拒绝。模型与推理档位属于目标 Agent 配置，方法由默认 Skill 装载，二者都不扩大权限。Session rail 为 `Progress / Artifacts / Outputs / Context / Capture`。`handoffs` 只驱动建议行和计划门，用户批准并点声明后由 General 就地执行与交付，战略改变由用户切回 Mission。Knowledge 使用 markdown-first 六 lane。
+产品不是固定模式向导。默认顶层入口为 `general` / `debugger` / `analyzer` / `optimizer`；另有 `generator` / `verifier` / `knowledge-scout` / `report-writer` / `shader-analyst` / `pass-analyst` / `resource-analyst` / `pixel-analyst` 八个默认内部 builtin。全部经同一 `builtin < user < project` 整资源解析与 Agents 设置管理；内部 profile 默认不出现在用户入口。历史 ask/plan/edit 及 S0 specialist id 一律拒绝。模型与推理档位按目标 Agent 从 Settings → Agents 解析，方法由默认 Skill 装载，二者都不扩大权限。Session rail 为 `Progress / Artifacts / Outputs / Context / Capture`。`handoffs` 只驱动建议行和计划门，用户批准并点声明后由 General 就地执行与交付，战略改变由用户切回 Mission。Knowledge 使用 markdown-first 六 lane。
 
 操作知识与执行权限分开：三条 Mission 可按需通过 `skills` / `skill_read` 读取共享 `rdc-tool-shell` 及各自一本专业手册和引用，用于规划参数、证据与调用成本；其它专业手册不可见。正文不自动预载，也不改变 profile 的工具集或在途权限。Mission 为 plan-only；General 经批准计划、声明交接及 requiredSkillIds 的真实预载后，按冻结 catalog、审批和 owning lease 执行。
 
@@ -22,7 +22,7 @@ Agent loop 不把“耗尽 turns”或“重复相同工具轮次”当作完成
 
 上手指南是四步图文操作教程，首次 bootstrap 后展示，标题栏问号可重开。每页解释操作入口、动作与完成预期；本地教学图与 HTML 双语标注分离，标明示意而非当前配置。桌面左文右图、窄屏上图下文，沿用 TaskDialog 与固定底部导航。关闭/完成只确认已阅读，标记写 Electron 应用状态目录；不创建 Project、不保存 Provider、不执行模型请求。Builtin 直接读取随应用打包的文件，不写 user seed。
 
-Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。主进程从根目录派生同安装捆绑 Python 与 CLI，验证 catalog 后由 Settings 边界保存。检测只读已配置位置和 Tools 默认 `%LOCALAPPDATA%/Programs/rdc-tool`；用户确认前不执行候选。根目录不是第二份持久配置。失败保留原配置；未配置 RDC 不阻塞 General。
+Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。主进程按宿主布局（`src/main/platform/rdcLayout.ts`，与 RDC-Tool `HOST_LAYOUTS` 一致）从根目录派生同安装捆绑 Python 与 CLI，安装根由捆绑 Python 路径去掉布局后缀得到，验证 catalog 后由 Settings 边界保存。检测只读已配置位置，Windows 另读安装器默认 `%LOCALAPPDATA%/Programs/rdc-tool`，Linux 只检查已配置或选择的根目录；用户确认前不执行候选。根目录不是第二份持久配置。失败保留原配置；未配置 RDC 不阻塞 General。
 
 ## Architecture Principles
 
@@ -37,7 +37,7 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 6. **可取消与可回收**：Turn 经 `TurnCoordinator`（Session ownership：Active → Aborting → Orphaned → Settled；Orphaned 时 `beginTurn` fail-closed `TURN_ORPHANED`；`abortAndJoin` 等 stream terminal **与** producerCompletion）。子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`（`release_owned_runtimes` 先于 `terminate_processes`）；迟到 event 按 generation 丢弃。无 durable session 的 turn/slot 使用 ephemeral scope id（禁止 `__anon__` / `__no_session__`）。Conversation Stop 相位语义：`preparing` 干净撤销；`committing`/`running` 单调落停。Renderer 对 monotonic-stopped turn/request 丢弃迟到 `draft|streaming` patch。会话工作块与工具的取消使用 cancelled，未执行 skipped，真实失败 error，不伪造用户拒绝；main 与乐观停止共用纯结算。当前计划携带 owning Turn，修订与决定核对真实归属；包含审阅交互的 result 不再重复提供 handoff，计划执行动作仅位于待审 Composer。ProcessSupervisor 超时未观察到 close 时标记 `unconfirmed_orphan` 并保留 registry。归属 RDC daemon 必须 clear+stop 且有进程回执，失败如实保留。
 7. **失败有分类**：安全类 fail-closed；完整性 degrade-safe；可用性 recoverable。分类权威见 `docs/contracts/failure-model.md`。
 8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；不保留兼容 shim。
-9. **对话模型**：Composer 底栏与 `/model` 选择的是**当前对话模型**，不写回 `.agent.md`。Settings 里的 Agent provider/model 只在用户还没点选时作为种子。未 override 是显式可选状态（菜单「按 Agent 配置」与 `/model default`）：有 session 时清除写入 `SessionRecord.modelOverride = null`，无 session 时清 Composer 草稿。Agent route 当前不可执行时禁止清除。`/model` 与底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集；裸 `default` 先于 `provider:model` 解析，真名叫 `default` 的模型用 canonical `provider:model` 逃生。有 session 时写入 `SessionRecord.modelOverride`；无 session 时只记 Composer 草稿，首次发送随 `configurationCommit` 进入 `resolveAgentRoutePreflight` 并在 session 落地后粘性保存。切 Agent **不清**模型。父 session 模型 **不传** sub agent。Agent 可执行模型必须具备 source-backed `toolCalling.supported` 与已实现 structured-tool adapter；`unknown`/`unsupported` 不是选择项，已持久 override 或 Agent route 指向它们时 fail-closed 并给出同 provider 已验证候选项，不静默回退。Settings catalog 保留完整可审计记录。非法 model fail-closed，不回退 Agent 种子。
+9. **对话模型**：Composer 底栏与 `/model` 选择的是**当前对话模型**，不写回 Settings。Agent 的模型由 Settings → Agents 决定（用户设置 `agentModels`：默认模型与推理档位，加按 Agent 的逐字段覆盖；项目不能指定模型，`.agent.md` 不声明模型），只在用户还没点选时作为种子。未 override 是显式可选状态（菜单「按 Agent 配置」与 `/model default`）：有 session 时清除写入 `SessionRecord.modelOverride = null`，无 session 时清 Composer 草稿。Agent route 当前不可执行时禁止清除。`/model` 与底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集；裸 `default` 先于 `provider:model` 解析，真名叫 `default` 的模型用 canonical `provider:model` 逃生。有 session 时写入 `SessionRecord.modelOverride`；无 session 时只记 Composer 草稿，首次发送随 `configurationCommit` 进入 `resolveAgentRoutePreflight` 并在 session 落地后粘性保存。切 Agent **不清**模型。父 session 模型 **不传** sub agent。Agent 可执行模型必须具备 source-backed `toolCalling.supported` 与已实现 structured-tool adapter；`unknown`/`unsupported` 不是选择项，已持久 override 或 Agent route 指向它们时 fail-closed 并给出同 provider 已验证候选项，不静默回退。Settings catalog 保留完整可审计记录。非法 model fail-closed，不回退 Agent 种子。
 10. **Agent Shell**：命令工具 id 是 `shell`。解释器由 `ShellResolver` 解析（Settings `tooling.shell.executable` 本机覆盖 → 真实 pwsh 7 → Windows PowerShell 5.1；POSIX 优先 `$SHELL`（basename ∈ zsh/bash/sh/dash）→ `/bin/zsh` → `/bin/bash` → `/bin/sh`）。fish/csh/nu 等 fail-closed。全部失败抛 `SHELL_UNAVAILABLE`，不静默降级到 `cmd.exe`。POSIX 非交互走 login `-lc`；Windows 5.1 不改 `[Console]::OutputEncoding`，改用独立 UTF-8 writer，并显式 `$PSNativeCommandUseErrorActionPreference = $false`。每次调用 spawn 新进程，只用 GUID begin/trailer 回读 cwd；只持久化文件系统且位于 project root 内的 cwd 到 session `shell-state.json`，不存 env。旧 token `bash` 进入 `REJECTED_TOOL_TOKENS`，无展示别名、无静默映射。
 
 ### Provider 连接与选择响应
@@ -122,7 +122,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - `docs/contracts/` — [`runtime-kernel.md`](docs/contracts/runtime-kernel.md)（Agent loop、Prompt/Request、Reasoning、Tools、Session、Model capability）、[`session-projection.md`](docs/contracts/session-projection.md)（Active Session Projection、IPC gate、Composer 恢复、Stop/Rewrite monotonic）、[`permissions.md`](docs/contracts/permissions.md)（Permission mode、Sandbox、CSP、IPC Zod、Bridge、Secret、RDC lease、MCP trust、Shell）、[`failure-model.md`](docs/contracts/failure-model.md)（Security / Integrity / Availability）
 - `docs/product/` — [`scoped-runtime-resources.md`](docs/product/scoped-runtime-resources.md)（Scope、Profiles、Skills、Hooks、Memory、Project Instructions）、[`RenderDoc Agent 完整设计书.md`](<docs/product/RenderDoc Agent 完整设计书.md>)（RenderDoc 领域目标；第 0 章为已定裁决）、[`acceptance-ledger.md`](docs/product/acceptance-ledger.md)（验收账本：真实运行证据）、[`README.md`](docs/product/README.md)（其余产品文档入口）
 - `docs/ui/` — [`workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md)（Workbench 轨、Work Process、Composer、Markdown）、[`design-system.md`](docs/ui/design-system.md)（Token、按钮、颜色、组件规则、Appearance 双体系）、[`work-process-checklist.md`](docs/ui/work-process-checklist.md)、[`appearance-checklist.md`](docs/ui/appearance-checklist.md)、[`knowledge-center.md`](docs/ui/knowledge-center.md)
-- `docs/architecture/` — [`README.md`](docs/architecture/README.md)（模块地图与数据流入口）、[`browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)（Browser QA 与桌面 channel 矩阵，debug-only）、[`rdc-runtime.md`](docs/architecture/rdc-runtime.md)（RDC 操作契约、lease、回放身份）
+- `docs/architecture/` — [`README.md`](docs/architecture/README.md)（模块地图与数据流入口）、[`browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)（Browser QA 与桌面 channel 矩阵，debug-only）、[`rdc-runtime.md`](docs/architecture/rdc-runtime.md)（RDC 操作契约、lease、回放身份）、[`host-platform.md`](docs/architecture/host-platform.md)（宿主平台模块、能力契约、门禁、Linux 密钥策略）
 - `docs/workflows/` — [`README.md`](docs/workflows/README.md)；当前执行计划为 [`vertical-investigation-convergence.md`](docs/workflows/vertical-investigation-convergence.md)
 
 ### Renderer 架构
@@ -139,7 +139,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 
 ## Verification Gate（摘要）
 
-文件行数由 ESLint `max-lines` 执行（`AgentOrchestrator.ts` < 800，main 单文件 ≤ 900）。CI 定义在 `.github/workflows/ci.yml`，覆盖 hygiene、typecheck、lint、test、coverage、`check:architecture`、各 `check:*` 门禁、`check:contracts`、build、browser-smoke、desktop-smoke 与双 OS launcher/pack。本地验证命令与完成标准见 `AGENTS.md` §5。`check:coverage-ratchet` 是固定底线（基线 `scripts/fidelity/coverage-ratchet.json`），只在大幅回退时失败。UI/工作流验收用 disposable `pnpm run start:agent-browser` 实例，流程见 `AGENTS.md`。
+文件行数由 ESLint `max-lines` 执行（`AgentOrchestrator.ts` < 800，main 单文件 ≤ 900）。CI 定义在 `.github/workflows/ci.yml`，覆盖 hygiene、typecheck、lint、test、coverage、`check:architecture`、各 `check:*` 门禁、`check:contracts`、build、browser-smoke、desktop-smoke、Windows 单元测试（`windows-unit`）、Linux Browser QA smoke（`linux-smoke`）与双 OS launcher/pack。本地验证命令与完成标准见 `AGENTS.md` §5。`check:coverage-ratchet` 是固定底线（基线 `scripts/fidelity/coverage-ratchet.json`），只在大幅回退时失败。UI/工作流验收用 disposable `pnpm run start:agent-browser` 实例，流程见 `AGENTS.md`。
 
 **Provider 失败诊断保真**（契约见 [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md)「provider 失败诊断保真」）：`ProviderEmptyStreamError`（`PROVIDER_STREAM_EMPTY`）不合成 HTTP 502；`ErrorRecovery` 的 `empty_stream` 最多 1 次重试，真实 5xx 为 `server_error`（3 次），503 为 `overloaded`，401 立即 abort；`AgentRecoveryAbortError` 必带 cause 与结构化字段；`createTurnFailedDiagnostic` 保留 `CONVERSATION_LLM_REQUEST_FAILED` 并按 auth / quota-rate / 5xx / empty_stream / network 分类文案。Work Process Active Signal 与诊断行对齐见 `check:work-process` + [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md)。
 
@@ -159,7 +159,7 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 
 ### A. Builtin Profiles
 
-四个默认顶层入口与八个默认内部 builtin 经同一有效快照加载；Settings、Composer 和 Conversation preflight 使用 project-aware 资源解析，资源读取不创建或改写 user seed。user/project 可覆盖合法 ID 或新增合法自定义 ID。Profile 冻结身份、模型、推理档位及默认 Skill；默认内部 Agent 经 Settings 配置并按需委派，Task 对必需执行和独立核验作真实准入。显式保存使用统一原子替换，sourceHash 为当前 Markdown 原始字节 SHA256。历史保留的拒绝 ID 诊断 `AGENT_ID_RESERVED_HISTORICAL`，不能通过保存、导入、路由或运行时激活。Run 结构见裁决 I。
+四个默认顶层入口与八个默认内部 builtin 经同一有效快照加载；Settings、Composer 和 Conversation preflight 使用 project-aware 资源解析，资源读取不创建或改写 user seed。user/project 可覆盖合法 ID 或新增合法自定义 ID。Profile 冻结身份与默认 Skill；模型与推理档位只来自 Settings → Agents（`agentModels.byAgent[id]` 逐字段覆盖 `agentModels.default`），`.agent.md` 声明 `model` / `reasoning-level` / handoff `model` 时整份判无效（`AGENT_MANIFEST_FIELD_MOVED`），按优先级回落下层，Agents 页提供用户触发的迁移（预览 → 备份 → 写入设置并去字段 → 原子替换）与删除覆盖。复制内置时写入 `based-on: <内置 sourceHash>`，内置变化后显示「内置已更新」并可对比、恢复内置。默认内部 Agent 经 Settings 配置并按需委派，Task 对必需执行和独立核验作真实准入。显式保存使用统一原子替换，sourceHash 为当前 Markdown 原始字节 SHA256。历史保留的拒绝 ID 诊断 `AGENT_ID_RESERVED_HISTORICAL`，不能通过保存、导入、路由或运行时激活。Run 结构见裁决 I。
 
 ### B. Right Rail
 
@@ -289,7 +289,7 @@ main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组
 
 ## Plan 与 generation
 
-General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 策略采用 renderdoc-execution 的六块 Markdown 模板，按规模填写；Knowledge 相似性仅是检查线索。
+General 为默认通用工作身份。核心正文只负责可信上下文、授权、持续执行、Skill 发现与收口；领域名称可留在能力目录。renderdoc-investigation 按调查目标选择 Mission，普通术语问答不强制路由。Mission 共用 investigation-planning 的计划结构，按规模填写：正文写给用户读，执行引用放进 `plan_artifact` 的结构化字段或正文末尾的 `## Execution references`，标题、摘要与正文里的内部引用由 `plan_artifact` 以 `PLAN_BODY_INTERNAL_REFERENCE` 拒绝；Knowledge 相似性仅是检查线索。
 
 独立审查结论、父级记录更新与最终接受是不同责任：通过现有 Task 与 Investigation 版本化交付，不建立额外结算状态机。工具正文投影已存的版本关系而不扩展读取授权。审批主进程来源/故障元数据仅解释结果，不改变授权或领域证明。
 

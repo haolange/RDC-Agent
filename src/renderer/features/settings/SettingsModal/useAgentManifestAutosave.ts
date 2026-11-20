@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { AgentDefinitionSaveResult, AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AgentDefinitionSaveResult, AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import { nextAgentDefinitionClientRevision } from '../../../stores/appSettingsStore';
 import {
@@ -72,11 +72,14 @@ export function useAgentManifestAutosave({
   useEffect(() => { blockSubmitRef.current = blockSubmit; }, [blockSubmit]);
   useEffect(() => { blockProjectedRef.current = blockProjectedSubmit; }, [blockProjectedSubmit]);
 
+  /** Committed definitions become the saved baseline: on close, and after import or migration. */
+  const rebase = (definitions: AgentManifestDefinition[]) => {
+    savedDraftsRef.current = definitions.map((entry) => ({ ...entry }));
+    failedDraftsRef.current = null;
+  };
+
   useEffect(() => {
-    if (!open) {
-      savedDraftsRef.current = settings.agents.definitions.map((entry) => ({ ...entry }));
-      failedDraftsRef.current = null;
-    }
+    if (!open) rebase(settings.agents.definitions);
   }, [open, settings.agents.definitions]);
 
   const selectDrafts = (pending = getChangedAgentManifestDrafts(draftsRef.current, savedDraftsRef.current)) => (
@@ -193,5 +196,5 @@ export function useAgentManifestAutosave({
     await executeRef.current(drafts, revision, draftsRef.current.filter(current => drafts.some(draft => draft.id === current.id)));
   };
 
-  return { retry };
+  return { retry, rebase };
 }

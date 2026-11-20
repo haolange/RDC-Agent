@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
 import type {
+  AgentModelSettings,
   AppRuntimePaths,
   AppSettings,
   LayoutPreferences,
@@ -45,6 +46,7 @@ import {
   sanitizeWindow,
   sanitizeToolingSettings,
 } from './settingsSanitize';
+import { sanitizeAgentModelSettings } from './agentModelSettings';
 import {
   createEmptyAgentRoutes,
   hydrateProviderSecrets,
@@ -71,6 +73,7 @@ export interface NormalizedPersistedSettings {
   profile: ProfileSettings;
   tooling: ToolingSettings;
   agentRuntime: AgentRuntimeSettings;
+  agentModels: AgentModelSettings;
   llm: {
     providers: LlmProviderEntry[];
   };
@@ -159,6 +162,7 @@ export function createDefaultRuntimeSettings(): AppSettings {
       shell: DEFAULT_SHELL_TOOLING,
     },
     agentRuntime: DEFAULT_AGENT_RUNTIME,
+    agentModels: { default: {}, byAgent: {} },
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
@@ -264,6 +268,7 @@ export function rebuildPersistedSettings(
     },
     tooling,
     agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
+    agentModels: sanitizeAgentModelSettings(candidate.agentModels, fixes),
     llm: {
       providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),
     },
@@ -308,6 +313,7 @@ export function normalizePersistedSettings(
     },
     tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
     agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
+    agentModels: sanitizeAgentModelSettings(candidate.agentModels),
     llm: {
       providers: nextProviders,
     },
@@ -375,6 +381,7 @@ export function toRuntimeSettings(
     profile: normalized.profile,
     tooling: normalized.tooling,
     agentRuntime: normalized.agentRuntime,
+    agentModels: normalized.agentModels,
     llm: {
       providers: hydratedProviders,
       agentRoutes,

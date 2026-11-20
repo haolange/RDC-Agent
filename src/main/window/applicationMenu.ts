@@ -1,4 +1,5 @@
 import { app, dialog, Menu, shell } from 'electron';
+import { currentHost } from '../platform/host';
 import { nativeMessage } from './nativeI18n';
 
 interface MenuActions {
@@ -16,7 +17,7 @@ export function installApplicationMenu(actions: MenuActions): void {
 export function refreshApplicationMenu(): void {
   if (!menuActions) return;
   const { openRdcFiles, openSettings, newCase } = menuActions;
-  if (process.platform === 'darwin') {
+  if (currentHost().isMac) {
     const template: Electron.MenuItemConstructorOptions[] = [
       { role: 'appMenu' },
       {

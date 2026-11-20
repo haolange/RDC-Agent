@@ -4,14 +4,19 @@ import { parseAgentMarkdownStrict, serializeAgentMarkdown } from './agentManifes
 const wrap = (frontmatter: string, body = 'instructions') => `---\n${frontmatter}\n---\n\n${body}\n`;
 
 describe('strict agent manifest parse', () => {
-  it('round trips an Agent reasoning default and rejects an invalid selection', () => {
-    const parsed = parseAgentMarkdownStrict(wrap('name: Review\nreasoning-level: high'), 'review.agent.md', 'review', 't', false);
-    expect(parsed.ok).toBe(true);
+  it('rejects model fields, which moved to Settings, and round trips based-on', () => {
+    for (const field of ['model: [openai:gpt]', 'reasoning-level: high']) {
+      const parsed = parseAgentMarkdownStrict(wrap(`name: Review\n${field}`), 'review.agent.md', 'review', 't', false);
+      expect(parsed.ok || parsed.reason).toMatch(/^AGENT_MANIFEST_FIELD_MOVED: /u);
+    }
+    const handoff = parseAgentMarkdownStrict(wrap('name: Review\nhandoffs:\n  - {label: Go, agent: general, prompt: Run., model: openai:gpt}'), 'review.agent.md', 'review', 't', false);
+    expect(handoff.ok || handoff.reason).toMatch(/^AGENT_MANIFEST_FIELD_MOVED: handoffs\[0\]\.model/u);
+    const basedOn = 'a'.repeat(64);
+    const parsed = parseAgentMarkdownStrict(wrap(`name: Review\nbased-on: ${basedOn}`), 'review.agent.md', 'review', 't', false);
     if (!parsed.ok) throw new Error(parsed.reason);
-    expect(parsed.definition.reasoningLevel).toBe('high');
     const again = parseAgentMarkdownStrict(serializeAgentMarkdown(parsed.definition), 'review.agent.md', 'review', 't', false);
-    expect(again.ok && again.definition.reasoningLevel).toBe('high');
-    expect(parseAgentMarkdownStrict(wrap('name: Review\nreasoning-level: extreme'), 'review.agent.md', 'review', 't', false).ok).toBe(false);
+    expect(again.ok && again.definition.basedOn).toBe(basedOn);
+    expect(parseAgentMarkdownStrict(wrap('name: Review\nbased-on: abc'), 'review.agent.md', 'review', 't', false).ok).toBe(false);
   });
   it('round trips declared translations without changing the handoff identity', () => {
     const parsed = parseAgentMarkdownStrict(wrap(`name: Custom

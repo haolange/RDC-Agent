@@ -1,6 +1,6 @@
 /**
  * Canonical builtin Skill inventory for T12.
- * 22 Mission / Knowledge / Coordinator + 9 general. No orphan, duplicate, or legacy names.
+ * 23 Mission / Knowledge / Coordinator + 9 general. No orphan, duplicate, or legacy names.
  */
 
 export const GENERAL_SKILL_IDS = [
@@ -20,6 +20,7 @@ export const MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS = [
   'debugger-coordinator',
   'analyzer-coordinator',
   'optimizer-coordinator',
+  'investigation-planning',
   'debugger-causal-method',
   'analyzer-architecture-method',
   'optimization-experiment',
@@ -59,9 +60,9 @@ export const RDC_OPERATION_MANUAL_SKILL_IDS = [
 
 export const SKILL_ARMED_BY_PROFILE: Record<string, readonly string[]> = {
   general: ['execution-orchestrator'],
-  debugger: ['debugger-coordinator'],
-  analyzer: ['analyzer-coordinator'],
-  optimizer: ['optimizer-coordinator'],
+  debugger: ['investigation-planning', 'debugger-coordinator'],
+  analyzer: ['investigation-planning', 'analyzer-coordinator'],
+  optimizer: ['investigation-planning', 'optimizer-coordinator'],
 };
 
 const ARMED_SKILL_IDS = new Set(Object.values(SKILL_ARMED_BY_PROFILE).flat());

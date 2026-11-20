@@ -16,6 +16,7 @@ AgentApprovalEventPayload
 AgentAssistantCompletedPayload
 AgentAssistantDeltaPayload
 AgentAssistantThinkingPayload
+AgentBuiltinComparison
 agentCompletionContract
 AgentCompletionContract
 AgentConfig
@@ -38,13 +39,18 @@ AgentHandoffDefinition
 AgentHandoffRequestedPayload
 AgentId
 AgentManifestDefinition
+AgentManifestDiagnostic
 AgentManifestDraft
 AgentManifestProvenance
 AgentManifestSettings
 AgentManifestWriteScope
 AgentMessage
 AgentMode
+AgentModelBinding
+AgentModelMigrationPreview
 AgentModelOption
+AgentModelSettings
+AgentOverrideFileRequest
 AgentPermissionMode
 AgentPermissionSettings
 AgentPhaseDefinition
@@ -126,7 +132,6 @@ ArtifactStatus
 assertChannelCapabilityCoverage
 assertHexOrNull
 assertNoJsonlDiagnostics
-assertRdcCliBinding
 assignDefaultCaptureRoles
 AssistantMessageDiagnostic
 AssistantMessageNode
@@ -144,6 +149,7 @@ BooleanControlDefinitionSchema
 BranchNavigatorViewModel
 BridgeChannelCapability
 buildToolResultPreview
+BUILTIN_AGENT_IDS
 BUILTIN_AGENT_TOOL_ID_SET
 BUILTIN_AGENT_TOOL_IDS
 BUILTIN_AGENT_TOOL_TIERS
@@ -169,6 +175,7 @@ CaptureApi
 CaptureControl
 CaptureDescriptor
 CaptureInfo
+CaptureRecoveryStatus
 CaptureReplayApplyRequest
 CaptureReplayBindingRequest
 CaptureReplayError
@@ -230,6 +237,7 @@ CompiledPromptCache
 CompiledProviderCatalog
 CompiledProviderCatalogIndex
 CompiledProviderSurface
+CompiledRdcProbe
 compileProviderCatalog
 compileRdcProbe
 compileThemeChrome
@@ -305,6 +313,7 @@ ConversationMessageErroredEvent
 ConversationMessagePatchedEvent
 ConversationMessageStatus
 ConversationMode
+ConversationOutputItem
 ConversationPlanReview
 ConversationPreflightErrorCode
 ConversationReasoningState
@@ -411,6 +420,8 @@ DevicePreparationRequest
 DevicePreparationResult
 diagnoseManifestToolTokens
 DialogApi
+DiffLine
+diffLines
 DiffPreview
 DiscoveryAdmission
 DiscoveryCapabilityMapping
@@ -489,11 +500,13 @@ FindingNode
 FindingSeverity
 FontScale
 FORBIDDEN_SKILL_NAMES
+formatAgentManifestDiagnostic
 formatAskUserAnswersForToolResult
 formatInvestigationContentHash
 formatPricePerMillion
 formatSessionArtifactUri
 formatTokenCount
+formatUnresolvedItem
 formatUsdCost
 freezeDelegationCapsule
 GeminiWireThinkingLevel
@@ -544,6 +557,7 @@ hsvToHex
 hsvToRgb
 ImagePreview
 index.ts::*
+INTERNAL_BUILTIN_AGENT_IDS
 INVESTIGATION_ARTIFACT_KINDS
 INVESTIGATION_ARTIFACT_STATUSES
 INVESTIGATION_KIND_REGISTRY
@@ -564,6 +578,8 @@ InvestigationListCursor
 InvestigationListPage
 InvestigationListRequest
 InvestigationMission
+InvestigationPlanContract
+InvestigationPlanContractSchema
 InvestigationReadIpcResult
 InvestigationReadIpcStatus
 InvestigationReadRequest
@@ -592,6 +608,7 @@ isRdcLeaseToolName
 isReasoningSelection
 isRendererEventChannel
 isRendererInvokeChannel
+isRetiredModel
 isSafeAgentProfileId
 isSessionArtifactCategory
 isSessionArtifactizedEnvelope
@@ -653,6 +670,8 @@ KnowledgePackageCard
 KnowledgePackConflict
 KnowledgeQueryRequest
 KnowledgeQueryResult
+KnowledgeReadRequest
+KnowledgeReadResult
 KnowledgeRelation
 KnowledgeRelationKind
 KnowledgeRetrievalLane
@@ -661,6 +680,13 @@ KnowledgeScope
 KnowledgeScopeAxis
 KnowledgeSpace
 KnowledgeSpaceKind
+KnowledgeTopic
+KnowledgeTopicAssignment
+KnowledgeTopicChanges
+KnowledgeTopicDocument
+KnowledgeTopicPreview
+KnowledgeTopicProposal
+KnowledgeTopicSuggestion
 LayeredToolDefinition
 LayoutPreferences
 LEFT_SIDEBAR_COLLAPSED_WIDTH
@@ -797,12 +823,16 @@ OutputsPanelViewModel
 PanelState
 parseDelegationCapsule
 ParsedSessionArtifactUri
+parseInvestigationPlanContract
 parsePlanTaskRequirements
 parseRdcThemeV1
 parseSessionArtifactUri
+parseUnresolvedItems
 parseYaml
 PhaseGroupNode
 PhaseKind
+PLAN_EXECUTION_REFERENCES_HEADING
+PLAN_INVESTIGATION_HEADING
 PLAN_REVIEW_STATE_SCHEMA
 PLAN_TASK_REQUIREMENTS_HEADING
 PlanApi
@@ -887,6 +917,9 @@ ProviderOperationBuilderId
 ProviderOutputRef
 ProviderOverride
 ProviderOverrideSchema
+ProviderProbeBatch
+ProviderProbeBatchItem
+ProviderProbeBatchRequest
 ProviderProfileManifest
 ProviderProfileManifestSchema
 ProviderProtocolOverride
@@ -951,6 +984,7 @@ ReasoningVisibility
 ReasoningWireProfile
 ReasoningWireProfileSchema
 recolorLogoRgba
+RecoverableApprovedHandoff
 REJECTED_TOOL_TOKENS
 relativeLuminance
 RemoteInstallationReceipt
@@ -963,6 +997,7 @@ RendererElectronApi
 RendererEventCallback
 RendererEventChannel
 RendererInvokeChannel
+renderInvestigationPlanContract
 renderPlanTaskRequirements
 repairConversationBranchState
 ReplayBackendHint
@@ -983,6 +1018,7 @@ RequestPlan
 RequestPlanningErrorCode
 RequestPlanningResult
 resolveAgentDisplay
+resolveAgentModel
 resolveAgentWriteTarget
 resolveAgentWriteTargetFromDraft
 resolveBridgeChannelCapability
@@ -991,6 +1027,7 @@ resolveContextTierChoices
 resolveConversationLoopOutputPhase
 ResolveConversationLoopOutputPhaseInput
 resolveConversationReasoningState
+ResolvedAgentModel
 ResolvedBooleanControlCapability
 ResolvedControlState
 ResolvedModelControls
@@ -1110,6 +1147,7 @@ SkillParameter
 SkillSelectionOption
 SkillSelectionProjection
 splitCanonicalAgentModelId
+splitPlanAppendix
 StatePlan
 StreamingPlan
 stringifyYaml
@@ -1137,6 +1175,8 @@ TaskExecutionRequirementsSchema
 TaskFrameNode
 TaskIndependentSource
 TaskIndependentSourceSchema
+TaskRuntimeEpoch
+TaskRuntimeEpochSchema
 TERMINAL_DEFAULT_HEIGHT
 TERMINAL_MAX_HEIGHT
 TERMINAL_MIN_HEIGHT
@@ -1214,6 +1254,9 @@ TraceStatus
 TraceVisibility
 type
 UiPreferences
+UNRESOLVED_BLOCKERS
+UnresolvedBlocker
+UnresolvedItem
 UserMessageNode
 UserRequest
 UserRequestRevision

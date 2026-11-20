@@ -46,6 +46,8 @@ import {
   LlmProviderIdArgsSchema,
   LlmRefreshProviderModelsArgsSchema,
   SettingsGetAgentDefinitionCommitArgsSchema,
+  SettingsPreviewAgentModelMigrationArgsSchema,
+  SettingsAgentOverrideFileArgsSchema,
   SettingsSaveAgentDefinitionArgsSchema,
   SettingsSaveProviderDefinitionArgsSchema,
   SettingsGetModelsOverrideArgsSchema,
@@ -53,6 +55,17 @@ import {
 } from './validation/settingsLlmSchemas';
 import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
 import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
+
+/** Observers of committed settings may fail; the saved file stays authoritative. */
+async function notifyCommitted(notify: () => unknown): Promise<void> {
+  try { await notify(); } catch (error) {
+    runtimeLogService.log({ scope: 'app', namespace: 'system', severity: 'error',
+      title: 'Settings committed; observer update failed',
+      summary: 'The saved settings remain authoritative.',
+      detail: error instanceof Error ? error.message : String(error),
+      raw: { code: 'SETTINGS_COMMITTED_NOTIFICATION_FAILED' } });
+  }
+}
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   registerProviderProbeHandlers(context);
@@ -302,6 +315,40 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return settingsService.getAgentDefinitionCommit(query);
   });
 
+  ipcMain.handle('settings:previewAgentModelMigration', async (_event, ...rawArgs: unknown[]) => {
+    const [sourcePath] = parseIpcArgs(SettingsPreviewAgentModelMigrationArgsSchema, rawArgs, {
+      label: 'settings:previewAgentModelMigration',
+      maxBytes: 8 * 1024,
+    });
+    return settingsService.previewAgentModelMigration(sourcePath);
+  });
+
+  ipcMain.handle('settings:applyAgentModelMigration', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(SettingsAgentOverrideFileArgsSchema, rawArgs, {
+      label: 'settings:applyAgentModelMigration',
+      maxBytes: 8 * 1024,
+    });
+    const settings = await settingsService.applyAgentModelMigration(request);
+    await notifyCommitted(() => context.applyCurrentLlmConfig());
+    return withEffectiveAgentModelOptions(settings);
+  });
+
+  ipcMain.handle('settings:deleteAgentOverrideFile', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(SettingsAgentOverrideFileArgsSchema, rawArgs, {
+      label: 'settings:deleteAgentOverrideFile',
+      maxBytes: 8 * 1024,
+    });
+    return withEffectiveAgentModelOptions(await settingsService.deleteAgentOverrideFile(request));
+  });
+
+  ipcMain.handle('settings:getAgentBuiltinComparison', async (_event, ...rawArgs: unknown[]) => {
+    const [query] = parseIpcArgs(SettingsGetAgentDefinitionCommitArgsSchema, rawArgs, {
+      label: 'settings:getAgentBuiltinComparison',
+      maxBytes: 4 * 1024,
+    });
+    return settingsService.getAgentBuiltinComparison(query);
+  });
+
   ipcMain.handle('settings:saveProviderDefinition', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(SettingsSaveProviderDefinitionArgsSchema, rawArgs, {
       label: 'settings:saveProviderDefinition',
@@ -343,19 +390,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const patch = settings as AppSettingsPatch;
     const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
-    const notifyCommitted = async (notify: () => unknown): Promise<void> => {
-      try { await notify(); } catch (error) {
-        runtimeLogService.log({ scope: 'app', namespace: 'system', severity: 'error',
-          title: 'Settings committed; observer update failed',
-          summary: 'The saved settings remain authoritative.',
-          detail: error instanceof Error ? error.message : String(error),
-          raw: { code: 'SETTINGS_COMMITTED_NOTIFICATION_FAILED' } });
-      }
-    };
     if (patch.appearance) await notifyCommitted(applyProductIcon);
     if (previousSettings.appearance.language !== nextSettings.appearance.language) await notifyCommitted(refreshApplicationMenu);
     const changedProviderIds = new Set<string>();
-    if (patch.llm?.providers) await notifyCommitted(() => context.applyCurrentLlmConfig());
+    if (patch.llm?.providers || patch.agentModels) await notifyCommitted(() => context.applyCurrentLlmConfig());
     for (const provider of patch.llm?.providers ? nextSettings.llm.providers : []) {
       const previous = previousSettings.llm.providers.find((entry) => entry.id === provider.id);
       const changed = !previous || JSON.stringify(previous) !== JSON.stringify(provider);

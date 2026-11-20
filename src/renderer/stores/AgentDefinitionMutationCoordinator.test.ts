@@ -6,6 +6,7 @@ import type {
 } from '@shared/types/agentManifest';
 import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
 
+/** Requests differ by instructions; the committed route echoes them so ordering is observable. */
 const draft = (model: string): AgentManifestDraft => ({
   id: 'ask',
   fileName: 'ask.agent.md',
@@ -13,9 +14,8 @@ const draft = (model: string): AgentManifestDraft => ({
   description: '',
   argumentHint: '',
   target: 'rdc-agent',
-  models: [model],
   icon: 'message-orbit',
-    accent: '#33d1ff',
+  accent: '#33d1ff',
   disableModelInvocation: false,
   userInvocable: true,
   tools: [],
@@ -24,12 +24,12 @@ const draft = (model: string): AgentManifestDraft => ({
   agents: [],
   handoffs: [],
   metadata: {},
-  instructions: '',
+  instructions: model,
   enabled: true,
 });
 
 const committed = (request: AgentDefinitionSaveRequest): AgentDefinitionSaveResult => {
-  const modelId = request.draft.models[0]?.split(':')[1] ?? '';
+  const modelId = request.draft.instructions.split(':')[1] ?? '';
   const route = { agentId: 'ask' as const, providerId: 'provider', modelId };
   const snapshot = {
     clientRevision: request.clientRevision,

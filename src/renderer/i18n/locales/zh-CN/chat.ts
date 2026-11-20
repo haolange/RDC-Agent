@@ -272,6 +272,7 @@ export const zhChat = {
   'chat.planReviewReadFull': '阅读完整计划',
   'chat.planReviewImplement': '实施此计划？',
   'chat.planReviewRevision': '版本 {revision}',
+  'chat.planReviewExecutionReferences': '执行引用',
   'chat.planReviewExport': '下载计划',
   'chat.planReviewSave': '保存到项目',
   'chat.planReviewCopy': '复制计划',

@@ -4,6 +4,7 @@
  * shortest-unique parameter binding. Never call Get-Alias at runtime.
  */
 
+import { defaultShellKind } from '../../../platform/shell';
 import type { ShellKind } from '../../../runtime/ShellResolver';
 
 const POWERSHELL_ALIASES: Record<string, string> = {
@@ -317,7 +318,7 @@ function matchPosixHardDeny(command: string): string | null {
 export function matchShellHardDeny(command: string, kind?: ShellKind | 'cmd'): string | null {
   const text = String(command ?? '');
   if (!text.trim()) return null;
-  const resolved = kind ?? (process.platform === 'win32' ? 'pwsh' : 'bash');
+  const resolved = kind ?? defaultShellKind();
   if (resolved === 'pwsh' || resolved === 'windows-powershell') {
     return matchPowerShellHardDeny(text) ?? matchWindowsCmdHardDeny(text) ?? matchPosixHardDeny(text);
   }

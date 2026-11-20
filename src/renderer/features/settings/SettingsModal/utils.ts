@@ -1,7 +1,6 @@
 import type { TranslationKey } from '../../../i18n';
 import { LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
 import type {
-  LlmAgentRoute,
   LlmProviderCategory,
   LlmProviderEntry,
   LlmProviderModel,
@@ -43,7 +42,6 @@ export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => (
   capabilities: provider.capabilities ? [...provider.capabilities] : undefined,
 });
 
-export const cloneRoute = (route: LlmAgentRoute): LlmAgentRoute => ({ ...route });
 
 export const getEnabledModels = (provider?: Pick<LlmProviderEntry, 'models'> | null) =>
   provider?.models.filter((model) => model.enabled) ?? [];

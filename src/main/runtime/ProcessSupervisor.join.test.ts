@@ -22,13 +22,16 @@ const childState = vi.hoisted(() => {
   return {
     child,
     spawn: vi.fn(() => child),
-    spawnSync: vi.fn(),
+    signalTree: vi.fn((_pid: number, _signal: NodeJS.Signals, _timeoutMs: number) => undefined),
   };
 });
 
 vi.mock('child_process', () => ({
   spawn: childState.spawn,
-  spawnSync: childState.spawnSync,
+}));
+vi.mock('../platform/process', () => ({
+  signalChildProcessTree: childState.signalTree,
+  isolatedChildSpawnOptions: () => ({}),
 }));
 
 import { withProcessExecutionOwner } from './ResourceExecutionLifetime';
@@ -37,8 +40,6 @@ import { ProcessSupervisor } from './ProcessSupervisor';
 
 describe('ProcessSupervisor bounded join', () => {
   it('coalesces repeated cancellation and timeout into one initial kill and one escalation', async () => {
-    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
-    Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
     vi.useFakeTimers();
     try {
       const supervisor = new ProcessSupervisor();
@@ -46,12 +47,12 @@ describe('ProcessSupervisor bounded join', () => {
       supervised.abort('abort');
       supervised.abort('timeout');
       const joined = supervised.join(10);
-      expect(childState.spawnSync).toHaveBeenCalledTimes(1);
+      expect(childState.signalTree).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(2000);
-      expect(childState.spawnSync).toHaveBeenCalledTimes(2);
+      expect(childState.signalTree.mock.calls.map((call) => call[1])).toEqual(['SIGTERM', 'SIGKILL']);
       supervised.abort('supervisor_kill');
       await vi.advanceTimersByTimeAsync(1100);
-      expect(childState.spawnSync).toHaveBeenCalledTimes(2);
+      expect(childState.signalTree).toHaveBeenCalledTimes(2);
       await expect(joined).resolves.toMatchObject({ reason: 'unconfirmed_orphan' });
       expect(supervisor.size).toBe(1);
       childState.child.emit('close', 1, null);
@@ -60,34 +61,26 @@ describe('ProcessSupervisor bounded join', () => {
     } finally {
       childState.child.emit('close', 1, null);
       vi.useRealTimers();
-      Object.defineProperty(process, 'platform', platform);
     }
   });
 
-  it('bounds the Windows tree-killer itself and never treats its return as observed child exit', () => {
-    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
-    Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
-    try {
-      childState.spawnSync.mockReturnValueOnce({ error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' }) });
-      const supervisor = new ProcessSupervisor();
-      const supervised = supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false });
-      supervised.abort();
-      const options = childState.spawnSync.mock.calls.at(-1)?.[2] as { timeout?: number } | undefined;
-      expect(options?.timeout).toBeGreaterThan(0);
-      expect(options?.timeout).toBeLessThanOrEqual(5000);
-      expect(supervisor.size).toBe(1);
-      childState.child.emit('close', 1, null);
-      expect(supervisor.size).toBe(0);
-    } finally {
-      Object.defineProperty(process, 'platform', platform);
-    }
+  it('bounds the tree-killer itself and never treats its return as observed child exit', () => {
+    const supervisor = new ProcessSupervisor();
+    const supervised = supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false });
+    supervised.abort();
+    const timeoutMs = childState.signalTree.mock.calls.at(-1)?.[2];
+    expect(timeoutMs).toBeGreaterThan(0);
+    expect(timeoutMs).toBeLessThanOrEqual(5000);
+    expect(supervisor.size).toBe(1);
+    childState.child.emit('close', 1, null);
+    expect(supervisor.size).toBe(0);
   });
 
   afterEach(() => {
     childState.child.emit('close', 0, null);
     childState.child.killed = false;
     childState.spawn.mockClear();
-    childState.spawnSync.mockClear();
+    childState.signalTree.mockClear();
   });
 
   it('returns unconfirmed_orphan when forced termination has no close event', async () => {

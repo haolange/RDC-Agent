@@ -10,7 +10,6 @@ const definition = (id: string, enabled: boolean): AgentManifestDefinition => ({
   description: '',
   argumentHint: '',
   target: 'rdc-agent',
-  models: [],
   icon: 'spark',
   accent: '#33d1ff',
   disableModelInvocation: false,
@@ -102,12 +101,6 @@ describe('validateAgentHandoffs', () => {
     ]);
   });
 
-  it('reports model-invalid for a selection absent from projection', () => {
-    expect(validateAgentHandoffs([{ ...valid, model: 'openai:missing' }], ctx)).toEqual([
-      { index: 0, field: 'model', code: 'model-invalid' },
-    ]);
-  });
-
   it('does not invent a duplicate-target error', () => {
     expect(validateAgentHandoffs([
       valid,
@@ -115,7 +108,7 @@ describe('validateAgentHandoffs', () => {
     ], ctx)).toEqual([]);
   });
 
-  it('allows an omitted model as inherit', () => {
+  it('accepts a handoff without any model field', () => {
     expect(validateAgentHandoffs([valid], ctx)).toEqual([]);
   });
 });
@@ -137,6 +130,6 @@ describe('persistAgentHandoff', () => {
       ...valid,
       surface: 'plan-gate',
     });
-    expect(persistAgentHandoff({ ...cleared, send: undefined, model: '' })).toEqual(valid);
+    expect(persistAgentHandoff({ ...cleared, send: undefined})).toEqual(valid);
   });
 });

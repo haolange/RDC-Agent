@@ -1,6 +1,5 @@
 import type {
   AppSettings,
-  LlmAgentRoute,
   LlmProviderEntry,
   LlmProviderModel,
   ProviderDefinitionSaveResult,
@@ -19,7 +18,6 @@ interface UseProviderConnectionOptions {
   settings: AppSettings;
   providerDrafts: LlmProviderEntry[];
   setProviderDrafts: Dispatch<SetStateAction<LlmProviderEntry[]>>;
-  setAgentRouteDrafts: Dispatch<SetStateAction<LlmAgentRoute[]>>;
   selectedProviderId: string | null;
   setSelectedProviderId: Dispatch<SetStateAction<string | null>>;
   connectionDraft: ProviderConnectionDraft | null;

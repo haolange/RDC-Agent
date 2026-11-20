@@ -1,12 +1,14 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ConversationPlanReview } from '@shared/types/planReview';
+import { splitPlanAppendix } from '@shared/utils/planAppendix';
 import { useI18n } from '../../i18n';
 import { useModalFocus } from '../../lib/useModalFocus';
 import { useOverlayLayer } from '../../lib/overlayStack';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { Details } from '../../ui/Details';
+import { planAppendixMarkdown } from './planPreview';
 import { usePlanReviewActions } from './usePlanReviewActions';
 import { useProjectStore } from '../../stores/projectStore';
 import { useReadingPanelGeometry } from '../../lib/useReadingPanelGeometry';
@@ -15,6 +17,7 @@ import { Button } from '../../ui/Button';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import type { ConversationPlanReview } from '@shared/types/planReview';
 
 export const PlanReviewPanel: React.FC<{
   plan: ConversationPlanReview;
@@ -37,6 +40,7 @@ export const PlanReviewPanel: React.FC<{
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const initialSession = useRef(sessionId);
+  const parts = useMemo(() => splitPlanAppendix(markdown), [markdown]);
   const reference = { sessionId: sessionId!, planId: plan.planId, revision: plan.revision, uri: plan.uri, expectedHash: plan.hash };
 
   useEffect(() => {
@@ -134,7 +138,13 @@ export const PlanReviewPanel: React.FC<{
         {notice ? <p className="plan-review-panel__notice" role="status">{notice}</p> : null}
         {error || projection?.error ? <p className="plan-review-panel__error" role="alert">{error || projection?.error}</p> : null}
         <div className="plan-review-panel__body" aria-busy={loading}>
-          {loading ? <p role="status">{t('chat.planReviewLoading')}</p> : markdown ? <MessageMarkdown content={markdown} /> : null}
+          {loading ? <p role="status">{t('chat.planReviewLoading')}</p> : markdown ? <>
+            <MessageMarkdown content={parts.body} />
+            {parts.appendix ? <Details variant="panel" className="plan-review-panel__appendix" data-testid="plan-review-appendix"
+              summary={t('chat.planReviewExecutionReferences')}>
+              <MessageMarkdown content={planAppendixMarkdown(parts.appendix)} />
+            </Details> : null}
+          </> : null}
         </div>
       </div>
     </div>,

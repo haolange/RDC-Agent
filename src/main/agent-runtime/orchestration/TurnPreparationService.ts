@@ -264,7 +264,8 @@ export class TurnPreparationService {
       mcpLease?.poolKey ?? null,
       { excludeRdcLeaseTools, excludeSubagent },
     );
-    const slotKey = agentSlotKey(resolveExecutionScopeId(input.sessionId), input.agentId);
+    const executionScopeId = resolveExecutionScopeId(input.sessionId);
+    const slotKey = agentSlotKey(executionScopeId, input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
     const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
     const investigationTools = ['investigation_schema', 'investigation_read', 'investigation_write', 'investigation_list'];
@@ -316,6 +317,7 @@ export class TurnPreparationService {
       promptPlan,
       requestPlan: input.requestPlan,
       tools: activeToolDefinitions,
+      affinityScopeId: executionScopeId,
     });
     // Preparation measures the complete input. The execution-owned coordinator
     // validates and compacts at the first provider boundary with a transcript sink.

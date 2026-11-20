@@ -22,3 +22,4 @@
 - `agentic-trace-protocol.md`：Trace、Progress 与 right-panel projection。
 - `provider-architecture.md`：Catalog / EffectiveModel / RequestPlan / credential lease。
 - `browser-qa-surface.md`：Browser（debug-only）与 Desktop 的单轨 API、transport、安全及状态 parity。
+- `host-platform.md`：宿主平台模块 `src/main/platform` 的盘点、能力契约、宿主平台门禁与 Linux 密钥策略。

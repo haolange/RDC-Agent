@@ -7,7 +7,7 @@ import { canInitializeAgentEditor, useSettingsModalState } from './useSettingsMo
 
 const projectAgent: AgentManifestDefinition = {
   id: 'general', fileName: 'general.agent.md', filePath: '/project/general.agent.md', name: 'General',
-  description: '', argumentHint: '', target: 'rdc-agent', models: [], icon: 'spark', accent: '#33d1ff',
+  description: '', argumentHint: '', target: 'rdc-agent', icon: 'spark', accent: '#33d1ff',
   disableModelInvocation: false, userInvocable: true, tools: [], skills: [], mcpServers: [], agents: [],
   handoffs: [], metadata: {}, instructions: 'project instructions', builtin: false, enabled: true,
   provenance: { scope: 'project', sourcePath: '/project/general.agent.md', sourceHash: 'project-hash' },

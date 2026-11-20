@@ -112,6 +112,7 @@ import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
 import * as toolResultArtifacts from '../tools/ToolResultArtifactizer';
 import { shellTool } from '../tools/primitives/ShellTool';
 import { parseRdcNativeResult } from '../../rdc/RdcNativeProtocol';
+import { directoryLinkType } from '../../platform/paths';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
@@ -1167,7 +1168,7 @@ describe('ToolExecutorFactory', () => {
     const planted = path.join(knowledge, 'escape');
     let junctionReady = true;
     try {
-      await symlink(memory, planted, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(memory, planted, directoryLinkType());
     } catch {
       junctionReady = false;
     }
@@ -1343,7 +1344,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       expect(result.isError, JSON.stringify(result.content)).toBe(false);
       expect(parseInvestigationPlanContract(write.mock.calls[0][1])).toEqual({ schemaVersion: 1, mission: 'analyzer' });
       expect(vi.mocked(agentPlanReviewRequestService.request).mock.calls.at(-1)?.[0].planReview.sections)
-        .toEqual(expect.arrayContaining([expect.objectContaining({ heading: 'Investigation execution contract' })]));
+        .not.toEqual(expect.arrayContaining([expect.objectContaining({ heading: 'Investigation execution contract' })]));
     } finally { write.mockRestore(); begin.mockRestore(); vi.mocked(agentPlanReviewRequestService.request).mockClear(); }
   });
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
+import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Badge } from '../../../../ui/Badge';
@@ -16,25 +16,29 @@ import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
 import { AgentHandoffEditor } from './AgentHandoffEditor';
-import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
+import { AgentModelBindingFields } from './AgentModelBindingFields';
+import { configStatus, modelSourceLabel, provenanceLabel, type AgentProvenanceScope } from './agentConfigStatus';
+import { InlineError } from '../../../../ui/InlineError';
 import { AgentAutosaveStatus } from './AgentAutosaveStatus';
 import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type AgentPanel = 'identity' | 'permissions' | 'handoffs' | 'instructions';
-export type AgentProvenanceScope = AgentManifestDefinition['provenance'] extends infer P
-  ? P extends { scope: infer S } ? S : never
-  : never;
-
 interface AgentManifestEditorProps {
   skills: AgentSkillCatalog;
   settings: AppSettings;
   selectedAgent: AgentManifestDraft;
   /** Read-only origin of the definition (builtin / user / project); new drafts have none yet. */
   provenanceScope: AgentProvenanceScope | null;
+  /** Present when the definition overrides a builtin profile. */
+  builtinUpdate: AgentManifestDefinition['builtinUpdate'];
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
+  onModelBindingChange: (binding: AgentModelBinding) => void;
+  modelError: string | null;
   onDuplicateAgent: () => void;
+  /** Deletes a custom Agent, or removes an override so the builtin applies again. */
   onDeleteAgent: () => void;
+  onShowBuiltinDiff: () => void;
   onRetrySaveAgentManifests: () => void | Promise<unknown>;
   agentManifestSaveState: 'idle' | 'saving' | 'saved' | 'error';
   agentManifestSaveMessage: string;
@@ -49,42 +53,18 @@ const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
   { id: 'instructions', icon: 'nav-skills' },
 ];
 
-/** Read-only configuration status derived from the enabled flag, model route, and required tool grant. */
-export function configStatus(agent: AgentManifestDraft, settings: AppSettings, t: Translate): { label: string; tone: 'success' | 'warning' | 'error' | 'primary' } {
-  if (!agent.enabled) return { label: t('settings.disabled'), tone: 'primary' };
-  const modelId = agent.models[0] ?? '';
-  if (!modelId) return { label: t('settings.agentStatusNoModel'), tone: 'warning' };
-  const option = settings.agents.modelOptions.find((entry) => entry.canonicalId === modelId);
-  if (!option) return { label: t('settings.routeReasonModelInvalid'), tone: 'error' };
-  if (option.status === 'provider-unavailable') {
-    const state = option.providerIssue === 'unconfigured' ? t('settings.agentStatusProviderUnconfigured')
-      : option.providerIssue === 'failed' ? t('settings.agentStatusProviderFailed')
-        : t('settings.routeReasonProviderUnavailable');
-    return { label: option.disabledReason
-      ? t('settings.agentStatusProviderDetail', { state, detail: option.disabledReason }) : state, tone: 'warning' };
-  }
-  if (option.status !== 'ready') return { label: option.disabledReason ?? t('settings.modelUnavailable'), tone: 'warning' };
-  if (agent.reasoningLevel && !option.reasoningSelections) return { label: t('settings.agentStatusReasoningUnverified'), tone: 'warning' };
-  if (agent.reasoningLevel && !option.reasoningSelections?.includes(agent.reasoningLevel)) return { label: t('settings.agentStatusReasoningUnsupported'), tone: 'error' };
-  if (agent.tools.length === 0) return { label: t('settings.agentStatusNoTools'), tone: 'warning' };
-  return { label: t('settings.agentStatusAvailable'), tone: 'success' };
-}
-
-export function provenanceLabel(scope: AgentProvenanceScope | null, t: Translate): string {
-  if (scope === 'project') return t('settings.scopeProject');
-  if (scope === 'user') return t('settings.scopeUser');
-  if (scope === 'builtin') return t('settings.scopeBuiltin');
-  return t('settings.unsaved');
-}
-
 export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   skills,
   settings,
   selectedAgent,
   provenanceScope,
+  builtinUpdate,
   onUpdateAgent,
+  onModelBindingChange,
+  modelError,
   onDuplicateAgent,
   onDeleteAgent,
+  onShowBuiltinDiff,
   onRetrySaveAgentManifests,
   agentManifestSaveState,
   agentManifestSaveMessage,
@@ -92,7 +72,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   t,
 }) => {
   const [openPanel, setOpenPanel] = useState<AgentPanel | null>(null);
-  const selectedModel = selectedAgent.models[0] ?? '';
   const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
   const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
   const status = configStatus(selectedAgent, settings, t);
@@ -156,7 +135,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           selfId={selectedAgent.id}
           handoffs={selectedAgent.handoffs}
           definitions={settings.agents.definitions}
-          modelOptions={settings.agents.modelOptions}
           forceShowRequired={agentManifestSaveBlocked}
           onChange={(handoffs) => onUpdateAgent({ handoffs })}
           t={t}
@@ -193,6 +171,12 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             <div className="settings-agent-editor-name">
               {selectedAgent.name}
               <Badge tone="primary" data-testid="settings-agent-provenance">{provenanceLabel(provenanceScope, t)}</Badge>
+              {builtinUpdate?.status === 'updated' ? (
+                <Badge tone="warning" data-testid="settings-agent-builtin-updated">{t('settings.agentBuiltinUpdated')}</Badge>
+              ) : null}
+              {builtinUpdate?.status === 'unknown-base' ? (
+                <Badge tone="primary" data-testid="settings-agent-builtin-base-unknown">{t('settings.agentBuiltinBaseUnknown')}</Badge>
+              ) : null}
             </div>
             <code className="settings-agent-editor-id">{selectedAgent.id}</code>
           </div>
@@ -201,8 +185,13 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           <Button variant="ghost" size="sm" onClick={onDuplicateAgent}>
             {t('settings.duplicateAgent')}
           </Button>
+          {builtinUpdate ? (
+            <Button variant="ghost" size="sm" onClick={onShowBuiltinDiff} data-testid="settings-agent-builtin-diff-open">
+              {t('settings.agentBuiltinDiffOpen')}
+            </Button>
+          ) : null}
           <Button variant="danger" size="sm" onClick={onDeleteAgent}>
-            {t('settings.deleteAgent')}
+            {t(builtinUpdate ? 'settings.agentRestoreBuiltin' : 'settings.deleteAgent')}
           </Button>
         </div>
       </div>
@@ -210,22 +199,24 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
       <div className="settings-manifest-editor-body scrollbar-thin">
         <SettingsSection title={t('settings.agentRouteAvailability')} className="settings-agent-route-panel">
           <div className="settings-agent-route-body">
-            <div className="settings-agent-route-grid">
-              <SettingsField label={t('settings.modelFieldLabel')} className="settings-model-route-row">
-                <AgentModelCascadeSelect
-                  value={selectedModel}
-                  options={settings.agents.modelOptions}
-                  onChange={(model) => onUpdateAgent({ models: [model] })}
-                  t={t}
-                />
-              </SettingsField>
-              <SettingsField label={t('settings.agentStatus')}>
+            <AgentModelBindingFields
+              binding={settings.agentModels.byAgent[selectedAgent.id] ?? {}}
+              options={settings.agents.modelOptions}
+              fallback={settings.agentModels.default}
+              onChange={onModelBindingChange}
+              testIdPrefix="settings-agent"
+              t={t}
+            />
+            {modelError ? <InlineError>{modelError}</InlineError> : null}
+            <SettingsField label={t('settings.agentStatus')}>
+              <div className="settings-agent-status-stack">
                 <div className="settings-agent-config-status" data-testid="settings-agent-config-status" data-tone={status.tone}>
                   <span className="settings-agent-config-status-dot" aria-hidden="true" />
                   {status.label}
                 </div>
-              </SettingsField>
-            </div>
+                <span className="settings-help-text" data-testid="settings-agent-model-source">{modelSourceLabel(selectedAgent, settings, t)}</span>
+              </div>
+            </SettingsField>
 
             <div className="settings-agent-flags" role="group" aria-label={t('settings.agentAvailability')}>
               <label className="settings-agent-flag">

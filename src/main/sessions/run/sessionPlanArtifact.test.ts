@@ -60,7 +60,7 @@ describe('plan markdown helpers', () => {
     const input = { title: 'Plan', summary: ['Goal'], content: '## Work\nRead and verify.' };
     const markdown = composePlanMarkdown({ ...input, taskRequirements: [task] });
     expect(parsePlanTaskRequirements(markdown)).toEqual([task]);
-    expect(sectionsFromMarkdown(markdown).at(-1)?.heading).toBe('Task execution requirements');
+    expect(sectionsFromMarkdown(markdown).map((section) => section.heading)).toEqual(['Work']);
     expect(composePlanMarkdown({ ...input, taskRequirements: [{ ...task, completionRequirements: ['review', 'limitations'] }] })).not.toBe(markdown);
     expect(() => composePlanMarkdown({ ...input, content: markdown })).toThrow('generated from requiredTaskIds');
   });

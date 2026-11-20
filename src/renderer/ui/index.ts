@@ -10,6 +10,7 @@ export {
 } from './ConfirmationDialog';
 export { ContextMenu, type ContextMenuProps } from './ContextMenu';
 export { ActiveSignalText, type ActiveSignalTone } from './ActiveSignalText';
+export { DiffBlock, type DiffBlockProps } from './DiffBlock';
 export { Divider, type DividerProps } from './Divider';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { Icon, type IconName, type IconProps, type IconSize } from './Icon';

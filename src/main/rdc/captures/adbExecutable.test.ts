@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
+import { rdcInstallationFiles } from '../../platform/rdcLayout';
 import { AdbExecutableCache } from './adbExecutable';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 vi.mock('../RdcInstallationService', () => ({ configuredInstallationRoot: (settings: RdcCliInvokerSettings) => settings.workingDirectory }));
@@ -10,7 +11,7 @@ const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await fs.rm(root, { recursive: true, force: true }); });
 async function setup() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-adb-')); roots.push(root);
-  const binary = path.join(root, 'binaries/windows/x64');
+  const binary = rdcInstallationFiles(root).runtimeDir;
   const adb = path.join(binary, 'adb/adb.exe');
   await fs.mkdir(path.dirname(adb), { recursive: true }); await fs.writeFile(adb, 'fixture');
   await fs.writeFile(path.join(binary, 'manifest.runtime.json'), JSON.stringify({

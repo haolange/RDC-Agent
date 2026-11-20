@@ -18,16 +18,16 @@ import type {
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
 } from '@shared/types/agentManifest';
-import type { AgentRouteSyncState } from './agentRouteSyncState';
 
 export interface AppSettingsState {
   settings: AppSettings;
   hydrated: boolean;
   systemTheme: ResolvedTheme;
-  agentRouteSyncById: Record<string, AgentRouteSyncState>;
   hydrate: (settings: AppSettings, systemTheme: ResolvedTheme) => void;
   setSystemTheme: (systemTheme: ResolvedTheme) => void;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
+  /** Adopts a snapshot main returned from a settings command other than `settings:set`. */
+  replaceSettings: (settings: AppSettings) => void;
   saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
   flushAgentDefinitionSaves: (
     query: import('@shared/types/agentManifest').AgentDefinitionCommitQuery,

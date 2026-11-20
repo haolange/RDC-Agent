@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_RDC_CLI_INVOKER } from '../settings/settings-core/settingsDefaults';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
 import { getRdcContextLease, setRdcRuntimeContextForSession } from './RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
@@ -29,8 +30,8 @@ describe.skipIf(!root || !capture || !phase || !output)('native event rejection 
       const contextId = 'rejection-' + randomUUID();
       const ownerId = 'rejection-session-' + randomUUID();
       const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, timeoutMs: 30000, workingDirectory: root!,
-        command: path.join(root!, 'binaries/windows/x64/python/python.exe'),
-        argsPrefix: [path.join(root!, 'cli/run_cli.py')],
+        command: rdcInstallationFiles(root!).python,
+        argsPrefix: [rdcInstallationFiles(root!).entry],
         env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
       const native = async (command: string, args: string[]) => parseRdcNativeResult(await rdcCliInvokerService.executeCLI(command,
         [...args, '--daemon-context', contextId], { settings, contextId }));

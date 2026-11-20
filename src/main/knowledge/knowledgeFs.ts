@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { samePath } from '../platform/paths';
 import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
 import { StorageIo } from '../sessions/store/StorageIo';
 import type { ParsedKnowledgeSource } from './knowledgeCardSchema';
@@ -102,15 +103,6 @@ function assertNotLink(stat: import('node:fs').Stats, target: string): void {
   }
 }
 
-function sameNormalizedPath(left: string, right: string): boolean {
-  const resolvedLeft = path.resolve(left);
-  const resolvedRight = path.resolve(right);
-  if (process.platform === 'win32') {
-    return resolvedLeft.normalize('NFC').toLowerCase() === resolvedRight.normalize('NFC').toLowerCase();
-  }
-  return resolvedLeft === resolvedRight;
-}
-
 function lexicalAncestorChain(absolute: string): string[] {
   const hops: string[] = [];
   let current = path.resolve(absolute);
@@ -130,7 +122,7 @@ async function assertLexicalAncestorsAreLinkFree(absolute: string): Promise<void
     if (!stat) continue;
     assertNotLink(stat, hop);
     const real = await fs.realpath(hop);
-    if (!sameNormalizedPath(real, hop)) {
+    if (!samePath(real, hop)) {
       throw new KnowledgeWritePathError(`path escapes through a link at ${hop}.`);
     }
   }
@@ -148,7 +140,7 @@ export async function assertSafeKnowledgeWriteTarget(
   await assertLexicalAncestorsAreLinkFree(lexicalRoot);
   await fs.mkdir(lexicalRoot, { recursive: true });
   const realRoot = await fs.realpath(lexicalRoot);
-  if (!sameNormalizedPath(realRoot, lexicalRoot)) {
+  if (!samePath(realRoot, lexicalRoot)) {
     throw new KnowledgeWritePathError(`space root realpath diverged from lexical path ${lexicalRoot}.`);
   }
   const lexical = path.resolve(lexicalRoot, ...normalizedRelative.split('/'));

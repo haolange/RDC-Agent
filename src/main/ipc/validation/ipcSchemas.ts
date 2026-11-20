@@ -2,6 +2,7 @@
  * Zod schemas for priority IPC channels (settings / workflow / memory).
  */
 import { z } from 'zod';
+import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 export const MemoryScopeSchema = z.enum(['user', 'project']);
@@ -60,6 +61,11 @@ const themeChromePatch = z.object({
 }).strict();
 const authMode = z.enum(['none', 'api-key', 'local', 'account', 'environment']);
 
+const agentModelBinding = z.object({
+  model: z.string().max(400).regex(/^[^:\s]+:[^\s]+$/u).optional(),
+  reasoningLevel: z.enum(REASONING_SELECTIONS as [ReasoningSelection, ...ReasoningSelection[]]).optional(),
+}).strict();
+
 export const SettingsSetArgsSchema = z.tuple([
   z.object({
     appearance: z.object({
@@ -85,6 +91,10 @@ export const SettingsSetArgsSchema = z.tuple([
         y: z.number().optional(),
         isMaximized: z.boolean().optional(),
       }).strict().optional(),
+    }).strict().optional(),
+    agentModels: z.object({
+      default: agentModelBinding,
+      byAgent: z.record(z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/u), agentModelBinding),
     }).strict().optional(),
     profile: z.object({
       nickname: settingsString(200).optional(),

@@ -46,7 +46,7 @@ export const zhOnboarding = {
   'onboarding.rdc.title': 'RDC 工具',
   'onboarding.rdc.headline': '下载，解压，选目录。',
   'onboarding.rdc.body': 'RDC-Tool 自带 Python。普通问答和通用任务可跳过这一步。',
-  'onboarding.rdc.first': '下载官方 Windows x64 zip，并完整解压。',
+  'onboarding.rdc.first': '下载适用于本机系统的官方 RDC-Tool 包，并完整解压。',
   'onboarding.rdc.second': '设置中心 → 工具：检测安装，或选择解压后的 rdc-tool 文件夹，不是 exe。',
   'onboarding.rdc.third': '点击“验证并应用”，成功后即可打开已导入的 capture。',
   'onboarding.rdc.firstLabel': '下载 Tools zip',

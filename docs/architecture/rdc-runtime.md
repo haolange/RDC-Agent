@@ -156,7 +156,7 @@ Android 回放使用匹配的 Tools/native 服务。服务端在等待用户下�
 
 ## 同安装 Python 绑定与 Tool batch
 
-共用 assertRdcCliBinding 校验 Settings 保存、安装验证与实际调用；command 固定为同安装捆绑 Python 绝对路径，唯一 argsPrefix 为 cli/run_cli.py。prepareTurn 经 catalog 验证冻结该配对。安装根由捆绑 Python 的位置决定，PYTHONHOME/PYTHONPATH 不接受外部导入路径。文件 realpath 不得逃出安装。bat/旧 PowerShell 转发器返回 RDC_BAT_REJECTED，不再改写启动命令。
+共用 assertRdcCliBinding 校验 Settings 保存、安装验证与实际调用；command 固定为同安装捆绑 Python 绝对路径，唯一 argsPrefix 为 cli/run_cli.py。prepareTurn 经 catalog 验证冻结该配对。安装根由捆绑 Python 路径去掉宿主布局后缀得到（[`host-platform.md`](host-platform.md)），PYTHONHOME/PYTHONPATH 不接受外部导入路径。文件 realpath 不得逃出安装。bat/旧 PowerShell 转发器返回 RDC_BAT_REJECTED，不再改写启动命令。
 
 旧非法设置读取后仍展示，通用工作台可启动；保存和 RDC 执行 fail-closed。失效验证清除缓存；除版本与完整 catalog 安装诊断外，调用前必须有验证成功的同安装 catalog。shell.rdc 一次一操作，发现仅读冻结定义。
 

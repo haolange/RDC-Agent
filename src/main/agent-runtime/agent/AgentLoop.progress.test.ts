@@ -446,7 +446,7 @@ it('ends at a host-confirmed tool boundary without another provider request or l
   expect(ended?.type === 'turn_end' && ended.toolResults?.[1].details).toMatchObject({ reason: 'turn completed after tool' });
 });
 
-it('continues an incomplete runtime obligation without adding a user message', async () => {
+it('continues an incomplete runtime obligation through the request tail without persisting it', async () => {
   const requests: Context[] = [];
   let decisions = 0;
   const response = { ...toolUseMessage(1), content: [{ type: 'text' as const, text: 'done' }], stopReason: 'stop' as const };
@@ -458,8 +458,8 @@ it('continues an incomplete runtime obligation without adding a user message', a
   }, provider, toolExecutor);
   await consume(stream);
   expect(requests).toHaveLength(2);
-  expect(requests[1].systemPrompt).toContain('Approved Task remains incomplete.');
-  expect(requests[1].messages.filter(message => message.role === 'user')).toHaveLength(1);
+  expect(requests[1].systemPrompt).toBe(requests[0].systemPrompt);
+  expect(JSON.stringify(requests[1].messages.at(-1))).toContain('Approved Task remains incomplete.');
   expect(JSON.stringify(context.messages)).not.toContain('Approved Task remains incomplete.');
 });
 
@@ -508,9 +508,10 @@ it('feeds an unfinished approved Task back into the same loop and accepts its la
     } });
     await consume(stream);
     expect(requests).toHaveLength(4);
-    expect(requests[1].systemPrompt).toContain('Approved Goal Reassessment');
-    expect(requests[1].systemPrompt).toContain(task.id);
-    expect(requests[1].messages.filter(message => message.role === 'user')).toHaveLength(1);
+    const tail = JSON.stringify(requests[1].messages.at(-1));
+    expect(tail).toContain('Approved Goal Reassessment');
+    expect(tail).toContain(task.id);
+    expect(requests[2].messages.some(message => JSON.stringify(message).includes('Approved Goal Reassessment'))).toBe(false);
     expect(turn.completionDeclaration?.disposition).toBe('completed');
     expect((await registry.getTask(task.id))?.status).toBe('completed');
   } finally {
@@ -545,7 +546,7 @@ it('keeps an honest partial when reassessment ends without further tool work', a
     }, provider, toolExecutor);
     await consume(stream);
     expect(requests).toHaveLength(2);
-    expect(requests[1].systemPrompt).toContain('Approved Goal Reassessment');
+    expect(JSON.stringify(requests[1].messages.at(-1))).toContain('Approved Goal Reassessment');
     expect(turn.completionDeclaration).toBe(declaration);
   } finally {
     if (existsSync(taskDir)) {

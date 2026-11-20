@@ -10,8 +10,8 @@
 
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
-import * as os from 'os';
 import * as path from 'path';
+import { expandHomePath, samePath, stripLongPathPrefix } from '../../../platform/paths';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { BINARY_SAMPLE_BYTES, TEXT_FILE_MAX_BYTES } from './toolLimits';
 
@@ -41,15 +41,6 @@ export function getWorkspaceRoot(context?: ToolExecutionContext): string {
   return path.resolve(process.cwd());
 }
 
-function normalizeInputPath(input: string): string {
-  const trimmed = input.trim();
-  if (trimmed === '~') return os.homedir();
-  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
-    return path.resolve(os.homedir(), trimmed.slice(2));
-  }
-  return trimmed.replace(/^%USERPROFILE%/i, os.homedir());
-}
-
 export function isWithinRoot(target: string, root: string): boolean {
   if (root === '*') return true;
   const resolvedRoot = path.resolve(root);
@@ -69,14 +60,9 @@ export function pathHasSymlinkOrJunction(target: string): boolean {
   return false;
 }
 
-function pathIdentityKey(value: string): string {
-  const resolved = path.resolve(value);
-  return process.platform === 'win32' ? resolved.normalize('NFC').toLowerCase() : resolved;
-}
-
 function sameExistingIdentity(left: string, right: string): boolean {
   try {
-    return pathIdentityKey(realpathExistingAncestor(left)) === pathIdentityKey(realpathExistingAncestor(right));
+    return samePath(realpathExistingAncestor(left), realpathExistingAncestor(right));
   } catch {
     return false;
   }
@@ -219,18 +205,11 @@ export async function writeTextFileNoFollow(absolutePath: string, content: strin
   assertNoSymlinkPath(finalTarget);
 }
 
-function stripWindowsExtendedPrefix(value: string): string {
-  if (process.platform !== 'win32') return value;
-  if (value.startsWith('\\\\?\\UNC\\')) return `\\\\${value.slice(8)}`;
-  if (value.startsWith('\\\\?\\')) return value.slice(4);
-  return value;
-}
-
 function realpathNative(target: string): string {
   const resolved = fs.realpathSync.native
     ? fs.realpathSync.native(target)
     : fs.realpathSync(target);
-  return path.resolve(stripWindowsExtendedPrefix(resolved));
+  return path.resolve(stripLongPathPrefix(resolved));
 }
 
 function realpathExistingAncestor(target: string): string {
@@ -258,7 +237,7 @@ export function safeResolvePath(input: string, root?: string, context?: ToolExec
     throw new Error('路径不能为空');
   }
   const workspaceRoot = root ?? getWorkspaceRoot(context);
-  const expandedInput = normalizeInputPath(input);
+  const expandedInput = expandHomePath(input);
   const lexical = path.isAbsolute(expandedInput)
     ? path.resolve(expandedInput)
     : path.resolve(workspaceRoot, expandedInput);

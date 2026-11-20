@@ -9,10 +9,6 @@ import {
 } from './agentDefinitionSettings';
 import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
 import {
-  routeMutationAffectsCapability,
-  withAgentRouteSyncState,
-} from './agentRouteSyncState';
-import {
   beginProviderDefinitionSave,
   enqueueProviderDefinitionSave,
   flushProviderDefinitionSaves,
@@ -38,55 +34,28 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   hydrated: false,
   systemTheme: 'dark',
-  agentRouteSyncById: {},
-  hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true, agentRouteSyncById: {} }),
+  hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true }),
   setSystemTheme: (systemTheme) => set({ systemTheme }),
   patchSettings: async (patch) => {
     const nextSettings = await window.electronAPI.settings.set(patch);
     set({ settings: nextSettings, hydrated: true });
     return nextSettings;
   },
+  replaceSettings: (settings) => set({ settings, hydrated: true }),
   saveAgentDefinition: async (request) => {
     const agentId = request.draft.id;
     const optimistic = beginAgentDefinitionSave(get().settings, request);
-    const previousSync = get().agentRouteSyncById[agentId];
-    const previousRoute = optimistic.rollback.route;
-    const optimisticRoute = optimistic.settings.llm.agentRoutes.find((entry) => entry.agentId === agentId) ?? null;
-    const routeChanged = routeMutationAffectsCapability(previousSync, previousRoute, optimisticRoute);
-    set((state) => ({
-      settings: optimistic.settings,
-      agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
-          status: 'saving',
-          clientRevision: request.clientRevision,
-          commitHash: previousSync?.commitHash ?? null,
-      }),
-    }));
+    set({ settings: optimistic.settings });
 
     try {
       const result = await agentDefinitionMutations.enqueue(request);
       if (!isLatestAgentDefinitionRevision(request.scope, request.projectId, agentId, request.clientRevision)) return result;
       if (result.status === 'failed') {
-        set((state) => ({
-          settings: rollbackAgentDefinitionSave(state.settings, agentId, result.lastSuccessful),
-          agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
-              status: 'failed',
-              clientRevision: request.clientRevision,
-              commitHash: result.lastSuccessful?.commitHash ?? null,
-              error: result.error ?? 'Agent definition save failed.',
-          }),
-        }));
+        set((state) => ({ settings: rollbackAgentDefinitionSave(state.settings, agentId, result.lastSuccessful) }));
         return Promise.reject(new Error(result.error ?? 'Agent definition save failed.'));
       }
       if (result.status === 'committed') {
-        set((state) => ({
-          settings: settleAgentDefinitionSave(state.settings, agentId, result),
-          hydrated: true,
-          agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
-              status: 'committed',
-              clientRevision: result.clientRevision,
-              commitHash: result.commitHash,
-          }),
-        }));
+        set((state) => ({ settings: settleAgentDefinitionSave(state.settings, agentId, result), hydrated: true }));
       }
       return result;
     } catch (error) {
@@ -96,15 +65,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
           scope: request.scope,
           projectId: request.projectId,
         }).catch(() => null);
-        set((state) => ({
-          settings: rollbackAgentDefinitionSave(state.settings, agentId, lastSuccessful),
-          agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
-              status: 'failed',
-              clientRevision: request.clientRevision,
-              commitHash: lastSuccessful?.commitHash ?? null,
-              error: error instanceof Error ? error.message : 'Agent definition save failed.',
-          }),
-        }));
+        set((state) => ({ settings: rollbackAgentDefinitionSave(state.settings, agentId, lastSuccessful) }));
       }
       throw error;
     }
@@ -115,7 +76,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   },
   reloadSettings: async () => {
     const nextSettings = await window.electronAPI.settings.get();
-    set({ settings: nextSettings, hydrated: true, agentRouteSyncById: {} });
+    set({ settings: nextSettings, hydrated: true });
     return nextSettings;
   },
   ...createAppSettingsAppearanceActions(get),

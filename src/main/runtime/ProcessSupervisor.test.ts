@@ -1,4 +1,5 @@
 ﻿import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { currentHost } from '../platform/host';
 import { ProcessSupervisor, RingBuffer, type ProcessOwner, type SupervisedSpawnOptions } from './ProcessSupervisor';
 
 const spawnLongRunning = (
@@ -78,7 +79,7 @@ describe('ProcessSupervisor', () => {
   it('spawn_failed surfaces for missing executable', async () => {
     const supervised = supervisor.spawn(
       'other',
-      process.platform === 'win32' ? 'this-command-does-not-exist-xyz.cmd' : '/nonexistent/binary/path',
+      currentHost().isWindows ? 'this-command-does-not-exist-xyz.cmd' : '/nonexistent/binary/path',
       [],
       { isolateProcessGroup: false },
     );

@@ -1,6 +1,7 @@
 /**
  * /status — 系统状态与诊断信息。
  */
+import { currentHost } from '../../platform/host';
 import type { CommandDefinition } from '@shared/types/command';
 
 export const statusCommand: CommandDefinition = {
@@ -19,8 +20,8 @@ export const statusCommand: CommandDefinition = {
       currentMode: ctx.currentMode ?? 'none',
       currentModelId: ctx.currentModelId ?? 'none',
       nodeVersion: process.version,
-      platform: process.platform,
-      arch: process.arch,
+      platform: currentHost().platform,
+      arch: currentHost().arch,
     };
     const lines = Object.entries(info).map(([k, v]) => `  ${k}: ${v}`);
     return {

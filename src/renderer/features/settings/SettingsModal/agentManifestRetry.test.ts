@@ -17,7 +17,7 @@ vi.mock('./useProviderConnection', () => ({ useProviderConnection: () => ({}) })
 
 const definition = (id: string): AgentManifestDefinition => ({
   id, fileName: `${id}.agent.md`, filePath: `/builtin/${id}.agent.md`, name: id,
-  description: '', argumentHint: '', target: 'rdc-agent', models: [], icon: 'spark', accent: '#33d1ff',
+  description: '', argumentHint: '', target: 'rdc-agent', icon: 'spark', accent: '#33d1ff',
   disableModelInvocation: false, userInvocable: true, tools: [], skills: [], mcpServers: [], agents: [],
   handoffs: [], metadata: {}, instructions: 'original', builtin: true, enabled: true, maxTurns: 50,
   provenance: { scope: 'builtin', sourcePath: `/builtin/${id}.agent.md`, sourceHash: `${id}:builtin` },

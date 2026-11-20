@@ -9,6 +9,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolvedPathKey } from '../platform/paths';
 
 export const KNOWLEDGE_READ_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
 
@@ -36,11 +37,6 @@ export interface ResolveKnowledgeReadRootsInput {
 
 export function isKnowledgeReadFileTool(toolName: string): boolean {
   return KNOWLEDGE_READ_FILE_TOOLS.has(toolName.trim().toLowerCase().replace(/[.-]/g, '_'));
-}
-
-export function pathIdentityKey(value: string): string {
-  const resolved = path.resolve(value);
-  return process.platform === 'win32' ? resolved.normalize('NFC').toLowerCase() : resolved;
 }
 
 function skip(
@@ -130,7 +126,7 @@ export function resolveKnowledgeReadRoots(
     if (!candidate?.trim()) continue;
     const root = considerCandidate(candidate, diagnostics);
     if (!root) continue;
-    const key = pathIdentityKey(root);
+    const key = resolvedPathKey(root);
     if (seen.has(key)) continue;
     seen.add(key);
     roots.push(root);

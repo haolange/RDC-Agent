@@ -11,8 +11,6 @@ export function capabilityStatusPresentation(
   state: CapabilityResolutionState,
 ): CapabilityStatusPresentation {
   switch (state.status) {
-    case 'syncing-route':
-      return { labelKey: 'composer.effort.capabilitySyncing', refreshing: false };
     case 'loading':
       return { labelKey: 'composer.effort.capabilityLoading', refreshing: false };
     case 'unconfigured':

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
+import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { TranslationKey, useI18n } from '../../../../i18n';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { Icon } from '../../../../ui/Icon';
@@ -9,7 +9,6 @@ import { Select } from '../../../../ui/Select';
 import { Textarea } from '../../../../ui/Textarea';
 import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
 import { SettingsField } from '../parts';
-import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 import {
   AGENT_HANDOFF_ISSUE_KEYS,
   IMMEDIATE_HANDOFF_ISSUE_CODES,
@@ -26,7 +25,6 @@ interface AgentHandoffCardProps {
   handoff: AgentHandoffDefinition;
   issues: AgentHandoffIssue[];
   targets: AgentManifestDefinition[];
-  modelOptions: AgentModelOption[];
   forceShowRequired: boolean;
   isFirst: boolean;
   isLast: boolean;
@@ -48,7 +46,6 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
   handoff,
   issues,
   targets,
-  modelOptions,
   forceShowRequired,
   isFirst,
   isLast,
@@ -67,7 +64,6 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
     labelTranslations: false,
     agent: false,
     prompt: false,
-    model: false,
   });
   const visible = (field: Field) => issues.filter((issue) => (
     issue.field === field
@@ -79,8 +75,8 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
   const errorId = (field: Field) => `settings-handoff-error-${field}-${index}`;
   const errorText = (issue: AgentHandoffIssue) => t(
     AGENT_HANDOFF_ISSUE_KEYS[issue.code] as TranslationKey,
-    issue.code === 'target-unknown' || issue.code === 'target-disabled' || issue.code === 'model-invalid'
-      ? { id: issue.field === 'model' ? (handoff.model ?? '') : handoff.agent }
+    issue.code === 'target-unknown' || issue.code === 'target-disabled'
+      ? { id: handoff.agent }
       : undefined,
   );
   const renderErrors = (field: Field) => visible(field).map((issue) => (
@@ -191,22 +187,6 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             onChange={(event) => patch({ prompt: event.currentTarget.value })}
           />
           {renderErrors('prompt')}
-        </SettingsField>
-
-        <SettingsField label={t('settings.agentHandoffModel')} layout="row">
-          <AgentModelCascadeSelect
-            value={handoff.model ?? ''}
-            options={modelOptions}
-            inherit={{
-              label: targetName
-                ? t('settings.agentHandoffModelInheritNamed', { name: targetName })
-                : t('settings.agentHandoffModelInherit'),
-              description: t('settings.agentHandoffModelInheritHint'),
-            }}
-            onChange={(model) => patch({ model: model || undefined })}
-            t={t}
-          />
-          {renderErrors('model')}
         </SettingsField>
 
         <SettingsField label={t('settings.agentHandoffSend')} layout="row">

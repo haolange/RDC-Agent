@@ -1,4 +1,5 @@
 import { settingsService } from '../settings/settings-core/SettingsService';
+import { currentHost } from '../platform/host';
 import {
   formatShellDialect,
   formatShellInterpreterLabel,
@@ -18,7 +19,7 @@ export function describeResolvedShell(shell: ResolvedShell): string {
     : '';
   return (
     `Run a command in the project directory via ${interpreter}. `
-    + `Host OS: ${process.platform}. Use ${dialect} syntax only;`
+    + `Host OS: ${currentHost().platform}. Use ${dialect} syntax only;`
     + posixWarning
     + ' Working directory persists across calls in this session.'
   );

@@ -11,7 +11,7 @@ const agentDefaults = vi.hoisted(() => ({ reasoningLevel: undefined as 'high' | 
 vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: unknown) => unknown) => select({
   settings: { agents: { definitions: [{ id: 'general', reasoningLevel: agentDefaults.reasoningLevel }] },
     llm: { providers: [{ id: 'p', protocol: 'OpenAICompatibleChatCompletions', models: [] }] } },
-  agentRouteSyncById: {}, hydrated: true,
+  hydrated: true,
 }) }));
 vi.mock('../../hooks/useComposerEffectiveModel', () => ({ useComposerEffectiveModel: () => ({ effective: { providerId: 'p', modelId: 'm' } }) }));
 vi.mock('./useEffectiveModelCapability', () => ({ useEffectiveModelCapability: () => () => {} }));

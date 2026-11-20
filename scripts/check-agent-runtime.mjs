@@ -277,8 +277,10 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const settingsService = read('src/main/settings/settings-core/SettingsService.ts');
   assert(settingsService.includes('capabilities: definition?.capabilities'), 'Settings normalization must hydrate builtin provider capabilities.');
   assert(settingsService.includes('agentRuntime'), 'Settings must persist agent runtime permission controls.');
-  for (const token of ['saveAgentDefinition(request:', 'agentDefinitionRevisions', 'clientRevision <= latestRevision', 'agentManifestService.routeFromDefinition']) {
-    assert(settingsService.includes(token), `Scoped agent-definition save path must include ${token}.`);
+  assert(settingsService.includes('saveAgentDefinition(request:'), 'Settings must expose the scoped agent-definition save.');
+  const settingsAgentOps = read('src/main/settings/settings-core/SettingsAgentOps.ts');
+  for (const token of ['agentDefinitionRevisions', 'clientRevision <= latestRevision', 'agentManifestService.routeForAgent']) {
+    assert(settingsAgentOps.includes(token), `Scoped agent-definition save path must include ${token}.`);
   }
 
   const bridge = read('src/main/agent-runtime/AgentEventBridge.ts');

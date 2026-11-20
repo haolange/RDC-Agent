@@ -42,6 +42,8 @@ import {
 import { bindProductIcon } from './window/productIcon';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
+import { currentHost } from './platform/host';
+import { currentProcessIdentity } from './platform/process';
 
 // Re-export for callers that historically imported from main entry.
 export { rdcSessionService } from './sessions';
@@ -218,7 +220,7 @@ console.log('[RDC-Agent] Startup identity:', JSON.stringify({
 }));
 
 const userDataLock = acquireUserDataInstanceLock(userDataPath, {
-  pid: process.pid,
+  ...currentProcessIdentity(),
   mode: isHeadlessMode ? 'browser' : 'desktop',
   startTs: new Date().toISOString(),
 });
@@ -538,7 +540,7 @@ app.on('window-all-closed', () => {
   if (isHeadlessMode) {
     return;
   }
-  if (process.platform !== 'darwin') {
+  if (!currentHost().isMac) {
     app.quit();
   }
 });

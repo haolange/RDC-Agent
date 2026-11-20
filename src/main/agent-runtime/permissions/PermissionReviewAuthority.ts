@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { pathComparisonKey } from '../../platform/paths';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
@@ -100,10 +101,7 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
     const comparedFile = comparison?.file as Record<string, unknown> | undefined;
     const files = [details.path, comparedFile?.path].filter((value): value is string => typeof value === 'string');
     if (message.isError || message.toolName !== 'read_file' || args?.mode !== 'audit') return false;
-    const normalize = (value: string): string => {
-      const normalized = path.normalize(value);
-      return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-    };
+    const normalize = (value: string): string => pathComparisonKey(path.normalize(value));
     return pendingScalars.some(([, value]) => typeof value === 'string' && files.some(file => normalize(value) === normalize(file)));
   };
   const relatedKinds = new Set<string>();

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import type { KnowledgeTopicDocument } from '@shared/types/knowledge';
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
+import { openedFileIdentity } from '../platform/fileIdentity';
 
 const topicId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/u);
 const name = z.string().trim().min(1).max(120);
@@ -85,7 +86,7 @@ export class KnowledgeTopicStore {
       throw error;
     }
     let initialized = false;
-    const identity = await handle.stat();
+    const identity = await handle.stat({ bigint: true });
     try {
       await handle.writeFile(token, 'utf8');
       initialized = true;
@@ -94,7 +95,8 @@ export class KnowledgeTopicStore {
     } finally {
       await handle.close().catch(() => undefined);
       const owner = await fs.readFile(lockPath, 'utf8').catch(() => null);
-      const current = await fs.lstat(lockPath).catch(() => null);
+      // Handle stats on both sides: a path stat is not comparable with a handle stat on every host.
+      const current = await openedFileIdentity(lockPath).catch(() => null);
       if (owner === token || (!initialized && current?.dev === identity.dev && current.ino === identity.ino)) await fs.unlink(lockPath);
     }
   }

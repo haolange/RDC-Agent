@@ -7,9 +7,9 @@ import { runtimePermissionStateService } from '../../agent-runtime/permissions/R
  *
  * Agent runtime: `agentRuntime` persists agent runtime permission controls.
  *
- * Scoped agent-definition save: `saveAgentDefinition(request:` with
- * `agentDefinitionRevisions`, `clientRevision <= latestRevision` conflict detection,
- * and `agentManifestService.routeFromDefinition` route resolution.
+ * Agent models: `agentModels` (default + per Agent) is the only source of Agent routes;
+ * `agentManifestService.routeForAgent` resolves them. Scoped agent-definition saves keep
+ * `clientRevision <= latestRevision` conflict detection and never change a route.
  */
 import type {
   AppRuntimePaths,
@@ -27,9 +27,13 @@ import type {
   WindowLayoutPreference,
 } from '@shared/types/settings';
 import type {
+  AgentBuiltinComparison,
+  AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
+  AgentModelMigrationPreview,
+  AgentOverrideFileRequest,
 } from '@shared/types/agentManifest';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import { compiledRoutesFromDefinitions } from '../provider-catalog/compiledAgentRoutes';
@@ -75,6 +79,8 @@ import {
 } from './settingsSanitize';
 import { SettingsAgentOps } from './SettingsAgentOps';
 import { SettingsProviderOps } from './SettingsProviderOps';
+import { SettingsAgentOverrideOps } from './SettingsAgentOverrideOps';
+import { sanitizeAgentModelSettings } from './agentModelSettings';
 import {
   assertPersistedSettingsSchemaVersion,
   createDefaultRuntimeSettings,
@@ -93,10 +99,16 @@ export { SETTINGS_SCHEMA_VERSION } from './settingsDefaults';
 export class SettingsService {
   private initialized = false;
   private readonly agentOps = new SettingsAgentOps();
+  private readonly agentOverrideOps = new SettingsAgentOverrideOps(this);
   private readonly providerOps: SettingsProviderOps;
 
   constructor() {
     this.providerOps = new SettingsProviderOps(this);
+    // Agent routes are resolved from the committed settings file, the same source getAll() reads.
+    agentManifestService.bindAgentModelSettings(() => {
+      const persisted = readJsonFile<PersistedSettingsPayload>(appPathService.getRuntimePaths().settingsPath);
+      return sanitizeAgentModelSettings(persisted?.agentModels);
+    });
   }
 
   initialize(): AppSettings {
@@ -365,6 +377,7 @@ export class SettingsService {
           ...(patch.agentRuntime?.context ?? {}),
         }),
       },
+      agentModels: sanitizeAgentModelSettings(patch.agentModels ?? currentPersisted.agentModels),
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),
       },
@@ -380,7 +393,7 @@ export class SettingsService {
   }
 
   async getAgentDefinitionCommit(
-    query: import('@shared/types/agentManifest').AgentDefinitionCommitQuery,
+    query: AgentDefinitionCommitQuery,
   ): Promise<AgentDefinitionCommitSnapshot | null> {
     this.ensureInitialized();
     return this.agentOps.getAgentDefinitionCommit(query);
@@ -389,6 +402,26 @@ export class SettingsService {
   async saveAgentDefinition(request: AgentDefinitionSaveRequest): Promise<AgentDefinitionSaveResult> {
     this.ensureInitialized();
     return this.agentOps.saveAgentDefinition(request);
+  }
+
+  previewAgentModelMigration(sourcePath: string): AgentModelMigrationPreview {
+    this.ensureInitialized();
+    return this.agentOverrideOps.previewModelMigration(sourcePath);
+  }
+
+  async applyAgentModelMigration(request: AgentOverrideFileRequest): Promise<AppSettings> {
+    this.ensureInitialized();
+    return this.agentOverrideOps.applyModelMigration(request);
+  }
+
+  async deleteAgentOverrideFile(request: AgentOverrideFileRequest): Promise<AppSettings> {
+    this.ensureInitialized();
+    return this.agentOverrideOps.deleteOverrideFile(request);
+  }
+
+  getAgentBuiltinComparison(query: AgentDefinitionCommitQuery): AgentBuiltinComparison {
+    this.ensureInitialized();
+    return this.agentOverrideOps.getBuiltinComparison(query);
   }
 
   async getProviderDefinitionCommit(providerIdDraft: string): Promise<ProviderDefinitionCommitSnapshot | null> {

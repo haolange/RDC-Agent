@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { directoryLinkType } from '../platform/paths';
 import { classifyAttachmentBytes } from './attachmentClassify';
 import { hydrateFrozenUserContent, materializeAgentUserInput } from './ConversationAttachmentMaterializer';
 import { AttachmentStagingService } from './AttachmentStagingService';
@@ -113,7 +114,7 @@ describe('staging quota and preview realpath', () => {
     fs.writeFileSync(secret, 'png');
     const link = path.join(root, 'attachments', 'escaped');
     try {
-      fs.symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+      fs.symlinkSync(outside, link, directoryLinkType());
     } catch {
       return;
     }

@@ -8,6 +8,7 @@ import type {
   StreamOptions,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { promptCacheHeaders } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
@@ -91,9 +92,11 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
       }
       const url = buildOpenAIResponsesUrl(baseUrl);
       const bodyText = JSON.stringify(applyRequestPlanBody(buildResponsesRequestBody(model, context, options), options.requestPlan));
-      const unsignedHeaders = apiKey
-        ? { ...this.createHeaders(apiKey), ...requestPlanHeaders(options.requestPlan) }
-        : { 'Content-Type': 'application/json', ...this.defaultHeaders, ...requestPlanHeaders(options.requestPlan) };
+      const unsignedHeaders = {
+        ...(apiKey ? this.createHeaders(apiKey) : { 'Content-Type': 'application/json', ...this.defaultHeaders }),
+        ...requestPlanHeaders(options.requestPlan),
+        ...promptCacheHeaders(options.promptCache),
+      };
       const headers = this.requestAuthorizer
         ? await this.requestAuthorizer({ url, method: 'POST', headers: unsignedHeaders, body: bodyText })
         : unsignedHeaders;

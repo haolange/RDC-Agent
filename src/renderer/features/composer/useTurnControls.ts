@@ -42,7 +42,6 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
         preference?.preferredRouteOptionId ?? '',
       ].join('\u001f')
     : '';
-  const routeSyncState = useAppSettingsStore((state) => state.agentRouteSyncById[agentId]);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
   const [saveState, setSaveState] = useState<{ sessionId: string | null; saving: boolean; error?: string }>({ sessionId, saving: false });
@@ -79,7 +78,6 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const retryCapability = useEffectiveModelCapability(
     agentId,
     routeFingerprint,
-    routeSyncState,
     settingsHydrated,
     setCapabilityState,
   );

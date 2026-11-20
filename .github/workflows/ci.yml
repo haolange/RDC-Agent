@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,10 +36,19 @@ jobs:
       - run: pnpm run check:coverage-ratchet
       - run: pnpm run test:coverage:renderer
       - run: pnpm run check:coverage-ratchet coverage/renderer/coverage-summary.json scripts/fidelity/coverage-ratchet-renderer.json
+      # Pull requests compare with their base and pushes with the previous head; a manual run
+      # has neither, so it compares with where the branch left the default branch.
+      - name: Resolve the comparison base
+        id: base
+        shell: bash
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ]; then base="$(git merge-base "origin/${{ github.event.repository.default_branch }}" HEAD)"; fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
       - name: Check gates
         env:
-          RDC_SYSTEM_DEBT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
-          RDC_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RDC_SYSTEM_DEBT_BASE_REF: ${{ steps.base.outputs.sha }}
+          RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:gates
       - run: pnpm run check:provider-catalog
       - run: pnpm run check:scoped-resources
@@ -48,9 +58,10 @@ jobs:
       - run: pnpm run check:hooks
       - run: pnpm run check:memory-policy
       - run: pnpm run check:contracts
+      - run: pnpm run check:request-cache-profile
       - name: Check git diff whitespace
         env:
-          RDC_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:git-diff
       - run: pnpm run build
 
@@ -73,6 +84,56 @@ jobs:
       # runner. Keep this OS-bound surface single-file to avoid concurrent
       # Electron framework extraction into the same node_modules tree.
       - run: pnpm exec vitest run --no-file-parallelism src/main/runtime src/main/agent-runtime/tools/primitives
+
+  windows-unit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      # pnpm does not run Electron's install script; the launcher's prepare restores the
+      # Electron runtime that main-process modules load, as in the other Windows jobs.
+      - name: Prepare through Windows wrapper
+        shell: cmd
+        run: scripts\start-rdc-agent.cmd --prepare-only
+      # The runner's TEMP is an 8.3 short path (RUNNER~1) that realpath expands; tests use the
+      # runner's own long-path temp directory instead of relaxing product path checks (AGENTS.md §5).
+      - run: pnpm test --project node
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          TMPDIR: ${{ runner.temp }}
+
+  linux-smoke:
+    runs-on: ubuntu-latest
+    env:
+      RDC_AGENT_SMOKE_START: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      - name: Prepare through POSIX wrapper
+        shell: bash
+        run: sh scripts/start-rdc-agent.sh --prepare-only
+      # Ubuntu 24.04 restricts unprivileged user namespaces, which the Electron sandbox needs.
+      - name: Allow the Electron sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Browser QA smoke on Linux
+        run: xvfb-run -a pnpm run smoke:agent-browser
 
   launcher-fresh-checkout:
     strategy:
