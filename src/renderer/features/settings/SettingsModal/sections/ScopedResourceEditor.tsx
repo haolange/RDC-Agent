@@ -11,6 +11,7 @@ import { Pill } from '../../../../ui/Pill';
 import { Select } from '../../../../ui/Select';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
+import { templateResourceId } from './runtimeScopeMutations';
 import type { ResourceFormState } from './scopedResourceForm';
 
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
@@ -91,7 +92,8 @@ export const ScopedResourceEditor: React.FC<{
 
         <SettingsField label={t('settings.resourceFieldId')}>
           <div className="settings-runtime-id-control">
-            <Input value={form.id} disabled={idLocked || busy} onChange={(event) => onChange({ id: event.target.value })} />
+            <Input value={form.id} disabled={idLocked || busy} placeholder={templateResourceId(kind)}
+              onChange={(event) => onChange({ id: event.target.value })} />
             {idLocked ? (
               <span className="settings-runtime-readonly-tag" data-testid="settings-resource-id-locked">
                 <Icon name="lock" size={12} />

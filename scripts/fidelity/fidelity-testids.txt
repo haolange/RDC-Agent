@@ -293,7 +293,7 @@ settings-runtime-editor
 settings-runtime-editor-dirty
 settings-runtime-editor-error
 settings-runtime-scope
-settings-search-result-${entry.id}
+settings-search-result-${entry.key}
 settings-search-results
 settings-tools-save
 settings-tools-save-status

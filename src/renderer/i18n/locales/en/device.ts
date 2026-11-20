@@ -36,7 +36,7 @@ export const enDevice = {
   'device.sessionDeviceTitle': "Session replay device: {summary}",
   'device.discovery.available': "Available",
   'device.status.unauthorized': "Authorization required",
-  'device.discovery.failed': 'Device discovery failed. Retry to refresh the list.',
+  'device.discovery.failed': 'Cannot look for Android devices (ADB unavailable). Local replay is unaffected.',
   'device.prepare.connected': "Device connected",
   'device.issue.busy': "Device service is in use",
   'device.issue.version': "Device service version does not match",

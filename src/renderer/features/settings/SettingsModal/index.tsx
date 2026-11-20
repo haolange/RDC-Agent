@@ -149,6 +149,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 if (section !== 'agents') clearAgentRequest();
                 setActiveSection(section);
               })}
+              providers={[...modal.accountProviders, ...modal.providerCatalog].map((provider) => ({
+                id: provider.id,
+                label: modal.getResolvedProviderLabel(provider),
+                open: () => guardLeave(() => { setActiveSection('models'); modal.openProviderConnection(provider); }),
+              }))}
               t={t}
             />
 

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../../../i18n';
 import { emptyForm, formFromContent, type ResourceFormState } from './scopedResourceForm';
-import { uniqueResourceId } from './uniqueResourceId';
 import { deleteScopedResource } from './runtimeScopeActions';
-import { importScopedResourceFromPicker, saveScopedResource, templateResourceId } from './runtimeScopeMutations';
+import { importScopedResourceFromPicker, saveScopedResource } from './runtimeScopeMutations';
 import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 export { normalizeResourceId, templateResourceId } from './runtimeScopeMutations';
@@ -30,7 +29,7 @@ export function useRuntimeScopePanel({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, templateResourceId(kind)));
+  const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, ''));
   const [baseline, setBaseline] = useState<ResourceFormState>(form);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,7 +39,7 @@ export function useRuntimeScopePanel({
   const [dialogEditing, setDialogEditing] = useState(false);
 
   const reset = () => {
-    const next = emptyForm(kind, templateResourceId(kind));
+    const next = emptyForm(kind, '');
     setSelectedId(null);
     setCreating(false);
     setDialogEditing(false);
@@ -74,8 +73,7 @@ export function useRuntimeScopePanel({
   });
 
   const startNew = () => guard(() => {
-    const nextId = uniqueResourceId(templateResourceId(kind), resources.map((resource) => resource.id));
-    const next = emptyForm(kind, nextId);
+    const next = emptyForm(kind, '');
     setCreating(true);
     setSelectedId(null);
     setForm(next);

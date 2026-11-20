@@ -21,6 +21,7 @@
   cursor: pointer;
 }
 
+.settings-search-result.is-active,
 .settings-search-result:hover,
 .settings-search-result:focus-visible {
   background: var(--token-interactive-hover);

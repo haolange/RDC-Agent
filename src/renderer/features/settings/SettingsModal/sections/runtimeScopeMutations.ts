@@ -10,7 +10,7 @@ export const normalizeResourceId = (value: string): string =>
 
 export type SaveScopedResourceOutcome =
   | { ok: true; overview: RdcRuntimeOverview; id: string }
-  | { ok: false; messageKey: 'resourceArgsInvalid' | 'resourceIdExists'; message?: string }
+  | { ok: false; messageKey: 'resourceArgsInvalid' | 'resourceIdExists' | 'resourceIdRequired'; message?: string }
   | { ok: false; messageKey: null; message: string };
 
 /**
@@ -35,6 +35,7 @@ export async function saveScopedResource(input: {
   }
 
   const nextId = normalizeResourceId(input.form.id);
+  if (!nextId) return { ok: false, messageKey: 'resourceIdRequired' };
   if (input.creating && input.existingIds.includes(nextId)) {
     return { ok: false, messageKey: 'resourceIdExists' };
   }
