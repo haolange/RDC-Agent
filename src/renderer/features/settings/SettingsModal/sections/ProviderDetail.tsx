@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
+import { Button } from '../../../../ui/Button';
 import { Details } from '../../../../ui/Details';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
-import { TaskDialog } from '../../../../ui/TaskDialog';
-import { getProviderCategoryTranslation } from '../utils';
+import { getProviderCategoryTranslation, getProviderProtocolLabel } from '../utils';
 import { SettingsField } from '../parts';
 import { shouldUseProviderDocsLink } from '../providerConnectionState';
+import { hasProviderConnectionDefinitionChanged } from '../providerConnectionRequest';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderConnectionFields } from './ProviderConnectionFields';
 import { ProviderAuthModeField } from './ProviderAuthModeField';
 import { ProviderConnectModelList } from './ProviderConnectModelList';
 import { ProviderConnectActions } from './ProviderConnectActions';
+import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import { ProviderConnectionStatusLine, ProviderDiscoveryEmpty, ProviderProtocolSummary, connectionPhase } from './ProviderConnectSummary';
 import type { ProviderConnectionDraft } from '../types';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
@@ -19,7 +21,7 @@ import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
-interface ProviderConnectDialogProps {
+interface ProviderDetailProps {
   connectionDraft: ProviderConnectionDraft;
   connectionProvider: LlmProviderEntry;
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
@@ -34,10 +36,16 @@ interface ProviderConnectDialogProps {
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
   onStartAccountLogin: () => void | Promise<void>;
+  onRefreshModels: (provider: LlmProviderEntry) => void | Promise<void>;
+  onDisconnect: (provider: LlmProviderEntry) => void | Promise<void>;
   t: Translate;
 }
 
-export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
+/**
+ * The selected provider beside the provider list: who it is, how it connects, its models, and — folded —
+ * the technical facts (service id, protocol, endpoints) that only diagnosis needs.
+ */
+export const ProviderDetail: React.FC<ProviderDetailProps> = ({
   connectionDraft,
   connectionProvider,
   getResolvedProviderLabel,
@@ -52,55 +60,56 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   onTest,
   onSave,
   onStartAccountLogin,
+  onRefreshModels,
+  onDisconnect,
   t,
 }) => {
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const [modelCount, setModelCount] = useState(0);
-  const authMode = connectionProvider.authMode;
-  const phase = connectionPhase(connectionDraft, connectionHasFreshTest);
+  const provider = connectionProvider;
+  const authMode = provider.authMode;
+  const busy = connectionDraft.busy !== 'idle';
+  const savedConnected = provider.isConfigured && provider.status === 'verified'
+    && !hasProviderConnectionDefinitionChanged(provider, connectionDraft);
+  const phase = connectionPhase(connectionDraft, connectionHasFreshTest, savedConnected);
   const unavailableCount = connectionDraft.models.filter((model) => model.availability === 'unavailable').length;
   const showDiscoveryEmpty = (authMode === 'environment' || authMode === 'local') && connectionDraft.models.length === 0;
+  // Who the connection is (account · plan); otherwise what kind of service it is, never its internal id.
+  const subtitle = [provider.accountLabel, provider.planLabel].filter(Boolean).join(' · ')
+    || t(getProviderCategoryTranslation(provider.category).label);
+  const protocolLabel = getProviderProtocolLabel(provider.protocol);
+  const routeCount = provider.routeCount ?? 1;
 
   return (
-    <TaskDialog
-      open
-      size="lg"
-      className="settings-provider-connect-dialog"
-      title={getResolvedProviderLabel(connectionProvider)}
-      description={t(getProviderCategoryTranslation(connectionProvider.category).label)}
-      onClose={onClose}
-      closeLabel={t('settings.cancel')}
-      busy={connectionDraft.busy !== 'idle'}
-      dataTestId="settings-provider-connect-dialog"
-      footer={(
-        <ProviderConnectActions
-          draft={connectionDraft}
-          provider={connectionProvider}
-          accountConnected={connectionAccountConnected}
-          devicePending={connectionDevicePending}
-          needsCredentials={connectionNeedsCredentials}
-          needsBaseUrl={connectionNeedsBaseUrl}
-          hasFreshTest={connectionHasFreshTest}
-          onClose={onClose}
-          onTest={onTest}
-          onSave={onSave}
-          t={t}
-        />
-      )}
-    >
-      <div
-        className="settings-provider-connect-body"
-        data-model-count={modelCount}
-        data-testid="settings-provider-connect-body"
-      >
+    <section className="settings-provider-detail" data-testid="settings-provider-detail" aria-busy={busy}
+      aria-label={getResolvedProviderLabel(provider)}>
+      <header className="settings-provider-detail-header">
+        <div className="settings-provider-detail-identity">
+          <h3 className="settings-provider-detail-title">{getResolvedProviderLabel(provider)}</h3>
+          <p className="settings-provider-detail-subtitle" title={subtitle}>{subtitle}</p>
+        </div>
+        {provider.isConfigured ? (
+          <div className="settings-provider-detail-actions">
+            <Button variant="secondary" size="sm" data-testid={`settings-provider-test-${provider.id}`}
+              disabled={busy} onClick={() => void onRefreshModels(provider)}>
+              {t('settings.providers.refreshModels')}
+            </Button>
+            <Button variant="ghost" size="sm" data-testid={`settings-provider-disconnect-${provider.id}`}
+              disabled={busy} onClick={() => void onDisconnect(provider)}>
+              {authMode === 'account' ? t('settings.signOut') : t('settings.disconnect')}
+            </Button>
+          </div>
+        ) : null}
+      </header>
+
+      <div className="settings-provider-connect-body" data-model-count={modelCount} data-testid="settings-provider-connect-body">
         <ProviderAuthModeField
-          provider={connectionProvider}
+          provider={provider}
           value={connectionDraft.authMode}
-          disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
+          disabled={busy || connectionDevicePending}
           onChange={(nextAuthMode) => onUpdateConnectionDraft({
             authMode: nextAuthMode,
-            usingStoredSecret: nextAuthMode === 'api-key'
-              && connectionProvider.hasStoredSecretByAuthMode?.['api-key'] === true,
+            usingStoredSecret: nextAuthMode === 'api-key' && provider.hasStoredSecretByAuthMode?.['api-key'] === true,
             accountStatus: undefined,
             authCode: '',
             error: '',
@@ -118,13 +127,13 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         {authMode === 'api-key' && (
           <ProviderConnectionFields
             connectionDraft={connectionDraft}
-            connectionProvider={connectionProvider}
+            connectionProvider={provider}
             onUpdateConnectionDraft={onUpdateConnectionDraft}
             t={t}
           />
         )}
 
-        {authMode === 'local' && connectionProvider.baseUrlEditable && (
+        {authMode === 'local' && provider.baseUrlEditable && (
           <SettingsField label={t('settings.providerBaseUrl')} description={t('settings.localProviderConnectHint')}>
             <Input
               data-testid="settings-provider-connect-base-url"
@@ -144,30 +153,22 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         )}
 
         {authMode === 'environment' && (
-          <>
-            <SettingsField label={t('settings.providers.authSource')} description={t('settings.environmentProviderConnectHint')}>
-              <div className="settings-provider-readonly" data-testid="settings-provider-environment-notice">
-                <Icon name="lock" size={14} />
-                {t('settings.providers.authSourceEnvironment')}
-              </div>
-            </SettingsField>
-          </>
+          <SettingsField label={t('settings.providers.authSource')} description={t('settings.environmentProviderConnectHint')}>
+            <div className="settings-provider-readonly" data-testid="settings-provider-environment-notice">
+              <Icon name="lock" size={14} />
+              {t('settings.providers.authSourceEnvironment')}
+            </div>
+          </SettingsField>
         )}
 
         <SettingsField label={t('settings.providers.connectionStatus')}>
           <ProviderConnectionStatusLine phase={phase} t={t} />
         </SettingsField>
 
-        {authMode !== 'account' && (
-          <Details className="settings-provider-summary" data-testid="settings-provider-summary" summary={t('settings.providers.summary.title')}>
-            <ProviderProtocolSummary provider={connectionProvider} t={t} />
-          </Details>
-        )}
-
         {authMode === 'account' && (
           <ProviderAccountOAuthPanel
             connectionDraft={connectionDraft}
-            connectionProvider={connectionProvider}
+            connectionProvider={provider}
             connectionAccountConnected={connectionAccountConnected}
             connectionDevicePending={connectionDevicePending}
             onUpdateConnectionDraft={onUpdateConnectionDraft}
@@ -176,11 +177,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           />
         )}
 
-        {connectionProvider.docsUrl && (
-          <a className="settings-link" href={connectionProvider.docsUrl} target="_blank" rel="noreferrer">
-            {shouldUseProviderDocsLink(connectionProvider)
-              ? t('settings.providerDocs')
-              : t('settings.getApiKey')}
+        {provider.docsUrl && (
+          <a className="settings-link" href={provider.docsUrl} target="_blank" rel="noreferrer">
+            {shouldUseProviderDocsLink(provider) ? t('settings.providerDocs') : t('settings.getApiKey')}
           </a>
         )}
 
@@ -217,19 +216,47 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         ) : null}
 
         {showDiscoveryEmpty || (authMode === 'account' && !connectionAccountConnected) ? null : (
-        <ProviderConnectModelList
-          provider={connectionProvider}
-          models={connectionDraft.models}
-          discoveryAccountId={connectionHasFreshTest ? connectionDraft.discoveryAccountId : null}
-          expandedModelId={expandedModelId}
-          disabled={connectionDraft.busy !== 'idle'}
-          onToggleExpanded={(modelId) => setExpandedModelId((current) => (current === modelId ? null : modelId))}
-          onModelChange={onModelChange}
-          onModelCountChange={setModelCount}
+          <ProviderConnectModelList
+            provider={provider}
+            models={connectionDraft.models}
+            discoveryAccountId={connectionHasFreshTest ? connectionDraft.discoveryAccountId : null}
+            expandedModelId={expandedModelId}
+            disabled={busy}
+            onToggleExpanded={(modelId) => setExpandedModelId((current) => (current === modelId ? null : modelId))}
+            onModelChange={onModelChange}
+            onModelCountChange={setModelCount}
+            t={t}
+          />
+        )}
+
+        <Details className="settings-provider-summary" data-testid="settings-provider-summary" summary={t('settings.providers.diagnostics')}>
+          <dl className="settings-provider-diagnostics">
+            <div><dt>{t('settings.providers.serviceId')}</dt><dd>{provider.id}</dd></div>
+            <div>
+              <dt>{t('settings.providerProtocol')}</dt>
+              <dd>{routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel}</dd>
+            </div>
+          </dl>
+          {authMode !== 'account' ? <ProviderProtocolSummary provider={provider} t={t} /> : null}
+          <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy || !provider.isConfigured} t={t} />
+        </Details>
+      </div>
+
+      <footer className="settings-provider-detail-footer">
+        <ProviderConnectActions
+          draft={connectionDraft}
+          provider={provider}
+          accountConnected={connectionAccountConnected}
+          devicePending={connectionDevicePending}
+          needsCredentials={connectionNeedsCredentials}
+          needsBaseUrl={connectionNeedsBaseUrl}
+          hasFreshTest={connectionHasFreshTest}
+          onClose={onClose}
+          onTest={onTest}
+          onSave={onSave}
           t={t}
         />
-        )}
-      </div>
-    </TaskDialog>
+      </footer>
+    </section>
   );
 };

@@ -289,7 +289,7 @@ assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the
 // Keep the shared component path authoritative for ordinary configuration disclosure.
 for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx',
-  'src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx',
+  'src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx',
   'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
   'src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx',
   'src/renderer/patterns/MaterialContextEditor.tsx',

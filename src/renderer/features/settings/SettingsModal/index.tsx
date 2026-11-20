@@ -9,7 +9,7 @@ import { IconButton } from '../../../ui/IconButton';
 import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
 import { useSettingsNavigationStore } from '../../../stores/settingsNavigationStore';
 import { useSettingsModal } from './useSettingsModal';
-import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
+import { ProviderDetail } from './sections/ProviderDetail';
 import { SettingsCenterNav } from './SettingsCenterNav';
 import { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 import { useSettingsNavigation } from './useSettingsNavigation';
@@ -54,6 +54,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleTestProviderDraft,
     handleSaveProviderConnection,
     handleStartAccountLogin,
+    handleRefreshProviderModels,
+    handleDisconnectProvider,
   } = modal;
 
   const { pendingLeave, keepEditing, discardAndLeave, guardLeave, requestClose, setResourceDraftDirty } =
@@ -71,9 +73,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     open,
     containerRef: dialogRef,
     onClose: closeSurface,
-    trap: !connectionDraft,
+    trap: true,
     layerId,
   });
+
+  // The selected provider's detail sits beside the provider list on the model services page.
+  const providerDetail = connectionDraft && connectionProvider ? (
+    <ProviderDetail
+      connectionDraft={connectionDraft}
+      connectionProvider={connectionProvider}
+      getResolvedProviderLabel={getResolvedProviderLabel}
+      connectionAccountConnected={connectionAccountConnected}
+      connectionDevicePending={connectionDevicePending}
+      connectionNeedsCredentials={connectionNeedsCredentials}
+      connectionNeedsBaseUrl={connectionNeedsBaseUrl}
+      connectionHasFreshTest={connectionHasFreshTest}
+      onClose={() => setConnectionDraft(null)}
+      onUpdateConnectionDraft={updateConnectionDraft}
+      onModelChange={updateConnectionModelPreference}
+      onTest={handleTestProviderDraft}
+      onSave={handleSaveProviderConnection}
+      onStartAccountLogin={handleStartAccountLogin}
+      onRefreshModels={handleRefreshProviderModels}
+      onDisconnect={handleDisconnectProvider}
+      t={t}
+    />
+  ) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -151,7 +176,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
               <SettingsPageContent modal={modal} settings={settings} runtime={runtime}
                 resourceScope={resourceScope} setResourceScope={setResourceScope}
-                setResourceDraftDirty={setResourceDraftDirty} />
+                setResourceDraftDirty={setResourceDraftDirty}
+                selectedProviderId={connectionProvider?.id ?? null} providerDetail={providerDetail} />
             </div>
           </div>
         </div>
@@ -168,25 +194,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         />
       ) : null}
 
-      {connectionDraft && connectionProvider && (
-        <ProviderConnectDialog
-          connectionDraft={connectionDraft}
-          connectionProvider={connectionProvider}
-          getResolvedProviderLabel={getResolvedProviderLabel}
-          connectionAccountConnected={connectionAccountConnected}
-          connectionDevicePending={connectionDevicePending}
-          connectionNeedsCredentials={connectionNeedsCredentials}
-          connectionNeedsBaseUrl={connectionNeedsBaseUrl}
-          connectionHasFreshTest={connectionHasFreshTest}
-          onClose={() => setConnectionDraft(null)}
-          onUpdateConnectionDraft={updateConnectionDraft}
-          onModelChange={updateConnectionModelPreference}
-          onTest={handleTestProviderDraft}
-          onSave={handleSaveProviderConnection}
-          onStartAccountLogin={handleStartAccountLogin}
-          t={t}
-        />
-      )}
     </>,
     document.body,
   );

@@ -209,7 +209,7 @@
     "composer.toolApprovalModel": "src/renderer/features/composer/toolApprovalRequestModel.ts",
     "transcriptWorkCardHeader": "src/renderer/features/transcript/WorkCardHeader.tsx",
     "transcriptWorkDisclosure": "src/renderer/features/transcript/WorkDisclosure.tsx",
-    "settings.providerConnectDialog": "src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx",
+    "settings.providerDetail": "src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx",
     "settings.localToolDisclosure": "src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx",
     "knowledge.spacesColumn": "src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx",
     "patterns.materialContextEditor": "src/renderer/patterns/MaterialContextEditor.tsx",

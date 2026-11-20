@@ -8,7 +8,7 @@
 
 @import './settings-mcp.css';
 @import './sections/provider-catalog.css';
-@import './sections/provider-card.css';
+@import './sections/provider-list.css';
 @import './sections/model-cascade-trigger.css';
 @import './sections/model-cascade-menu.css';
 @import './sections/settings-form-fields.css';

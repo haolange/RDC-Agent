@@ -7,6 +7,7 @@ import { McpServicesPanel } from './sections/McpServicesPanel';
 import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
 import { HooksSettings } from './sections/HooksSettings';
 import { PolicySettings } from './sections/PolicySettings';
+import type React from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import type { useSettingsModal } from './useSettingsModal';
 import type { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
@@ -16,7 +17,7 @@ type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'handleAccountSave' | 'setLanguage' | 'globalInstructionsDraft' | 'setGlobalInstructionsDraft' | 'handleSavePersonalization' |
   'setTheme' | 'setFontScale' | 'setComposerMarkdown' | 'setUsePointerCursors' |
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
-  'handleRefreshProviderModels' | 'handleDisconnectProvider' | 'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
+  'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
   'handleAgentModelsChange' | 'previewAgentModelMigration' | 'handleCommitAgentOverrideFile' | 'loadAgentBuiltinComparison' |
   'previewProjectAgentTrust' | 'handleTrustProjectAgent' |
@@ -29,9 +30,12 @@ interface SettingsPageContentProps {
   resourceScope: 'user' | 'project';
   setResourceScope: (scope: 'user' | 'project') => void;
   setResourceDraftDirty: (dirty: boolean) => void;
+  /** The provider whose detail is open on the model services page, and that detail. */
+  selectedProviderId: string | null;
+  providerDetail: React.ReactNode;
 }
 export function SettingsPageContent({ modal, settings, runtime, resourceScope, setResourceScope,
-  setResourceDraftDirty }: SettingsPageContentProps) {
+  setResourceDraftDirty, selectedProviderId, providerDetail }: SettingsPageContentProps) {
   const {
     activeSection,
     t,
@@ -53,8 +57,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     providerCatalog,
     providerCatalogCategories,
     getResolvedProviderLabel,
-    handleRefreshProviderModels,
-    handleDisconnectProvider,
     openProviderConnection,
     agentManifestDrafts,
     agentManifestContextReady,
@@ -113,9 +115,9 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         providerCatalog={providerCatalog}
         providerCatalogCategories={providerCatalogCategories}
         getResolvedProviderLabel={getResolvedProviderLabel}
-        onRefreshProviderModels={handleRefreshProviderModels}
-        onDisconnectProvider={handleDisconnectProvider}
         onOpenProviderConnection={openProviderConnection}
+        selectedProviderId={selectedProviderId}
+        detail={providerDetail}
         t={t}
       />
     )}

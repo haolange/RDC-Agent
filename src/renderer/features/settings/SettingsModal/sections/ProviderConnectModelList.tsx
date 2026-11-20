@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../../../stores/effectiveCatalogStore';
 import { projectProviderModels } from '../providerModelProjection';
 import { SearchField } from '../../../../ui/SearchField';
-import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
 import type { useI18n } from '../../../../i18n';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
@@ -77,7 +76,6 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
           })}
         </span>
       </div>
-      <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={disabled || !provider.isConfigured} t={t} />
       {snapshot?.lastRefreshError ? (
         <div className="settings-provider-notice" role="status">{snapshot.lastRefreshError}</div>
       ) : null}

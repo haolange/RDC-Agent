@@ -1,6 +1,7 @@
 import { getErrorMessage } from './utils';
 import { mergeTestedProviderModels } from './providerModelProjection';
 import {
+  createProviderConnectionDraft,
   getConnectionDraftSignature,
   getConnectionRequestValues,
 } from './providerConnectionState';
@@ -32,6 +33,13 @@ export const useProviderConnectionActions = (
 
   const modelPreferences = () => projectProviderModelPreferences(connectionDraft);
 
+  /** After a successful save or sign-in the detail stays on the provider, re-read from saved settings. */
+  const reopenSaved = async (providerId: string): Promise<void> => {
+    const settings = await refreshLocalSettings(providerId);
+    const saved = settings.llm.providers.find((entry) => entry.id === providerId);
+    setConnectionDraft(saved ? createProviderConnectionDraft(saved) : null);
+  };
+
   const saveModelPreferences = async (): Promise<void> => {
     if (!connectionDraft) return;
     const provider = providerDrafts.find((entry) => entry.id === connectionDraft.providerId);
@@ -40,8 +48,7 @@ export const useProviderConnectionActions = (
       ...provider,
       models: connectionDraft.models.map((model) => ({ ...model })),
     });
-    await refreshLocalSettings(connectionDraft.providerId);
-    setConnectionDraft(null);
+    await reopenSaved(connectionDraft.providerId);
   };
 
   const handleTestProviderDraft = async () => {
@@ -126,8 +133,7 @@ export const useProviderConnectionActions = (
           return;
         }
         if (status.connected) {
-          await refreshLocalSettings(connectionDraft.providerId);
-          setConnectionDraft(null);
+          await reopenSaved(connectionDraft.providerId);
           return;
         }
         updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
@@ -153,8 +159,7 @@ export const useProviderConnectionActions = (
         updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerSaveFailed'), models: [] });
         return;
       }
-      await refreshLocalSettings(connectionDraft.providerId);
-      setConnectionDraft(null);
+      await reopenSaved(connectionDraft.providerId);
     } catch (error) {
       updateConnectionDraft({
         busy: 'idle',
@@ -177,8 +182,7 @@ export const useProviderConnectionActions = (
         accountStatus: status,
       });
       if (status.connected) {
-        await refreshLocalSettings(connectionDraft.providerId);
-        setConnectionDraft(null);
+        await reopenSaved(connectionDraft.providerId);
       }
     } catch (error) {
       updateConnectionDraft({

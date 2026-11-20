@@ -29,22 +29,6 @@ export function resolveProviderCardStatus(provider: LlmProviderEntry): ProviderC
   return { tone: 'neutral', labelKey: 'settings.providerUnconfigured', detail: unavailableReason };
 }
 
-export interface ProviderIdentitySummary {
-  /** Account or connection identity, never a secret. */
-  value: string;
-  isPlaceholder: boolean;
-}
-
-export function resolveProviderIdentity(
-  provider: LlmProviderEntry,
-  unconfiguredLabel: string,
-): ProviderIdentitySummary {
-  const identity = [provider.accountLabel, provider.planLabel].filter(Boolean).join(' · ').trim();
-  if (identity) return { value: identity, isPlaceholder: false };
-  if (!provider.isConfigured) return { value: unconfiguredLabel, isPlaceholder: true };
-  return { value: provider.id, isPlaceholder: false };
-}
-
 /** Overview shows a model count, never an inline catalog. */
 export function countEnabledModels(provider: LlmProviderEntry): number {
   return provider.models.filter((model) => model.enabled).length;
