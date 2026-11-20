@@ -13,6 +13,10 @@ export const nativeEnglish = {
   file: 'File', openCapture: 'Open .rdc File', newCase: 'New Case', settings: 'Settings', edit: 'Edit', view: 'View', help: 'Help',
   documentation: 'Documentation', reportIssue: 'Report Issue', about: 'About RDC-Agent', version: 'Version: {version}',
   selectedCaptures: 'Selected {count} external .rdc files.',
+  pastedText: 'Pasted text ({count} characters)',
+  trust: 'Trust', trustTitle: 'Trust a project resource',
+  trustHook: 'Let hook "{id}" run on Agent events?', trustMcp: 'Let MCP server "{id}" start and give the Agent its tools?',
+  trustAgent: 'Use project Agent "{id}" in this project?',
 } as const;
 
 export type NativeMessageKey = keyof typeof nativeEnglish;
@@ -30,6 +34,10 @@ export const nativeChinese: Record<NativeMessageKey, string> = {
   file: '文件', openCapture: '打开 .rdc 文件', newCase: '新建案例', settings: '设置', edit: '编辑', view: '视图', help: '帮助',
   documentation: '使用文档', reportIssue: '报告问题', about: '关于 RDC-Agent', version: '版本：{version}',
   selectedCaptures: '已选择 {count} 个外部 .rdc 文件。',
+  pastedText: '粘贴的文本（{count} 个字符）',
+  trust: '信任', trustTitle: '信任项目资源',
+  trustHook: '允许钩子「{id}」在智能体事件上运行？', trustMcp: '允许 MCP 服务「{id}」启动并向智能体提供工具？',
+  trustAgent: '在这个项目里使用项目智能体「{id}」？',
 };
 
 export function nativeText(language: AppLanguage, key: NativeMessageKey, params?: Record<string, string | number>): string {

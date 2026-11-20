@@ -812,7 +812,7 @@ it('forwards a child approval with its actual execution identity and controlled 
   const runner = new SubagentRunner({
     getActiveTurn: () => null, systemPromptForAgent: () => 'profile',
     sendProfileMessage: async (_agent, _content, options) => {
-      const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-permission-turn', toolCallId: 'mutation', toolName: 'shell', reason: 'Write scoped output', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-permission-turn' }, signal: options?.signal, onEvent: options?.onEvent });
+      const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-permission-turn', toolCallId: 'mutation', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'Write scoped output', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-permission-turn' }, signal: options?.signal, onEvent: options?.onEvent });
       return approved ? 'approved child output' : 'denied';
     },
   });

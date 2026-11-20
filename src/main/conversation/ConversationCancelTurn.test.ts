@@ -20,6 +20,7 @@ describe('cancel turn stability', () => {
       agentId: 'debugger',
       turnId,
       toolCallId: 'tool-shell',
+      argumentsSha256: 'a'.repeat(64),
       toolName: 'shell',
       reason: 'Run command?',
       risk: 'medium',

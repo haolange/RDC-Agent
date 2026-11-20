@@ -79,6 +79,12 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - 对外查询仅 `{ hasSecret, maskedPreview? }`；不得返回明文。
 - 损坏条目 quarantine；文件权限 0600/ACL。
 - Credential 仅进入主进程 opaque lease，不进 manifest / Route / RequestPlan / IPC / Trace。
+- 落盘与可见投影统一走 `src/main/runtime/secretRedaction.ts`：凭据类字段名（api key、authorization、password、secret、private key、cookie、各类 `*_token` 与 `token`）整值替换；文本中识别 Bearer、`sk-`/`sk-ant-`/`xai-`/Slack `xox?-`、GitHub `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`/`github_pat_`、AWS `AKIA`/`ASIA`、Google `AIza`、JWT 与 PEM 私钥块。工作过程里任何工具的 `argsPreview` 都经 `redactedArgumentsPreview`，主回合与子代理不分两条路径。
+
+## 主进程确认与审计
+
+- **主进程确认**：知识写入/提升/导入、记忆写入/删除、计划写入/导出、hook / MCP / 项目 Agent 的 trust，都由主进程原生对话框确认（`src/main/window/mainConfirmation.ts`，默认按钮为取消）；renderer 请求本身不构成批准，没有聚焦窗口时一律不确认。唯一例外是未打包 Browser QA 显式 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 且无窗口，自动确认并写运行日志。取消 trust 返回未变化的状态。
+- **审计日志**：`<userData>/state/audit.jsonl` 只追加、不改写、不裁剪，每行带 `at` 与 `origin`（`desktop` / `browser-qa` / `runtime`）。记录：每次 high-impact IPC 调用（通道、参数 sha256、结果与错误码）；每个工具决定（用户、自动审查或策略拒绝，含工具名、调用 id、参数 sha256、风险）；权限设置的前后值。参数只记指纹不记内容；写入失败报 stderr，不阻断它所记录的决定。
 
 ## RDC Context Lease
 
@@ -149,6 +155,7 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 - `src/main/browserAppBridge/bridgeSecurity.test.ts`
 - `src/shared/renderer-api/createRendererApi.test.ts`
 - `src/main/settings/settings-core/SecretStorageService.test.ts`
+- `src/main/runtime/secretRedaction.test.ts`、`src/main/runtime/AuditLog.test.ts`、`src/main/window/mainConfirmation.test.ts`
 - `src/main/settings/agent-manifests/AgentRuntimeConfigService.test.ts`（MCP trust）
 - `src/main/settings/agent-manifests/AgentManifestService.effectiveCommit.test.ts`（项目 Agent trust 与天花板收紧）
 - `src/main/agent-runtime/orchestration/SubagentRunner.test.ts`（子代理天花板取交集）

@@ -9,6 +9,7 @@ export {
 export type { RendererEventChannel, RendererInvokeChannel } from './channels';
 export {
   assertChannelCapabilityCoverage,
+  isHighImpactChannel,
   listUnclassifiedInvokeChannels,
   resolveBridgeChannelCapability,
 } from './channelCapabilities';

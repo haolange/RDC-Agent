@@ -188,6 +188,11 @@ export function resolveBridgeChannelCapability(channel: string): BridgeChannelCa
   return CHANNEL_CAPABILITY[channel];
 }
 
+/** High-impact channels are confirmed and audited on every transport. */
+export function isHighImpactChannel(channel: string): boolean {
+  return hasBridgeChannelCapability(channel) && CHANNEL_CAPABILITY[channel] === 'high-impact';
+}
+
 export function listUnclassifiedInvokeChannels(): string[] {
   return RENDERER_INVOKE_CHANNELS.filter((channel) => !hasBridgeChannelCapability(channel));
 }

@@ -116,7 +116,7 @@ export function useKnowledgeImport(options: {
         ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         ...(filePath ? { filePath } : { source }),
       });
-      if (!request.isCurrent(seq)) return;
+      if (!request.isCurrent(seq) || 'cancelled' in imported) return;
       setResult(imported);
       await refreshInbox();
       if (!request.isCurrent(seq)) return;

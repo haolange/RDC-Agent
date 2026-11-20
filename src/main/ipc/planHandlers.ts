@@ -1,5 +1,6 @@
+import { confirmInMainProcess } from '../window/mainConfirmation';
 import { nativeMessage } from '../window/nativeI18n';
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { PlanApprovalTokenRequest, PlanExportRequest, PlanReadRequest, PlanSaveToProjectRequest } from '@shared/types/planReview';
@@ -7,7 +8,6 @@ import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
 import { assertPlanWritePath, composeProjectPlan, writePlanFile } from '../sessions/run/planFilePersistence';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { appPathService } from '../runtime/AppPathService';
-import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -16,34 +16,14 @@ import { agentPlanReviewRequestService } from '../agent-runtime/interactions/Age
 import { conversationService } from '../conversation/ConversationService';
 
 async function confirmPlanMutation(action: 'plan.saveToProject' | 'plan.export', sessionId: string): Promise<boolean> {
-  if (process.env.RDC_AGENT_BROWSER_QA === '1') {
-    const owner = BrowserWindow.getFocusedWindow() ?? undefined;
-    if (!owner && process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1') {
-      runtimeLogService.log({
-        scope: 'app',
-        namespace: 'context',
-        severity: 'warning',
-        title: 'Browser QA plan mutation auto-confirmed',
-        summary: `${action} was auto-confirmed because Browser QA full access is explicitly enabled.`,
-        raw: { action, sessionId },
-      });
-      return true;
-    }
-    if (!owner) return false;
-  }
-  const owner = BrowserWindow.getFocusedWindow() ?? undefined;
-  if (!owner) return false;
-  const result = await dialog.showMessageBox(owner, {
-    type: 'warning',
-    buttons: [nativeMessage('allowOnce'), nativeMessage('cancel')],
-    defaultId: 1,
-    cancelId: 1,
+  return confirmInMainProcess({
+    action,
     title: nativeMessage('planTitle'),
     message: nativeMessage(action === 'plan.saveToProject' ? 'planSave' : 'planExport'),
     detail: nativeMessage('session', { id: sessionId }),
-    noLink: true,
+    confirmLabel: nativeMessage('allowOnce'),
+    cancelLabel: nativeMessage('cancel'),
   });
-  return result.response === 0;
 }
 
 

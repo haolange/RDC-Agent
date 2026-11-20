@@ -23,7 +23,7 @@ it('canonical background dispatch projects the child approval after parent reply
  const gate = new Promise<void>((resolve) => { release = resolve; });
  const runner = new SubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async (_agent, _text, options) => {
   await gate;
-  const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-turn', toolCallId: 'mutation', toolName: 'shell', reason: 'bounded write', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-turn' }, signal: options?.signal, onEvent: options?.onEvent });
+  const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-turn', toolCallId: 'mutation', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'bounded write', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-turn' }, signal: options?.signal, onEvent: options?.onEvent });
   expect(approved).toBe(true);
   return 'approved';
  } });

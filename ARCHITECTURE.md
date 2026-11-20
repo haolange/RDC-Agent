@@ -30,7 +30,7 @@ Settings 的 RDC 安装入口为检测安装、选择目录、验证并应用。
 
 1. **单一真相**：Session / Conversation / branch / journal 是会话历史权威；Agent slot 是执行配置与缓存，不是私有历史。
 2. **冻结执行**：`EffectiveRuntimePlan`（`schemaVersion: 3`，含 `planId` / fingerprint 与冻结工具/策略约束面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用冻结约束；主进程 mode/revision 在工具准入和每次 Provider 请求前采样，不进入冻结权限约束。
-3. **主进程权威**：权限、secret、MCP trust、Shell、RDC CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
+3. **主进程权威**：权限、secret、MCP trust、Shell、RDC CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。需要人确认的变更（trust、知识/记忆/计划写入）由主进程原生对话框确认；安全决定只追加写入 `state/audit.jsonl`。
 4. **Scope 固定**：用户资源 `~/.rdc-agent`，项目资源 `<project-root>/.rdc-agent`（用户点保存的计划在 `plans/<sessionId>/`）；无配置 workspace root、无旧目录 fallback、无静默迁移。
 5. **Provider 事实分层**：Manifest 是**基线真值**（baseline truth），Discovery 是**候选验证**（candidate validation），用户覆盖（`models.json`）是**显式覆盖，自带 provenance**（explicit override with provenance），三者合并为 EffectiveCatalog。模型/协议/控件基线事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery 与 user-override。用户覆盖不得触及 route.protocol、authSchemaId、adapterId、compatibilityGroup、carrier 等安全/延续性字段。
    `catalogRevision` 只冻结 Effective Catalog 的可执行/可选择语义；刷新仅更新 provenance 时间戳时 revision 稳定，route、control、availability、quota 等有效语义变化时才更新。

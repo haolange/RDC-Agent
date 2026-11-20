@@ -2,6 +2,7 @@ import { registerProviderProbeHandlers } from './providerProbeHandlers';
 import { refreshApplicationMenu } from '../window/applicationMenu';
 import { providerAccountAuthService } from '../settings/provider-auth/ProviderAccountAuthService';
 import { ipcMain } from 'electron';
+import { confirmResourceTrust } from '../window/trustConfirmation';
 import type {
   AppSettings,
   AppSettingsPatch,
@@ -354,6 +355,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       label: 'settings:trustProjectAgent',
       maxBytes: 8 * 1024,
     });
+    const preview = settingsService.previewProjectAgentTrust(request.sourcePath);
+    if (!await confirmResourceTrust('agent', preview.agentId, preview.sourcePath)) {
+      return withEffectiveAgentModelOptions(settingsService.getAll());
+    }
     const settings = settingsService.trustProjectAgent(request);
     await notifyCommitted(() => context.applyCurrentLlmConfig());
     return withEffectiveAgentModelOptions(settings);

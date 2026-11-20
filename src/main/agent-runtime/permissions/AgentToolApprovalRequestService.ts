@@ -6,6 +6,7 @@ import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '..
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
+import { auditLog } from '../../runtime/AuditLog';
 
 export interface ToolApprovalRequestInput {
   agentId: AgentRole;
@@ -13,6 +14,8 @@ export interface ToolApprovalRequestInput {
   turnId?: string;
   toolCallId: string;
   toolName: string;
+  /** Fingerprint of the exact arguments under decision; recorded in the audit log, never the arguments. */
+  argumentsSha256: string;
   reason: string;
   risk: 'low' | 'medium' | 'high';
   context: AgentEventBridgeContext;
@@ -142,6 +145,11 @@ export class AgentToolApprovalRequestService {
         ? error.message : `${errorCode}: ${error instanceof Error ? error.message : String(error)}` };
     }
     const { approved, reason } = verdict;
+    auditLog.record({
+      kind: 'tool-decision', decidedBy: 'auto-review', approved, tool: input.toolName, toolCallId: input.toolCallId,
+      argumentsSha256: input.argumentsSha256, risk: input.risk, sessionId: input.sessionId ?? null, turnId: input.turnId,
+      ...(errorCode ? { reason: errorCode } : {}),
+    });
     this.emit(synthetic, 'approval.answered', {
       approvalId,
       title: `Auto-review ${input.toolName}`,
@@ -175,6 +183,10 @@ export class AgentToolApprovalRequestService {
     }
 
     this.deletePending(pending);
+    auditLog.record({
+      kind: 'tool-decision', decidedBy: 'user', approved: input.approved, tool: pending.toolName, toolCallId: pending.toolCallId,
+      argumentsSha256: pending.argumentsSha256, risk: pending.risk, sessionId: pending.sessionId, turnId: pending.turnId,
+    });
     this.emit(pending, 'approval.answered', {
       approvalId: pending.approvalId,
       title: `Approve ${pending.toolName}`,

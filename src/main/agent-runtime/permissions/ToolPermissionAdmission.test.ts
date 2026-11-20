@@ -84,7 +84,7 @@ describe('final tool permission admission', () => {
     const result = executeWithPermissionAdmission({ state, assertLive: () => {}, beforeExecute: async () => {}, withResource: operation => operation(), execute: effect,
       authorize: async (snapshot, signal) => {
         if (snapshot.mode === 'full-access') return allow;
-        const approved = await approvals.request({ agentId: 'general', sessionId: 'owner', turnId: 'turn', toolCallId: 'call', toolName: 'shell', reason: 'test', risk: 'medium', context: { sessionId: 'owner', turnId: 'turn' }, signal,
+        const approved = await approvals.request({ agentId: 'general', sessionId: 'owner', turnId: 'turn', toolCallId: 'call', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'test', risk: 'medium', context: { sessionId: 'owner', turnId: 'turn' }, signal,
           onEvent: event => { events.push(event); if (event.type === 'approval.requested') requested.resolve(); } });
         if (!approved) throw new Error('USER_DENIED'); return allow;
       } });
@@ -98,7 +98,7 @@ describe('final tool permission admission', () => {
     state.commitMode('default'); const deniedRequested = deferred();
     const denied = executeWithPermissionAdmission({ state, assertLive: () => {}, beforeExecute: async () => {}, withResource: operation => operation(), execute: effect,
       authorize: async (_snapshot, signal) => {
-        const approved = await approvals.request({ agentId: 'general', sessionId: 'owner', turnId: 'deny-turn', toolCallId: 'deny-call', toolName: 'shell', reason: 'test', risk: 'medium', context: { sessionId: 'owner', turnId: 'deny-turn' }, signal,
+        const approved = await approvals.request({ agentId: 'general', sessionId: 'owner', turnId: 'deny-turn', toolCallId: 'deny-call', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'test', risk: 'medium', context: { sessionId: 'owner', turnId: 'deny-turn' }, signal,
           onEvent: event => { events.push(event); if (event.type === 'approval.requested') deniedRequested.resolve(); } });
         if (!approved) throw new Error('USER_DENIED'); return allow;
       } });
@@ -116,7 +116,7 @@ describe('final tool permission admission', () => {
     const execution = executeWithPermissionAdmission({ state, assertLive: () => {}, beforeExecute: async () => {}, withResource: operation => operation(), execute: effect,
       authorize: async (snapshot, signal) => {
         if (snapshot.mode !== 'auto-review') return allow;
-        const verdict = await approvals.autoReview({ agentId: 'general', sessionId: 'child', turnId: 'turn', toolCallId: 'call', toolName: 'shell', reason: 'test', risk: 'medium', context: { sessionId: 'child', turnId: 'turn' }, signal, onEvent: event => events.push(event),
+        const verdict = await approvals.autoReview({ agentId: 'general', sessionId: 'child', turnId: 'turn', toolCallId: 'call', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'test', risk: 'medium', context: { sessionId: 'child', turnId: 'turn' }, signal, onEvent: event => events.push(event),
           action: { tool: 'shell', arguments: {}, reason: 'test', facts: {} }, reviewer: async () => { reviewerStarted.resolve(); return review.promise; } });
         if (!verdict.approved) throw new Error('REVIEW_DENIED'); return allow;
       } });

@@ -301,7 +301,7 @@ export interface ElectronAPI {
       sessionId?: string;
       source?: string;
       filePath?: string;
-    }) => Promise<KnowledgeImportResult>;
+    }) => Promise<KnowledgeImportResult | { cancelled: true }>;
     image: (request: {
       spaceId: string;
       relativePath: string;

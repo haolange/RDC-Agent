@@ -19,7 +19,7 @@ import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { redactCredentialLikeText, redactSecretsDeep } from '../runtime/secretRedaction';
+import { redactCredentialLikeText, redactedArgumentsPreview } from '../runtime/secretRedaction';
 import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import {
@@ -369,7 +369,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                     toolName: String(payload.toolCall.name),
                     status: 'pending',
                     providerOutputRef: payload.providerOutputRef ? { ...payload.providerOutputRef } : undefined,
-                    argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
+                    argsPreview: redactedArgumentsPreview(payload.toolCall.arguments),
                     startedAt: nowMs(),
                   }, currentLoopOptions()),
                 });
@@ -390,7 +390,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   toolName: String(event.payload.toolName),
                   status: 'running',
                   executionStartedAt: event.timestamp,
-                  argsPreview: JSON.stringify(isSubagent ? redactSecretsDeep(event.payload.args ?? {}).value : event.payload.args ?? {}).slice(0, 600),
+                  argsPreview: redactedArgumentsPreview(event.payload.args),
                   ...(isSubagent ? {
                     delegation: {
                       task: redactCredentialLikeText(String((event.payload.args as Record<string, unknown> | undefined)?.task ?? '')),

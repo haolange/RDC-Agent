@@ -1,4 +1,5 @@
 import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
+import { auditLog } from '../../runtime/AuditLog';
 /**
  * SettingsService — persists and normalizes application settings.
  *
@@ -385,7 +386,12 @@ export class SettingsService {
     };
 
     writeSettings(nextPersisted);
-    runtimePermissionStateService.commitMode(sanitizeAgentPermissionSettings(nextPersisted.agentRuntime?.permissions).mode);
+    const previousPermissions = sanitizeAgentPermissionSettings(currentPersisted.agentRuntime?.permissions);
+    const nextPermissions = sanitizeAgentPermissionSettings(nextPersisted.agentRuntime?.permissions);
+    if (JSON.stringify(previousPermissions) !== JSON.stringify(nextPermissions)) {
+      auditLog.record({ kind: 'permission-settings', from: previousPermissions, to: nextPermissions });
+    }
+    runtimePermissionStateService.commitMode(nextPermissions.mode);
     deleteSecretsAfterCommit(secretRefsToDelete, nextPaths.userRdcRoot);
     return this.getAll({
       ...nextPaths,
