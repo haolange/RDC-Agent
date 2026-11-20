@@ -23,7 +23,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   const visibleSteps = row.visibleSteps;
   const running = isTrackActivity(row);
   const actions = t(row.stepCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: row.stepCount });
-  const heading = running
+  const detail = running
     ? t('chat.workProcessSectionRunning', { actions })
     : row.duration ? t('chat.workProcessSectionDone', { actions, duration: row.duration }) : actions;
   return (
@@ -31,7 +31,10 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         {row.stepCount > 0 ? (
-          <p className={`work-process-section-heading${running ? ' is-running' : ''}`} data-work-node-heading>{heading}</p>
+          <p className={`work-process-section-heading${running ? ' is-running' : ''}`} data-work-node-heading>
+            {row.ordinal ? <span className="work-process-section-title">{t('chat.workProcessSectionTitle', { ordinal: row.ordinal })}</span> : null}
+            <span className="work-process-section-detail">{detail}</span>
+          </p>
         ) : null}
         {visibleSteps.length > 0 ? (
           <MeasuredWorkRows className={`work-process-steps work-process-section-list ${hasError || row.defaultOpen ? 'is-open' : ''}`}

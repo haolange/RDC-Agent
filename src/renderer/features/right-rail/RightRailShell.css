@@ -56,6 +56,12 @@
   padding: 0;
 }
 
+/* A text-only empty state is a caption line, not a bordered box that reads like an input. */
+.right-rail-empty-state.ui-empty-state.is-layout-compact:not(:has(.ui-empty-state-visual)) {
+  border: 0;
+  background: transparent;
+}
+
 .right-rail-empty-state .ui-empty-state-visual {
   justify-content: center;
   width: 100%;
@@ -84,4 +90,41 @@
   padding: 0;
   gap: var(--space-2);
   list-style: none;
+}
+
+/* Tab bar over one section at a time; the selected tab already names the section. */
+.right-rail-tabs {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.right-rail-tabs .ui-tabs-tab {
+  min-width: 0;
+  padding: 0 var(--space-1);
+}
+
+.right-rail-tab-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.right-rail-tab-count {
+  color: var(--token-text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.right-rail-tabs .right-rail-section-heading {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.right-rail-tabs .right-rail-section-content {
+  margin-top: 0;
 }

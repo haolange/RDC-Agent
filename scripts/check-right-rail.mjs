@@ -76,9 +76,10 @@ for (const requiredSection of ['id="progress"', 'id="artifacts"', 'id="outputs"'
   requireText(tracePanel, requiredSection, `SessionRightRail must render ${requiredSection}`);
 }
 if (!/id="progress"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/.test(tracePanel)) {
-  fail('SessionRightRail must render five cards in Progress / Artifacts / Outputs / Context / Capture order');
+  fail('SessionRightRail must offer Progress / Artifacts / Outputs / Context / Capture in that order');
 }
 for (const required of [
+  '<Tabs',
   'EmptyState',
   'RightRailArtifactList',
   'RightRailOutputList',
@@ -96,7 +97,7 @@ for (const required of [
 ]) {
   requireText(tracePanel, required, `SessionRightRail must retain ${required}`);
 }
-for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded', 'useState']) {
+for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded']) {
   forbidText(tracePanel, forbidden, `SessionRightRail must not retain ${forbidden}`);
 }
 forbidText(tracePanel, 'is-empty', 'SessionRightRail sections must keep one card shell regardless of content');

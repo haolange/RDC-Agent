@@ -157,3 +157,19 @@
 .nested-session-list {
   padding: 0;
 }
+
+/* An empty project reads as one quiet caption line under its name, not a boxed placeholder. */
+.ui-empty-state.is-layout-compact.session-list-empty:not(:has(.ui-empty-state-visual)) {
+  align-items: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: transparent;
+}
+
+.session-list-empty .ui-empty-state-title {
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-line);
+  font-weight: var(--font-normal);
+  text-align: left;
+}

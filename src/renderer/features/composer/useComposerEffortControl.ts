@@ -126,6 +126,8 @@ export function useComposerEffortControl(options: {
     turnControls,
     selectedLevel,
     effortLabel,
+    /** The model has no reasoning switch or levels; the Composer shows no reasoning level for it. */
+    reasoningLockedDisabled,
     displayLevel,
     displayLevels,
     displayIndex,

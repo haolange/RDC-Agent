@@ -80,6 +80,8 @@ export const ComposerModelEffortControl: React.FC<{
     fastModel: !unavailable && displayedControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
   });
+  // No level beside a model that cannot reason, or beside the "choose a model" placeholder.
+  const showReasoningLevel = !unavailable && Boolean(selected) && (Boolean(frozen) || !effort.reasoningLockedDisabled);
   const title = unavailable ? `${modelLabel} · ${t('composer.model.unavailable')}` : waiting ? `${capsule.title} · ${t('composer.model.preparing')}` : capsule.title;
   const activeView = view;
 
@@ -132,7 +134,7 @@ export const ComposerModelEffortControl: React.FC<{
           </span>
         ) : null}
         <OverflowFade className="composer-model-effort-pill-model" text={capsule.modelLabel} />
-        {!unavailable ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
+        {showReasoningLevel ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
         <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </Pill>
 
@@ -148,6 +150,7 @@ export const ComposerModelEffortControl: React.FC<{
           capabilityRetryLabel={controlsState.saveState.error ? t('composer.model.retrySave') : effort.capabilityRetryLabel}
           onRetryCapability={controlsState.saveState.error ? controlsState.retrySave : effort.retryCapability}
           hasAdjustableReasoning={effort.hasAdjustableReasoning}
+          reasoningLabel={displayedEffort}
           displayLevel={effort.displayLevel}
           displayLevels={effort.displayLevels}
           displayIndex={effort.displayIndex}

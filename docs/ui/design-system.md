@@ -162,7 +162,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 ## 空态
 
-所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体。Right Rail 五卡通过可选 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
+所有空态使用统一 `<EmptyState title description? actions? visual?>`。Settings 资源列表、Knowledge 列表、Sidebar 只用文案，不放装饰几何体，只有文案的空态显示为一行说明文字而非边框盒。Right Rail 各标签的卡片通过可选 `visual` 槽显示中性、紧凑的线框图（`RightRailEmptyVisuals`），配一句 honest copy；不用彩色等距场景、渐变或模糊阴影。需要操作时把按钮放进 `actions` 槽。
 
 共享空态区分紧凑区块与填充面板用途。资源空态以有边界的中性实色承载标题、说明和统一动作组；Tools 的 MCP 保持紧凑，独立资源页使用剩余空间。资源列表行以实色表面、细边框和明确 hover/focus/selected 状态承载内容，长名称可换行，状态不能被挤掉；技能 description 不在列表展开。
 
@@ -249,7 +249,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 | Settings / Composer / Sidebar 弹层 | `Popover` 或 `Menu`（锚定、viewport clamp、Escape 焦点返回） |
 | Knowledge 三列 | `Panel` + `ListRow` + `SearchField` + `Pill` + `EmptyState` + `Tabs` |
 | Composer 底栏 | `Pill` + `Popover` / `Menu`；控件高 `--control-height-sm`（28） |
-| Right Rail 五卡 / Sidebar | `SectionHeader` + `ListRow` + `EmptyState` |
+| Right Rail 标签卡 / Sidebar | `SectionHeader` + `ListRow` + `EmptyState` |
 | 表单校验 | `InlineError`，不用 toast 代替字段错误 |
 
 ## 品牌与图标
@@ -290,7 +290,7 @@ pnpm run typecheck
 | 层依赖、feature 横向、组件直调 IPC、退役目录、global feature 选择器、`is-*` 状态类 | `check:renderer-structure` | 0 |
 | Appearance 双体系、Select 实色、`ColorField`、组件消费者索引 | `check:appearance` | — |
 | Composer energy orbit、Active Signal 参数 | `check:work-process`（对照 CSS 的角度范围、2.85s、1.6s / 200% / 36%） | — |
-| 右栏五卡单轨 | `check:right-rail` | — |
+| 右栏五标签单轨 | `check:right-rail` | — |
 | i18n 双语 key 一致 | `check:i18n` | — |
 | `:hover` 必配 `:focus-visible`、禁无替代 `outline: none` | 无自动门禁 | — |
 

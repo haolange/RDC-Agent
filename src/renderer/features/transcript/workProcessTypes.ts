@@ -269,6 +269,8 @@ export type WorkProcessRow =
   | {
     type: 'section';
     id: string;
+    /** 1-based position among the turn's steps, assigned once the rows are assembled. */
+    ordinal?: number;
     status: WorkProcessRowStatus;
     /** Activity of task lifecycle calls represented by their snapshots rather than separate tool rows. */
     hasActiveTools?: boolean;

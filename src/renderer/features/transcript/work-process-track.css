@@ -103,6 +103,19 @@
   font-weight: var(--font-medium);
 }
 
+.work-process-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+}
+
+/* "步骤 N" reads as the group's name; the detail after it stays caption-weight. */
+.work-process-section-title {
+  color: var(--token-text-heading);
+  font-weight: var(--font-semibold);
+}
+
 .work-process-section-heading.is-running {
   color: var(--token-text-body);
 }

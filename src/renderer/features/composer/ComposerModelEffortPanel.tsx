@@ -36,6 +36,8 @@ export const ComposerModelEffortPanel: React.FC<{
   capabilityRetryLabel: string;
   onRetryCapability: () => void;
   hasAdjustableReasoning: boolean;
+  /** The reasoning level the turn uses, already translated. */
+  reasoningLabel: string;
   displayLevel: ReasoningSelection;
   displayLevels: ReasoningSelection[];
   displayIndex: number;
@@ -75,6 +77,7 @@ export const ComposerModelEffortPanel: React.FC<{
   capabilityRetryLabel,
   onRetryCapability,
   hasAdjustableReasoning,
+  reasoningLabel: currentReasoningLabel,
   displayLevel,
   displayLevels,
   displayIndex,
@@ -109,9 +112,8 @@ export const ComposerModelEffortPanel: React.FC<{
   });
   const thumbDynStyle = useDynStyle({ left: `${thumbPercent}%` });
   const tooltipDynStyle = useDynStyle({ left: `${tooltipLeftPercent}%` });
-  const reasoningLabel = hasAdjustableReasoning
-    ? t(EFFORT_LABEL_KEYS[displayLevel])
-    : t('composer.effort.levelOff');
+  // While the slider moves the header follows it; otherwise it shows the level the turn uses.
+  const reasoningLabel = hasAdjustableReasoning ? t(EFFORT_LABEL_KEYS[displayLevel]) : currentReasoningLabel;
 
   return (
     <div

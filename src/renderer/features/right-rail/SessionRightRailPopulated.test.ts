@@ -60,6 +60,9 @@ function replay(): CaptureReplayState {
   };
 }
 
+/** The rail shows one section at a time: Progress, Artifacts, Outputs, Context, Capture. */
+const openRailTab = (host: HTMLElement, index: number) => act(() => host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!.click());
+
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   state.tracePresentation = presentation(); state.replay = replay(); state.previewUrl = null; state.recovery = null;
@@ -74,6 +77,7 @@ describe('populated session rail', () => {
     const button = () => [...host.querySelectorAll('button')].find(entry => entry.textContent === 'control.replay.recoveryAction');
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
+      openRailTab(host, 4);
       expect(host.textContent).toContain('Scene.rdc · local · EID 21');
       expect(button()?.disabled).toBe(true); expect(state.restoreRecovery).not.toHaveBeenCalled();
       state.replay = { ...replay(), interactionLock: null, revision: 2 };
@@ -91,6 +95,7 @@ describe('populated session rail', () => {
     const host = document.createElement('div'); const root = createRoot(host);
     try {
       act(() => root.render(createElement(SessionRightRail)));
+      openRailTab(host, 4);
       const button = (label: string) => [...host.querySelectorAll('button')].find(entry => entry.textContent === label);
       expect(button('control.captureOpen')?.disabled).toBe(true);
       expect(host.querySelector<HTMLButtonElement>('[data-testid="right-rail-replay-device"]')?.disabled).toBe(true);
@@ -128,6 +133,7 @@ describe('populated session rail', () => {
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
+      openRailTab(host, 1);
       const preview = host.querySelector<HTMLButtonElement>('.right-rail-investigation-list button');
       await act(async () => preview!.click());
       const dialog = document.querySelector('[data-testid="investigation-preview"]');
@@ -146,6 +152,7 @@ describe('populated session rail', () => {
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
+      openRailTab(host, 1);
       const row = host.querySelector<HTMLButtonElement>('.right-rail-investigation-list button');
       expect(row?.textContent).toContain(artifact.title);
       expect(row?.textContent).not.toContain('control.rightRail.artifacts.status.stale');
@@ -167,6 +174,7 @@ describe('populated session rail', () => {
     const button = (label: string) => [...host.querySelectorAll('button')].find((entry) => entry.textContent === label);
     try {
       render();
+      openRailTab(host, 4);
       expect(host.querySelectorAll('[data-testid="right-rail-capture"]')).toHaveLength(1);
       expect(host.querySelector('.capture-replay-file-row')?.getAttribute('title')).toBe('/captures/Scene.rdc');
       expect(host.querySelector('.capture-replay-status')?.textContent).toBe('control.replay.ready');
@@ -181,7 +189,7 @@ describe('populated session rail', () => {
       expect(host.querySelector('[role="alert"]')?.textContent).toContain('Readback failed');
       expect(button('control.replay.retryImage')?.disabled).toBe(false);
       expect(host.querySelector('.capture-replay-status')?.classList.contains('is-error')).toBe(true);
-      expect(host.querySelectorAll('section[data-testid]')).toHaveLength(5);
+      expect([...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid'))).toEqual(['right-rail-capture']);
     } finally { act(() => root.unmount()); }
   });
 });
