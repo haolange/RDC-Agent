@@ -306,6 +306,7 @@ export async function startProfileTurn(
     promptPlan: preparedPrompt.promptPlan,
     effectiveProfile: preparedPrompt.effectiveProfile,
     effectiveProfileIds: preparedPrompt.effectiveProfileIds,
+    delegableProfileIds: preparedPrompt.delegableProfileIds,
     toolAllowlist: preparedPrompt.allowedToolNames,
     projectRootPath: preparedPrompt.projectRootPath,
     projectId: context.projectId,

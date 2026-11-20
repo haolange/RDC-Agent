@@ -71,6 +71,8 @@ export interface PreparedConversationPrompt {
   effectiveProfile: EffectiveAgentProfile;
   /** Enabled profile ids from the same resolution snapshot, used by handoff validation. */
   effectiveProfileIds: string[];
+  /** Profiles other agents may hand work to (enabled, not `disable-model-invocation`). */
+  delegableProfileIds: string[];
   allowedToolNames: string[];
   promptPlan: PromptPlan;
   visibleTurnIds: string[];

@@ -102,6 +102,8 @@ export interface BuildEffectiveRuntimePlanInput {
     handoffs?: AgentManifestDefinition['handoffs'];
   } | null;
   enabledProfileIds?: readonly string[];
+  /** Profiles other agents may hand work to; declared delegates outside this set are dropped. */
+  delegableProfileIds?: readonly string[];
   profileDelegates?: readonly string[];
   toolAllowlist: readonly string[];
   permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
@@ -200,7 +202,9 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
       : {}),
   })));
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
-  const profileDelegates = freezeStringList(input.profileDelegates ?? input.profile?.agents ?? []);
+  const declaredDelegates = input.profileDelegates ?? input.profile?.agents ?? [];
+  const delegable = input.delegableProfileIds ? new Set(input.delegableProfileIds) : null;
+  const profileDelegates = freezeStringList(delegable ? declaredDelegates.filter((id) => delegable.has(id)) : declaredDelegates);
   const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
   const excludeSubagent = input.excludeSubagent === true;
   const withoutSubagent = (values: readonly string[]): string[] => excludeSubagent

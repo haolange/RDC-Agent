@@ -47,6 +47,7 @@ export interface ProfileTurnPreparationInput {
   promptPlan: PromptPlan;
   effectiveProfile: EffectiveAgentProfile | null;
   effectiveProfileIds: string[];
+  delegableProfileIds: string[];
   projectRootPath?: string | null;
   projectId?: string | null;
   sessionId?: string | null;
@@ -138,6 +139,7 @@ export class ProfileTurnPreparation {
       promptPlan: input.promptPlan,
       effectiveProfile: input.effectiveProfile,
       effectiveProfileIds: input.effectiveProfileIds,
+      delegableProfileIds: input.delegableProfileIds,
       toolAllowlist: input.toolAllowlist,
       projectRootPath: input.projectRootPath ?? null,
       projectId: input.projectId ?? null,

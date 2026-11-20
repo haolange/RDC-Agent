@@ -142,6 +142,8 @@ export class TurnPreparationService {
     promptPlan: PromptPlan;
     effectiveProfile: EffectiveAgentProfile;
     effectiveProfileIds: string[];
+    /** Profiles other agents may hand work to; the profile's declared delegates are limited to these. */
+    delegableProfileIds?: string[];
     toolAllowlist: string[];
     projectRootPath: string | null;
     projectId: string | null;
@@ -393,6 +395,7 @@ export class TurnPreparationService {
       profile,
       profileProvenance: profile.provenance,
       enabledProfileIds: input.effectiveProfileIds,
+      delegableProfileIds: input.delegableProfileIds,
       toolAllowlist: input.toolAllowlist,
       permissionConstraints: turnSettings.agentRuntime.permissions,
       knowledgeReadRoots: knowledgeResolution.roots,

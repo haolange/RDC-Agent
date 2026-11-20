@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { describe, expect, it } from 'vitest';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { compileFixturePolicy } from '../testing/policyFixture';
+import { delegableProfileIds } from './orchestration/delegableProfiles';
 import {
   activeToolNamesForPlan,
   buildEffectiveRuntimePlan,
@@ -409,4 +410,20 @@ describe('EffectiveRuntimePlan', () => {
     ], child)).toEqual(['read_file']);
     expect(child.fingerprint).not.toBe(root.fingerprint);
   });
+
+  it('keeps only declared delegates other agents may invoke: enabled and not disable-model-invocation', () => {
+    const delegable = delegableProfileIds([
+      { id: 'verifier', enabled: true, disableModelInvocation: false },
+      { id: 'reviewer', enabled: true, disableModelInvocation: true },
+      { id: 'retired', enabled: false, disableModelInvocation: false },
+    ]);
+    expect(delegable).toEqual(['verifier']);
+    const plan = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: 'D:/Project', projectId: 'p',
+      profile: { skills: [], agents: ['verifier', 'reviewer', 'retired'] }, delegableProfileIds: delegable,
+      toolAllowlist: ['read_file'], permissionConstraints: basePermission, routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'request' } }, promptPlan: { systemPrompt: 'identity' },
+      policy: compileFixturePolicy({}) } as never);
+    expect(plan.profileDelegates).toEqual(['verifier']);
+  });
 });
+

@@ -9,6 +9,7 @@ import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../..
  */
 
 import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
+import { delegableProfileIds } from './delegableProfiles';
 import {
   AGENT_DISPLAY_NAMES,
   AgentSlotRegistry,
@@ -226,6 +227,7 @@ export class AgentOrchestrator {
       const effectiveProfileIds = options?.effectiveProfileIds?.length
         ? options.effectiveProfileIds
         : effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id);
+      const delegableIds = options?.delegableProfileIds ?? delegableProfileIds(effectiveProfiles);
       const config: AgentConfig = {
         ...fallbackConfig,
         modelProvider: frozenRequestPlan?.providerId
@@ -330,6 +332,7 @@ export class AgentOrchestrator {
           promptPlan,
           effectiveProfile,
           effectiveProfileIds: [...effectiveProfileIds],
+          delegableProfileIds: [...delegableIds],
           projectRootPath: options?.projectRootPath ?? null,
           projectId: options?.projectId ?? null,
           sessionId: isSubagentSession ? null : (options?.sessionId ?? null),

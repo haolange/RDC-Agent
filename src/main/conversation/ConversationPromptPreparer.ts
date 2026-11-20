@@ -1,5 +1,6 @@
 import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { charsToTokens } from '@shared/utils/tokens';
+import { delegableProfileIds } from '../agent-runtime/orchestration/delegableProfiles';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -84,6 +85,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
       const ids = effectiveProfiles.filter((profile) => profile.enabled).map((profile) => profile.id);
       return ids.length > 0 ? ids : [definition.id];
     })(),
+    delegableProfileIds: delegableProfileIds(effectiveProfiles),
     allowedToolNames,
     promptPlan,
     visibleTurnIds,

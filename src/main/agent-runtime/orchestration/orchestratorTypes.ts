@@ -89,6 +89,8 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   effectiveProfile?: EffectiveAgentProfile | null;
   /** Enabled profile ids from the same resolution snapshot. */
   effectiveProfileIds?: string[];
+  /** Profiles other agents may hand work to, from the same resolution snapshot. */
+  delegableProfileIds?: string[];
   visibleTurnIds?: string[];
   activeBranchId?: string;
   /** Shared parent-child policy lineage; child turns must not reset counters. */
