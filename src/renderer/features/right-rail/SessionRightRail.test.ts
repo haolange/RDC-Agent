@@ -51,9 +51,10 @@ describe('session rail projection composition', () => {
       expect(progress.querySelector('.right-rail-section-meta')?.textContent).toBe('control.rightRail.tasks.count:1/3');
       expect(host.querySelectorAll('.right-rail-section.is-populated')).toHaveLength(1);
       expect(progress.textContent).toContain('Complete title retained');
-      const title = progress.querySelector<HTMLElement>('.right-rail-task-copy .ui-overflow-fade')!;
+      const title = progress.querySelector<HTMLElement>('.right-rail-task-title')!;
       expect(title.textContent).toBe('Complete title retained');
-      expect(title.title).toBe('Complete title retained');
+      expect(title.closest('button')?.title).toContain('Complete title retained');
+      expect(progress.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('1');
       state.tracePresentation = null;
       act(() => root.render(createElement(SessionRightRail)));
       expect(progress.classList.contains('is-populated')).toBe(false);

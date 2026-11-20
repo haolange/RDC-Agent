@@ -177,10 +177,25 @@
 }
 
 .ui-tabs.is-icon-only .ui-tabs-tab {
+  flex: 0 0 auto;
   padding: 0 var(--space-2);
 }
 
-.ui-tabs.is-icon-only .ui-tabs-count {
+/* The selected tab keeps its name so the panel is always identified; the others are icons with tooltips. */
+.ui-tabs.is-icon-only .ui-tabs-tab.is-selected {
+  flex: 1 1 auto;
+}
+
+.ui-tabs.is-icon-only .ui-tabs-tab.is-selected .ui-tabs-label {
+  position: static;
+  inline-size: auto;
+  block-size: auto;
+  overflow: hidden;
+  clip-path: none;
+  text-overflow: ellipsis;
+}
+
+.ui-tabs.is-icon-only .ui-tabs-tab:not(.is-selected) .ui-tabs-count {
   position: absolute;
   top: 0;
   right: 0;

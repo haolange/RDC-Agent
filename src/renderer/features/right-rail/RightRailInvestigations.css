@@ -19,6 +19,8 @@
 .right-rail-compact-row:focus-visible { background: var(--token-bg-muted); }
 .right-rail-compact-icon { display: inline-flex; color: var(--token-text-caption); }
 .right-rail-compact-icon svg { width: var(--space-4); height: var(--space-4); fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
-.right-rail-compact-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--type-body-size); }
+.right-rail-compact-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--type-item-size); }
+.right-rail-compact-copy { display: flex; flex-direction: column; min-width: 0; }
+.right-rail-compact-kind { color: var(--token-text-caption); font-size: var(--type-caption-size); font-weight: var(--font-normal); line-height: var(--type-caption-line); }
 .right-rail-browse-all.button { width: 100%; margin-top: var(--space-1); color: var(--token-text-caption); }
 .right-rail-resource-detail { display: grid; gap: var(--space-2); overflow-wrap: anywhere; }
