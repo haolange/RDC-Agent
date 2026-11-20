@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
-import { isSafeAgentProfileId } from '@shared/types/agent';
+import { GENERAL_AGENT_ID, isSafeAgentProfileId } from '@shared/types/agent';
 import {
   AGENT_PROJECT_CEILING_NARROWED,
   AGENT_PROJECT_UNTRUSTED,
@@ -367,6 +367,9 @@ export class AgentManifestService {
     }
     if (isReservedAgentId(agentId)) {
       throw new Error(`AGENT_ID_RESERVED_HISTORICAL: ${agentId} cannot be saved as a current profile.`);
+    }
+    if (agentId === GENERAL_AGENT_ID && !draft.delete && draft.enabled === false) {
+      throw new Error('AGENT_DEFAULT_REQUIRED: General is the default Agent and cannot be switched off.');
     }
     const directory = options.scope === 'project'
       ? this.resolveProjectAgentsPath(options.projectRoot)

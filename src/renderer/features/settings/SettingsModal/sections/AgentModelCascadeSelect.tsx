@@ -19,11 +19,6 @@ interface AgentModelCascadeSelectProps {
   value: string;
   options: AgentModelOption[];
   onChange: (value: string) => void;
-  /**
-   * Offers "use the default model" as the first entry for one Agent; an empty value means
-   * the Agent falls back to the default. Not set when editing the default itself.
-   */
-  inherit?: { label: string; description: string };
   t: Translate;
 }
 
@@ -34,7 +29,6 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   value,
   options,
   onChange,
-  inherit,
   t,
 }) => {
   const [open, setOpen] = useState(false);
@@ -42,7 +36,6 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
 
   const selected = options.find((option) => option.canonicalId === value
     && (option.configured || option.status === 'provider-unavailable'));
-  const inheriting = Boolean(inherit) && !value;
   const invalidSelection = isAgentModelSelectionInvalid(value, options);
   const providerUnavailable = selected?.status === 'provider-unavailable';
   const groups = useMemo(() => buildAgentModelGroups(options, query), [options, query]);
@@ -66,12 +59,8 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     setQuery('');
   };
 
-  const triggerPrimary = inheriting
-    ? inherit?.label
-    : selected ? selected.modelLabel : invalidSelection ? t('composer.model.unavailable') : t('settings.selectModelPlaceholder');
-  const triggerSecondary = inheriting
-    ? null
-    : selected ? selected.canonicalId : t('settings.selectProviderPlaceholder');
+  const triggerPrimary = selected ? selected.modelLabel : invalidSelection ? t('composer.model.unavailable') : t('settings.selectModelPlaceholder');
+  const triggerSecondary = selected ? selected.canonicalId : t('settings.selectProviderPlaceholder');
 
   return (
     <div className="settings-model-cascade">
@@ -108,7 +97,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             data-testid="settings-model-cascade-search"
           />
         </div>
-        {groups.length === 0 && !inherit ? (
+        {groups.length === 0 ? (
           <div className="settings-model-empty" role="status">
             <strong>{t('settings.noModelsAvailable')}</strong>
             <p>{t('settings.modelEmptyHint')}</p>
@@ -120,28 +109,6 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             aria-label={t('settings.modelFieldLabel')}
             onKeyDown={onMenuKeyDown}
           >
-            {inherit ? (
-              <button
-                type="button"
-                role="option"
-                aria-selected={inheriting}
-                className={`settings-model-option${inheriting ? ' is-selected' : ''}`}
-                data-testid="settings-model-option-inherit"
-                onClick={() => select('')}
-              >
-                <span className="settings-model-option-copy">
-                  <span className="settings-model-option-label">{inherit.label}</span>
-                  <span className="settings-model-option-id">{inherit.description}</span>
-                </span>
-                {inheriting ? <Icon name="check" size={14} className="settings-model-option-check" /> : null}
-              </button>
-            ) : null}
-            {groups.length === 0 ? (
-              <div className="settings-model-empty" role="status">
-                <strong>{t('settings.noModelsAvailable')}</strong>
-                <p>{t('settings.modelEmptyHint')}</p>
-              </div>
-            ) : null}
             {groups.map((group) => (
               <div key={group.providerId} className="settings-model-group" role="group" aria-label={group.label} data-provider-id={group.providerId}>
                 <div className="settings-model-group-title">

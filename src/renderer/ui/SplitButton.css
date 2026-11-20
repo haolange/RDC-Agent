@@ -1,0 +1,26 @@
+.ui-split-button {
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.ui-split-button-main.button {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.ui-split-button-caret.button {
+  flex: 0 0 auto;
+  padding-inline: var(--space-2);
+  border-inline-start-width: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.ui-split-button-main.button:focus-visible,
+.ui-split-button-caret.button:focus-visible {
+  position: relative;
+  z-index: 1;
+}

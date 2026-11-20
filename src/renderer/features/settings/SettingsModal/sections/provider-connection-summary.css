@@ -99,6 +99,7 @@
 .settings-provider-connection-status[data-phase='connected'] .settings-provider-connection-status-dot { background: var(--token-status-success); }
 
 .settings-provider-connection-status[data-phase='failed'] .settings-provider-connection-status-dot { background: var(--token-status-error); }
+.settings-provider-connection-status[data-phase='testPassed'] .settings-provider-connection-status-dot { background: var(--token-accent-primary); }
 
 .settings-provider-connection-status[data-phase='testing'] .settings-provider-connection-status-dot,
 .settings-provider-connection-status[data-phase='saving'] .settings-provider-connection-status-dot { background: var(--token-status-warning); }

@@ -1,7 +1,9 @@
 .settings-manifest-count {
   color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-overline-size);
+  font-weight: var(--font-semibold);
+  line-height: var(--type-overline-line);
+  letter-spacing: var(--tracking-overline);
   white-space: nowrap;
 }
 

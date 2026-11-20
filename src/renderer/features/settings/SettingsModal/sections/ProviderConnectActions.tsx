@@ -72,7 +72,7 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
             ? accountRequiresCode && !accountConnected
               ? t('settings.oauthContinue')
               : provider.isConfigured ? t('settings.save') : t('settings.connect')
-            : hasFreshTest ? t('settings.save') : t('settings.connect')}
+            : provider.isConfigured || hasFreshTest ? t('settings.save') : t('settings.connect')}
       </Button>
     </>
   );

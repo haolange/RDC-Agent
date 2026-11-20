@@ -227,7 +227,6 @@ settings-modal
 settings-model-cascade-search
 settings-model-cascade-trigger
 settings-model-option-custom-${option.canonicalId}
-settings-model-option-inherit
 settings-nav-${section.id}
 settings-nav-search
 settings-policy-tighten-note

@@ -1,17 +1,27 @@
 /* Model services: list of services beside the selected service's detail. */
 .settings-providers-layout {
   display: grid;
+  flex: 1 1 0;
   grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
   gap: var(--space-4);
-  align-items: start;
+  align-items: stretch;
   min-width: 0;
+  min-height: 0;
+}
+
+.settings-provider-list-pane,
+.settings-provider-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .settings-provider-list-pane {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  min-width: 0;
+  padding-right: var(--space-1);
 }
 
 .settings-provider-search.ui-search-field {
@@ -224,7 +234,18 @@
 }
 
 @container settings-panel (max-width: 46rem) {
+  /* One column: the page scrolls as a whole and the panes take their natural height. */
+  .settings-page-models > .settings-models-page {
+    overflow-y: auto;
+  }
+
   .settings-providers-layout {
+    flex: 0 0 auto;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-provider-list-pane,
+  .settings-provider-detail-pane {
+    overflow: visible;
   }
 }

@@ -77,6 +77,15 @@ describe('AgentManifestService save/delete effective commit', () => {
     );
   });
 
+  it('refuses to switch off General, the default Agent, before writing anything', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-general-'));
+    roots.push(root);
+    const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
+    await expect(agentManifestService.saveDefinition(paths, { ...customDraft('general'), enabled: false }, { scope: 'user' }))
+      .rejects.toThrow(/AGENT_DEFAULT_REQUIRED/);
+    expect(fs.existsSync(paths.agentsPath)).toBe(false);
+  });
+
   it('returns compiledRoute and provenance.sourceHash and accepts that hash on the next save', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-save-meta-'));
     roots.push(root);
