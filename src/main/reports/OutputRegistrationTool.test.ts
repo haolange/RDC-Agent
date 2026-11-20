@@ -49,4 +49,18 @@ describe('OutputRegistrationTool', () => {
     await expect(tool().execute('escape', { path: '../outside.md' })).resolves.toMatchObject({ isError: true });
     expect(mocks.register).not.toHaveBeenCalled();
   });
+
+  it('refuses a project link that points at a file outside the project when the platform can create it', async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-output-outside-'));
+    fs.writeFileSync(path.join(outside, 'credentials'), 'secret');
+    try {
+      fs.symlinkSync(path.join(outside, 'credentials'), path.join(root, 'report.md'));
+    } catch {
+      fs.rmSync(outside, { recursive: true, force: true });
+      return;
+    }
+    await expect(tool().execute('linked', { path: 'report.md' })).resolves.toMatchObject({ isError: true });
+    expect(mocks.register).not.toHaveBeenCalled();
+    fs.rmSync(outside, { recursive: true, force: true });
+  });
 });

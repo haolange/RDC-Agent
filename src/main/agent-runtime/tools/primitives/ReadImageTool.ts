@@ -60,6 +60,7 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
     requiresApproval: false,
   },
   permissionHint: 'readonly',
+  effects: { reads: ['path'] },
 
   async execute(toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

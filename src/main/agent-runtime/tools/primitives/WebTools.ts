@@ -96,6 +96,7 @@ export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
+  effects: { network: true },
 
   async execute(_toolCallId, params, signal) {
     const result = await fetchPublicText(params, signal);
@@ -122,6 +123,7 @@ export const webSearchTool: AgentTool<WebSearchParams, WebSearchDetails> = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
+  effects: { network: true },
 
   async execute(_toolCallId, params, signal) {
     const query = params.query?.trim();

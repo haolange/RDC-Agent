@@ -47,6 +47,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
+  effects: { writes: ['path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {

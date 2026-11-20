@@ -28,6 +28,7 @@ export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'destructive',
+  effects: { writes: ['path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

@@ -331,9 +331,13 @@ function main() {
     path.join(repoRoot, 'src/main/agent-runtime/permissions/AgentPermissionPolicy.ts'),
     'utf8',
   );
+  const artifactReadTool = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/ArtifactReadTool.ts'),
+    'utf8',
+  );
   assert(
-    /READ_ONLY_FILE_TOOLS\s*=\s*new Set\(\['read_file', 'read_image', 'glob', 'grep'\]\)/.test(permissionPolicy),
-    'artifact_read must not join READ_ONLY_FILE_TOOLS / attachments auto-auth',
+    !/effects:\s*\{[^}]*\breads\b/.test(artifactReadTool) && !/READ_ONLY_FILE_TOOLS/.test(permissionPolicy),
+    'artifact_read reads session artifacts by URI and must not declare filesystem read effects (attachments auto-auth)',
   );
   assert(
     permissionPolicy.includes('matchShellHardDeny'),

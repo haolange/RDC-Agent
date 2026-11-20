@@ -237,7 +237,7 @@ Knowledge 位于 `src/main/knowledge/`。主进程服务：`KnowledgeQueryServic
 
 ### J. Mission 工具面
 
-工具按 `observe` / `record` / `mutate` / `execute` 分类，天花板决定工具类，不按 profile id 维护第二份白名单：`read-only` 只留 observe 与 record；`workspace-write` 增加 mutate；`full` 才允许 execute（含原生 `shell.rdc`）；未知工具与 MCP 按 execute 处理。Profile `access-ceiling` 在 (1) profile allowlist 解析（token 展开后过滤）、(2) 冻结 EffectiveRuntimePlan executor、(3) AgentPermissionPolicy hard deny、(4) tool activation 四处同时执行；Full access 不能绕过。内置三 Mission 声明 `read-only` 与 `completion-contract: investigation-report`。
+工具按 `observe` / `record` / `mutate` / `execute` 分类，天花板决定工具类，不按 profile id 维护第二份白名单：`read-only` 只留 observe 与 record；`workspace-write` 增加 mutate；`full` 才允许 execute（含原生 `shell.rdc`）；未知工具与 MCP 按 execute 处理。Profile `access-ceiling` 在 (1) profile allowlist 解析（token 展开后过滤）、(2) 冻结 EffectiveRuntimePlan executor、(3) AgentPermissionPolicy hard deny、(4) tool activation 四处同时执行；Full access 不能绕过。内置三 Mission 声明 `read-only` 与 `completion-contract: investigation-report`。工具在定义处声明效果（读/写路径参数、联网），权限策略只读声明，不按工具名推断；未声明效果的 mutate / execute 工具需审批。
 
 Mission runtime allowlist：
 

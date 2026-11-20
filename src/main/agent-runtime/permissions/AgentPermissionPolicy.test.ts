@@ -51,11 +51,34 @@ vi.mock('../../runtime/resolveConfiguredShell', () => ({
   }),
 }));
 
+import { readFileTool as productionReadFile } from '../tools/primitives/ReadFileTool';
+import { readImageTool as productionReadImage } from '../tools/primitives/ReadImageTool';
+import { globTool as productionGlob } from '../tools/primitives/GlobTool';
+import { grepTool as productionGrep } from '../tools/primitives/GrepTool';
+import { writeFileTool as productionWriteFile } from '../tools/primitives/WriteFileTool';
+import { editFileTool as productionEditFile } from '../tools/primitives/EditFileTool';
+import { webSearchTool as productionWebSearch } from '../tools/primitives/WebTools';
+import { deleteFileTool as productionDeleteFile } from '../tools/file/DeleteFileTool';
+import { moveFileTool as productionMoveFile } from '../tools/file/MoveFileTool';
+
+/** Fixtures keep the production effect declarations; the policy reads effects, never names. */
+const PRODUCTION_EFFECTS: Record<string, AgentTool['effects']> = {
+  read_file: productionReadFile.effects,
+  read_image: productionReadImage.effects,
+  glob: productionGlob.effects,
+  grep: productionGrep.effects,
+  write_file: productionWriteFile.effects,
+  edit_file: productionEditFile.effects,
+  web_search: productionWebSearch.effects,
+  delete_file: productionDeleteFile.effects,
+};
+
 const readFileTool: AgentTool = {
   name: 'read_file',
   description: 'read file',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'readonly',
+  effects: PRODUCTION_EFFECTS.read_file,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
@@ -64,6 +87,7 @@ const webSearchTool: AgentTool = {
   description: 'search web',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'readonly',
+  effects: PRODUCTION_EFFECTS.web_search,
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
@@ -82,12 +106,13 @@ const deleteFileTool: AgentTool = {
   description: 'delete',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'destructive',
+  effects: PRODUCTION_EFFECTS.delete_file,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
 it('classifies replay lifecycle separately from read-only probe queries', () => {
   const service = new AgentPermissionPolicyService();
-  const tool: AgentTool = { ...readFileTool, name: 'rdc_probe' };
+  const tool: AgentTool = { ...readFileTool, name: 'rdc_probe', effects: undefined };
   const decision = (action: string, mode: AgentPermissionMode, ceiling: 'full' | 'read-only', policy = {}) => service.evaluate({
     ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
     tool, toolCall: { type: 'toolCall', id: 'probe', name: 'rdc_probe', arguments: { action } },
@@ -319,7 +344,7 @@ describe('AgentPermissionPolicyService network tools', () => {
     expect(decision.risk).toBe('medium');
   });
 
-  it('allows network tools in custom mode after explicit policy selection', () => {
+  it('keeps network tools under approval in custom mode', () => {
     mockSettings.agentRuntime.permissions.mode = 'custom';
 
     const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
@@ -328,7 +353,7 @@ describe('AgentPermissionPolicyService network tools', () => {
       projectRootPath: 'D:\\Projects\\Demo',
     });
 
-    expect(decision.action).toBe('allow');
+    expect(decision.action).toBe('ask_user');
   });
 });
 
@@ -449,6 +474,7 @@ describe('AgentPermissionPolicyService floor × mode lattice', () => {
     description: 'write file',
     parameters: { type: 'object', properties: {} },
     permissionHint: 'mutation',
+    effects: PRODUCTION_EFFECTS.write_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   };
 
@@ -642,6 +668,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     description: 'write',
     parameters: { type: 'object', properties: {} },
     permissionHint: 'mutation',
+    effects: PRODUCTION_EFFECTS.write_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   };
   const editFileTool: AgentTool = {
@@ -649,6 +676,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     description: 'edit',
     parameters: { type: 'object', properties: {} },
     permissionHint: 'mutation',
+    effects: PRODUCTION_EFFECTS.edit_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   };
   const codeInterpreterTool: AgentTool = {
@@ -670,6 +698,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
       description: name,
       parameters: { type: 'object', properties: {} },
       permissionHint: 'readonly',
+      effects: PRODUCTION_EFFECTS[name],
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     };
   }
@@ -868,6 +897,53 @@ describe('file routing across permission modes', () => {
       expect(decision.action).toBe('deny');
       expect(decision.reason).toContain(command.startsWith('rdc') ? 'RDC_VIA_COMMAND_DENIED' : 'SHELL_FILE_TOOL_BYPASS');
     }
+  });
+});
+
+describe('AgentPermissionPolicyService declared effects', () => {
+  const service = new AgentPermissionPolicyService();
+  const settings = (mode: AgentPermissionMode): AgentPermissionSettings => ({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] });
+  const call = (name: string, args: Record<string, unknown>): ToolCall => ({ type: 'toolCall', id: `tc-${name}`, name, arguments: args });
+  const moveFileTool: AgentTool = { name: 'move_file', description: 'move', parameters: { type: 'object', properties: {} },
+    permissionHint: 'mutation', effects: productionMoveFile.effects, execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) };
+
+  it('refuses moving a capture in every mode, including full access', () => {
+    for (const mode of ['default', 'full-access'] as const) {
+      const decision = service.evaluate({ ...permissionInput(settings(mode)), tool: moveFileTool,
+        toolCall: call('move_file', { source: 'frame.rdc', destination: 'frame-old.rdc' }), projectRootPath: workspaceRoot });
+      expect(decision).toMatchObject({ action: 'deny', reason: expect.stringContaining('FILE_WRITE_PROTECTED') });
+    }
+  });
+
+  it('keeps protected configuration writes under approval in full access', () => {
+    const decision = service.evaluate({ ...permissionInput(settings('full-access')), tool: deleteFileTool,
+      toolCall: call('delete_file', { path: '.rdc-agent/policies/team.policy.yml' }), projectRootPath: workspaceRoot });
+    expect(decision).toMatchObject({ action: 'ask_user', risk: 'high' });
+  });
+
+  it('gives a conversation without a project no workspace', () => {
+    const read = service.evaluate({ ...permissionInput(settings('default')), tool: readFileTool,
+      toolCall: call('read_file', { path: 'notes.txt' }), projectRootPath: null });
+    const shell = service.evaluate({ ...permissionInput(settings('default')), tool: shellTool,
+      toolCall: call('shell', { command: 'ls' }), projectRootPath: null });
+    expect(read.action).toBe('ask_user');
+    expect(shell.action).toBe('ask_user');
+  });
+
+  it('treats a parent-directory reference in a routine command as an external path', () => {
+    const decision = service.evaluate({ ...permissionInput(settings('default')), tool: shellTool,
+      toolCall: call('shell', { command: 'ls ../..' }), projectRootPath: workspaceRoot });
+    expect(decision.action).toBe('ask_user');
+  });
+
+  it('reviews a tool that declares no effects by its access level', () => {
+    const undeclared = (name: string): AgentTool => ({ name, description: name, parameters: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) });
+    const evaluate = (name: string) => service.evaluate({ ...permissionInput(settings('default')), tool: undeclared(name),
+      toolCall: call(name, {}), projectRootPath: workspaceRoot }).action;
+    expect(evaluate('task_list')).toBe('allow');
+    expect(evaluate('memory_write')).toBe('ask_user');
+    expect(evaluate('unregistered_tool')).toBe('ask_user');
   });
 });
 

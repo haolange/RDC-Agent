@@ -72,6 +72,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'file', requiresApproval: false },
   permissionHint: 'readonly',
+  effects: { reads: ['path', 'compareWith.path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {

@@ -68,6 +68,7 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
   permissionHint: 'readonly',
+  effects: { reads: ['cwd', 'path'], readPattern: 'pattern' },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {

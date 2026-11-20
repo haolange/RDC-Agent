@@ -6,12 +6,14 @@
 
 Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进程 `AgentPermissionPolicy` 为权威，结合 profile 天花板、permission mode、workspace root、tool metadata、`CompiledPolicy`。可读根、可写根、允许/拒绝命令前缀只在 Custom 生效，在 Settings 的 Custom 规则中编辑；保存等待主进程确认，不乐观生效。
 
-- `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。
+- `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。没有打开项目时不存在 workspace，任何文件读取与 shell 都需审批。
 - `Auto-review`：先执行确定性规则；已验证的低风险操作记录规则批准，其余可审操作提交一次独立、无工具的模型审核。没有有效批准不执行；不自动切人工或 Full access。
-- `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。
-- `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效。Full access 仍不能越过 profile 天花板。
+- `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。capture、Git 元数据和规范 Knowledge 在任何挡位都不是写入目标；写入受保护的配置或凭据路径在 Full access 下仍需用户确认。
+- `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效；网络工具仍需审批。Full access 仍不能越过 profile 天花板。
 
 工具按 observe / record / mutate / execute 分类（`src/shared/constants/toolAccess.ts`）；`read-only` = observe + record，`workspace-write` 再加 mutate，`full` 再加 execute；未知工具与 MCP 按 execute；Full access 权限模式不能抬高 profile 天花板；原生 `shell.rdc` 要求 `full`。
+
+工具在定义处声明效果（`AgentTool.effects`：读路径参数、写路径参数、glob 前缀参数、是否联网），`AgentPermissionPolicy` 只读这些声明，不按工具名推断。写路径在任何挡位先经 `fileOperationBoundary`（工程内目标经 realpath 且拒绝 symlink）；只读目标拒绝，受保护目标需审批。未声明效果的工具按访问类别：observe / record 自动，mutate / execute 需审批。
 
 Browser QA 代答 `conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 属于 high-impact，只在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时放行。桌面 IPC 不受该环境变量限制。
 
@@ -31,7 +33,7 @@ Work Process 必须展示真实 `Requested approval` / `Approved` / `Denied` / `
 
 Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllowedPathRoots`。
 
-当前 session 的 `{sessionPath}/attachments` 作为 scoped readable root 注入 `AgentPermissionPolicy.sessionAttachmentsRoot`。仅 `READ_ONLY_FILE_TOOLS`（`read_file` / `read_image` / `glob` / `grep`）自动可读；写工具、`code_interpreter` 与跨 session 附件目录不继承。依据是用户亲手附加 = 显式意图；`.rdc`、可执行文件与 SVG 不得进入该目录。
+当前 session 的 `{sessionPath}/attachments` 作为 scoped readable root 注入 `AgentPermissionPolicy.sessionAttachmentsRoot`。仅声明读效果且不写的工具（`read_file` / `read_image` / `glob` / `grep`）自动可读；写工具、`code_interpreter` 与跨 session 附件目录不继承。依据是用户亲手附加 = 显式意图；`.rdc`、可执行文件与 SVG 不得进入该目录。
 
 `read_file` 的显式 `mode: audit` 沿用该工具的冻结可用性与读取权限；`path` 和 `compareWith.path` 分别提取并审批，第一路径在工程内不自动授权第二路径。执行层对两者分别 realpath/根边界校验，且校验各自预期hash；不由模型脚本直接读磁盘，不增加新工具身份或向受限reviewer授予 `read_file`。审计只返回有界字节信息和整文件比较结果，不授予编辑前置读取资格。capture拒绝、8MiB输入上限和取消合同见 runtime-kernel。
 

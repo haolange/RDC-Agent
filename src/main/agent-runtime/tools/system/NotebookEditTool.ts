@@ -32,6 +32,7 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
+  effects: { writes: ['notebook_path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

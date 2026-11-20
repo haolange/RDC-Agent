@@ -30,6 +30,7 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
+  effects: { writes: ['source', 'destination'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');

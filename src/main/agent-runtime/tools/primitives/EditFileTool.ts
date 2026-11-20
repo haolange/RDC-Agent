@@ -53,6 +53,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
+  effects: { writes: ['path'] },
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {
