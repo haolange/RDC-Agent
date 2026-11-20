@@ -13,11 +13,6 @@ import type { ResolvedTheme, ThemeChromeConfig } from '../types/settings';
 
 export type CompiledChromeCssVars = Record<string, string>;
 
-const DEFAULT_UI_FONT =
-  "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-const DEFAULT_CODE_FONT =
-  "'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace";
-
 /**
  * Compile Appearance chrome into CSS custom-property patches applied on :root.
  * Does not touch compose/agent effort variables.
@@ -56,8 +51,9 @@ export function compileThemeChrome(
   vars['--color-warning'] = variant === 'light' ? '122 82 0' : '251 191 36';
   vars['--color-error'] = variant === 'light' ? '180 35 24' : '255 138 128';
 
-  vars['--font-sans'] = chrome.fonts.ui?.trim() || DEFAULT_UI_FONT;
-  vars['--font-mono'] = chrome.fonts.code?.trim() || DEFAULT_CODE_FONT;
+  // Only a chosen font overrides the bundled default stacks owned by design-tokens.css.
+  if (chrome.fonts.ui?.trim()) vars['--font-sans'] = chrome.fonts.ui.trim();
+  if (chrome.fonts.code?.trim()) vars['--font-mono'] = chrome.fonts.code.trim();
 
   // Semantic surfaces that read from primitives
   vars['--surface-shell'] = `rgb(var(--color-bg-1))`;

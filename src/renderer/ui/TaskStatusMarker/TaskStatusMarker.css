@@ -31,7 +31,7 @@
 
 .task-status-marker.is-snapshot.is-in-progress path,
 .task-status-marker.is-snapshot.is-completed path {
-  stroke: var(--token-text-inverse);
+  stroke: var(--token-text-on-accent);
 }
 
 .task-status-marker.is-snapshot.is-completed {

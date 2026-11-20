@@ -22,24 +22,30 @@
 
 专属 CSS 与组件就近维护，按 shell、输入、工具栏、内容与动效等稳定职责命名；不要按行数切成数字文件。迁移保持级联顺序、选择器优先级、变量作用域与容器查询，删除被替代文件和引用。共享弹层统一复用 TaskDialog、overlay stack 和 focus 管理；图片等特殊内容用专属内容布局保留展示空间。视觉调整必须针对明确缺陷，与结构迁移分开记录。
 
-RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 VS Code / JetBrains / Linear 的密度与克制）。裁决见 [`DESIGN.md`](../../DESIGN.md)「视觉定位」。
+RDC-Agent 是 **现代精密工作台**：工作区高密度，其余处从容。裁决见 [`DESIGN.md`](../../DESIGN.md)「视觉定位」。
 
-- 层次由 1px 边框 + 实色表面建立；阴影只用于 popover 与 modal。
+- 层次由分层实色表面、柔和 elevation（`--token-elevation-1/2/3`：卡片 / 浮层 / Sheet 与对话框）和 1px 半透明描边共同建立；不靠加粗边框或加深底色堆层次。
+- 圆角宽松：控件与输入 `--radius-md`（8），卡片 `--radius-card`（10），Sheet 与对话框 `--radius-sheet`（18），胶囊 `--radius-full`。
+- 动效只服务可追踪的状态变化：披露展开 `--motion-disclosure`、选中指示器 `--motion-indicator`、浮层进出 `--motion-overlay`，以及运行指示；系统减少动效时全部归零。
+- 字体：随应用打包 Inter 与 JetBrains Mono（`@fontsource-variable`，可变字重，许可信息保留在字体文件元数据中），中文落到系统字体；Appearance 选择的字体覆盖默认栈。标题用 `--tracking-heading` 轻微收紧，分组标签用 overline 角色加宽字距。
 - 不使用无状态含义的装饰性背景；仅有两处例外：Terminal 抽屉的表面渐变（见「Terminal 抽屉」）与空工作台工具卡的轻量 accent 渐变（顶部 ≤8% 混色与 2px 顶线）。Transcript 顶部渐隐遮罩属于滚动边缘处理，不算背景装饰。backdrop blur 只允许模态全屏遮罩（`--modal-backdrop` + `--modal-backdrop-filter`）；Dropdown / popover / chrome 仍为实色。Active Signal、Composer 绕光与 Effort 是核心状态视觉，保留完整动效。
-- 单一 accent 只承担 focus / selected / primary CTA；状态色只表达状态。
-- 信息密度优先于留白：同屏能多放一行真实信息，就不要用空白替代。
+- 单一 accent 只承担 focus / selected / primary CTA；状态色只表达状态。选中态用 `--token-selection-bg` 加 `--token-selection-indicator` 指示条，不只靠描边。
+- 灰色只表示「未开始或不做了」：任务状态色见 `--token-task-*`，完成是绿色而不是灰色。
+- accent 实色上的文字与图形用 `--token-text-on-accent`；滑块拇指、开关旋钮与档位圆点是控件表面，恒用 `--token-control-knob`（两套主题都是浅色，带细边与阴影），不随 accent 墨色变黑。
+- 工作区（对话、Working、列表）保持信息密度；设置、知识中心与空态给出清晰分组与留白，不用堆叠边框盒子分隔内容。
 
 ## 刻度（唯一真值：`src/renderer/styles/design-tokens.css`）
 
 | 维度 | 变量 | 取值 | 用法 |
 |------|------|------|------|
 | 控件高度 | `--control-height-sm/md/lg` | 28 / 32 / 36 | pill、列表行、导航项、输入框、按钮统一落在此三档 |
-| 圆角 | `--radius-sm/md/lg/xl/full` | 4 / 6 / 8 / 12 / 9999 | 卡片与输入 `md`；按钮与控件 `lg`（`--control-radius`）；Composer 壳 `lg`；pill `full` |
+| 圆角 | `--radius-sm/md/lg/xl/2xl/full` | 6 / 8 / 10 / 14 / 18 / 9999 | 控件、输入与按钮 `md`；卡片 `--radius-card`（lg）；Composer 壳与浮层 `xl`；Sheet 与对话框 `--radius-sheet`（2xl）；pill `full` |
 | 间距 | `--space-*` | 4 基（另有 `--space-0-5` 2px） | panel 内边距 `--space-3`（工作台右栏 inspector 外壳同此）；section 间距 `--space-5`；禁奇数 px |
 | 字号 | `--type-<角色>-size` / `-line` | 见下表 | 只引用角色；`data-font-scale` 的 small / large 同时重映射全部角色；caption 是 12px 下限 |
 | 行高 | `--leading-none/tight/snug/normal/relaxed` | 1 / 1.25 / 1.375 / 1.5 / 1.625 | 正文 `normal`，紧凑标题 `tight` |
-| 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | 统一 `--ease-standard`；`--transition-*` 是 `duration + ease` 别名 |
-| 字距 | `--tracking-tight/normal/wide` | -0.02 / 0 / 0.04em | 标题收紧、正文默认、标签加宽 |
+| 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | `--transition-*` 是 `duration + --ease-standard`；状态动效用 `--motion-disclosure` / `--motion-indicator`（`--ease-emphasized`）与 `--motion-overlay` |
+| 字距 | `--tracking-tight/heading/normal/wide/overline` | -0.02 / -0.011 / 0 / 0.04 / 0.06em | 大标题收紧、标题轻收、正文默认、标签与 overline 加宽 |
+| 阴影 | `--token-elevation-1/2/3` | 卡片 / 浮层 / Sheet 与对话框 | 只表达层级；不叠加装饰光晕 |
 
 
 **排版层级（唯一一套，跨界面通用）**
@@ -49,10 +55,12 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 | `display` | 24/32 · 22/30 · 26/34 | 空工作台等页面主标题 |
 | `title` | 18/26 · 17/24 · 20/28 | 对话框、面板、Settings 页头 |
 | `heading` | 15/24 · 14/22 · 16/26 | 分组、卡片标题 |
-| `body` | 14/22 · 13/20 · 15/24 | 界面正文、列表主文本、输入框 |
+| `body` | 14/22 · 13/20 · 15/24 | 界面正文、输入框 |
+| `item` | 14/22 · 13/20 · 15/24 | 供人扫读的列表行：任务、设置列表、知识卡片 |
 | `reading` | 15/26 · 14/24 · 16/28 | 回复与知识正文 |
 | `label` | 13/20 · 12/18 · 14/22 | 按钮、控件、字段名 |
 | `caption` | 12/18 · 12/18 · 13/20 | 说明、时间、计数（下限） |
+| `overline` | 12/16 · 12/16 · 13/18 | 列表上方的分组标签，配 `--tracking-overline` |
 | `code` | 13/20 · 12/18 · 14/22 | 代码、路径、ID（`--font-mono`） |
 
 CSS 写法：`font-size: var(--type-label-size); line-height: var(--type-label-line);`。字重用 `--font-*`。门禁拒绝任何非角色字号（包括对角色做缩小计算），原始 `--text-*` 刻度已删除。
@@ -124,7 +132,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 
 - **必须**引用语义 token（`--token-*`），禁止在组件 CSS 中直接用 primitive token（`--color-bg-3`、`rgb(var(--color-accent-500))` 等）。
 - `--token-*` 完整定义在 `src/renderer/styles/design-tokens.css` 的语义层。
-- 字号必须用 `var(--text-*)` 变量，**禁止** px 字面值。
+- 字号只引用排版角色 `var(--type-<角色>-size)` / `var(--type-<角色>-line)`，**禁止** px 字面值与对角色做缩放计算。
 - 间距必须用 `var(--space-*)` 变量，**禁止**奇数像素值（3px、7px、9px）。
 
 ## 按钮规则
@@ -174,7 +182,7 @@ Composer 底栏用量环保持 `--control-height-sm` 的原始外框，与发送
 - 图片卡 72px 圆角真实缩略图；文件卡类型字形 + 文件名 + `TYPE · size`。
 - 图片卡与文件卡都有「说明」按钮，打开 `TaskDialog` 形式的 `MaterialContextEditor` 编辑素材说明；图片还可在其中框选关注区域（以原图比例的 0–1 坐标记录），保存只写说明与区域，不改原图。文件名用 `OverflowFade`，完整名称保留在 `title`。
 - 移除叉仅 hover / `:focus-within` 显现；键盘聚焦时常驻。
-- 颜色、字号、间距只引用 `--token-*` / `--text-*` / `--space-*`；样式在 `composer-attachments.css`，禁止回到 `app-shell.css` 的 primitive token chip。
+- 颜色、字号、间距只引用 `--token-*` / `--type-*` / `--space-*`；样式在 `composer-attachments.css`，禁止回到 `app-shell.css` 的 primitive token chip。
 - `<=480px` 卡片缩尺、托盘限高滚动，不得挤掉底栏控件。
 
 ## Transcript 卡壳
@@ -201,7 +209,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog.tsx`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
 
-- 结构固定 `title`（+可选 `description`）/ `body`（唯一滚动区）/ `footer`（右对齐动作，主要动作在最右）。尺寸档位 `sm 420px` / `md 560px` / `lg 760px`，高度上限 `min(88vh, ...)`，`≤640px` 全屏。
+- 结构固定 `title`（+可选 `description`）/ `body`（唯一滚动区）/ `footer`（右对齐动作，主要动作在最右）。尺寸档位 `sm 26rem` / `md 35rem` / `lg 47.5rem`，高度上限 `min(100dvh − 2 × --space-6, 60rem)`，`≤640px` 收紧内边距与高度上限。圆角 `--radius-sheet`，阴影 `--token-elevation-3`。
 - 层级 `--z-overlay`，背景 `--token-bg-overlay`，阴影 `--token-shadow-modal`。焦点经 `lib/useModalFocus` 捕获；每个弹层在 `lib/overlayStack` 注册，Escape 与 Tab trap **只**作用栈顶层，关闭后焦点回到触发控件。
 - `ConfirmationDialog` 是 TaskDialog 的 `alertdialog` 变体，承担删除等危险确认（`danger` 主按钮，默认焦点在取消）；`UnsavedChangesDialog` 承担手动保存表单的「继续编辑 / 放弃更改」。自动保存表单失败走自身重试语义，不套这个模板。
 - 禁止 feature 内再造第二套 overlay / backdrop / 焦点栈。

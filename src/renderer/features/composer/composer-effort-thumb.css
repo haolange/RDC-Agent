@@ -49,18 +49,18 @@
   width: var(--space-2);
   height: var(--space-2);
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--token-text-inverse) 42%, transparent);
+  background: color-mix(in srgb, var(--token-control-knob) 42%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-bg-app) 12%, transparent);
   transform: translate(-50%, -50%);
 }
 
 .composer-effort-slider.is-max-visual .composer-effort-slider-stop::after {
-  background: color-mix(in srgb, var(--token-text-inverse) 78%, transparent);
+  background: color-mix(in srgb, var(--token-control-knob) 78%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-bg-app) 22%, transparent);
 }
 
 .composer-effort-slider.is-max-visual .composer-effort-slider-stop.is-current::after {
-  background: color-mix(in srgb, var(--token-text-inverse) 92%, transparent);
+  background: color-mix(in srgb, var(--token-control-knob) 92%, transparent);
 }
 
 .composer-effort-slider.is-disabled .composer-effort-slider-stop::after {
@@ -68,7 +68,7 @@
 }
 
 .composer-effort-slider-stop.is-current::after {
-  background: color-mix(in srgb, var(--token-text-inverse) 68%, transparent);
+  background: color-mix(in srgb, var(--token-control-knob) 68%, transparent);
 }
 
 .composer-effort-slider-thumb {
@@ -78,12 +78,10 @@
   top: 50%;
   width: var(--space-8);
   height: var(--space-8);
-  border: 1px solid var(--token-border-strong);
+  border: 1px solid var(--token-control-knob-border);
   border-radius: var(--radius-full);
-  background: var(--token-text-inverse);
-  box-shadow:
-    0 1px 6px color-mix(in srgb, var(--token-bg-app) 55%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--token-text-inverse) 24%, transparent);
+  background: var(--token-control-knob);
+  box-shadow: var(--token-control-knob-shadow);
   transform: translate(-50%, -50%);
   transition:
     left var(--composer-effort-position-duration, var(--transition-base)),

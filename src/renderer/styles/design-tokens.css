@@ -1,6 +1,7 @@
 /**
- * Design System - RDC-Agent professional workstation theme
- * A restrained debugging interface system for long RenderDoc sessions.
+ * Design System - RDC-Agent modern precision workbench
+ * Dense where work happens, calm everywhere else: layered surfaces, soft elevation, generous radii and
+ * purposeful motion over a single theme accent. Values here are the only literal scale in the renderer.
  */
 
 /* ========== CSS Custom Properties ========== */
@@ -97,17 +98,19 @@
   --space-20: 80px;
   --space-24: 96px;
 
-  /* Border Radius — restrained 4 / 6 / 8 / 12 / full */
+  /* Border Radius — 6 / 8 / 10 / 14 / 18 / full */
   --radius-none: 0;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
   --radius-full: 9999px;
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  /* Inter and JetBrains Mono ship with the app (@fontsource-variable); CJK falls through to the system face. */
+  --font-sans: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
   /* Typography roles (DESIGN.md): components reference a role, never a raw size. Readable text is
      never below 12px; the font-scale presets below remap the roles together. */
@@ -127,6 +130,12 @@
   --type-caption-line: 18px;
   --type-code-size: 13px;
   --type-code-line: 20px;
+  /* List rows people scan (Tasks, settings lists, knowledge cards): body size with a roomier line. */
+  --type-item-size: 14px;
+  --type-item-line: 22px;
+  /* Group labels above lists: small, tracked, quiet. */
+  --type-overline-size: 12px;
+  --type-overline-line: 16px;
 
   /* Font Weights */
   --font-normal: 400;
@@ -156,8 +165,10 @@
 
   /* Tracking */
   --tracking-tight: -0.02em;
+  --tracking-heading: -0.011em;
   --tracking-normal: 0;
   --tracking-wide: 0.04em;
+  --tracking-overline: 0.06em;
 
   /* Motion */
   --duration-fast: 120ms;
@@ -192,6 +203,13 @@
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  /* Entrances and state changes the eye should follow: fast start, long settle. */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Purposeful motion only: disclosure, selection indicators, overlays. Reduced motion zeroes them. */
+  --motion-disclosure: var(--duration-base) var(--ease-emphasized);
+  --motion-indicator: var(--duration-base) var(--ease-emphasized);
+  --motion-overlay: var(--duration-fast) var(--ease-decelerate);
 
   /* Animation Duration */
   --animation-typing: 1.4s;
@@ -202,9 +220,10 @@
   --animation-shake: 0.5s;
 
   /* Semantic Border Radius */
-  --radius-card: var(--radius-lg);        /* 8px - card */
-  --radius-button: var(--radius-lg);      /* 8px - 按钮 */
-  --radius-input: var(--radius-md);       /* 6px - 输入框 */
+  --radius-card: var(--radius-lg);        /* 10px - card */
+  --radius-button: var(--radius-md);      /* 8px - button */
+  --radius-input: var(--radius-md);       /* 8px - input */
+  --radius-sheet: var(--radius-2xl);      /* 18px - sheets and dialogs */
   --radius-bubble: var(--radius-xl);
   --radius-bubble-tail: var(--radius-md);
 
@@ -336,6 +355,10 @@
   --type-caption-line: 18px;
   --type-code-size: 12px;
   --type-code-line: 18px;
+  --type-item-size: 13px;
+  --type-item-line: 20px;
+  --type-overline-size: 12px;
+  --type-overline-line: 16px;
 }
 
 :root[data-font-scale='large'] {
@@ -355,6 +378,10 @@
   --type-caption-line: 20px;
   --type-code-size: 14px;
   --type-code-line: 22px;
+  --type-item-size: 15px;
+  --type-item-line: 24px;
+  --type-overline-size: 13px;
+  --type-overline-line: 18px;
 }
 
 /* ─── Semantic Token Layer ─────────────────────────────────────────────────
@@ -399,7 +426,17 @@
   --token-text-placeholder:    rgb(var(--color-text-muted));
   --token-text-disabled:       rgb(var(--color-text-disabled));
   --token-text-link:           rgb(var(--color-accent-ink));
-  --token-text-inverse:        rgb(var(--color-text-on-accent));
+  /* Text and glyphs on a filled accent surface (primary buttons, filled markers). */
+  --token-text-on-accent:      rgb(var(--color-text-on-accent));
+  /* Slider thumbs, switch knobs and stop dots: a constant light control face in both themes, never the ink. */
+  --token-control-knob:        rgb(255 255 255);
+  --token-control-knob-border: rgb(0 0 0 / 0.14);
+  --token-control-knob-shadow: 0 1px 2px rgb(0 0 0 / 0.24), 0 2px 6px rgb(0 0 0 / 0.16);
+
+  /* ── Selection ── */
+  --token-selection-bg:        rgb(var(--color-accent-500) / 0.12);
+  --token-selection-bg-hover:  rgb(var(--color-accent-500) / 0.16);
+  --token-selection-indicator: var(--token-accent-primary);
 
   /* ── Accent ── */
   --token-accent-primary:      rgb(var(--color-accent-ink));
@@ -415,6 +452,14 @@
   --token-status-warning:      rgb(var(--color-warning));
   --token-status-error:        rgb(var(--color-error));
   --token-status-info:         rgb(var(--color-info));
+
+  /* ── Task states ── grey only means "not happening": pending (hollow) and cancelled (slashed). */
+  --token-task-pending:        rgb(var(--color-text-tertiary));
+  --token-task-active:         var(--token-accent-primary);
+  --token-task-done:           rgb(var(--color-success));
+  --token-task-blocked:        rgb(var(--color-warning));
+  --token-task-failed:         rgb(var(--color-error));
+  --token-task-cancelled:      rgb(var(--color-text-muted));
 
   /* Effort 强度渐进指示专用，不得挪作装饰。普通档：低浅 → 高深（不含 Max）。 */
   --token-effort-fill-1:       hsl(265 46% 72%);
@@ -448,13 +493,17 @@
   /* ── Elevation (macOS-style depth) ──
    *  Components express depth through these tokens instead of hard 1px borders.
    *  `*-edge` appends a glassy top highlight; pair it after the shadow. */
-  --transcript-card-radius:    var(--radius-md);
+  --transcript-card-radius:    var(--radius-lg);
   --transcript-card-padding:   var(--space-2) var(--space-3);
   --transcript-card-border:    1px solid var(--token-border-muted);
   --transcript-card-surface:   var(--token-surface-sunken);
   --transcript-card-shadow:    var(--shadow-panel-hover);
   --transcript-card-icon-size: 14px;
 
+  /* Elevation: cards rest at 1, floating panels at 2, sheets and dialogs at 3. */
+  --token-elevation-1:         var(--shadow-sm);
+  --token-elevation-2:         var(--shadow-lg);
+  --token-elevation-3:         var(--shadow-xl);
   --token-shadow-raised:       var(--shadow-sm);
   --token-shadow-card:         var(--shadow-md);
   --token-shadow-popover:      var(--shadow-lg);
@@ -486,7 +535,7 @@
   --btn-font-weight:           var(--font-semibold);
   --btn-primary-bg:            var(--token-accent-primary);
   --btn-primary-bg-hover:      color-mix(in srgb, var(--token-accent-primary) 88%, var(--token-text-heading));
-  --btn-primary-text:          var(--token-text-inverse);
+  --btn-primary-text:          var(--token-text-on-accent);
   --btn-secondary-bg:          var(--token-bg-muted);
   --btn-secondary-bg-hover:    var(--token-interactive-hover);
   --btn-secondary-border:      var(--token-border-default);
@@ -518,13 +567,13 @@
   --card-bg:                   var(--token-bg-panel);
   --card-bg-hover:             var(--token-interactive-hover);
   --card-border:               var(--token-border-card);
-  --card-radius:               var(--radius-md);
+  --card-radius:               var(--radius-card);
   --card-shadow:               var(--token-shadow-card);
 
   /* ── Component: Modal / Dialog ── */
   --modal-bg:                  var(--token-bg-shell);
   --modal-border:              var(--token-border-default);
-  --modal-radius:              var(--radius-lg);
+  --modal-radius:              var(--radius-sheet);
   --modal-shadow:              var(--token-shadow-popover);
   --modal-backdrop:            color-mix(in srgb, var(--token-bg-app) 40%, transparent);
   --modal-backdrop-filter:     blur(16px);

@@ -37,7 +37,7 @@ function readFieldColors(el: HTMLElement): FieldColors {
     to: readCssColor(el, '--composer-effort-max-to', '--token-effort-max-to')
       || readCssColor(el, '--token-effort-fill-4', '--composer-effort-fill-4'),
     sparkle: readCssColor(el, '--composer-effort-max-sparkle', '--token-effort-max-sparkle')
-      || readCssColor(el, '--token-text-inverse', '--composer-effort-max-sparkle'),
+      || readCssColor(el, '--token-control-knob', '--composer-effort-max-sparkle'),
   };
 }
 

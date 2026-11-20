@@ -94,7 +94,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius-md);
-  color: var(--token-text-inverse);
+  color: var(--token-text-on-accent);
   font-size: var(--type-caption-size);
   font-weight: var(--font-semibold);
   letter-spacing: 0.01em;
