@@ -81,7 +81,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
       const baselineHash = hash(outputPath);
       copyFileSync(outputPath, path.join(directory, 'baseline.png'));
       const intervention = await invoke('intervention', 'rd.shader.edit_and_replace', {
-        event_id: eventId, stage: 'PS', source_encoding: 'glsl', entry: 'main', preserve_outputs: false,
+        event_id: eventId, stage: 'ps', source_encoding: 'glsl', entry: 'main', preserve_outputs: false,
         source_text: '#version 450\nlayout(location=0) out vec4 outColor;\nvoid main(){outColor=vec4(1.0,0.0,1.0,1.0);}',
       });
       const replacementId = receipts.read(sessionId, intervention).result.replacement_id;

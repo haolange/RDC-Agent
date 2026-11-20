@@ -66,6 +66,8 @@ export default defineConfig({
   ...shared,
   test: {
     globals: true,
+    // One isolated temp/home/app-data root for the whole run (a second per-project copy would nest
+    // TMPDIR and push Unix socket paths past their length limit).
     globalSetup: ['./scripts/vitest-global-setup.ts'],
     // Vitest reads coverage only here, not per project. The test:coverage scripts pick the project's
     // source set (--coverage.include) and report directory, so files no test imports still count.
@@ -81,7 +83,6 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: ['src/main/**/*.test.ts', 'src/shared/**/*.test.ts', 'src/preload/**/*.test.ts'],
-          globalSetup: ['./scripts/vitest-global-setup.ts'],
         },
       },
       {
