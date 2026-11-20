@@ -1,3 +1,4 @@
+import os from 'os';
 import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -39,15 +40,33 @@ interface GitOutput {
   stderr: string;
 }
 
+/**
+ * Command-line config outranks repository config, so these overrides keep a cloned
+ * repository from turning an observe-class git call into code execution.
+ */
+const INERT_GIT_CONFIG = [
+  '-c', 'core.quotepath=false',
+  '-c', 'core.fsmonitor=false',
+  '-c', `core.hooksPath=${os.devNull}`,
+  '-c', 'core.sshCommand=',
+  '-c', 'diff.external=',
+];
+
+/** Repository-local keys that name a program git may run; their presence fails closed. */
+const EXECUTABLE_CONFIG_KEY = /^(?:core\.(?:fsmonitor|hookspath|sshcommand|pager|editor|askpass)|diff\..+\.(?:textconv|command)|merge\..+\.driver|filter\..+\.(?:clean|smudge|process)|include(?:if\..+)?\.path|credential\..*helper|gpg\..*program|uploadpack\.packobjectshook)$/i;
+
+const GIT_ENVIRONMENT = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' };
+
 async function runGit(
   cwd: string,
   args: string[],
   signal?: AbortSignal,
 ): Promise<GitOutput> {
   try {
-    const result = await execFileAsync('git', ['-c', 'core.quotepath=false', ...args], {
+    const result = await execFileAsync('git', [...INERT_GIT_CONFIG, ...args], {
       cwd,
       encoding: 'utf8',
+      env: GIT_ENVIRONMENT,
       maxBuffer: GIT_MAX_OUTPUT_BYTES * 2,
       windowsHide: true,
       timeout: GIT_TIMEOUT_MS,
@@ -100,12 +119,22 @@ function createResult(cwd: string, args: string[], output: string): AgentToolRes
   };
 }
 
+/** `git config --list` only reads files; it never runs a configured program. */
+async function assertInertRepositoryConfig(gitRoot: string, signal?: AbortSignal): Promise<void> {
+  const output = await runGit(gitRoot, ['config', '--local', '--name-only', '--list'], signal);
+  const executable = output.stdout.split(/\r?\n/).map((key) => key.trim()).filter((key) => EXECUTABLE_CONFIG_KEY.test(key));
+  if (executable.length > 0) {
+    throw new Error(`GIT_REPOSITORY_CONFIG_EXECUTABLE: repository config names programs git would run (${[...new Set(executable)].join(', ')}). Review the repository configuration before using git tools.`);
+  }
+}
+
 async function executeGit(
   args: string[],
   contextRoot: string,
   signal?: AbortSignal,
 ): Promise<AgentToolResult<GitDetails>> {
   const gitRoot = await resolveGitRoot(contextRoot, signal);
+  await assertInertRepositoryConfig(gitRoot, signal);
   const output = await runGit(gitRoot, args, signal);
   const text = [output.stdout.trim(), output.stderr.trim()]
     .filter(Boolean)

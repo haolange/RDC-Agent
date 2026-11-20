@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
@@ -40,5 +40,18 @@ describe('GitTool', () => {
     const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
     expect(text).toMatch(/readme\.txt|No commits yet|##/);
     expect(result.details).toMatchObject({ cwd: expect.any(String), args: expect.any(Array) });
+  });
+
+  it('refuses a repository whose config names a program before git runs it', { timeout: 30_000 }, async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-git-tool-'));
+    roots.push(root);
+    const marker = path.join(root, 'fsmonitor-ran');
+    await execFileAsync('git', ['init'], { cwd: root, windowsHide: true });
+    await execFileAsync('git', ['config', 'core.fsmonitor', `node -e "require('fs').writeFileSync(process.argv[1],'x')" ${JSON.stringify(marker)}`], { cwd: root, windowsHide: true });
+    await writeFile(path.join(root, 'readme.txt'), 'hello\n', 'utf8');
+
+    await expect(gitStatusTool.execute('g4', { short: true }, undefined, undefined, contextFor(root)))
+      .rejects.toThrow(/GIT_REPOSITORY_CONFIG_EXECUTABLE: .*core\.fsmonitor/);
+    await expect(access(marker)).rejects.toThrow();
   });
 });

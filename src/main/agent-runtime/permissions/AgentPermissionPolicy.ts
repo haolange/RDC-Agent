@@ -102,10 +102,6 @@ const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
   'pwd',
   'echo',
   'write-output',
-  'git status',
-  'git diff',
-  'git show',
-  'git log',
 ];
 
 const POSIX_ROUTINE_COMMAND_PREFIXES = [
@@ -114,10 +110,6 @@ const POSIX_ROUTINE_COMMAND_PREFIXES = [
   'echo',
   'which',
   'where',
-  'git status',
-  'git diff',
-  'git show',
-  'git log',
 ];
 const DANGEROUS_COMMAND_PATTERNS = [
   /\brm\b/i,

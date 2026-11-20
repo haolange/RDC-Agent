@@ -101,7 +101,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - `ShellCommandRiskAnalyzer`：结构分析 + denied 词边界与路径前缀；最高分档为 `high`，只做审批路由，没有 `critical` 档位。
 - **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + 原生身份/路径等执行检查与操作系统权限。Electron renderer sandbox 不隔离主进程派生的普通 shell；不得宣称存在命令级 OS sandbox。
 - shell.rdc 与 shell.command 互斥。严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning root 的 full 天花板 profile、冻结 binding/catalog、lease、scope/effects、参数与路径。已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。实际执行再次验证，保留串行、取消、恢复及签名证据合同。
-- 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；一个 `git status` 不授权后续 `git reset --hard`。仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。专用 Git 工具仍经原权限入口，shell 不增加 Git 权限。
+- 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；用户允许 `git status` 不授权后续 `git reset --hard`。shell 里的 git 不属于例行命令：仓库配置可以指定 git 运行的程序。仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。专用 Git 工具以命令行配置覆盖 fsmonitor、hooks、外部 diff 与 sshCommand，仓库本地配置声明可执行程序（fsmonitor、hooksPath、textconv、filter、include 等）时拒绝执行；shell 不增加 Git 权限。
 - project 内普通 write_file/edit_file 可按 low risk 自动批准；执行层仍要求 realpath、无链接写入、文本大小及覆盖前同 session 成功读取。capture 输入、Git 元数据与 canonical knowledge 不作为通用写入目标；Agent/Skill/Hook/Policy/MCP/Memory、secret 与环境配置需要明确审核，不获得通用自动编辑许可。
 
 ### 独立权限审核

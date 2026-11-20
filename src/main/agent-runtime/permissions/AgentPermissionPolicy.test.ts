@@ -550,6 +550,15 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
     expect(decision.action).not.toBe('deny');
   });
 
+  it('reviews shell git because repository config can name programs git runs', () => {
+    const decision = service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
+      tool: shellTool,
+      toolCall: { type: 'toolCall', id: 'tc-shell', name: 'shell', arguments: { command: 'git status' } },
+      projectRootPath: workspaceRoot,
+    });
+    expect(decision.action).not.toBe('allow');
+  });
+
   it('denies path-prefixed /bin/rm against denied prefix rm', () => {
     mockSettings.agentRuntime.permissions.mode = 'custom';
     mockSettings.agentRuntime.permissions.deniedCommandPrefixes = ['rm'];
