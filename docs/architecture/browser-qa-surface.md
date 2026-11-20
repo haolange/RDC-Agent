@@ -53,6 +53,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
 - 手动：运行 `start:agent-browser`，从最新日志复制完整的一次性 `/qa?qaBootstrap=...` URL，核对真实 Settings / Project / Session / usage、语言持久化与 parity；高风险 channel 分别在未设置与设置 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时检查；仅在获授权的真实数据流程中显式使用 canonical userData。
+- 可读性：`RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 启动一个 disposable 实例（切换外观需要写设置），把日志路径交给 `node scripts/qa-readability.mjs <日志> [截图目录]`。它用这次的一次性 URL 进入，在 Settings › Appearance 切换深色/浅色，对首页、设置与 720px 窄屏逐一检查可见文字小于 12px、文字对比度低于 WCAG AA（正文 4.5:1、大字 3:1）与水平溢出，有问题即非零退出。Playwright 来自 QA 环境；CI 只执行静态的一半（`check:design-tokens` 的排版角色规则）。打印日志时遮去 `qaBootstrap` 令牌。
 
 ## 原生交互性能观察
 

@@ -1,7 +1,9 @@
 import {
   applyContrastPair,
   hexToRgb,
+  inkOn,
   normalizeHexColor,
+  readableOn,
   rgbToCssTriplet,
   scaleAccentPalette,
   scaleInkPalette,
@@ -40,6 +42,11 @@ export function compileThemeChrome(
   for (const [step, rgb] of Object.entries(surfaces)) {
     vars[`--color-bg-${step}`] = rgbToCssTriplet(rgb);
   }
+  // Accent text, icons and outlined CTAs must stay readable on every chrome surface they sit on, and
+  // filled accent surfaces carry whichever of near-black / near-white reads better on that ink.
+  const accentInk = readableOn(accents['400'], [surfaces['1'], surfaces['2'], surfaces['3']]);
+  vars['--color-accent-ink'] = rgbToCssTriplet(accentInk);
+  vars['--color-text-on-accent'] = rgbToCssTriplet(inkOn(accentInk));
   vars['--color-text-primary'] = rgbToCssTriplet(texts.primary);
   vars['--color-text-secondary'] = rgbToCssTriplet(texts.secondary);
   vars['--color-text-tertiary'] = rgbToCssTriplet(texts.tertiary);

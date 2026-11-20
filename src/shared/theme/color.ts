@@ -61,6 +61,38 @@ export function relativeLuminance({ r, g, b }: Rgb): number {
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
+export function contrastRatio(a: Rgb, b: Rgb): number {
+  const [lighter, darker] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+const NEAR_BLACK: Rgb = { r: 12, g: 16, b: 22 };
+const NEAR_WHITE: Rgb = { r: 248, g: 251, b: 255 };
+/** Luminance at which near-black and near-white read equally well. */
+const INK_FLIP_LUMINANCE = 0.18;
+
+/**
+ * The same hue moved away from the given backgrounds (darker on light surfaces, lighter on dark ones)
+ * just far enough to read at `minRatio` on every one of them.
+ */
+export function readableOn(color: Rgb, backgrounds: readonly Rgb[], minRatio = 4.5): Rgb {
+  const worstRatio = (candidate: Rgb) => Math.min(...backgrounds.map((background) => contrastRatio(candidate, background)));
+  if (worstRatio(color) >= minRatio) return color;
+  const meanLuminance = backgrounds.reduce((sum, background) => sum + relativeLuminance(background), 0) / backgrounds.length;
+  const direction = meanLuminance > INK_FLIP_LUMINANCE ? -1 : 1;
+  const hsl = rgbToHsl(color);
+  for (let lightness = hsl.l + direction; lightness >= 0 && lightness <= 100; lightness += direction) {
+    const candidate = hslToRgb({ ...hsl, l: lightness });
+    if (worstRatio(candidate) >= minRatio) return candidate;
+  }
+  return direction < 0 ? NEAR_BLACK : NEAR_WHITE;
+}
+
+/** Near-black or near-white, whichever reads better as text or icons on a filled `background`. */
+export function inkOn(background: Rgb): Rgb {
+  return contrastRatio(NEAR_BLACK, background) >= contrastRatio(NEAR_WHITE, background) ? NEAR_BLACK : NEAR_WHITE;
+}
+
 export function rgbToHsl({ r, g, b }: Rgb): Hsl {
   const rn = r / 255;
   const gn = g / 255;

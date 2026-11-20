@@ -57,7 +57,7 @@
 
 .ui-badge--accent {
   background: rgb(var(--color-accent-500) / 0.15);
-  color: rgb(var(--color-accent-400));
+  color: var(--token-accent-primary);
 }
 
 .ui-badge--success {

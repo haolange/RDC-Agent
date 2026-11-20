@@ -24,6 +24,11 @@ describe('composeAccent', () => {
     expect(light['--composer-effort-thumb']).toMatch(/^hsl\(/);
   });
 
+  it('puts the Send icon in whichever of near-black / near-white reads on the agent accent', () => {
+    expect(deriveComposeAccentVars('#33d1ff', 'dark')['--composer-mode-on-accent']).toBe('rgb(12 16 22)');
+    expect(deriveComposeAccentVars('#3b2fb8', 'dark')['--composer-mode-on-accent']).toBe('rgb(248 251 255)');
+  });
+
   it('keeps dark effort tiers visually anchored to a light violet agent accent', () => {
     const analyzer = deriveComposeAccentVars('#8d8bff', 'dark');
     expect(analyzer['--composer-mode-accent']).toBe('#8d8bff');

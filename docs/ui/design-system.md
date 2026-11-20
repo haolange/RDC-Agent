@@ -72,7 +72,8 @@ CSS 写法：`font-size: var(--type-label-size); line-height: var(--type-label-l
 | `rgb(var(--color-border-default))` | `var(--token-border-default)` |
 | `rgb(var(--color-border-secondary))` | `var(--token-border-card)` |
 | `rgb(var(--color-border-strong))` | `var(--token-border-strong)` |
-| `rgb(var(--color-accent-500))` | 焦点环 `var(--token-border-focus)`；强调文本/图标 `var(--token-accent-primary)` |
+| `rgb(var(--color-accent-500))` | 焦点环 `var(--token-border-focus)` |
+| `rgb(var(--color-accent-ink))` | 强调文本/图标/描边 CTA `var(--token-accent-primary)`、链接 `var(--token-text-link)` |
 | `rgb(var(--color-text-primary))` | `var(--token-text-heading)` |
 | `rgb(var(--color-text-secondary))` | `var(--token-text-body)` |
 | `rgb(var(--color-text-tertiary))` | `var(--token-text-caption)` |
@@ -142,6 +143,7 @@ Settings 辅助解释使用字段标签旁的 HelpTip，支持悬停、聚焦与
 ## 颜色使用规则
 
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
+- 强调文本、图标与描边 CTA 读 `--token-accent-primary`（primitive `--color-accent-ink`）：`ThemeChromeCompiler` 从 accent-400 出发，沿同一色相向远离背景的方向调亮度，直到在 `bg-1…bg-3` 上都达到 4.5:1；实心 accent 面上的文字/图标读 `--token-text-inverse`（`--color-text-on-accent`），取近黑与近白中对比更高者。Composer Send 同理读 compose 派生的 `--composer-mode-on-accent`。任何主题与自定义 accent 都不再靠人工挑色保证可读。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
 - **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框、send、Effort/Max 滑条、Max 字色、Max mode / Fast 角标开态）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
 - Effort 弹层的 Max mode / Fast mode 是稳定能力槽位，不随模型消失：面板里始终占位；unsupported 显示灰色关闭，fixed 显示灰色开启，selectable 才允许切换。收起胶囊只在对应模式开启时前置图标。

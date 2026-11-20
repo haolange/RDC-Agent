@@ -2,7 +2,7 @@ import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSettingsNavigationStore } from '../stores/settingsNavigationStore';
 
-export type WorkbenchSetupStepId = 'rdc' | 'model' | 'project';
+export type WorkbenchSetupStepId = 'rdcTool' | 'model' | 'project';
 
 export interface WorkbenchSetupStep {
   id: WorkbenchSetupStepId;
@@ -22,7 +22,7 @@ export function useWorkbenchSetup(): WorkbenchSetupStep[] {
   const requestAddProject = useProjectStore((state) => state.requestAddProject);
   const openSection = useSettingsNavigationStore((state) => state.openSection);
   return [
-    { id: 'rdc', done: rdcCli.enabled && rdcCli.command.trim().length > 0, act: () => openSection('tools') },
+    { id: 'rdcTool', done: rdcCli.enabled && rdcCli.command.trim().length > 0, act: () => openSection('tools') },
     { id: 'model', done: modelConnected, act: () => openSection('models') },
     { id: 'project', done: hasProject, act: requestAddProject },
   ];
