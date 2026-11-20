@@ -25,10 +25,6 @@
   gap: 0;
 }
 
-.work-process-step.kind-section > .work-process-step-content > .work-process-thinking-state + .work-process-prose {
-  margin-top: var(--space-2);
-}
-
 /* Beat kind-section / aggregate bottom padding so process→answer stays 10px. */
 .work-process-steps > .work-process-step:last-child {
   padding-bottom: 0;

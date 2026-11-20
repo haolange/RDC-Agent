@@ -15,9 +15,8 @@ const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<st
 const tool = (id: string, status: 'running' | 'pending' | 'error' | 'complete' = 'complete') => createToolRowForPresentation({
   id, toolName: 'read_file', status, startedAt: 1,
 }, t) as Extract<WorkProcessRow, { type: 'tool' }>;
-const section = (id: string, steps: WorkProcessRow[], proseText = ''): Extract<WorkProcessRow, { type: 'section' }> => ({
-  type: 'section', id, loopId: id, status: 'running', proseText, proseStreaming: false,
-  thinkingPreview: '', thinkingLabel: '', thinkingExpandable: false, thinkingOpenByDefault: false,
+const section = (id: string, steps: WorkProcessRow[]): Extract<WorkProcessRow, { type: 'section' }> => ({
+  type: 'section', id, loopId: id, status: 'running',
   steps, visibleSteps: steps, stepCount: steps.length, duration: '', defaultOpen: false,
 });
 it('preserves pending delegation until execution starts instead of creating a running node', () => {
@@ -62,7 +61,7 @@ it('finds the first visible event through silent model turns without changing or
   const rows = [section('a', []), section('b', [tool('first'), tool('second')]), section('c', [tool('third')])];
   expect(firstTrackEvent(rows)).toBe('b');
   expect(rows[1].visibleSteps.map(row => row.id)).toEqual(['first', 'second']);
-  expect(firstTrackEvent([section('narrative', [tool('first')], 'Start here')])).toBe('narrative');
+  expect(firstTrackEvent([section('acted', [tool('first')])])).toBe('acted');
   expect(firstTrackEvent([])).toBeUndefined();
 });
 
@@ -86,7 +85,7 @@ it('keeps started details stable during streaming and excludes future calls whil
   expect(denied.duration).toBe('');
 });
 it('gives silent tool sections a node without giving each tool another node', () => {
-  const rows: WorkProcessRow[] = [section('silent', [tool('first')]), tool('first'), tool('second'), section('new', [], 'Next step')];
+  const rows: WorkProcessRow[] = [section('silent', [tool('first')]), tool('first'), tool('second'), section('new', [tool('third')])];
   const html = renderToStaticMarkup(createElement(WorkProcessTrackContext.Provider, {
     value: 'silent', children: rows.map(row => createElement(WorkProcessRailIcon, { key: row.id, row })),
   }));
@@ -99,9 +98,7 @@ it('counts real parallel execution despite another child error and excludes appr
   const wait = tool('wait', 'running');
   wait.approval = { status: 'pending', verb: 'Waiting', message: '', metaLines: [] };
   expect([tool('error', 'error'), tool('a', 'running'), tool('b', 'running'), tool('pending', 'pending'), wait].filter(isTrackActivity)).toHaveLength(2);
-  expect(isTrackActivity({ ...section('settled-thinking', []), thinkingStatus: 'complete' })).toBe(false);
-  expect(isTrackActivity({ ...section('stream', []), proseStreaming: true })).toBe(true);
-  expect(isTrackActivity({ ...section('thinking', []), thinkingStatus: 'streaming' })).toBe(true);
+  expect(isTrackActivity(section('settled', [tool('done')]))).toBe(false);
   expect(isTrackActivity(section('tools', [tool('running', 'running')]))).toBe(true);
   expect(isTrackActivity(section('approval', [wait]))).toBe(false);
 });

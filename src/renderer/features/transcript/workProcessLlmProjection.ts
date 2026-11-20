@@ -93,12 +93,6 @@ export function projectLlmTurn(
       id: block.id,
       loopId: block.id,
       status: block.status,
-      proseText: '',
-      proseStreaming: false,
-      thinkingPreview: '',
-      thinkingLabel: '',
-      thinkingExpandable: false,
-      thinkingOpenByDefault: false,
       hasActiveTools: block.toolCalls.some((call) => isTaskLifecycleTool(call.toolName) && call.status === 'running'
         && call.executionStartedAt !== undefined && (!call.approval || call.approval.status === 'approved')),
       stepCount: deps.countToolSteps(steps),

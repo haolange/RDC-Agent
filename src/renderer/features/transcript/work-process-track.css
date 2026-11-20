@@ -77,7 +77,10 @@
 .work-process.is-collapsed .work-process-track::before,
 .work-process.is-collapsed .work-process-section > .work-process-event-anchor,
 .work-process.is-collapsed .work-process-section > .work-process-step-content > :not(.work-process-section-list),
-.work-process.is-collapsed .work-process-step:not(.work-process-section):not(.kind-output-final_answer) {
+/* Folding hides the process, never the reply: only commentary text folds away with the steps. Text whose
+   phase the provider never declared stays visible, like the final answer. */
+.work-process.is-collapsed .work-process-step:not(.work-process-section):not(.work-process-output),
+.work-process.is-collapsed .work-process-output.kind-output-commentary {
   display: none;
 }
 
@@ -87,12 +90,23 @@
   margin-top: 0;
 }
 
-.work-process-body:not(.is-embedded) .work-process-narrative-stream > .work-process-section:last-child
-  > .work-process-step-content > .work-process-section-list > .kind-output-final_answer:not(:has(~ :not(.kind-output-final_answer))) {
-  margin-left: calc(var(--work-track-gutter) * -1);
-  margin-right: calc(var(--work-process-inline-end-inset) * -1);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .work-process-rail-marker.is-running::after { animation: none; }
+}
+
+/* The group heading names a loop that acted and carries its rail node. */
+.work-process-section-heading {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  font-weight: var(--font-medium);
+}
+
+.work-process-section-heading.is-running {
+  color: var(--token-text-body);
+}
+
+.work-process-section-heading + .work-process-section-list {
+  margin-top: var(--space-2);
 }

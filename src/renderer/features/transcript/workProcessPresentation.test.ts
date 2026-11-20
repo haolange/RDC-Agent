@@ -207,10 +207,6 @@ describe('buildWorkProcessPresentation', () => {
       text: 'Inspecting capture metadata', phase: 'commentary', status: 'running',
     })]);
     expect(rowsOfType(presentation.rows, 'thinking')).toHaveLength(0);
-    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
-      thinkingLabel: '',
-      thinkingExpandable: false,
-    });
   });
 
   it('keeps settled commentary text even when the loop has no tool calls', () => {
@@ -442,11 +438,6 @@ describe('buildWorkProcessPresentation', () => {
       openByDefault: false,
     })]);
     expect(rowsOfType(presentation.rows, 'output').map((row) => row.text)).toEqual(['Read files before answering.']);
-    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
-      thinkingPreview: '',
-      thinkingLabel: '',
-      thinkingExpandable: false,
-    });
   });
 
   it('keeps each thinking block of one loop as its own row around the tool between them', () => {

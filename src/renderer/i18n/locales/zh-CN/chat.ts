@@ -30,6 +30,8 @@ export const zhChat = {
   'chat.system': '系统',
   'chat.thinking': '正在思考',
   'chat.workProcessTitle': '工作过程',
+  'chat.workProcessSectionRunning': '执行中 · {actions}',
+  'chat.workProcessSectionDone': '{actions} · {duration}',
   'chat.workProcessActions': '{count} 个动作',
   'chat.workProcessDuration': '耗时 {duration}',
   'chat.workProcessDurationRunning': '已运行 {duration}',

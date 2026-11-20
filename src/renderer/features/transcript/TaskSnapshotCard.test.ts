@@ -77,8 +77,7 @@ it('keeps all snapshots open until the user collapses one and remembers that ges
 
 it('defaults historical cards to open even when they belong to separate turns', () => {
   const section = (id: string, step: Extract<WorkProcessRow, { type: 'taskSnapshot' }>): Extract<WorkProcessRow, { type: 'section' }> => ({
-    type: 'section', id, status: 'complete', proseText: '', proseStreaming: false,
-    thinkingPreview: '', thinkingLabel: '', thinkingExpandable: false, thinkingOpenByDefault: false,
+    type: 'section', id, status: 'complete',
     stepCount: 1, duration: '', defaultOpen: true,
     steps: [step], visibleSteps: [step], loopId: id,
   });

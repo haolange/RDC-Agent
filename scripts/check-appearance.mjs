@@ -192,7 +192,7 @@ const mainTsx = scriptRead('src/renderer/main.tsx');
 assert(!mainTsx.includes('styles/tokens'), 'main.tsx must not import styles/tokens');
 assert(mainTsx.includes('styles/global.css'), 'main.tsx imports global.css');
 
-const types = scriptRead('src/renderer/features/settings/SettingsModal/types.ts');
+const types = scriptRead('src/renderer/lib/settingsSections.ts');
 assert(types.includes("'appearance'"), 'SettingsSection includes appearance');
 
 const applyChromeThemeSource = scriptRead('src/renderer/app/theme/applyChromeTheme.ts');

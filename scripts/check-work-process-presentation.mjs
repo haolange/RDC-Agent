@@ -75,13 +75,7 @@ const flattenRows = (rows) => rows.flatMap((row) => {
 });
 
 const collectVisible = (rows) => rows.flatMap((row) => {
-  if (row.type === 'section') return [
-    row.proseText,
-    row.thinkingLabel,
-    row.thinkingSource,
-    row.thinkingOpenByDefault ? row.thinkingPreview : '',
-    ...collectVisible(row.steps),
-  ].filter(Boolean);
+  if (row.type === 'section') return collectVisible(row.steps);
   if (row.type === 'toolAggregate') return [
     row.summary,
     ...collectVisible(row.children),
@@ -235,9 +229,8 @@ assert(
   loopOutputs.length === 1 && loopOutputs[0].text === 'Read files before answering.' && loopOutputs[0].phase === 'commentary',
   'tool-backed commentary should render as a narrative output row',
 );
-assert(loopSection.proseText === '', 'commentary must not also render as section prose');
+assert(!('proseText' in loopSection), 'commentary must not also render as section prose');
 assert(stepsOfType(loopSection, 'thinking').length === 0, 'commentary must not be promoted into a thinking row');
-assert(loopSection.thinkingLabel === '' && loopSection.thinkingPreview === '', 'commentary must not occupy the section thinking slot');
 assert(loopSection.stepCount === 2, `expected 2 tool actions in section, got ${loopSection.stepCount}`);
 const loopToolRows = stepsOfType(loopSection, 'tool');
 assert(loopToolRows.length === 2, `loop section should keep flat tool rows for two tools, got ${loopToolRows.length}`);
@@ -351,8 +344,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
 const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
 assert(
-  summaryThinkingSection.proseText === ''
-    && occurrences(summaryThinkingPresentation.rows, 'Turn result.') === 1
+  occurrences(summaryThinkingPresentation.rows, 'Turn result.') === 1
     && stepsOfType(summaryThinkingSection, 'output').every((row) => row.phase === 'final_answer'),
   'answer-only thinking must not duplicate final answer text as commentary or prose',
 );
@@ -1059,7 +1051,6 @@ assert(
   /\.work-process-user-input\s*\{[^}]*border:\s*1px\s+solid\s+var\(--token-border-muted\)/.test(cssSource),
   'Asked rows should use the same card border chrome as tool cards',
 );
-assert(presentationSource.includes('proseText'), 'presentation should expose narrative prose on sections');
 assert(presentationSource.includes('aggregateSectionSteps'), 'presentation should aggregate consecutive tools');
 assert(presentationSource.includes("type: 'toolAggregate'"), 'presentation should expose toolAggregate rows');
 assert(presentationSource.includes('buildToolAggregateSummary'), 'tool aggregate summaries should be built centrally');
@@ -1111,7 +1102,6 @@ for (const forbidden of ['Called tool']) {
 assert(!componentSource.includes('ToolGroupRow'), 'component must not render toolGroup shells');
 assert(componentSource.includes('ToolAggregateRow'), 'component should render tool aggregate rows');
 assert(componentSource.includes('work-process-narrative-stream'), 'component should use narrative stream list class');
-assert(componentSource.includes('work-process-prose'), 'component should render narrative prose');
 assert(!componentSource.includes('ResponseRow'), 'component must not render a Reply response boundary row');
 assert(!scriptExists('src/renderer/features/transcript/WorkProcessResponseRow.tsx'), 'WorkProcessResponseRow must be deleted');
 assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should use the process title translation');
@@ -1212,11 +1202,11 @@ assert(
   'Settings Diagnostics page must remain removed',
 );
 assert(
-  !readSource('src/renderer/features/settings/SettingsModal/types.ts').includes("'diagnostics'"),
+  !readSource('src/renderer/lib/settingsSections.ts').includes("'diagnostics'"),
   'SettingsSection must not restore diagnostics',
 );
 assert(
-  readSource('src/renderer/features/settings/SettingsModal/types.ts').includes("'policy'"),
+  readSource('src/renderer/lib/settingsSections.ts').includes("'policy'"),
   'SettingsSection must include peer policy navigation',
 );
 assert(
@@ -1254,10 +1244,6 @@ assert(
 assert(
   /\.work-process-steps\s*>\s*\.work-process-step:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-2\)/.test(cssSource),
   'adjacent visible tools and task snapshots must share one space-2 boundary',
-);
-assert(
-  /\.work-process-prose\s*\+\s*\.work-process-section-list\s*\{[^}]*margin-top:\s*var\(--space-3\)/.test(cssSource),
-  'thinking/commentary → first tool should use space-3 entrance margin',
 );
 assert(
   !cssSource.includes('.work-process-section + .work-process-section:not(.has-prose)'),
@@ -1320,7 +1306,6 @@ assert(
 );
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
-assert(cssSource.includes('.work-process-prose.is-streaming'), 'prose streaming indicator should exist');
 assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
 assert(!cssSource.includes('.work-process-step-rail'), 'segmented guides and nested rail suppression must be removed');
 assert(cssSource.includes('.work-process-rail-marker.is-running'), 'actual activity owns blue markers');

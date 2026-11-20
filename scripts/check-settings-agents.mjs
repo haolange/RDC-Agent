@@ -163,7 +163,7 @@ async function main() {
     'utf8',
   );
   const settingsModalTypes = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/types.ts'),
+    path.join(repoRoot, 'src/renderer/lib/settingsSections.ts'),
     'utf8',
   );
   const settingsModalCss = scriptReadCssBundle(
