@@ -2,3 +2,4 @@ export { ResourceListDetail, type ResourceListDetailProps } from './ResourceList
 export { SettingsField, type SettingsFieldProps } from './SettingsField';
 export { SettingsScopeBar } from './SettingsScopeBar';
 export { SettingsSection, type SettingsSectionProps } from './SettingsSection';
+export { useSettingsAutosave, type SettingsAutosaveStatus } from './useSettingsAutosave';

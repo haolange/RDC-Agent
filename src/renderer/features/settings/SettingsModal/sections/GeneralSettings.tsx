@@ -40,6 +40,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
       <div className="settings-general-grid">
         <ProfileSettings
           accountDraft={accountDraft}
+          savedProfile={settings.profile}
           onAccountDraftChange={onAccountDraftChange}
           onAvatarSelect={onAvatarSelect}
           onSave={onAccountSave}
@@ -71,6 +72,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
         </SettingsSection>
         <PersonalizationSettings
           globalInstructionsDraft={globalInstructionsDraft}
+          savedGlobalInstructions={settings.agents.globalInstructions}
           onGlobalInstructionsDraftChange={onGlobalInstructionsDraftChange}
           onSavePersonalization={onSavePersonalization}
           t={t}
