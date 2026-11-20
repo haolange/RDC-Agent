@@ -3,6 +3,7 @@ import { copyFileSync, cpSync, mkdtempSync, readFileSync, writeFileSync, mkdirSy
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
+import { rdcInstallationFiles } from '../platform/rdcLayout';
 import { isolatedRdcTools } from '../testing/isolatedRdcTools';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { assertExecutionEvidence } from '../investigation/investigationExecutionEvidence';
@@ -23,9 +24,9 @@ vi.mock('./RdcExecutionReceipts', async (original) => ({
     write: (...args: Parameters<RdcExecutionReceipts['write']>) => state.receipts!.write(...args),
   },
 }));
-const python = process.env.RDC_NATIVE_PYTHON;
+const root = process.env.RDC_NATIVE_TOOLS_ROOT;
 const fixture = process.env.RDC_NATIVE_CAPTURE;
-const enabled = Boolean(python && fixture && process.env.RDC_NATIVE_ALLOW_MUTATION === '1');
+const enabled = Boolean(root && fixture && process.env.RDC_NATIVE_ALLOW_MUTATION === '1');
 const hash = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
 
 function cleanupNativeTestDirectory(directory: string, testRoot: string): void {
@@ -35,7 +36,9 @@ rmSync(directory, { recursive: true, force: true });
 
 describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit disposable capture)', () => {
   it('changes actual pixels, rolls back, and verifies main-issued receipts', { timeout: 180_000 }, async () => {
-    const testRoot = path.resolve(path.dirname(python!), '../../../../intermediate/tool-convergence-tests/agent');
+    // Paths come from the host layout, so the same test runs on Windows and Linux installations.
+    const files = rdcInstallationFiles(root!);
+    const testRoot = path.join(root!, 'intermediate', 'tool-convergence-tests', 'agent');
     mkdirSync(testRoot, { recursive: true });
     const directory = mkdtempSync(path.join(testRoot, 'native-receipts-'));
     const nativeEnv = isolatedRdcTools(directory);
@@ -44,8 +47,8 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
     const before = hash(fixture!);
     const contextId = 'qa-receipt-' + randomUUID().slice(0, 12);
     const sessionId = 'qa-session-' + randomUUID();
-    const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: python!,
-      argsPrefix: [path.resolve(path.dirname(python!), '../../../../cli/run_cli.py')], env: nativeEnv, timeoutMs: 60_000 };
+    const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: files.python,
+      argsPrefix: [files.entry], env: nativeEnv, timeoutMs: 60_000 };
     const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => id === sessionId ? directory : null });
     const receipts = new RdcExecutionReceipts(resolver, () => 'isolated-integration-signing-key');
     state.receipts = receipts;
