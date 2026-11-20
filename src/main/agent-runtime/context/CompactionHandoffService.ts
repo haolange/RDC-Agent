@@ -1,4 +1,5 @@
-import { assistantMessageText, executeCompactionHandoff, type CompactionHandoffExecution } from './CompactionHandoffRuntime';
+import { assistantMessageText } from '../prompt/ToolFreeRequest';
+import { executeCompactionHandoff, type CompactionHandoffExecution } from './CompactionHandoffRuntime';
 import { parseModelHandoffSections } from './StructuredHandoffBuilder';
 import { ContextManager } from '../agent/ContextManager';
 

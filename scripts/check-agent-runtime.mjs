@@ -245,15 +245,18 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const conversationTurnStarter = read('src/main/conversation/ConversationTurnStarter.ts');
   const conversationTurnRunner = read('src/main/conversation/ConversationTurnRunner.ts');
   const conversationRuntimeSources = [conversationService, conversationPromptPreparer, conversationTurnStarter, conversationTurnRunner].join('\n');
-  assert(conversationPromptPreparer.includes('mergeTurnPreloadSkillIds'), 'Conversation prompt preparation must merge profile/$skill/pending skill preload ids.');
-  assert(conversationPromptPreparer.includes('SKILL_UNAVAILABLE'), 'Conversation prompt preparation must fail closed on missing preload skills.');
+  const turnPromptPlan = read('src/main/agent-runtime/orchestration/TurnPromptPlan.ts');
+  assert(conversationPromptPreparer.includes('buildTurnPromptPlan(') && read('src/main/agent-runtime/orchestration/PromptPlanForTurn.ts').includes('buildTurnPromptPlan('),
+    'Conversation and profile turns must build their PromptPlan through the one shared buildTurnPromptPlan.');
+  assert(turnPromptPlan.includes('mergeTurnPreloadSkillIds'), 'Turn prompt preparation must merge profile/$skill/pending skill preload ids.');
+  assert(turnPromptPlan.includes('SKILL_UNAVAILABLE'), 'Turn prompt preparation must fail closed on missing preload skills.');
   for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
     assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not keep legacy prompt/text-tool logic: ${forbidden}.`);
   }
   for (const forbidden of ['TASK_FILE_PATTERN', 'readFileSync(taskFilePath', 'fs.existsSync(taskFilePath']) {
     assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not preload local files outside the tool permission policy: ${forbidden}.`);
   }
-  assert(conversationPromptPreparer.includes('promptPlanBuilder.build'), 'Conversation prompt preparation must build a PromptPlan for system instructions.');
+  assert(turnPromptPlan.includes('promptPlanBuilder.build'), 'Turn prompt preparation must build a PromptPlan for system instructions.');
   assert(conversationPromptPreparer.includes('routeCapability: input.routePreflight.routeCapability'), 'Conversation prompt preparation must pass the frozen route capability into PromptPlanBuilder.');
   assert(conversationPromptPreparer.includes('permissionConstraints: runtimeSettings.agentRuntime.permissions'), 'Conversation prompt preparation must pass explicit frozen permission constraints into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');

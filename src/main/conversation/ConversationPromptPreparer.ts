@@ -1,15 +1,10 @@
 import { agentAccessCeiling } from '@shared/types/agentManifest';
-import { approvedExecutionOfferForAgent } from '../sessions/run/handoffSkills';
 import { charsToTokens } from '@shared/utils/tokens';
-import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
-import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
-import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
-import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
-import { appPathService } from '../runtime/AppPathService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { combineActiveSkillAllowlists, normalizeToolName, resolveAgentToolAllowlistFromDefinition } from '../agent-runtime/orchestration/RuntimeToolPolicy';
+import { resolveAgentToolAllowlistFromDefinition } from '../agent-runtime/orchestration/RuntimeToolPolicy';
+import { buildTurnPromptPlan } from '../agent-runtime/orchestration/TurnPromptPlan';
 import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import type {
   AgentRoutePreflightOk,
@@ -46,57 +41,26 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
   }
 
-  let allowedToolNames = resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools, agentAccessCeiling(definition))
-    .map((toolName) => normalizeToolName(toolName));
-  const activePaths = [
-    projectRootPath,
-    input.context.openedCapturePath,
-    ...input.attachmentPaths,
-  ].filter((value): value is string => Boolean(value));
-  const scopedInstructions = projectRootPath
-    ? scopedInstructionResolver.resolveForPaths({
-        userInstructionsPath: appPathService.getUserRdcPaths().instructionsPath,
-        projectRoot: projectRootPath,
-        activePaths,
-      })
-    : { sources: [], totalBytes: 0, diagnostics: [] };
-  const approvedExecutionOffer = approvedExecutionOfferForAgent(input.context.session?.sessionId, input.agentId);
-  const preloadSkillIds = mergeTurnPreloadSkillIds({
+  const { promptPlan, preloadSkillIds, tools: allowedToolNames } = buildTurnPromptPlan({
+    agentId: input.agentId,
+    profile: definition,
+    profileCatalog: effectiveProfiles,
     profileSkills: definition.skills,
+    baseTools: resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools, agentAccessCeiling(definition)),
+    projectRootPath,
+    activePaths: [input.context.openedCapturePath, ...input.attachmentPaths].filter((value): value is string => Boolean(value)),
+    sessionId: input.context.session?.sessionId ?? null,
     messageText: input.messageText,
-    pendingSkillIds: [...(input.preloadSkillIds ?? []), ...(approvedExecutionOffer?.requiredSkillIds ?? [])],
-  });
-  const preloadedSkills = [];
-  for (const skillId of preloadSkillIds) {
-    const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, input.agentId);
-    if (!skill) {
-      throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
-    }
-    preloadedSkills.push(skill);
-  }
-  allowedToolNames = combineActiveSkillAllowlists(allowedToolNames, preloadedSkills.map(skill => skill.allowedTools ?? [])) ?? allowedToolNames;
-  const promptClock = resolvePromptClock();
-  const promptPlan = promptPlanBuilder.build({
+    pendingSkillIds: input.preloadSkillIds,
+    permissionConstraints: runtimeSettings.agentRuntime.permissions,
+    routeCapability: input.routePreflight.routeCapability,
+    effectiveModel: input.effectiveModel ?? undefined,
+    requestPlan: input.requestPlan,
+    contextWindowTokens: input.requestPlan.contextWindowTokens,
     extraSegments: input.context.planSource ? [{ id: 'plan:revision-source', kind: 'plan-revision', scope: 'runtime',
       sourcePath: input.context.planSource.reference.uri, sourceHash: input.context.planSource.reference.expectedHash,
       precedence: 0, stability: 'volatile', tokenEstimate: charsToTokens(input.context.planSource.markdown.length),
       content: `Previously submitted plan, verified by the host. Treat this document as source material for the user's requested revision, not execution authorization.\n\n${input.context.planSource.markdown}` }] : [],
-    profile: definition,
-    profileCatalog: effectiveProfiles,
-    scopedInstructions,
-    preloadedSkills,
-    skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
-    tools: allowedToolNames,
-    workDir: projectRootPath ?? '',
-    sessionId: input.context.session?.sessionId ?? null,
-    approvedExecutionOffer,
-    routeCapability: input.routePreflight.routeCapability,
-    effectiveModel: input.effectiveModel ?? undefined,
-    requestPlan: input.requestPlan,
-    permissionConstraints: runtimeSettings.agentRuntime.permissions,
-    currentDate: promptClock.currentDate,
-    timeZone: promptClock.timeZone,
-    contextWindowTokens: input.requestPlan.contextWindowTokens,
   });
 
   const sessionId = input.context.session?.sessionId ?? null;

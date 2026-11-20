@@ -2,7 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { AssistantMessage } from '../core/types';
 const mock = vi.hoisted(() => ({ stream: vi.fn(), write: vi.fn(), complete: vi.fn() }));
 vi.mock('../providers/ConfiguredRuntimeProvider', () => ({ configuredRuntimeProvider: { stream: mock.stream }, encodeAgentModel: () => 'frozen-route' }));
-vi.mock('../prompt', () => ({ requestEnvelopeBuilder: { build: (value: unknown) => ({ id: 'snapshot', value }) }, requestSnapshotStore: { nextCallIndex: () => 1, write: mock.write, complete: mock.complete } }));
+vi.mock('../prompt/RequestEnvelopeBuilder', () => ({ requestEnvelopeBuilder: { build: (value: unknown) => ({ id: 'snapshot', value }) } }));
+vi.mock('../prompt/RequestSnapshotStore', () => ({ requestSnapshotStore: { nextCallIndex: () => 1, write: mock.write, complete: mock.complete } }));
 vi.mock('../prompt/PromptCacheCompiler', () => ({ promptCacheCompiler: { compile: () => ({ enabled: true }) } }));
 import { executePermissionReview, parsePermissionReview } from './PermissionReviewRuntime';
 const input: Parameters<typeof executePermissionReview>[0] = { sessionId: 'owner',
