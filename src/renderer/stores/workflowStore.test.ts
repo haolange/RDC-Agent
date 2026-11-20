@@ -3,7 +3,7 @@ import { useWorkflowStore } from './workflowStore';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 
 const rightPanel = {
-  progress: [],
+  tasks: [],
   artifacts: { rows: [], totalCount: 0, storeDegraded: false },
   outputs: { current: [], previous: [] },
   context: {
@@ -41,7 +41,7 @@ describe('workflowStore', () => {
     useWorkflowStore.getState().setTracePresentation(presentation());
     const next = presentation({
       updatedAt: '2026-01-01T00:00:01.000Z',
-      rightPanel: { ...rightPanel, progress: [] },
+      rightPanel: { ...rightPanel, tasks: [] },
     });
     useWorkflowStore.getState().setTracePresentation(next);
     expect(useWorkflowStore.getState().tracePresentation).toBe(next);

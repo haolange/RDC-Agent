@@ -2,7 +2,7 @@ import React from 'react';
 import type { RightRailEmptyKind } from './RightRailEmptyState';
 import './RightRailEmptyVisuals.css';
 
-const ProgressVisual = () => (
+const TasksVisual = () => (
   <>
     <path d="M49 19h75M49 36h75M49 53h75" />
     <circle cx="43" cy="19" r="4" />
@@ -47,7 +47,7 @@ const CaptureVisual = () => (
 );
 
 const visuals: Record<RightRailEmptyKind, React.ReactNode> = {
-  progress: <ProgressVisual />,
+  tasks: <TasksVisual />,
   artifacts: <ArtifactsVisual />,
   outputs: <OutputsVisual />,
   context: <ContextVisual />,

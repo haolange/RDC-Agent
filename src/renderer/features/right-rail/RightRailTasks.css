@@ -1,4 +1,4 @@
-/* Progress owns its populated density; empty rail cards retain their shared shell. */
+/* Tasks own their populated density; empty rail cards retain their shared shell. */
 .right-rail-section.is-populated > .right-rail-section-heading {
   display: flex;
   align-items: baseline;
@@ -8,7 +8,7 @@
   line-height: var(--leading-normal);
 }
 .right-rail-section.is-populated > .right-rail-section-content { margin-top: var(--space-2); }
-.right-rail-section .right-rail-progress { gap: 0; }
+.right-rail-section .right-rail-tasks { gap: 0; }
 .right-rail-task-row + .right-rail-task-row { border-top: 1px solid var(--token-border-subtle); }
 .right-rail-task-row > button {
   display: grid;

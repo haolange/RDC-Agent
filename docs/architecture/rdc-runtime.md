@@ -216,7 +216,7 @@ Tools 的安装前核验和只读核验共用 PM session 解析。应用重启�
 
 ## Right Rail projection
 
-Session Right Rail 固定为 `Progress / Artifacts / Outputs / Context / Capture` 五卡，Project 只显示 `Import .rdc` 与项目输入；投影合同见 [`docs/contracts/session-projection.md`](../contracts/session-projection.md)，owner-scoped 的 RDC 身份数据只供 agent 使用，不进入 rail 清单。
+Session Right Rail 固定为 `Tasks / Artifacts / Outputs / Context / Capture` 五卡，Project 只显示 `Import .rdc` 与项目输入；投影合同见 [`docs/contracts/session-projection.md`](../contracts/session-projection.md)，owner-scoped 的 RDC 身份数据只供 agent 使用，不进入 rail 清单。
 
 Android 启动沿唯一明确 Loader activity，正常系统授权等待使用原连接总预算，不另设 15 秒启动截止或以其它启动器覆盖原始结果。主进程调用同安装捆绑 Python 时，真正移除环境中的 PYTHONHOME/PYTHONPATH（包括环境继承），不能以空字符串代替删除；Shell 内部 env 的 undefined 只用于子进程 unset，不扩展 Settings/IPC 的配置模型。诊断详情保留有界 command/returncode/stdout/stderr，短标题不据英文错误猜测安装。
 

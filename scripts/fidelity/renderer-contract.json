@@ -194,7 +194,7 @@
     "captureReplayControls": "src/renderer/features/right-rail/CaptureReplayControls.tsx",
     "captureWorkspace": "src/renderer/features/right-rail/CaptureWorkspace.tsx",
     "capturePreviewHook": "src/renderer/features/right-rail/useCapturePreview.ts",
-    "rightRailProgressList": "src/renderer/features/right-rail/RightRailProgressList.tsx",
+    "rightRailTaskList": "src/renderer/features/right-rail/RightRailTaskList.tsx",
     "captureReplayCss": "src/renderer/features/right-rail/CaptureReplay.css",
     "rdcSessionService": "src/main/rdc/RdcSessionService.ts",
     "app.sessionSubscriptions": "src/renderer/app/bootstrap/sessionSubscriptions.ts",

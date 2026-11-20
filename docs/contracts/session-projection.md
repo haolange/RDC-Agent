@@ -92,7 +92,7 @@ interface ActiveTurnContext {
 
 Right Rail 的任务资源与 Capture 状态以完整的 `{ projectId, sessionId, payload }` envelope 限定作用域。`context:get`、`capture:getOpenedState`、replay apply 与 close 请求必须显式给出 scope，无 owner scope 时返回 `null`。`context:changed`、`capture:openedStateChanged` 与会话 capture 状态更新使用同一 envelope。Renderer 按 owner session 缓存后台 payload；只有 Active Session 会 hydrate Context 资源与常驻的 Capture 区域，其他 session 的迟到事件不能覆盖这两处。
 
-Outputs 走同一条 session 所属的投影路径。`output_register` 在复制一个已完成的项目文件后写入显式的 run 级制品记录；该 session 刷新后投影进 Outputs。`tracePresentation.rightPanel` 承载 Progress、Artifacts、Outputs、Context，Capture 走独立 scoped 通道；整体为 Progress / Artifacts / Outputs / Context / Capture 单轨。Investigation Artifacts 与 Outputs 不混用。renderer 不做路径发现，后台 session 的制品事件不得填充当前右栏。
+Outputs 走同一条 session 所属的投影路径。`output_register` 在复制一个已完成的项目文件后写入显式的 run 级制品记录；该 session 刷新后投影进 Outputs。`tracePresentation.rightPanel` 承载 Tasks、Artifacts、Outputs、Context，Capture 走独立 scoped 通道；整体为 Tasks / Artifacts / Outputs / Context / Capture 单轨。Investigation Artifacts 与 Outputs 不混用。renderer 不做路径发现，后台 session 的制品事件不得填充当前右栏。
 
 ## Capture Replay projection
 
@@ -108,7 +108,7 @@ Capture 的人工与 Agent 控制共用同一当前回放状态、图片、原�
 
 子代理卡片由父消息中的 tool call 定位；会话拥有的委派日志独立增量持久化。`conversation:getDelegationTrace` 的零页只返回头部，含子执行状态及后台 Task Execution 状态；两者含义不同。步骤页带稳定 ID、revision 和可见 `ConversationWorkBlock`；工作过程首次展开取最近 40 步，向前每页 40 步，运行中按 revision 合并。`conversation:getDelegationContent` 校验当前 session、父调用、child session、execution ID 与 generation，再以 UTF-8 字节偏移分块读取结构化任务、实际发送载荷、final、父调用/回执或指定子工具回执；分页不得拆断字符。`conversation:delegationChanged` 携带 session、父调用与 revision，仅刷新对应卡片；切换 session、取消及身份变化后的迟到结果不得进入当前视图。后台 Task 在父消息结束后仍可更新其记录，终态后迟到通知不得重新激活。
 
-Progress 的任务定位仅通过 renderer 内部有类型的请求收集工作记录中的候选卡，由窗口化列表负责展开、滚动与聚焦；请求不提供任务状态，也不增加公共 IPC。历史 Task 卡保留事件发生时的列表，右栏仍读取最新 `taskProjection`。
+Tasks 的任务定位仅通过 renderer 内部有类型的请求收集工作记录中的候选卡，由窗口化列表负责展开、滚动与聚焦；请求不提供任务状态，也不增加公共 IPC。历史 Task 卡保留事件发生时的列表，右栏仍读取最新 `taskProjection`。
 
 计划门与普通工具审批互斥投影，包括 delegated 请求。子计划的内容与决定绑定 child owner，parent 仅承载显示与回答入口。建议行 Agent 切换成功后，send:true直接发送显式载荷、send:false才预填；当前会话变化、Stop、请求失效或切换失败必须丢弃迟到结果，不覆盖其他会话草稿。
 
@@ -153,7 +153,7 @@ EffectiveCatalogSnapshot 的 scopeGeneration 由主进程配置代次签发，pr
 
 ### Tasks 依赖等待投影
 
-ProgressTask 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、可选 title、reason: unfinished/unverified/missing）。五种 status 不因依赖变化改写；statusReason 只保留任务本身原因。主进程执行准入和等待信息共用同一证明判定。右栏读取任务与执行的一致快照，任务事件在当前事务中冻结同一信息；renderer 不重算依赖，历史快照不跟随最新状态。pending 等待使用灰色空心圆及“等待前置任务”提示，原因按需展开；真正 blocked 才使用黄色受阻标记。
+TaskRailItem 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、可选 title、reason: unfinished/unverified/missing）。五种 status 不因依赖变化改写；statusReason 只保留任务本身原因。主进程执行准入和等待信息共用同一证明判定。右栏读取任务与执行的一致快照，任务事件在当前事务中冻结同一信息；renderer 不重算依赖，历史快照不跟随最新状态。pending 等待使用灰色空心圆及“等待前置任务”提示，原因按需展开；真正 blocked 才使用黄色受阻标记。
 
 
 ### 计划批准与交接

@@ -3,8 +3,8 @@ import { OverflowFade } from '../../ui/OverflowFade';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import { useI18n } from '../../i18n';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
-import type { ProgressTask } from '@shared/types/trace';
-import './RightRailProgress.css';
+import type { TaskRailItem } from '@shared/types/trace';
+import './RightRailTasks.css';
 
 const focusWorkProcessTask = (taskId: string): void => {
   const candidates: WorkProcessTaskLocationRequest['candidates'] = [];
@@ -16,10 +16,10 @@ const focusWorkProcessTask = (taskId: string): void => {
   latest?.reveal();
 };
 
-export const RightRailProgressList: React.FC<{ tasks: ProgressTask[]; locateLabel: string }> = React.memo(({ tasks, locateLabel }) => {
+export const RightRailTaskList: React.FC<{ tasks: TaskRailItem[]; locateLabel: string }> = React.memo(({ tasks, locateLabel }) => {
   const { t } = useI18n();
   return <>
-    <ol className="right-rail-progress">{tasks.map((task) => (
+    <ol className="right-rail-tasks">{tasks.map((task) => (
       <li key={task.id} className={`right-rail-task-row status-${task.status}`}>
         <button type="button" onClick={() => focusWorkProcessTask(task.id)} title={`${task.title} — ${task.waitingOn?.length ? `${t('chat.taskWaitingDependencies')} — ` : ''}${locateLabel}`}>
           <span className="right-rail-task-order">{task.order + 1}</span>

@@ -4,6 +4,7 @@ import type {
   InvestigationMission,
   InvestigationRecordType,
 } from './renderdocInvestigation';
+import type { ConversationTaskStatus } from './conversation';
 import type { TaskDependencyWait } from './taskExecution';
 
 export interface RawAuditRef {
@@ -15,20 +16,14 @@ export interface RawAuditRef {
   ref?: string;
 }
 
-export type ProgressTaskStatus =
-  | 'pending'
-  | 'in_progress'
-  | 'completed'
-  | 'blocked'
-  | 'cancelled';
-
-export interface ProgressTask {
+/** One Task as the session right rail shows it, projected by main from TaskRegistry. */
+export interface TaskRailItem {
   id: string;
   sessionId: string;
   traceLaneId: string;
   branchId: string;
   title: string;
-  status: ProgressTaskStatus;
+  status: ConversationTaskStatus;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -237,7 +232,7 @@ export interface ContextPanelViewModel {
 }
 
 export interface RightPanelViewModel {
-  progress: ProgressTask[];
+  tasks: TaskRailItem[];
   artifacts: InvestigationArtifactsPanelViewModel;
   outputs: OutputsPanelViewModel;
   context: ContextPanelViewModel;

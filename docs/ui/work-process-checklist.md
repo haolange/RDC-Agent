@@ -39,7 +39,7 @@
 - 或 ≥8 聚合摘要行。
 - 同 loop 连续 tool 外距 `--space-2`。
 - thinking/commentary → 首个 tool 与有可见叙述的 section 入口为 `--space-3`；无叙述 section、Tasks 快照及其他相邻事件统一 `--space-2`。窗口化前后不得重复计入间距。
-- file/search/shell/git/web/memory/skill/mcp/runtime/interpreter/generic 族模板一致；Tasks 在主回合内每次实际创建/更新各留一张历史卡，批量创建一张，状态在提交时冻结，按事件 ID 去重。卡头显示添加/更新与完成数量，不显示伪工具耗时；逐项图形显示待办/进行中/完成/受阻/取消，右栏 Progress 仍用序号呈现最新状态。每张历史卡初次出现默认展开，手动开合跨窗口化重挂载保持，后续更新不自动折叠或重开；旧记录以中性标题读取。Compact 区分自动/手动并展示计数。
+- file/search/shell/git/web/memory/skill/mcp/runtime/interpreter/generic 族模板一致；Tasks 在主回合内每次实际创建/更新各留一张历史卡，批量创建一张，状态在提交时冻结，按事件 ID 去重。卡头显示添加/更新与完成数量，不显示伪工具耗时；逐项图形显示待办/进行中/完成/受阻/取消，右栏 Tasks 仍用序号呈现最新状态。每张历史卡初次出现默认展开，手动开合跨窗口化重挂载保持，后续更新不自动折叠或重开；旧记录以中性标题读取。Compact 区分自动/手动并展示计数。
 - turn_complete：卡头「已记录本轮声明」；含 unresolved 时列「剩余工作」（gap / 阻塞类型 / 已尝试 · 恢复条件），窄容器换行；旧结果仅显示声明。
 - 每个 builtin tool 唯一 header glyph（`mcp__*`→`plug`）。
 - 结构节点只标识起始及真实叙述入口，内部模型轮次不另打点。

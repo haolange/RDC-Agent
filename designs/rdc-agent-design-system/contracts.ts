@@ -29,7 +29,7 @@ export const contracts = {
     motion: '运行标识来自任务状态；展开不重置历史，也不恢复已结束的运行效果。',
     consumers: 'features/transcript/WorkProcessRows.tsx',
   },
-  RightRailProgressList: {
+  RightRailTaskList: {
     avoid: '不从选中状态推断 running，不显示其它会话的后台任务。',
     states: '空任务、各任务终态、活动任务、长名称、定位目标不可见。',
     layout: '单轨列表随右栏伸缩；名称按实际宽度渐隐并提供完整提示。',
@@ -97,7 +97,7 @@ export const contracts = {
     states: 'active/inactive、工作/思考 tone；pending/in_progress/blocked/completed/cancelled。',
     layout: '由轨道放置；禁止父样式覆盖 active 文字遮罩、变量或伪元素层级。',
     motion: '冻结现有从左到右 active-signal-shimmer；不创建第二套扫光或全局停播规则。',
-    consumers: 'Transcript 工作过程、TaskSnapshotCard、RightRailProgressList。',
+    consumers: 'Transcript 工作过程、TaskSnapshotCard、RightRailTaskList。',
   },
   'ColorField / HelpTip': {
     avoid: '不恢复系统原生取色弹窗；HelpTip 不承载必须立即可见的错误和权限。',

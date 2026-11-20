@@ -15,8 +15,8 @@ export const TaskSnapshotCard: React.FC<{
   const [expanded, toggle] = useScopedWorkDisclosure(`task-snapshot-${row.id}`, true);
   const listId = useId();
   const reasonText = (reason: string) => reason === TASK_STATUS_REASONS.parentTurnStopped
-    ? t('control.rightRail.progress.reason.parentTurnStopped') : reason === TASK_STATUS_REASONS.createdTurnStopped
-      ? t('control.rightRail.progress.reason.createdTurnStopped') : reason;
+    ? t('control.rightRail.tasks.reason.parentTurnStopped') : reason === TASK_STATUS_REASONS.createdTurnStopped
+      ? t('control.rightRail.tasks.reason.createdTurnStopped') : reason;
   const title = row.change === 'created' ? t('chat.workProcessTaskSnapshotCreated')
     : row.change === 'updated' ? t('chat.workProcessTaskSnapshotUpdated')
       : t('chat.workProcessTaskSnapshotList');

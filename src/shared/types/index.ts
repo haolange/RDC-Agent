@@ -410,7 +410,7 @@ export type {
 } from './workflow';
 export type {
   BranchNavigatorViewModel,
-  ProgressTask,
+  TaskRailItem,
   RequestBranch,
   RequestBranchGroup,
   InvestigationArtifactRow,

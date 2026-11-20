@@ -7,10 +7,10 @@ import { RightRailArtifactList } from './RightRailArtifactList';
 import { RightRailContext } from './RightRailContext';
 import { RightRailEmptyState as EmptyState } from './RightRailEmptyState';
 import { RightRailOutputList } from './RightRailOutputList';
-import { RightRailProgressList } from './RightRailProgressList';
+import { RightRailTaskList } from './RightRailTaskList';
 import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 
-type RailTab = 'progress' | 'artifacts' | 'outputs' | 'context' | 'capture';
+type RailTab = 'tasks' | 'artifacts' | 'outputs' | 'context' | 'capture';
 
 const RailSection: React.FC<{ id: RailTab; title: string; populated?: boolean; meta?: string; children: React.ReactNode }> = ({ id, title, populated = false, meta, children }) => (
   <section className={`right-rail-section${populated ? ' is-populated' : ''}`} data-testid={`right-rail-${id}`}>
@@ -24,15 +24,15 @@ const TabLabel: React.FC<{ title: string; count?: string }> = ({ title, count })
 );
 
 /**
- * The session inspector: one tab bar over Progress / Artifacts / Outputs / Context / Capture, showing one
+ * The session inspector: one tab bar over Tasks / Artifacts / Outputs / Context / Capture, showing one
  * section at a time so an empty session is one quiet panel rather than five stacked placeholders.
  */
 export const SessionRightRail: React.FC = () => {
   const { t } = useI18n();
-  const [tab, setTab] = useState<RailTab>('progress');
+  const [tab, setTab] = useState<RailTab>('tasks');
   const presentation = useWorkflowStore((state) => state.tracePresentation);
   const rightPanel = presentation?.rightPanel;
-  const tasks = rightPanel?.progress ?? [];
+  const tasks = rightPanel?.tasks ?? [];
   const artifacts = rightPanel?.artifacts ?? { rows: [], totalCount: 0, storeDegraded: false };
   const outputs = rightPanel?.outputs ?? { current: [], previous: [] };
   const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context?.task;
@@ -41,13 +41,13 @@ export const SessionRightRail: React.FC = () => {
   const outputCount = outputs.current.length + outputs.previous.length;
   const hasTaskContext = Boolean(taskContext?.resources.length);
   const hasCapture = Boolean(taskContext && captureContext && captureContext.availableCaptures.length);
-  const progressSessionId = tasks[0]?.sessionId ?? 'no-session';
-  const progressCount = tasks.length
-    ? t('control.traceProgressCount', { done: tasks.filter(task => task.status === 'completed').length, total: tasks.length })
+  const taskSessionId = tasks[0]?.sessionId ?? 'no-session';
+  const taskCount = tasks.length
+    ? t('control.rightRail.tasks.count', { done: tasks.filter(task => task.status === 'completed').length, total: tasks.length })
     : undefined;
 
   const tabs = [
-    { id: 'progress', label: <TabLabel title={t('control.rightRail.progress.title')} count={progressCount} /> },
+    { id: 'tasks', label: <TabLabel title={t('control.rightRail.tasks.title')} count={taskCount} /> },
     { id: 'artifacts', label: <TabLabel title={t('control.rightRail.artifacts.title')} count={hasArtifacts ? String(artifacts.totalCount) : undefined} /> },
     { id: 'outputs', label: <TabLabel title={t('control.rightRail.outputs.title')} count={outputCount ? String(outputCount) : undefined} /> },
     { id: 'context', label: <TabLabel title={t('control.rightRail.context.title')} /> },
@@ -56,12 +56,12 @@ export const SessionRightRail: React.FC = () => {
 
   const panel = (() => {
     switch (tab) {
-      case 'progress':
+      case 'tasks':
         return (
-          <RailSection id="progress" populated={tasks.length > 0} meta={progressCount} title={t('control.rightRail.progress.title')}>
+          <RailSection id="tasks" populated={tasks.length > 0} meta={taskCount} title={t('control.rightRail.tasks.title')}>
             {tasks.length ? (
-              <RightRailProgressList key={progressSessionId} tasks={tasks} locateLabel={t('control.rightRail.locateTask')} />
-            ) : <EmptyState kind="progress" copy={t('control.rightRail.progress.empty')} />}
+              <RightRailTaskList key={taskSessionId} tasks={tasks} locateLabel={t('control.rightRail.locateTask')} />
+            ) : <EmptyState kind="tasks" copy={t('control.rightRail.tasks.empty')} />}
           </RailSection>
         );
       case 'artifacts':

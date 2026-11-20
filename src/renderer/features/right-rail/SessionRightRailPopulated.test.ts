@@ -39,7 +39,7 @@ function presentation(): AgentRunPresentation {
     projectId: 'project', sessionId: 'session', activeBranchId: 'branch', profileId: 'general',
     updatedAt: '2026-09-22T00:00:00Z', runs: [], rawAuditRefs: [],
     rightPanel: {
-      progress: [], artifacts: { rows: [artifact], totalCount: 1, storeDegraded: false },
+      tasks: [], artifacts: { rows: [artifact], totalCount: 1, storeDegraded: false },
       outputs: { current: [], previous: [] },
       context: {
         task: { projectId: 'project', projectName: 'Project', sessionId: 'session', sessionTitle: 'Session',

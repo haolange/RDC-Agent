@@ -24,7 +24,7 @@
 | ActiveSignalText、TaskStatusMarker | Transcript 工作过程、右栏进度 | selected 与 running 分离；左到右扫光只使用现有实现 |
 | ComposerMarkdownInput | features/composer/ComposerEditor | 输入与 Markdown 预览保持领域所有权；文档仅本地回调 |
 | PlanCard、TaskSnapshotCard | features/transcript/WorkProcessRows | 保留时间顺序、多交接动作和会话展开记忆；PlanCard 通过 onOpen 交还全文入口 |
-| RightRailProgressList | features/right-rail | 当前会话单轨投影，不从动画推断运行状态 |
+| RightRailTaskList | features/right-rail | 当前会话单轨投影，不从动画推断运行状态 |
 | ComposerModelEffortPanel、EffortMaxField | features/composer/ComposerModelEffortControl | Max 特效仍由 useMaxVisualController + maxVisual 时间线 + EffortMaxField 共同实现；不复制到通用 ui |
 
 Max 视觉验收与模型调用分开：可在真实滑条上检查进入、持续、重开和退出，但模型验证请求使用 Low。Composer 边缘绕光与 ActiveSignalText 扫光也通过真实 working 链路验收；目录样例不能替代该证据。
