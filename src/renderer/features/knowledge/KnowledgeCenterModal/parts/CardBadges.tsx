@@ -1,4 +1,5 @@
 import { useI18n } from '../../../../i18n';
+import { Badge, type BadgeTone } from '../../../../ui/Badge';
 import { LIFECYCLE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import type { KnowledgeCardType, KnowledgeLifecycle } from '@shared/types/knowledge';
 
@@ -8,22 +9,27 @@ interface CardBadgesProps {
   sourceStatus?: string;
 }
 
+/** Lifecycle reads as state (verified succeeds, retired recedes); type and source are plain labels. */
+const LIFECYCLE_TONE: Record<KnowledgeLifecycle, BadgeTone> = {
+  draft: 'neutral', candidate: 'warning', verified: 'success', promoted: 'accent', retired: 'neutral',
+};
+
 export function CardBadges({ type, lifecycle, sourceStatus }: CardBadgesProps) {
   const { t } = useI18n();
   return (
-    <div className="knowledge-center-badges">
-      {type && <span className="knowledge-center-badge">{t(TYPE_LABEL_KEYS[type])}</span>}
+    <span className="knowledge-center-badges">
+      {type && <Badge variant="outline">{t(TYPE_LABEL_KEYS[type])}</Badge>}
       {lifecycle && (
-        <span className={`knowledge-center-badge knowledge-center-badge--${lifecycle}`}>
+        <Badge tone={LIFECYCLE_TONE[lifecycle]} variant={lifecycle === 'draft' || lifecycle === 'retired' ? 'outline' : 'soft'}>
           {t(LIFECYCLE_LABEL_KEYS[lifecycle])}
-        </span>
+        </Badge>
       )}
       {sourceStatus && (
-        <span className="knowledge-center-badge">
+        <Badge variant="outline">
           {sourceStatus}
           {sourceStatus === 'fixed' ? ` ${t('knowledgeCenter.fixedNotVerified')}` : ''}
-        </span>
+        </Badge>
       )}
-    </div>
+    </span>
   );
 }

@@ -7,8 +7,8 @@
 
 .knowledge-center-markdown {
   color: var(--token-text-body);
-  font-size: var(--type-body-size);
-  line-height: var(--leading-normal);
+  font-size: var(--type-reading-size);
+  line-height: var(--type-reading-line);
   overflow-wrap: anywhere;
 }
 

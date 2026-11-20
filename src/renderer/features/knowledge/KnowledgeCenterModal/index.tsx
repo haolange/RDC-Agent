@@ -124,8 +124,18 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               </h2>
             </div>
             <div className="knowledge-center-topbar-actions">
-              <Button variant="secondary" size="sm" onClick={() => void topics.openPanel()} data-testid="knowledge-topics-open">
+              {/* Organizing and exporting are occasional; importing is the one primary action. */}
+              <Button variant="ghost" size="sm" onClick={() => void topics.openPanel()} data-testid="knowledge-topics-open">
                 {t('knowledgeCenter.topicsTitle')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!exporter.canExport}
+                onClick={exporter.openPanel}
+                data-testid="knowledge-center-export-open"
+              >
+                {t('knowledgeCenter.exportKnowledge')}
               </Button>
               <Button
                 variant="primary"
@@ -134,15 +144,6 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
                 data-testid="knowledge-center-import-open"
               >
                 {t('knowledgeCenter.importKnowledge')}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!exporter.canExport}
-                onClick={exporter.openPanel}
-                data-testid="knowledge-center-export-open"
-              >
-                {t('knowledgeCenter.exportKnowledge')}
               </Button>
               {!state.narrow ? (
                 <IconButton label={t('knowledgeCenter.close')} size="sm" onClick={onClose} data-testid="knowledge-center-close">
@@ -176,7 +177,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
             </div>
           )}
           <div className="knowledge-center-grid" ref={bodyRef}>
-            {showSpaces && <SpacesColumn state={state} />}
+            {showSpaces && <SpacesColumn state={state} candidateCount={importer.inbox?.candidates.length} />}
             {showList && <ListColumn state={state} inbox={importer.inbox} />}
             {showDetail && (
               <DetailColumn

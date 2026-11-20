@@ -102,7 +102,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
             <EmptyState
               variant="page"
               title={t(state.viewMode === 'conflicts' ? 'knowledgeCenter.selectConflictPrompt' : isCandidateView ? 'knowledgeCenter.selectCandidatePrompt' : 'knowledgeCenter.selectPrompt')}
-              description={state.viewMode === 'cards' ? t('knowledgeCenter.emptyDetailHint') : undefined}
+              description={state.viewMode === 'cards' && state.hits.length === 0 ? t('knowledgeCenter.emptyDetailHint') : undefined}
             />
           </div>
         )}

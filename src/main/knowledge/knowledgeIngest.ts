@@ -13,6 +13,7 @@ import {
   type KnowledgeScope,
 } from '@shared/types/knowledge';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
+import { structuredText } from './knowledgeFs';
 import {
   isKnowledgeImageFileName,
   knowledgeImageDestination,
@@ -294,6 +295,10 @@ function mapDeclaredAssets(assets: KnowledgeImportAssetRef[], caseId: string): {
   return { mapping, images };
 }
 
+function parseStructured(chapter: string): unknown {
+  try { return /^[[{]/.test(chapter.trim()) ? JSON.parse(chapter) : chapter; } catch { return chapter; }
+}
+
 function chapterFrom(value: unknown): string | undefined {
   if (typeof value === 'string' && value.trim()) return value.trim();
   if (value && typeof value === 'object') return JSON.stringify(value);
@@ -497,7 +502,9 @@ export function ingestKnowledge(source: string, options: {
   const spaceId = options.spaceId || 'staging';
   const relativePath = `cases/${sanitizedCaseId}.md`;
   const body = redactText(buildBody(sanitizedTitle, chapters), mapping);
-  const preview = redactText(sanitizedTitle, mapping);
+  // What went wrong reads better in a list than the title repeated: symptoms first, then the fix.
+  const preview = redactText([chapters.symptoms, chapters.fix]
+    .map((chapter) => chapter ? structuredText(parseStructured(chapter)) : '').find(Boolean) || sanitizedTitle, mapping);
   const originals = assets.map((asset) => asset.file);
   const sanitizedImages = sanitizeKnowledgeImages(images, relativePath, sanitizedCaseId);
   const allowedPaths = new Set([

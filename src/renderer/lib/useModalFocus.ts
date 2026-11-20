@@ -82,11 +82,14 @@ export function useModalFocus(options: {
     const handleKeyDown = (event: KeyboardEvent) => {
       const container = containerRef.current;
       if (!container) return;
+      // An Escape another layer already consumed must not close this one as well: listener order on the
+      // document follows effect order, and the closed layer can unmount before later listeners run.
+      if (event.key === 'Escape' && event.defaultPrevented) return;
       if (!isTopOverlayLayer(layerId)) return;
       if (event.key === 'Escape') {
         if (busy) return;
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         onClose();
         return;
       }

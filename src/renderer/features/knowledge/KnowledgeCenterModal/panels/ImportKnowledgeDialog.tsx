@@ -1,3 +1,4 @@
+import { Badge, type BadgeTone } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
@@ -8,6 +9,8 @@ import { Textarea } from '../../../../ui/Textarea';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import type { KnowledgeImportItem, KnowledgeImportStatus, KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeImport } from '../useKnowledgeImport';
+
+const IMPORT_STATUS_TONE: Record<KnowledgeImportStatus, BadgeTone> = { draft: 'success', quarantine: 'error', conflict: 'warning' };
 
 const IMPORT_STATUS_KEYS: Record<KnowledgeImportStatus, TranslationKey> = {
   draft: 'knowledgeCenter.importStatusDraft',
@@ -85,11 +88,11 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
             </h3>
             <div className="knowledge-import-result-status">
               {uniformStatus ? (
-                <span className="knowledge-center-badge" data-status={uniformAlreadyPresent ? 'draft' : uniformStatus}>
+                <Badge tone={uniformAlreadyPresent ? 'neutral' : IMPORT_STATUS_TONE[uniformStatus]} data-status={uniformAlreadyPresent ? 'draft' : uniformStatus}>
                   {uniformAlreadyPresent
                     ? t('knowledgeCenter.importStatusAlreadyPresent')
                     : t(IMPORT_STATUS_KEYS[uniformStatus])}
-                </span>
+                </Badge>
               ) : null}
             </div>
           </div>
@@ -110,11 +113,11 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
                 <strong>{title}</strong>
                 {caseId ? <p>{t('knowledgeCenter.metaCaseId')}: {caseId}</p> : null}
                 {item.record?.relativePath ? <p>{item.record.relativePath}</p> : null}
-                <span className="knowledge-center-badge" data-status={item.status}>
+                <Badge tone={item.reason === 'already-present' ? 'neutral' : IMPORT_STATUS_TONE[item.status]} data-status={item.status}>
                   {item.reason === 'already-present'
                     ? t('knowledgeCenter.importStatusAlreadyPresent')
                     : t(IMPORT_STATUS_KEYS[item.status])}
-                </span>
+                </Badge>
                 {item.status === 'conflict' && existingCardId ? (
                   <p className="knowledge-import-hint">{t('knowledgeCenter.importExistingCard', { id: existingCardId })}</p>
                 ) : null}
@@ -172,7 +175,7 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
                 <span className="knowledge-import-file-name">
                   {importer.filePath ? fileNameOf(importer.filePath) : t('knowledgeCenter.importNoFile')}
                   {importer.filePath ? (
-                    <span className="knowledge-center-badge">{t('knowledgeCenter.importPendingValidation')}</span>
+                    <Badge tone="warning">{t('knowledgeCenter.importPendingValidation')}</Badge>
                   ) : null}
                 </span>
                 {importer.filePath ? <code className="knowledge-import-file-path" title={importer.filePath}>{importer.filePath}</code> : null}

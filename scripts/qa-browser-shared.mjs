@@ -23,8 +23,9 @@ export async function openApp(logPath, viewport = { width: 1440, height: 900 }) 
   return { browser, page };
 }
 
-export async function closeOverlays(page) {
-  for (let index = 0; index < 3; index += 1) {
+/** Escape closes the topmost overlay per press; `layers` bounds how many to close. */
+export async function closeOverlays(page, layers = 3) {
+  for (let index = 0; index < layers; index += 1) {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(120);
   }
@@ -46,7 +47,8 @@ export async function openSettings(page, section) {
  */
 export async function useTheme(page, theme) {
   await openSettings(page, 'appearance');
-  await page.getByTestId('settings-appearance-page')
+  // The mode tabs, not the editor's light/dark switch below them.
+  await page.getByTestId('settings-appearance-page').locator('.appearance-mode-tabs')
     .getByRole('tab', { name: theme === 'light' ? /^(浅色|Light)$/ : /^(深色|Dark)$/ }).click();
   await page.waitForFunction((expected) => document.documentElement.dataset.resolvedTheme === expected, theme, { timeout: 4000 })
     .catch(() => {

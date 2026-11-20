@@ -9,19 +9,20 @@ import { useI18n } from '../../../../i18n';
 import { IndexStatusBar } from '../parts/IndexStatusBar';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
-interface SpacesColumnProps { state: ReturnType<typeof useKnowledgeCenter>; }
+interface SpacesColumnProps { state: ReturnType<typeof useKnowledgeCenter>; candidateCount?: number }
 
-export function SpacesColumn({ state }: SpacesColumnProps) {
+export function SpacesColumn({ state, candidateCount }: SpacesColumnProps) {
   const { t } = useI18n();
+  // Each view says how much is in it, so an empty review queue is visible before it is opened.
   const views = [
-    { id: 'cards', label: 'knowledgeCenter.viewCards', icon: 'book' },
-    { id: 'candidates', label: 'knowledgeCenter.viewCandidates', icon: 'inbox' },
-    { id: 'conflicts', label: 'knowledgeCenter.viewConflicts', icon: 'conflict' },
+    { id: 'cards', label: 'knowledgeCenter.viewCards', icon: 'book', count: state.index?.cardCount },
+    { id: 'candidates', label: 'knowledgeCenter.viewCandidates', icon: 'inbox', count: candidateCount },
+    { id: 'conflicts', label: 'knowledgeCenter.viewConflicts', icon: 'conflict', count: state.pack?.conflicts.length },
   ] as const;
   return (
     <Panel className="knowledge-center-spaces" data-testid="knowledge-center-spaces">
       <div className="knowledge-center-navigation" role="tablist" aria-label={t('knowledgeCenter.viewLabel')}>
-        {views.map(({ id, label, icon }) => (
+        {views.map(({ id, label, icon, count }) => (
           <ListRow
             key={id}
             className="knowledge-center-nav-item"
@@ -29,6 +30,7 @@ export function SpacesColumn({ state }: SpacesColumnProps) {
             role="tab"
             data-testid={'knowledge-center-view-' + id}
             leading={<KnowledgeIcon name={icon} size={16} />}
+            trailing={count ? <span className="knowledge-center-nav-count">{count}</span> : undefined}
             onClick={() => state.setViewMode(id)}
           >
             {t(label)}

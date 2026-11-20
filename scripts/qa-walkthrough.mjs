@@ -44,6 +44,19 @@ const send = async (text) => {
 };
 const waitForText = (text, timeout = 90_000) => page.getByText(text, { exact: false }).last().waitFor({ timeout });
 
+const KNOWLEDGE_CASES = [
+  ['qa-hair-darkening', 'Adreno 740 头发偏暗 / KajiyaDiffuse', '头发比参考静帧暗一档，只在 Adreno 740 上出现。'],
+  ['qa-shadow-acne', '阴影贴图条纹 / 深度偏移过小', '地面出现斜向条纹，随相机距离变化。'],
+];
+const knowledgeCase = (caseId, title, symptom) => [
+  `case_id: ${caseId}`, `title: ${title}`, 'meta:', '  status: fixed', '  severity: high',
+  'environment:', '  platform: Android', '  api: Vulkan', '  gpu_vendor: Qualcomm',
+  'symptoms:', `  visual: ${symptom}`,
+  'root_cause:', '  phenomenon: 输出偏暗', '  first_bad_event: 着色阶段', '  responsible_layer: shader',
+  'fix:', '  summary: 调整能量项并在同一 capture 上复核。',
+  'verification_plan:', '  - 回放相同 pass 并与参考图对比',
+].join('\n');
+
 const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-qa-project-'));
 if (capture) fs.copyFileSync(capture, path.join(projectRoot, path.basename(capture)));
 
@@ -52,6 +65,18 @@ try {
   await step('knowledge', async () => {
     await page.getByTestId('sidebar-knowledge-center-trigger').click();
     await shot('02-knowledge');
+    // Two pasted cases give the list and the reader real content to show.
+    for (const [caseId, title, symptom] of KNOWLEDGE_CASES) {
+      await page.getByTestId('knowledge-center-import-open').first().click();
+      await page.getByRole('tab', { name: /粘贴|Paste/ }).click();
+      await page.getByTestId('knowledge-center-import-source').fill(knowledgeCase(caseId, title, symptom));
+      await page.getByTestId('knowledge-center-import-run').click();
+      await page.getByTestId('knowledge-center-import-run').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => undefined);
+      await closeOverlays(page, 1);
+    }
+    await page.locator('.knowledge-center-card-button').first().click();
+    await page.getByTestId('knowledge-center-detail').waitFor({ timeout: 30_000 });
+    await shot('02b-knowledge-cards');
     await closeOverlays(page);
   });
 

@@ -3,8 +3,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-5) var(--space-3);
-  border-bottom: 1px solid var(--token-border-muted);
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--token-border-subtle);
   min-height: var(--control-height-lg);
   flex-shrink: 0;
 }
@@ -28,7 +28,8 @@
   color: var(--token-text-heading);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
-  line-height: var(--leading-tight);
+  line-height: var(--type-title-line);
+  letter-spacing: var(--tracking-heading);
   overflow-wrap: anywhere;
 }
 
