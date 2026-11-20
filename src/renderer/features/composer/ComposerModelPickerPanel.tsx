@@ -6,17 +6,15 @@ import { useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { InlineError } from '../../ui/InlineError';
-import {
-  filterComposerPickerOptions,
-  groupComposerPickerOptions,
-} from './composerModelPicker';
+import { filterComposerPickerOptions, type ComposerModelPickerOption } from './composerModelPicker';
 import {
   resolveComposerAgentDefaultState,
   type ComposerAgentDefaultState,
 } from './composerAgentDefaultModel';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
-import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
+import { useComposerModelPickerOptions, type ComposerPickerProviderNotice } from './useComposerModelPickerOptions';
 import type { SessionRecord } from '@shared/types/session';
 import type { ComposerModelSaveState } from './ComposerModelEffortControl';
 
@@ -59,21 +57,24 @@ export const ComposerModelPickerPanel: React.FC<{
   const agentName = useAppSettingsStore((state) => (
     state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
   ));
-  const { options, loading, failedProviders, unavailableProviders = [], retry } = useComposerModelPickerOptions(providers);
+  const { options, providerStates, loading, retry } = useComposerModelPickerOptions(providers);
   const { effective, hasChoice, projectId } = useComposerEffectiveModel(agentId, currentSession);
   const agentDefault = resolveComposerAgentDefaultState(agentRoute, options, !loading);
   const agentDefaultMeta = formatAgentDefaultMeta(agentDefault, agentName, t);
   const agentDefaultTitle = agentDefault.kind === 'unavailable' && agentDefault.providerId && agentDefault.modelId
     ? `${agentDefault.providerId} / ${agentDefault.modelId}`
     : t('composer.model.agentDefaultTitle', { name: agentName });
-  const filtered = useMemo(
-    () => filterComposerPickerOptions(options, query),
-    [options, query],
-  );
-  const groups = useMemo(() => groupComposerPickerOptions(filtered), [filtered]);
-  const unavailableGroups = unavailableProviders.filter(provider => (
-    !query.trim() || `${provider.id} ${provider.label}`.toLowerCase().includes(query.trim().toLowerCase())
-  ));
+  // One section per connected provider, in settings order: its matching models plus, when it has one,
+  // the provider's own loading / refresh-failed / empty notice, so a failure sits next to what it affects.
+  const sections = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return providerStates.flatMap((state) => {
+      const models = filterComposerPickerOptions(state.models, query);
+      const providerMatches = !normalized || `${state.id} ${state.label}`.toLowerCase().includes(normalized);
+      if (models.length === 0 && !(state.notice && providerMatches)) return [];
+      return [{ ...state, models }];
+    });
+  }, [providerStates, query]);
   const popupDynStyle = useDynStyle({
     '--composer-effort-popup-shift-x': `${popupShiftPx}px`,
   });
@@ -187,28 +188,16 @@ export const ComposerModelPickerPanel: React.FC<{
           <span className="composer-model-item-meta">{agentDefaultMeta}</span>
         </Button>
         {saving ? <p className="composer-model-empty" role="status">{t('settings.saving')}</p> : null}
-        {failedProviders.length ? <div className="composer-model-errors">{failedProviders.map((provider) => <InlineError key={provider.id}>
-          {provider.label}: {provider.error}
-          <Button variant="ghost" size="sm" onClick={() => retry(provider.id)}>{t('settings.retry')}</Button>
-        </InlineError>)}</div> : null}
         {saveError ? <InlineError>{saveError}</InlineError> : null}
-        {loading && groups.length === 0 && unavailableGroups.length === 0 ? (
-          <p className="composer-model-empty">{t('composer.model.loading')}</p>
-        ) : groups.length === 0 && unavailableGroups.length === 0 ? (
-          <p className="composer-model-empty">{t('composer.model.empty')}</p>
-        ) : null}
       </div>
-      {groups.length > 0 || unavailableGroups.length > 0 ? (
+      {sections.length === 0 ? (
+        <p className="composer-model-empty">{t(loading ? 'composer.model.loading' : 'composer.model.empty')}</p>
+      ) : (
         <div className="composer-model-list">
-          {unavailableGroups.map(provider => <div key={provider.id} className="composer-model-group" data-testid={`composer-model-provider-${provider.id}`}>
-            <p className="composer-model-group-label">{provider.label}</p>
-            <p className="composer-model-empty" role="status">{t(provider.loading ? 'composer.model.loading' : 'composer.model.empty')}</p>
-            <Button variant="ghost" size="sm" disabled={provider.retrying} onClick={() => retry(provider.id)}>{t('settings.retry')}</Button>
-          </div>)}
-          {groups.map((group) => (
-            <div key={group.providerId} className="composer-model-group">
-              <p className="composer-model-group-label">{group.providerLabel}</p>
-              {group.models.map((option) => {
+          {sections.map((section) => (
+            <div key={section.id} className="composer-model-group" data-testid={`composer-model-provider-${section.id}`}>
+              <p className="composer-model-group-label">{section.label}</p>
+              {section.models.map((option) => {
                 const selected = Boolean(
                   effective
                   && option.providerId === effective.providerId
@@ -228,24 +217,55 @@ export const ComposerModelPickerPanel: React.FC<{
                       modelId: option.modelId,
                     })}
                   >
-                    <span className="composer-model-item-label">{option.label}</span>
-                    <span className="composer-model-item-meta">
-                      {option.contextWindowLabel
-                        ? t('composer.model.contextWindow', {
-                          tokens: option.contextWindowLabel,
-                        })
-                        : null}
-                      {option.hasReasoning ? (
-                        <span className="composer-model-badge">{t('composer.model.reasoningBadge')}</span>
-                      ) : null}
+                    <span className="composer-model-item-text">
+                      <span className="composer-model-item-label">{option.label}</span>
+                      <ModelMeta option={option} />
                     </span>
+                    {option.hasFastMode ? <span className="composer-model-chip">{t('composer.model.fastChip')}</span> : null}
+                    {selected ? <Icon name="check" size={16} className="composer-model-check" /> : null}
                   </Button>
                 );
               })}
+              {section.notice ? (
+                <ProviderNotice
+                  notice={section.notice}
+                  retrying={section.retrying}
+                  onRetry={() => retry(section.id)}
+                />
+              ) : null}
             </div>
           ))}
         </div>
-      ) : null}
+      )}
+    </div>
+  );
+};
+
+const ModelMeta: React.FC<{ option: ComposerModelPickerOption }> = ({ option }) => {
+  const { t } = useI18n();
+  const facts = [
+    option.contextWindowLabel ? t('composer.model.contextWindow', { tokens: option.contextWindowLabel }) : null,
+    option.hasVisionInput ? t('composer.model.visionInput') : null,
+    option.hasReasoning ? t('composer.model.reasoning') : null,
+  ].filter((fact): fact is string => fact !== null);
+  return facts.length ? <span className="composer-model-item-meta">{facts.join(' · ')}</span> : null;
+};
+
+const ProviderNotice: React.FC<{
+  notice: ComposerPickerProviderNotice;
+  retrying: boolean;
+  onRetry: () => void;
+}> = ({ notice, retrying, onRetry }) => {
+  const { t } = useI18n();
+  const text = notice.kind === 'failed'
+    ? t('composer.model.refreshFailed', { error: notice.error })
+    : t(notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty');
+  return (
+    <div className="composer-model-notice" role="status" data-notice={notice.kind}>
+      <span className="composer-model-notice-text">{text}</span>
+      {notice.kind === 'loading' ? null : (
+        <Button variant="secondary" size="sm" disabled={retrying} onClick={onRetry}>{t('settings.retry')}</Button>
+      )}
     </div>
   );
 };

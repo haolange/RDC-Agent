@@ -15,10 +15,16 @@ vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: 
 vi.mock('../../hooks/useComposerEffectiveModel', () => ({ useComposerEffectiveModel: () => ({
   effective: { providerId: 'p', modelId: 'model' }, hasChoice: mock.choice, projectId: 'project',
 }) }));
-vi.mock('./useComposerModelPickerOptions', () => ({ useComposerModelPickerOptions: () => ({
-  options: [{ providerId: 'p', providerLabel: 'Provider', modelId: 'model', label: 'Model', aliases: [],
-    contextWindowTokens: 1000, contextWindowLabel: '1k', hasReasoning: true }], loading: false, failedProviders: [], retry: vi.fn(),
-}) }));
+vi.mock('./useComposerModelPickerOptions', () => {
+  const option = { providerId: 'p', providerLabel: 'Provider', modelId: 'model', label: 'Model', aliases: [],
+    contextWindowTokens: 1000, contextWindowLabel: '1k', hasReasoning: true, hasVisionInput: false, hasFastMode: false };
+  return { useComposerModelPickerOptions: () => ({
+    options: [option],
+    providerStates: [{ id: 'p', label: 'Provider', models: [option], notice: null, retrying: false }],
+    loading: false,
+    retry: vi.fn(),
+  }) };
+});
 vi.mock('./ComposerTurnControlsContext', () => ({ useComposerTurnControls: () => mock.controls }));
 vi.mock('./sessionModelOverride', () => ({ commitComposerModelChoice: mock.commit, clearComposerModelChoice: mock.clear }));
 vi.mock('./useComposerEffortControl', () => ({ useComposerEffortControl: () => ({

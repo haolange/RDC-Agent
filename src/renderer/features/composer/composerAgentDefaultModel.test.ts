@@ -14,6 +14,8 @@ const option: ComposerModelPickerOption = {
   contextWindowTokens: 128000,
   contextWindowLabel: '128k',
   hasReasoning: false,
+  hasVisionInput: false,
+  hasFastMode: false,
 };
 
 describe('isComposerAgentDefaultToken', () => {

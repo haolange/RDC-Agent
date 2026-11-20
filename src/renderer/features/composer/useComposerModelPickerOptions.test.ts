@@ -25,11 +25,13 @@ function catalog(providerId: string): EffectiveCatalogSnapshot {
     } satisfies EffectiveModel] };
 }
 function Consumer({ name, connections = providers }: { name: string; connections?: LlmProviderEntry[] }) {
-  const { options, failedProviders, retry, loading, unavailableProviders = [] } = useComposerModelPickerOptions(connections);
+  const { options, providerStates, retry, loading } = useComposerModelPickerOptions(connections);
   return h('section', { 'data-consumer': name, 'aria-busy': loading },
     ...options.map((row) => h('span', { key: row.providerId }, row.providerLabel)),
-    ...failedProviders.map((row) => h('button', { key: row.id, onClick: () => retry(row.id) }, row.error)),
-    ...unavailableProviders.map((row) => h('p', { key: row.id, 'data-pending-provider': row.id }, `${row.label}:${row.loading}`)));
+    ...providerStates.flatMap((state) => state.notice?.kind === 'failed'
+      ? [h('button', { key: state.id, onClick: () => retry(state.id) }, state.notice.error)] : []),
+    ...providerStates.flatMap((state) => state.notice && state.notice.kind !== 'failed'
+      ? [h('p', { key: state.id, 'data-pending-provider': state.id }, `${state.label}:${state.notice.kind === 'loading'}`)] : []));
 }
 it('keeps a configured Grok subscription visible while its models refresh and after an empty directory', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); resetCatalogProjection(); read.mockReset();

@@ -151,11 +151,15 @@ assert(
     && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='max-context'] .composer-model-effort-mode-tip"),
   'Fast/Max tips must be raised pills centered on the icons, not pinned cards growing into the panel',
 );
-assert(
-  composerChromeSource
-    .includes('padding: var(--space-1) var(--space-1) var(--space-2) 0;'),
-  'Model list must keep bottom padding so the last row is not clipped by the popup radius',
-);
+{
+  // The last row must clear the popup radius: the list's bottom padding is at least --space-2.
+  const listPadding = composerChromeSource.match(/\.composer-model-list \{[^}]*?\bpadding:\s*([^;]+);/u)?.[1].trim().split(/\s+/u) ?? [];
+  const bottom = listPadding[listPadding.length === 4 || listPadding.length === 3 ? 2 : 0];
+  assert(
+    /^var\(--space-(?:[2-9]|1[0-9])\)$/u.test(bottom ?? ''),
+    'Model list must keep bottom padding so the last row is not clipped by the popup radius',
+  );
+}
 assert(
   !effortPopupSource.includes("'--composer-effort-stops-opacity'"),
   'Effort popup must not compete with the Max animation for stop opacity ownership',

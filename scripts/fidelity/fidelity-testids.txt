@@ -37,7 +37,7 @@ composer-model-effort-pill
 composer-model-effort-popup
 composer-model-item-${option.providerId}-${option.modelId}
 composer-model-popup
-composer-model-provider-${provider.id}
+composer-model-provider-${section.id}
 composer-model-search
 composer-permission-pill
 composer-skill-chip

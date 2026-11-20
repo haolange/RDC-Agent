@@ -12,12 +12,10 @@ export interface ComposerModelPickerOption {
   contextWindowTokens: number | null;
   contextWindowLabel: string | null;
   hasReasoning: boolean;
-}
-
-export interface ComposerModelPickerGroup {
-  providerId: string;
-  providerLabel: string;
-  models: ComposerModelPickerOption[];
+  /** Accepts image attachments. */
+  hasVisionInput: boolean;
+  /** Fast mode is offered (selectable) or always on (fixed) for this model. */
+  hasFastMode: boolean;
 }
 
 export function isComposerPickerModel(model: EffectiveModel): boolean {
@@ -63,6 +61,9 @@ export function toComposerPickerOption(
     contextWindowTokens: window.tokens,
     contextWindowLabel: window.label,
     hasReasoning: hasPickerReasoning(model),
+    hasVisionInput: model.visionInput.state === 'supported',
+    hasFastMode: model.controls.fast.state === 'selectable'
+      || (model.controls.fast.state === 'fixed' && model.controls.fast.fixedValue === true),
   };
 }
 
@@ -86,26 +87,4 @@ export function filterComposerPickerOptions(
   query: string,
 ): ComposerModelPickerOption[] {
   return options.filter((option) => matchesComposerPickerQuery(option, query));
-}
-
-export function groupComposerPickerOptions(
-  options: ComposerModelPickerOption[],
-): ComposerModelPickerGroup[] {
-  const groups: ComposerModelPickerGroup[] = [];
-  const index = new Map<string, ComposerModelPickerGroup>();
-  for (const option of options) {
-    const existing = index.get(option.providerId);
-    if (existing) {
-      existing.models.push(option);
-      continue;
-    }
-    const group: ComposerModelPickerGroup = {
-      providerId: option.providerId,
-      providerLabel: option.providerLabel,
-      models: [option],
-    };
-    index.set(option.providerId, group);
-    groups.push(group);
-  }
-  return groups;
 }

@@ -12,6 +12,8 @@ function option(
     contextWindowTokens: null,
     contextWindowLabel: null,
     hasReasoning: false,
+    hasVisionInput: false,
+    hasFastMode: false,
     ...partial,
   };
 }
