@@ -1,0 +1,63 @@
+/* A user message that executes or revises a reviewed plan: what it does, not the raw handoff prompt. */
+.plan-reference-card {
+  display: grid;
+  gap: var(--space-1);
+  min-width: min(calc(var(--space-24) * 3), 100%);
+  padding: var(--transcript-card-padding);
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  background: var(--token-bg-raised);
+  color: var(--token-text-body);
+}
+
+.plan-reference-card:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.plan-reference-card__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--token-accent-primary);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  font-weight: var(--font-medium);
+}
+
+.plan-reference-card__title {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-heading);
+  font: inherit;
+  font-size: var(--type-heading-size);
+  line-height: var(--type-heading-line);
+  font-weight: var(--font-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-reference-card__title:hover,
+.plan-reference-card__title:focus-visible {
+  color: var(--token-text-link);
+  text-decoration: underline;
+  text-underline-offset: var(--space-0-5);
+  outline: none;
+}
+
+.plan-reference-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-line);
+}
+
+.plan-reference-card__prompt {
+  margin-top: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+}

@@ -316,6 +316,8 @@ export interface ConversationMessage {
   preparedContext?: PreparedTurnContextSummary;
   /** Turn-end continue actions from frozen profile handoffs whose surface is `turn-end`. */
   handoffSuggestions?: PlanReviewHandoffSuggestion[];
+  /** User messages only: the reviewed plan this message executes or revises, verified by main at send. */
+  planReference?: import('./planReview').ConversationPlanReference;
 }
 
 export type AttachmentLayer = SessionAttachmentLayer;
@@ -416,7 +418,7 @@ export interface ConversationExecutionTransition {
 }
 
 export interface ConversationSendRequest {
-  planSource?: import('./planReview').PlanReadRequest;
+  planReference?: import('./planReview').PlanReferenceRequest;
   requestId: string;
   projectId?: string | null;
   sessionId?: string | null;

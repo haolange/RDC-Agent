@@ -162,7 +162,7 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 详细字段与领域流程见设计书；工程合同冲突以本节为准。以下约束全局成立：
 
 - 无平台级 InvestigationGraph、第二 TaskStore 或第二 Agent Runtime。
-- `TaskRecord.metadata`、`AgentProfile.metadata`、`ConversationMessage` 不带领域字段；垂直记录只引用 task id。
+- `TaskRecord.metadata`、`AgentProfile.metadata`、`ConversationMessage` 不带领域字段；垂直记录只引用 task id。用户消息上的 `planReference`（计划 id、版本、hash、冻结 URI、标题、目标 Agent 与声明标签）是通用 harness 字段，记录该消息执行或修订哪一份已审计划。
 - RDC 操作集合不注册为独立模型工具，RDC 不是 MCP；RDC 是外部 CLI，无内置副本。**Live RDC** 要求冻结 `access-ceiling: full`、owning lease，以及 Settings 配置的 CLI 与结构化 `shell.rdc`。`read-only` 天花板的 profile（内置 Debugger / Analyzer / Optimizer）不能使用 `shell` 或 `code_interpreter`；它们用 `runtime_context` 读取会话身份，并在拥有 lease 时看到其中的 `rdc` 载荷，另用只读 `rdc_probe` 访问 RDC。Full access 不抬高天花板。
 - Knowledge 持久写入仅 human review；`FullAccess` 不可绕过；无自动 Memory / Knowledge / Candidate / Promote。
 - 新结构替代旧结构时直接收敛，不保留 legacy / deprecated shim。
@@ -183,7 +183,7 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
 
 ### D. Declared Continue and Execution Offer
 
-`AgentHandoffDefinition` 是 UI 声明（label / labelTranslations / agent / prompt / send / surface / requiredSkillIds / requiredToolIds）。`surface` 省略等于 `turn-end`；`plan-gate` 只出现在计划门；`hidden` 不出现。旧字段 `showContinueOn` 解析即失败，不静默映射。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。预载规则见「Plan 与 generation」。
+`AgentHandoffDefinition` 是 UI 声明（label / labelTranslations / agent / prompt / send / surface / requiredSkillIds / requiredToolIds）。`surface` 省略等于 `turn-end`；`plan-gate` 只出现在计划门；`hidden` 不出现。旧字段 `showContinueOn` 解析即失败，不静默映射。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。交接发送与修订请求带 `planReference`（`execute` / `revise`），主进程在接受消息前经 `planReferenceResolution` 核验：execute 必须是已批准、未消费的冻结版本，目标 Agent 与声明一致且正文就是声明的交接 prompt；revise 必须是当前被拒版本且由原规划 Agent 发起。核验通过的引用持久化在该用户消息上，转录据此渲染计划引用卡；没有引用的旧消息照原文显示，不推断。General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。预载规则见「Plan 与 generation」。
 
 ### E. Investigation Vertical Schema
 

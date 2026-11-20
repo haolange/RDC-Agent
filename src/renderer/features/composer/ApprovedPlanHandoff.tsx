@@ -13,7 +13,7 @@ export function ApprovedPlanHandoff({ sessionId, disabled }: { sessionId?: strin
     <p>{t('chat.approvedPlanReady')}</p>
     <HandoffActionRow options={[handoff]} disabled={disabled || queued} onSelect={() => {
       useComposerSessionContextStore.getState().queueHandoffSuggestion({ sessionId, agentId: handoff.agent,
-        label: handoff.label, prompt: handoff.prompt, send: handoff.send, approvedPlanHash: handoff.planHash });
+        label: handoff.label, prompt: handoff.prompt, send: handoff.send, approvedPlan: { planId: handoff.planId, revision: handoff.revision, hash: handoff.planHash } });
     }} />
   </section>;
 }

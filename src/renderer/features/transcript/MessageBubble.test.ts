@@ -29,3 +29,17 @@ it('preserves ordinary handoffs and original stopped output without a duplicate 
   expect(html).toContain('Original result');
   expect(html).not.toContain('is-stopped');
 });
+it('shows a plan-executing user message as its plan reference and keeps the handoff prompt one disclosure away', () => {
+  const user: ConversationMessage = { id: 'u', turnId: 't2', sessionId: 's', projectId: 'p', role: 'user', content: 'Execute the frozen plan.',
+    createdAt: 2, status: 'complete' };
+  const referenced = renderToStaticMarkup(createElement(MessageBubble, { message: { ...user, planReference: {
+    intent: 'execute', planId: 'plan', revision: 3, hash: 'a'.repeat(64), uri: 'session://plans/frozen.md', title: 'Find the draw', agentId: 'general',
+  } } }));
+  expect(referenced).toContain('data-testid="plan-reference-card"');
+  expect(referenced).toContain('Find the draw');
+  expect(referenced).toContain('chat.planReference.execute');
+  expect(referenced).not.toContain('conversation-bubble-user');
+  const plain = renderToStaticMarkup(createElement(MessageBubble, { message: user }));
+  expect(plain).toContain('conversation-bubble-user');
+  expect(plain).not.toContain('plan-reference-card');
+});

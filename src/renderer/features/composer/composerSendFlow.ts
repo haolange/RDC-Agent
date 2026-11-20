@@ -56,7 +56,7 @@ export async function sendComposerConversationTurn(options: {
   showNotice: (message: string) => void;
   failedSummary: string;
   preserveDraft?: boolean;
-  planSource?: import('@shared/types/planReview').PlanReadRequest;
+  planReference?: import('@shared/types/planReview').PlanReferenceRequest;
 }): Promise<ComposerSendOutcome> {
   const {
     electronAPI,
@@ -196,7 +196,7 @@ export async function sendComposerConversationTurn(options: {
       message: sentPrompt,
       attachments: toConversationAttachmentInputs(sentAttachments),
       preloadSkillIds: sentSkillIds,
-      ...(options.planSource ? { planSource: options.planSource } : {}),
+      ...(options.planReference ? { planReference: options.planReference } : {}),
       turnControls,
       configurationCommit: configuration.configurationCommit,
     });

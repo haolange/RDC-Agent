@@ -55,7 +55,10 @@ export function canonicalJson(value: unknown): string {
 }
 
 export interface ResolvedConversationContext {
+  /** Revise only: the verified rejected plan, sent to the planner as runtime material. */
   planSource?: { reference: import('@shared/types/planReview').PlanReadRequest; markdown: string };
+  /** The verified plan the user message executes or revises; persisted on that message. */
+  planReference?: import('@shared/types/planReview').ConversationPlanReference;
   projectId: string | null;
   session: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -171,6 +174,7 @@ export function createConversationMessage(
     forkId?: string;
     variantIndex?: number;
     preparedContext?: ConversationMessage['preparedContext'];
+    planReference?: ConversationMessage['planReference'];
   },
 ): ConversationMessage {
   const createdAt = nowMs();
@@ -195,6 +199,7 @@ export function createConversationMessage(
     forkId: options.forkId,
     variantIndex: options.variantIndex,
     preparedContext: options.preparedContext,
+    ...(options.planReference ? { planReference: options.planReference } : {}),
     createdAt,
   };
 }

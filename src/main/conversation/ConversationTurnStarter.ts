@@ -385,6 +385,7 @@ export async function startProfileTurn(
       forkId: branchContext?.forkId,
       variantIndex: branchContext?.variantIndex,
       preparedContext: preparedTurn.summary,
+      planReference: context.planReference,
     });
     assistantDraftMessage = createConversationMessage('assistant', '', {
       requestId,

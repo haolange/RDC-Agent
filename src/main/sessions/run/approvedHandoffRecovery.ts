@@ -22,11 +22,11 @@ export function resolveApprovedHandoff(sessionId: string, approval: PlanReviewSt
 
   const history = storageAdapter.readConversationHistory(sessionId);
   const visible = resolveVisibleConversationMessages(history, storageAdapter.readConversationBranchState(sessionId));
-  const owner = visible.find(message => message.turnId === approval.ownerTurnId && message.agentId === offer.sourceAgentId
-    && (message.workTrace?.blocks ?? []).some(block => block.toolCalls.some(call => call.toolName === 'plan_artifact'
-      && call.planReview?.planId === approval.planId && call.planReview.revision === approval.revision
-      && call.planReview.hash === approval.approvedHash)));
-  if (!owner) return null;
+  const ownerReview = visible.filter(message => message.turnId === approval.ownerTurnId && message.agentId === offer.sourceAgentId)
+    .flatMap(message => (message.workTrace?.blocks ?? []).flatMap(block => block.toolCalls))
+    .find(call => call.toolName === 'plan_artifact' && call.planReview?.planId === approval.planId
+      && call.planReview.revision === approval.revision && call.planReview.hash === approval.approvedHash)?.planReview;
+  if (!ownerReview) return null;
   const source = readReferencedPlan({ sessionId, planId: approval.planId, revision: approval.revision,
     uri: approval.frozenUri, expectedHash: approval.approvedHash });
   if (source.ownerSessionId !== sessionId || source.turnId !== approval.ownerTurnId || source.agentId !== offer.sourceAgentId) return null;
@@ -39,5 +39,6 @@ export function resolveApprovedHandoff(sessionId: string, approval: PlanReviewSt
   if (declared.prompt !== offer.prompt || !same(declared.requiredSkillIds ?? [], offer.requiredSkillIds)
     || !same(declared.requiredToolIds ?? [], offer.requiredToolIds ?? [])) return null;
   return { agent: declared.agent, label: declared.label, ...(declared.labelTranslations ? { labelTranslations: declared.labelTranslations } : {}),
-    prompt: declared.prompt, send: declared.send === true, planHash: approval.approvedHash };
+    prompt: declared.prompt, send: declared.send === true, planId: approval.planId, revision: approval.revision,
+    planHash: approval.approvedHash, planUri: approval.frozenUri, planTitle: ownerReview.title };
 }
