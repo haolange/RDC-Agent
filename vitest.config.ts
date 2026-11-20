@@ -15,6 +15,7 @@ const shared = {
 
 const coverageExclude = [
   '**/*.test.ts',
+  '**/*.d.ts',
   '**/fixtures/**',
   '**/__fixtures__/**',
   '**/generated/**',
@@ -66,22 +67,21 @@ export default defineConfig({
   test: {
     globals: true,
     globalSetup: ['./scripts/vitest-global-setup.ts'],
+    // Vitest reads coverage only here, not per project. The test:coverage scripts pick the project's
+    // source set (--coverage.include) and report directory, so files no test imports still count.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'json'],
+      exclude: coverageExclude,
+    },
     projects: [
       {
         ...shared,
         test: {
           name: 'node',
           environment: 'node',
-          include: ['src/main/**/*.test.ts', 'src/shared/**/*.test.ts'],
+          include: ['src/main/**/*.test.ts', 'src/shared/**/*.test.ts', 'src/preload/**/*.test.ts'],
           globalSetup: ['./scripts/vitest-global-setup.ts'],
-          coverage: {
-            provider: 'v8',
-            reporter: ['text', 'lcov', 'json-summary'],
-            reportsDirectory: './coverage',
-            include: ['src/main/**/*.{ts,tsx}', 'src/shared/**/*.{ts,tsx}'],
-            exclude: coverageExclude,
-            thresholds: { lines: 40, functions: 40, branches: 30, statements: 40 },
-          },
         },
       },
       {
@@ -90,16 +90,6 @@ export default defineConfig({
           name: 'renderer',
           environment: 'happy-dom',
           include: ['src/renderer/**/*.test.ts'],
-          coverage: {
-            provider: 'v8',
-            reporter: [
-              'text',
-              ['json-summary', { file: 'coverage-summary.json' }],
-            ],
-            reportsDirectory: './coverage/renderer',
-            include: ['src/renderer/**/*.{ts,tsx}'],
-            exclude: ['**/*.test.ts'],
-          },
         },
       },
     ],
