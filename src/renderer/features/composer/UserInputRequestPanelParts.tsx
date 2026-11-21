@@ -31,11 +31,8 @@ export const UserInputOptionList: FC<{
           <span className="composer-user-input-option-copy">
             <span className="composer-user-input-option-label">{option.label}</span>
             {option.description ? (
-              <span className="composer-user-input-option-description">
+              <span className="composer-user-input-option-description" data-tooltip={option.description}>
                 <span className="composer-user-input-option-description-text">{option.description}</span>
-                <span className="composer-user-input-option-tooltip" role="tooltip">
-                  {option.description}
-                </span>
               </span>
             ) : null}
           </span>

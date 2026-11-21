@@ -219,9 +219,11 @@ export const ComposerModelPickerPanel: React.FC<{
                   >
                     <span className="composer-model-item-text">
                       <span className="composer-model-item-label">{option.label}</span>
-                      <ModelMeta option={option} />
+                      {option.contextWindowLabel ? (
+                        <span className="composer-model-item-meta">{t('composer.model.contextWindow', { tokens: option.contextWindowLabel })}</span>
+                      ) : null}
                     </span>
-                    {option.hasFastMode ? <span className="composer-model-chip">{t('composer.model.fastChip')}</span> : null}
+                    <ModelCapabilities option={option} />
                     {selected ? <Icon name="check" size={16} className="composer-model-check" /> : null}
                   </Button>
                 );
@@ -241,14 +243,24 @@ export const ComposerModelPickerPanel: React.FC<{
   );
 };
 
-const ModelMeta: React.FC<{ option: ComposerModelPickerOption }> = ({ option }) => {
+/** What a model can do, as quiet icons named on hover: image input, reasoning, Fast mode. */
+const ModelCapabilities: React.FC<{ option: ComposerModelPickerOption }> = ({ option }) => {
   const { t } = useI18n();
-  const facts = [
-    option.contextWindowLabel ? t('composer.model.contextWindow', { tokens: option.contextWindowLabel }) : null,
-    option.hasVisionInput ? t('composer.model.visionInput') : null,
-    option.hasReasoning ? t('composer.model.reasoning') : null,
-  ].filter((fact): fact is string => fact !== null);
-  return facts.length ? <span className="composer-model-item-meta">{facts.join(' · ')}</span> : null;
+  const capabilities = [
+    option.hasVisionInput ? { icon: 'image' as const, label: t('composer.model.visionInput') } : null,
+    option.hasReasoning ? { icon: 'brain' as const, label: t('composer.model.reasoning') } : null,
+    option.hasFastMode ? { icon: 'lightning' as const, label: t('composer.model.fastChip') } : null,
+  ].filter((capability) => capability !== null);
+  if (capabilities.length === 0) return null;
+  return (
+    <span className="composer-model-capabilities">
+      {capabilities.map((capability) => (
+        <span key={capability.icon} className="composer-model-capability" data-tooltip={capability.label} aria-label={capability.label} role="img">
+          <Icon name={capability.icon} size={14} />
+        </span>
+      ))}
+    </span>
+  );
 };
 
 const ProviderNotice: React.FC<{
@@ -257,11 +269,12 @@ const ProviderNotice: React.FC<{
   onRetry: () => void;
 }> = ({ notice, retrying, onRetry }) => {
   const { t } = useI18n();
-  const text = notice.kind === 'failed'
-    ? t('composer.model.refreshFailed', { error: notice.error })
-    : t(notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty');
+  const text = t(notice.kind === 'failed' ? 'composer.model.refreshFailed'
+    : notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty');
+  // The provider's own error text is technical; it stays on hover rather than in the sentence.
   return (
-    <div className="composer-model-notice" role="status" data-notice={notice.kind}>
+    <div className="composer-model-notice" role="status" data-notice={notice.kind}
+      data-tooltip={notice.kind === 'failed' ? notice.error : undefined}>
       <span className="composer-model-notice-text">{text}</span>
       {notice.kind === 'loading' ? null : (
         <Button variant="secondary" size="sm" disabled={retrying} onClick={onRetry}>{t('settings.retry')}</Button>

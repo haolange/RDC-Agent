@@ -39,7 +39,7 @@ export function useComposerSend(options: {
   setPendingAttachments: Dispatch<SetStateAction<PendingAttachmentDraft[]>>;
   pendingSkillIds: string[];
   setPendingSkillIds: Dispatch<SetStateAction<string[]>>;
-  armPendingSkill: (skillId: string) => void;
+  armPendingSkill: (skillId: string, skillName?: string) => void;
 }) {
   const {
     showNotice, t, currentMode, selectedAgentId, setSelectedAgentId, setCurrentMode, openSettings, currentProject,

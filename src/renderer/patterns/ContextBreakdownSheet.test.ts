@@ -271,8 +271,7 @@ describe('ContextBreakdownContent phase authority', () => {
     );
     expect(html).toContain('contextBreakdown.projected');
     expect(html).toContain('>~12%</span>');
-    expect(html).toContain('contextBreakdown.projectedNote');
-    expect(html).toContain('data-testid="context-breakdown-projected-note"');
+    expect(html).toContain('data-tooltip="contextBreakdown.projectedNote"');
     expect(html).not.toContain('contextBreakdown.lastActual');
     expect(html).not.toContain('contextBreakdown.staleNote');
   });

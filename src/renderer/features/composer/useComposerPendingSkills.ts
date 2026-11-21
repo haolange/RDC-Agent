@@ -8,11 +8,13 @@ export function useComposerPendingSkills(options: {
 }) {
   const { currentProject, currentSession } = options;
   const [pendingSkillsByScope, setPendingSkillsByScope] = useState<Record<string, string[]>>({});
+  // Display names learned when a skill is armed; a restored id without one shows the id.
+  const [skillNames, setSkillNames] = useState<Record<string, string>>({});
   const skillScopeKey = useMemo(
     () => buildComposerSessionScopeKey(currentProject?.projectId, currentSession?.sessionId),
     [currentProject?.projectId, currentSession?.sessionId],
   );
-  const pendingSkillIds = pendingSkillsByScope[skillScopeKey] ?? [];
+  const pendingSkillIds = useMemo(() => pendingSkillsByScope[skillScopeKey] ?? [], [pendingSkillsByScope, skillScopeKey]);
 
   const setPendingSkillIds: Dispatch<SetStateAction<string[]>> = useCallback((next) => {
     setPendingSkillsByScope((current) => {
@@ -28,11 +30,13 @@ export function useComposerPendingSkills(options: {
     });
   }, [skillScopeKey]);
 
-  const armPendingSkill = useCallback((skillId: string) => {
+  const armPendingSkill = useCallback((skillId: string, skillName?: string) => {
     const id = skillId.trim();
     if (!id) return;
+    if (skillName?.trim()) setSkillNames((current) => ({ ...current, [id]: skillName.trim() }));
     setPendingSkillIds((current) => (current.includes(id) ? current : [...current, id]));
   }, [setPendingSkillIds]);
+  const pendingSkills = useMemo(() => pendingSkillIds.map((id) => ({ id, name: skillNames[id] ?? id })), [pendingSkillIds, skillNames]);
 
   const removePendingSkill = useCallback((skillId: string) => {
     setPendingSkillIds((current) => current.filter((id) => id !== skillId));
@@ -40,6 +44,7 @@ export function useComposerPendingSkills(options: {
 
   return {
     pendingSkillIds,
+    pendingSkills,
     setPendingSkillIds,
     armPendingSkill,
     removePendingSkill,

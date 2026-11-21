@@ -77,9 +77,12 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   color: var(--token-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
 }
+
+/* Risk reads at a glance: low green, medium amber, high red. */
+.composer-tool-approval-meta .composer-tool-approval-risk.is-low { border-color: color-mix(in srgb, var(--token-status-success) 45%, transparent); color: var(--token-status-success); }
+.composer-tool-approval-meta .composer-tool-approval-risk.is-medium { border-color: color-mix(in srgb, var(--token-status-warning) 45%, transparent); color: var(--token-status-warning); }
+.composer-tool-approval-meta .composer-tool-approval-risk.is-high { border-color: color-mix(in srgb, var(--token-status-error) 45%, transparent); color: var(--token-status-error); }
 
 .composer-tool-approval-meta span {
   min-height: var(--space-6);
@@ -104,4 +107,22 @@
 .composer-tool-approval-deny,
 .composer-tool-approval-approve {
   min-height: var(--space-8);
+}
+
+/* A pending request replaces the Composer in place; it fades in instead of swapping abruptly. */
+.composer-shell-tool-approval,
+.composer-shell-plan-review,
+.composer-shell-user-input {
+  animation: composer-pending-enter var(--duration-slow) var(--ease-decelerate) both;
+}
+
+@keyframes composer-pending-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-shell-tool-approval,
+  .composer-shell-plan-review,
+  .composer-shell-user-input { animation: none; }
 }

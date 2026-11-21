@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { formatBytes } from '../../services/attachmentHelpers';
+import { formatBytes } from '../../lib/formatBytes';
+import { useI18n } from '../../i18n';
 import { openAppPath } from '../../hooks/appShellBridge';
 import { MaterialContextViewer } from '../../patterns/MaterialContextViewer';
 import { useConversationStore } from '../../stores/conversationStore';
@@ -15,6 +16,7 @@ const MessageAttachmentPill: React.FC<{
   previewUrl?: string;
   onInspect: (attachment: SessionAttachmentRecord) => void;
 }> = ({ attachment, previewUrl, onInspect }) => {
+  const { language } = useI18n();
   const image = isImageAttachment(attachment);
 
   const openAttachment = () => {
@@ -34,7 +36,7 @@ const MessageAttachmentPill: React.FC<{
       </span>
       <span className="message-attachment-pill-copy">
         <span className="message-attachment-pill-name">{attachment.fileName}</span>
-        <span className="message-attachment-pill-meta">{formatBytes(attachment.size)}</span>
+        {attachment.size > 0 ? <span className="message-attachment-pill-meta">{formatBytes(attachment.size, language)}</span> : null}
       </span>
     </button>
   );

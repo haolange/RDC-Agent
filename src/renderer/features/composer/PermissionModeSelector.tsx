@@ -4,7 +4,7 @@ import { Icon } from '../../ui/Icon';
 import { Chevron } from '../../ui/Chevron';
 import { Pill } from '../../ui/Pill';
 import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
-import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import type { TranslationKey } from '../../i18n';
@@ -23,8 +23,6 @@ export const PermissionModeSelector: React.FC = () => {
   const error = useRuntimePermissionStore((state) => state.error);
   const refresh = useRuntimePermissionStore((state) => state.refresh);
   const mode = snapshot?.mode;
-  const status = t(pendingMode ? 'composer.permission.saving' : error
-    ? 'composer.permission.saveFailed' : !snapshot ? 'composer.permission.loading' : 'composer.permission.applied');
   const setMode = useAppSettingsStore((state) => state.setAgentPermissionMode);
   const current = mode ?? 'default';
   const setRootRef = useCallback((node: HTMLDivElement | null) => {
@@ -51,7 +49,7 @@ export const PermissionModeSelector: React.FC = () => {
         aria-busy={pendingMode !== null}
         aria-haspopup="menu"
         aria-expanded={menu.open}
-        data-tooltip={`${snapshot ? t(labelKey(current)) : t('composer.permission.loading')} — ${status} ${t('composer.permission.scope')}`}
+        data-tooltip={snapshot ? `${t(labelKey(current))} · ${t(descKey(current))}` : t('composer.permission.loading')}
         onClick={() => menu.toggle()}
       >
         <span className="composer-permission-pill-icon" aria-hidden="true">
@@ -70,19 +68,21 @@ export const PermissionModeSelector: React.FC = () => {
               type="button"
               className={`composer-permission-menu-item ${entry === mode ? 'is-selected' : ''}`}
               data-mode={entry}
+              data-tooltip={t(descKey(entry))}
               role="menuitemradio"
               aria-checked={entry === mode}
               disabled={!snapshot}
               onClick={() => selectMode(entry)}
             >
               <span className="composer-permission-menu-label">{t(labelKey(entry))}</span>
-              <span className="composer-permission-menu-desc">{t(descKey(entry))}</span>
+              {entry === mode ? <Icon name="check" size={16} className="composer-permission-menu-check" /> : null}
             </button>
           ))}
-          <p className="composer-permission-status" role="status">{status} {t('composer.permission.scope')}</p>
-          {error && <Button variant="ghost" size="sm" role="menuitem" onClick={() => { void refresh().catch(() => undefined); }}>
-            {t('composer.permission.retry')}
-          </Button>}
+          {error ? (
+            <InlineError onRetry={() => { void refresh().catch(() => undefined); }} retryLabel={t('composer.permission.retry')}>
+              {t('composer.permission.saveFailed')}
+            </InlineError>
+          ) : null}
         </div>
       ) : null}
     </div>

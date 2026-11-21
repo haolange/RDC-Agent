@@ -1,80 +1,75 @@
+/* Same surface and rows as the model picker: caption-headed groups, a name and one line of description per row. */
 .slash-command-popover {
   position: absolute;
   bottom: calc(100% + var(--space-2));
   left: 0;
   right: 0;
-  max-height: 280px;
-  overflow-y: auto;
-  background: var(--token-bg-overlay);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--token-shadow-popover);
   z-index: var(--z-popover);
-  margin-bottom: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: min(22rem, calc(100vh - var(--space-16)));
+  padding: var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-xl);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-shadow-popover);
+  animation: slash-command-enter var(--duration-base) var(--ease-decelerate) both;
+}
+
+@keyframes slash-command-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slash-command-popover { animation: none; }
+}
+
+.slash-command-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.slash-command-group-label {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
+  font-weight: var(--font-semibold);
 }
 
 .slash-command-item {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
   padding: var(--space-2) var(--space-3);
-  border: 0;
-  background: transparent;
-  color: var(--token-text-secondary);
-  font: inherit;
-  font-size: var(--type-body-size);
-  text-align: left;
+  border-radius: var(--control-radius);
+  color: var(--token-text-primary);
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  width: 100%;
   transition: background var(--transition-fast);
 }
 
-.slash-command-item:hover,
-.slash-command-item:focus-visible,
 .slash-command-item.is-selected {
   background: var(--token-interactive-hover);
-  color: var(--token-text-primary);
 }
 
 .slash-command-name {
-  font-weight: var(--font-semibold);
-  color: var(--token-text-primary);
-  min-width: var(--space-20);
+  font-family: var(--font-mono);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
 }
 
 .slash-command-desc {
-  flex: 1;
-  font-size: var(--type-meta-size);
-  color: var(--token-text-secondary);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.slash-command-cat {
-  font-size: var(--type-meta-size);
   color: var(--token-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
   white-space: nowrap;
-}
-
-.slash-command-footer {
-  padding: var(--space-2) var(--space-3);
-  border-top: 1px solid var(--token-border-subtle);
-  color: var(--token-text-disabled);
-  font-size: var(--type-meta-size);
-  text-align: right;
-}
-
-.slash-command-footer kbd {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--space-1);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-sm);
-  font-size: var(--type-meta-size);
-  font-family: inherit;
+  mask-image: linear-gradient(to right, rgb(0 0 0) 70%, transparent);
 }

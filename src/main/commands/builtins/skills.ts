@@ -40,7 +40,7 @@ export const skillsCommand: CommandDefinition = {
       return {
         success: true,
         message: `Armed skill for next send: ${skill.id}`,
-        uiAction: { type: 'run-skill', payload: { skillId: skill.id } },
+        uiAction: { type: 'run-skill', payload: { skillId: skill.id, skillName: skill.label || skill.name } },
         data: { skill },
       };
     }
@@ -54,7 +54,7 @@ export const skillsCommand: CommandDefinition = {
     return {
       success: true,
       message: `Armed skill for next send: ${skill.id}`,
-      uiAction: { type: 'run-skill', payload: { skillId: skill.id } },
+      uiAction: { type: 'run-skill', payload: { skillId: skill.id, skillName: skill.label || skill.name } },
       data: { skill },
     };
   },

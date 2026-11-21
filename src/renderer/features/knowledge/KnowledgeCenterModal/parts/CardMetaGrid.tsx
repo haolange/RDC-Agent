@@ -1,6 +1,7 @@
 import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail } from '@shared/types/knowledge';
 import { Details } from '../../../../ui/Details';
 import { useI18n } from '../../../../i18n';
+import { formatBytes } from '../../../../lib/formatBytes';
 import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { Button } from '../../../../ui/Button';
 import { CardBadges } from './CardBadges';
@@ -13,19 +14,13 @@ interface CardMetaGridProps {
   onOpenRelation?: (targetCardId: string) => void;
 }
 
-function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 /**
  * Metadata for the selected card: type / lifecycle / source status / caseId / updatedAt /
  * space / relative path, scope axes with exclusions, relations, and a collapsed
  * provenance block (import hash / mtime / size) when the card was ingested.
  */
 export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const exclusions = card.scope.exclusions ?? {};
   const axes = KNOWLEDGE_SCOPE_AXES.filter((axis) => card.scope[axis] || exclusions[axis]?.length);
   const hasProvenance = Boolean(card.sourceHash || card.sourceMtimeMs != null || card.sourceSize != null);
@@ -122,7 +117,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
             </div>
             <div>
               <dt>{t('knowledgeCenter.metaSourceSize')}</dt>
-              <dd>{card.sourceSize != null ? formatBytes(card.sourceSize) : '—'}</dd>
+              <dd>{card.sourceSize != null ? formatBytes(card.sourceSize, language) : '—'}</dd>
             </div>
           </dl>
         ) : (

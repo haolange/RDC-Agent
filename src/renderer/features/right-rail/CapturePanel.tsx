@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { useUiLabels } from '../../lib/useUiLabels';
+import { formatBytes } from '../../lib/formatBytes';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 import { DevicePreparationStatus, isDevicePreparing, isDeviceInstallationUnconfirmed } from '../../patterns/DevicePreparationStatus';
@@ -32,10 +33,6 @@ import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@share
 import './CaptureReplay.css';
 
 type Action = 'open' | 'close' | 'refresh' | 'image';
-const sizeLabel = (size: number, locale: string) => new Intl.NumberFormat(locale, {
-  style: 'unit', unit: size >= 1024 ** 3 ? 'gigabyte' : 'megabyte', maximumFractionDigits: 1,
-}).format(size >= 1024 ** 3 ? size / 1024 ** 3 : size / 1024 ** 2);
-
 const copied = (value: string) => async () => {
   try {
     await copyAppText(value);
@@ -123,7 +120,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     <div className="capture-replay-status-row">
       <CaptureReplayStatusChip label={t(captureStatusLabelKey({ pending, partial, phase: state?.phase }))} tone={statusTone} />
     </div>
-    <div className="capture-replay-file-row" data-tooltip={selectedInput ? `${selectedInput.fileName} · ${sizeLabel(selectedInput.sizeBytes, language)}` : undefined}>
+    <div className="capture-replay-file-row" data-tooltip={selectedInput ? `${selectedInput.fileName} · ${formatBytes(selectedInput.sizeBytes, language)}` : undefined}>
       <Select dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
         options={capture.availableCaptures.map((input) => ({ value: input.inputId, label: input.fileName }))} disabled={disabled}
         onChange={(inputId) => setDraft({ ...chosen, inputId })} />

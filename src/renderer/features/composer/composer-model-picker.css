@@ -211,17 +211,16 @@
   font-weight: var(--font-normal);
 }
 
-.composer-model-chip {
+.composer-model-capabilities {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--token-accent-primary) 14%, transparent);
-  color: var(--token-accent-primary);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-line);
-  font-weight: var(--font-semibold);
+  gap: var(--space-1);
+  color: var(--token-text-secondary);
+}
+
+.composer-model-capability {
+  display: inline-flex;
 }
 
 .composer-model-check {

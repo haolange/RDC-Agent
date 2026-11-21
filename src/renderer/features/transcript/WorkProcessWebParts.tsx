@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../lib/formatBytes';
 import { FaviconImage } from '../../patterns/FaviconImage';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
@@ -48,10 +49,10 @@ export const WebPillStrip: React.FC<{ pages: readonly WorkProcessWebPage[]; mark
 
 /** The expanded list: every page with its title, address and first lines; reads also show their HTTP facts. */
 export const WebPageList: React.FC<{ pages: readonly WorkProcessWebPage[]; meta?: ToolRowModel['webMeta'] }> = ({ pages, meta }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const facts = [
     meta?.status !== undefined ? t('chat.webPageStatus', { status: meta.status }) : '',
-    meta?.bytes !== undefined ? t('chat.webPageSize', { size: formatSize(meta.bytes) }) : '',
+    meta?.bytes !== undefined ? t('chat.webPageSize', { size: formatBytes(meta.bytes, language) }) : '',
   ].filter(Boolean);
   return (
     <ul className="work-process-web-list" data-testid="work-process-tool-preview">
@@ -71,12 +72,6 @@ export const WebPageList: React.FC<{ pages: readonly WorkProcessWebPage[]; meta?
       ))}
     </ul>
   );
-};
-
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 /**

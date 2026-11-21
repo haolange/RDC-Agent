@@ -1,10 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { formatTokenCount } from '@shared/utils/tokens';
-import { formatUsdCost } from '@shared/utils/cost';
 import { useI18n } from '../i18n';
 import {
   awaitsExecutionContextWindow,
-  resolveDisplayedPromptBudget,
   type ContextUsageSelectedProfile,
 } from './contextUsageDisplay';
 import { ContextBreakdownSheet } from './ContextBreakdownSheet';
@@ -50,7 +47,6 @@ export const ContextUsageIndicator: React.FC<{
   const showEstimatedRing = previewActive && phase !== 'preparing';
   const usagePercent = showPrepared ? prepared.usagePercent : usage?.usagePercent ?? 0;
   const normalizedPercent = awaitingWindow ? 0 : Math.max(0, Math.min(100, usagePercent));
-  const windowTokens = resolveDisplayedPromptBudget(showPrepared, prepared, usage, selectedProfile);
   const radius = 16.5;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - (normalizedPercent / 100));
@@ -72,17 +68,6 @@ export const ContextUsageIndicator: React.FC<{
     setLocalOpen((current) => !current);
   }, [menu]);
 
-  const windowLabel = phase === 'preparing'
-    ? t('contextBreakdown.preparing')
-    : awaitingWindow && prepared
-      ? `${t('contextBreakdown.windowPending')} · ~${formatTokenCount(prepared.uncompactedInputTokens)} / ${formatTokenCount(prepared.promptBudgetTokens)}`
-    : showPrepared
-      ? `${t('contextBreakdown.currentRequest')} ~${formatTokenCount(prepared.preparedInputTokens)} / ${formatTokenCount(prepared.promptBudgetTokens)}`
-      : previewActive
-        ? `${t('contextBreakdown.projected')} ${percentLabel}${windowTokens ? ` ${formatTokenCount(windowTokens)}` : ''}`
-        : usage
-          ? `${phase === 'actual' ? t('contextBreakdown.actual') : t('contextBreakdown.lastActual')} ${normalizedPercent}%${windowTokens ? ` ${formatTokenCount(windowTokens)}` : ''}${typeof usage.cumulativeCost === 'number' ? ` ${formatUsdCost(usage.cumulativeCost)}` : ''}`
-          : `${t('contextBreakdown.noUsageYet')}${windowTokens ? ` ${formatTokenCount(windowTokens)}` : ''}`;
   const ariaLabel = phase === 'preparing'
     ? t('contextBreakdown.preparing')
     : awaitingWindow
@@ -113,7 +98,7 @@ export const ContextUsageIndicator: React.FC<{
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
-        data-tooltip={windowLabel}
+        data-tooltip={ariaLabel}
         onClick={togglePopover}
       >
         <svg className="composer-usage-ring" viewBox="0 0 36 36" aria-hidden="true">

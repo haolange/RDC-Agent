@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { OverflowFade } from '../../ui/OverflowFade';
 import { Button } from '../../ui/Button';
 import { MaterialContextEditor } from '../../patterns/MaterialContextEditor';
-import { fileExtensionLabel, formatBytes } from '../../services/attachmentHelpers';
+import { formatBytes } from '../../lib/formatBytes';
 import { getAttachmentPreview } from '../../hooks/conversationPreview';
 import { useI18n } from '../../i18n';
 import { Icon, type IconName } from '../../ui/Icon';
@@ -34,7 +34,7 @@ export const AttachmentCard: React.FC<{
   onRemove,
   onMaterialChange,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [editing, setEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const failed = Boolean(attachment.error);
@@ -58,7 +58,7 @@ export const AttachmentCard: React.FC<{
     ? t(attachmentRejectKey(attachment.error.code))
     : warning
       ? visionUnsupportedLabel
-      : [fileExtensionLabel(attachment.fileName), formatBytes(attachment.size)].filter(Boolean).join(' · ');
+      : attachment.size ? formatBytes(attachment.size, language) : '';
 
   return (
     <div

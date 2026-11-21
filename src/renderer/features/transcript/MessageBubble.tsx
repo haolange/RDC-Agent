@@ -11,6 +11,8 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useI18n } from '../../i18n';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { errorDetail } from '../../lib/errorDetail';
+import { useUiLabels } from '../../lib/useUiLabels';
+import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
 import { WorkProcess } from './WorkProcess';
 import { MessageActions } from './MessageActions';
 import { UserMessageEditForm } from './UserMessageEditForm';
@@ -87,6 +89,10 @@ const MessageMetaBar: React.FC<{
     {status === 'error' ? (
       <span className="conversation-message-status-tag is-error">{t('chat.messageError')}</span>
     ) : null}
+    {/* A Working header already says 已停止; the tag only speaks for replies stopped before any work showed. */}
+    {status === 'stopped' && !message.workTrace?.blocks.length ? (
+      <span className="conversation-message-status-tag is-stopped">{t('chat.messageStopped')}</span>
+    ) : null}
     <MessageActions message={message} branchState={branchState} onEditResend={onEditResend} />
   </footer>
   );
@@ -106,10 +112,10 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
   const selectedAgent = agentDefinitions.find((agent) => agent.id === selectedAgentId);
   const currentSession = useProjectStore((state) => state.currentSession);
   const { effective } = useComposerEffectiveModel(selectedAgentId, currentSession);
+  const modelLabel = useModelDisplayLabel(effective?.providerId, effective?.modelId);
   const executionPreview = t('chat.rewriteWillUse', {
     agent: selectedAgent?.name ?? selectedAgentId,
-    provider: effective?.providerId ?? '—',
-    model: effective?.modelId ?? '—',
+    model: modelLabel ?? t('chat.rewriteModelUnknown'),
   });
 
   const beginEdit = () => {
@@ -192,6 +198,7 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
 
 const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const { t } = useI18n();
+  const labels = useUiLabels();
   const agentId = message.agentId;
   const time = formatClockTime(message.createdAt);
   const trace = message.workTrace ?? null;
@@ -243,7 +250,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
                 <span className="conversation-message-diagnostic-text">
                   {message.diagnostic.userMessage}
                 </span>
-                <Details className="conversation-message-diagnostic-details" summary={t('chat.diagnosticTechnicalDetails')}>
+                <Details className="conversation-message-diagnostic-details" summary={labels.diagnostics}>
                   <code className="conversation-message-diagnostic-code">{message.diagnostic.code}</code>
                   {message.diagnostic.technicalMessage ? (
                     <code className="conversation-message-diagnostic-code">{message.diagnostic.technicalMessage}</code>

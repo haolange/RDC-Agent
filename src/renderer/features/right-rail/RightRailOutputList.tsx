@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../lib/formatBytes';
 import { copyAppText, openAppPath } from '../../hooks/appShellBridge';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
@@ -9,18 +10,12 @@ import type { TraceArtifactRecord } from '@shared/types/trace';
 
 interface RightRailOutputListProps { current: TraceArtifactRecord[]; previous: TraceArtifactRecord[]; }
 
-const formatSize = (size: number | undefined, locale: string): string => {
-  if (typeof size !== 'number') return '';
-  const [value, unit] = size >= 1024 * 1024 ? [size / (1024 * 1024), 'megabyte'] : [Math.max(1, size / 1024), 'kilobyte'];
-  return new Intl.NumberFormat(locale, { style: 'unit', unit, maximumFractionDigits: 1 }).format(value);
-};
-
 /** One output: its name and one action. The size rides on the hover text; copying the path lives in「更多」. */
 const OutputRow: React.FC<{ artifact: TraceArtifactRecord }> = ({ artifact }) => {
   const { t, language } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const failed = artifact.status === 'failed';
-  const size = formatSize(artifact.sizeBytes, language);
+  const size = typeof artifact.sizeBytes === 'number' ? formatBytes(artifact.sizeBytes, language) : '';
   return (
     <article className={`right-rail-artifact-row status-${artifact.status}`}>
       <span className="right-rail-artifact-icon" aria-hidden="true"><Icon name="file" /></span>

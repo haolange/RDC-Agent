@@ -138,7 +138,7 @@ describe('ContextUsageIndicator', () => {
         }),
       }),
     );
-    expect(idle).toContain('data-tooltip="contextBreakdown.noUsageYet 1M"');
+    expect(idle).toContain('data-tooltip="contextBreakdown.noUsageYet"');
     expect(idle).not.toContain('composer-usage-ring-threshold');
   });
 
@@ -176,7 +176,7 @@ describe('ContextUsageIndicator', () => {
     expect(projected).toContain(`~${usagePercent}%`);
     expect(projected).toContain('is-estimated');
     expect(projected).toContain('data-estimated="true"');
-    expect(projected).toContain(`data-tooltip="contextBreakdown.projected ~${usagePercent}% 1M"`);
+    expect(projected).toContain('data-tooltip="contextBreakdown.projectedAria"');
     expect(projected).not.toContain('composer-usage-value-label');
   });
 

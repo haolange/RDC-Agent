@@ -7,17 +7,12 @@ import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
 import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../lib/formatBytes';
 import { errorDetail } from '../../lib/errorDetail';
 import { importProjectInputs, refreshProjectInputs, removeProjectInput } from './projectCaptureActions';
 import { ProjectCaptureReferenceDialog } from './ProjectCaptureReferenceDialog';
 import type { ProjectInputRecord } from '@shared/types/session';
 import './CaptureReplay.css';
-
-const formatSize = (size: number): string => {
-  if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(size / 1024))} KB`;
-};
 
 const formatImportError = (reason: unknown, sessionExpired: string): string => {
   const message = errorDetail(reason);
@@ -30,10 +25,12 @@ const CaptureFileIcon: React.FC = () => (
   <Icon name="file" className="project-capture-input-icon" />
 );
 
-const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabled: boolean; removeLabel: string; referenceLabel: string }> = ({ input, remove, disabled, removeLabel, referenceLabel }) => (
-  <article
+const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabled: boolean; removeLabel: string; referenceLabel: string }> = ({ input, remove, disabled, removeLabel, referenceLabel }) => {
+  const { language } = useI18n();
+  const size = formatBytes(input.size, language);
+  return <article
     className="project-capture-input-row"
-    aria-label={`${input.fileName}, ${formatSize(input.size)}. ${input.filePath}`}
+    aria-label={`${input.fileName}, ${size}. ${input.filePath}`}
     data-tooltip={input.filePath}
     role="listitem"
   >
@@ -42,9 +39,9 @@ const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabl
       <strong data-tooltip={`${input.fileName}\n${input.filePath}`}>{input.fileName}</strong>
       {input.source === 'external_reference' ? <span>{referenceLabel}</span> : null}
     </span>
-    <span className="project-capture-input-actions"><span className="project-capture-input-size">{formatSize(input.size)}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}><Icon name="close" size={14} /></Button></span>
-  </article>
-);
+    <span className="project-capture-input-actions"><span className="project-capture-input-size">{size}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}><Icon name="close" size={14} /></Button></span>
+  </article>;
+};
 
 export const ProjectCaptureImportPanel: React.FC = () => {
   const { t } = useI18n();

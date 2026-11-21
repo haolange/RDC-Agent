@@ -1,17 +1,10 @@
-/**
- * SlashCommandPopover — 斜杠命令弹出选择器。
- *
- * 当用户在输入框中输入 "/" 时显示可用命令列表，
- * 支持键盘导航（上下箭头 / Enter / Escape）和鼠标选择。
- */
-
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCommandCatalog } from '../../hooks/useCommandCatalog';
 import { useI18n } from '../../i18n';
-import { Kbd } from '../../ui/Kbd';
 import { useOverlayDismiss } from '../../lib/overlayStack';
+import { InlineError } from '../../ui/InlineError';
+import { Skeleton } from '../../ui/Skeleton';
 import './SlashCommandPopover.css';
-
 
 interface SlashCommandPopoverProps {
   filterText: string;
@@ -19,81 +12,68 @@ interface SlashCommandPopoverProps {
   onDismiss: () => void;
 }
 
-export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
-  filterText,
-  onSelect,
-  onDismiss,
-}) => {
+/**
+ * Commands for what was typed after "/", grouped by category the way the model picker groups providers: a caption,
+ * then rows of name and one line of description. Arrow keys move, Enter picks, Escape closes.
+ */
+export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({ filterText, onSelect, onDismiss }) => {
   const { t } = useI18n();
   const { commands, loading, error } = useCommandCatalog();
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const filtered = commands.filter(
-    (c) =>
-      c.name.startsWith(filterText.toLowerCase()) ||
-      c.aliases.some((a) => a.startsWith(filterText.toLowerCase())),
-  );
+  const query = filterText.toLowerCase();
+  const filtered = useMemo(() => commands.filter((command) =>
+    command.name.startsWith(query) || command.aliases.some((alias) => alias.startsWith(query))), [commands, query]);
+  const groups = useMemo(() => {
+    const byCategory = new Map<string, typeof filtered>();
+    for (const command of filtered) byCategory.set(command.category, [...(byCategory.get(command.category) ?? []), command]);
+    return [...byCategory.entries()];
+  }, [filtered]);
+  const ordered = useMemo(() => groups.flatMap(([, entries]) => entries), [groups]);
 
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [filterText]);
+  useEffect(() => setSelectedIndex(0), [filterText]);
 
-  // 键盘导航
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          setSelectedIndex((prev) => Math.max(prev - 1, 0));
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (filtered[selectedIndex]) {
-            onSelect(filtered[selectedIndex].name);
-          }
-          break;
-      }
-    },
-    [filtered, selectedIndex, onSelect],
-  );
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setSelectedIndex((previous) => Math.min(previous + 1, ordered.length - 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setSelectedIndex((previous) => Math.max(previous - 1, 0));
+    } else if (event.key === 'Enter' && ordered[selectedIndex]) {
+      event.preventDefault();
+      onSelect(ordered[selectedIndex].name);
+    }
+  }, [ordered, selectedIndex, onSelect]);
 
-  useOverlayDismiss(filtered.length > 0 && !loading && !error, onDismiss);
+  useOverlayDismiss(ordered.length > 0 && !loading && !error, onDismiss);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  if (loading || error) return <div className="slash-command-popover" role="status">
-    <p>{t(error ? 'app.commandsFailed' : 'app.commandsLoading')}</p>
-    {error ? <p>{error}</p> : null}
-  </div>;
-  if (filtered.length === 0) return null;
+  if (loading) return <div className="slash-command-popover" role="status"><Skeleton shape="row" count={3} /></div>;
+  if (error) return <div className="slash-command-popover"><InlineError detail={error}>{t('app.commandsFailed')}</InlineError></div>;
+  if (ordered.length === 0) return null;
 
   return (
-    <div className="slash-command-popover" ref={containerRef} role="listbox">
-      {filtered.map((cmd, idx) => (
-        <div
-          key={cmd.id}
-          className={`slash-command-item${idx === selectedIndex ? ' is-selected' : ''}`}
-          role="option"
-          aria-selected={idx === selectedIndex}
-          data-tooltip={cmd.description}
-          onClick={() => onSelect(cmd.name)}
-          onMouseEnter={() => setSelectedIndex(idx)}
-        >
-          <span className="slash-command-name">/{cmd.name}</span>
-          <span className="slash-command-desc">{cmd.description}</span>
-          <span className="slash-command-cat">{cmd.category}</span>
+    <div className="slash-command-popover" role="listbox" aria-label={t('composer.slashCommands')}>
+      {groups.map(([category, entries]) => (
+        <div key={category} className="slash-command-group" role="group" aria-label={category}>
+          <p className="slash-command-group-label">{category}</p>
+          {entries.map((command) => {
+            const index = ordered.indexOf(command);
+            return (
+              <div key={command.id} className={`slash-command-item${index === selectedIndex ? ' is-selected' : ''}`}
+                role="option" aria-selected={index === selectedIndex}
+                onClick={() => onSelect(command.name)} onMouseEnter={() => setSelectedIndex(index)}>
+                <span className="slash-command-name">/{command.name}</span>
+                {command.description ? <span className="slash-command-desc">{command.description}</span> : null}
+              </div>
+            );
+          })}
         </div>
       ))}
-      <div className="slash-command-footer">
-        <Kbd>↑↓</Kbd> {t('composer.slashHintNavigate')} <Kbd>Enter</Kbd> {t('composer.slashHintSelect')} <Kbd>Esc</Kbd> {t('composer.slashHintDismiss')}
-      </div>
     </div>
   );
 };

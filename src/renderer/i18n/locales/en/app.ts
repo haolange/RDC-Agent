@@ -50,7 +50,7 @@ export const enApp = {
   'app.conversationRequestFailed': 'Conversation request failed.',
   'app.removeAttachment': 'Remove {fileName}',
   'app.armedSkillMeta': 'Preload on send',
-  'app.removeArmedSkill': 'Remove armed skill {skillId}',
+  'app.removeArmedSkill': 'Remove skill {skill}',
   'app.inspector': 'Inspector',
   'app.closePanel': 'Close panel',
   'app.commandPaletteInput': "Command palette input",

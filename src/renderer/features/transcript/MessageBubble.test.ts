@@ -27,11 +27,15 @@ it.each<PlanReviewStatus>(['awaiting', 'approved', 'rejected', 'superseded', 'ca
   expect(html.includes('data-testid="plan-deliverable"')).toBe(status === 'awaiting' || status === 'approved');
   if (status === 'awaiting') expect(html.indexOf('work-process')).toBeLessThan(html.indexOf('plan-deliverable'));
 });
-it('preserves ordinary handoffs and original stopped output without a duplicate stop badge', () => {
+it('preserves ordinary handoffs and says once that a reply stopped', () => {
   expect(renderToStaticMarkup(createElement(MessageBubble, { message: base }))).toContain('Continue handoff');
   const html = renderToStaticMarkup(createElement(MessageBubble, { message: { ...base, status: 'stopped' } }));
   expect(html).toContain('Original result');
-  expect(html).not.toContain('is-stopped');
+  expect(html.match(/is-stopped/g)).toHaveLength(1);
+  const withWork = renderToStaticMarkup(createElement(MessageBubble, { message: { ...base, status: 'stopped', workTrace: {
+    status: 'stopped', updatedAt: 1, blocks: [{ id: 'b', kind: 'llm_turn', title: 'Turn', status: 'cancelled', startedAt: 1, toolCalls: [] }],
+  } } }));
+  expect(withWork).not.toContain('conversation-message-status-tag is-stopped');
 });
 it('shows a plan-executing user message as its plan reference and keeps the handoff prompt one disclosure away', () => {
   const user: ConversationMessage = { id: 'u', turnId: 't2', sessionId: 's', projectId: 'p', role: 'user', content: 'Execute the frozen plan.',

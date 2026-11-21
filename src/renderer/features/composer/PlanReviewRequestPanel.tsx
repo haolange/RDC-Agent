@@ -1,10 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { Textarea } from '../../ui/Textarea';
-import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { InlineError } from '../../ui/InlineError';
+import { Spinner } from '../../ui/Spinner';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { cancelPlanReview } from '../../services/planReviewService';
@@ -132,15 +132,13 @@ export const PlanReviewRequestPanel: React.FC<{
         </IconButton>
       </div>
       {modelSave.error ? <InlineError detail={modelSave.error} onRetry={modelSave.retry ?? undefined} retryLabel={t('composer.model.retrySave')}>{t('app.error.saveFailed')}</InlineError> : null}
-      {isSubmitting || transition ? <p className="composer-transition-status" role="status">{t(transition?.phase === 'handoff' ? 'composer.handoff.switching' : 'composer.handoff.confirming')}</p> : null}
+      {isSubmitting || transition ? <p className="composer-transition-status" role="status"><Spinner size="sm" />{t(transition?.phase === 'handoff' ? 'composer.handoff.switching' : 'composer.handoff.confirming')}</p> : null}
       {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
-      {modelStatus.labelKey ? <p className="composer-transition-status" role="status">
-        {t(modelStatus.labelKey)}
-        {capabilityState.status === 'error' || capabilityState.status === 'unavailable' ? <>
-          {' '}{capabilityState.message}
-          <Button variant="ghost" size="sm" onClick={retryCapability}>{t('composer.effort.capabilityRetry')}</Button>
-        </> : null}
-      </p> : null}
+      {modelStatus.labelKey && (capabilityState.status === 'error' || capabilityState.status === 'unavailable') ? (
+        <InlineError detail={capabilityState.message} onRetry={retryCapability} retryLabel={t('composer.effort.capabilityRetry')}>
+          {t(modelStatus.labelKey)}
+        </InlineError>
+      ) : modelStatus.labelKey ? <p className="composer-transition-status" role="status">{t(modelStatus.labelKey)}</p> : null}
       </div>
       <div className="composer-plan-review__footer">
         <ComposerModelEffortControl agentId={agentId} currentSession={currentSession}

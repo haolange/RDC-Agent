@@ -47,7 +47,6 @@ composer-user-input-panel
 context-breakdown
 context-breakdown-bar-threshold
 context-breakdown-cost
-context-breakdown-projected-note
 context-breakdown-run-meter
 context-breakdown-window-note
 context-list

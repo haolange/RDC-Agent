@@ -50,7 +50,7 @@ export const zhApp = {
   'app.conversationRequestFailed': '对话请求失败。',
   'app.removeAttachment': '移除 {fileName}',
   'app.armedSkillMeta': '发送时预载',
-  'app.removeArmedSkill': '移除武装技能 {skillId}',
+  'app.removeArmedSkill': '移除技能 {skill}',
   'app.inspector': '检查面板',
   'app.closePanel': '关闭面板',
   'app.commandPaletteInput': "命令面板输入",

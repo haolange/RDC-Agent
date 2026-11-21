@@ -143,18 +143,6 @@
   min-width: 0;
 }
 
-@container (max-width: 42rem) {
-  .context-breakdown-hero-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .context-breakdown-hero-tokens {
-    white-space: normal;
-  }
-}
-
 @container (max-width: 38rem) {
   .context-breakdown-run-columns {
     grid-template-columns: minmax(0, 1fr);

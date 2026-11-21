@@ -1,38 +1,24 @@
 import React from 'react';
-import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
 import { Icon } from '../../ui/Icon';
 
+/** A skill armed for the next send: its icon and name; what "armed" means is on hover. */
 export const ComposerSkillChips: React.FC<{
-  pendingSkillIds: string[];
+  pendingSkills: ReadonlyArray<{ id: string; name: string }>;
   removePendingSkill: (skillId: string) => void;
   armedSkillMeta: string;
-  removeArmedSkillLabel: (skillId: string) => string;
-}> = ({
-  pendingSkillIds,
-  removePendingSkill,
-  armedSkillMeta,
-  removeArmedSkillLabel,
-}) => {
-  if (pendingSkillIds.length === 0) return null;
-  return (
-    <>
-      {pendingSkillIds.map((skillId) => (
-        <div key={`skill-${skillId}`} className="composer-skill-chip" data-testid="composer-skill-chip">
-          <span className="composer-skill-chip-glyph" aria-hidden="true">SKL</span>
-          <span className="composer-skill-chip-copy">
-            <span className="composer-skill-chip-name">${skillId}</span>
-            <span className="composer-skill-chip-meta">{armedSkillMeta}</span>
-          </span>
-          <Button variant="ghost" size="sm"
-            type="button"
-            className="composer-skill-chip-remove"
-            onClick={() => removePendingSkill(skillId)}
-            aria-label={removeArmedSkillLabel(skillId)}
-          >
-            <Icon name="close" size={12} />
-          </Button>
-        </div>
-      ))}
-    </>
-  );
-};
+  removeArmedSkillLabel: (skillName: string) => string;
+}> = ({ pendingSkills, removePendingSkill, armedSkillMeta, removeArmedSkillLabel }) => (
+  <>
+    {pendingSkills.map((skill) => (
+      <div key={`skill-${skill.id}`} className="composer-skill-chip" data-testid="composer-skill-chip" data-tooltip={armedSkillMeta}>
+        <Icon name="skill-read" size={16} className="composer-skill-chip-glyph" />
+        <span className="composer-skill-chip-name">{skill.name}</span>
+        <IconButton size="sm" className="composer-skill-chip-remove" onClick={() => removePendingSkill(skill.id)}
+          label={removeArmedSkillLabel(skill.name)}>
+          <Icon name="close" size={12} />
+        </IconButton>
+      </div>
+    ))}
+  </>
+);

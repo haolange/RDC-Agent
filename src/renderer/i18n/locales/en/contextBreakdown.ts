@@ -36,7 +36,7 @@ export const enContextBreakdown = {
   'contextBreakdown.countSuffix.builtin_tools_deferred': '',
   'contextBreakdown.countSuffix.subagent_definitions': '',
   'contextBreakdown.countSuffix.conversation': ' msgs',
-  'contextBreakdown.detailsLabel': 'Details',
+  'contextBreakdown.detailsLabel': 'Usage details',
   'contextBreakdown.detailsExpandAria': 'Show context breakdown details',
   'contextBreakdown.detailsCollapseAria': 'Hide context breakdown details',
   'contextBreakdown.currentRequest': 'Current request',

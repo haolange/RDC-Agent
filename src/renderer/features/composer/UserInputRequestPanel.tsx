@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Button } from '../../ui/Button';
 import { Chevron } from '../../ui/Chevron';
+import { InlineError } from '../../ui/InlineError';
 import { UserInputCustomAnswer, UserInputOptionList } from './UserInputRequestPanelParts';
 import { useUserInputRequestSubmit } from './useUserInputRequestSubmit';
 import {
@@ -262,16 +263,8 @@ export const UserInputRequestPanel: React.FC<{
         </Button>
       </div>
 
-      {error ? (
-        <p className="composer-user-input-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {!hasValidQuestions ? (
-        <p className="composer-user-input-error" role="alert">
-          {t('chat.userInputIncomplete')}
-        </p>
-      ) : null}
+      {error ? <InlineError detail={error}>{t('chat.userInputSubmitFailed')}</InlineError> : null}
+      {!hasValidQuestions ? <InlineError>{t('chat.userInputIncomplete')}</InlineError> : null}
     </section>
   );
 };

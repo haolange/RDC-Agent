@@ -97,11 +97,4 @@
   white-space: nowrap;
 }
 
-.context-breakdown-footer {
-  margin: 0;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--token-border-subtle);
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-line);
-}
+

@@ -263,6 +263,11 @@
   border: 1px solid color-mix(in srgb, var(--token-accent-primary) 32%, transparent);
 }
 
+.conversation-message-status-tag.is-stopped {
+  border: 1px solid var(--token-border-muted);
+  color: var(--token-text-secondary);
+}
+
 .conversation-message-status-tag.is-error {
   background: color-mix(in srgb, var(--token-status-error) 14%, transparent);
   color: var(--token-status-error);

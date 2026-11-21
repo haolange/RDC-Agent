@@ -97,31 +97,6 @@
   mask-image: linear-gradient(90deg, black 0%, black 82%, transparent 100%);
 }
 
-.composer-user-input-option-tooltip {
-  position: absolute;
-  left: 0;
-  top: calc(100% + var(--space-2));
-  z-index: var(--z-tooltip);
-  display: none;
-  width: max-content;
-  max-width: min(calc(var(--space-24) * 5), calc(100vw - var(--space-8)));
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-panel);
-  box-shadow: var(--shadow-panel);
-  color: var(--token-text-primary);
-  font-size: var(--type-body-size);
-  line-height: 1.5;
-  white-space: normal;
-  pointer-events: none;
-}
-
-.composer-user-input-option-description:hover .composer-user-input-option-tooltip,
-.composer-user-input-option:focus-visible .composer-user-input-option-tooltip {
-  display: block;
-}
-
 .composer-user-input-option-check {
   display: inline-flex;
   align-items: center;
@@ -172,9 +147,3 @@
   min-width: var(--space-16);
 }
 
-.composer-user-input-error {
-  margin: 0;
-  color: var(--token-status-error);
-  font-size: var(--type-meta-size);
-  line-height: 1.5;
-}

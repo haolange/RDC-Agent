@@ -107,8 +107,7 @@
 
 .composer-permission-menu-item {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-1);
   width: 100%;
   padding: var(--space-2);
@@ -137,17 +136,8 @@
   font-weight: var(--font-semibold);
 }
 
-.composer-permission-menu-desc {
-  font-size: var(--type-meta-size);
-  color: var(--token-text-secondary);
-  line-height: 1.45;
-  font-weight: var(--font-normal);
-}
-
-.composer-permission-status {
-  margin: var(--space-2);
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: var(--leading-normal);
-  white-space: normal;
+.composer-permission-menu-check {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--permission-tone, var(--token-accent-primary));
 }

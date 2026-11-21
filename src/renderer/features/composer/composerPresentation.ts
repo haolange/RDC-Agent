@@ -1,9 +1,8 @@
-import type { AgentMode } from '@shared/types/layout';
-import type { AppLanguage } from '@shared/types/settings';
+import type { Translator } from '../../i18n/messages';
 
+/** Placeholder and button names for the Composer, in the interface language. */
 export function buildComposerPresentation(input: {
-  language: AppLanguage;
-  currentMode: AgentMode;
+  t: Translator;
   currentModeLabel: string;
   /** The Agent's own "what to tell me", already in the interface language; empty when it declares none. */
   currentModeHint: string;
@@ -11,29 +10,12 @@ export function buildComposerPresentation(input: {
   hasActiveDebugRun: boolean;
   isComposerBusy: boolean;
 }) {
-  const zh = input.language === 'zh-CN';
+  const { t, currentModeLabel: agent } = input;
   const hint = input.currentModeHint.trim();
-  const promptPlaceholder = hint
-    ? zh ? `向 ${input.currentModeLabel} 说明${hint}` : `${input.currentModeLabel}: ${hint}`
-    : zh ? `向 ${input.currentModeLabel} 描述目标、异常或验证需求`
-      : `Describe the goal, anomaly, or verification request for ${input.currentModeLabel}`;
-  const attachButtonLabel = !input.hasProject
-    ? (zh ? '选择项目后可附加图片或文件' : 'Select a project before attaching images or files')
-    : (zh ? '附加图片或文件' : 'Attach images or files');
-  const stopButtonLabel = input.hasActiveDebugRun
-    ? (zh ? '停止当前调试' : 'Stop current debug run')
-    : (zh ? '停止当前请求' : 'Stop current request');
-  const primaryButtonLabel = input.isComposerBusy
-    ? stopButtonLabel
-    : input.hasActiveDebugRun
-      ? (zh ? '发送' : 'Send')
-      : (zh ? '开始' : 'Start');
-
+  const stopLabel = t(input.hasActiveDebugRun ? 'composer.stopDebugRun' : 'composer.stopRequest');
   return {
-    promptPlaceholder,
-    attachButtonLabel,
-    primaryButtonDescription: input.isComposerBusy
-      ? stopButtonLabel
-      : `${primaryButtonLabel} ${input.currentModeLabel} ${zh ? '消息' : 'message'}`,
+    promptPlaceholder: hint ? t('composer.placeholderHint', { agent, hint }) : t('composer.placeholder', { agent }),
+    attachButtonLabel: t(input.hasProject ? 'composer.attach' : 'composer.attachNeedsProject'),
+    primaryButtonDescription: input.isComposerBusy ? stopLabel : t('composer.sendTo', { agent }),
   };
 }

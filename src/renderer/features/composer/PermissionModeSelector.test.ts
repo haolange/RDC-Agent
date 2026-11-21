@@ -20,7 +20,7 @@ vi.mock('./useComposerMenuRegistry', () => ({ useComposerMenu: () => ({ open: tr
 
 afterEach(() => { fixture.snapshot = { mode: 'default', revision: 1 }; fixture.pendingMode = null; fixture.error = false; fixture.language = 'en'; });
 
-it('exposes pending and confirmed modes separately and translates live status both ways', () => {
+it('exposes pending and confirmed modes separately and keeps mode descriptions on hover', () => {
   fixture.pendingMode = 'full-access';
   for (const language of ['en', 'zh-CN', 'en'] as const) {
     fixture.language = language;
@@ -28,14 +28,14 @@ it('exposes pending and confirmed modes separately and translates live status bo
     expect(html).toContain('data-mode="default"');
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain(translate(language, 'composer.permission.saving'));
-    expect(html).toContain(translate(language, 'composer.permission.scope'));
-    expect(html).toContain('role="status"');
+    expect(html).toContain(`data-tooltip="${translate(language, 'composer.permission.full-accessDesc')}"`);
+    expect(html).not.toContain('composer-permission-menu-desc');
   }
   fixture.pendingMode = null;
   fixture.snapshot = { mode: 'full-access', revision: 2 };
   const confirmed = renderToStaticMarkup(React.createElement(PermissionModeSelector));
   expect(confirmed).toContain('data-mode="full-access"');
-  expect(confirmed).toContain(translate('en', 'composer.permission.applied'));
+  expect(confirmed.match(/composer-permission-menu-check/g)).toHaveLength(1);
 });
 
 it('does not claim a default effective mode when main state is unavailable', () => {
