@@ -66,16 +66,19 @@
 
 .knowledge-center-empty-inline,
 .knowledge-center-missing,
-/* One line of preview; the title carries the second line. */
 .knowledge-center-card-preview {
   font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
   color: var(--token-text-caption);
+}
+
+/* One line of preview; the title carries the second line. */
+.knowledge-center-card-preview {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
   overflow: hidden;
   overflow-wrap: anywhere;
+  line-height: var(--type-caption-line);
 }
 
 .knowledge-center-list-head {
