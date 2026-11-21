@@ -127,7 +127,7 @@ export const createDetailLines = (value?: string, maxLines = 8): string[] => {
     .filter(Boolean);
   const visible = lines.slice(0, maxLines);
   if (lines.length > maxLines) {
-    visible.push(`... ${lines.length - maxLines} more lines`);
+    visible.push('…');
   }
   return visible;
 };
@@ -199,6 +199,9 @@ const decodeEscapedText = (value: string): string => (
     .replace(/\\+"/g, '"')
     .replace(/\\\\/g, '\\')
 );
+
+/** A session file address is the runtime's receipt, never something a person reads on a card or in its details. */
+export const isInternalAddress = (value: string): boolean => /^session:\/\//i.test(value.trim());
 
 export const isJsonLike = (value: string): boolean => {
   const text = value.trim();

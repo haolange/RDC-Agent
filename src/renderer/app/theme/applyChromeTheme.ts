@@ -47,5 +47,4 @@ export function applyChromeTheme(
   document.documentElement.dataset.resolvedTheme = resolvedTheme;
   document.documentElement.dataset.theme = appearance.theme;
   document.documentElement.dataset.fontScale = appearance.fontScale;
-  document.documentElement.dataset.pointerCursors = appearance.usePointerCursors ? 'true' : 'false';
 }

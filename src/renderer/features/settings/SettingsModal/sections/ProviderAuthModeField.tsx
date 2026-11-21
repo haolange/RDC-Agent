@@ -58,7 +58,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
               data-testid={`settings-provider-auth-mode-${mode}`}
               role="radio"
               aria-checked={mode === value}
-              title={reason}
+              data-tooltip={reason}
               disabled={disabled || unavailable}
               onClick={() => onChange(mode)}
             >
@@ -69,7 +69,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
       </div>
       {selectedAvailability.state !== 'available' && selectedReason ? (
         <span
-          className={`settings-help-text settings-provider-auth-state settings-provider-auth-state--${selectedAvailability.state}`}
+          className={`settings-provider-auth-state settings-provider-auth-state--${selectedAvailability.state}`}
           data-testid="settings-provider-auth-state"
         >
           {selectedReason}

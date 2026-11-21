@@ -1,4 +1,5 @@
 import { Button } from '../../../../ui/Button';
+import { HelpTip } from '../../../../ui/HelpTip';
 import type { LlmModelCapabilityProbeMode } from '@shared/types/settings';
 import type { ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 
@@ -12,8 +13,10 @@ export function ProviderModelProbe({ model, provider, t, probeMode, probeModes, 
   return (
     <div className="settings-model-capability-probe" data-testid={`settings-provider-model-probe-${model.id}`}>
       <div className="settings-model-preferences-heading">
-        <span className="settings-model-capability-section-label">{t('settings.providers.capability.probe')}</span>
-        <span className="settings-help-text">{t('settings.providers.capability.probeHint')}</span>
+        <span className="settings-model-capability-section-label">
+          {t('settings.providers.capability.probe')}
+          <HelpTip label={t('settings.providers.capability.probe')}>{t('settings.providers.capability.probeHint')}</HelpTip>
+        </span>
       </div>
       <div className="settings-model-capability-probe-actions">
         {probeModes.map((mode) => (
@@ -22,6 +25,7 @@ export function ProviderModelProbe({ model, provider, t, probeMode, probeModes, 
             type="button"
             size="sm"
             disabled={!provider.isConfigured || !model.enabled || probeMode !== null}
+            data-tooltip={!provider.isConfigured ? t('settings.providers.capability.probeRequiresConnection') : undefined}
             onClick={() => void runProbe(mode)}
           >
             {probeMode === mode
@@ -30,9 +34,6 @@ export function ProviderModelProbe({ model, provider, t, probeMode, probeModes, 
           </Button>
         ))}
       </div>
-      {!provider.isConfigured ? (
-        <span className="settings-help-text">{t('settings.providers.capability.probeRequiresConnection')}</span>
-      ) : null}
     </div>
   );
 }

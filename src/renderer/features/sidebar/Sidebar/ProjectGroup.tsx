@@ -1,5 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
+import { Icon } from '../../../ui/Icon';
+import { Chevron } from '../../../ui/Chevron';
 import { getProjectOriginName } from './useProjectTree';
 import { SessionList } from './SessionList';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
@@ -71,7 +73,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
             <button
               type="button"
               className={`project-item-chevron ${isExpanded ? 'is-expanded' : ''}`}
-              title={t('sidebar.toggleProjectSessions')}
+              data-tooltip={t('sidebar.toggleProjectSessions')}
               aria-label={t('sidebar.toggleProjectSessions')}
               aria-expanded={isExpanded}
               onClick={(event) => void onProjectChevronClick(event, project)}
@@ -83,14 +85,12 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
                 }
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+              <Chevron open={isExpanded} />
             </button>
             <button
               type="button"
               className="session-item-select project-item-select"
-              title={shouldShowProjectOriginName ? `${project.name} / ${projectOriginName}` : project.name}
+              data-tooltip={shouldShowProjectOriginName ? `${project.name} / ${projectOriginName}` : project.name}
               onClick={() => void onProjectSelect(project)}
             >
               <span className="project-item-title-wrap">
@@ -106,7 +106,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
               <button
                 type="button"
                 className="session-item-icon-button"
-                title={t('sidebar.menu')}
+                data-tooltip={t('sidebar.menu')}
                 onClick={(e) => {
                   e.stopPropagation();
                   const rect = e.currentTarget.getBoundingClientRect();
@@ -121,11 +121,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
                   }
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="1.5" />
-                  <circle cx="19" cy="12" r="1.5" />
-                  <circle cx="5" cy="12" r="1.5" />
-                </svg>
+                <Icon name="more" size={14} />
               </button>
             </span>
           )}

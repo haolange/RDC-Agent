@@ -4,7 +4,7 @@
   bottom: var(--space-4);
   z-index: var(--z-notification);
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: var(--space-2);
   width: min(360px, calc(100vw - var(--space-8)));
   pointer-events: none;
@@ -16,24 +16,26 @@
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--token-border-card);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-shell);
+  border-radius: var(--radius-card);
+  background: var(--token-bg-overlay);
   box-shadow: var(--token-shadow-popover);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   pointer-events: auto;
+  animation: surface-rise-in var(--motion-overlay);
 }
 
-.ui-toast.is-tone-success {
-  border-color: color-mix(in srgb, var(--token-status-success) 40%, var(--token-border-card));
+.ui-toast[data-state='closing'] {
+  animation: surface-rise-out var(--motion-overlay) forwards;
 }
 
-.ui-toast.is-tone-warning {
-  border-color: color-mix(in srgb, var(--token-status-warning) 40%, var(--token-border-card));
+.ui-toast-icon {
+  margin-top: var(--space-0-5);
+  color: var(--token-status-info);
 }
 
-.ui-toast.is-tone-error {
-  border-color: color-mix(in srgb, var(--token-status-error) 40%, var(--token-border-card));
-}
+.ui-toast.is-tone-success .ui-toast-icon { color: var(--token-status-success); }
+.ui-toast.is-tone-warning .ui-toast-icon { color: var(--token-status-warning); }
+.ui-toast.is-tone-error .ui-toast-icon { color: var(--token-status-error); }
 
 .ui-toast-copy {
   flex: 1;
@@ -44,17 +46,19 @@
 }
 
 .ui-toast-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
   font-weight: var(--font-semibold);
 }
 
 .ui-toast-message {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  line-height: var(--leading-normal);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
 }
 
 .ui-toast-dismiss {
   flex-shrink: 0;
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0 0;
 }

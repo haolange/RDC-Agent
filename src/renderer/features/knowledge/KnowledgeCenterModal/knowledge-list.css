@@ -1,6 +1,6 @@
 .knowledge-center-section-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
 }
@@ -29,15 +29,23 @@
   text-overflow: unset;
 }
 
+/* The type icon sits inline before the first line of the title. */
+.knowledge-center-card-type {
+  display: inline-flex;
+  margin-inline-end: var(--space-1);
+  color: var(--token-text-secondary);
+  vertical-align: -2px;
+}
+
 .knowledge-center-card-title {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  color: var(--token-text-heading);
-  font-size: var(--type-item-size);
-  font-weight: var(--font-medium);
-  line-height: var(--type-item-line);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
+  line-height: var(--type-body-line);
   overflow-wrap: anywhere;
 }
 
@@ -47,28 +55,11 @@
   flex-shrink: 0;
 }
 
-.knowledge-center-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.knowledge-center-sidebar-footer {
-  margin-top: auto;
-  display: grid;
-  gap: var(--space-4);
-}
-
-.knowledge-center-sidebar-footer > .button {
-  width: 100%;
-  gap: var(--space-2);
-}
-
 .knowledge-center-empty-inline,
 .knowledge-center-missing,
 .knowledge-center-card-preview {
-  font-size: var(--type-caption-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-body-size);
+  color: var(--token-text-secondary);
 }
 
 /* One line of preview; the title carries the second line. */
@@ -78,7 +69,7 @@
   -webkit-line-clamp: 1;
   overflow: hidden;
   overflow-wrap: anywhere;
-  line-height: var(--type-caption-line);
+  line-height: var(--type-body-line);
 }
 
 .knowledge-center-list-head {
@@ -93,21 +84,35 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--token-text-heading);
-  font-size: var(--type-heading-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
 .knowledge-center-list-count {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-regular);
   font-variant-numeric: tabular-nums;
 }
 
 .knowledge-center-list-hint {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+
+/* Shown only when the index could not be built: one line and the way out. */
+.knowledge-center-index-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--token-status-warning) 40%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-status-warning) 8%, transparent);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
 }
 
 .knowledge-center-conflict-row.ui-list-row {
@@ -122,33 +127,21 @@
   text-overflow: unset;
 }
 
-.knowledge-center-conflict-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.knowledge-center-conflict-ids {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  overflow-wrap: anywhere;
-}
-
-.knowledge-center-conflict-ids code {
-  font-family: var(--font-mono);
-}
-
 .knowledge-center-conflict-trailing {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
   gap: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .knowledge-center-conflict-swap {
   margin: 0 var(--space-2);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
+}
+
+/* A status tag keeps its own width under the title and preview. */
+.knowledge-center-card-button .ui-badge {
+  align-self: flex-start;
 }

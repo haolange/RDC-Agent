@@ -34,47 +34,13 @@
 .runtime-terminal-entry {
   position: relative;
   border-bottom: 1px solid var(--token-border-card);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   transition: background var(--transition-fast);
-}
-
-.runtime-terminal-entry::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 2px;
-  border-radius: var(--radius-full);
-  background: transparent;
-  opacity: 0;
-  transition: opacity var(--transition-fast), background var(--transition-fast);
-}
-
-.runtime-terminal-entry:hover::before,
-.runtime-terminal-entry.expanded::before {
-  opacity: 1;
-}
-
-.runtime-terminal-entry.severity-error::before {
-  background: var(--token-status-error);
-}
-
-.runtime-terminal-entry.severity-warning::before {
-  background: var(--token-status-warning);
-}
-
-.runtime-terminal-entry.severity-success::before {
-  background: var(--token-status-success);
-}
-
-.runtime-terminal-entry.severity-info::before {
-  background: var(--token-status-info);
 }
 
 .runtime-terminal-entry-main {
   display: grid;
-  grid-template-columns: 78px 74px 82px minmax(160px, 0.9fr) minmax(220px, 1.6fr);
+  grid-template-columns: auto 78px minmax(160px, 0.9fr) minmax(220px, 1.6fr);
   align-items: center;
   gap: var(--space-2);
   width: 100%;
@@ -97,73 +63,23 @@
 }
 
 .runtime-terminal-entry-time {
-  color: var(--token-text-placeholder);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-disabled);
+  font-size: var(--type-meta-size);
   white-space: nowrap;
 }
 
-.runtime-terminal-severity,
-.runtime-terminal-entry-namespace {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  height: 22px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-md);
-  font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
-  font-weight: 650;
-  line-height: 1;
-  text-transform: uppercase;
-  white-space: nowrap;
+/* Severity is a dot in its status color; the word is the tooltip. The source lives in the expanded details. */
+.runtime-terminal-severity-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--token-text-disabled);
 }
 
-.runtime-terminal-severity.severity-error {
-  border: 1px solid color-mix(in srgb, var(--token-status-error) 26%, transparent);
-  background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
-  color: var(--token-status-error);
-}
-
-.runtime-terminal-severity.severity-warning {
-  border: 1px solid color-mix(in srgb, var(--token-status-warning) 26%, transparent);
-  background: color-mix(in srgb, var(--token-status-warning) 8%, transparent);
-  color: var(--token-status-warning);
-}
-
-.runtime-terminal-severity.severity-success {
-  border: 1px solid color-mix(in srgb, var(--token-status-success) 22%, transparent);
-  background: color-mix(in srgb, var(--token-status-success) 8%, transparent);
-  color: var(--token-status-success);
-}
-
-.runtime-terminal-severity.severity-info {
-  border: 1px solid var(--token-border-card);
-  background: color-mix(in srgb, var(--token-bg-panel) 62%, transparent);
-  color: var(--token-text-body);
-}
-
-.runtime-terminal-entry-namespace {
-  border: 1px solid var(--token-border-card);
-  background: color-mix(in srgb, var(--token-bg-panel) 62%, transparent);
-  color: var(--token-text-caption);
-}
-
-.runtime-terminal-entry-namespace.namespace-agent {
-  color: var(--token-accent-primary);
-}
-
-.runtime-terminal-entry-namespace.namespace-tool {
-  color: var(--token-status-warning);
-}
-
-.runtime-terminal-entry-namespace.namespace-device {
-  color: var(--token-status-success);
-}
-
-.runtime-terminal-entry-namespace.namespace-capture {
-  color: var(--token-accent-primary);
-}
+.runtime-terminal-severity-dot.severity-error { background: var(--token-status-error); }
+.runtime-terminal-severity-dot.severity-warning { background: var(--token-status-warning); }
+.runtime-terminal-severity-dot.severity-success { background: var(--token-status-success); }
+.runtime-terminal-severity-dot.severity-info { background: var(--token-status-info); }
 
 .runtime-terminal-entry-title,
 .runtime-terminal-entry-summary {
@@ -173,14 +89,14 @@
 }
 
 .runtime-terminal-entry-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: 650;
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
 }
 
 .runtime-terminal-entry-summary {
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .runtime-terminal-entry.severity-error .runtime-terminal-entry-title,
@@ -198,9 +114,9 @@
 }
 
 .runtime-terminal-entry-detail {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-sans);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: 1.5;
 }
 
@@ -208,8 +124,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .runtime-terminal-entry-raw {
@@ -220,8 +136,8 @@
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--token-bg-app) 76%, transparent);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   white-space: pre-wrap;
   word-break: break-word;
 }

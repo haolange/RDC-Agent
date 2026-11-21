@@ -1199,11 +1199,11 @@ describe('buildWorkProcessPresentation', () => {
       (row) => row.type === 'tool' && row.toolName === 'read_file',
     );
     if (!readRow || readRow.type !== 'tool') throw new Error('expected read tool row');
-    expect(readRow.bodyText).toBe('DESIGN.md · 240 行');
+    expect(readRow.bodyText).toBe('240 行');
     expect(readRow.pathChip).toBe('DESIGN.md');
   });
 
-  it('shows a session:// chip and short hash for artifactized tool results', () => {
+  it('keeps the session address and hash of an offloaded result out of the card', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now,
@@ -1240,8 +1240,10 @@ describe('buildWorkProcessPresentation', () => {
       (entry) => entry.type === 'tool' && entry.toolName === 'grep',
     );
     if (!row || row.type !== 'tool') throw new Error('expected artifactized tool row');
-    expect(row.pathChip).toBe('session://tool-outputs/call-9.json');
-    expect(row.chips).toEqual(['abcdef01']);
+    expect(row.pathChip).toBeUndefined();
+    expect(row.chips).toBeUndefined();
+    expect(row.previewLines).toEqual(['Offloaded grep matches']);
+    expect(row.rawLines.join('\n')).toContain('session://tool-outputs/call-9.json');
   });
 
   it('projects adjacent task snapshots with N of M counts and task anchors', () => {

@@ -1,9 +1,3 @@
-.composer-shell.is-drop-active {
-  border-color: var(--composer-mode-accent);
-  outline: 2px dashed color-mix(in srgb, var(--composer-mode-accent) 55%, transparent);
-  outline-offset: -4px;
-}
-
 .composer-drop-overlay {
   position: absolute;
   inset: 0;
@@ -11,11 +5,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid var(--composer-mode-accent);
   border-radius: inherit;
-  background: color-mix(in srgb, var(--token-bg-overlay) 88%, transparent);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  background: color-mix(in srgb, var(--token-bg-overlay) 90%, transparent);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  opacity: 0;
   pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.composer-drop-overlay.is-visible {
+  opacity: 1;
+}
+
+.composer-drop-overlay .ui-icon {
+  color: var(--composer-mode-accent);
 }
 
 .composer-attachment-tray {
@@ -58,8 +64,7 @@
   border-color: var(--token-status-warning);
 }
 
-.composer-attachment-card-preview,
-.composer-skill-chip-glyph {
+.composer-attachment-card-preview {
   width: var(--composer-attachment-card-size);
   height: var(--composer-attachment-card-size);
   display: inline-flex;
@@ -68,20 +73,18 @@
   overflow: hidden;
   border-radius: var(--control-radius);
   background: var(--token-bg-muted);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-bold);
-  letter-spacing: 0.06em;
+  color: var(--token-text-secondary);
   flex-shrink: 0;
 }
 
+/* A skill armed for the next send: a compact chip, icon and name. */
 .composer-skill-chip {
-  min-height: var(--composer-attachment-card-size-narrow);
+  min-height: var(--control-height-md);
+  padding: var(--space-1) var(--space-6) var(--space-1) var(--space-2);
 }
 
 .composer-skill-chip-glyph {
-  width: 40px;
-  height: 40px;
+  flex: 0 0 auto;
   color: var(--token-text-link);
 }
 
@@ -92,8 +95,7 @@
   object-fit: cover;
 }
 
-.composer-attachment-card-copy,
-.composer-skill-chip-copy {
+.composer-attachment-card-copy {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -102,17 +104,16 @@
 
 .composer-attachment-card-name,
 .composer-skill-chip-name {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.composer-attachment-card-meta,
-.composer-skill-chip-meta {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+.composer-attachment-card-meta {
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .composer-attachment-card-remove,
@@ -128,10 +129,11 @@
   border-radius: var(--radius-full);
   border: 1px solid var(--token-border-default);
   background: var(--token-bg-overlay);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
+  transition: opacity var(--transition-fast);
 }
 
 .composer-attachment-card:hover .composer-attachment-card-remove,
@@ -159,4 +161,37 @@
     width: var(--composer-attachment-card-size-narrow);
     height: var(--composer-attachment-card-size-narrow);
   }
+}
+
+/* The approved plan waiting to continue: the same card language as the plan reference it becomes once sent. */
+.composer-approved-plan {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) var(--space-2) 0;
+  padding: var(--transcript-card-padding);
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  background: var(--token-bg-raised);
+  animation: composer-approved-plan-enter var(--duration-base) var(--ease-decelerate) both;
+}
+
+.composer-approved-plan-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--token-accent-primary);
+}
+
+.composer-approved-plan-title {
+  color: var(--token-text-primary);
+  font-weight: var(--font-semibold);
+}
+
+@keyframes composer-approved-plan-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-approved-plan { animation: none; }
 }

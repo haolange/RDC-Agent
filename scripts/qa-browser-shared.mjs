@@ -15,7 +15,9 @@ export function readBootstrapUrl(logPath) {
 
 export async function openApp(logPath, viewport = { width: 1440, height: 900 }) {
   const browser = await chromium.launch();
-  const page = await (await browser.newContext({ viewport })).newPage();
+  // QA_VIDEO_DIR records the whole run (for motion clips); without it nothing is written.
+  const recordVideo = process.env.QA_VIDEO_DIR ? { recordVideo: { dir: process.env.QA_VIDEO_DIR, size: viewport } } : {};
+  const page = await (await browser.newContext({ viewport, ...recordVideo })).newPage();
   page.setDefaultTimeout(8000);
   await page.goto(readBootstrapUrl(logPath));
   await page.waitForURL(/\/app/, { timeout: 60_000 });
@@ -103,4 +105,34 @@ export function inspectPage() {
   }
   const overflow = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1;
   return { small: [...small], lowContrast: [...lowContrast], overflow };
+}
+
+/**
+ * Runs in the page: facts that may only live in 诊断 but show on the surface — internal addresses, long hashes and
+ * HTTP status codes. User and model content, expanded technical layers and the run log are not the surface.
+ */
+export function scanSurfaceForbidden() {
+  const EXCLUDED = [
+    '.markdown-body', '.message-bubble-user', 'textarea', 'input',
+    '.knowledge-center-markdown', '.knowledge-center-meta-details', '.knowledge-center-index-diagnostics',
+    '.settings-diagnostics', '.ui-inline-error-detail', '.runtime-terminal-drawer',
+    '.work-process-tool-card-raw', '.work-process-subagent-raw', '.work-process-tool-card-expand',
+  ].join(', ');
+  const PATTERNS = [
+    ['internal-address', /session:\/\//u],
+    ['hash', /\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\b/iu],
+    ['http-status', /\bHTTP\s?[1-5]\d\d\b/u],
+  ];
+  const hits = new Set();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const text = walker.currentNode.textContent.trim();
+    if (!text) continue;
+    const element = walker.currentNode.parentElement;
+    if (!element || element.closest(EXCLUDED)) continue;
+    const rect = element.getBoundingClientRect();
+    if (!rect.width || !rect.height || getComputedStyle(element).visibility === 'hidden') continue;
+    for (const [kind, pattern] of PATTERNS) if (pattern.test(text)) hits.add(`${kind}: ${text.slice(0, 60)}`);
+  }
+  return [...hits];
 }

@@ -90,7 +90,7 @@ describe('ContextUsageIndicator', () => {
     );
     expect(preparing).toContain('…');
     expect(preparing).toContain('is-pending');
-    expect(preparing).toContain('title="contextBreakdown.preparing"');
+    expect(preparing).toContain('data-tooltip="contextBreakdown.preparing"');
     expect(preparing).not.toContain('composer-usage-value-label');
 
     const actual = renderToStaticMarkup(
@@ -138,7 +138,7 @@ describe('ContextUsageIndicator', () => {
         }),
       }),
     );
-    expect(idle).toContain('title="contextBreakdown.noUsageYet 1M"');
+    expect(idle).toContain('data-tooltip="contextBreakdown.noUsageYet"');
     expect(idle).not.toContain('composer-usage-ring-threshold');
   });
 
@@ -176,7 +176,7 @@ describe('ContextUsageIndicator', () => {
     expect(projected).toContain(`~${usagePercent}%`);
     expect(projected).toContain('is-estimated');
     expect(projected).toContain('data-estimated="true"');
-    expect(projected).toContain(`title="contextBreakdown.projected ~${usagePercent}% 1M"`);
+    expect(projected).toContain('data-tooltip="contextBreakdown.projectedAria"');
     expect(projected).not.toContain('composer-usage-value-label');
   });
 
@@ -213,7 +213,7 @@ describe('ContextUsageIndicator', () => {
     );
     expect(preparing).toContain('…');
     expect(preparing).toContain('is-pending');
-    expect(preparing).toContain('title="contextBreakdown.preparing"');
+    expect(preparing).toContain('data-tooltip="contextBreakdown.preparing"');
     expect(preparing).not.toContain('is-estimated');
     expect(preparing).not.toContain('data-estimated="true"');
   });

@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Button } from '../../ui/Button';
-import { ChevronIcon } from './userInputRequestIcons';
+import { Chevron } from '../../ui/Chevron';
+import { InlineError } from '../../ui/InlineError';
 import { UserInputCustomAnswer, UserInputOptionList } from './UserInputRequestPanelParts';
 import { useUserInputRequestSubmit } from './useUserInputRequestSubmit';
 import {
@@ -204,7 +205,7 @@ export const UserInputRequestPanel: React.FC<{
               aria-label={t('chat.userInputPreviousQuestion')}
               onClick={() => goToQuestion(currentIndex - 1)}
             >
-              <ChevronIcon direction="left" />
+              <Chevron direction="left" />
             </Button>
             <span>{t('chat.userInputQuestionProgress', { current: currentIndex + 1, count: questionCount })}</span>
             <Button
@@ -215,7 +216,7 @@ export const UserInputRequestPanel: React.FC<{
               aria-label={t('chat.userInputNextQuestion')}
               onClick={() => goToQuestion(currentIndex + 1)}
             >
-              <ChevronIcon direction="right" />
+              <Chevron />
             </Button>
           </div>
         ) : null}
@@ -262,16 +263,8 @@ export const UserInputRequestPanel: React.FC<{
         </Button>
       </div>
 
-      {error ? (
-        <p className="composer-user-input-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {!hasValidQuestions ? (
-        <p className="composer-user-input-error" role="alert">
-          {t('chat.userInputIncomplete')}
-        </p>
-      ) : null}
+      {error ? <InlineError detail={error}>{t('chat.userInputSubmitFailed')}</InlineError> : null}
+      {!hasValidQuestions ? <InlineError>{t('chat.userInputIncomplete')}</InlineError> : null}
     </section>
   );
 };

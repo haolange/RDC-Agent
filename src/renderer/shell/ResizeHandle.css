@@ -32,8 +32,8 @@
   width: var(--space-0-5);
   height: var(--space-6);
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--token-text-caption) 0%, transparent);
-  transition: background var(--transition-base) var(--ease-standard), height var(--transition-base) var(--ease-standard);
+  background: color-mix(in srgb, var(--token-text-secondary) 0%, transparent);
+  transition: background var(--duration-base) var(--ease-standard), height var(--duration-base) var(--ease-standard);
   pointer-events: none;
 }
 

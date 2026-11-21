@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { useClipboardBridge } from '../../hooks/useClipboardBridge';
+import { Skeleton } from '../../ui/Skeleton';
 import { useDelegationContent } from './useDelegationContent';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkDisclosure } from './WorkDisclosure';
@@ -19,7 +20,7 @@ function Detail({ label, kind, available, sessionId, parentToolCallId, childSess
     disabled={!available} preview={!available ? t('chat.subagentRecordUnavailable') : undefined}>
     <div className="work-process-subagent-record-body">
       {content.text ? <pre className="work-process-tool-card-raw-pre is-unbounded">{kind === 'invocation' ? formatInvocation(content.text) : content.text}</pre> : null}
-      {content.loading ? <span>{t('chat.subagentLoading')}</span> : null}
+      {content.loading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" count={2} inline /></span> : null}
       {content.error ? <button type="button" className="work-process-subagent-more" onClick={content.retry}>{t('chat.subagentRetry')}</button> : null}
       {content.hasMore ? <button type="button" className="work-process-subagent-more" onClick={() => void content.loadMore()}>{t('chat.subagentShowMore')}</button> : null}
     </div>
@@ -54,7 +55,7 @@ export const SubagentCallDetails: React.FC<{
       executionId={header?.executionId} generation={header?.generation} />
     {identifiers.length > 0 ? <WorkDisclosure variant="secondary-card" title={t('chat.subagentIdentifiers')}
       open={identifiersOpen} onToggle={toggleIdentifiers}><dl className="work-process-subagent-identifiers">
-      {identifiers.map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={String(value)}>{value}<Button variant="ghost" size="sm" onClick={() => void copyText(String(value))}>{t('chat.subagentCopy')}</Button></dd></div>)}
+      {identifiers.map(([label, value]) => <div key={label}><dt>{label}</dt><dd data-tooltip={String(value)}>{value}<Button variant="ghost" size="sm" onClick={() => void copyText(String(value))}>{t('chat.subagentCopy')}</Button></dd></div>)}
     </dl></WorkDisclosure> : null}
     {header?.error ? <p className="work-process-subagent-receipt-error" role="alert">{header.error}</p> : null}
   </div>;

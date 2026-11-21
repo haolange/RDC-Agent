@@ -51,7 +51,7 @@ afterEach(() => {
 });
 
 describe('OverflowFade', () => {
-  it('keeps the complete text and title while toggling both ways for the same text width', async () => {
+  it('keeps the complete text and offers it as a tooltip only while it overflows', async () => {
     const container = document.createElement('div');
     document.body.append(container);
     let root: Root;
@@ -67,11 +67,12 @@ describe('OverflowFade', () => {
     await act(async () => { resizeCallback?.([], {} as ResizeObserver); });
     expect(text.classList.contains('is-overflowing')).toBe(true);
     expect(text.textContent).toBe('Complete model name');
-    expect(text.title).toBe('Complete model name');
+    expect(text.dataset.tooltip).toBe('Complete model name');
 
     Object.defineProperty(text, 'scrollWidth', { configurable: true, value: 60 });
     await act(async () => { resizeCallback?.([], {} as ResizeObserver); });
     expect(text.classList.contains('is-overflowing')).toBe(false);
+    expect(text.dataset.tooltip).toBeUndefined();
 
     Object.defineProperty(text, 'scrollWidth', { configurable: true, value: 140 });
     await act(async () => { resizeCallback?.([], {} as ResizeObserver); });
@@ -145,7 +146,7 @@ describe('OverflowFade', () => {
     expect(measurementCount).toBe(countAfterUnmount);
   });
 
-  it('retains the single-line element and title contract for an empty string', async () => {
+  it('retains the single-line element for an empty string without a tooltip', async () => {
     const container = document.createElement('div');
     document.body.append(container);
     let root: Root;
@@ -155,7 +156,7 @@ describe('OverflowFade', () => {
     });
     const text = container.querySelector<HTMLElement>('.ui-overflow-fade')!;
     expect(text.textContent).toBe('');
-    expect(text.title).toBe('');
+    expect(text.dataset.tooltip).toBeUndefined();
     expect(text.classList.contains('ui-overflow-fade')).toBe(true);
     await act(async () => root.unmount());
   });

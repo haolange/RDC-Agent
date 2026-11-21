@@ -31,7 +31,7 @@ export const AgentListItem: React.FC<AgentListItemProps> = ({
     )}
   >
     <span className="settings-agent-list-item-copy">
-      <span className="settings-agent-list-item-name" title={name}>{name}</span>
+      <span className="settings-agent-list-item-name" data-tooltip={name}>{name}</span>
       <OverflowFade className="settings-agent-list-item-description" text={description} />
     </span>
   </ListRow>

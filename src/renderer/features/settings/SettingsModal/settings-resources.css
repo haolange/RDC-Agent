@@ -39,7 +39,7 @@
   flex: 1 1 auto;
   min-height: 0;
   padding: var(--space-6);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-size: var(--type-body-size);
 }
 
@@ -68,7 +68,7 @@
 }
 
 .settings-page-hooks .settings-runtime-detail-grid :is(dt, dd, code) {
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .settings-runtime-form-span {
@@ -81,8 +81,8 @@
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-2);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 /* Read-only rows inside the editor (scope, locked id). */
@@ -100,8 +100,8 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-bg-raised);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .settings-runtime-readonly > span:first-child {
@@ -118,8 +118,8 @@
   flex: none;
   align-items: center;
   gap: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .settings-runtime-editor-note {
@@ -131,7 +131,20 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-bg-raised);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
 }
+
+.settings-runtime-editor-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+
+.settings-runtime-editor-status .ui-icon { color: var(--token-status-success); }
 
 .settings-runtime-editor-note .ui-icon {
   flex: none;
@@ -144,16 +157,16 @@
 }
 
 .settings-runtime-dialog-status {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .settings-runtime-result {
   padding: var(--space-3) var(--space-4);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-bg-app);
@@ -166,5 +179,5 @@
 
 .settings-runtime-editor textarea {
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }

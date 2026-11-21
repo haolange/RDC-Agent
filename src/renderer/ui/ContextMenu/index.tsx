@@ -1,8 +1,9 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import { usePresence, type PresenceState } from '../usePresence';
 import type { ContextMenuCommandId } from '../../lib/contextMenuCommands';
 import type { ContextMenuItem } from '../../lib/contextMenuItems';
 import './ContextMenu.css';
@@ -10,6 +11,7 @@ import './ContextMenu.css';
 const VIEWPORT_MARGIN = 8;
 
 export interface ContextMenuProps {
+  open: boolean;
   x: number;
   y: number;
   items: ContextMenuItem[];
@@ -31,15 +33,25 @@ function nextEnabledIndex(items: ContextMenuItem[], current: number, delta: numb
   return enabled[(position + delta + enabled.length) % enabled.length];
 }
 
-export const ContextMenu: React.FC<ContextMenuProps> = ({
+/** The menu stays mounted while its exit plays; a closed menu no longer owns a layer, so it ignores input. */
+export const ContextMenu: React.FC<ContextMenuProps> = ({ open, ...props }) => {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const presence = usePresence(open, menuRef);
+  if (!presence.mounted) return null;
+  return <ContextMenuSurface {...props} open={open} state={presence.state} menuRef={menuRef} />;
+};
+
+const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: boolean; state: PresenceState; menuRef: RefObject<HTMLDivElement> }> = ({
+  open,
+  state,
+  menuRef,
   x,
   y,
   items,
   onSelect,
   onClose,
 }) => {
-  const { layerId } = useOverlayLayer(true);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const { layerId } = useOverlayLayer(open);
   const [coords, setCoords] = useState({ left: x, top: y });
   const [activeIndex, setActiveIndex] = useState(() => enabledCommandIndexes(items)[0] ?? -1);
   const positionStyle = useDynStyle({
@@ -66,7 +78,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       window.removeEventListener('resize', position);
       document.fonts?.removeEventListener('loadingdone', position);
     };
-  }, [x, y, items]);
+  }, [x, y, items, menuRef]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
@@ -108,7 +120,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [activeIndex, items, layerId, onClose, onSelect]);
+  }, [activeIndex, items, layerId, onClose, onSelect, menuRef]);
 
   useEffect(() => {
     const origin = document.activeElement;
@@ -117,7 +129,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
   useEffect(() => {
     menuRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus({ preventScroll: true });
-  }, [activeIndex]);
+  }, [activeIndex, menuRef]);
 
   const labelledBy = useMemo(
     () => items.find((item) => item.type === 'command')?.id ?? 'copy',
@@ -128,6 +140,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     <div
       ref={menuRef}
       className="app-context-menu"
+      data-state={state}
       data-testid="app-context-menu"
       role="menu"
       aria-labelledby={`app-context-menu-${labelledBy}`}

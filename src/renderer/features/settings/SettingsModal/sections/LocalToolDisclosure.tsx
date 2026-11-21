@@ -12,8 +12,8 @@ interface LocalToolDisclosureProps {
 }
 
 /**
- * Compact summary row for a machine-local tool. Collapsed by default so the
- * Tools page reads as a short list instead of three stacked forms.
+ * Compact summary row for a machine-local tool: its icon and name, with what it does on hover. Collapsed by default so
+ * the Tools page reads as a short list instead of three stacked forms.
  */
 export function LocalToolDisclosure({
   icon,
@@ -26,10 +26,7 @@ export function LocalToolDisclosure({
   return (
     <Details className="settings-local-tool" data-testid={testId} open={defaultOpen} summaryClassName="settings-local-tool-summary" summary={<>
         <Icon name={icon} size={16} className="settings-local-tool-icon" />
-        <span className="settings-local-tool-copy">
-          <span className="settings-local-tool-title">{title}</span>
-          <span className="settings-local-tool-description">{description}</span>
-        </span>
+        <span className="settings-local-tool-title" data-tooltip={description}>{title}</span>
 
        </>}>
       <div className="settings-local-tool-body">{children}</div>

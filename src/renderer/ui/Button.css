@@ -8,7 +8,7 @@
   border: 1px solid var(--token-border-default);
   border-radius: var(--btn-radius);
   background: var(--token-bg-raised);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--btn-font-size);
   font-weight: var(--btn-font-weight);
   line-height: var(--leading-tight);
@@ -29,7 +29,7 @@
 
 .button:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .button:active:not(:disabled) {
@@ -94,13 +94,13 @@
 .button-sm {
   min-height: var(--btn-height-sm);
   padding: var(--btn-padding-sm);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .button-lg {
   min-height: var(--btn-height-lg);
   padding: var(--btn-padding-lg);
-  font-size: var(--type-heading-size);
+  font-size: var(--type-body-size);
 }
 
 .button.button-reset {

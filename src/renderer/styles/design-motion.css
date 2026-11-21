@@ -39,12 +39,55 @@
   100% { background-position: -100% 0; }
 }
 
+/* Paired enter / exit for every overlay. An overlay plays the enter keyframe while open and the exit keyframe
+   while `data-state="closing"`; ui/usePresence unmounts it on the exit's animationend. */
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes overlay-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes surface-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2)) scale(0.98);
+  }
+}
+
+@keyframes surface-rise-out {
+  to {
+    opacity: 0;
+    transform: translateY(var(--space-1)) scale(0.98);
+  }
+}
+
+/* Popovers slide from their anchor: --popover-enter-offset is negative below the trigger, positive above it. */
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--popover-enter-offset, calc(-1 * var(--space-1)))) scale(0.98);
+  }
+}
+
+@keyframes popover-out {
+  to {
+    opacity: 0;
+    transform: translateY(var(--popover-enter-offset, calc(-1 * var(--space-1)))) scale(0.98);
+  }
+}
+
+[data-state='closing'] {
+  pointer-events: none;
+}
+
 /* ========== Utility Classes ========== */
 
 .animate-spin { animation: spin 1s linear infinite; }
 /* Active runtime signal text — left-to-right energy shimmer on live phrases */
 .active-signal-text {
-  --active-signal-highlight: var(--token-text-heading);
+  --active-signal-highlight: var(--token-text-primary);
   color: inherit;
 }
 
@@ -57,7 +100,7 @@
 }
 
 .active-signal-text.tone-response {
-  --active-signal-highlight: var(--token-text-body);
+  --active-signal-highlight: var(--token-text-secondary);
 }
 
 .active-signal-text.is-active {

@@ -6,6 +6,7 @@ import { SettingsModal } from '../features/settings/SettingsModal';
 import { KnowledgeCenterModal } from '../features/knowledge/KnowledgeCenterModal';
 import { useComposer } from '../features/composer/useComposer';
 import { AppShell } from '../shell/AppShell';
+import { WindowControls } from '../shell/TitleBar/WindowControls';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -15,6 +16,7 @@ import { useI18n } from '../i18n';
 import { useWindowControls } from '../hooks/useWindowControls';
 import { ProductLogo } from '../ui/ProductLogo';
 import { useSettingsNavigationStore } from '../stores/settingsNavigationStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { WorkbenchUtilities } from './WorkbenchUtilities';
 import { resolveActiveChrome } from './theme/applyChromeTheme';
 import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
@@ -31,7 +33,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [, setConnectionStatus] = useState<'connected' | 'degraded' | 'offline'>('offline');
   const [windowMaximized, setWindowMaximized] = useState(false);
-  const [shellNotice, setShellNotice] = useState<string | null>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<{ element: HTMLButtonElement; rect: DOMRect } | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
@@ -52,9 +53,6 @@ const App: React.FC = () => {
 
   const settings = useAppSettingsStore((state) => state.settings);
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
-  const setTheme = useAppSettingsStore((state) => state.setTheme);
-  const setLanguage = useAppSettingsStore((state) => state.setLanguage);
-  const setFontScale = useAppSettingsStore((state) => state.setFontScale);
 
   const resolvedTheme: ResolvedTheme = settings.appearance.theme === 'system'
     ? systemTheme
@@ -73,14 +71,8 @@ const App: React.FC = () => {
   );
 
   const showNotice = useCallback((message: string) => {
-    setShellNotice(message);
+    useNotificationStore.getState().add({ tone: 'info', title: message });
   }, []);
-
-  const applyAppearancePreference = useCallback((mutation: () => Promise<void>) => {
-    void mutation().catch((error: unknown) => {
-      showNotice(error instanceof Error ? error.message : t('app.appearanceUpdateFailed'));
-    });
-  }, [showNotice, t]);
 
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
   const handleToggleLeftSidebar = useCallback(() => {
@@ -117,12 +109,6 @@ const App: React.FC = () => {
     t,
   });
 
-  useEffect(() => {
-    if (!shellNotice) return;
-    const timeoutId = window.setTimeout(() => setShellNotice(null), 3200);
-    return () => window.clearTimeout(timeoutId);
-  }, [shellNotice]);
-
   const activityAlertSeverity = activityEntries.some((entry) => entry.severity === 'error')
     ? 'error'
     : activityEntries.some((entry) => entry.severity === 'warning')
@@ -149,9 +135,17 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="loading-screen">
+      <div className="loading-screen" role="status" aria-label={t('app.loadingShell')}>
+        <div className="loading-titlebar">
+          <WindowControls
+            maximized={windowMaximized}
+            labels={{ group: t('app.windowControls'), minimize: t('app.windowMinimize'), maximize: t('app.windowMaximize'), restore: t('app.windowRestore'), close: t('app.windowClose') }}
+            onMinimize={handleWindowMinimize}
+            onToggleMaximize={handleWindowToggleMaximize}
+            onClose={handleWindowClose}
+          />
+        </div>
         <ProductLogo className="loading-logo" accent={resolveActiveChrome(settings.appearance, resolvedTheme).accent} />
-        <div className="loading-text">{t('app.loadingShell')}</div>
         <div className="loading-bar" />
       </div>
     );
@@ -201,7 +195,6 @@ const App: React.FC = () => {
           isTerminalOpen={isTerminalOpen}
           bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
           workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
-          shellNotice={shellNotice}
           nickname={nickname}
           avatarPath={avatarPath}
           composer={composer}
@@ -229,9 +222,6 @@ const App: React.FC = () => {
             setUserMenuAnchor(null);
             setSettingsModalOpen(true);
           }}
-          onThemeChange={(theme) => applyAppearancePreference(() => setTheme(theme))}
-          onLanguageChange={(language) => applyAppearancePreference(() => setLanguage(language))}
-          onFontScaleChange={(fontScale) => applyAppearancePreference(() => setFontScale(fontScale))}
         />
 
         <SettingsModal

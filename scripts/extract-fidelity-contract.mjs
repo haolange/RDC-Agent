@@ -24,6 +24,9 @@ const testIdPatterns = [
   /data-testid\s*=\s*\{\s*['"]([^'"]+)['"]\s*\}/g,
   /dataTestId\s*=\s*"([^"]+)"/g,
   /dataTestId\s*=\s*'([^']+)'/g,
+  // Shared parts take the id as a prop (SettingsField, SettingsDiagnostics, ResourceTrustBlock).
+  /\btestId\s*=\s*"([^"]+)"/g,
+  /\btestId:\s*'([^']+)'/g,
 ];
 
 const testIds = new Set();

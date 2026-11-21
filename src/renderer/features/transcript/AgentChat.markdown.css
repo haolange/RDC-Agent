@@ -1,5 +1,5 @@
 .markdown-body {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-body-size);
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -20,17 +20,22 @@
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
-.markdown-body h4 {
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   margin: var(--space-5) 0 var(--space-2);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-weight: var(--font-semibold);
   line-height: 1.35;
 }
 
-.markdown-body h1 { font-size: var(--type-title-size); }
-.markdown-body h2 { font-size: var(--type-title-size); }
-.markdown-body h3 { font-size: var(--type-heading-size); }
-.markdown-body h4 { font-size: var(--type-body-size); }
+/* Six levels on the four type roles: size steps down, then weight and colour carry the last levels. */
+.markdown-body h1 { margin-top: var(--space-6); font-size: var(--type-title-size); }
+.markdown-body h2 { font-size: var(--type-reading-size); }
+.markdown-body h3 { font-size: var(--type-body-size); }
+.markdown-body h4 { margin-top: var(--space-4); font-size: var(--type-body-size); }
+.markdown-body h5 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); }
+.markdown-body h6 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); font-weight: var(--font-normal); }
 
 .markdown-body ul,
 .markdown-body ol {
@@ -51,7 +56,7 @@
 }
 
 .markdown-body li::marker {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .markdown-body li > p {
@@ -70,27 +75,18 @@
 }
 
 .markdown-body strong {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-weight: var(--font-semibold);
 }
 
 .markdown-body em {
   font-style: italic;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .markdown-body del {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   text-decoration: line-through;
-}
-
-.markdown-body-img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 0 0 var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--token-border-muted);
 }
 
 .markdown-body ul.contains-task-list {
@@ -115,7 +111,7 @@
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--token-bg-raised) 70%, transparent);
   border: 1px solid color-mix(in srgb, var(--token-border-muted) 60%, transparent);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-family: var(--font-mono);
   font-size: 0.92em;
 }
@@ -136,13 +132,13 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-surface-sunken);
-  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.16);
+  box-shadow: var(--token-shadow-well);
 }
 
 .markdown-code-block-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
   border-bottom: 1px solid var(--token-border-muted);
@@ -151,9 +147,9 @@
 
 .markdown-code-block-lang {
   min-width: 0;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   text-transform: lowercase;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -164,7 +160,7 @@
   flex-shrink: 0;
   min-height: auto;
   padding: var(--space-1) var(--space-2);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .markdown-code-block-pre {
@@ -177,8 +173,8 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.6;
 }
 
@@ -206,13 +202,13 @@
 .markdown-mermaid-error {
   margin: 0;
   color: var(--token-status-error);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .markdown-mermaid-loading {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .markdown-mermaid-source {
@@ -222,7 +218,7 @@
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--token-bg-raised) 60%, transparent);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: 1.55;
   white-space: pre-wrap;
 }
@@ -234,7 +230,7 @@
 }
 
 .markdown-body .katex {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-size: 1.05em;
 }
 
@@ -242,8 +238,8 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.6;
 }
 
@@ -251,7 +247,7 @@
   margin: 0 0 var(--space-3);
   padding: var(--space-1) var(--space-3);
   border-left: 2px solid color-mix(in srgb, var(--token-status-info) 55%, transparent);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .markdown-body hr {
@@ -260,25 +256,31 @@
   border-top: 1px solid var(--token-border-muted);
 }
 
+/* The rounded container owns the border and both scroll axes, so a long table keeps its header in view. */
 .markdown-table-scroll {
   max-width: 100%;
+  max-height: min(60vh, 480px);
   margin: 0 0 var(--space-3);
-  overflow-x: auto;
+  overflow: auto;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-card);
 }
 
 .markdown-body table {
   width: max-content;
   min-width: 100%;
   margin: 0;
-  border-collapse: collapse;
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-md);
-  font-size: var(--type-label-size);
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--type-body-size);
 }
 
 .markdown-body thead th {
-  background: color-mix(in srgb, var(--token-bg-raised) 70%, transparent);
-  color: var(--token-text-heading);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-local-1);
+  background: var(--token-bg-raised);
+  color: var(--token-text-primary);
   font-weight: var(--font-semibold);
 }
 

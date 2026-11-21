@@ -8,7 +8,7 @@
 .ui-search-field-icon {
   position: absolute;
   left: var(--space-3);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   pointer-events: none;
 }
 

@@ -57,13 +57,11 @@ const ProviderRow: React.FC<{
       data-testid={`settings-provider-row-${provider.id}`}
       selected={selected}
       disabled={blocked}
-      title={status.detail || undefined}
-      leading={<span className="settings-provider-row-glyph" aria-hidden="true">{label.slice(0, 1).toUpperCase()}</span>}
-      trailing={provider.isConfigured ? <span className="settings-provider-row-dot" aria-hidden="true" /> : undefined}
+      data-tooltip={[line, status.detail].filter(Boolean).join(' · ')}
+      trailing={provider.isConfigured ? <span className="settings-provider-row-dot" role="img" aria-label={line} /> : undefined}
       onClick={() => onSelect(provider)}
     >
       <span className="settings-provider-row-name">{label}</span>
-      <span className="settings-provider-row-status">{line}</span>
     </ListRow>
   );
 };
@@ -148,8 +146,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
             <span>{t('settings.providers.upcoming')}</span>
             <span>{t('settings.providerCount', { count: upcoming.length })}</span>
           </>}>
-            <div className="settings-provider-upcoming-body">
-              <p className="settings-section-subtitle">{t('settings.providers.upcomingHint')}</p>
+            <div className="settings-provider-upcoming-body" data-tooltip={t('settings.providers.upcomingHint')}>
               <div className="settings-provider-rows" role="list">{upcoming.map(renderRow)}</div>
             </div>
           </Details>

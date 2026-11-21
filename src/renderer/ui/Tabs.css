@@ -27,26 +27,30 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
-  line-height: var(--type-label-line);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
+  line-height: var(--type-body-line);
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .ui-tabs-tab:hover:not(:disabled) {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
+}
+
+.ui-tabs-tab:active:not(:disabled) {
+  opacity: 0.8;
 }
 
 .ui-tabs-tab:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .ui-tabs-tab.is-selected {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .ui-tabs-tab:disabled {
@@ -63,20 +67,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: calc(var(--type-caption-line) + var(--space-0-5));
-  height: var(--type-caption-line);
+  min-width: calc(var(--type-meta-line) + var(--space-0-5));
+  height: var(--type-meta-line);
   padding: 0 var(--space-1);
   border-radius: var(--radius-full);
   background: var(--token-interactive-hover);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
 .ui-tabs-tab.is-selected .ui-tabs-count {
   background: var(--token-selection-bg);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .ui-tabs-indicator {

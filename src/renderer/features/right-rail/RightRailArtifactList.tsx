@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import { TaskDialog } from '../../ui/TaskDialog';
+import { Chevron } from '../../ui/Chevron';
+import { Skeleton } from '../../ui/Skeleton';
 import { RightRailArtifactGlyph } from './RightRailArtifactGlyphs';
 import { RightRailInvestigationPreview } from './RightRailInvestigationPreview';
 import { listInvestigationArtifacts } from './investigationPreviewActions';
@@ -10,12 +13,14 @@ import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, In
 
 function ArtifactRows({ rows, select }: { rows: InvestigationArtifactRow[]; select: (row: InvestigationArtifactRow) => void }) {
   const { t } = useI18n();
-  return <div className="right-rail-investigation-list">{rows.map(row => <Button key={row.artifactId} variant="ghost"
-    className="right-rail-compact-row" title={row.title || row.artifactId} onClick={() => select(row)}>
+  return <div className="right-rail-investigation-list">{rows.map(row => {
+    const title = row.title || t(`control.rightRail.artifacts.kind.${row.kind}`);
+    return <Button key={row.artifactId} variant="ghost" className="right-rail-compact-row" data-tooltip={title} onClick={() => select(row)}>
     <span className="right-rail-compact-icon" aria-hidden="true"><RightRailArtifactGlyph kind={row.kind} /></span>
-    <span className="right-rail-compact-title">{row.title || `${t(`control.rightRail.artifacts.kind.${row.kind}`)} · ${row.artifactId}`}</span>
-    <span aria-hidden="true">›</span>
-  </Button>)}</div>;
+    <span className="right-rail-compact-title">{title}</span>
+    <Chevron />
+  </Button>;
+  })}</div>;
 }
 
 function ScopedArtifactList({ artifacts, projectId, sessionId }: {
@@ -48,9 +53,10 @@ function ScopedArtifactList({ artifacts, projectId, sessionId }: {
     <TaskDialog open={all} title={t('control.rightRail.artifacts.title')} closeLabel={t('control.rightRail.browse.close')}
       onClose={() => setAll(false)} dataTestId="investigation-list">
       {page && <ArtifactRows rows={page.rows} select={setPreview} />}
-      {loading && <p role="status">{t('control.rightRail.browse.loading')}</p>}
-      {error && <div role="alert"><p>{t('control.rightRail.browse.error')}</p><Button variant="ghost" size="sm"
-        onClick={() => setAttempt(value => value + 1)}>{t('control.rightRail.browse.retry')}</Button></div>}
+      {loading && <div role="status" aria-label={t('control.rightRail.browse.loading')}><Skeleton shape="row" count={4} /></div>}
+      {error && <InlineError onRetry={() => setAttempt(value => value + 1)} retryLabel={t('control.rightRail.browse.retry')}>
+        {t('control.rightRail.browse.error')}
+      </InlineError>}
       {!loading && !error && page?.rows.length === 0 && <p>{t('control.rightRail.artifacts.empty')}</p>}
       {!loading && !error && page?.nextCursor && <Button variant="ghost" size="sm"
         onClick={() => setCursor(page.nextCursor)}>{t('control.rightRail.browse.more')}</Button>}

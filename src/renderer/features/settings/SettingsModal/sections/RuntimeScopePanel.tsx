@@ -9,13 +9,18 @@ import { TaskDialog } from '../../../../ui/TaskDialog';
 import { UnsavedChangesDialog } from '../../../../ui/UnsavedChangesDialog';
 import { ResourceListDetail, SettingsScopeBar } from '../parts';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
-import { McpResourceTable } from './McpResourceTable';
-import { resourceCardMeta } from './scopedResourceForm';
+import { resourceDisplayName } from './scopedResourceForm';
 import { useRuntimeScopePanel } from './useRuntimeScopePanel';
 import { revealResourceLocation } from './runtimeScopeActions';
 import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
+
+export interface RuntimeScopeListContext {
+  resources: ScopedResourceDocument[];
+  selectedId: string | null;
+  select: (resource: ScopedResourceDocument) => void;
+}
 
 export interface RuntimeScopeDetailContext {
   resource: ScopedResourceDocument;
@@ -36,6 +41,10 @@ export const RuntimeScopePanel: React.FC<{
   toolbarExtra?: React.ReactNode;
   /** Trailing content for a list row (connection / trust badges). */
   renderRowTrailing?: (resource: ScopedResourceDocument) => React.ReactNode;
+  /** A second line for a list row, in words (a hook's event). */
+  rowDescription?: (resource: ScopedResourceDocument) => string | undefined;
+  /** Replaces the default rows when a kind needs controls in the row itself (MCP switches). */
+  renderList?: (context: RuntimeScopeListContext) => React.ReactNode;
   /** Read-only detail for the selected resource when the editor lives in a dialog. */
   renderDetail?: (context: RuntimeScopeDetailContext) => React.ReactNode;
   /** Description for the empty state below the default hint. */
@@ -50,6 +59,8 @@ export const RuntimeScopePanel: React.FC<{
   editorPresentation = 'inline',
   toolbarExtra,
   renderRowTrailing,
+  rowDescription,
+  renderList,
   renderDetail,
   emptyDescriptionExtra,
 }) => {
@@ -158,37 +169,25 @@ export const RuntimeScopePanel: React.FC<{
               {actions}
             </>
           )}
-          list={kind === 'mcp' && panel.resources.length ? (
-            <McpResourceTable
-              resources={panel.resources}
-              selectedId={panel.creating ? null : panel.selectedId}
-              onSelect={panel.openResource}
-              onEdit={(resource) => {
+          list={!panel.resources.length ? null : renderList ? renderList({
+            resources: panel.resources,
+            selectedId: panel.creating ? null : panel.selectedId,
+            select: panel.openResource,
+          }) : panel.resources.map((resource) => (
+            <ListRow
+              key={`${resource.kind}:${resource.id}`}
+              className={cn('settings-scope-row', `status-${resource.effectiveStatus}`)}
+              selected={!panel.creating && resource.id === panel.selectedId}
+              description={rowDescription?.(resource)}
+              onClick={() => {
                 panel.openResource(resource);
-                panel.openDialogEditor();
+                if (dialogMode && !renderDetail) panel.openDialogEditor();
               }}
-              renderStatus={renderRowTrailing}
-            />
-          ) : panel.resources.length ? panel.resources.map((resource) => {
-            const meta = resourceCardMeta(resource.kind, resource.content);
-            return (
-              <ListRow
-                key={`${resource.kind}:${resource.id}`}
-                className={cn('settings-scope-row', `status-${resource.effectiveStatus}`)}
-                selected={!panel.creating && resource.id === panel.selectedId}
-                onClick={() => {
-                  panel.openResource(resource);
-                  if (dialogMode && !renderDetail) panel.openDialogEditor();
-                }}
-                trailing={renderRowTrailing?.(resource)}
-              >
-                <span className="settings-scope-row-copy">
-                  <strong>{resource.id}</strong>
-                  {meta ? <small>{meta}</small> : null}
-                </span>
-              </ListRow>
-            );
-          }) : null}
+              trailing={renderRowTrailing?.(resource)}
+            >
+              {resourceDisplayName(resource.kind, resource.id, resource.content)}
+            </ListRow>
+          ))}
           detail={detail}
         />
 

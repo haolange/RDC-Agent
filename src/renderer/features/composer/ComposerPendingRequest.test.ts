@@ -41,7 +41,7 @@ it.each([true, false])('submits approval=%s once while pending, displays errors 
   expect(mock.approval).toHaveBeenCalledExactlyOnceWith(approval.request, approved);
   expect(button.disabled).toBe(true);
   await act(async () => fail(new Error('Approval unavailable')));
-  expect(host.querySelector('[role="alert"]')?.textContent).toBe('Approval unavailable');
+  expect(host.querySelector('[role="alert"] .ui-inline-error-detail-text')?.textContent).toBe('Approval unavailable');
   await act(async () => button.click());
   expect(mock.approval).toHaveBeenCalledTimes(2);
 });
@@ -107,7 +107,7 @@ it.each([
   expect(host.querySelector<HTMLButtonElement>(selector)!.disabled).toBe(true);
   await click(selector); expect(submit).toHaveBeenCalledTimes(2);
   await act(async () => failNew(new Error('New request retry')));
-  expect(host.querySelector('[role="alert"]')?.textContent).toBe('New request retry');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('New request retry');
   await click(selector); expect(submit).toHaveBeenCalledTimes(3);
 });
 
@@ -130,7 +130,7 @@ it('advances batch options, focuses freeform, preserves failed answers and remov
   expect(mock.answer).not.toHaveBeenCalled();
   mock.answer.mockRejectedValueOnce(new Error('Please retry'));
   await click('.composer-user-input-submit');
-  expect(host.querySelector('[role="alert"]')?.textContent).toBe('Please retry');
+  expect(host.querySelector('[role="alert"] .ui-inline-error-detail-text')?.textContent).toBe('Please retry');
   expect(textarea.value).toBe('中文细节');
   await click('.composer-user-input-submit');
   expect(mock.answer).toHaveBeenCalledTimes(2);

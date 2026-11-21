@@ -4,13 +4,10 @@
 
 ## Appearance 面板
 
-- System/Light/Dark 分段 `Tabs`（`variant="segmented"`）。
-- 双栏视觉预览（非 JSON/代码块）。
-- Light/Dark 编辑卡跟随 App chrome。
-- 圆角色板+hex。
-- 可读预设下拉（统一 pill Aa+名称触发体、菜单右缘贴合并向左延伸、caret 衔接 tip、实色 overlay 菜单、每项 Aa+勾选、足够宽度）。
-- Import/Copy `rdc-theme-v1:`。
-- Preferences。
+- 全应用只有一个主题入口：外观页的「主题：跟随系统 / 浅色 / 深色」分段 `Tabs`（`variant="segmented"`）；用户菜单只有头像、名字与「设置」。
+- 浅色、深色各一行：每个预设是一块小窗口缩略图（底色、侧栏、强调色条，悬停出名字，选中描边用该预设的强调色），行尾「自定义」在下方展开该模式的自定义面板：强调色、背景、前景、对比度、字体（圆角色板 + hex），以及 Import/Copy `rdc-theme-v1:`。
+- 自定义面板的预览跟随 App chrome，是视觉预览而不是 JSON。
+- 字号、Markdown 输入等偏好与主题同页，没有说明小字；没有「使用指针光标」开关，可点击元素始终使用指针光标。
 
 ## 预览一致性
 
@@ -27,13 +24,13 @@
 - canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`。
 - 上下文开关只叫 `Max mode / Max 模式`（reasoning 的 `Max` 不变）。
 - 固定 Max mode 开启且不可关闭。
-- Max mode 与 Fast mode 在思考面板里始终占位：不支持时灰色关闭，固定支持时灰色开启，只有 selectable 状态可交互。收起的合并胶囊只在对应模式开启时显示前置图标。hover / `:focus-visible` 的 Fast/Max tip 是对准图标的实色圆胶囊（`--token-bg-raised`），完全浮在弹层上方；有约束状态只显示状态，不朝下叠进身份行。
+- Max mode 与 Fast mode 只在模型支持时出现：固定支持显示锁定开启，只有 selectable 状态可交互。收起的合并胶囊只在对应模式开启时显示前置图标。hover / `:focus-visible` 的 Fast/Max tip 是对准图标的实色圆胶囊（`--token-bg-raised`），完全浮在弹层上方；有约束状态只显示状态，不朝下叠进身份行。
 - 快速 A→B→C 只保留最新 revision。
 - 在途 turn 保持创建时冻结的 `RequestPlan`。
 - 切换和输入不触发 Context preview IPC。
 - 发送后计量相位依次为 `Preparing` / `Current request ~` / provider `Actual`。
   - 圆环环面只显示 `%` / `—` / `…`，阶段文案仅在 title/aria 与 Context breakdown 弹层。
-  - 分段条显示压缩线刻度，圆环不标压缩位置；说明行拼接压缩线、条件完整窗口与本轮可生成。
+  - 圆环悬停只显示「已用 N%」；面板先给大百分比、分段条与一句「大约还能写 N」，自动压缩位置、条件完整窗口、缓存与成本在默认收起的「详细用量」。
   - 弹层始终使用同一 hero、分段条、Tokens | Cache | Reasoning 和 Details 结构：Preparing 尚无新快照时保留最近真实计量，Current request 显示 prepared 预估，完全无遥测显示 `—`，不制造假 0 或切换到独立空态。
 - Actual / Last actual 在弹层宽度大于 `38rem` 时保持等宽三列独立圆角卡片 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%；Cache 卡内 stats 可折成 2×2）；卡片间距用 `--space-3`，禁止分隔线连体与 `clamp` 归零 gap；只有真实窄屏才纵向单列堆叠。
 - 缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。

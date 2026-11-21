@@ -65,7 +65,7 @@ it('presents the frozen task once in each card state and unmounts the preview on
   state.taskLoading = true;
   const loading = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })), 'text/html');
   expect(loading.querySelector('.work-card-preview')).toBeNull();
-  expect(loading.querySelector('.work-process-subagent-task')?.textContent).toContain('chat.subagentLoading');
+  expect(loading.querySelector('.work-process-subagent-task [role="status"]')?.getAttribute('aria-label')).toBe('chat.subagentLoading');
   expect(loading.body.textContent).not.toContain(task);
 
   state.taskLoading = false;
@@ -79,7 +79,7 @@ it('presents the frozen task once in each card state and unmounts the preview on
   state.headerLoading = true;
   const pending = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })), 'text/html');
   expect(pending.querySelector('.work-card-preview')).toBeNull();
-  expect(pending.querySelector('.work-process-subagent-task')?.textContent).toContain('chat.subagentLoading');
+  expect(pending.querySelector('.work-process-subagent-task [role="status"]')?.getAttribute('aria-label')).toBe('chat.subagentLoading');
   expect(pending.body.textContent).not.toContain(task);
   expect(pending.body.textContent).not.toContain('chat.subagentNoActions');
   expect(pending.body.textContent).not.toContain('chat.subagentNoFinal');
@@ -128,7 +128,9 @@ it('shows the parent receipt and task when admission fails before a child trace 
   const failedRow = { ...row, status: 'error' as const, resultPreview: 'SUBAGENT_BUDGET: child wall time exceeded' };
   try {
     const opened = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row: failedRow, sessionId: 's1' })), 'text/html');
-    expect(opened.querySelector('.work-process-subagent-receipt-error[role="alert"]')?.textContent).toContain('SUBAGENT_BUDGET');
+    const failure = opened.querySelector('.ui-inline-error[role="alert"]');
+    expect(failure?.querySelector('.ui-inline-error-message')?.textContent).toBe('chat.subagentFailedSummary');
+    expect(failure?.querySelector('.ui-inline-error-detail-text')?.textContent).toContain('SUBAGENT_BUDGET');
     expect(opened.querySelector('.work-process-subagent-task')?.textContent).toContain(task);
     expect(opened.querySelector('.work-process-subagent-task')?.textContent).not.toContain('chat.subagentContentUnavailable');
   } finally {

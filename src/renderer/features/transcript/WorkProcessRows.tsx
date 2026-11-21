@@ -1,6 +1,8 @@
 import React, { useId } from 'react';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { Icon } from '../../ui/Icon';
+import { Chevron } from '../../ui/Chevron';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
 import { type WorkProcessRow } from './workProcessTypes';
@@ -8,7 +10,6 @@ import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveWorkProcessStatus } from './workProcessActiveSignal';
 import { ToolRow } from './WorkProcessRowParts';
 import { WorkCardHeader } from './WorkCardHeader';
-import { WorkProcessIcon } from './WorkProcessIcons';
 
 export { ToolRow };
 
@@ -23,7 +24,7 @@ export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summar
             <details className="work-process-disclosure">
               <summary className="work-process-summary-line">
                 <span className="work-process-step-summary" data-work-node-prose>{title}</span>
-                <span className="work-process-row-caret" aria-hidden="true" />
+                <Chevron size={12} className="work-process-row-caret" />
               </summary>
               <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
             </details>
@@ -47,7 +48,7 @@ const HookDiagnosticCard: React.FC<{
     <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
       <div className={`work-process-tool-card is-orphan-hook severity-${row.severity}${density === 'compact' ? ' is-compact' : ''}${expanded ? ' is-expanded' : ''}`}>
-        <WorkCardHeader icon={<WorkProcessIcon icon="plug" className="work-process-tool-card-icon" />}
+        <WorkCardHeader icon={<Icon name="plug" className="work-process-icon work-process-tool-card-icon" />}
           title={t('chat.workProcessHookDiagnostics')}
           status={row.severity === 'error' ? t('chat.workProcessStatusError')
             : row.severity === 'warning' ? t('chat.workProcessHookWarning') : null}
@@ -78,7 +79,7 @@ export const DiagnosticRow: React.FC<{
         <details className="work-process-disclosure" open={row.status === 'error'}>
           <summary className="work-process-summary-line">
             <span className="work-process-diagnostic-message" data-work-node-prose>{row.message}</span>
-            <span className="work-process-row-caret" aria-hidden="true" />
+            <Chevron size={12} className="work-process-row-caret" />
           </summary>
           <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
         </details>
@@ -121,7 +122,7 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
             {row.status !== 'complete' ? (
               <span className="work-process-user-input-progress">{row.answeredCount}/{row.questionCount}</span>
             ) : null}
-            <span className={`work-process-row-caret${expanded ? ' is-open' : ''}`} aria-hidden="true" />
+            <Chevron open={expanded} size={12} className="work-process-row-caret" />
           </button>
           {!expanded && !row.incomplete && row.items[0] ? (
             <p className="work-process-user-input-collapsed-summary">

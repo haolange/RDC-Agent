@@ -1,10 +1,10 @@
 import { type ToolContentInput, type UnwrappedToolContent, FILE_TOOL_NAMES, asFiniteNumber, sanitizeContentText, filterEnvelopeLines, extractReadableResultLines, enhanceToolPreviewLines } from './workProcessToolContentShared';
-import { stringifyPreview, createDetailLines, readNestedValue, isLikelyBinaryText } from './workProcessContentText';
+import { stringifyPreview, createDetailLines, readNestedValue, isLikelyBinaryText, isInternalAddress } from './workProcessContentText';
 
 export function unwrapFileContent(input: ToolContentInput): UnwrappedToolContent | null {
   const { toolName, parsed, t, normalized, record, details, argsRecord, contentText } = input;
   if (FILE_TOOL_NAMES.test(normalized)) {
-    const pathChip = sanitizeContentText(
+    const address = sanitizeContentText(
       stringifyPreview(
         argsRecord?.uri
         ?? argsRecord?.ref
@@ -21,6 +21,7 @@ export function unwrapFileContent(input: ToolContentInput): UnwrappedToolContent
         ?? record?.path,
       ),
     );
+    const pathChip = isInternalAddress(address) ? '' : address;
     const isRead = /read_file|^read$/i.test(normalized);
     const previewLineLimit = isRead ? 4 : 3;
     const baseLines = contentText
@@ -42,12 +43,10 @@ export function unwrapFileContent(input: ToolContentInput): UnwrappedToolContent
       ?? record?.lineCount
       ?? readNestedValue(record ?? {}, ['meta', 'lineCount']),
     );
-    let bodyText = pathChip || undefined;
-    if (isRead && bodyText && totalLines != null) {
-      bodyText = `${bodyText} · ${t(totalLines === 1 ? 'chat.previewLineOne' : 'chat.previewLines', { count: totalLines })}`;
-    } else if (!isRead && previewLines.length > 0 && !bodyText) {
-      bodyText = previewLines[0];
-    }
+    // The title names the file and the details show its path, so the caption only adds how long a read file is.
+    const bodyText = isRead && totalLines != null
+      ? t(totalLines === 1 ? 'chat.previewLineOne' : 'chat.previewLines', { count: totalLines })
+      : undefined;
 
     return {
       previewKind: 'file',

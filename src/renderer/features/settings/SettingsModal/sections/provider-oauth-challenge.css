@@ -14,8 +14,8 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-lg);
   background: var(--token-surface-sunken);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .settings-oauth-steps {
@@ -42,9 +42,9 @@
   justify-content: center;
   border-radius: var(--radius-full);
   background: var(--token-bg-raised);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
 }
 
 .settings-oauth-step[data-state='active'] .settings-oauth-step-index {
@@ -69,14 +69,17 @@
 }
 
 .settings-oauth-step-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
   line-height: 1.6;
 }
 
-.settings-oauth-step-body .settings-help-text {
+.settings-oauth-step-description {
   margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--leading-normal);
 }
 
 .settings-oauth-link-button {
@@ -101,9 +104,9 @@
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-md);
   background: var(--token-surface-raised);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--type-heading-size);
+  font-size: var(--type-body-size);
   letter-spacing: 0.04em;
 }
 
@@ -117,8 +120,8 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-surface-sunken);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .settings-oauth-browser-opened .ui-icon {
@@ -141,12 +144,12 @@
 
 .settings-provider-oauth-diagnostic {
   border-color: color-mix(in srgb, var(--token-status-error) 44%, var(--token-border-muted));
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .settings-provider-oauth-diagnostic > span,
 .settings-provider-oauth-checklist {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .settings-provider-oauth-checklist {

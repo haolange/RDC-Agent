@@ -15,8 +15,8 @@
   width: fit-content;
   max-width: 100%;
   padding: var(--space-1) 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -27,7 +27,7 @@
 }
 
 .work-process-tool-aggregate-summary:hover {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .work-process-aggregate-caret {
@@ -46,8 +46,8 @@
 
 .work-process-tool-inline-meta {
   flex-shrink: 0;
-  color: var(--token-text-muted);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
 }
 
@@ -74,23 +74,23 @@
 
 .handoff-suggestion-row__label {
   margin: 0;
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .work-process.is-collapsed .work-process-header {
   margin-bottom: 0;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .work-process.is-collapsed .work-process-label:not(.is-active),
 .work-process.is-collapsed .work-process-meta {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .work-process.is-collapsed .work-process-header:hover .work-process-label:not(.is-active),
 .work-process.is-collapsed .work-process-header:hover .work-process-meta {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 @keyframes work-process-result-pulse {
@@ -128,9 +128,9 @@
   padding: var(--space-0-5) var(--space-2);
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-full);
-  color: var(--token-text-muted);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -158,7 +158,7 @@
 
 .work-process-disclosure > summary:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .work-process-disclosure:not([open]) > :not(summary) {
@@ -168,13 +168,7 @@
 .work-process-row-caret {
   flex: 0 0 auto;
   align-self: center;
-  width: 0;
-  height: 0;
-  border-left: 4px solid currentColor;
-  border-top: 3px solid transparent;
-  border-bottom: 3px solid transparent;
-  opacity: 0.55;
-  transition: transform var(--transition-fast);
+  color: var(--token-text-secondary);
 }
 
 .work-process-disclosure[open] .work-process-row-caret {

@@ -14,6 +14,11 @@
   background: var(--token-bg-overlay);
   border: 1px solid var(--token-border-card);
   box-shadow: var(--token-shadow-popover);
+  animation: popover-in var(--motion-overlay);
+}
+
+.app-context-menu[data-state='closing'] {
+  animation: popover-out var(--motion-overlay) forwards;
 }
 
 .app-context-menu-item {
@@ -27,9 +32,9 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font: inherit;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: 1.3;
   text-align: left;
   cursor: pointer;
@@ -39,7 +44,7 @@
 .app-context-menu-item:focus-visible:not(:disabled),
 .app-context-menu-item.is-active:not(:disabled) {
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   outline: none;
 }
 
@@ -54,8 +59,8 @@
 
 .app-context-menu-shortcut {
   flex: 0 0 auto;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .app-context-menu-item:disabled .app-context-menu-shortcut {

@@ -33,7 +33,7 @@ it('navigates enabled context actions, reserves Escape for the top layer, and re
   function Sample() {
     const [open, setOpen] = useState(false);
     return createElement('div', {}, createElement('button', { onClick: () => setOpen(true) }, 'Open'),
-      open ? createElement(ContextMenu, { x: 100, y: 100, onClose: () => setOpen(false), onSelect: select,
+      open ? createElement(ContextMenu, { open, x: 100, y: 100, onClose: () => setOpen(false), onSelect: select,
         items: [{ type: 'command', id: 'copy', label: 'Copy', shortcut: '', disabled: false },
           { type: 'command', id: 'cut', label: 'Cut', shortcut: '', disabled: true },
           { type: 'command', id: 'paste', label: 'Paste', shortcut: '', disabled: false }] }) : null);

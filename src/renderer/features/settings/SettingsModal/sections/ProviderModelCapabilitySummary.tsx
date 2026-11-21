@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { Details } from '../../../../ui/Details';
 import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
+import { errorDetail } from '../../../../lib/errorDetail';
+import { Skeleton } from '../../../../ui/Skeleton';
 import { testModelCapability } from './providerCatalogActions';
 import { ProviderModelProbe } from './ProviderModelProbe';
 import { ProviderModelPreferences } from './ProviderModelPreferences';
@@ -74,7 +76,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
         success: false,
         status: 'failed',
         requestSent: false,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: errorDetail(error),
       });
     } finally {
       setProbeMode(null);
@@ -85,7 +87,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   return (
     <div className="settings-model-capability-panel" data-testid={`settings-provider-model-capability-panel-${model.id}`}>
       {loading ? (
-        <div className="settings-model-capability-note">{t('settings.providers.capability.loading')}</div>
+        <div role="status" aria-label={t('settings.providers.capability.loading')}><Skeleton shape="line" count={2} /></div>
       ) : loadFailed ? (
         <div className="settings-model-capability-note settings-model-capability-note--error">{t('settings.providers.capability.loadFailed')}</div>
       ) : effectiveModel ? (
@@ -122,7 +124,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
           {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}
           {snapshot?.stale ? <div className="settings-model-capability-note">{t('settings.providers.capability.stale')}</div> : null}
           {snapshot?.lastRefreshError ? (
-            <div className="settings-model-capability-note settings-model-capability-note--warning">{t('settings.providers.capability.refreshFailed', { error: snapshot.lastRefreshError })}</div>
+            <div className="settings-model-capability-note settings-model-capability-note--warning" data-tooltip={snapshot.lastRefreshError}>{t('settings.providers.capability.refreshFailed')}</div>
           ) : null}
           {effectiveModel.quota ? (
             <div className="settings-model-capability-note settings-model-capability-note--warning">

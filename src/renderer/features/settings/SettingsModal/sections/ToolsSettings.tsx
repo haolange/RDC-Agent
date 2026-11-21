@@ -1,5 +1,7 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '../../../../ui/Button';
+import { HelpTip } from '../../../../ui/HelpTip';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { RdcCliInvokerSettingsFields } from './RdcCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
@@ -47,7 +49,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
       setStatus('saved');
     } catch (failure) {
       setStatus('error');
-      setError(failure instanceof Error ? failure.message : String(failure));
+      setError(errorDetail(failure));
     }
   };
 
@@ -69,9 +71,9 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
       onSubmit={(event) => { event.preventDefault(); void save(); }}
     >
       <header className="settings-section-header">
-        <div>
-          <div className="settings-section-title">{t('settings.localToolsTitle')}</div>
-          <div className="settings-section-subtitle">{t('settings.localToolsHint')}</div>
+        <div className="settings-section-title">
+          {t('settings.localToolsTitle')}
+          <HelpTip label={t('settings.localToolsTitle')}>{t('settings.localToolsHint')}</HelpTip>
         </div>
       </header>
 

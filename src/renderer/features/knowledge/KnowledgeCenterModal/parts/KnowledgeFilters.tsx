@@ -5,13 +5,13 @@ import { Icon } from '../../../../ui/Icon';
 import { Popover } from '../../../../ui/Popover';
 import { useI18n } from '../../../../i18n';
 import { ALL_CARD_TYPES, ALL_LIFECYCLES } from '../knowledgeCenterModel';
-import { TYPE_LABEL_KEYS, LIFECYCLE_LABEL_KEYS, LANE_LABEL_KEYS } from '../knowledgeCenterLabels';
+import { TYPE_LABEL_KEYS, LIFECYCLE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 import './KnowledgeFilters.css';
 
 /**
- * Type, lifecycle and the six retrieval lanes come straight from the shared
- * enums; this panel never introduces filters the query service cannot honour.
+ * Type and lifecycle come straight from the shared enums; this panel never introduces filters the query service cannot
+ * honour. Retrieval lanes are how the service searches, not something a reader filters by.
  */
 export function KnowledgeFilters({ state }: { state: ReturnType<typeof useKnowledgeCenter> }) {
   const { t } = useI18n();
@@ -36,16 +36,6 @@ export function KnowledgeFilters({ state }: { state: ReturnType<typeof useKnowle
         label: t(LIFECYCLE_LABEL_KEYS[id]),
         selected: state.lifecycles.includes(id),
         toggle: () => state.toggleLifecycle(id),
-      })),
-    },
-    {
-      id: 'lane',
-      label: t('knowledgeCenter.lanesTitle'),
-      options: state.allLanes.map((id) => ({
-        id,
-        label: t(LANE_LABEL_KEYS[id]),
-        selected: state.lanes.includes(id),
-        toggle: () => state.toggleLane(id),
       })),
     },
   ];

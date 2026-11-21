@@ -45,9 +45,9 @@ export function DeviceSelector() {
   return <div className="device-selector-container">
     <Popover open={open} onOpenChange={setOpen} align="end" className="device-selector-dropdown"
       trigger={<Button variant="ghost" size="sm" className="device-selector-trigger device-selector-trigger-utility main-utility-toggle"
-        data-testid="utility-device-selector-trigger" aria-haspopup="dialog" title={t('device.sessionDeviceTitle', { summary: name })}>
+        data-testid="utility-device-selector-trigger" aria-haspopup="dialog" data-tooltip={t('device.sessionDeviceTitle', { summary: name })}>
         <DeviceTypeIcon type={targetId === 'local' ? 'local' : 'android'} />
-        <span className="device-selector-utility-label">{t('device.sessionDeviceShort', { summary: name })}</span>
+        <span className="device-selector-utility-label">{name}</span>
       </Button>}>
       <div data-testid="utility-device-selector-dropdown" aria-label={t('device.discovery.title')}>
         <div className="device-selector-header"><span>{t('device.discovery.title')}</span>
@@ -66,10 +66,9 @@ export function DeviceSelector() {
             className={`device-selector-option ${device.id === targetId ? 'is-selected' : ''}`} aria-selected={device.id === targetId}
             aria-busy={device.id === targetId && Boolean(state && isDevicePreparing(state.preparation.phase))}
             disabled={!scope || !state || locked || installUnconfirmed || (device.type === 'android' && device.adbState !== 'device')}
-            onClick={() => select(device.id)} title={[device.type === 'local' ? t('device.local') : device.label, device.serial].filter(Boolean).join('\n')}>
+            onClick={() => select(device.id)} data-tooltip={[device.type === 'local' ? t('device.local') : device.label, device.serial].filter(Boolean).join('\n')}>
             <span className="device-selector-option-main"><span className="device-option-leading"><DeviceTypeIcon type={device.type} />
-              <span className="device-option-identity"><span className="device-option-name">{device.type === 'local' ? t('device.local') : device.label}</span>
-                {device.serial && <span className="device-option-serial">{device.serial}</span>}</span></span>
+              <span className="device-option-identity"><span className="device-option-name">{device.type === 'local' ? t('device.local') : device.label}</span></span></span>
               <span className={`device-option-status${device.type === 'android' && device.adbState !== 'device' ? ' is-error' : ''}`}>
                 {device.id === targetId && state && isDevicePreparing(state.preparation.phase) && <Spinner size="sm" />}{t(
                 device.id === targetId && state?.preparation.targetDeviceId === device.id && state.preparation.phase !== 'idle'

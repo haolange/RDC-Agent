@@ -14,10 +14,6 @@ import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessContent } from './WorkProcessContent';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { ToolAggregateRow } from './ToolAggregateRow';
-vi.mock('./WorkProcessExpansion', async (importOriginal) => ({
-  ...await importOriginal<typeof import('./WorkProcessExpansion')>(),
-  useWorkProcessExpansion: () => ({ preference: 'all', active: false }),
-}));
 
 const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 
@@ -30,7 +26,7 @@ it('retains an open tool detail when the settled group reparents it into an aggr
   document.body.append(host);
   const root = createRoot(host);
   const row: ToolRowModel = { type: 'tool', id: 'reparented', status: 'complete', verb: 'Read',
-    category: 'File', icon: 'fileRead', groupKind: 'explore', family: 'file', toolName: 'read_file',
+    category: 'File', icon: 'file-read', groupKind: 'explore', family: 'file', toolName: 'read_file',
     target: 'source.txt', duration: '', argsLines: ['path: source.txt'], rawLines: [], previewLines: ['retained detail'] };
   const render = (grouped: boolean) => root.render(createElement(ScopedWorkDisclosure, { scope: 'aggregate-reparent',
     children: createElement('ul', null, grouped
@@ -164,7 +160,7 @@ it('keeps original fields reachable while hiding secondary groups initially and 
 
 it('shows exact duplicate summary/output only once without dropping distinct output or raw receipts', () => {
   const row: ToolRowModel = { type: 'tool', id: 'complete', status: 'complete', verb: 'Completed', category: 'task',
-    icon: 'turnComplete', groupKind: 'task', family: 'generic', toolName: 'turn_complete', target: '', duration: '25ms',
+    icon: 'turn-complete', groupKind: 'task', family: 'generic', toolName: 'turn_complete', target: '', duration: '25ms',
     argsLines: [], previewLines: ['Completion recorded.'], rawLines: ['Completion recorded.'],
     bodyText: 'Completion recorded.', bodyLines: ['Completion recorded.'] };
   const render = (value: ToolRowModel) => new DOMParser().parseFromString(renderToStaticMarkup(createElement(CardBody, { row: value })), 'text/html').body.textContent;
@@ -177,7 +173,7 @@ it('shows exact duplicate summary/output only once without dropping distinct out
 
 it('uses one semantic tool card for normal, compact and background wait densities', () => {
   const row: ToolRowModel = { type: 'tool', id: 'inline', status: 'complete', verb: 'Wait ended', category: 'task',
-    icon: 'backgroundWait', groupKind: 'task', family: 'generic', toolName: 'background_wait', target: '', duration: '5s',
+    icon: 'background-wait', groupKind: 'task', family: 'generic', toolName: 'background_wait', target: '', duration: '5s',
     argsLines: ['executionId: e1'], previewLines: [], rawLines: ['completed'], bodyText: 'completed', bodyLines: [] };
   const normal = new DOMParser().parseFromString(renderToStaticMarkup(createElement(ToolRow, {
     row: { ...row, toolName: 'turn_complete' }, density: 'normal',
@@ -273,7 +269,7 @@ it('opens the same detail and raw receipt components at both densities', async (
   document.body.append(host);
   const root = createRoot(host);
   const row: ToolRowModel = { type: 'tool', id: 'same-record', status: 'error', verb: 'Read failed', category: 'task',
-    icon: 'fileRead', groupKind: 'task', family: 'file', toolName: 'read_file', target: 'README.md', duration: '20ms',
+    icon: 'file-read', groupKind: 'task', family: 'file', toolName: 'read_file', target: 'README.md', duration: '20ms',
     argsLines: ['path: README.md'], previewLines: ['ENOENT'], rawLines: ['file missing'], bodyText: 'README.md',
     diagnosticCaption: 'Read failed' };
   const read = async (density: 'normal' | 'compact', scope: string) => {

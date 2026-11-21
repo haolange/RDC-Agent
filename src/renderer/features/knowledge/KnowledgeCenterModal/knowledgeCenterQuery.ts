@@ -3,7 +3,6 @@ import type {
   KnowledgePack,
   KnowledgeQueryRequest,
   KnowledgeQueryResult,
-  KnowledgeRetrievalLane,
   KnowledgeSpace,
 } from '@shared/types/knowledge';
 import type { KnowledgeViewMode } from './knowledgeCenterModel';
@@ -26,14 +25,12 @@ export function buildKnowledgeCenterQueryRequest(input: {
   text: string;
   type: KnowledgeQueryRequest['type'];
   lifecycle: KnowledgeQueryRequest['lifecycle'];
-  lanes: KnowledgeRetrievalLane[];
 }): KnowledgeQueryRequest {
   return {
     spaceIds: input.spaceIds,
     text: input.text.trim() || undefined,
     type: input.type,
     lifecycle: input.lifecycle,
-    lanes: input.lanes,
   };
 }
 

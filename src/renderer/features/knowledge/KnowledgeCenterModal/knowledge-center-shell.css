@@ -9,6 +9,11 @@
   background: var(--modal-backdrop);
   backdrop-filter: var(--modal-backdrop-filter);
   -webkit-backdrop-filter: var(--modal-backdrop-filter);
+  animation: overlay-fade-in var(--motion-overlay);
+}
+
+.knowledge-center-backdrop[data-state='closing'] {
+  animation: overlay-fade-out var(--motion-overlay) forwards;
 }
 
 .knowledge-center {
@@ -25,6 +30,11 @@
   background: var(--modal-bg);
   box-shadow: var(--token-shadow-modal, var(--shadow-xl));
   overflow: hidden;
+  animation: surface-rise-in var(--motion-overlay);
+}
+
+[data-state='closing'] > .knowledge-center {
+  animation: surface-rise-out var(--motion-overlay) forwards;
 }
 
 .knowledge-center-grid {
@@ -91,12 +101,12 @@
   gap: var(--space-2);
   min-width: 0;
   min-height: var(--control-height-md);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .knowledge-center-brand-title {
   margin: 0;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);

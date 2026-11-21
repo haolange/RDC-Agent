@@ -81,12 +81,12 @@ export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeI
         />
       </SettingsField>
       {preview.state === 'empty' ? (
-        <p className="settings-help-text appearance-import-status" role="status">{t('settings.appearanceImportEmpty')}</p>
+        <p className="appearance-import-status" role="status">{t('settings.appearanceImportEmpty')}</p>
       ) : null}
       {preview.state === 'invalid' ? <InlineError>{themeImportErrorMessage(preview.error, t)}</InlineError> : null}
       {preview.state === 'valid' ? (
         <>
-          <p className="settings-help-text appearance-import-status" role="status">{t('settings.appearanceImportValid')}</p>
+          <p className="appearance-import-status" role="status">{t('settings.appearanceImportValid')}</p>
           <ThemeImportSwatches chrome={preview.chrome} />
         </>
       ) : null}

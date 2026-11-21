@@ -12,7 +12,7 @@
 .work-process-user-input-transcript-error {
   margin: 0;
   min-width: 0;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -20,7 +20,7 @@
 .work-process-user-input-transcript-index {
   grid-column: 1;
   grid-row: 1;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-variant-numeric: tabular-nums;
   line-height: 1.65;
 }
@@ -28,13 +28,13 @@
 .work-process-user-input-transcript-question {
   grid-column: 2;
   grid-row: 1;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .work-process-user-input-transcript-answer,
 .work-process-user-input-transcript-pending {
   grid-column: 2;
-  color: var(--token-text-muted);
+  color: var(--token-text-secondary);
 }
 
 .work-process-user-input-transcript-answer {
@@ -42,7 +42,7 @@
 }
 
 .work-process-user-input-transcript-pending {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .work-process-user-input-transcript-error {
@@ -59,7 +59,7 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--token-bg-muted) 72%, transparent);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .work-process-tool-approval-head {
@@ -70,7 +70,7 @@
 }
 
 .work-process-tool-approval-verb {
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
@@ -78,14 +78,14 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  color: var(--token-text-muted);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .work-process-tool-approval-message {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -93,7 +93,7 @@
 .work-process-tool-approval-attention {
   margin: 0;
   padding: var(--space-2) var(--space-3);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }

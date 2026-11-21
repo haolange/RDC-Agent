@@ -25,33 +25,20 @@
 
 .settings-local-tool-summary:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .settings-local-tool-icon {
   flex: none;
-  color: var(--token-text-caption);
-}
-
-.settings-local-tool-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
-  min-width: 0;
-  flex: 1;
+  color: var(--token-text-secondary);
 }
 
 .settings-local-tool-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
-}
-
-.settings-local-tool-description {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  word-break: keep-all;
-  overflow-wrap: normal;
+  min-width: 0;
+  flex: 1;
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 
@@ -81,21 +68,12 @@
   gap: var(--space-3);
 }
 
-.settings-page-tools :is(.settings-field-label, .settings-help-text, .settings-section-subtitle) {
+.settings-page-tools .settings-field-label {
   word-break: keep-all;
   overflow-wrap: normal;
 }
 
-.settings-page-tools .settings-help-text {
-  font-size: var(--type-caption-size);
-  line-height: var(--leading-normal);
-}
-
 @media (max-width: 48rem) {
-  .settings-mcp-table {
-    min-width: 36rem;
-  }
-
   .settings-mcp-dialog .settings-field:not(.settings-runtime-form-check) {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);

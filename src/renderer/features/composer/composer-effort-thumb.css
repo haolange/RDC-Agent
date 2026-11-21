@@ -64,7 +64,7 @@
 }
 
 .composer-effort-slider.is-disabled .composer-effort-slider-stop::after {
-  background: color-mix(in srgb, var(--token-text-caption) 54%, transparent);
+  background: color-mix(in srgb, var(--token-text-secondary) 54%, transparent);
 }
 
 .composer-effort-slider-stop.is-current::after {
@@ -125,13 +125,13 @@
 
 .composer-effort-slider.is-disabled .composer-effort-slider-thumb {
   border-color: var(--token-border-muted);
-  background: var(--token-text-caption);
+  background: var(--token-text-secondary);
   opacity: 0.7;
 }
 
 .composer-effort-slider-thumb:focus-visible {
   outline: 2px solid var(--composer-mode-accent);
-  outline-offset: 3px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .composer-effort-slider-tooltip {
@@ -143,8 +143,8 @@
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-md);
   background: var(--token-bg-overlay);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   white-space: nowrap;
   pointer-events: none;
@@ -155,8 +155,8 @@
   display: flex;
   order: -1;
   justify-content: space-between;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
 }
 

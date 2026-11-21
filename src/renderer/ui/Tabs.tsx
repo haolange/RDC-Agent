@@ -83,7 +83,7 @@ export function Tabs({
               aria-selected={selected}
               aria-controls={hasPanel && selected ? panelId : undefined}
               aria-label={collapsed ? tab.label : undefined}
-              title={tooltip}
+              data-tooltip={tooltip}
               tabIndex={index === focusIndex ? 0 : -1}
               disabled={tab.disabled}
               className={cn('ui-tabs-tab', selected && 'is-selected')}

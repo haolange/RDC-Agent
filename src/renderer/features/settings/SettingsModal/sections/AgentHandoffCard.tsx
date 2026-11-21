@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { IconButton } from '../../../../ui/IconButton';
 import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
@@ -100,7 +101,7 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
           onClick={onToggle}
         >
           <span className="settings-handoff-card-index">{index + 1}</span>
-          <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size={14} />
+          <Chevron open={expanded} />
           <strong className="settings-handoff-card-title">
             {handoff.label.trim() || t('settings.agentHandoffUntitled')}
           </strong>

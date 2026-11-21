@@ -11,14 +11,15 @@ import { Pill } from '../../../../ui/Pill';
 import { Select } from '../../../../ui/Select';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
+import { hookEventLabel, mcpTransportLabel, timeoutSeconds } from './resourceLabels';
 import { templateResourceId } from './runtimeScopeMutations';
-import type { ResourceFormState } from './scopedResourceForm';
+import { resourceDisplayName, type ResourceFormState } from './scopedResourceForm';
 
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
 
 /** Enum select whose options always include the current value so an unsupported value never gets silently rewritten. */
-function enumOptions(values: readonly string[], current: string, unsupportedSuffix: string) {
-  const options = values.map((value) => ({ value, label: value }));
+function enumOptions(values: readonly string[], current: string, label: (value: string) => string, unsupportedSuffix: string) {
+  const options = values.map((value) => ({ value, label: label(value) }));
   if (current && !values.includes(current)) {
     options.unshift({ value: current, label: `${current} ${unsupportedSuffix}` });
   }
@@ -62,7 +63,7 @@ export const ScopedResourceEditor: React.FC<{
       {showHeader ? (
         <div className="settings-manifest-editor-head">
           <div className="settings-section-title">
-            {form.id || t('settings.scopeAdd', { kind: kindLabel })}
+            {form.id ? resourceDisplayName(kind, form.id, form.body) : t('settings.scopeAdd', { kind: kindLabel })}
             {dirty ? (
               <span className="settings-editor-dirty" data-testid="settings-runtime-editor-dirty">
                 {t('settings.unsaved')}
@@ -130,7 +131,7 @@ export const ScopedResourceEditor: React.FC<{
                 value={form.transport}
                 disabled={busy}
                 onChange={(value) => onChange({ transport: value })}
-                options={enumOptions(MCP_TRANSPORTS, form.transport, t('settings.resourceEnumUnsupported'))}
+                options={enumOptions(MCP_TRANSPORTS, form.transport, (value) => mcpTransportLabel(value, t), t('settings.resourceEnumUnsupported'))}
               />
             </SettingsField>
             {form.transport === 'streamable-http' ? (
@@ -163,7 +164,7 @@ export const ScopedResourceEditor: React.FC<{
                 value={form.event}
                 disabled={busy}
                 onChange={(value) => onChange({ event: value })}
-                options={enumOptions(CANONICAL_HOOK_EVENTS, form.event, t('settings.resourceEnumUnsupported'))}
+                options={enumOptions(CANONICAL_HOOK_EVENTS, form.event, (value) => hookEventLabel(value, t), t('settings.resourceEnumUnsupported'))}
               />
             </SettingsField>
             <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldCommand')}>
@@ -172,8 +173,10 @@ export const ScopedResourceEditor: React.FC<{
             <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')}>
               <Input value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
             </SettingsField>
-            <SettingsField label={t('settings.resourceFieldTimeoutMs')}>
-              <Input type="number" min={1000} max={600000} step={1000} value={form.timeoutMs} disabled={busy} onChange={(event) => onChange({ timeoutMs: event.target.value })} />
+            <SettingsField label={t('settings.resourceFieldTimeout')}>
+              {/* Stored in milliseconds, edited in seconds. */}
+              <Input type="number" min={1} max={600} step={1} value={timeoutSeconds(form.timeoutMs)} disabled={busy}
+                onChange={(event) => onChange({ timeoutMs: event.target.value ? String(Math.round(Number(event.target.value) * 1000)) : '' })} />
             </SettingsField>
             <SettingsField label={t('settings.resourceFieldFailurePolicy')}>
               <div className="settings-choice-group" role="radiogroup" aria-label={t('settings.resourceFieldFailurePolicy')} data-testid="settings-hook-failure-policy">
@@ -203,13 +206,13 @@ export const ScopedResourceEditor: React.FC<{
       </div>
 
       {kind === 'hook' ? (
-        <p className="settings-help-text settings-runtime-editor-note">
+        <p className="settings-runtime-editor-note">
           <Icon name="warning" size={14} />
           {t('settings.hookRetrustAfterSave')}
         </p>
       ) : null}
       {kind === 'policy' && scope === 'project' ? (
-        <p className="settings-help-text settings-runtime-editor-note" data-testid="settings-policy-tighten-note">
+        <p className="settings-runtime-editor-note" data-testid="settings-policy-tighten-note">
           <Icon name="warning" size={14} />
           {t('settings.policyProjectTightenOnly')}
         </p>
@@ -217,7 +220,7 @@ export const ScopedResourceEditor: React.FC<{
       {message ? (
         isError
           ? <InlineError data-testid="settings-runtime-editor-error">{message}</InlineError>
-          : <p className="settings-help-text" role="status">{message}</p>
+          : <p className="settings-runtime-editor-status" role="status"><Icon name="check" size={14} />{message}</p>
       ) : null}
     </div>
   );

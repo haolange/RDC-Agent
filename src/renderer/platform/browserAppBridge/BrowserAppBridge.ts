@@ -105,6 +105,11 @@ class BrowserAppBridgeClient implements RendererApiTransport {
   }
 }
 
+/** True when the renderer runs against the Browser QA bridge instead of the desktop preload. */
+export function browserAppBridgeInstalled(): boolean {
+  return typeof window !== 'undefined' && Boolean((window as BrowserBridgeWindow)[BRIDGE_MARKER]);
+}
+
 export function installBrowserAppBridge(): void {
   if (typeof window === 'undefined') return;
 

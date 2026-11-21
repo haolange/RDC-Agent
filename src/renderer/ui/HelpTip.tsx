@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 import { Popover } from './Popover';
 import './HelpTip.css';
+import { Icon } from './Icon';
 
 export function HelpTip({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -16,7 +17,7 @@ export function HelpTip({ label, children }: { label: string; children: ReactNod
         aria-describedby={open ? id : undefined} onMouseEnter={enter} onMouseLeave={leave}
         onFocus={enter} onBlur={() => setOpen(false)}
         onClick={(event) => { event.preventDefault(); enter(); }}>
-        <span aria-hidden="true">ⓘ</span>
+        <Icon name="help" size={14} />
       </Button>
     }>
       <div id={id} onMouseEnter={enter} onMouseLeave={leave}>{children}</div>

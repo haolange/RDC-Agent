@@ -33,7 +33,8 @@ describe('AgentModelCascadeSelect selection validation', () => {
     try {
       await act(async () => render(unavailable));
       expect(host.textContent).toContain(unavailable.modelLabel);
-      expect(host.textContent).toContain(unavailable.canonicalId);
+      expect(host.textContent).toContain(unavailable.providerLabel);
+      expect(host.textContent).not.toContain(unavailable.canonicalId);
       expect(host.textContent).not.toContain('所选模型已失效');
       expect(host.textContent).toContain('所选供应商当前不可用');
       expect(host.querySelector('[aria-invalid]')?.getAttribute('aria-invalid')).toBe('true');

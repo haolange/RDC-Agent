@@ -1,0 +1,51 @@
+/* Proximity highlight (design-system.md「动效」). The surface owns position and radius; the glow layer reads the
+   pointer position the host writes and stays out of hit testing. */
+/* The surface becomes its own stacking context so the glow (z-index -1) paints over the surface background and
+   under its content without touching how the children are positioned. */
+[data-proximity] {
+  --proximity-tint: var(--token-accent-primary);
+  position: relative;
+  isolation: isolate;
+}
+
+.ui-proximity-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  background: radial-gradient(
+    var(--proximity-radius) circle at var(--proximity-x, 50%) var(--proximity-y, 50%),
+    color-mix(in srgb, var(--proximity-tint) var(--proximity-fill), transparent),
+    transparent 72%
+  );
+}
+
+/* The rim: the same light, masked to a 1px ring so only the border segment nearest the pointer lights up. */
+.ui-proximity-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: var(--proximity-rim-width);
+  border-radius: inherit;
+  background: radial-gradient(
+    calc(var(--proximity-radius) * 0.7) circle at var(--proximity-x, 50%) var(--proximity-y, 50%),
+    color-mix(in srgb, var(--proximity-tint) var(--proximity-rim), transparent),
+    transparent 70%
+  );
+  -webkit-mask: linear-gradient(rgb(0 0 0) 0 0) content-box, linear-gradient(rgb(0 0 0) 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(rgb(0 0 0) 0 0) content-box exclude, linear-gradient(rgb(0 0 0) 0 0);
+}
+
+[data-proximity][data-proximity-active] > .ui-proximity-glow {
+  opacity: 1;
+}
+
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .ui-proximity-glow {
+    display: none;
+  }
+}

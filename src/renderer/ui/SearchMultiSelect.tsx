@@ -1,10 +1,12 @@
 import { useId, useState, type ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import { Button } from './Button';
+import { InlineError } from './InlineError';
 import { Checkbox } from './Checkbox';
 import { SearchField } from './SearchField';
 import { filterMultiSelectOptions, toggleMultiSelectId, type SearchMultiSelectOption } from './searchMultiSelectModel';
 import './SearchMultiSelect.css';
+import { Icon } from './Icon';
 
 export type { SearchMultiSelectOption } from './searchMultiSelectModel';
 
@@ -49,14 +51,14 @@ export function SearchMultiSelect({ value, options, onChange, unavailable = {}, 
           return <li key={selectedId} className={cn('ui-search-multi-select-selection', reason && 'is-unavailable')}>
             <span>{option?.label ?? selectedId}{reason && <small>{reason}</small>}</span>
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={removeLabel(selectedId)}
-              onClick={() => onChange(toggleMultiSelectId(value, selectedId, false))}>×</Button>
+              onClick={() => onChange(toggleMultiSelectId(value, selectedId, false))}><Icon name="close" size={14} /></Button>
           </li>;
         })}
       </ul>}
       <SearchField aria-label={searchLabel} placeholder={searchLabel} value={query} disabled={disabled}
         onChange={(event) => setQuery(event.currentTarget.value)} />
       <div aria-live="polite" className="ui-search-multi-select-status">
-        {error ? <div role="alert">{error}{onRetry && retryLabel && <Button size="sm" disabled={disabled || loading} onClick={onRetry}>{retryLabel}</Button>}</div>
+        {error ? <InlineError onRetry={onRetry} retryLabel={retryLabel} retryDisabled={disabled || loading}>{error}</InlineError>
           : loading ? loadingLabel : candidates.length === 0 ? (query.trim() ? noResultsLabel : emptyLabel) : null}
       </div>
       {candidates.length > 0 && <ul className="ui-search-multi-select-options">

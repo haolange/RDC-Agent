@@ -23,7 +23,11 @@ const Spacer: React.FC<{ height: number }> = ({ height }) => {
   return <li className="work-process-row-spacer" aria-hidden="true" {...dynStyle} />;
 };
 
-/** Page-scroll windowing shared by parent and child Work Process lists. */
+/** A following Working window scrolls on its own; elsewhere the transcript is the scroller. */
+const nearestScroller = (list: HTMLElement): HTMLElement | null =>
+  list.closest<HTMLElement>('.work-process-viewport.is-following > .work-process-viewport-scroller, .chat-messages');
+
+/** Scroll windowing shared by parent and child Work Process lists. */
 export const MeasuredWorkRows: React.FC<{
   rows: WorkProcessRow[];
   renderRow: (row: WorkProcessRow) => React.ReactNode;
@@ -39,7 +43,7 @@ export const MeasuredWorkRows: React.FC<{
   offsetsRef.current = offsets;
   const updateRange = React.useCallback(() => {
     const list = listRef.current;
-    const scroller = list?.closest('.chat-messages') as HTMLElement | null;
+    const scroller = list ? nearestScroller(list) : null;
     if (!list || !scroller || rows.length <= THRESHOLD) return;
     const listTop = list.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
     const viewStart = Math.max(0, scroller.scrollTop - listTop);
@@ -49,15 +53,28 @@ export const MeasuredWorkRows: React.FC<{
     setRange((current) => current.start === start && current.end === end ? current : { start, end });
   }, [rows.length]);
 
-  React.useEffect(() => {
-    const scroller = listRef.current?.closest('.chat-messages') as HTMLElement | null;
+  // The scroller changes when the Working window switches between following and showing everything, without the
+  // row count changing; after every render the listeners move to whichever element actually scrolls.
+  const updateRangeRef = React.useRef(updateRange);
+  updateRangeRef.current = updateRange;
+  const binding = React.useRef<{ scroller: HTMLElement; release: () => void } | null>(null);
+  React.useLayoutEffect(() => {
+    const scroller = listRef.current ? nearestScroller(listRef.current) : null;
+    if (binding.current?.scroller === scroller) return;
+    binding.current?.release();
+    binding.current = null;
     if (!scroller) return;
-    scroller.addEventListener('scroll', updateRange, { passive: true });
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateRange);
+    const onChange = () => updateRangeRef.current();
+    scroller.addEventListener('scroll', onChange, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onChange);
     observer?.observe(scroller);
-    updateRange();
-    return () => { scroller.removeEventListener('scroll', updateRange); observer?.disconnect(); };
-  }, [updateRange]);
+    binding.current = { scroller, release: () => { scroller.removeEventListener('scroll', onChange); observer?.disconnect(); } };
+    onChange();
+  });
+  React.useEffect(() => () => {
+    binding.current?.release();
+    binding.current = null;
+  }, []);
   React.useEffect(updateRange, [rows.length, revision, updateRange]);
 
   React.useEffect(() => {
@@ -76,7 +93,7 @@ export const MeasuredWorkRows: React.FC<{
       if (index < 0) return;
       const rowId = rows[index].id;
       detail.candidates.push({ element: list, reveal: () => {
-        const scroller = list.closest('.chat-messages') as HTMLElement | null;
+        const scroller = nearestScroller(list);
         if (scroller && rows.length > THRESHOLD) {
           const listTop = list.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
           scroller.scrollTop = listTop + (offsetsRef.current[index] ?? 0);
@@ -118,7 +135,7 @@ export const MeasuredWorkRows: React.FC<{
     if (rows.length <= THRESHOLD || typeof ResizeObserver === 'undefined') return;
     const list = listRef.current;
     if (!list) return;
-    const scroller = list.closest('.chat-messages') as HTMLElement | null;
+    const scroller = nearestScroller(list);
     const children = [...list.children].filter((child) => !child.classList.contains('work-process-row-spacer')) as HTMLElement[];
     const observer = new ResizeObserver((entries) => {
       let changed = false;

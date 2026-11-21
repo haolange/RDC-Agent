@@ -29,7 +29,7 @@ interface SlashCommandContext {
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   openSettings: (section?: string) => void;
   showNotice: (message: string) => void;
-  armPendingSkill?: (skillId: string) => void;
+  armPendingSkill?: (skillId: string, skillName?: string) => void;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -223,8 +223,9 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
         context.showNotice(currentText('composer.commandNoSkill'));
         return;
       }
-      context.armPendingSkill?.(skillId);
-      context.showNotice(currentText('composer.commandSkillArmed', { skill: skillId }));
+      const skillName = getPayloadString(action, 'skillName') || skillId;
+      context.armPendingSkill?.(skillId, skillName);
+      context.showNotice(currentText('composer.commandSkillArmed', { skill: skillName }));
       return;
     }
     default:

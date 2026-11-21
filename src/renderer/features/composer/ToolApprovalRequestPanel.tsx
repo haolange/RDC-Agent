@@ -1,5 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { formatToolApprovalReason } from '../../lib/toolApprovalText';
+import { toolCategoryLabel } from '../../lib/toolCategoryLabel';
+import { errorDetail } from '../../lib/errorDetail';
+import { InlineError } from '../../ui/InlineError';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
@@ -11,7 +14,8 @@ export const ToolApprovalRequestPanel: React.FC<{
 }> = ({ request }) => {
   const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<{ message?: string } | null>(null);
+  // The submission failure's technical reason, kept for the diagnostics disclosure; '' when it carried none.
+  const [error, setError] = useState<string | null>(null);
   const submitApproval = useToolApprovalSubmit();
   const submittingRef = useRef(false);
 
@@ -23,7 +27,7 @@ export const ToolApprovalRequestPanel: React.FC<{
     try {
       await submitApproval(request, approved);
     } catch (err) {
-      setError(err instanceof Error ? { message: err.message } : {});
+      setError(errorDetail(err));
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
@@ -37,15 +41,9 @@ export const ToolApprovalRequestPanel: React.FC<{
         <p>{formatToolApprovalReason(request.question, t) || t('chat.approvalRequiredMessage')}</p>
       </div>
       <div className="composer-tool-approval-meta" aria-label={t('composer.toolApprovalContext')}>
-        <span>{request.toolName}</span>
-        <span>{t((
-          {
-            low: 'composer.toolApprovalRisk.low',
-            medium: 'composer.toolApprovalRisk.medium',
-            high: 'composer.toolApprovalRisk.high',
-          } as const
-        )[request.risk])}</span>
-        {request.reviewer ? <span>{request.reviewer === 'user' ? t('chat.workProcessManualReviewMeta') : request.reviewer}</span> : null}
+        <span>{toolCategoryLabel(request.toolName, t)}</span>
+        <span className={`composer-tool-approval-risk is-${request.risk}`}>{t(`composer.toolApprovalRisk.${request.risk}`)}</span>
+        {request.reviewer ? <span>{t(request.reviewer === 'user' ? 'chat.workProcessManualReviewMeta' : 'chat.workProcessAutoReviewMeta')}</span> : null}
       </div>
       <div className="composer-tool-approval-actions">
         <Button
@@ -65,11 +63,7 @@ export const ToolApprovalRequestPanel: React.FC<{
           {t('composer.toolApprovalApproveOnce')}
         </Button>
       </div>
-      {error ? (
-        <p className="composer-user-input-error" role="alert">
-          {error.message || t('composer.toolApprovalSubmitFailed')}
-        </p>
-      ) : null}
+      {error !== null ? <InlineError detail={error || undefined}>{t('composer.toolApprovalSubmitFailed')}</InlineError> : null}
     </section>
   );
 };

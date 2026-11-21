@@ -1,4 +1,6 @@
 import { ProductLogo } from '../../ui/ProductLogo';
+import { Icon } from '../../ui/Icon';
+import { WindowControls } from './WindowControls';
 import type { ReactNode } from 'react';
 import './TitleBar.css';
 
@@ -65,18 +67,11 @@ export function TitleBar({
           data-testid="titlebar-left-panel-toggle"
           onClick={!leftToggleDisabled ? onToggleLeft : undefined}
           aria-label={leftPanelToggleLabel}
-          title={leftToggleDisabled ? autoCollapsedTitle : leftPanelToggleLabel}
+          aria-expanded={!effectiveLeftCollapsed}
+          data-tooltip={leftToggleDisabled ? autoCollapsedTitle : leftPanelToggleLabel}
           disabled={leftToggleDisabled}
         >
-          <span className="shell-panel-toggle-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              {effectiveLeftCollapsed ? (
-                <polyline points="9 18 15 12 9 6" />
-              ) : (
-                <polyline points="15 6 9 12 15 18" />
-              )}
-            </svg>
-          </span>
+          <Icon name="sidebar-left" size={18} className="shell-panel-toggle-icon" />
         </button>
       </div>
       <div className="app-titlebar-right no-drag">
@@ -88,49 +83,20 @@ export function TitleBar({
             data-testid="titlebar-right-panel-toggle"
             onClick={!rightToggleDisabled ? onToggleRight : undefined}
             aria-label={rightPanelToggleLabel}
-            title={rightToggleDisabled ? autoCollapsedTitle : rightPanelToggleLabel}
+            aria-expanded={!effectiveRightCollapsed}
+            data-tooltip={rightToggleDisabled ? autoCollapsedTitle : rightPanelToggleLabel}
             disabled={rightToggleDisabled}
           >
-            <span className="shell-panel-toggle-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {effectiveRightCollapsed ? (
-                  <polyline points="15 18 9 12 15 6" />
-                ) : (
-                  <polyline points="9 18 15 12 9 6" />
-                )}
-              </svg>
-            </span>
+            <Icon name="sidebar-right" size={18} className="shell-panel-toggle-icon" />
           </button>
         )}
-        <div className="window-controls" role="group" aria-label={windowControlsLabel}>
-          <button
-            type="button"
-            className="window-control window-control-minimize tooltip"
-            data-tooltip={windowMinimizeLabel}
-            aria-label={windowMinimizeLabel}
-            onClick={onMinimize}
-          >
-            <span className="minimize" />
-          </button>
-          <button
-            type="button"
-            className="window-control window-control-maximize tooltip"
-            data-tooltip={windowMaximized ? windowRestoreLabel : windowMaximizeLabel}
-            aria-label={windowMaximized ? windowRestoreLabel : windowMaximizeLabel}
-            onClick={onToggleMaximize}
-          >
-            <span className={windowMaximized ? 'restore' : 'maximize'} />
-          </button>
-          <button
-            type="button"
-            className="window-control close tooltip"
-            data-tooltip={windowCloseLabel}
-            aria-label={windowCloseLabel}
-            onClick={onClose}
-          >
-            <span className="close-mark" />
-          </button>
-        </div>
+        <WindowControls
+          maximized={windowMaximized}
+          labels={{ group: windowControlsLabel, minimize: windowMinimizeLabel, maximize: windowMaximizeLabel, restore: windowRestoreLabel, close: windowCloseLabel }}
+          onMinimize={onMinimize}
+          onToggleMaximize={onToggleMaximize}
+          onClose={onClose}
+        />
       </div>
     </header>
   );

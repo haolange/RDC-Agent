@@ -4,12 +4,12 @@
 .plan-review-panel__notice,
 .plan-review-panel__error {
   margin: 0;
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-line);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
 }
 
-.plan-review-panel__notice { color: var(--token-text-body); }
+.plan-review-panel__notice { color: var(--token-text-secondary); }
 .plan-review-panel__error { color: var(--token-status-error); }
 
 .plan-review-panel__appendix { margin-top: var(--space-5); }
-.plan-review-panel__appendix > summary { color: var(--token-text-caption); }
+.plan-review-panel__appendix > summary { color: var(--token-text-secondary); }

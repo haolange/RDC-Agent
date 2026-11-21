@@ -5551,3 +5551,9 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 结果：两次运行中切换与一次第二回合完成后切换未复现；原串显会话重开及刷新后未见异会话消息。
 - 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\session-cross-display.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\ui04-reopened-dom.json`。
 - 人工介入：经侧栏切换并刷新页面。
+
+## 2026-11-21：UI Resync 本地验收
+- 提交：`11b20b29`
+- 结果：界面减法规格第 11 版的 U0–U15 全部落地；全量单测 645 个文件、4764 条通过（5 个文件、6 条按条件跳过），check:gates、check:contracts（250 条）、覆盖率 ratchet（行 80.84%、分支 70.32%）、生产构建与对 main 分叉点的 git diff 检查通过；Browser QA 完整走查通过，每张默认画面的表面扫描没有发现内部地址、长哈希或 HTTP 状态码，伪本地化与命令面板画面已截图。CI 与 Windows 实机走查不在本条范围内。
+- 证据：本地：`TMPDIR=/dev/shm npx vitest run`、`npm run check:gates`、`npm run check:contracts`、`npm run test:coverage && npm run check:coverage-ratchet`、`npm run build`、`RDC_DIFF_BASE=$(git merge-base HEAD origin/main) npm run check:git-diff`、`node scripts/qa-walkthrough.mjs <应用日志> <截图目录>`。
+- 人工介入：无；改前改后对照与动效录屏整理在私有页面中供验收。

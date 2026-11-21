@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { formatBytes } from '../../services/attachmentHelpers';
+import { formatBytes } from '../../lib/formatBytes';
+import { useI18n } from '../../i18n';
 import { openAppPath } from '../../hooks/appShellBridge';
 import { MaterialContextViewer } from '../../patterns/MaterialContextViewer';
 import { useConversationStore } from '../../stores/conversationStore';
 import { getAttachmentPreview } from '../../hooks/conversationPreview';
+import { Icon } from '../../ui/Icon';
 import type { SessionAttachmentRecord } from '@shared/types/session';
 
 const isImageAttachment = (attachment: SessionAttachmentRecord): boolean =>
@@ -14,10 +16,8 @@ const MessageAttachmentPill: React.FC<{
   previewUrl?: string;
   onInspect: (attachment: SessionAttachmentRecord) => void;
 }> = ({ attachment, previewUrl, onInspect }) => {
+  const { language } = useI18n();
   const image = isImageAttachment(attachment);
-  const ext = attachment.fileName.includes('.')
-    ? attachment.fileName.slice(attachment.fileName.lastIndexOf('.') + 1).toUpperCase()
-    : 'FILE';
 
   const openAttachment = () => {
     onInspect(attachment);
@@ -32,11 +32,11 @@ const MessageAttachmentPill: React.FC<{
       <span className="message-attachment-pill-icon" aria-hidden="true">
         {previewUrl ? (
           <img src={previewUrl} alt="" className="message-attachment-pill-thumb" />
-        ) : image ? 'IMG' : ext.slice(0, 4)}
+        ) : <Icon name={image ? 'image' : 'file'} />}
       </span>
       <span className="message-attachment-pill-copy">
         <span className="message-attachment-pill-name">{attachment.fileName}</span>
-        <span className="message-attachment-pill-meta">{formatBytes(attachment.size)}</span>
+        {attachment.size > 0 ? <span className="message-attachment-pill-meta">{formatBytes(attachment.size, language)}</span> : null}
       </span>
     </button>
   );

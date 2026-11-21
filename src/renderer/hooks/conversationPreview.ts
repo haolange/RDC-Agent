@@ -26,3 +26,8 @@ export function switchConversationBranch(request: {
 }) {
   return getElectronApi()?.conversation.switchBranch(request);
 }
+
+/** A media reference in an answer (session artifact, attachment name or project path), resolved by the main process. */
+export function resolveConversationMedia(request: { sessionId: string; src: string }) {
+  return getElectronApi()?.conversation.resolveMedia(request);
+}

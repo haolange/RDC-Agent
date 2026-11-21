@@ -12,7 +12,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { closeOverlays, openApp, openSettings, useTheme } from './qa-browser-shared.mjs';
+import zlib from 'node:zlib';
+import { closeOverlays, openApp, openSettings, scanSurfaceForbidden, useTheme } from './qa-browser-shared.mjs';
 
 const args = process.argv.slice(2);
 const [logPath, shotDir] = args;
@@ -22,10 +23,44 @@ fs.mkdirSync(shotDir, { recursive: true });
 
 const { browser, page } = await openApp(logPath);
 const failures = [];
+/** A real raster image for the Markdown media path: a dark-to-accent gradient, encoded as RGB PNG. */
+function gradientPng(width, height) {
+  const chunk = (type, data) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(Buffer.concat([Buffer.from(type), data])));
+    return Buffer.concat([length, Buffer.from(type), data, crc]);
+  };
+  const rows = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = y * (width * 3 + 1) + 1 + x * 3;
+      rows[offset] = Math.round(20 + (x / width) * 40);
+      rows[offset + 1] = Math.round(30 + (y / height) * 90);
+      rows[offset + 2] = Math.round(60 + (x / width) * 160);
+    }
+  }
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header),
+    chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+const startedAt = Date.now();
 const shot = async (name) => {
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(shotDir, `${name}.png`) });
-  console.log(`[walkthrough] shot ${name}`);
+  // The elapsed time lines a shot up with a recorded video (QA_VIDEO_DIR) for cutting motion clips.
+  console.log(`[walkthrough] shot ${name} t=${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+  // Pseudo-locale shots stretch copy on purpose; every other default screen must keep 诊断 facts off the surface.
+  const forbidden = name.includes('pseudo') ? [] : await page.evaluate(scanSurfaceForbidden);
+  if (forbidden.length) {
+    failures.push(`surface:${name}`);
+    for (const hit of forbidden) console.log(`[walkthrough] SURFACE ${name} ${hit}`);
+  }
 };
 const step = async (name, action) => {
   try {
@@ -38,6 +73,8 @@ const step = async (name, action) => {
 const composer = () => page.locator('.composer-textarea').first();
 const send = async (text) => {
   await closeOverlays(page);
+  // A turn still settling (a plan execution, a background delegation) keeps the Composer busy.
+  await page.getByTestId('debugger-start-button').waitFor({ timeout: 90_000 });
   await composer().click();
   await page.keyboard.type(text);
   await page.keyboard.press('Enter');
@@ -58,6 +95,8 @@ const knowledgeCase = (caseId, title, symptom) => [
 ].join('\n');
 
 const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-qa-project-'));
+fs.mkdirSync(path.join(projectRoot, 'docs'));
+fs.writeFileSync(path.join(projectRoot, 'docs', 'frame.png'), gradientPng(480, 270));
 if (capture) fs.copyFileSync(capture, path.join(projectRoot, path.basename(capture)));
 
 try {
@@ -92,7 +131,7 @@ try {
     await openSettings(page, 'models');
     await page.getByTestId('settings-provider-row-ollama').click();
     const detail = page.getByTestId('settings-provider-detail');
-    await detail.getByRole('button', { name: /^(测试|Test)$/ }).click();
+    await detail.getByRole('button', { name: /^(检查连接|Check connection)$/ }).click();
     await page.waitForTimeout(3000);
     await detail.getByRole('button', { name: /^(保存|连接|Save|Connect)$/ }).click();
     await page.waitForTimeout(2500);
@@ -100,7 +139,19 @@ try {
   });
   await step('settings-agents', async () => {
     await openSettings(page, 'agents');
+    // Delegated Agents run on their own configured route, so the stub model becomes the default model.
+    await page.getByTestId('settings-agent-default-model').getByTestId('settings-model-cascade-trigger').click();
+    await page.locator('.settings-model-option[data-model-id="qa-stub:4b"]').first().click();
+    await page.waitForTimeout(1500);
     await shot('04-settings-agents');
+    await openSettings(page, 'tools');
+    await shot('04d-settings-tools');
+    await openSettings(page, 'hooks');
+    await shot('04e-settings-hooks');
+    await openSettings(page, 'general');
+    await shot('04b-settings-general');
+    await openSettings(page, 'appearance');
+    await shot('04c-settings-appearance');
     await closeOverlays(page);
   });
 
@@ -153,6 +204,39 @@ try {
     if (stuck) throw new Error('wheel scrolling did not move the transcript upward');
   });
 
+  await step('markdown', async () => {
+    await send('qa:markdown 展示一份排版样例。');
+    await waitForText('结论来自同一 capture');
+    await page.waitForTimeout(1500);
+    const answer = page.locator('[data-testid="message-bubble-assistant"]').last();
+    await answer.locator('.markdown-body h1').first().scrollIntoViewIfNeeded();
+    await shot('11b-markdown-top');
+    await answer.locator('[data-testid="markdown-code-block"]').first().scrollIntoViewIfNeeded();
+    await shot('11c-markdown-code');
+    await answer.locator('.markdown-media, .markdown-media-missing').last().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    await shot('11d-markdown-media');
+  });
+
+  await step('subagent', async () => {
+    await send('qa:subagent 请让一个子代理核对工作区里有没有 capture。');
+    const card = page.locator('[data-testid="work-process-subagent"]').last();
+    await card.waitFor({ timeout: 90_000 });
+    await page.waitForTimeout(1500);
+    await card.scrollIntoViewIfNeeded();
+    await shot('14b-subagent-running');
+    await waitForText('Verifier 核对完了');
+    await page.waitForTimeout(1200);
+    // A settled turn folds its work process; open it once so the settled card is in view.
+    if (!(await page.locator('[data-testid="work-process-subagent"]').last().isVisible())) {
+      await page.locator('.work-process-header').last().click();
+      await page.waitForTimeout(400);
+    }
+    await page.locator('.work-process-header').last().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await shot('14c-subagent-settled');
+  });
+
   await step('plan', async () => {
     await page.getByTestId('composer-mode-pill').click();
     await page.getByRole('menuitemradio', { name: /Debugger/ }).or(page.getByRole('option', { name: /Debugger/ })).first().click();
@@ -179,6 +263,44 @@ try {
     await shot('17-light-knowledge');
     await closeOverlays(page);
   });
+  await step('english', async () => {
+    await openSettings(page, 'general');
+    await page.locator('.settings-page-general').getByRole('tab', { name: /^English$/ }).click();
+    await page.waitForTimeout(800);
+    await shot('19-en-settings-general');
+    await closeOverlays(page);
+    await shot('20-en-conversation');
+    await page.getByTestId('sidebar-knowledge-center-trigger').click();
+    await page.locator('.knowledge-center-card-button').first().click();
+    await shot('21-en-knowledge');
+    await closeOverlays(page);
+    // Pseudo-localized English: accented and 40% longer, so an untranslated literal or a cramped layout shows.
+    const pseudo = new URL(page.url());
+    pseudo.searchParams.set('pseudoLocale', '1');
+    await page.goto(pseudo.toString());
+    await page.waitForTimeout(1500);
+    await shot('22-pseudo-conversation');
+    await openSettings(page, 'agents');
+    await shot('23-pseudo-settings-agents');
+    await closeOverlays(page);
+    pseudo.searchParams.delete('pseudoLocale');
+    await page.goto(pseudo.toString());
+    await page.waitForTimeout(1500);
+    await openSettings(page, 'general');
+    await page.locator('.settings-page-general').getByRole('tab', { name: /^简体中文$/ }).click();
+    await closeOverlays(page);
+  });
+
+  await step('command-palette', async () => {
+    await useTheme(page, 'dark');
+    await page.keyboard.press('Control+k');
+    await page.getByTestId('command-palette').waitFor();
+    await page.waitForTimeout(600);
+    await shot('24-command-palette');
+    await page.keyboard.press('Escape');
+    await page.getByTestId('command-palette').waitFor({ state: 'detached' });
+  });
+
   await step('narrow', async () => {
     await useTheme(page, 'dark');
     await page.setViewportSize({ width: 720, height: 900 });

@@ -19,7 +19,7 @@
 
 .settings-modal-title {
   min-width: 0;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: 1.25;
@@ -28,8 +28,8 @@
 
 .settings-modal-subtitle {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.45;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -47,7 +47,7 @@
   justify-content: center;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
   border: 1px solid transparent;
@@ -56,7 +56,7 @@
 .settings-modal-close:hover,
 .settings-modal-close:focus-visible {
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   border-color: var(--token-border-muted);
 }
 

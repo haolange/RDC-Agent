@@ -9,6 +9,10 @@
   vertical-align: middle;
 }
 
+.ui-icon.is-filled {
+  fill: currentColor;
+}
+
 .ui-icon.is-size-12 {
   width: 12px;
   height: 12px;

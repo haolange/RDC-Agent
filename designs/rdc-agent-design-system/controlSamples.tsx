@@ -49,6 +49,6 @@ export function UnsavedSample() {
     {open && <UnsavedChangesDialog title="保留草稿？" message="这里只处理活文档中的本地输入。"
       keepEditingLabel="继续编辑" discardLabel="放弃草稿" onKeepEditing={() => setOpen(false)}
       onDiscard={() => { setDraft(''); setOpen(false); setNotice(true); }} />}
-    {notice && <ToastStack><Toast title="示例草稿已放弃" onDismiss={() => setNotice(false)} dismissLabel="关闭反馈" /></ToastStack>}
+    <ToastStack><Toast open={notice} title="示例草稿已放弃" onDismiss={() => setNotice(false)} onExited={() => undefined} dismissLabel="关闭反馈" /></ToastStack>
   </>;
 }

@@ -1,14 +1,8 @@
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useUiLabels } from '../../lib/useUiLabels';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
+import { usePresence } from '../usePresence';
 import {
   ANCHOR_GAP,
   clamp,
@@ -22,8 +16,7 @@ import { SelectMenu, SelectTrigger } from './SelectPrimitives';
 import type { SelectProps } from './types';
 import './Select.css';
 
-export type { SelectOption } from './types';
-export type { SelectProps } from './types';
+export type { SelectOption, SelectProps } from './types';
 
 export const Select: React.FC<SelectProps> = ({
   value,
@@ -49,6 +42,7 @@ export const Select: React.FC<SelectProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const { layerId } = useOverlayLayer(open);
+  const presence = usePresence(open, menuRef);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [menuPosition, setMenuPosition] = useState({
     left: VIEWPORT_MARGIN,
@@ -112,10 +106,12 @@ export const Select: React.FC<SelectProps> = ({
     });
   }, [menuAlign, minMenuWidth]);
 
-  const closeMenu = useCallback(() => {
-    setOpen(false);
-    setMenuPosition((current) => ({ ...current, ready: false }));
-  }, []);
+  const closeMenu = useCallback(() => setOpen(false), []);
+
+  // A closing menu keeps its place while the exit plays; it is measured afresh after it unmounts.
+  useLayoutEffect(() => {
+    if (!presence.mounted) setMenuPosition((current) => (current.ready ? { ...current, ready: false } : current));
+  }, [presence.mounted]);
 
   const commitSelection = useCallback((nextValue: string) => {
     onChange(nextValue);
@@ -273,9 +269,10 @@ export const Select: React.FC<SelectProps> = ({
         onKeyDown={handleTriggerKeyDown}
       />
 
-      {open && (
+      {presence.mounted && (
         <SelectMenu
           menuRef={menuRef}
+          state={presence.state}
           variant={variant}
           dataTestId={dataTestId}
           triggerAriaLabel={triggerAriaLabel}

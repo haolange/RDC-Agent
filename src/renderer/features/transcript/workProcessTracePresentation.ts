@@ -8,6 +8,7 @@ import { createToolRowForPresentation } from './workProcessToolRows';
 import { countWorkActions } from './workProcessSectionModel';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
 import { buildPresentationUnits, presentationUnitsToDetailRows, type ThinkingItemPresentation } from './workProcessBlockProjection';
+import { markReadSearchResults, mergeWebReadsAcrossSteps } from './workProcessWebFlow';
 import type { Translator } from '../../i18n/messages';
 
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
@@ -72,7 +73,6 @@ const resolveThinkingItem = (
     preview,
     label: status === 'streaming' ? t('chat.workProcessThinkingStreaming') : resolveSettledThinkingLabel(item, t),
     kind: thinking.kind,
-    kindLabel: thinking.kind === 'summary' ? t('chat.workProcessThinkingSummary') : '',
     visibility: thinking.visibility,
     status,
     // Expand while the block streams; fold once it settles (the row keeps a user's sticky choice).
@@ -120,7 +120,7 @@ export const buildWorkProcessPresentation = (
   t: Translator,
 ): WorkProcessPresentation => {
   const blocks = Array.isArray(trace.blocks) ? trace.blocks : [];
-  const rows = blocksToDetailRows(blocks, t);
+  const rows = markReadSearchResults(mergeWebReadsAcrossSteps(blocksToDetailRows(blocks, t)));
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);

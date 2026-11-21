@@ -1,5 +1,6 @@
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { useI18n } from '../i18n';
+import { Icon } from '../ui/Icon';
 
 interface WorkbenchUtilitiesProps {
   isTerminalOpen: boolean;
@@ -21,12 +22,9 @@ export function WorkbenchUtilities({ isTerminalOpen, activityAlertSeverity, onTo
         data-testid="terminal-toggle"
         aria-label={label}
         aria-pressed={isTerminalOpen}
-        title={label}
+        data-tooltip={label}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path d="M4 17l6-6-6-6" />
-          <path d="M12 19h8" />
-        </svg>
+        <Icon name="terminal" />
         {activityAlertSeverity && <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />}
       </button>
     </div>

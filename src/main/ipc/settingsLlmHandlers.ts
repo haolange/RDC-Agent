@@ -14,6 +14,7 @@ import { providerCapabilityProbeService } from '../settings/provider-catalog/Pro
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { applyProductIcon } from '../window/productIcon';
+import { applyWindowBackgrounds } from '../window/appearanceChrome';
 import { formatShellInterpreterLabel, shellResolver } from '../runtime/ShellResolver';
 import { modelsOverrideService } from '../settings/settings-core/ModelsOverrideService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -413,7 +414,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const patch = settings as AppSettingsPatch;
     const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
-    if (patch.appearance) await notifyCommitted(applyProductIcon);
+    if (patch.appearance) {
+      await notifyCommitted(applyProductIcon);
+      await notifyCommitted(applyWindowBackgrounds);
+    }
     if (previousSettings.appearance.language !== nextSettings.appearance.language) await notifyCommitted(refreshApplicationMenu);
     const changedProviderIds = new Set<string>();
     if (patch.llm?.providers || patch.agentModels) await notifyCommitted(() => context.applyCurrentLlmConfig());

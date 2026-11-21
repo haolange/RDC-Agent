@@ -49,6 +49,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
         (message) => message.sessionId === currentSession.sessionId,
       );
       const traceAlreadyBound = useWorkflowStore.getState().tracePresentation?.sessionId === currentSession.sessionId;
+      if (!historyAlreadyBound) conversation.setHistoryLoadingSessionId(currentSession.sessionId);
       const [historyResult, evidenceResult, traceResult] = await Promise.all([
         historyAlreadyBound
           ? Promise.resolve(null)
@@ -61,6 +62,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
           : electronAPI.trace.getProjection(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
       ]);
       if (cancelled) return;
+      useConversationStore.getState().setHistoryLoadingSessionId(null);
       if (historyResult) {
         hydrateLoadedSessionSurface({
           messages: hydrateMessagesWithActionEvents(
@@ -76,7 +78,10 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
         setTracePresentation(traceResult.presentation ?? null);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      useConversationStore.getState().setHistoryLoadingSessionId(null);
+    };
   }, [currentSession?.sessionId, shellReady, setConversationSnapshot, setTracePresentation]);
 
   useEffect(() => {

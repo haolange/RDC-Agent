@@ -1,6 +1,7 @@
 import React, { useMemo, useState, type KeyboardEvent } from 'react';
 import { formatPricePerMillion } from '@shared/utils/cost';
 import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { SearchField } from '../../../../ui/SearchField';
 import {
@@ -18,6 +19,8 @@ type Translate = ReturnType<typeof useI18n>['t'];
 interface AgentModelCascadeSelectProps {
   value: string;
   options: AgentModelOption[];
+  /** For one Agent: the first choice follows the default model, named in this label; choosing it clears the value. */
+  followDefaultLabel?: string;
   onChange: (value: string) => void;
   t: Translate;
 }
@@ -28,6 +31,7 @@ interface AgentModelCascadeSelectProps {
 export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = ({
   value,
   options,
+  followDefaultLabel,
   onChange,
   t,
 }) => {
@@ -59,8 +63,10 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     setQuery('');
   };
 
-  const triggerPrimary = selected ? selected.modelLabel : invalidSelection ? t('composer.model.unavailable') : t('settings.selectModelPlaceholder');
-  const triggerSecondary = selected ? selected.canonicalId : t('settings.selectProviderPlaceholder');
+  const triggerPrimary = selected ? selected.modelLabel
+    : invalidSelection ? t('composer.model.unavailable')
+      : followDefaultLabel ?? t('settings.selectModelPlaceholder');
+  const followsDefault = Boolean(followDefaultLabel) && !value;
 
   return (
     <div className="settings-model-cascade">
@@ -80,9 +86,9 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           >
             <span className="settings-model-cascade-trigger-copy">
               <strong>{triggerPrimary}</strong>
-              {triggerSecondary ? <span>{triggerSecondary}</span> : null}
+              {selected ? <span>{selected.providerLabel}</span> : null}
             </span>
-            <Icon name="chevron-down" size={14} />
+            <Chevron direction="down" />
           </button>
         )}
       >
@@ -97,6 +103,23 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             data-testid="settings-model-cascade-search"
           />
         </div>
+        {followDefaultLabel && !query ? (
+          <div className="settings-model-cascade-list" role="listbox" aria-label={t('settings.modelFieldLabel')} onKeyDown={onMenuKeyDown}>
+            <button
+              type="button"
+              className={`settings-model-option settings-model-option--default${followsDefault ? ' is-selected' : ''}`}
+              role="option"
+              aria-selected={followsDefault}
+              data-testid="settings-model-option-default"
+              onClick={() => select('')}
+            >
+              <span className="settings-model-option-copy">
+                <span className="settings-model-option-label">{followDefaultLabel}</span>
+              </span>
+              {followsDefault ? <Icon name="check" size={14} className="settings-model-option-check" /> : null}
+            </button>
+          </div>
+        ) : null}
         {groups.length === 0 ? (
           <div className="settings-model-empty" role="status">
             <strong>{t('settings.noModelsAvailable')}</strong>
@@ -129,7 +152,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                       role="option"
                       aria-label={accessibleLabel}
                       aria-selected={selectedRow}
-                      title={accessibleLabel}
+                      data-tooltip={option.disabledReason}
                       onClick={() => select(option.canonicalId)}
                     >
                       <span className="settings-model-option-copy">
@@ -144,7 +167,6 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                             </span>
                           ) : null}
                         </span>
-                        <span className="settings-model-option-id">{option.canonicalId}</span>
                       </span>
                       {option.cost ? (
                         <span className="settings-model-option-cost">
@@ -161,9 +183,9 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         )}
       </Popover>
       {invalidSelection ? (
-        <small className="settings-model-cascade-invalid" data-testid="settings-agent-model-invalid">
-          {providerUnavailable ? t('settings.routeReasonProviderUnavailable') : `${t('settings.routeReasonModelInvalid')}: ${value}`}
-        </small>
+        <p className="settings-model-cascade-invalid" data-testid="settings-agent-model-invalid" role="status">
+          {providerUnavailable ? t('settings.routeReasonProviderUnavailable') : t('settings.routeReasonModelInvalid')}
+        </p>
       ) : null}
     </div>
   );

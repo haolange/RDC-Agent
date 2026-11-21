@@ -12,6 +12,7 @@ import { projectSessionForClient } from '../sessions/store/projectSessionHandoff
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { applyProductIcon } from '../window/productIcon';
+import { applyWindowBackgrounds } from '../window/appearanceChrome';
 import { sessionResumeService } from '../sessions/store/SessionResumeService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import { registerMemoryHandlers } from './memoryHandlers';
@@ -20,6 +21,7 @@ import { registerKnowledgeHandlers } from './knowledgeHandlers';
 import { registerCaptureDeviceHandlers } from './captureDeviceHandlers';
 import { registerCommandHandlers } from './commandHandlers';
 import { registerConversationHandlers } from './conversationHandlers';
+import { registerConversationMediaHandlers } from './conversationMediaHandlers';
 import { registerPlanHandlers } from './planHandlers';
 import { registerProjectSessionHandlers } from './projectSessionHandlers';
 import { registerRuntimePermissionHandlers } from './runtimePermissionHandlers';
@@ -252,6 +254,7 @@ function registerNativeThemeBridge(): void {
   nativeTheme.on('updated', () => {
     broadcastToRenderer('app:themeChanged', nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
     applyProductIcon();
+    applyWindowBackgrounds();
   });
   nativeThemeSubscribed = true;
 }
@@ -263,6 +266,7 @@ export function registerIPCHandlers(): void {
   registerShellHandlers();
   registerWebHandlers();
   registerConversationHandlers(context);
+  registerConversationMediaHandlers(context);
   registerPlanHandlers(context);
   registerWorkflowHandlers(context);
   registerProjectSessionHandlers(context);

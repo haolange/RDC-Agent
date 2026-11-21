@@ -101,10 +101,8 @@ it('updates an already mounted historical tool without losing disclosure or focu
   try {
     await switchTo('zh-CN');
     await act(async () => root.render(createElement(WorkProcess, { trace, sessionId: 'language-test', messageId: 'history' })));
-    // A settled Working is folded: open it, then the step's action list, to reach the historical tool card.
+    // A settled Working is folded: open it to reach the historical tool card; its steps are laid out flat.
     await act(async () => { host.querySelector<HTMLButtonElement>('.work-process-header')!.click(); });
-    const sectionToggle = host.querySelector<HTMLButtonElement>('.work-process-section-toggle[aria-expanded="false"]');
-    if (sectionToggle) await act(async () => { sectionToggle.click(); });
     const trigger = host.querySelector<HTMLButtonElement>('.work-card-trigger')!;
     expect(trigger.textContent).toContain('已读取产物');
     await act(async () => { trigger.focus(); trigger.click(); });
@@ -130,7 +128,8 @@ it('localizes builtin command descriptions without replacing custom descriptions
   const localized = localizeCommands(commands, translator('zh-CN'));
   expect(localized[0].description).toBe('列出可用命令或查看命令详情');
   expect(localized[0].name).toBe('help');
-  expect(localized[1]).toEqual(commands[1]);
+  expect(localized[1]).toEqual({ ...commands[1], categoryLabel: 'custom' });
+  expect(localized[0]).toMatchObject({ category: 'system', categoryLabel: '系统' });
   expect(commands[0].description).toBe('original');
 });
 

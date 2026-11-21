@@ -16,14 +16,6 @@
   padding: var(--space-1) var(--space-1) var(--space-3);
 }
 
-.right-rail-task-progress-label {
-  flex: 0 0 auto;
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
-  font-variant-numeric: tabular-nums;
-}
-
 .right-rail-task-progress-track {
   position: relative;
   flex: 1 1 auto;
@@ -51,20 +43,20 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font: inherit;
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   cursor: pointer;
 }
 
-.right-rail-task-fold:hover { color: var(--token-text-heading); background: var(--token-interactive-hover); }
-.right-rail-task-fold:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 0; }
+.right-rail-task-fold:hover { color: var(--token-text-primary); background: var(--token-interactive-hover); }
+.right-rail-task-fold:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
 
 .right-rail-section .right-rail-tasks { gap: var(--space-0-5); }
 
 .right-rail-task-row > button {
   display: grid;
-  grid-template-columns: var(--space-3) calc(var(--space-3) + var(--space-0-5)) minmax(0, 1fr);
+  grid-template-columns: calc(var(--space-3) + var(--space-0-5)) minmax(0, 1fr);
   align-items: start;
   column-gap: var(--space-2);
   width: 100%;
@@ -74,7 +66,7 @@
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -82,24 +74,10 @@
 }
 
 .right-rail-task-row > button:hover { background: var(--token-interactive-hover); }
-.right-rail-task-row > button:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: -2px; }
-
-.right-rail-task-order {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-item-line);
-  font-variant-numeric: tabular-nums;
-}
+.right-rail-task-row > button:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
 
 .right-rail-task-row .task-status-marker {
-  margin-top: calc((var(--type-item-line) - var(--space-3) - var(--space-0-5)) / 2);
-}
-
-.right-rail-task-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+  margin-top: calc((var(--type-body-line) - var(--space-3) - var(--space-0-5)) / 2);
 }
 
 /* Two lines of title: enough to tell tasks apart without truncating them to a fragment. */
@@ -108,30 +86,24 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  color: var(--token-text-body);
-  font-size: var(--type-item-size);
-  line-height: var(--type-item-line);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
   overflow-wrap: anywhere;
 }
 
-.right-rail-task-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
 .right-rail-task-row.status-in_progress .right-rail-task-title,
-.right-rail-task-row.status-failed .right-rail-task-title { color: var(--token-text-heading); font-weight: var(--font-medium); }
+.right-rail-task-row.status-failed .right-rail-task-title { color: var(--token-text-primary); font-weight: var(--font-normal); }
 /* Finished work stays readable; only cancelled work recedes and is struck through. */
 .right-rail-task-row.status-cancelled .right-rail-task-title {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--token-text-caption) 60%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--token-text-secondary) 60%, transparent);
 }
 
 .right-rail-section-meta {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-normal);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

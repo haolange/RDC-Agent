@@ -40,10 +40,13 @@ it('pages beyond fifty, opens nested preview, copies full ID and closes only the
   expect(data.list.mock.calls[1][0].cursor.artifactId).toBe('artifact-49');
   await click(list.querySelector('.right-rail-compact-row'));
   const preview = document.querySelector('[data-testid="investigation-preview"]')!;
-  expect(preview.textContent).toContain('Expected hash differs');
-  await click(named(preview,'control.rightRail.artifacts.copyId'));
+  const integrity = preview.querySelector('[data-testid="investigation-preview-integrity"]')!;
+  expect(integrity.textContent).toContain('control.rightRail.artifacts.preview.integrity.hashMismatch');
+  expect(integrity.textContent).toContain('Expected hash differs');
+  const copyId = preview.querySelector('button[aria-label="control.rightRail.artifacts.copyId"]');
+  await click(copyId);
   expect(data.copy).toHaveBeenCalledWith('artifact-0');
-  expect(preview.textContent).toContain('control.rightRail.browse.copy.copied');
+  expect(copyId?.getAttribute('data-copied')).toBe('true');
   await act(async () => document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})));
   expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
   expect(document.querySelector('[data-testid="investigation-list"]')).toBe(list);
@@ -93,7 +96,8 @@ it('reports ID clipboard failure inside preview without reporting success', asyn
   await act(async()=>root.render(createElement(RightRailArtifactList,{artifacts:{rows:[row(0)],totalCount:1,storeDegraded:false}})));
   await click(host.querySelector('.right-rail-compact-row'));
   const preview=document.querySelector('[data-testid="investigation-preview"]')!;
-  await click(named(preview,'control.rightRail.artifacts.copyId'));
-  expect(preview.textContent).toContain('control.rightRail.browse.copy.failed');
-  expect(preview.textContent).not.toContain('control.rightRail.browse.copy.copied');
+  const copyId = preview.querySelector('button[aria-label="control.rightRail.artifacts.copyId"]');
+  await click(copyId);
+  expect(data.copy).toHaveBeenCalledWith('artifact-0');
+  expect(copyId?.getAttribute('data-copied')).toBe('false');
 });

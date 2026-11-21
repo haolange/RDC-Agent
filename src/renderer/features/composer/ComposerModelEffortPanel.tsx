@@ -1,9 +1,11 @@
 import React from 'react';
+import { EFFORT_LABEL_KEYS } from '../../lib/reasoningLabels';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
+import { Chevron } from '../../ui/Chevron';
 import { Switch } from '../../ui/Switch';
-import { EFFORT_LABEL_KEYS, EffortModeIconButton, getStopPosition } from './effortControlParts';
+import { EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import { EffortMaxField } from './EffortMaxField';
 import type { MaxVisualTimeline } from './maxVisual';
@@ -149,11 +151,11 @@ export const ComposerModelEffortPanel: React.FC<{
             className="composer-model-effort-model"
             data-testid="composer-model-effort-open-picker"
             aria-label={t('composer.model.openPicker')}
-            title={modelLabel}
+            data-tooltip={modelLabel}
             onClick={onOpenModels}
           >
             <span>{modelLabel}</span>
-            <Icon name="chevron-right" size={12} />
+            <Chevron size={12} />
           </button>
           {capabilityStateDetail ? (
             <Button variant="ghost" size="sm" onClick={onRetryCapability}>
@@ -180,11 +182,8 @@ export const ComposerModelEffortPanel: React.FC<{
       </div>
 
       {onLevel ? (
-        <div className="composer-effort-switch-row">
-          <span className="composer-effort-switch-copy">
-            <span className="composer-effort-switch-title">{t('composer.effort.thinkingSwitch')}</span>
-            <span className="composer-effort-switch-hint">{t('composer.effort.thinkingSwitchHint')}</span>
-          </span>
+        <div className="composer-effort-switch-row" data-tooltip={t('composer.effort.thinkingSwitchHint')}>
+          <span className="composer-effort-switch-title">{t('composer.effort.thinkingSwitch')}</span>
           <Switch data-testid="composer-effort-switch" aria-label={t('composer.effort.thinkingSwitch')}
             checked={displayLevel !== 'off'} onCheckedChange={(on) => onSelectLevel(on ? onLevel : 'off')} />
         </div>

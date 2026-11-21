@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { agentDescription } from '../../lib/agentDescription';
 import { InlineError } from '../../ui/InlineError';
-import { Button } from '../../ui/Button';
+import { Spinner } from '../../ui/Spinner';
+import { ProximityGlow } from '../../ui/ProximityHost';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -71,7 +72,7 @@ export const Composer: React.FC<ComposerProps> = ({
     promptValue,
     setPromptValue,
     pendingAttachments,
-    pendingSkillIds,
+    pendingSkills,
     removePendingSkill,
     promptInputRef,
     currentMode,
@@ -132,13 +133,15 @@ export const Composer: React.FC<ComposerProps> = ({
       ? `${composerScopeKey}:${planReviewRequestKey(pendingRequest.request)}` : composerScopeKey}>
     {pendingRequest ? <ComposerPendingRequest shellRef={shellRef} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
       agentId={pendingRequest.kind === 'plan-review' ? selectedAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onReplan={composer.sendExplicitPrompt} /> : <div
-      ref={shellRef} className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
+      ref={shellRef} className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}`}
       {...composeAccentStyle}
       onDragOver={attachmentDrop.handleDragOver}
       onDragLeave={attachmentDrop.handleDragLeave}
       onDrop={attachmentDrop.handleDrop}
       onPaste={attachmentDrop.handlePaste}
+      data-proximity
     >
+      <ProximityGlow />
       <ApprovedPlanHandoff sessionId={currentSession?.sessionId} disabled={isComposerBusy} />
       <ComposerAttachIngest
         fileInputRef={fileInputRef}
@@ -155,24 +158,30 @@ export const Composer: React.FC<ComposerProps> = ({
       ) : null}
       <ComposerAttachmentTray
         onMaterialChange={(id, material) => composer.setPendingAttachments(current => current.map(item => item.id === id ? { ...item, material } : item))}
-        pendingSkillIds={pendingSkillIds}
+        pendingSkills={pendingSkills}
         pendingAttachments={pendingAttachments}
         composerScopeKey={composerScopeKey}
         visionUnsupported={!visionSupported}
         removePendingSkill={removePendingSkill}
         handlePendingAttachmentRemove={handlePendingAttachmentRemove}
         armedSkillMeta={t('app.armedSkillMeta')}
-        removeArmedSkillLabel={(skillId) => t('app.removeArmedSkill', { skillId })}
+        removeArmedSkillLabel={(skill) => t('app.removeArmedSkill', { skill })}
         removeAttachmentLabel={(fileName) => t('app.removeAttachment', { fileName })}
         visionUnsupportedLabel={t('app.attachVisionUnsupported')}
       />
-      {composer.handoff?.error ? <InlineError>
-        {composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? t('app.handoffUnconfirmed') : composer.handoff.error}
-        <Button variant="ghost" size="sm" onClick={() => void composer.handoff.retry()}>
-          {t(composer.handoff.checking ? 'app.handoffCheckDelivery' : 'app.handoffRetry')}
-        </Button>
-      </InlineError> : null}
-      {composer.handoff?.phase || (isComposerBusy && conversationPreparationPhase === 'preparing') ? <p className="composer-transition-status" role="status">{t(conversationPreparationPhase === 'preparing' || composer.handoff?.phase === 'preparing' ? 'composer.handoff.preparing' : composer.handoff?.phase === 'confirming' ? 'composer.handoff.confirming' : 'composer.handoff.switching')}</p> : null}
+      {composer.handoff?.error ? (
+        <InlineError detail={composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? undefined : composer.handoff.error}
+          onRetry={() => void composer.handoff.retry()}
+          retryLabel={t(composer.handoff.checking ? 'app.handoffCheckDelivery' : 'app.handoffRetry')}>
+          {t(composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? 'app.handoffUnconfirmed' : 'app.handoffFailed')}
+        </InlineError>
+      ) : null}
+      {composer.handoff?.phase || (isComposerBusy && conversationPreparationPhase === 'preparing') ? (
+        <p className="composer-transition-status" role="status">
+          <Spinner size="sm" />
+          {t(conversationPreparationPhase === 'preparing' || composer.handoff?.phase === 'preparing' ? 'composer.handoff.preparing' : composer.handoff?.phase === 'confirming' ? 'composer.handoff.confirming' : 'composer.handoff.switching')}
+        </p>
+      ) : null}
       <ComposerEditor
         promptValue={promptValue}
         setPromptValue={setPromptValue}

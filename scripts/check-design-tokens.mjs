@@ -65,8 +65,8 @@ const RULES = [
   },
   {
     id: 'font-size-role',
-    pattern: /font-size:(?!\s*(?:var\(--type-[a-z]+-size\)|var\(--[a-z-]+-font-size\)|inherit\b|100%|(?:0?\.9\d*|1(?:\.\d+)?)em\b))/,
-    message: 'font-size must use a typography role var(--type-*-size); readable text never shrinks below caption',
+    pattern: /font-size:(?!\s*(?:var\(--type-(?:title|reading|body|meta)-size\)|var\(--[a-z-]+-font-size\)|inherit\b|100%|(?:0?\.9\d*|1(?:\.\d+)?)em\b))/,
+    message: 'font-size must use one of the four typography roles var(--type-title|reading|body|meta-size); mono text may compensate optically in em',
   },
   {
     id: 'raw-type-scale',

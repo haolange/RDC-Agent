@@ -6,11 +6,12 @@ import { OverflowFade } from '../../ui/OverflowFade';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useOverlayDismiss } from '../../lib/overlayStack';
+import { Chevron } from '../../ui/Chevron';
+import { EFFORT_LABEL_KEYS } from '../../lib/reasoningLabels';
 import { useComposerMenu } from './useComposerMenuRegistry';
-import { EFFORT_LABEL_KEYS } from './effortControlParts';
 import { useComposerTurnControls } from './ComposerTurnControlsContext';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
-import { buildModelEffortCapsulePresentation, ChevronIcon } from './effortControlParts';
+import { buildModelEffortCapsulePresentation } from './effortControlParts';
 import { useComposerEffortControl } from './useComposerEffortControl';
 import { ComposerModelEffortPanel } from './ComposerModelEffortPanel';
 import { ComposerModelPickerPanel } from './ComposerModelPickerPanel';
@@ -122,7 +123,7 @@ export const ComposerModelEffortControl: React.FC<{
         data-testid="composer-model-effort-pill"
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={title}
+        data-tooltip={title}
         aria-label={title}
         disabled={disabled || saveState.saving || controlsState.saveState.saving}
         onClick={() => menu.toggle()}
@@ -138,8 +139,8 @@ export const ComposerModelEffortControl: React.FC<{
           </span>
         ) : null}
         <OverflowFade className="composer-model-effort-pill-model" text={capsule.modelLabel} />
-        {showReasoningLevel ? <span className="composer-model-effort-pill-level" title={capsule.reasoningLabel}>{displayedEffort}</span> : null}
-        <span className="composer-model-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
+        {showReasoningLevel ? <span className="composer-model-effort-pill-level" data-tooltip={capsule.reasoningLabel}>{displayedEffort}</span> : null}
+        <span className="composer-model-effort-pill-caret" aria-hidden="true"><Chevron direction="down" size={12} /></span>
       </Pill>
 
       {open && activeView === 'effort' ? (

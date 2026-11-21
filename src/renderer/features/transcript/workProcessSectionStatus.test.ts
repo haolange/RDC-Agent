@@ -8,10 +8,6 @@ import { WorkProcessContent } from './WorkProcessContent';
 import { PlanReaderHost } from './PlanReaderHost';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import type { ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
-vi.mock('./WorkProcessExpansion', async (importOriginal) => ({
-  ...await importOriginal<typeof import('./WorkProcessExpansion')>(),
-  useWorkProcessExpansion: () => ({ preference: 'all', active: false }),
-}));
 
 const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 

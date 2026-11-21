@@ -12,7 +12,7 @@ vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { done: number; total: number }) => values ? `${key}:${values.done}/${values.total}` : key, language: 'en' }) }));
 
 describe('session rail projection composition', () => {
-  it('keeps task numbers independent of state and hides reasons from the compact list', () => {
+  it('keeps one status marker per task and hides reasons from the compact list', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const host = document.createElement('div'); const root = createRoot(host);
     try {
@@ -27,7 +27,7 @@ describe('session rail projection composition', () => {
       expect(host.textContent).not.toContain('control.rightRail.tasks.reason.parentTurnStopped');
       expect(host.textContent).not.toContain('control.rightRail.tasks.reason.createdTurnStopped');
       expect(host.textContent).not.toContain('等待用户确认');
-      expect([...host.querySelectorAll('.right-rail-task-order')].map(el => el.textContent)).toEqual(['1','2','3']);
+      expect([...host.querySelectorAll('.right-rail-task-title')].map(el => el.textContent)).toEqual(['Started', 'Pending', 'Custom']);
       expect(host.querySelectorAll('.right-rail-task-row .task-status-marker')).toHaveLength(3);
       expect(zhControl['control.rightRail.tasks.reason.parentTurnStopped']).toBe('主回合停止，所属执行已结束。');
       expect(zhControl['control.rightRail.tasks.reason.createdTurnStopped']).toBe('创建此任务的回合已停止，任务尚未开始。');
@@ -53,7 +53,7 @@ describe('session rail projection composition', () => {
       expect(progress.textContent).toContain('Complete title retained');
       const title = progress.querySelector<HTMLElement>('.right-rail-task-title')!;
       expect(title.textContent).toBe('Complete title retained');
-      expect(title.closest('button')?.title).toContain('Complete title retained');
+      expect(title.closest('button')?.dataset.tooltip).toContain('Complete title retained');
       expect(progress.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('1');
       state.tracePresentation = null;
       act(() => root.render(createElement(SessionRightRail)));
@@ -90,8 +90,8 @@ describe('session rail projection composition', () => {
         }
         if (id === 'artifacts') expect(host.textContent).toContain('control.rightRail.artifacts.storeDegraded');
         if (id === 'outputs') {
-          const missing = [...host.querySelectorAll('button')].find((button) => button.textContent === 'control.rightRail.outputs.missing');
-          expect(missing?.disabled).toBe(true);
+          expect(host.querySelector('.right-rail-output-missing')?.textContent).toBe('control.rightRail.outputs.missing');
+          expect([...host.querySelectorAll('button')].some((button) => button.textContent === 'control.rightRail.outputs.open')).toBe(false);
         }
         if (id === 'context') expect(host.textContent).toContain('A loaded skill');
       });

@@ -39,7 +39,7 @@
   width: 14px;
   height: 14px;
   border-radius: var(--radius-full);
-  background: var(--token-text-body);
+  background: var(--token-text-secondary);
   box-shadow: var(--token-shadow-card);
   transition:
     transform var(--transition-fast),
@@ -75,16 +75,11 @@
 
 .ui-switch-label {
   min-width: 0;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   line-height: 1.35;
 }
 
-/* Respect pointer-cursor preference */
-html:not([data-pointer-cursors='true']) .ui-switch {
-  cursor: default;
-}
-
-html[data-pointer-cursors='true'] .ui-switch:not(:has(.ui-switch-input:disabled)) {
+.ui-switch:not(:has(.ui-switch-input:disabled)) {
   cursor: pointer;
 }

@@ -48,9 +48,10 @@ it('navigates actual device states, starts preparation on selection and returns 
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     await act(async () => trigger.click());
     const options = document.querySelectorAll<HTMLButtonElement>('[role="option"]');
-    expect(options[2].textContent).toBe('A'.repeat(500) + 'b54ed446' + 'device.discovery.available');
-    expect(options[2].querySelector('.device-option-serial')?.textContent).toBe('b54ed446');
-    expect(options[2].title).toContain('b54ed446');
+    expect(options[2].textContent).toBe('A'.repeat(500) + 'device.discovery.available');
+    expect(options[2].querySelector('.device-option-serial')).toBeNull();
+    expect(options[2].getAttribute('data-tooltip')).toContain('b54ed446');
+    expect(options[2].dataset.tooltip).toContain('b54ed446');
     expect(document.querySelector('.device-discovery-status')).toBeNull();
     expect(options[1].disabled).toBe(true); expect(document.activeElement).toBe(options[0]);
     await act(async () => options[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
@@ -83,11 +84,11 @@ it.each(['unauthorized', 'offline', 'missing'] as const)('keeps %s explicit with
     await act(async () => root.render(createElement(DeviceSelector)));
     await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
     const option = document.querySelectorAll<HTMLButtonElement>('[role="option"]')[2];
-    expect(option.textContent).toBe('A'.repeat(500) + 'b54ed446' + (adbState === 'unauthorized' ? 'device.status.unauthorized' : 'device.status.offline'));
+    expect(option.textContent).toBe('A'.repeat(500) + (adbState === 'unauthorized' ? 'device.status.unauthorized' : 'device.status.offline'));
     expect(option.querySelector('.device-option-status')?.classList.contains('is-error')).toBe(true);
     expect(option.disabled).toBe(true);
-    expect(option.querySelector('.device-option-serial')?.textContent).toBe('b54ed446');
-    expect(option.title).toContain('b54ed446');
+    expect(option.getAttribute('data-tooltip')).toContain('b54ed446');
+    expect(option.dataset.tooltip).toContain('b54ed446');
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 

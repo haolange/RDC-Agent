@@ -29,12 +29,12 @@ function ScopedCaptureWorkspace({ scope, state, disabled, receive }: CaptureWork
   const ownership = lock === 'agent_running' || lock === 'delegated_execution' ? 'control.replay.controlAgent'
     : lock ? 'control.replay.controlLocked' : live ? 'control.replay.controlHuman' : 'control.replay.controlClosed';
   return <div className="capture-replay-content" aria-label={t('control.replay.workspace')}>
-    <div className="capture-workspace-toolbar" role="status" title={lock ? t(lockReason) : undefined}>
+    <div className="capture-workspace-toolbar" role="status" data-tooltip={lock ? t(lockReason) : undefined}>
       <span className={`capture-workspace-owner${lock ? ' is-locked' : ''}`}>{t(ownership)}</span>
-      {live && state?.imageEventId != null && <span className="capture-workspace-eid">EID {state.imageEventId}</span>}
+      {live && state?.imageEventId != null && <span className="capture-workspace-eid">{t('control.replay.eventNumber', { id: state.imageEventId })}</span>}
     </div>
     <div className="capture-replay-image" aria-busy={busy}>
-      {preview.url ? <img src={preview.url} alt={`EID ${state?.imageEventId ?? '—'}`} />
+      {preview.url ? <img src={preview.url} alt={state?.imageEventId != null ? t('control.replay.eventNumber', { id: state.imageEventId }) : t('control.replay.event')} />
         : <span>{preview.error ? t('control.replay.imageReadFailed') : busy ? t(phaseBusy && state ? `control.replay.${state.phase}` : 'control.replay.imageLoading') : t(live ? 'control.replay.noOutput' : 'control.replay.noImage')}</span>}
       {preview.url && busy && <span className="capture-image-state">{t('control.replay.imageLoading')}</span>}
     </div>

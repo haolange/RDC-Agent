@@ -35,6 +35,18 @@ it('preserves structured preview references after offloading a large image resul
   expect(result.details).toMatchObject({ artifactized: true, imagePreviews });
 });
 
+it('keeps the human gist of an offloaded result so the card can still name the page it read', () => {
+  const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'display-offload-')); roots.push(sessionPath);
+  fs.writeFileSync(path.join(sessionPath, 'session.json'), '{}');
+  const details = { kind: 'fetch', url: 'https://platform.claude.com/docs/en/models/overview', title: 'Models overview', status: 200, bytes: 19_000 };
+  const result = artifactizeToolResult({ sessionId: 'sess-1', toolCallId: 'fetch', toolName: 'web_fetch',
+    resolver: resolverFor(sessionPath), thresholdBytes: 1,
+    result: { content: [{ type: 'text', text: 'page text' }], details } });
+  expect(result.details).toMatchObject({ artifactized: true,
+    display: { kind: 'fetch', url: details.url, title: 'Models overview', status: 200 } });
+  expect(JSON.stringify((result.details as { display: unknown }).display)).not.toContain('bytes');
+});
+
 function pngWithTextBytes(count: number): Buffer {
   const png = Buffer.from(
     '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',

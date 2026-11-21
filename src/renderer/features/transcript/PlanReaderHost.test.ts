@@ -6,8 +6,14 @@ import { PlanReaderHost, usePlanReader } from './PlanReaderHost';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: { getState: () => ({ currentSession: { sessionId: 's' } }) } }));
-vi.mock('./PlanReviewPanel', () => ({ PlanReviewPanel: ({ onClose }: { onClose: () => void }) =>
-  createElement('button', { onClick: onClose, 'data-reader': true }, 'Close') }));
+// The reader stays mounted while it closes and reports when it has left, as ReadingSheet does.
+vi.mock('./PlanReviewPanel', async () => {
+  const { useEffect } = await vi.importActual<typeof import('react')>('react');
+  return { PlanReviewPanel: ({ open, onClose, onExited }: { open: boolean; onClose: () => void; onExited: () => void }) => {
+    useEffect(() => { if (!open) onExited(); }, [open, onExited]);
+    return open ? createElement('button', { onClick: onClose, 'data-reader': true }, 'Close') : null;
+  } };
+});
 
 it('keeps the reader open across transcript remounts and restores the new trigger', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

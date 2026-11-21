@@ -40,7 +40,7 @@ const ContextBarSegment: React.FC<{
     <span
       className="context-breakdown-bar-segment"
       data-segment={id}
-      title={title}
+      data-tooltip={title}
       {...dynStyle}
     />
   );
@@ -58,10 +58,10 @@ interface ContextBreakdownContentProps {
 }
 
 /** Context usage in the shared reading sheet: same area, size and single scroller as the plan reader. */
-export const ContextBreakdownSheet: React.FC<ContextBreakdownContentProps & { onClose: () => void }> = ({ onClose, ...content }) => {
+export const ContextBreakdownSheet: React.FC<ContextBreakdownContentProps & { open: boolean; onClose: () => void }> = ({ open, onClose, ...content }) => {
   const { t } = useI18n();
   return (
-    <ReadingSheet title={t('contextBreakdown.title')} closeLabel={t('contextBreakdown.close')} onClose={onClose}
+    <ReadingSheet open={open} title={t('contextBreakdown.title')} closeLabel={t('contextBreakdown.close')} onClose={onClose}
       className="context-breakdown" dataTestId="context-breakdown">
       <ContextBreakdownContent {...content} />
     </ReadingSheet>
@@ -160,26 +160,17 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
 
   return (
     <div className="context-breakdown-content">
+        {/* One big number and one sentence; token counts, cache, reasoning and cost live under 详细用量. */}
         <div className="context-breakdown-hero">
-          <div className="context-breakdown-hero-row">
-            <div className="context-breakdown-hero-usage">
-              <span className="context-breakdown-pct-large">
-                {typeof displayUsagePercent === 'number'
-                  ? `${showEstimated ? '~' : ''}${displayUsagePercent}%`
-                  : METER_UNAVAILABLE}
-              </span>
-              <span className="context-breakdown-summary-caption">{summaryCaption}</span>
-            </div>
-            <span className="context-breakdown-hero-tokens">
-              {formatKnownTokens(occupiedTokens, showPrepared || showEstimated)} / {formatKnownTokens(windowTokens)}{' '}
-              {t('contextBreakdown.tokensLabel')}
+          <div className="context-breakdown-hero-usage"
+            data-tooltip={showEstimated ? t('contextBreakdown.projectedNote') : stale ? t('contextBreakdown.staleNote') : undefined}>
+            <span className="context-breakdown-pct-large">
+              {typeof displayUsagePercent === 'number'
+                ? `${showEstimated ? '~' : ''}${displayUsagePercent}%`
+                : METER_UNAVAILABLE}
             </span>
+            <span className="context-breakdown-summary-caption">{summaryCaption}</span>
           </div>
-          {budgetNoteParts.length > 0 ? (
-            <p className="context-breakdown-window-note" data-testid="context-breakdown-window-note">
-              {budgetNoteParts.join(' · ')}
-            </p>
-          ) : null}
           <div className="context-breakdown-bar" aria-hidden="true">
             {barEntries.map((entry) => (
               <ContextBarSegment
@@ -198,6 +189,24 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
             ) : null}
           </div>
         </div>
+        <Disclosure
+          className="context-breakdown-disclosure"
+          triggerClassName="context-breakdown-details-toggle"
+          bodyClassName="context-breakdown-details"
+          open={detailsExpanded}
+          onOpenChange={onDetailsExpandedChange}
+          triggerLabel={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
+          summary={t('contextBreakdown.detailsLabel')}
+        >
+        <p className="context-breakdown-hero-tokens">
+          {formatKnownTokens(occupiedTokens, showPrepared || showEstimated)} / {formatKnownTokens(windowTokens)}{' '}
+          {t('contextBreakdown.tokensLabel')}
+        </p>
+        {budgetNoteParts.length > 0 ? (
+          <p className="context-breakdown-window-note" data-testid="context-breakdown-window-note">
+            {budgetNoteParts.join(' · ')}
+          </p>
+        ) : null}
         <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared && !awaitingWindow ? prepared : null} estimated={showEstimated} />
         {showUsage && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
           <div className="context-breakdown-cost-card" data-testid="context-breakdown-cost">
@@ -222,25 +231,8 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
             </div>
           </div>
         ) : null}
-        <Disclosure
-          className="context-breakdown-disclosure"
-          triggerClassName="context-breakdown-details-toggle"
-          bodyClassName="context-breakdown-details"
-          open={detailsExpanded}
-          onOpenChange={onDetailsExpandedChange}
-          triggerLabel={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
-          summary={t('contextBreakdown.detailsLabel')}
-        >
           <ContextBreakdownLegend entries={breakdown} unavailable={!hasAuthoritativeBreakdown} />
         </Disclosure>
-
-        {showEstimated ? (
-          <p className="context-breakdown-footer" data-testid="context-breakdown-projected-note">
-            {t('contextBreakdown.projectedNote')}
-          </p>
-        ) : stale ? (
-          <p className="context-breakdown-footer">{t('contextBreakdown.staleNote')}</p>
-        ) : null}
     </div>
   );
 };

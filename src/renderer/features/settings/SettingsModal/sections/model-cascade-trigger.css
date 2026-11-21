@@ -14,7 +14,7 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--settings-subtle-bg);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   text-align: start;
   cursor: pointer;
 }
@@ -25,7 +25,7 @@
 
 .settings-model-cascade-trigger:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 1px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .settings-model-cascade-trigger[aria-invalid='true'] {
@@ -41,14 +41,14 @@
 
 .settings-model-cascade-trigger .ui-icon {
   flex: none;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-model-cascade-invalid {
   display: block;
-  margin-top: var(--space-2);
+  margin: var(--space-2) 0 0;
   color: var(--token-status-error);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 
@@ -61,12 +61,11 @@
 }
 
 .settings-model-cascade-trigger strong {
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .settings-model-cascade-trigger span {
-  color: var(--token-text-caption);
-  font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }

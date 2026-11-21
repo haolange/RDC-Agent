@@ -2,6 +2,7 @@ import React, { useRef, useState, type KeyboardEvent } from 'react';
 import { AGENT_ICON_PRESETS } from '@shared/constants/agents';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Popover } from '../../../../ui/Popover';
 import type { ModeIconKey } from '@shared/types/layout';
@@ -52,7 +53,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
         <Button variant="secondary" className="settings-agent-icon-trigger" aria-haspopup="menu">
           <ModeGlyph mode="general" icon={value} size={16} strokeWidth={1.9} />
           <span>{t('settings.changeAgentIcon')}</span>
-          <Icon name="chevron-down" size={14} />
+          <Chevron direction="down" />
         </Button>
       )}
     >
@@ -71,7 +72,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
             className={`settings-agent-icon-option${value === preset.id ? ' is-selected' : ''}`}
             role="menuitemradio"
             aria-checked={value === preset.id}
-            title={preset.label}
+            data-tooltip={preset.label}
             onClick={() => chooseIcon(preset.id)}
           >
             <ModeGlyph mode="general" icon={preset.id} size={18} strokeWidth={1.9} />

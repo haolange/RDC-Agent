@@ -44,8 +44,8 @@
 }
 
 .composer-model-effort-level {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
 }
 
@@ -59,8 +59,8 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   cursor: pointer;
 }
@@ -78,8 +78,8 @@
 }
 
 .composer-model-effort-refreshing {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .composer-model-effort-mode .ui-icon {
@@ -104,7 +104,7 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   cursor: pointer;
 }
 
@@ -134,7 +134,7 @@
 
 .composer-model-effort-mode:disabled:hover,
 .composer-model-effort-mode:disabled:focus-visible {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   background: transparent;
 }
 
@@ -149,8 +149,8 @@
   border-radius: var(--radius-full);
   background: var(--token-bg-raised);
   box-shadow: var(--token-shadow-raised);
-  color: var(--token-text-heading);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-meta-size);
   line-height: var(--leading-normal);
   opacity: 0;
   pointer-events: none;

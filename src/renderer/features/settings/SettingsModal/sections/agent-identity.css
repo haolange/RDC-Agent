@@ -43,23 +43,58 @@
 }
 
 .settings-agent-editor-name {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
-.settings-agent-editor-id {
-  color: var(--token-text-caption);
-  font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+.settings-agent-editor-description {
+  margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
-.settings-agent-editor-name {
+/* 已修改（基于内置）· 恢复: one quiet line, the two words are the actions. */
+.settings-agent-editor-override {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+
+.settings-agent-editor-override > * + *::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+  color: var(--token-text-secondary);
+}
+
+.settings-agent-editor-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  transition: color var(--transition-fast);
+}
+
+.settings-agent-editor-link:hover,
+.settings-agent-editor-link:focus-visible {
+  color: var(--token-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.settings-agent-editor-override[data-tone='warning'] > .settings-agent-editor-link:first-child {
+  color: var(--token-status-warning);
 }
 
 .settings-agent-flags {
@@ -95,7 +130,7 @@
 }
 
 .settings-agent-identity-grid .settings-field.is-row .settings-field-label {
-  padding-top: calc((var(--control-height-md) - var(--type-label-size) * 1.4) / 2);
+  padding-top: calc((var(--control-height-md) - var(--type-body-size) * 1.4) / 2);
 }
 
 .settings-agent-name-input {

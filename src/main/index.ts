@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
-import { app, BrowserWindow, dialog, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, session } from 'electron';
 import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
 import { installApplicationMenu } from './window/applicationMenu';
 import { nativeMessage } from './window/nativeI18n';
@@ -40,7 +40,8 @@ import {
   resolveWindowCreationOptions,
 } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
-import { isTrustedRendererUrl, trustRendererEntry } from './window/rendererTrust';
+import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
+import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './window/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 import { currentHost } from './platform/host';
@@ -163,6 +164,7 @@ function installRendererSecurityPolicy(): void {
     styleSrc,
     styleSrcAttr,
     "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
     "font-src 'self' data:",
     "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
     "object-src 'none'",
@@ -387,20 +389,23 @@ function createMainWindow(): void {
     frame: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    backgroundColor: '#08080c',
+    backgroundColor: windowBackgroundColor(settingsService.getAll().appearance),
   });
   bindProductIcon(mainWindow);
 
-  // Load the renderer.
+  // Load the renderer. The boot theme rides along so the first paint already uses the chosen light or dark palette.
+  const bootTheme = resolvedAppearanceMode(settingsService.getAll().appearance);
   if (isDev) {
     const rendererUrl = getDevRendererUrl();
     trustRendererEntry(rendererUrl);
-    mainWindow.loadURL(rendererUrl);
+    const entry = new URL(rendererUrl);
+    entry.searchParams.set('theme', bootTheme);
+    mainWindow.loadURL(entry.href);
   } else {
     // Production mode loads the bundled renderer.
     const rendererEntry = path.join(__dirname, '../renderer/index.html');
     trustRendererEntry(pathToFileURL(rendererEntry).href);
-    mainWindow.loadFile(rendererEntry);
+    mainWindow.loadFile(rendererEntry, { query: { theme: bootTheme } });
   }
 
   // Show after the window is ready.
@@ -436,11 +441,9 @@ function createMainWindow(): void {
     console.error('[RendererProcessGone]', details);
   });
 
-  // Open external links in the default browser.
+  // Links never open app windows: https pages open in the system browser and everything else is refused.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      shell.openExternal(url);
-    }
+    void openExternalHttps(url).catch((error: unknown) => console.warn('[window] external link refused', error));
     return { action: 'deny' };
   });
 

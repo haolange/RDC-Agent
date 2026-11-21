@@ -3,12 +3,12 @@
   width: 100%;
   height: calc(var(--control-height-sm) * 2);
   fill: none;
-  stroke: var(--token-text-placeholder);
+  stroke: var(--token-text-disabled);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .right-rail-empty-visual .rr-wireframe-emphasis {
-  stroke: var(--token-text-caption);
+  stroke: var(--token-text-secondary);
 }

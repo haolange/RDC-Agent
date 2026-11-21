@@ -14,8 +14,8 @@
 /* A reply whose stored work process came from an older version. */
 .conversation-message-trace-note {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .message-actions {
@@ -41,7 +41,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
@@ -49,12 +49,12 @@
 .message-action-btn:hover {
   border-color: var(--token-border-muted);
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .message-action-btn:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* Message footer tools */
@@ -64,7 +64,7 @@
   align-items: center;
   gap: var(--space-2);
   min-height: var(--space-6);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .conversation-message-user .conversation-message-footer {
@@ -78,8 +78,8 @@
 }
 
 .conversation-message-footer .conversation-message-time {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   letter-spacing: 0;
 }
 
@@ -94,8 +94,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .message-variant-nav-btn {
@@ -113,7 +113,7 @@
 }
 
 .message-variant-nav-btn:hover:not(:disabled) {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   background: color-mix(in srgb, var(--token-bg-muted) 70%, transparent);
 }
 
@@ -132,13 +132,13 @@
   width: calc(var(--space-6) + var(--space-1));
   height: calc(var(--space-6) + var(--space-1));
   border-radius: var(--radius-md);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .conversation-message-footer .message-action-btn:hover {
   border-color: var(--token-border-muted);
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .conversation-message-footer .message-action-btn[data-copied='true'] {
@@ -149,7 +149,7 @@
 .conversation-message-footer .conversation-message-status-tag {
   min-height: var(--space-5);
   padding: 0 var(--space-2);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   letter-spacing: 0;
   text-transform: none;
 }

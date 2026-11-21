@@ -6,71 +6,21 @@ import type {
   ConversationToolExecutionEvidence,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
+import type { IconName } from '../../ui/Icon';
 
 export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped' | 'cancelled';
 
-/** Per-builtin Work Process header glyph. Each catalog tool maps to a unique key. */
-export type WorkProcessIconKey =
-  | 'fileRead'
-  | 'artifactRead'
-  | 'fileWrite'
-  | 'fileEdit'
-  | 'fileDelete'
-  | 'fileMove'
-  | 'fileCopy'
-  | 'fileGlob'
-  | 'codeSearch'
-  | 'notebookEdit'
-  | 'webFetch'
-  | 'webSearch'
-  | 'terminal'
-  | 'gitStatus'
-  | 'gitDiff'
-  | 'gitLog'
-  | 'gitAdd'
-  | 'gitUnstage'
-  | 'gitCommit'
-  | 'question'
-  | 'toolSearch'
-  | 'handoff'
-  | 'planArtifact'
-  | 'outputPublish'
-  | 'memorySearch'
-  | 'memoryRead'
-  | 'memoryWrite'
-  | 'memoryDelete'
-  | 'skillsList'
-  | 'skillRead'
-  | 'plug'
-  | 'monitor'
-  | 'rdcProbe'
-  | 'brain'
-  | 'subagentReport'
-  | 'taskCreate'
-  | 'taskUpdate'
-  | 'taskGet'
-  | 'taskList'
-  | 'taskStop'
-  | 'turnComplete'
-  | 'backgroundQuery'
-  | 'backgroundWait'
-  | 'backgroundResult'
-  | 'backgroundMessage'
-  | 'backgroundCancel'
-  | 'backgroundJoin'
-  | 'imageRead'
-  | 'interpreter'
-  | 'knowledgeBrowse'
-  | 'knowledgeSearch'
-  | 'knowledgeRead'
-  | 'knowledgeCompile'
-  | 'knowledgeCandidate'
-  | 'investigationSchema'
-  | 'investigationRead'
-  | 'investigationWrite'
-  | 'investigationList'
-  | 'spark'
-  | 'tool';
+/** One web page as a pill: where it is, what it is called, and whether it loaded (and, for a search result, was read later). */
+export interface WorkProcessWebPage {
+  url?: string;
+  domain: string;
+  title?: string;
+  snippet?: string;
+  state: 'pending' | 'done' | 'failed';
+  /** A search result whose page a later read in the same turn opened. */
+  read?: boolean;
+}
+
 
 export type WorkProcessToolGroupKind =
   | 'explore'
@@ -123,7 +73,6 @@ export type WorkProcessRow =
     preview: string;
     label: string;
     kind?: ThinkingArtifact['kind'];
-    kindLabel?: string;
     visibility?: ThinkingArtifact['visibility'];
     thinkingStatus?: ConversationThinkingStatus;
     expandable: boolean;
@@ -155,7 +104,7 @@ export type WorkProcessRow =
     status: WorkProcessRowStatus;
     verb: string;
     category: string;
-    icon: WorkProcessIconKey;
+    icon: IconName;
     groupKind: WorkProcessToolGroupKind;
     /** Unified card family for body/detail templates. */
     family: WorkProcessToolFamily;
@@ -183,18 +132,26 @@ export type WorkProcessRow =
     diagnosticCaption?: string;
     hookDiagnostics?: import('@shared/types/conversation').ConversationToolCall['hookDiagnostics'];
     approval?: WorkProcessToolApproval;
-    sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
-    /** Single-page chip for web_fetch (distinct from search source pills). */
-    pageChip?: {
-      domain: string;
-      url: string;
-      pathLabel?: string;
-      title?: string;
-      status?: number;
-      bytes?: number;
-    };
+    /** Search results, or the one page a read targets; each renders as a pill (favicon + title). */
+    webPages?: WorkProcessWebPage[];
+    /** The query a search ran. */
+    webQuery?: string;
+    /** Technical facts of a read (path, HTTP status, bytes), shown only in the expanded detail. */
+    webMeta?: { path?: string; status?: number; bytes?: number };
+    /** Execution window in epoch ms, so grouped reads can show the whole span. */
+    startedAt?: number;
+    completedAt?: number;
     imagePreviews?: import('@shared/types/conversation').ConversationToolImagePreviewRef[];
     chips?: string[];
+  }
+  | {
+    /** Consecutive web reads shown as one card with one pill per page; each member keeps its own receipt. */
+    type: 'webGroup';
+    id: string;
+    status: WorkProcessRowStatus;
+    members: Extract<WorkProcessRow, { type: 'tool' }>[];
+    pages: WorkProcessWebPage[];
+    duration: string;
   }
   | {
     type: 'taskSnapshot';

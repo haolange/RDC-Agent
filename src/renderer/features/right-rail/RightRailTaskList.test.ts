@@ -14,7 +14,7 @@ const task = (index: number, status: TaskRailItem['status'], extra: Partial<Task
   order: index, createdAt: '2026-11-20T00:00:00Z', updatedAt: '2026-11-20T00:00:00Z', ...extra,
 });
 
-it('names delegated and background executions and folds finished work in long lists', async () => {
+it('names delegated and background executions on hover and folds finished work in long lists', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
@@ -29,8 +29,10 @@ it('names delegated and background executions and folds finished work in long li
     await act(async () => root.render(createElement(RightRailTaskList, { tasks, locateLabel: 'locate' })));
     const titles = () => [...host.querySelectorAll('.right-rail-task-title')].map((node) => node.textContent);
     expect(titles()).toEqual(['Task 3', 'Task 4', 'Task 5', 'Task 6']);
-    expect([...host.querySelectorAll('.right-rail-task-row')][0].textContent).toContain('control.rightRail.tasks.backgroundDebuggerqa-stub:4b');
-    expect([...host.querySelectorAll('.right-rail-task-row')][1].querySelector('.ui-badge')).toBeNull();
+    const hover = (index: number) => [...host.querySelectorAll('.right-rail-task-row > button')][index].getAttribute('data-tooltip');
+    expect(hover(0)).toBe('Task 3 · chat.workProcessTaskStatus.in_progress · control.rightRail.tasks.background · Debugger · qa-stub:4b');
+    expect(hover(1)).toBe('Task 4 · chat.workProcessTaskStatus.in_progress');
+    expect(host.querySelector('.right-rail-task-row')?.textContent).toBe('Task 3');
     expect(host.querySelector('.status-failed .task-status-marker')?.getAttribute('aria-label')).toBe('chat.workProcessTaskStatus.failed');
     await act(async () => host.querySelector<HTMLButtonElement>('.right-rail-task-fold')!.click());
     expect(titles()).toHaveLength(7);

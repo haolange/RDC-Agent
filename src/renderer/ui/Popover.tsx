@@ -16,6 +16,7 @@ import { cn } from '../lib/cn';
 import { placeAnchoredSurface } from '../lib/anchoredSurface';
 import { useDynStyle } from '../lib/useDynStyle';
 import { isTopOverlayLayer, useOverlayLayer } from '../lib/overlayStack';
+import { usePresence } from './usePresence';
 import './Popover.css';
 
 const VIEWPORT_MARGIN = 8;
@@ -56,6 +57,7 @@ export function Popover({
   // An open popover is the topmost dismissible layer, so Escape closes only it
   // and leaves the modal it was launched from open.
   const { layerId } = useOverlayLayer(open);
+  const presence = usePresence(open, contentRef);
   const [coords, setCoords] = useState({ left: VIEWPORT_MARGIN, top: VIEWPORT_MARGIN, ready: false });
   const positionStyle = useDynStyle({
     left: `${coords.left}px`,
@@ -73,13 +75,14 @@ export function Popover({
     setCoords({ left, top, ready: true });
   }, [align, side]);
 
+  // A closing popover keeps its place while the exit plays; it is measured afresh after it unmounts.
   useLayoutEffect(() => {
-    if (!open) {
+    if (!presence.mounted) {
       setCoords((current) => (current.ready ? { ...current, ready: false } : current));
       return;
     }
-    updatePosition();
-  }, [open, children, updatePosition]);
+    if (open) updatePosition();
+  }, [open, presence.mounted, children, updatePosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -142,12 +145,14 @@ export function Popover({
   return (
     <>
       {triggerNode}
-      {open && typeof document !== 'undefined'
+      {presence.mounted && typeof document !== 'undefined'
         ? createPortal(
           <div
             ref={contentRef}
             className={cn('ui-popover', className)}
             role={role}
+            data-side={side}
+            data-state={presence.state}
             data-ready={coords.ready ? 'true' : 'false'}
             {...positionStyle}
           >

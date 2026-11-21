@@ -1,15 +1,9 @@
-/** Shared focus, scrollbar, badge, and skeleton rules. */
-
-/* Focus states */
-.focus-ring:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgb(var(--color-bg-0)), 0 0 0 4px rgb(var(--color-accent-500) / 0.5);
-}
+/** Shared scrollbar and selection rules. */
 
 /* Scrollbar styling */
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgb(var(--color-bg-5)) transparent;
+  scrollbar-color: var(--token-border-strong) transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -22,89 +16,16 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgb(var(--color-bg-5));
+  background: var(--token-border-strong);
   border-radius: var(--radius-full);
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--color-text-muted));
+  background: var(--token-text-disabled);
 }
 
 /* Selection */
 ::selection {
-  background: rgb(var(--color-accent-500) / 0.3);
-  color: rgb(var(--color-text-primary));
-}
-
-/* ─── Shared Component Utilities ─── */
-
-/* Icon Button */
-.ui-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--control-height-sm);
-  height: var(--control-height-sm);
-  border: none;
-  border-radius: var(--control-radius);
-  background: transparent;
-  color: rgb(var(--color-text-secondary));
-  cursor: pointer;
-  transition: all var(--transition-fast) var(--ease-standard);
-  flex-shrink: 0;
-}
-
-.ui-icon-btn:hover {
-  background: rgb(var(--color-bg-3));
-  color: rgb(var(--color-text-primary));
-}
-
-.ui-icon-btn:active {
-  transform: scale(0.95);
-}
-
-.ui-icon-btn--sm {
-  width: 24px;
-  height: 24px;
-}
-
-.ui-icon-btn--lg {
-  width: 40px;
-  height: 40px;
-}
-
-/* Skeleton Loading */
-.ui-skeleton {
-  background: linear-gradient(
-    90deg,
-    rgb(var(--color-bg-3)) 25%,
-    rgb(var(--color-bg-2)) 50%,
-    rgb(var(--color-bg-3)) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer var(--animation-shimmer) var(--ease-standard) infinite;
-  border-radius: var(--radius-md);
-}
-
-.ui-skeleton--text {
-  height: 14px;
-  margin-bottom: 8px;
-}
-
-.ui-skeleton--text-sm {
-  height: 10px;
-  margin-bottom: 6px;
-}
-
-.ui-skeleton--circle {
-  border-radius: var(--radius-full);
-}
-
-.ui-skeleton--card {
-  height: 56px;
-  border-radius: var(--radius-card);
-}
-
-.ui-skeleton--card-stack {
-  margin-bottom: var(--space-2);
+  background: color-mix(in srgb, var(--token-accent-primary) 30%, transparent);
+  color: var(--token-text-primary);
 }

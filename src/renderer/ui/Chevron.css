@@ -1,0 +1,23 @@
+.ui-chevron {
+  transition: transform var(--motion-disclosure);
+}
+
+.ui-chevron.is-down {
+  transform: rotate(90deg);
+}
+
+.ui-chevron.is-up {
+  transform: rotate(-90deg);
+}
+
+.ui-chevron.is-left {
+  transform: rotate(180deg);
+}
+
+.ui-chevron.is-right.is-open {
+  transform: rotate(90deg);
+}
+
+.ui-chevron.is-down.is-open {
+  transform: rotate(-90deg);
+}

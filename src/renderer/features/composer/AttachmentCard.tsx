@@ -2,18 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { OverflowFade } from '../../ui/OverflowFade';
 import { Button } from '../../ui/Button';
 import { MaterialContextEditor } from '../../patterns/MaterialContextEditor';
-import { fileExtensionLabel, formatBytes } from '../../services/attachmentHelpers';
+import { formatBytes } from '../../lib/formatBytes';
 import { getAttachmentPreview } from '../../hooks/conversationPreview';
 import { useI18n } from '../../i18n';
+import { Icon, type IconName } from '../../ui/Icon';
 import { attachmentRejectKey } from './attachmentRejectCopy';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 import type { MaterialContext } from '@shared/types/materialContext';
 
-const LAYER_GLYPH: Record<PendingAttachmentDraft['layer'], string> = {
-  image: 'IMG',
-  text: 'TXT',
-  pdf: 'PDF',
-  binary: 'FILE',
+const LAYER_ICONS: Record<PendingAttachmentDraft['layer'], IconName> = {
+  image: 'image',
+  text: 'file-text',
+  pdf: 'file-text',
+  binary: 'file',
 };
 
 export const AttachmentCard: React.FC<{
@@ -33,7 +34,7 @@ export const AttachmentCard: React.FC<{
   onRemove,
   onMaterialChange,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [editing, setEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const failed = Boolean(attachment.error);
@@ -57,7 +58,7 @@ export const AttachmentCard: React.FC<{
     ? t(attachmentRejectKey(attachment.error.code))
     : warning
       ? visionUnsupportedLabel
-      : `${fileExtensionLabel(attachment.fileName)} · ${formatBytes(attachment.size)}`;
+      : attachment.size ? formatBytes(attachment.size, language) : '';
 
   return (
     <div
@@ -68,11 +69,11 @@ export const AttachmentCard: React.FC<{
         {previewUrl ? (
           <img src={previewUrl} alt="" className="composer-attachment-card-thumb" />
         ) : (
-          <span className="composer-attachment-card-glyph">{LAYER_GLYPH[attachment.layer]}</span>
+          <span className="composer-attachment-card-glyph"><Icon name={LAYER_ICONS[attachment.layer]} size={20} /></span>
         )}
       </div>
       <span className="composer-attachment-card-copy">
-        <span className="composer-attachment-card-name" title={attachment.fileName}>
+        <span className="composer-attachment-card-name" data-tooltip={attachment.fileName}>
           <OverflowFade text={attachment.fileName} />
         </span>
         <span className="composer-attachment-card-meta">{meta}</span>
@@ -85,15 +86,7 @@ export const AttachmentCard: React.FC<{
         onClick={() => onRemove(attachment.id)}
         aria-label={removeLabel}
       >
-        <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">
-          <path
-            d="M3.2 3.2 12.8 12.8M12.8 3.2 3.2 12.8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        </svg>
+        <Icon name="close" size={12} />
       </Button>
     </div>
   );

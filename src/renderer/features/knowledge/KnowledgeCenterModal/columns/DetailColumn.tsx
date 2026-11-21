@@ -1,22 +1,26 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KNOWLEDGE_CASE_CHAPTERS } from '@shared/types/knowledge';
-import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
-import { InlineError } from '../../../../ui/InlineError';
 import { Icon } from '../../../../ui/Icon';
+import { IconButton } from '../../../../ui/IconButton';
+import { InlineError } from '../../../../ui/InlineError';
+import { Chevron } from '../../../../ui/Chevron';
+import { Menu } from '../../../../ui/Menu';
 import { Panel } from '../../../../ui/Panel';
-import { useI18n } from '../../../../i18n';
+import { useI18n, type TranslationKey } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { detailToRecord, type KnowledgeWriteAction } from '../knowledgeCenterModel';
+import { knowledgeCardActions, type KnowledgeCardAction } from '../knowledgeCardActions';
+import { bodyWithoutTitle, markdownOutline } from '../knowledgeOutline';
 import { CaseChapterContent } from '../parts/CaseChapterContent';
 import { KnowledgeCardImages } from '../parts/KnowledgeCardImages';
 import { KnowledgeMarkdown } from '../parts/KnowledgeMarkdown';
 import '../parts/KnowledgeDetail.css';
-import { CardBadges } from '../parts/CardBadges';
+import { KnowledgeStatusTag } from '../parts/KnowledgeStatusTag';
 import { CardMetaGrid } from '../parts/CardMetaGrid';
 import { ConflictCompare } from '../parts/ConflictCompare';
-import { KnowledgeReadPanel } from '../parts/KnowledgeReadPanel';
+import { Skeleton } from '../../../../ui/Skeleton';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 
@@ -29,21 +33,52 @@ interface DetailColumnProps {
   candidateError: string | null;
 }
 
+const ACTION_LABEL_KEYS: Record<KnowledgeCardAction, TranslationKey> = {
+  'create-candidate': 'knowledgeCenter.createCandidate',
+  'persist-draft': 'knowledgeCenter.saveAsDraft',
+  'promote-verified': 'knowledgeCenter.promoteVerified',
+  'promote-promoted': 'knowledgeCenter.promotePromoted',
+  save: 'knowledgeCenter.save',
+  retire: 'knowledgeCenter.retire',
+};
+
+/** An outline earns its place once there is more than one section to move between. */
+const OUTLINE_MIN_ENTRIES = 2;
+
 export function DetailColumn({ state, write, onCreateCandidate, candidateHasSession, candidateBusy, candidateError }: DetailColumnProps) {
   const { t } = useI18n();
   const card = state.selectedCard;
   const conflict = state.viewMode === 'conflicts' ? state.selectedConflict : null;
-  const [metadataOpen, setMetadataOpen] = useState(false);
-  const missing = card?.type === 'case'
-    ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => !card.chapters?.[chapter]?.trim())
-    : [];
-  const isDraft = card?.lifecycle === 'draft';
-  const isCandidateView = state.viewMode === 'candidates';
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const textRef = useRef<HTMLDivElement>(null);
+  const reviewing = state.viewMode === 'candidates';
   const space = card ? state.spaces.find((entry) => entry.spaceId === card.spaceId) : undefined;
-  const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : (space?.label ?? card?.spaceId ?? '');
-  const openWrite = async (action: KnowledgeWriteAction) => {
-    const complete = await state.ensureFullCard();
-    if (complete) await write.openFor(action, detailToRecord(complete));
+  const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : (space?.label ?? '');
+  const chapters = card?.type === 'case' && card.chapters
+    ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim())
+    : null;
+  const missing = card?.type === 'case' ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => !card.chapters?.[chapter]?.trim()) : [];
+  const body = card && !chapters ? bodyWithoutTitle(card.body, card.title) : '';
+  const outline = chapters
+    ? chapters.map((chapter) => t(CHAPTER_LABEL_KEYS[chapter]))
+    : markdownOutline(body).filter((heading) => heading.level <= 3).map((heading) => heading.title);
+  const actions = card ? knowledgeCardActions(card.lifecycle, reviewing) : null;
+  const candidateBlocked = !candidateHasSession ? t('knowledgeCenter.sessionRequired')
+    : card?.missingAssets?.length ? t('knowledgeCenter.candidateAssetsMissing') : undefined;
+
+  const jumpTo = (index: number) => {
+    // Chapters and Markdown headings of levels 1–3 are drawn in outline order, so the nth entry is the nth heading.
+    textRef.current?.querySelectorAll(chapters ? '.knowledge-case-section > h3' : 'h1, h2, h3')[index]
+      ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+  const run = (action: KnowledgeCardAction) => {
+    if (!card) return;
+    if (action === 'create-candidate') {
+      onCreateCandidate();
+      return;
+    }
+    void write.openFor(action as KnowledgeWriteAction, detailToRecord(card));
   };
 
   return (
@@ -61,8 +96,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
               <>
                 <h1 className="knowledge-center-header-title">{card.title}</h1>
                 <div className="knowledge-center-meta-line" data-testid="knowledge-center-meta-line">
-                  {isCandidateView ? <Badge tone="warning">{t('knowledgeCenter.pendingReview')}</Badge> : null}
-                  <CardBadges type={card.type} lifecycle={card.lifecycle} sourceStatus={card.sourceStatus} />
+                  <KnowledgeStatusTag lifecycle={card.lifecycle} sourceStatus={card.sourceStatus} reviewing={reviewing} />
                 </div>
               </>
             ) : null}
@@ -73,13 +107,13 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 variant="ghost"
                 size="sm"
                 className="knowledge-detail-info-toggle"
-                aria-expanded={metadataOpen}
+                aria-expanded={infoOpen}
                 aria-controls="knowledge-card-information"
-                onClick={() => setMetadataOpen(!metadataOpen)}
+                onClick={() => setInfoOpen(!infoOpen)}
                 data-testid="knowledge-center-metadata-toggle"
               >
                 {t('knowledgeCenter.metadata')}
-                <Icon name={metadataOpen ? 'chevron-up' : 'chevron-down'} size={14} />
+                <Chevron direction="down" open={infoOpen} />
               </Button>
             ) : null}
           </div>
@@ -87,7 +121,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
       ) : null}
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">
-        {state.loadingDetail && <div className="knowledge-center-status">{t('knowledgeCenter.loading')}</div>}
+        {state.loadingDetail && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={8} /></div>}
         {conflict ? (
           <ConflictCompare
             conflict={conflict}
@@ -101,18 +135,20 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-detail">
             <EmptyState
               variant="page"
-              title={t(state.viewMode === 'conflicts' ? 'knowledgeCenter.selectConflictPrompt' : isCandidateView ? 'knowledgeCenter.selectCandidatePrompt' : 'knowledgeCenter.selectPrompt')}
+              title={t(state.viewMode === 'conflicts' ? 'knowledgeCenter.selectConflictPrompt' : reviewing ? 'knowledgeCenter.selectCandidatePrompt' : 'knowledgeCenter.selectPrompt')}
               description={state.viewMode === 'cards' && state.hits.length === 0 ? t('knowledgeCenter.emptyDetailHint') : undefined}
             />
           </div>
         )}
         {!state.loadingDetail && card && (
           <article data-testid="knowledge-center-detail">
-            {metadataOpen ? (
+            {infoOpen ? (
               <div id="knowledge-card-information" className="knowledge-detail-info">
                 <CardMetaGrid
                   card={card}
                   spaceLabel={spaceLabel}
+                  resolveTitle={(targetCardId) => (state.hits.find((entry) => entry.cardId === targetCardId)
+                    ?? state.pack?.hits.find((entry) => entry.cardId === targetCardId))?.title}
                   onOpenRelation={(targetCardId) => {
                     const hit = state.hits.find((entry) => entry.cardId === targetCardId)
                       ?? state.pack?.hits.find((entry) => entry.cardId === targetCardId);
@@ -121,69 +157,69 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 />
               </div>
             ) : null}
-            {!state.reading && card.type === 'case' && (
-              <nav className="knowledge-center-chapters" data-testid="knowledge-center-chapters">
-                {KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim()).map((chapter) => (
-                  <a key={chapter} href={`#knowledge-chapter-${chapter}`}>{t(CHAPTER_LABEL_KEYS[chapter])}</a>
-                ))}
+            {outline.length >= OUTLINE_MIN_ENTRIES || missing.length > 0 ? (
+              <nav className="knowledge-center-chapters" aria-label={t('knowledgeCenter.outline')} data-testid="knowledge-center-chapters">
+                {outline.length >= OUTLINE_MIN_ENTRIES ? outline.map((label, index) => (
+                  <button key={`${label}:${index}`} type="button" className="knowledge-center-outline-link" onClick={() => jumpTo(index)}>
+                    {label}
+                  </button>
+                )) : null}
                 {missing.length > 0 && (
                   <p className="knowledge-center-missing">
-                    {t('knowledgeCenter.chaptersMissing')}: {missing.map((chapter) => t(CHAPTER_LABEL_KEYS[chapter])).join(', ')}
+                    {t('knowledgeCenter.chaptersMissing', { chapters: missing.map((chapter) => t(CHAPTER_LABEL_KEYS[chapter])).join(t('knowledgeCenter.listSeparator')) })}
                   </p>
                 )}
               </nav>
-            )}
+            ) : null}
             <div className="knowledge-center-markdown">
               {card.images?.length ? <KnowledgeCardImages spaceId={card.spaceId} images={card.images} /> : null}
-              {state.reading ? <KnowledgeReadPanel key={card.cardId} reading={state.reading} onRead={state.readSelection} busy={state.readingBusy} /> : card.type === 'case' && card.chapters
-                ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim()).map((chapter) => (
-                  <section className="knowledge-case-section" key={chapter} id={`knowledge-chapter-${chapter}`}>
+              <div ref={textRef}>
+              {chapters
+                ? chapters.map((chapter) => (
+                  <section className="knowledge-case-section" key={chapter}>
                     <h3>{t(CHAPTER_LABEL_KEYS[chapter])}</h3>
-                    {card.chapters?.[chapter]
-                      ? <CaseChapterContent spaceId={card.spaceId} chapter={chapter} content={card.chapters[chapter] ?? ''} />
-                      : <p className="knowledge-center-missing">{t('knowledgeCenter.chaptersMissing')}</p>}
+                    <CaseChapterContent spaceId={card.spaceId} chapter={chapter} content={card.chapters?.[chapter] ?? ''} />
                   </section>
                 ))
-                : <KnowledgeMarkdown content={card.body} spaceId={card.spaceId} />}
+                : <KnowledgeMarkdown content={body} spaceId={card.spaceId} />}
+              </div>
             </div>
           </article>
         )}
       </div>
 
-      {card && (
+      {card && actions ? (
         <div className="knowledge-center-actions" data-testid="knowledge-center-actions">
-          {isDraft ? (
-            <>
-              <Button variant="primary" disabled={!candidateHasSession || candidateBusy || state.readingBusy || Boolean(card.missingAssets?.length)} onClick={onCreateCandidate} data-testid="knowledge-center-create-candidate">
-                {t('knowledgeCenter.createCandidate')}
-              </Button>
-              {!candidateHasSession ? <p className="knowledge-import-hint">{t('knowledgeCenter.sessionRequired')}</p> : null}
-              {card.missingAssets?.length ? <p className="knowledge-import-hint">{t('knowledgeCenter.candidateAssetsMissing')}</p> : null}
-              {candidateError ? <InlineError>{candidateError}</InlineError> : null}
-            </>
-          ) : (
-            <>
-              <Button variant="secondary" disabled={state.readingBusy} onClick={() => void openWrite('promote-verified')}>
-                {t('knowledgeCenter.promoteVerified')}
-              </Button>
-              <Button variant="secondary" disabled={state.readingBusy} onClick={() => void openWrite('promote-promoted')}>
-                {t('knowledgeCenter.promotePromoted')}
-              </Button>
-              <Button variant="danger" disabled={state.readingBusy} onClick={() => void openWrite('retire')}>
-                {t('knowledgeCenter.retire')}
-              </Button>
-              <Button
-                variant="primary"
-                disabled={state.readingBusy}
-                data-testid="knowledge-center-primary-write"
-                onClick={() => void openWrite(isCandidateView ? 'persist-draft' : 'save')}
-              >
-                {isCandidateView ? t('knowledgeCenter.saveAsDraft') : t('knowledgeCenter.save')}
-              </Button>
-            </>
-          )}
+          {candidateError ? <InlineError detail={candidateError}>{t('knowledgeCenter.candidateFailed')}</InlineError> : null}
+          {actions.more.length > 0 ? (
+            <Menu
+              open={moreOpen}
+              onOpenChange={setMoreOpen}
+              align="end"
+              side="top"
+              label={t('knowledgeCenter.moreActions')}
+              items={actions.more.map((action) => ({ id: action, label: t(ACTION_LABEL_KEYS[action]), onSelect: () => run(action) }))}
+              trigger={(
+                <IconButton label={t('knowledgeCenter.moreActions')} size="sm" data-testid="knowledge-center-more-actions">
+                  <Icon name="more" size={16} />
+                </IconButton>
+              )}
+            />
+          ) : null}
+          {actions.primary ? (
+            <Button
+              variant="primary"
+              data-testid="knowledge-center-primary-action"
+              data-action={actions.primary}
+              disabled={actions.primary === 'create-candidate' && (Boolean(candidateBlocked) || candidateBusy)}
+              data-tooltip={actions.primary === 'create-candidate' ? candidateBlocked : undefined}
+              onClick={() => run(actions.primary!)}
+            >
+              {t(ACTION_LABEL_KEYS[actions.primary])}
+            </Button>
+          ) : null}
         </div>
-      )}
+      ) : null}
     </Panel>
   );
 }

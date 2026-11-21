@@ -11,6 +11,10 @@
 //     qa:loops   thinking → task_create → commentary + glob → start two Tasks → complete, cancel and block → answer
 //     qa:long    five model steps of six parallel `glob` calls each, then a long Markdown answer
 //     qa:plan    (Mission agents) thinking → plan_artifact; the plan gate then pauses the turn
+//     qa:markdown an answer exercising the Markdown renderer: headings, callout, table, titled and long code, Mermaid,
+//                footnote and a project image (docs/frame.png, written by the walkthrough)
+//     qa:subagent thinking → tool_search loads `subagent` → one waited delegation to Verifier → answer; the child
+//                 (recognised by the delegated task text) declares a completed result through turn_complete
 //   An approved plan's execution turn (default scenario with `turn_complete` offered) declares an honest
 //   blocked outcome after its `glob`: the workspace has no capture, so the frozen goal cannot finish here.
 //   Runtime follow-up prompts ("# Incomplete Approved Obligation", "# Approved Goal Reassessment") continue
@@ -36,11 +40,31 @@ const LONG_ANSWER = [
   '\n```text\nvkcube_lavapipe.rdc\n```\n\n',
   '## 下一步\n\n导入这个 capture 后再读取事件树与管线状态。\n',
 ];
+const MARKDOWN_ANSWER = [
+  '# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n',
+  '## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n',
+  '> [!WARNING]\n> 修改着色器前先备份 capture。\n\n',
+  '| Pass | 耗时 | 结论 |\n| --- | --- | --- |\n',
+  ...Array.from({ length: 12 }, (_, index) => `| Pass ${index + 1} | ${((index + 1) * 0.4).toFixed(1)} ms | 正常 |\n`),
+  '\n```hlsl:shaders/lighting.hlsl\nfloat4 main(float4 pos : SV_Position) : SV_Target\n{\n    return saturate(float4(pos.xy / 512.0, 0.5, 1.0));\n}\n```\n\n',
+  '```diff\n- float exposure = 1.0;\n+ float exposure = 0.8;\n```\n\n',
+  `\`\`\`ts\n${Array.from({ length: 36 }, (_, index) => `const pass${index} = measure(${index});`).join('\n')}\n\`\`\`\n\n`,
+  '```mermaid\ngraph LR\n  A[Capture] --> B[Replay]\n  B --> C[Compare]\n```\n\n',
+  '![修复前的这一帧](docs/frame.png)\n\n',
+  '[^1]: 结论来自同一 capture 的两次回放。\n',
+];
 const PLAN = {
   title: '定位 vkcube 帧的唯一 draw 调用',
   summary: ['列出事件树并确认唯一的 draw 调用', '读取该调用的管线状态', '用三句话总结这一帧画了什么'],
   content: '## 目标\n\n确认这一帧只有一次 draw 调用，并说明它画了什么。\n\n## 步骤\n\n1. 列出事件树。\n2. 读取 draw 调用的管线状态。\n3. 汇总结论。\n',
   requiredTaskIds: [],
+};
+const DELEGATION = {
+  profile: 'verifier', mode: 'wait',
+  goal: '核对工作区里是否已有可回放的 capture',
+  task: '列出工作区文件，确认有没有 .rdc capture，并说明下一步。',
+  scope: '只读工作区文件', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [],
+  outputRequirements: '一句话结论', stopConditions: ['列完文件即停止'], requiredSkillIds: [],
 };
 const BLOCKED_COMPLETION = {
   disposition: 'blocked',
@@ -54,6 +78,21 @@ const BLOCKED_COMPLETION = {
     recoveryState: [],
   },
 };
+
+const CHILD_COMPLETION = {
+  disposition: 'completed',
+  result: {
+    summary: '工作区里没有 .rdc capture，需要先导入。',
+    outputs: {},
+    counterevidence: [],
+    unresolved: [],
+    scope: '只读核对工作区文件',
+    sideEffects: [],
+    recoveryState: [],
+  },
+};
+
+const CHILD_DELAY_MS = 4000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -98,7 +137,8 @@ function turnState(body) {
   const after = messages.slice(lastUser + 1);
   const prompt = typeof messages[lastUser]?.content === 'string' ? messages[lastUser].content : '';
   return {
-    scenario: ['qa:loops', 'qa:long', 'qa:plan'].find((keyword) => prompt.includes(keyword)) ?? 'default',
+    scenario: prompt.includes(DELEGATION.task) ? 'qa:subagent-child'
+      : ['qa:loops', 'qa:long', 'qa:plan', 'qa:subagent', 'qa:markdown'].find((keyword) => prompt.includes(keyword)) ?? 'default',
     step: after.filter((entry) => entry.role === 'assistant').length,
     toolResults: after.filter((entry) => entry.role === 'tool').map((entry) => String(entry.content ?? '')),
   };
@@ -144,6 +184,21 @@ function chatChunks(body) {
   const state = turnState(body);
   if (state.scenario === 'qa:loops') return loopsScenario(state, tools);
   if (state.scenario === 'qa:long') return longScenario(state, tools);
+  if (state.scenario === 'qa:markdown') return text(MARKDOWN_ANSWER);
+  if (state.scenario === 'qa:subagent') {
+    // subagent is a deferred tool: load it through tool_search first, then delegate once and answer.
+    const delegated = state.toolResults.length >= 2;
+    if (!delegated && !tools.has('subagent') && tools.has('tool_search')) {
+      return [...thinking(['这件事交给 Verifier 去核对，', '我等它的结论。']), toolCalls([['tool_search', { query: 'subagent' }]])];
+    }
+    if (!delegated && tools.has('subagent')) return [toolCalls([['subagent', DELEGATION]])];
+    return text(['Verifier 核对完了：工作区里没有 capture，需要先导入再继续。']);
+  }
+  if (state.scenario === 'qa:subagent-child') {
+    const declared = state.toolResults.some((result) => result.includes('Turn completion recorded'));
+    if (!declared && tools.has('turn_complete')) return [...thinking(['工作区里没有 .rdc 文件，', '结论可以交回。']), toolCalls([['turn_complete', CHILD_COMPLETION]])];
+    return text(['工作区里没有 .rdc capture，需要先导入。']);
+  }
   if (state.scenario === 'qa:plan' && tools.has('plan_artifact') && state.step === 0) {
     return [...thinking(['先把调查计划写出来，', '交给用户审阅。']), toolCalls([['plan_artifact', PLAN]])];
   }
@@ -172,6 +227,8 @@ const server = http.createServer(async (request, response) => {
       const body = await readBody(request);
       const state = turnState(body);
       console.log(`[qa-ollama-stub]   scenario=${state.scenario} step=${state.step} think=${body.think ?? '(unset)'} tools=${(body.tools ?? []).length}`);
+      // The delegated child answers after a pause so the running subagent card stays on screen long enough to inspect.
+      if (state.scenario === 'qa:subagent-child' && state.step === 0) await sleep(CHILD_DELAY_MS);
       return await streamChat(response, chatChunks(body));
     }
     return json(response, 404, { error: 'not found' });

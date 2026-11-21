@@ -6,9 +6,11 @@ import { useModalFocus } from '../lib/useModalFocus';
 import { useReadingPanelGeometry } from '../lib/useReadingPanelGeometry';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
+import { usePresence } from './usePresence';
 import './ReadingSheet.css';
 
 export interface ReadingSheetProps {
+  open: boolean;
   title: ReactNode;
   /** Plain-text name for the dialog when `title` is not a string. */
   label?: string;
@@ -20,6 +22,8 @@ export interface ReadingSheetProps {
   footer?: ReactNode;
   children: ReactNode;
   onClose: () => void;
+  /** Runs once the exit animation has finished, so the owner can drop the content it kept for the exit. */
+  onExited?: () => void;
   closeLabel: string;
   busy?: boolean;
   className?: string;
@@ -31,22 +35,23 @@ export interface ReadingSheetProps {
  * up to that area, and keeps header, status and footer fixed while the body is the only scroller.
  */
 export function ReadingSheet({
-  title, label, meta, actions, status, footer, children, onClose, closeLabel, busy = false, className, dataTestId,
+  open, title, label, meta, actions, status, footer, children, onClose, onExited, closeLabel, busy = false, className, dataTestId,
 }: ReadingSheetProps) {
   const titleId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
   const geometry = useReadingPanelGeometry();
-  const visible = geometry.ready || !geometry.anchored;
-  const { layerId } = useOverlayLayer(visible);
-  useModalFocus({ open: visible, containerRef: sheetRef, onClose, busy, layerId });
+  const shown = open && (geometry.ready || !geometry.anchored);
+  const { layerId } = useOverlayLayer(shown);
+  const presence = usePresence(shown, sheetRef, onExited);
+  useModalFocus({ open: shown, containerRef: sheetRef, onClose, busy, layerId });
 
-  if (typeof document === 'undefined' || !visible) return null;
+  if (typeof document === 'undefined' || !presence.mounted) return null;
 
   return createPortal(
     <div
       className={cn('ui-reading-sheet-overlay', !geometry.anchored && 'is-viewport')}
       {...geometry.style}
-      data-overlay-layer
+      data-state={presence.state}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose();
       }}

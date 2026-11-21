@@ -11,7 +11,7 @@ const tool = (id: string): Extract<WorkProcessRow, { type: 'tool' }> => ({
   status: 'complete',
   verb: 'Read',
   category: 'File',
-  icon: 'fileRead',
+  icon: 'file-read',
   groupKind: 'explore',
   family: 'file',
   toolName: 'read_file',

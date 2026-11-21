@@ -1,20 +1,24 @@
-import React from 'react';
-import { Details } from '../../../../ui/Details';
+import React, { useState } from 'react';
 import { useI18n, type TranslationKey } from '../../../../i18n';
-import { Badge, type BadgeTone } from '../../../../ui/Badge';
+import { errorDetail } from '../../../../lib/errorDetail';
+import { useUiLabels } from '../../../../lib/useUiLabels';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
+import { SettingsDiagnostics, type SettingsDiagnosticsRow } from '../parts';
+import { McpResourceList } from './McpResourceList';
 import { McpTrustBadge, McpTrustPanel, mcpTrustState } from './McpTrustPanel';
+import { mcpTransportLabel } from './resourceLabels';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
+import { saveScopedResource } from './runtimeScopeMutations';
 import { formFromContent } from './scopedResourceForm';
 import { useMcpStatus } from './useMcpStatus';
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 
-type BadgeKind = 'connected' | 'error' | 'loading' | 'disconnected';
+type ConnectionKind = 'connected' | 'error' | 'loading' | 'disconnected';
 
-const STATUS_BADGE: Record<MCPConnectionStatus, BadgeKind> = {
+const CONNECTION_KIND: Record<MCPConnectionStatus, ConnectionKind> = {
   connected: 'connected',
   error: 'error',
   connecting: 'loading',
@@ -22,34 +26,28 @@ const STATUS_BADGE: Record<MCPConnectionStatus, BadgeKind> = {
   unknown: 'disconnected',
 };
 
-const STATUS_LABEL_KEY: Record<BadgeKind, TranslationKey> = {
+const CONNECTION_LABEL_KEY: Record<ConnectionKind, TranslationKey> = {
   connected: 'settings.mcpStatusConnected',
   error: 'settings.mcpStatusError',
   loading: 'settings.mcpStatusLoading',
   disconnected: 'settings.mcpStatusDisconnected',
 };
 
-const STATUS_TONE: Record<BadgeKind, BadgeTone | null> = {
-  connected: 'success',
-  error: 'error',
-  loading: 'warning',
-  disconnected: null,
-};
-
-function ConnectionBadge({ server }: { server: MCPServerStatusSummary | undefined }) {
+/** A status dot and one word; the reason for an error is in the server's detail. */
+function ConnectionStatus({ server }: { server: MCPServerStatusSummary | undefined }) {
   const { t } = useI18n();
-  const kind = server ? STATUS_BADGE[server.connectionStatus] ?? 'disconnected' : 'disconnected';
-  const tone = STATUS_TONE[kind];
-  const label = t(STATUS_LABEL_KEY[kind]);
-  return tone
-    ? <Badge tone={tone} data-testid="settings-mcp-connection-badge" data-status={kind}>{label}</Badge>
-    : <span className="settings-mcp-status-neutral" data-testid="settings-mcp-connection-badge" data-status={kind}>{label}</span>;
+  const kind = server ? CONNECTION_KIND[server.connectionStatus] ?? 'disconnected' : 'disconnected';
+  return (
+    <span className="settings-mcp-status" data-testid="settings-mcp-connection-badge" data-status={kind}>
+      {t(CONNECTION_LABEL_KEY[kind])}
+    </span>
+  );
 }
 
 /**
- * Tools → MCP services: the scoped MCP resource list joined with the live connection
- * summary and, per selected server, a read-only detail with its trust state.
- * Connection failure and trust are independent facts and stay in separate badges.
+ * Tools → MCP services: the scoped MCP servers as name · status · switch, joined with the live connection summary.
+ * The selected server shows its tools, its trust and, under 诊断, how it is reached and where it is defined.
+ * Connection failure and trust are independent facts and stay separate.
  */
 export const McpServicesPanel: React.FC<{
   overview: RdcRuntimeOverview | null;
@@ -58,52 +56,79 @@ export const McpServicesPanel: React.FC<{
   onChanged: (overview: RdcRuntimeOverview) => void;
 }> = ({ overview, scope, onScopeChange, onChanged }) => {
   const { t } = useI18n();
+  const labels = useUiLabels();
   const status = useMcpStatus();
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const statusFor = (resource: ScopedResourceDocument) => status.byId.get(resource.id);
   const overviewFor = (resource: ScopedResourceDocument) =>
     overview?.mcpServers.find((server) => server.id === resource.id && server.scope === resource.scope);
+
+  const toggle = async (resource: ScopedResourceDocument, enabled: boolean) => {
+    setTogglingId(resource.id);
+    setToggleError(null);
+    try {
+      const outcome = await saveScopedResource({
+        kind: 'mcp',
+        scope: resource.scope,
+        form: { ...formFromContent('mcp', resource.id, resource.content), enabled },
+        creating: false,
+        existingIds: [],
+        ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
+      });
+      if (!outcome.ok) {
+        setToggleError(outcome.message ?? '');
+        return;
+      }
+      onChanged(outcome.overview);
+      void status.refresh();
+    } catch (failure) {
+      setToggleError(errorDetail(failure));
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const renderDetail = ({ resource, edit }: { resource: ScopedResourceDocument; edit: () => void }) => {
     const form = formFromContent('mcp', resource.id, resource.content);
     const live = statusFor(resource);
     const server = overviewFor(resource);
     const trust = server ? mcpTrustState(server) : null;
+    const args = form.argsText.trim() && form.argsText.trim() !== '[]' ? form.argsText.replace(/\s+/g, ' ') : '';
+    const diagnostics: SettingsDiagnosticsRow[] = [
+      { label: t('settings.resourceFieldId'), value: resource.id },
+      { label: t('settings.resourceFieldTransport'), value: mcpTransportLabel(form.transport, t) },
+      ...(form.url ? [{ label: t('settings.resourceFieldUrl'), value: form.url }] : []),
+      ...(form.command ? [{ label: t('settings.resourceFieldCommand'), value: form.command }] : []),
+      ...(args ? [{ label: t('settings.resourceFieldArgs'), value: args }] : []),
+      { label: t('settings.resourceScope'), value: resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') },
+      { label: t('settings.scopeResourceLocation'), value: resource.sourcePath },
+      ...(server?.descriptorHash ? [{ label: t('settings.mcpDescriptorHash'), value: server.descriptorHash }] : []),
+    ];
     return (
-      <Details key={resource.id} className="settings-mcp-detail" data-testid="settings-mcp-detail" summaryClassName="settings-local-tool-summary" summary={<>
-          <span className="settings-runtime-detail-title">
+      <div key={resource.id} className="settings-runtime-detail settings-mcp-detail" data-testid="settings-mcp-detail">
+        <header className="settings-runtime-detail-head">
+          <div className="settings-runtime-detail-title">
             <strong>{form.name || resource.id}</strong>
-            <span className="settings-runtime-detail-badges">
-              <ConnectionBadge server={live} />
-              {trust ? <McpTrustBadge state={trust} /> : null}
-            </span>
-          </span>
-
-         </>}>
-        <div className="settings-runtime-detail">
+            {trust ? <span className="settings-runtime-detail-badges"><McpTrustBadge state={trust} /></span> : null}
+          </div>
           <div className="settings-runtime-actions">
             <Button variant="secondary" size="sm" onClick={edit} data-testid="settings-mcp-detail-edit">
               <Icon name="edit" size={14} />
               {t('settings.edit')}
             </Button>
           </div>
-        <dl className="settings-runtime-detail-grid">
-          <div><dt>{t('settings.resourceFieldId')}</dt><dd><code>{resource.id}</code></dd></div>
-          <div><dt>{t('settings.resourceFieldTransport')}</dt><dd>{form.transport}</dd></div>
-          {form.url ? <div><dt>{t('settings.resourceFieldUrl')}</dt><dd><code>{form.url}</code></dd></div> : null}
-          {form.command ? <div><dt>{t('settings.resourceFieldCommand')}</dt><dd><code>{form.command}</code></dd></div> : null}
-          {form.argsText.trim() && form.argsText.trim() !== '[]' ? (
-            <div><dt>{t('settings.resourceFieldArgs')}</dt><dd><code>{form.argsText.replace(/\s+/g, ' ')}</code></dd></div>
-          ) : null}
-          <div><dt>{t('settings.resourceFieldEnabledDefault')}</dt><dd>{form.enabled ? t('settings.enabled') : t('settings.disabled')}</dd></div>
-          <div><dt>{t('settings.mcpStatusTitle')}</dt><dd>{live ? t('settings.mcpStatusToolCount', { count: live.toolCount }) : t('settings.mcpStatusDisconnected')}</dd></div>
-          <div><dt>{t('settings.resourceScope')}</dt><dd>{resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser')}</dd></div>
-          <div><dt>{t('settings.scopeResourceLocation')}</dt><dd><code>{resource.sourcePath}</code></dd></div>
-        </dl>
-        {live?.lastError ? <InlineError>{live.lastError}</InlineError> : null}
+        </header>
+        {live?.connectionStatus === 'connected' ? (
+          <dl className="settings-runtime-detail-grid">
+            <div><dt>{t('settings.mcpToolsLabel')}</dt><dd>{t('settings.mcpStatusToolCount', { count: live.toolCount })}</dd></div>
+          </dl>
+        ) : null}
+        {live?.lastError ? <InlineError detail={live.lastError}>{t('settings.mcpConnectFailed')}</InlineError> : null}
         {server && overview ? <McpTrustPanel overview={overview} server={server} onChanged={onChanged} /> : null}
-        </div>
-      </Details>
+        <SettingsDiagnostics testId="settings-mcp-diagnostics" rows={diagnostics} />
+      </div>
     );
   };
 
@@ -127,19 +152,25 @@ export const McpServicesPanel: React.FC<{
             {status.loading ? t('settings.mcpStatusRefreshing') : t('settings.mcpStatusRefresh')}
           </Button>
         )}
-        renderRowTrailing={(resource) => {
-          const live = statusFor(resource);
-          return (
-            <span className="settings-mcp-row-trailing">
-              {live ? <small>{t('settings.mcpStatusToolCount', { count: live.toolCount })}</small> : null}
-              <ConnectionBadge server={live} />
-            </span>
-          );
-        }}
+        renderList={({ resources, selectedId, select }) => (
+          <McpResourceList
+            resources={resources}
+            selectedId={selectedId}
+            busyId={togglingId}
+            onSelect={select}
+            onToggle={(resource, enabled) => void toggle(resource, enabled)}
+            renderStatus={(resource) => <ConnectionStatus server={statusFor(resource)} />}
+          />
+        )}
         renderDetail={renderDetail}
       />
-      {status.error ? <InlineError>{status.error}</InlineError> : null}
-      {status.unavailable ? <p className="settings-help-text">{t('settings.mcpStatusUnavailable')}</p> : null}
+      {toggleError !== null ? <InlineError detail={toggleError || undefined}>{t('settings.mcpToggleFailed')}</InlineError> : null}
+      {status.error !== null || status.unavailable ? (
+        <InlineError detail={status.error ?? undefined} onRetry={() => void status.refresh()} retryLabel={labels.retry}
+          retryDisabled={status.loading}>
+          {t('settings.mcpStatusUnavailable')}
+        </InlineError>
+      ) : null}
     </>
   );
 };

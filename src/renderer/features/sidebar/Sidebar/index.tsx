@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../../i18n';
 import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import { useProjectStore } from '../../../stores/projectStore';
+import { Icon } from '../../../ui/Icon';
+import { Skeleton } from '../../../ui/Skeleton';
 import { ProjectGroup } from './ProjectGroup';
 import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
@@ -83,27 +85,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
             </div>
             <div className="session-section-actions">
               {selection.currentProject && (
-                <button type="button" className="session-section-action" title={t('sidebar.removeProject')}
+                <button type="button" className="session-section-action" data-tooltip={t('sidebar.removeProject')}
                   onClick={() => setPendingRemoval({ kind: 'project', project: selection.currentProject! })} disabled={selection.isBusy}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" />
-                  </svg>
+                  <Icon name="trash" size={14} />
                 </button>
               )}
-              <button type="button" className="session-section-action" title={t('sidebar.addProject')}
+              <button type="button" className="session-section-action" data-tooltip={t('sidebar.addProject')}
                 onClick={() => setAddingProject(true)} disabled={selection.isBusy}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5v14" /><path d="M5 12h14" />
-                </svg>
+                <Icon name="plus" size={14} />
               </button>
             </div>
           </div>
 
           {selection.isLoading ? (
             <div className="session-list project-list">
-              <div className="ui-skeleton ui-skeleton--card ui-skeleton--card-stack" />
-              <div className="ui-skeleton ui-skeleton--card ui-skeleton--card-stack" />
-              <div className="ui-skeleton ui-skeleton--card" />
+              <Skeleton shape="row" count={3} />
             </div>
           ) : selection.projects.length > 0 ? (
             <div className="project-stack">

@@ -1,9 +1,10 @@
 import type { TranslationKey } from '../../../i18n';
+import type { IconName } from '../../../ui/Icon';
 import type {
   KnowledgeCardType,
   KnowledgeCaseChapter,
   KnowledgeLifecycle,
-  KnowledgeRetrievalLane,
+  KnowledgeRelationKind,
   KnowledgeScopeAxis,
 } from '@shared/types/knowledge';
 
@@ -44,13 +45,39 @@ export const LIFECYCLE_LABEL_KEYS: Record<KnowledgeLifecycle, TranslationKey> = 
   retired: 'knowledgeCenter.lifecycleRetired',
 };
 
-export const LANE_LABEL_KEYS: Record<KnowledgeRetrievalLane, TranslationKey> = {
-  'Identity/Path': 'knowledgeCenter.laneIdentityPath',
-  'Scope/Metadata': 'knowledgeCenter.laneScopeMetadata',
-  Lexical: 'knowledgeCenter.laneLexical',
-  Structural: 'knowledgeCenter.laneStructural',
-  'Relation/Graph': 'knowledgeCenter.laneRelationGraph',
-  'Temporal/Version': 'knowledgeCenter.laneTemporalVersion',
+/** What each lifecycle means, for the status tag's hover. */
+export const LIFECYCLE_HINT_KEYS: Record<KnowledgeLifecycle, TranslationKey> = {
+  draft: 'knowledgeCenter.lifecycleHint.draft',
+  candidate: 'knowledgeCenter.lifecycleHint.candidate',
+  verified: 'knowledgeCenter.lifecycleHint.verified',
+  promoted: 'knowledgeCenter.lifecycleHint.promoted',
+  retired: 'knowledgeCenter.lifecycleHint.retired',
+};
+
+/** A card type as a small icon before its title; the type name is the icon's tooltip. */
+export const TYPE_ICONS: Record<KnowledgeCardType, IconName> = {
+  fact: 'file-text',
+  constraint: 'lock',
+  pattern: 'layers',
+  procedure: 'tasks',
+  case: 'artifact-evidence',
+  model: 'cube',
+};
+
+export const RELATION_LABEL_KEYS: Record<KnowledgeRelationKind, TranslationKey> = {
+  supports: 'knowledgeCenter.relation.supports',
+  contradicts: 'knowledgeCenter.relation.contradicts',
+  specializes: 'knowledgeCenter.relation.specializes',
+  generalizes: 'knowledgeCenter.relation.generalizes',
+  derived_from: 'knowledgeCenter.relation.derived_from',
+  validated_by: 'knowledgeCenter.relation.validated_by',
+  invalidated_by: 'knowledgeCenter.relation.invalidated_by',
+  applies_to: 'knowledgeCenter.relation.applies_to',
+  excludes: 'knowledgeCenter.relation.excludes',
+  supersedes: 'knowledgeCenter.relation.supersedes',
+  related_to: 'knowledgeCenter.relation.related_to',
+  recommended_for: 'knowledgeCenter.relation.recommended_for',
+  failed_in: 'knowledgeCenter.relation.failed_in',
 };
 
 /** Local `YYYY-MM-DD HH:mm`; empty when the card carries no timestamp. */

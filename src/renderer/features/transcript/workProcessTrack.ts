@@ -17,5 +17,6 @@ export function isTrackActivity(row: WorkProcessRow): boolean {
   if (row.type === 'output') return row.status === 'running';
   if (row.type === 'thinking') return row.thinkingStatus === 'streaming';
   if (row.type === 'subagent') return row.status === 'running';
+  if (row.type === 'webGroup') return row.members.some(isTrackActivity);
   return false;
 }

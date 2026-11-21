@@ -42,7 +42,7 @@ export function OverflowFade({ text, className }: OverflowFadeProps) {
     <span
       ref={textRef}
       className={cn('ui-overflow-fade', overflowing && 'is-overflowing', className)}
-      title={text}
+      data-tooltip={overflowing ? text : undefined}
     >
       {text}
     </span>

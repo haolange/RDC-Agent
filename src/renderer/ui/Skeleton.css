@@ -1,0 +1,36 @@
+.ui-skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-skeleton {
+  display: block;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--token-bg-raised) 25%, var(--token-bg-panel) 50%, var(--token-bg-raised) 75%);
+  background-size: 200% 100%;
+  animation: shimmer var(--animation-shimmer) var(--ease-standard) infinite;
+}
+
+.ui-skeleton-stack.is-shape-line .ui-skeleton {
+  height: var(--type-body-line);
+}
+
+.ui-skeleton-stack.is-shape-line .ui-skeleton:last-child:not(:first-child) {
+  width: 62%;
+}
+
+.ui-skeleton-stack.is-shape-row .ui-skeleton {
+  height: var(--control-height-md);
+}
+
+.ui-skeleton-stack.is-shape-card .ui-skeleton {
+  height: var(--space-12);
+  border-radius: var(--radius-card);
+}
+
+.ui-skeleton-stack.is-shape-block .ui-skeleton {
+  height: 100%;
+  min-height: var(--space-24);
+  border-radius: var(--radius-card);
+}

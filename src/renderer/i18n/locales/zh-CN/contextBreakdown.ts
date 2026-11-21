@@ -36,7 +36,7 @@ export const zhContextBreakdown = {
   'contextBreakdown.countSuffix.builtin_tools_deferred': '个',
   'contextBreakdown.countSuffix.subagent_definitions': '个',
   'contextBreakdown.countSuffix.conversation': '条',
-  'contextBreakdown.detailsLabel': '明细',
+  'contextBreakdown.detailsLabel': '详细用量',
   'contextBreakdown.detailsExpandAria': '展开上下文明细',
   'contextBreakdown.detailsCollapseAria': '收起上下文明细',
   'contextBreakdown.currentRequest': '当前请求',

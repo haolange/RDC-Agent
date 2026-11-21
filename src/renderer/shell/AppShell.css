@@ -1,17 +1,3 @@
-.shell-notice {
-  position: absolute;
-  top: var(--space-4);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: var(--z-notification);
-  max-width: calc(100% - var(--space-8));
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--token-border-default);
-  background: var(--token-bg-panel);
-  color: var(--token-text-heading);
-}
-
 .sidebar-footer-entry {
   --btn-radius: var(--radius-sm);
   width: 100%;
@@ -37,15 +23,15 @@
 }
 
 .footer-entry-title {
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
   line-height: var(--leading-tight);
 }
 
 .footer-entry-trailing {
   display: inline-flex;
   align-items: center;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .sidebar-knowledge-icon,
@@ -56,13 +42,13 @@
   flex: 0 0 var(--space-6);
   width: var(--space-6);
   height: var(--space-6);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .footer-entry-avatar {
   border-radius: var(--radius-sm);
   background: var(--token-bg-raised);
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
 }

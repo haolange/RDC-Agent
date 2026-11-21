@@ -55,10 +55,13 @@ const CATEGORY_KEYS: Record<string, TranslationKey> = {
   edit: 'composer.commandCategory.edit',
   session: 'composer.commandCategory.session',
 };
-/** The command list stays main-owned; only builtin display copy is localized here. */
-export function localizeCommands(commands: CommandListResult['commands'], t: Translator): CommandListResult['commands'] {
+/** A command as the interface shows it: the main-owned entry plus its description and category in words. */
+export type LocalizedCommand = CommandListResult['commands'][number] & { categoryLabel: string };
+
+/** The command list stays main-owned; only builtin display copy is localized here. The raw category stays for icons. */
+export function localizeCommands(commands: CommandListResult['commands'], t: Translator): LocalizedCommand[] {
   return commands.map(command => ({ ...command,
     description: DESCRIPTION_KEYS[command.id] ? t(DESCRIPTION_KEYS[command.id]) : command.description,
-    category: CATEGORY_KEYS[command.category] ? t(CATEGORY_KEYS[command.category]) : command.category,
+    categoryLabel: CATEGORY_KEYS[command.category] ? t(CATEGORY_KEYS[command.category]) : command.category,
   }));
 }

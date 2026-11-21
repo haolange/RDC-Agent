@@ -541,6 +541,10 @@ Reserved historical filename.
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentIdentityPanel.tsx'),
     'utf8',
   );
+  const modelBindingSource = readSrcFile(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentModelBindingFields.tsx'),
+    'utf8',
+  );
   assert(agentIdentitySource.includes("from '../../../../ui/ColorField'"), 'Agents accent must use shared ColorField');
   assert(agentIdentitySource.includes('testId="settings-agent-accent"'), 'Agents accent must keep a stable test id');
   assert(agentIdentitySource.includes('AgentIconPresetPicker') && agentIdentitySource.includes('settings-agent-identity-grid'), 'Agents Icon+Accent live in the identity panel (A02), not a separate look strip');
@@ -554,6 +558,14 @@ Reserved historical filename.
   assert(
     agentEditorSource.includes('settings-agent-config-status') && agentEditorSource.includes("from '../../../../ui/Switch'"),
     'Agents route panel must show a read-only configuration status and Switch-based availability flags',
+  );
+  assert(
+    !agentEditorSource.includes('settings-agent-editor-id') && !agentEditorSource.includes('modelSourceLabel'),
+    'Agent editor header shows the name and description only: no agent id and no duplicate model-source line',
+  );
+  assert(
+    modelBindingSource.includes('followDefaultLabel') && !modelBindingSource.includes("ui/Tabs'"),
+    'An Agent picks its model in one selector whose first choice follows the default model',
   );
   assert(
     agentEditorSource.includes('settings-agent-panels') && agentEditorSource.includes('aria-expanded={open}'),

@@ -2,7 +2,7 @@
 
 /* True viewport breakpoints only. No unconditional chrome overrides. */
 
-@media (max-width: 900px) {
+@media (max-width: 920px) {
   .app-body {
     grid-template-columns:
       minmax(220px, 280px)
@@ -31,39 +31,14 @@
     padding-left: var(--space-3);
   }
 
-  .app-titlebar-center {
-    display: none;
-  }
-
-  .app-footer {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: center;
-  }
-
-  .footer-left {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
   .footer-entry {
     width: 100%;
-  }
-
-  .footer-right {
-    justify-content: flex-start;
-  }
-
-  .main-header {
-    padding: var(--space-2) var(--space-3);
   }
 
   .main-input-bar {
     width: var(--conversation-column-width, 100%);
     padding: var(--space-2) 0 var(--space-3);
   }
-
-
 }
 
 @media (max-width: 720px) {
@@ -91,8 +66,6 @@
     display: flex;
     padding: var(--space-2);
   }
-
-
 }
 
 .app-body.has-left-drawer {

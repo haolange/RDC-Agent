@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useI18n } from '../../i18n';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { WorkCardHeader } from './WorkCardHeader';
-import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import { CopyPathButton } from './WorkProcessFamilyLayers';
@@ -35,7 +35,7 @@ export function WorkProcessImageRow({ row, renderToolDetail }: {
     <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
       <div className={`work-process-tool-card${expanded ? ' is-expanded' : ''}`}>
-        <WorkCardHeader icon={<WorkProcessIcon icon="imageRead" className="work-process-tool-card-icon" />}
+        <WorkCardHeader icon={<Icon name="image-read" className="work-process-icon work-process-tool-card-icon" />}
           title={t('chat.imagesViewed', { count })} duration={row.duration} expanded={expanded} controls={detailsId} onClick={toggle} />
         <div className="work-process-image-summary">
           <WorkProcessImageThumbs previews={previews} />

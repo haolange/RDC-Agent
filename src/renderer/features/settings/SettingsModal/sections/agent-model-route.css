@@ -36,7 +36,7 @@
 }
 
 .settings-agent-route-panel .settings-section-title {
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
@@ -66,7 +66,7 @@
 }
 
 .settings-page-agents .settings-agent-route-panel .settings-section-title {
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   letter-spacing: 0.01em;
 }
@@ -76,14 +76,6 @@
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-4);
-}
-
-.settings-agent-status-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  min-width: 0;
 }
 
 @container settings-panel (max-width: 48rem) {
@@ -108,20 +100,16 @@
 
 .settings-agent-defaults-copy {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-1);
   min-width: 0;
 }
 
 .settings-agent-defaults-title {
   margin: 0;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
-  color: var(--token-text-heading);
-}
-
-.settings-agent-defaults-copy .settings-help-text {
-  margin: 0;
+  color: var(--token-text-primary);
 }
 
 .settings-agent-defaults > .ui-inline-error {
@@ -144,23 +132,23 @@
   grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--space-2) var(--space-4);
   margin: 0;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .settings-agent-migration-facts dt {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-agent-migration-facts dd {
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .settings-agent-migration-facts code {
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .settings-agent-migration-facts ul {
@@ -177,9 +165,9 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-bg-panel);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

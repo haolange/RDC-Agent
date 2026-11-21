@@ -1,9 +1,10 @@
 import React from 'react';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { Icon } from '../../ui/Icon';
+import { Chevron } from '../../ui/Chevron';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { isActiveThinkingStatus } from './workProcessActiveSignal';
-import { WorkProcessIcon } from './WorkProcessIcons';
 import type { WorkProcessRow } from './workProcessTypes';
 
 type ThinkingRow = Extract<WorkProcessRow, { type: 'thinking' }>;
@@ -15,16 +16,15 @@ export const WorkProcessThinking: React.FC<{ row: ThinkingRow }> = ({ row }) => 
     row.visibility ? `visibility-${row.visibility}` : '', row.thinkingStatus ? `status-${row.thinkingStatus}` : '']
     .filter(Boolean).join(' ');
   const [open, toggle] = useScopedWorkDisclosure(`thinking-${row.id}`, row.openByDefault);
-  const label = <><WorkProcessIcon icon="spark" className="work-process-thinking-icon" />
+  const label = <><Icon name="spark" className="work-process-icon work-process-thinking-icon" />
     <ActiveSignalText active={active} tone="info">{row.label}</ActiveSignalText></>;
-  const kindLabel = row.kindLabel ? <span className="work-process-thinking-kind">{row.kindLabel}</span> : null;
   if (row.expandable) return <details className={className} open={open}>
     <summary className="work-process-thinking-summary" data-work-node-heading onClick={(event) => { event.preventDefault(); toggle(); }}>
-      {label}{kindLabel}<span className="work-process-row-caret" aria-hidden="true" />
+      {label}<Chevron size={12} className="work-process-row-caret" />
     </summary>
     <div className="work-process-thinking-preview"><MessageMarkdown content={row.preview} deferHeavyPlugins={active} /></div>
   </details>;
-  return row.label ? <p className={`${className} work-process-thinking-caption`} data-work-node-heading>{label}{kindLabel}</p> : null;
+  return row.label ? <p className={`${className} work-process-thinking-caption`} data-work-node-heading>{label}</p> : null;
 };
 
 export const WorkProcessThinkingRow: React.FC<{ row: ThinkingRow }> = ({ row }) => (

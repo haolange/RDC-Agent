@@ -1,39 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../lib/formatBytes';
 import { copyAppText, openAppPath } from '../../hooks/appShellBridge';
 import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
+import { IconButton } from '../../ui/IconButton';
+import { Menu } from '../../ui/Menu';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 
 interface RightRailOutputListProps { current: TraceArtifactRecord[]; previous: TraceArtifactRecord[]; }
 
-const formatSize = (size?: number): string => typeof size !== 'number' ? '' : size >= 1024 * 1024 ? `${(size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(size / 1024))} KB`;
-
-const OutputFileGlyph: React.FC = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M6 3.5h7l5 5V20.5H6z" />
-    <path d="M13 3.5v5h5M9 14h6M9 17h4" />
-  </svg>
-);
-
-export const RightRailOutputList: React.FC<RightRailOutputListProps> = React.memo(({ current, previous }) => {
-  const { t } = useI18n();
+/** One output: its name and one action. The size rides on the hover text; copying the path lives in「更多」. */
+const OutputRow: React.FC<{ artifact: TraceArtifactRecord }> = ({ artifact }) => {
+  const { t, language } = useI18n();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const failed = artifact.status === 'failed';
+  const size = typeof artifact.sizeBytes === 'number' ? formatBytes(artifact.sizeBytes, language) : '';
   return (
-    <div className="right-rail-artifact-list">
-      {[...current, ...previous].map((artifact) => {
-        const failed = artifact.status === 'failed';
-        return (
-          <article key={artifact.id} className={`right-rail-artifact-row status-${artifact.status}`}>
-            <span className="right-rail-artifact-icon" aria-hidden="true"><OutputFileGlyph /></span>
-            <span className="right-rail-artifact-copy"><strong title={artifact.displayName}>{artifact.displayName}</strong>{formatSize(artifact.sizeBytes) ? <small>{formatSize(artifact.sizeBytes)}</small> : null}</span>
-            <span className="right-rail-output-actions">
-              <Button variant="ghost" size="sm" onClick={() => artifact.path && void openAppPath(artifact.path)} disabled={!artifact.path || failed}>{failed ? t('control.rightRail.outputs.missing') : t('control.rightRail.outputs.open')}</Button>
-              <Button variant="ghost" size="sm" onClick={() => artifact.path && void copyAppText(artifact.path)} disabled={!artifact.path}>{t('control.rightRail.outputs.copy')}</Button>
-            </span>
-          </article>
-        );
-      })}
-    </div>
+    <article className={`right-rail-artifact-row status-${artifact.status}`}>
+      <span className="right-rail-artifact-icon" aria-hidden="true"><Icon name="file" /></span>
+      <span className="right-rail-artifact-copy">
+        <strong data-tooltip={[artifact.displayName, size].filter(Boolean).join(' · ')}>{artifact.displayName}</strong>
+      </span>
+      <span className="right-rail-output-actions">
+        {failed ? <span className="right-rail-output-missing">{t('control.rightRail.outputs.missing')}</span> : (
+          <Button variant="ghost" size="sm" onClick={() => artifact.path && void openAppPath(artifact.path)} disabled={!artifact.path}>
+            {t('control.rightRail.outputs.open')}
+          </Button>
+        )}
+        <Menu open={menuOpen} onOpenChange={setMenuOpen} align="end" label={t('control.rightRail.outputs.more')}
+          items={[{ id: 'copy-path', label: t('control.rightRail.outputs.copyPath'), disabled: !artifact.path,
+            onSelect: () => artifact.path && void copyAppText(artifact.path) }]}
+          trigger={<IconButton size="sm" label={t('control.rightRail.outputs.more')} data-tooltip={t('control.rightRail.outputs.more')}>
+            <Icon name="more" size={16} />
+          </IconButton>} />
+      </span>
+    </article>
   );
-});
+};
+
+export const RightRailOutputList: React.FC<RightRailOutputListProps> = React.memo(({ current, previous }) => (
+  <div className="right-rail-artifact-list">
+    {[...current, ...previous].map((artifact) => <OutputRow key={artifact.id} artifact={artifact} />)}
+  </div>
+));
 
 export default RightRailOutputList;

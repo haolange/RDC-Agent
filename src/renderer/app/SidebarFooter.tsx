@@ -1,6 +1,7 @@
 import { ProfileAvatar } from '../patterns/ProfileAvatar';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
+import { Chevron } from '../ui/Chevron';
 import type { TranslationKey } from '../i18n';
 import type { MouseEvent } from 'react';
 
@@ -28,7 +29,7 @@ export function SidebarFooter({
         className="footer-entry sidebar-footer-entry"
         data-testid="sidebar-knowledge-center-trigger"
         onClick={() => { onCloseLeftDrawer(); onOpenKnowledgeCenter(); }}
-        title={t('knowledgeCenter.title')}
+        data-tooltip={t('knowledgeCenter.title')}
         aria-label={t('knowledgeCenter.title')}
       >
         <span className="footer-entry-main">
@@ -48,7 +49,7 @@ export function SidebarFooter({
         aria-expanded={isUserMenuOpen}
         aria-controls={isUserMenuOpen ? 'sidebar-user-menu' : undefined}
         onClick={(event) => { onCloseLeftDrawer(); onUserMenuToggle(event); }}
-        title={t('sidebar.userSettings')}
+        data-tooltip={t('sidebar.userSettings')}
         aria-label={t('sidebar.userSettings')}
       >
         <span className="footer-entry-main">
@@ -59,7 +60,7 @@ export function SidebarFooter({
         </span>
         <span className="footer-entry-trailing">
           <span className="footer-entry-chevron">
-            <Icon name="chevron-down" size={12} />
+            <Chevron direction="down" size={12} />
           </span>
         </span>
       </Button>

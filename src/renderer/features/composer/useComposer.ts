@@ -131,8 +131,7 @@ export function useComposer(options: {
   const hasMessageContent = Boolean(promptValue.trim());
   const hasPendingAttachments = attachments.pendingAttachments.some((attachment) => !attachment.error);
   const presentation = buildComposerPresentation({
-    language,
-    currentMode,
+    t,
     currentModeLabel,
     currentModeHint: agentArgumentHint(selectedAgent, language),
     hasProject: Boolean(currentProject),
@@ -161,7 +160,7 @@ export function useComposer(options: {
     setPromptValue,
     pendingAttachments: attachments.pendingAttachments,
     setPendingAttachments: attachments.setPendingAttachments,
-    pendingSkillIds: pendingSkills.pendingSkillIds,
+    pendingSkills: pendingSkills.pendingSkills,
     removePendingSkill: pendingSkills.removePendingSkill,
     promptInputRef,
     currentMode,

@@ -2,9 +2,9 @@ import React, { useId } from 'react';
 import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 import { useI18n } from '../../i18n';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
+import { Icon } from '../../ui/Icon';
 import { WorkCardHeader } from './WorkCardHeader';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
-import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import type { WorkProcessRow } from './workProcessTypes';
 
@@ -27,7 +27,7 @@ export const TaskSnapshotCard: React.FC<{
       <div className="work-process-step-content">
         <div className={`work-process-task-snapshot${expanded ? ' is-expanded' : ''}`}>
           <WorkCardHeader onClick={toggle} expanded={expanded} controls={listId}
-            icon={<WorkProcessIcon icon="taskList" className="work-process-tool-card-icon" />}
+            icon={<Icon name="task-list" className="work-process-icon work-process-tool-card-icon" />}
             title={title}
             status={<span className="work-process-task-snapshot-count">{t('chat.workProcessTaskSnapshotCount', { completed: row.completed, total: row.total })}</span>} />
           {expanded ? (
@@ -47,7 +47,7 @@ export const TaskSnapshotCard: React.FC<{
                     <summary className="work-process-task-snapshot-title">{item.title}</summary>
                     {item.statusReason ? <p className="work-process-task-snapshot-reason">{reasonText(item.statusReason)}</p> : null}
                     {item.waitingOn?.map(wait => <p className="work-process-task-snapshot-reason" key={wait.taskId}>
-                      {t(`chat.taskDependency.${wait.reason}`, { title: wait.title ?? wait.taskId })}
+                      {t(`chat.taskDependency.${wait.reason}`, { title: wait.title ?? t('chat.taskUntitled') })}
                     </p>)}
                   </details> : <span className="work-process-task-snapshot-title">{item.title}</span>}
                 </li>

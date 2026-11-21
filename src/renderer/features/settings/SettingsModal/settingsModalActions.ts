@@ -74,26 +74,6 @@ export function createSettingsModalActions({
     await updateProfile(modalState.accountDraft);
   };
 
-  const handleRefreshProviderModels = async (provider: LlmProviderEntry) => {
-    modalState.setProviderDrafts((current) => current.map((entry) => (
-      entry.id === provider.id ? { ...entry, status: 'unconfigured', lastError: '' } : entry
-    )));
-    try {
-      const result = await window.electronAPI.llm.refreshProviderModels(provider.id);
-      if (!result.success) {
-        modalState.setProviderDrafts((current) => current.map((entry) => (
-          entry.id === provider.id ? { ...entry, status: 'failed', lastError: result.error } : entry
-        )));
-        return;
-      }
-      await providerConnection.refreshLocalSettings(provider.id);
-    } catch (error) {
-      modalState.setProviderDrafts((current) => current.map((entry) => (
-        entry.id === provider.id ? { ...entry, status: 'failed', lastError: getErrorMessage(error, t('settings.providerTestFailed')) } : entry
-      )));
-    }
-  };
-
   const handleDisconnectProvider = async (provider: LlmProviderEntry) => {
     try {
       if (provider.authMode === 'account') {
@@ -231,7 +211,6 @@ export function createSettingsModalActions({
   return {
     handleAvatarSelect,
     handleAccountSave,
-    handleRefreshProviderModels,
     handleDisconnectProvider,
     handleSaveAgentManifests,
     handleImportAgentManifest,

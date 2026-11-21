@@ -13,7 +13,7 @@
   border-radius: var(--radius-full);
   background: var(--token-accent-primary);
   color: var(--token-text-on-accent);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
 }
 
@@ -33,9 +33,9 @@
 }
 
 .knowledge-filter-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .knowledge-filter-group {
@@ -51,9 +51,9 @@
 
 .knowledge-filter-group legend {
   padding: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .knowledge-filter-options {

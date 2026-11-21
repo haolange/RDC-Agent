@@ -39,7 +39,7 @@ it('shows the reader-facing body and keeps the execution appendix collapsed', as
   const onClose = () => undefined;
   const plan = { planId: 'p', revision: 1, uri: 'session://plans/plan.md', hash: 'h', title: 'Plan', summary: [], sections: [], status: 'awaiting', handoffOptions: [] } as ConversationPlanReview;
   try {
-    await act(async () => root.render(createElement(PlanReviewPanel, { plan, onClose })));
+    await act(async () => root.render(createElement(PlanReviewPanel, { open: true, onExited: onClose, plan, onClose })));
     await act(async () => undefined);
     const panel = document.querySelector('[data-testid="plan-review-panel"]')!;
     const [body, references] = [...panel.querySelectorAll('[data-markdown]')].map((node) => node.textContent ?? '');

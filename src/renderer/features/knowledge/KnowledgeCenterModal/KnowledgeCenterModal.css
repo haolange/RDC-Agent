@@ -1,10 +1,7 @@
 @import './knowledge-center-shell.css';
 @import './knowledge-center-sidebar.css';
-
-
 @import './knowledge-center-dialogs.css';
 @import './knowledge-list.css';
-@import './knowledge-index.css';
 @import './knowledge-detail-header.css';
 @import './knowledge-metadata.css';
 @import './knowledge-reader.css';

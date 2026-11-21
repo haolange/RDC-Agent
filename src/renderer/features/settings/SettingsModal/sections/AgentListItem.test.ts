@@ -48,15 +48,16 @@ describe('AgentListItem', () => {
     await render({ name, description });
     const title = container.querySelector<HTMLElement>('.settings-agent-list-item-name')!;
     const detail = container.querySelector<HTMLElement>('.ui-overflow-fade')!;
-    expect(title.title).toBe(name);
+    expect(title.dataset.tooltip).toBe(name);
     expect(title.textContent).toBe(name);
-    expect(detail.title).toBe(description);
+    // The description offers its full text as a tooltip only once it measurably overflows.
+    expect(detail.dataset.tooltip).toBeUndefined();
     expect(detail.textContent).toBe(description);
     expect(container.querySelector('strong')).toBeNull();
     await render({ description: '' });
     expect(container.querySelector('.ui-overflow-fade')).toBe(detail);
     expect(detail.textContent).toBe('');
-    expect(detail.title).toBe('');
+    expect(detail.dataset.tooltip).toBeUndefined();
   });
 
   it('keeps glyphs decorative and small, and delegates disabled behavior to ListRow', async () => {

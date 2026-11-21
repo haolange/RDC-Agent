@@ -3,6 +3,7 @@ import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
 import { PersonalizationSettings } from './PersonalizationSettings';
+import { WorkProcessExpansionPicker } from './WorkProcessExpansionPicker';
 import { ProfileSettings } from './ProfileSettings';
 import type { useI18n } from '../../../../i18n';
 import type { AppSettings } from '@shared/types/settings';
@@ -60,14 +61,9 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
                 if (language === 'zh-CN' || language === 'en') void onLanguageChange(language);
               }} />
           </SettingsField>
-          <SettingsField layout="row" label={t('settings.workProcessExpansion')} description={t('settings.workProcessExpansionHelp')}
-            search="work-process-expansion">
-            <Tabs variant="segmented" label={t('settings.workProcessExpansion')}
-              value={settings.appearance.workProcessExpansion}
-              tabs={[{ id: 'latest', label: t('settings.workProcessExpansionLatest') }, { id: 'all', label: t('settings.workProcessExpansionAll') }]}
-              onChange={(expansion) => {
-                if (expansion === 'latest' || expansion === 'all') void onWorkProcessExpansionChange(expansion);
-              }} />
+          <SettingsField label={t('settings.workProcessExpansion')} search="work-process-expansion">
+            <WorkProcessExpansionPicker value={settings.appearance.workProcessExpansion} t={t}
+              onChange={(expansion) => void onWorkProcessExpansionChange(expansion)} />
           </SettingsField>
         </SettingsSection>
         <PersonalizationSettings

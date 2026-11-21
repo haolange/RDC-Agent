@@ -31,7 +31,6 @@ export interface WorkbenchShellProps {
   isTerminalOpen: boolean;
   bothSidebarsCollapsed: boolean;
   workbenchRailMaxWidth: string;
-  shellNotice: string | null;
   nickname: string;
   avatarPath: string | undefined;
   composer: ComposerController;
@@ -60,7 +59,6 @@ export function WorkbenchShell({
   isTerminalOpen,
   bothSidebarsCollapsed,
   workbenchRailMaxWidth,
-  shellNotice,
   nickname,
   avatarPath,
   composer,
@@ -131,11 +129,6 @@ export function WorkbenchShell({
 
       <main ref={workArea} className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
         <div className="main-content">
-          {shellNotice && (
-            <div className="shell-notice" role="status" aria-live="polite">
-              {shellNotice}
-            </div>
-          )}
           <div className="main-page-shell">{mainPage}</div>
         </div>
         {showMainPromptBar && (

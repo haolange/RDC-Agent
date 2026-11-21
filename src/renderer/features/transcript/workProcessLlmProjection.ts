@@ -63,7 +63,7 @@ export function projectLlmTurn(
       time: block.startedAt,
       row: { type: 'thinking', id: `${block.id}:thinking:${item.providerOutputRef.providerBlockKey}:${item.providerOutputRef.contentIndex}`,
         duration: '', status: presented.status === 'streaming' ? 'running' : 'complete',
-        preview: presented.preview, label: presented.label, kind: presented.kind, kindLabel: presented.kindLabel,
+        preview: presented.preview, label: presented.label, kind: presented.kind,
         visibility: presented.visibility, thinkingStatus: presented.status, expandable: true,
         openByDefault: presented.openByDefault } as WorkProcessRow,
       presented,

@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ProfileAvatar } from '../../patterns/ProfileAvatar';
-import { Tabs } from '../../ui/Tabs';
 import { Button } from '../../ui/Button';
-import type { AppLanguage, AppSettings, AppTheme, FontScale } from '@shared/types/settings';
+import type { AppSettings } from '@shared/types/settings';
 import './UserMenu.css';
 
 interface UserMenuProps {
@@ -15,9 +14,6 @@ interface UserMenuProps {
   settings: AppSettings;
   onClose: () => void;
   onOpenSettings: () => void;
-  onThemeChange: (theme: AppTheme) => void;
-  onLanguageChange: (language: AppLanguage) => void;
-  onFontScaleChange: (fontScale: FontScale) => void;
 }
 
 const VIEWPORT_MARGIN = 16;
@@ -37,9 +33,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
   settings,
   onClose,
   onOpenSettings,
-  onThemeChange,
-  onLanguageChange,
-  onFontScaleChange,
 }) => {
   const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -49,7 +42,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     // Wait for the anchor drawer's focus restoration and measured visibility.
     const frame = requestAnimationFrame(() => {
       returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      menuRef.current?.querySelector<HTMLButtonElement>('[role="tab"][tabindex="0"]')?.focus();
+      menuRef.current?.querySelector<HTMLButtonElement>('[data-testid="open-settings-entry"]')?.focus();
     });
     return () => cancelAnimationFrame(frame);
   }, [open]);
@@ -146,7 +139,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     open,
     updatePosition,
     settings.appearance.fontScale,
-    settings.appearance.language,
     settings.profile.nickname,
   ]);
 
@@ -179,29 +171,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
           <div className="user-menu-header-copy">
             <div className="user-menu-name">{settings.profile.nickname}</div>
           </div>
-        </div>
-
-        <div className="user-menu-preferences">
-        <div className="user-menu-section">
-          <div className="user-menu-section-label">{t('userMenu.language')}</div>
-          <Tabs variant="segmented" fullWidth label={t('userMenu.language')} value={settings.appearance.language}
-            onChange={(value) => onLanguageChange(value as AppLanguage)}
-            tabs={[{ id: 'zh-CN', label: t('language.zh') }, { id: 'en', label: t('language.en') }]} />
-        </div>
-
-        <div className="user-menu-section">
-          <div className="user-menu-section-label">{t('userMenu.theme')}</div>
-          <Tabs variant="segmented" fullWidth label={t('userMenu.theme')} value={settings.appearance.theme}
-            onChange={(value) => onThemeChange(value as AppTheme)}
-            tabs={(['dark', 'light', 'system'] as AppTheme[]).map((theme) => ({ id: theme, label: t(`theme.${theme}`) }))} />
-        </div>
-
-        <div className="user-menu-section">
-          <div className="user-menu-section-label">{t('userMenu.fontScale')}</div>
-          <Tabs variant="segmented" fullWidth label={t('userMenu.fontScale')} value={settings.appearance.fontScale}
-            onChange={(value) => onFontScaleChange(value as FontScale)}
-            tabs={(['small', 'medium', 'large'] as FontScale[]).map((size) => ({ id: size, label: t(`font.${size}`) }))} />
-        </div>
         </div>
 
         <Button

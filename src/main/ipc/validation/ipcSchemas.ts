@@ -73,7 +73,6 @@ export const SettingsSetArgsSchema = z.tuple([
       language: z.enum(['zh-CN', 'en']).optional(),
       fontScale: z.enum(['small', 'medium', 'large']).optional(),
       composerMarkdown: z.boolean().optional(),
-      usePointerCursors: z.boolean().optional(),
       contextBreakdownExpanded: z.boolean().optional(),
       workProcessExpansion: z.enum(['latest', 'all']).optional(),
       chromeThemes: z.object({

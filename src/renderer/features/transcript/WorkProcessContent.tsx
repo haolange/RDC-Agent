@@ -1,8 +1,9 @@
 import React from 'react';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
-import { WorkProcessExpansionProvider } from './WorkProcessExpansion';
+import { WorkProcessViewport } from './WorkProcessViewport';
 import { WorkProcessTrackContext } from './WorkProcessRailIcon';
 import { firstTrackEvent } from './workProcessTrack';
 import { useWorkProcessTrack } from './useWorkProcessTrack';
@@ -20,7 +21,7 @@ export const WorkProcessContent: React.FC<{
   /** The enclosing disclosure already supplies the leading content inset. */
   embedded?: boolean;
   leadingContent?: React.ReactNode;
-  /** The owning turn or delegation is still running: its latest step opens under the `latest` preference. */
+  /** The owning turn or delegation is still running; under the `latest` preference it follows the newest step. */
   active: boolean;
 }> = ({ presentation, sessionId, renderToolDetail, disclosureScope, leadingContent, active, embedded = false, density = 'normal' }) => {
   const trackRef = React.useRef<HTMLDivElement>(null);
@@ -30,17 +31,18 @@ export const WorkProcessContent: React.FC<{
     () => createWorkProcessRowRenderer(sessionId, renderToolDetail, density),
     [sessionId, renderToolDetail, density],
   );
-  const latestSectionId = presentation.rows.filter((row) => row.type === 'section').at(-1)?.id;
+  const preference = useAppSettingsStore((state) => state.settings.appearance.workProcessExpansion);
   if (!presentation.summary && presentation.rows.length === 0) return null;
-  const body = <WorkProcessExpansionProvider active={active} latestSectionId={latestSectionId}>
-    <div className={`work-process-body${embedded ? ' is-embedded' : ''}${density === 'compact' ? ' is-compact' : ''}`}>
+  const body = <div className={`work-process-body${embedded ? ' is-embedded' : ''}${density === 'compact' ? ' is-compact' : ''}`}>
     {presentation.summary ? <p className="work-process-summary">{presentation.summary}</p> : null}
-    <WorkProcessTrackContext.Provider value={firstId}><div ref={trackRef} className="work-process-track" data-work-track="true">
-      {leadingContent ? <div className="work-process-track-leading">{leadingContent}</div> : null}
-      {presentation.rows.length > 0 ? <MeasuredWorkRows className="work-process-steps work-process-narrative-stream"
-        rows={presentation.rows} renderRow={renderRow} /> : null}
-    </div></WorkProcessTrackContext.Provider>
-  </div></WorkProcessExpansionProvider>;
+    <WorkProcessViewport following={active && preference === 'latest'}>
+      <WorkProcessTrackContext.Provider value={firstId}><div ref={trackRef} className="work-process-track" data-work-track="true">
+        {leadingContent ? <div className="work-process-track-leading">{leadingContent}</div> : null}
+        {presentation.rows.length > 0 ? <MeasuredWorkRows className="work-process-steps work-process-narrative-stream"
+          rows={presentation.rows} renderRow={renderRow} /> : null}
+      </div></WorkProcessTrackContext.Provider>
+    </WorkProcessViewport>
+  </div>;
   // The turn's Working supplies its scope above the root disclosure; a delegation brings its own.
   return disclosureScope === undefined ? body : <ScopedWorkDisclosure scope={disclosureScope}>{body}</ScopedWorkDisclosure>;
 };

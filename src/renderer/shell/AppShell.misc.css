@@ -1,4 +1,5 @@
 .loading-screen {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8,18 +9,26 @@
   background: var(--token-bg-app);
 }
 
+/* The boot screen keeps the window movable and closable before the workbench mounts. */
+.loading-titlebar {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  height: var(--header-height);
+  -webkit-app-region: drag;
+}
+
 .loading-logo {
   width: var(--space-12);
   height: var(--space-12);
-}
-
-.loading-text {
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  animation: surface-rise-in var(--duration-slow) var(--ease-emphasized) both;
 }
 
 .loading-bar {
-  width: 14rem;
+  width: 10rem;
+  animation: overlay-fade-in var(--duration-slow) var(--ease-standard) both;
+  animation-delay: var(--duration-base);
   height: var(--space-1);
   border-radius: var(--radius-full);
   background: var(--token-bg-raised);
@@ -32,7 +41,7 @@
   width: 36%;
   height: 100%;
   background: var(--token-accent-primary);
-  animation: loading-shimmer 1.5s ease-in-out infinite;
+  animation: loading-shimmer 1.5s var(--ease-standard) infinite;
 }
 
 @keyframes loading-shimmer {

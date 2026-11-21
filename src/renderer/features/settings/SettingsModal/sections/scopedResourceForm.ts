@@ -89,6 +89,16 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
   return { ...base, id, body: content };
 };
 
+/** The descriptor the form was opened from, as an object; a new or unreadable one starts empty. */
+const parseDescriptor = (body: string): Record<string, unknown> => {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+};
+
 export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormState): string => {
   if (kind === 'skill' || kind === 'policy' || kind === 'agent') return form.body;
   if (kind === 'mcp') {
@@ -96,7 +106,10 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
     if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
       throw new Error('Arguments must be a JSON array of strings.');
     }
+    // The form edits a few fields of the descriptor; everything else it carries (env, description, …) stays as written.
+    const { url: _url, ...original } = parseDescriptor(form.body);
     return JSON.stringify({
+      ...original,
       id: form.id,
       name: form.name || form.id,
       transport: form.transport || 'stdio',
@@ -120,16 +133,13 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
   return form.body;
 };
 
-export const resourceCardMeta = (kind: ScopedResourceKind, content: string): string => {
-  if (kind === 'mcp') {
-    try {
-      const parsed = JSON.parse(content) as { transport?: string; command?: string };
-      return [parsed.transport, parsed.command].filter(Boolean).join(' · ');
-    } catch { return ''; }
+/** The name a person gave the resource: a skill's frontmatter name, an MCP server's name, otherwise its id. */
+export const resourceDisplayName = (kind: ScopedResourceKind, id: string, content: string): string => {
+  if (kind === 'skill') {
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content)?.[1] ?? '';
+    const name = frontmatter.split(/\r?\n/).find((line) => line.startsWith('name:'))?.slice('name:'.length).trim();
+    return name ? name.replace(/^['"]|['"]$/g, '') : id;
   }
-  if (kind === 'hook') {
-    const event = content.split(/\r?\n/).find((line) => line.startsWith('event:'));
-    return event ? event.slice(6).trim() : '';
-  }
-  return '';
+  if (kind === 'mcp') return formFromContent('mcp', id, content).name || id;
+  return id;
 };

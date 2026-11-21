@@ -21,7 +21,7 @@
 .color-picker-area:focus-visible,
 .color-picker-hue:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .color-picker-thumb {

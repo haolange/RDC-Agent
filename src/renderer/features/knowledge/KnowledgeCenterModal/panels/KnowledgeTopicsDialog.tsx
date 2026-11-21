@@ -6,6 +6,7 @@ import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
+import { Skeleton } from '../../../../ui/Skeleton';
 import type { useKnowledgeTopics } from '../useKnowledgeTopics';
 
 export function KnowledgeTopicsDialog({ topics }: { topics: ReturnType<typeof useKnowledgeTopics> }) {
@@ -31,7 +32,7 @@ export function KnowledgeTopicsDialog({ topics }: { topics: ReturnType<typeof us
           </Button>
         </>
       )}>
-      {topics.busy && !topics.proposal ? <p role="status">{t('knowledgeCenter.loading')}</p> : null}
+      {topics.busy && !topics.proposal ? <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="row" count={4} /></div> : null}
       {!preview && topics.proposal ? (
         <>
           {topics.suggestions.length === 0 ? <p>{t('knowledgeCenter.topicsNoSuggestions')}</p> : null}

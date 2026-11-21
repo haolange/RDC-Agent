@@ -25,7 +25,6 @@ export function createDefaultUiPreferences(): UiPreferences {
     language: 'zh-CN',
     fontScale: 'medium',
     composerMarkdown: false,
-    usePointerCursors: false,
     contextBreakdownExpanded: true,
     workProcessExpansion: 'latest',
     chromeThemes: createDefaultChromeThemes(),
@@ -48,9 +47,6 @@ export function sanitizeUiPreferences(
     composerMarkdown: typeof record.composerMarkdown === 'boolean'
       ? record.composerMarkdown
       : fallback.composerMarkdown,
-    usePointerCursors: typeof record.usePointerCursors === 'boolean'
-      ? record.usePointerCursors
-      : fallback.usePointerCursors,
     contextBreakdownExpanded: typeof record.contextBreakdownExpanded === 'boolean'
       ? record.contextBreakdownExpanded
       : fallback.contextBreakdownExpanded,

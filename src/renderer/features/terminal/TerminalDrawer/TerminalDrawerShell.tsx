@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDynStyle } from '../../../lib/useDynStyle';
+import { Icon } from '../../../ui/Icon';
 import type { TerminalDrawerViewModel } from './useTerminalDrawer';
 
 interface TerminalDrawerShellProps {
@@ -82,7 +83,7 @@ export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({
           aria-label={t('terminal.close')}
           onClick={closeTerminal}
         >
-          <span className="runtime-terminal-close-mark" aria-hidden="true" />
+          <Icon name="close" size={14} />
         </button>
       </div>
 

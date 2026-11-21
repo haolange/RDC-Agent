@@ -7,7 +7,7 @@
   width: 100%;
   min-width: 0;
   font-family: var(--font-mono);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .appearance-import-preview {
@@ -36,12 +36,14 @@
 
 .appearance-import-preview-code {
   min-width: 0;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
 
 .appearance-import-status {
   margin: var(--space-2) 0 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }

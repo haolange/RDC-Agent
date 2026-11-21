@@ -104,8 +104,6 @@ import type {
   KnowledgePack,
   KnowledgeQueryRequest,
   KnowledgeQueryResult,
-  KnowledgeReadRequest,
-  KnowledgeReadResult,
   KnowledgeTopicChanges,
   KnowledgeTopicPreview,
   KnowledgeTopicProposal,
@@ -189,6 +187,8 @@ export interface ElectronAPI {
     resolveFavicon: (domain: string) => Promise<{
       dataUrl: string | null;
     }>;
+    /** An https image an answer embeds, fetched by the main process (≤5 MB, sniffed raster types only). */
+    fetchImage: (url: string) => Promise<{ dataUrl: string } | { dataUrl: null; error: string }>;
   };
 
   conversation: {
@@ -229,6 +229,10 @@ export interface ElectronAPI {
     getAttachmentPreview: (
       request: ConversationGetAttachmentPreviewRequest,
     ) => Promise<ConversationGetAttachmentPreviewResult>;
+    /** A session artifact, attachment or project file an answer embeds; images and mp4/webm video only. */
+    resolveMedia: (request: { sessionId: string; src: string }) => Promise<
+      { dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: string }
+    >;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;
     offEvent: (callback: (event: ConversationStreamEvent) => void) => void;
   };
@@ -285,7 +289,6 @@ export interface ElectronAPI {
     topicApply: (request: { changes: KnowledgeTopicChanges; changeHash: string; confirmation: KnowledgeHumanConfirmation }) => Promise<{ revision: string } | { cancelled: true }>;
     query: (request: KnowledgeQueryRequest) => Promise<KnowledgeQueryResult>;
     card: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
-    read: (request: KnowledgeReadRequest) => Promise<KnowledgeReadResult>;
     compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
     indexRebuild: () => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
     candidates: (sessionId: string) => Promise<KnowledgeCandidatesResult>;

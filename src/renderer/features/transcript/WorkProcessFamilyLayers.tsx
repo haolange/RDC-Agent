@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
 import { copyAppText } from '../../hooks/appShellBridge';
-import { Button } from '../../ui/Button';
+import { CopyButton } from '../../ui/CopyButton';
 import { WorkProcessHighlightedCode } from './WorkProcessHighlightedCode';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import type { ToolRowModel } from './workProcessToolTypes';
@@ -16,31 +16,12 @@ export const isDedicatedFamily = (family: ToolRowModel['family']): boolean => (
 
 export const CopyPathButton: React.FC<{ path: string }> = ({ path }) => {
   const { t } = useI18n();
-  const [copied, setCopied] = React.useState(false);
-  const copyLabel = t('chat.workProcessCopy');
-  const copiedLabel = t('chat.workProcessCopied');
-
-  const onCopy = async (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!path) return;
+  const copy = async () => {
+    if (!path) return false;
     await copyAppText(path);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
+    return true;
   };
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="work-process-tool-card-copy"
-      onClick={onCopy}
-      aria-label={copied ? copiedLabel : copyLabel}
-      title={copied ? copiedLabel : copyLabel}
-    >
-      {copied ? '✓' : '⧉'}
-    </Button>
-  );
+  return <CopyButton className="work-process-tool-card-copy" onCopy={copy} label={t('chat.workProcessCopy')} copiedLabel={t('chat.workProcessCopied')} />;
 };
 
 const ChipRow: React.FC<{ chips?: string[] }> = ({ chips }) => {
@@ -54,7 +35,7 @@ const ChipRow: React.FC<{ chips?: string[] }> = ({ chips }) => {
 
 const PathRow: React.FC<{ path: string }> = ({ path }) => (
   <div className="work-process-family-path">
-    <code className="work-process-tool-card-path" title={path}>{path}</code>
+    <code className="work-process-tool-card-path" data-tooltip={path}>{path}</code>
     <CopyPathButton path={path} />
   </div>
 );
@@ -94,7 +75,7 @@ const MemoryBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   return (
     <div className="work-process-tool-card-body family-memory">
       <ChipRow chips={row.chips} />
-      {sample ? <span className="work-process-tool-card-body-text is-summary" title={sample}>{sample}</span> : null}
+      {sample ? <span className="work-process-tool-card-body-text is-summary" data-tooltip={sample}>{sample}</span> : null}
     </div>
   );
 };
@@ -117,7 +98,7 @@ const SkillBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   if (!name) return null;
   return (
     <div className="work-process-tool-card-body family-skill">
-      <span className="work-process-tool-card-body-text is-summary" title={name}>{name}</span>
+      <span className="work-process-tool-card-body-text is-summary" data-tooltip={name}>{name}</span>
     </div>
   );
 };
@@ -140,7 +121,7 @@ const McpBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   return (
     <div className="work-process-tool-card-body family-mcp">
       <ChipRow chips={row.chips} />
-      {summary ? <span className="work-process-tool-card-body-text is-summary" title={summary}>{summary}</span> : null}
+      {summary ? <span className="work-process-tool-card-body-text is-summary" data-tooltip={summary}>{summary}</span> : null}
     </div>
   );
 };
@@ -168,7 +149,7 @@ const RuntimeBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className="work-process-tool-card-body family-runtime">
       <ChipRow chips={row.chips} />
       {row.bodyText ? (
-        <span className="work-process-tool-card-body-text is-summary" title={row.bodyText}>{row.bodyText}</span>
+        <span className="work-process-tool-card-body-text is-summary" data-tooltip={row.bodyText}>{row.bodyText}</span>
       ) : null}
     </div>
   );

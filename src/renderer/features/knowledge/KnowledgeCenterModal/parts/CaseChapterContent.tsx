@@ -1,8 +1,11 @@
 import { useId, useState } from 'react';
 import { Button } from '../../../../ui/Button';
 import { useI18n } from '../../../../i18n';
+import { Chevron } from '../../../../ui/Chevron';
+import { SCOPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { KnowledgeMarkdown } from './KnowledgeMarkdown';
 import type { TranslationKey } from '../../../../i18n/messages';
+import type { KnowledgeScopeAxis } from '@shared/types/knowledge';
 
 type Value = null | boolean | number | string | Value[] | { [key: string]: Value };
 
@@ -41,6 +44,12 @@ const FIELD_LABELS: Record<string, TranslationKey> = {
   decoration: 'knowledgeCenter.field.decoration',
 };
 
+/** A field in words: case fields first, then scope axes; a field this build does not know is shown as written. */
+function fieldLabel(key: string, t: (key: TranslationKey) => string): string {
+  if (FIELD_LABELS[key]) return t(FIELD_LABELS[key]);
+  return key in SCOPE_LABEL_KEYS ? t(SCOPE_LABEL_KEYS[key as KnowledgeScopeAxis]) : key;
+}
+
 export function parseChapterValue(content: string): Value | undefined {
   const text = content.trim();
   if (!text.startsWith('{') && !text.startsWith('[')) return undefined;
@@ -65,7 +74,7 @@ function StructuredValue({ value, depth = 0 }: { value: Value; depth?: number })
   if (!Object.keys(value).length) return <span>{t('knowledgeCenter.case.noFields')}</span>;
   return <dl className="knowledge-case-fields">{Object.entries(value).map(([key, item]) => (
     <div key={key} className={!isCompactList(item) && (typeof item === 'object' && item !== null || String(item).length > 75) ? 'is-wide' : undefined}>
-      <dt title={key}>{FIELD_LABELS[key] ? t(FIELD_LABELS[key]) : key}</dt>
+      <dt>{fieldLabel(key, t)}</dt>
       <dd><StructuredValue value={item} depth={depth + 1} /></dd>
     </div>
   ))}</dl>;
@@ -85,7 +94,7 @@ function EvidenceItem({ value }: { value: Record<string, Value> }) {
     {Object.keys(details).length > 0 && <>
       <Button variant="ghost" size="sm" className="knowledge-evidence-toggle" aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen(!open)}>
         {t('knowledgeCenter.case.sourceDetails')}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d={open ? 'm5 15 7-7 7 7' : 'm5 9 7 7 7-7'}/></svg>
+        <Chevron direction="down" open={open} />
       </Button>
       {open && <div id={detailsId} className="knowledge-evidence-details"><StructuredValue value={details} /></div>}
     </>}

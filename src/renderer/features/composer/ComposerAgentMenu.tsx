@@ -4,6 +4,7 @@ import { Icon } from '../../ui/Icon';
 import { ModeGlyph } from '../../ui/ModeGlyph';
 import { Pill } from '../../ui/Pill';
 import { useI18n } from '../../i18n';
+import { Chevron } from '../../ui/Chevron';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
@@ -92,16 +93,14 @@ export const ComposerAgentMenu: React.FC<{
         onClick={() => menu.toggle()}
         aria-haspopup="menu"
         aria-expanded={menu.open}
-        title={selectedAgentCapability || currentModeLabel}
+        data-tooltip={selectedAgentCapability || currentModeLabel}
       >
         <span className="composer-agent-pill-icon" aria-hidden="true">
           <ModeGlyph mode={currentMode} icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon} size={16} strokeWidth={2} />
         </span>
         <span className="composer-agent-pill-label">{currentModeLabel}</span>
         <span className="composer-agent-pill-caret" aria-hidden="true">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <Chevron direction="down" size={12} />
         </span>
       </Pill>
       {menu.open ? (
@@ -125,7 +124,7 @@ export const ComposerAgentMenu: React.FC<{
                 data-selected={isSelected}
                 role="menuitemradio"
                 aria-checked={isSelected}
-                title={description || agent.name}
+                data-tooltip={description || agent.name}
                 onClick={() => selectAgent(agent)}
               >
                 <span className="composer-agent-menu-item-icon" aria-hidden="true">

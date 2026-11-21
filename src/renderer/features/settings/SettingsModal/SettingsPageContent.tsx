@@ -1,3 +1,4 @@
+import { HelpTip } from '../../../ui/HelpTip';
 import { GeneralSettings } from './sections/GeneralSettings';
 import { AppearanceSettings } from './sections/AppearanceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
@@ -15,7 +16,7 @@ import type { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'activeSection' | 't' | 'currentProjectId' | 'accountDraft' | 'setAccountDraft' | 'handleAvatarSelect' |
   'handleAccountSave' | 'setLanguage' | 'globalInstructionsDraft' | 'setGlobalInstructionsDraft' | 'handleSavePersonalization' |
-  'setTheme' | 'setFontScale' | 'setComposerMarkdown' | 'setUsePointerCursors' |
+  'setTheme' | 'setFontScale' | 'setComposerMarkdown' |
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
   'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
@@ -51,7 +52,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     setTheme,
     setFontScale,
     setComposerMarkdown,
-    setUsePointerCursors,
     setChromeTheme,
     accountProviders,
     providerCatalog,
@@ -103,7 +103,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         onThemeChange={setTheme}
         onFontScaleChange={setFontScale}
         onComposerMarkdownChange={setComposerMarkdown}
-        onUsePointerCursorsChange={setUsePointerCursors}
         onChromeThemeChange={setChromeTheme}
         t={t}
       />
@@ -155,9 +154,9 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     {activeSection === 'tools' && (
       <section className="settings-page settings-page-tools" data-settings-search="tools">
       <header className="settings-section-header">
-        <div>
+        <div className="settings-section-title-row">
           <div className="settings-section-title">{t('settings.mcpServicesTitle')}</div>
-          <div className="settings-section-subtitle">{t('settings.mcpServicesHint')}</div>
+          <HelpTip label={t('settings.mcpServicesTitle')}>{t('settings.mcpServicesHint')}</HelpTip>
         </div>
       </header>
       <McpServicesPanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />

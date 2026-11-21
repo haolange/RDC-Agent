@@ -3,9 +3,15 @@ import { Button, Tabs, TaskDialog } from '../../src/renderer/ui';
 import { ComposerMarkdownInput } from '../../src/renderer/features/composer/ComposerMarkdownInput';
 import { PlanCard } from '../../src/renderer/features/transcript/PlanCard';
 import { TaskSnapshotCard } from '../../src/renderer/features/transcript/TaskSnapshotCard';
+import { WorkProcessContent } from '../../src/renderer/features/transcript/WorkProcessContent';
+import { buildWorkProcessPresentation } from '../../src/renderer/features/transcript/workProcessTracePresentation';
+import { useI18n } from '../../src/renderer/i18n';
+import type { ConversationToolCall, ConversationWorkBlock } from '../../src/shared/types/conversation';
 import { ScopedWorkDisclosure } from '../../src/renderer/features/transcript/ScopedWorkDisclosure';
 import { RightRailTaskList } from '../../src/renderer/features/right-rail/RightRailTaskList';
 import { MessageMarkdown } from '../../src/renderer/patterns/Markdown/MessageMarkdown';
+import { MarkdownSourceProvider } from '../../src/renderer/patterns/Markdown/markdownSources';
+import { MarkdownSourcesRow } from '../../src/renderer/patterns/Markdown/MarkdownSourcesRow';
 import type { ConversationPlanReview } from '../../src/shared/types/planReview';
 import '../../src/renderer/features/transcript/AgentChat.css';
 import '../../src/renderer/features/transcript/work-process-tasks.css';
@@ -58,4 +64,54 @@ export function TaskListSample() {
     sessionId: 'catalog', traceLaneId: 'catalog', branchId: 'catalog',
     createdAt: '2026-10-30T00:00:00Z', updatedAt: '2026-10-30T00:00:00Z',
   }))} />;
+}
+
+const at = Date.parse('2026-10-30T08:00:00Z');
+const webResult = (details: Record<string, unknown>) => JSON.stringify({ ok: true, data: { content: [], details } });
+const read = (id: string, url: string, title: string | undefined, start: number, end: number, failed = false): ConversationToolCall => ({
+  id, toolName: 'web_fetch', status: failed ? 'error' : 'complete', argsPreview: JSON.stringify({ url }),
+  ...(failed ? { error: 'HTTP 404 Not Found' } : { resultPreview: webResult({ kind: 'fetch', url, status: 200, bytes: 48_213, ...(title ? { title } : {}) }) }),
+  startedAt: at + start, executionStartedAt: at + start, completedAt: at + end,
+});
+const webTurn = (id: string, text: string, toolCalls: ConversationToolCall[]): ConversationWorkBlock => ({
+  id, kind: 'llm_turn', title: 'LLM turn', status: 'complete', startedAt: at, completedAt: at + 4_000,
+  result: { status: 'complete', toolCallIds: toolCalls.map(call => call.id) },
+  items: text ? [{ kind: 'text', text, phase: 'commentary', status: 'complete', displayOrder: 0,
+    providerOutputRef: { protocol: 'sample', providerBlockKey: id, contentIndex: 0 } }] : [],
+  toolCalls,
+});
+
+/** Search, reads that merge across steps, a failed page and a single read: every web card state, no network. */
+export function WorkProcessWebSample() {
+  const { t } = useI18n();
+  const presentation = buildWorkProcessPresentation({ status: 'complete', updatedAt: at + 4_000, blocks: [
+    webTurn('search', '先找 Vulkan 抓帧相关的资料。', [{ id: 'search', toolName: 'web_search', status: 'complete',
+      argsPreview: JSON.stringify({ query: 'RenderDoc Vulkan capture' }), startedAt: at, executionStartedAt: at, completedAt: at + 640,
+      resultPreview: webResult({ kind: 'search', query: 'RenderDoc Vulkan capture', results: [
+        { url: 'https://renderdoc.org/docs/getting_started/quick_start.html', title: 'Quick Start — RenderDoc', snippet: 'Capturing a frame and inspecting the event browser.' },
+        { url: 'https://www.khronos.org/vulkan/', title: 'Vulkan Overview', snippet: 'The cross-platform graphics and compute API.' },
+        { url: 'https://github.com/baldurk/renderdoc', title: 'baldurk/renderdoc', snippet: 'A stand-alone graphics debugger.' },
+        { url: 'https://developer.nvidia.com/nsight-graphics', title: 'Nsight Graphics', snippet: 'Frame debugging and profiling.' },
+      ] }) }]),
+    webTurn('reads', '', [read('quick', 'https://renderdoc.org/docs/getting_started/quick_start.html', 'Quick Start — RenderDoc', 700, 1_300),
+      read('khronos', 'https://www.khronos.org/vulkan/', 'Vulkan Overview', 720, 1_900), read('gone', 'https://example.com/moved', undefined, 740, 1_100, true)]),
+    webTurn('single', '再确认一下仓库说明。', [read('repo', 'https://github.com/baldurk/renderdoc', 'baldurk/renderdoc', 2_000, 2_450)]),
+  ] }, t);
+  return <ScopedWorkDisclosure scope="catalog-web"><WorkProcessContent presentation={presentation} active={false} /></ScopedWorkDisclosure>;
+}
+
+const citedAnswer = [
+  '这一帧的 draw 调用只有一次，抓帧流程与 [RenderDoc 快速上手](https://renderdoc.org/docs/getting_started/quick_start.html) 一致；',
+  'Vulkan 侧的同步语义见 [Khronos 概览](https://www.khronos.org/vulkan/)，另可参考 [社区讨论](https://example.com/thread)。',
+].join('');
+
+/** Links to pages the turn read become citation pills; the answer ends with the pages it cited. */
+export function CitationSample() {
+  return <MarkdownSourceProvider sources={[
+    { url: 'https://renderdoc.org/docs/getting_started/quick_start.html', domain: 'renderdoc.org', title: 'Quick Start — RenderDoc', summary: 'Capturing a frame and inspecting the event browser.' },
+    { url: 'https://www.khronos.org/vulkan/', domain: 'khronos.org', title: 'Vulkan Overview' },
+  ]}>
+    <MessageMarkdown content={citedAnswer} />
+    <MarkdownSourcesRow content={citedAnswer} />
+  </MarkdownSourceProvider>;
 }

@@ -20,7 +20,7 @@ interface CodeInterpreterSettingsFieldsProps {
 export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFieldsProps> = ({ draft, onChange, t }) => {
   const [envText, setEnvText] = useState(() => envToText(draft.env));
   const [argsText, setArgsText] = useState(() => draft.argsPrefix.join(' '));
-  const [timeoutText, setTimeoutText] = useState(() => String(draft.timeoutMs));
+  const [timeoutText, setTimeoutText] = useState(() => String(draft.timeoutMs / 1000));
 
   return (
     <section className="settings-local-tool-form" data-testid="settings-code-interpreter" data-settings-search="code-interpreter">
@@ -47,19 +47,20 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
           />
         </SettingsField>
         <SettingsField label={t('settings.codeInterpreterTimeout')}>
+          {/* Stored in milliseconds, edited in seconds. */}
           <Input
             type="number"
-            min={1000}
-            max={600000}
+            min={1}
+            max={600}
             required
             value={timeoutText}
             onChange={(event) => {
               setTimeoutText(event.target.value);
-              onChange({ ...draft, timeoutMs: Number(event.target.value) });
+              onChange({ ...draft, timeoutMs: Math.round(Number(event.target.value) * 1000) });
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterArgs')} description={t('settings.rdcCliArgsPrefixHint')}>
+        <SettingsField label={t('settings.codeInterpreterArgs')} help={t('settings.rdcCliArgsPrefixHint')}>
           <Input
             type="text"
             value={argsText}
@@ -70,7 +71,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterEnv')} description={t('settings.envLineHint')}>
+        <SettingsField label={t('settings.codeInterpreterEnv')} help={t('settings.envLineHint')}>
           <Textarea
             aria-label={t('settings.codeInterpreterEnv')}
             data-testid="settings-code-interpreter-env"
@@ -86,7 +87,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField className="settings-interpreter-artifacts" layout="row" label={t('settings.codeInterpreterArtifacts')} description={t('settings.codeInterpreterArtifactsHint')}>
+        <SettingsField className="settings-interpreter-artifacts" layout="row" label={t('settings.codeInterpreterArtifacts')} help={t('settings.codeInterpreterArtifactsHint')}>
           <Checkbox
             checked={draft.artifactsEnabled}
             onCheckedChange={(checked) => onChange({ ...draft, artifactsEnabled: checked })}

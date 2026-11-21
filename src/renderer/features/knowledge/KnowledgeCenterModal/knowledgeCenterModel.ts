@@ -1,10 +1,9 @@
-import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, KNOWLEDGE_RETRIEVAL_LANES } from '@shared/types/knowledge';
+import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES } from '@shared/types/knowledge';
 import type {
   KnowledgeCardRecord,
   KnowledgeCardType,
   KnowledgeLifecycle,
   KnowledgeQueryRequest,
-  KnowledgeRetrievalLane,
 } from '@shared/types/knowledge';
 
 export type KnowledgeViewMode = 'cards' | 'candidates' | 'conflicts';
@@ -18,7 +17,6 @@ export type KnowledgeWriteAction =
 
 export const ALL_CARD_TYPES: KnowledgeCardType[] = [...KNOWLEDGE_CARD_TYPES];
 export const ALL_LIFECYCLES: KnowledgeLifecycle[] = [...KNOWLEDGE_LIFECYCLES];
-export const ALL_LANES: KnowledgeRetrievalLane[] = [...KNOWLEDGE_RETRIEVAL_LANES];
 
 export { serviceErrorMessage as knowledgeErrorMessage } from '../../../lib/serviceErrorMessage';
 

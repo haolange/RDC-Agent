@@ -47,21 +47,6 @@ export const KnowledgeCardArgsSchema = z.tuple([
   ipcNonEmptyString(1024, 'relativePath'),
 ]);
 
-export const KnowledgeReadArgsSchema = z.tuple([z.object({
-  spaceId: KnowledgeSpaceIdSchema,
-  relativePath: ipcNonEmptyString(1024, 'relativePath'),
-  mode: z.enum(['summary', 'section', 'range', 'full']),
-  contentHash: z.string().regex(/^[a-f0-9]{64}$/u).optional(),
-  heading: ipcNonEmptyString(512, 'heading').optional(),
-  headingLine: z.number().int().positive().optional(),
-  startLine: z.number().int().positive().optional(),
-  endLine: z.number().int().positive().optional(),
-}).strict().superRefine((request, context) => {
-  if (request.mode !== 'summary' && !request.contentHash) context.addIssue({ code: 'custom', message: 'contentHash is required for versioned reading.' });
-  if (request.mode === 'section' && !request.heading) context.addIssue({ code: 'custom', message: 'heading is required for a section.' });
-  if (request.mode === 'range' && (!request.startLine || !request.endLine)) context.addIssue({ code: 'custom', message: 'startLine and endLine are required for a range.' });
-})]);
-
 export const KnowledgeCompileArgsSchema = z.tuple([
   z.object({
     spaceIds: z.array(KnowledgeSpaceIdSchema).max(64).optional(),

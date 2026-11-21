@@ -23,7 +23,9 @@ describe('policy page composition', () => {
     expect(html.match(/data-testid="policy-resources"/g)).toHaveLength(1);
     expect(html).toContain(`data-scope="${scope}"`);
     expect(html.indexOf('policy-resources')).toBeLessThan(html.indexOf('settings.globalRuntimeSettings'));
-    expect(html).toContain('settings.compactionThresholdScope');
+    // The threshold's scope note sits behind the field's help tip instead of a line under it.
+    expect(html).toContain('aria-label="settings.compactionThreshold"');
+    expect(html).not.toContain('settings-help-text');
     expect(html).toContain('80');
   });
 });

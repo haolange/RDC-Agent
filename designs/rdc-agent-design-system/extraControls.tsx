@@ -36,8 +36,8 @@ export function ExtraControls() {
         const rect = event.currentTarget.getBoundingClientRect();
         setContext({ x: rect.right, y: rect.bottom });
       }}>上下文菜单示例</Button>
-      <p>ContextMenu x / y / items / onSelect / onClose：用于编辑上下文命令，普通表单使用 Popover。方向键跳过禁用项，Home/End 定位，Escape 返回触发器；视口边缘自动限宽和翻转。</p>
-      {context && <ContextMenu {...context} items={[
+      <p>ContextMenu open / x / y / items / onSelect / onClose：用于编辑上下文命令，普通表单使用 Popover。方向键跳过禁用项，Home/End 定位，Escape 返回触发器；视口边缘自动限宽和翻转。</p>
+      {context && <ContextMenu open {...context} items={[
         { type: 'command', id: 'copy', label: '示例复制', shortcut: 'Ctrl+C', disabled: false },
         { type: 'command', id: 'paste', label: '示例粘贴（不可用）', shortcut: 'Ctrl+V', disabled: true },
       ]} onSelect={() => { setMessage('仅更新本地状态，未访问剪贴板'); setContext(null); }} onClose={() => setContext(null)} />}
@@ -53,7 +53,7 @@ export function ExtraControls() {
     </Details>
     <Details summary="InlineError / Toast / Spinner / Kbd · 反馈">
       <InlineError>保存失败，草稿仍保留。此处是明确标注的错误示例。</InlineError>
-      <Toast title="已保存" message="操作结果反馈示例" tone="success" />
+      <Toast open title="已保存" message="操作结果反馈示例" tone="success" dismissLabel="关闭" onDismiss={() => undefined} onExited={() => undefined} />
       <div className="catalog-row"><Spinner /><Kbd>Esc</Kbd><span>关闭顶层浮层</span></div>
       <p>InlineError 保持可见；Toast 用于操作结果；Spinner 不替代文字状态。</p>
     </Details>

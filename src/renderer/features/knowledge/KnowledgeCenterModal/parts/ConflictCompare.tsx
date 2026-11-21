@@ -1,9 +1,10 @@
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
-import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
-import { CardBadges } from './CardBadges';
+import { Skeleton } from '../../../../ui/Skeleton';
+import { KnowledgeStatusTag } from './KnowledgeStatusTag';
 import type { KnowledgeCardDetail, KnowledgePackConflict } from '@shared/types/knowledge';
 
 interface ConflictCompareProps {
@@ -35,26 +36,23 @@ function ConflictCardPane({
         {card ? (
           <Button variant="ghost" size="sm" onClick={onOpen} data-testid="knowledge-conflict-open-card">
             {t('knowledgeCenter.viewRelatedCard')}
-            <Icon name="chevron-right" size={14} />
+            <Chevron />
           </Button>
         ) : null}
       </header>
       {loading && !card ? (
-        <p className="knowledge-center-status">{t('knowledgeCenter.loading')}</p>
+        <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={4} /></div>
       ) : card ? (
         <dl className="knowledge-conflict-pane-grid">
           <div>
             <dt>{t('knowledgeCenter.sourceLabel')}</dt>
-            <dd>
-              <code>{card.spaceId}</code> · <code>{card.relativePath}</code>
-              {card.sourceStatus ? ` · ${card.sourceStatus}` : ''}
-            </dd>
+            <dd>{card.relativePath}</dd>
           </div>
           <div>
             <dt>{t('knowledgeCenter.conflictTitle')}</dt>
             <dd>
               {card.title}
-              <CardBadges type={card.type} lifecycle={card.lifecycle} />
+              <KnowledgeStatusTag lifecycle={card.lifecycle} sourceStatus={card.sourceStatus} />
             </dd>
           </div>
           <div>
@@ -69,9 +67,7 @@ function ConflictCardPane({
           ) : null}
         </dl>
       ) : (
-        <p className="knowledge-center-status">
-          <code>{cardId}</code> · {t('knowledgeCenter.conflictCardMissing')}
-        </p>
+        <p className="knowledge-center-status" data-tooltip={cardId}>{t('knowledgeCenter.conflictCardMissing')}</p>
       )}
     </section>
   );

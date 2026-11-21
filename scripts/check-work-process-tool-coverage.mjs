@@ -374,7 +374,7 @@ for (const toolName of allTools) {
     assert(row.type === 'tool', 'plan_artifact should render as a compact tool shell row');
     assert(row.target === 'Plan', 'plan shell row should name the plan title');
     assert(row.planReview?.status === 'awaiting', 'plan shell row should keep the review status');
-    assert(row.icon === 'planArtifact', 'plan shell row should use the plan icon');
+    assert(row.icon === 'plan-artifact', 'plan shell row should use the plan icon');
     continue;
   }
 
@@ -410,28 +410,25 @@ for (const toolName of allTools) {
   }
 
   if (toolName === 'read_file') {
-    assert(row.bodyText && row.bodyText.includes('src/main/index.ts'), 'read_file body should keep the path');
-    assert(row.bodyText.includes('12 行'), `read_file body should include totalLines, got "${row.bodyText}"`);
+    assert(row.pathChip === 'src/main/index.ts', `read_file keeps its path for the details, got "${row.pathChip}"`);
+    assert(row.bodyText === '12 行', `read_file caption is only the line count, got "${row.bodyText}"`);
     assert(row.previewLines.some((line) => line.includes('export')), 'read_file preview should include file content');
   }
 
   if (toolName === 'artifact_read') {
-    assert(row.pathChip === 'session://tool-outputs/call-1.json', `artifact_read should expose session:// pathChip, got "${row.pathChip}"`);
-    assert(Array.isArray(row.chips) && row.chips.includes('aabbccdd'), `artifact_read should expose short hash chip, got ${JSON.stringify(row.chips)}`);
+    assert(!row.pathChip && !row.target.startsWith('session://'), `artifact_read shows no session:// address, got "${row.pathChip || row.target}"`);
+    assert(!row.chips?.some((chip) => /^[0-9a-f]{8,}$/i.test(chip)), `artifact_read shows no hash chip, got ${JSON.stringify(row.chips)}`);
   }
 
   if (toolName === 'web_search') {
-    assert(Array.isArray(row.sourcePills) && row.sourcePills.length > 0, 'web_search should expose source pills');
-    assert(row.sourcePills.every((pill) => pill.domain), 'web_search pills must include domain');
-    assert(!row.pageChip, 'web_search must not expose pageChip');
-    assert(row.icon === 'webSearch', 'web_search icon key must be webSearch');
+    assert(row.webPages?.length > 0 && row.webPages.every((page) => page.domain), 'web_search lists results as page pills with domains');
+    assert(row.icon === 'web-search', 'web_search icon key must be webSearch');
   }
 
   if (toolName === 'web_fetch') {
-    assert(row.pageChip?.domain === 'example.com', `web_fetch should expose pageChip domain, got ${JSON.stringify(row.pageChip)}`);
-    assert(row.pageChip?.status === 200, 'web_fetch pageChip should include status');
-    assert(!row.sourcePills?.length, 'web_fetch must not reuse source pills');
-    assert(row.icon === 'webFetch', 'web_fetch icon key must be webFetch');
+    assert(row.webPages?.[0]?.domain === 'example.com', `web_fetch shows the page it read, got ${JSON.stringify(row.webPages)}`);
+    assert(row.webMeta?.status === 200 && !row.bodyText, 'web_fetch keeps the HTTP status in its expanded facts, not on the card');
+    assert(row.icon === 'web-fetch', 'web_fetch icon key must be webFetch');
     assert(row.verb === '已抓取', `web_fetch verb should be 已抓取, got "${row.verb}"`);
   }
 }

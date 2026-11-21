@@ -97,7 +97,7 @@ it('keeps warnings outside collapsed details and shows an inconclusive probe aft
     expect(host.textContent).toContain('Unavailable route');
     await act(async () => host.querySelector('summary')!.click());
     expect(details.open).toBe(true);
-    const probe = host.querySelector<HTMLButtonElement>('[data-testid="settings-provider-model-probe-model-a"] button')!;
+    const probe = host.querySelector<HTMLButtonElement>('[data-testid="settings-provider-model-probe-model-a"] .settings-model-capability-probe-actions button')!;
     await act(async () => probe.click());
     await act(async () => host.querySelector('summary')!.click());
     expect(host.querySelector('[role="status"]')?.closest('details')).toBeNull();

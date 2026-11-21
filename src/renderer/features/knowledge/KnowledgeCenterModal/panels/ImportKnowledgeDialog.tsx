@@ -178,7 +178,7 @@ export function ImportKnowledgeDialog({ importer, spaces }: ImportKnowledgeDialo
                     <Badge tone="warning">{t('knowledgeCenter.importPendingValidation')}</Badge>
                   ) : null}
                 </span>
-                {importer.filePath ? <code className="knowledge-import-file-path" title={importer.filePath}>{importer.filePath}</code> : null}
+                {importer.filePath ? <code className="knowledge-import-file-path" data-tooltip={importer.filePath}>{importer.filePath}</code> : null}
               </span>
               <Button variant="secondary" size="sm" disabled={importer.busy} onClick={() => void importer.selectFile()}>
                 {importer.filePath

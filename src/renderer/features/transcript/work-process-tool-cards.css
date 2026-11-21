@@ -5,8 +5,8 @@
   border: var(--transcript-card-border);
   border-radius: var(--transcript-card-radius);
   background: var(--transcript-card-surface);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .work-process-tool-card.status-error {
@@ -25,7 +25,7 @@
 .work-process-orphan-hook-message {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 .work-process-tool-card.is-orphan-hook .work-process-tool-card-expand {
   padding-top: var(--space-2);
@@ -55,16 +55,16 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   text-align: left;
   font: inherit;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   cursor: pointer;
 }
 .work-card-trigger:disabled { cursor: default; }
 .work-card-trigger:not(:disabled):hover,
 .work-card-trigger:focus-visible { background: color-mix(in srgb, var(--token-interactive-hover) 30%, var(--transcript-card-surface)); }
-.work-card-trigger:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: -2px; }
+.work-card-trigger:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
 .work-card-trigger.has-preview { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: var(--space-2); }
 .work-card-trigger.has-preview > .work-process-tool-card-header,
 .work-card-trigger.has-preview > .work-card-preview { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
@@ -81,11 +81,11 @@
   width: var(--transcript-card-icon-size);
   height: var(--transcript-card-icon-size);
   flex-shrink: 0;
-  color: var(--token-text-muted);
+  color: var(--token-text-secondary);
 }
 
 .work-process-tool-card-verb {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-weight: var(--font-semibold);
   overflow: hidden;
   white-space: nowrap;
@@ -101,8 +101,8 @@
   align-items: center;
   flex-shrink: 0;
   gap: var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .work-process-tool-status-error {
@@ -128,9 +128,8 @@
   width: 100%;
 }
 
-.work-process-tool-card-body.family-web .work-process-source-pills {
+.work-process-tool-card-body.family-web .work-process-web-pills {
   width: 100%;
-  justify-content: flex-start;
 }
 
 .work-process-tool-card-body.family-search,
@@ -148,19 +147,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .work-process-tool-card-body-text {
   font-family: var(--font-sans);
-  font-size: var(--type-label-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-body-size);
+  color: var(--token-text-secondary);
 }
 
 .work-process-tool-card-body-text.is-summary {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .work-process-tool-card-body-list {
@@ -179,27 +178,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: 1.45;
 }
 
 .work-process-tool-card-link {
   color: var(--token-accent-primary);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   text-decoration: underline;
   text-underline-offset: 2px;
   overflow-wrap: anywhere;
 }
 
 .work-process-tool-card-link:hover {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .work-process-tool-card-link:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
   border-radius: var(--radius-sm);
 }
 
@@ -229,19 +228,19 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--token-bg-app);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: calc(var(--type-caption-size) * 1.55 * 12);
+  max-height: calc(var(--type-meta-size) * 1.55 * 12);
   overflow-y: auto;
 }
 
 .work-process-shell-command {
   margin-bottom: var(--space-1);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   background: color-mix(in srgb, var(--token-surface-raised) 70%, transparent);
   max-height: none;
 }
@@ -260,17 +259,17 @@
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--token-bg-app);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
 .work-process-tool-card-caption {
   margin: 0 0 var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.45;
 }
 
@@ -291,8 +290,8 @@
   display: block;
   padding: var(--space-1) var(--space-3);
   border-bottom: 1px solid var(--token-border-muted);
-  color: var(--token-text-muted);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -301,19 +300,14 @@
 .work-process-tool-card-raw-pre {
   margin: 0;
   padding: var(--space-2) var(--space-3);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 9rem;
   overflow-y: auto;
-}
-
-.work-card-trigger .work-process-row-caret.is-open,
-.work-disclosure-header .work-process-row-caret.is-open {
-  transform: rotate(90deg);
 }
 
 .work-process-tool-card-raw-pre.is-unbounded { max-height: none; overflow-y: visible; }
@@ -329,8 +323,8 @@
   padding: var(--space-1) var(--space-3) var(--space-2);
   border: 0;
   background: transparent;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.55;
   text-align: left;
   cursor: pointer;
@@ -338,12 +332,12 @@
 
 .work-process-tool-diagnostic:hover,
 .work-process-tool-diagnostic.is-open {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .work-process-tool-diagnostic:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .work-process-tool-diagnostic-text {
@@ -353,8 +347,8 @@
 
 .work-process-tool-diagnostic-action {
   flex-shrink: 0;
-  color: var(--token-text-muted);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -362,7 +356,7 @@
 .work-process-tool-hook-attention {
   padding: var(--space-1) var(--space-3) var(--space-2);
   color: var(--token-status-warning);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
 .work-process-tool-hook-attention.severity-error { color: var(--token-status-error); }
@@ -378,8 +372,8 @@
   list-style: none;
 }
 .work-process-tool-hook-details li {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 .work-process-tool-hook-details li + li { margin-top: var(--space-1); }

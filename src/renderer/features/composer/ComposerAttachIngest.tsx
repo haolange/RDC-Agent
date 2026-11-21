@@ -1,4 +1,5 @@
 import React, { type RefObject } from 'react';
+import { Icon } from '../../ui/Icon';
 
 export const ComposerAttachIngest: React.FC<{
   fileInputRef: RefObject<HTMLInputElement>;
@@ -19,10 +20,10 @@ export const ComposerAttachIngest: React.FC<{
         if (files.length > 0) onFiles(files);
       }}
     />
-    {isDropActive ? (
-      <div className="composer-drop-overlay" data-testid="composer-drop-overlay">
-        {dropHint}
-      </div>
-    ) : null}
+    {/* The one drop feedback: always mounted so it fades both in and out. */}
+    <div className={`composer-drop-overlay${isDropActive ? ' is-visible' : ''}`} data-testid="composer-drop-overlay" aria-hidden={!isDropActive}>
+      <Icon name="upload" size={20} />
+      <span>{dropHint}</span>
+    </div>
   </>
 );

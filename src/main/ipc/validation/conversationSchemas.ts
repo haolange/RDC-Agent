@@ -144,6 +144,13 @@ export const ConversationGetToolImagePreviewArgsSchema = z.tuple([
   }).strict(),
 ]);
 
+export const ConversationResolveMediaArgsSchema = z.tuple([
+  z.object({
+    sessionId: ipcId(128, 'sessionId'),
+    src: ipcNonEmptyString(4096, 'src'),
+  }).strict(),
+]);
+
 export const ConversationSwitchBranchArgsSchema = z.tuple([
   z.object({
     sessionId: ipcId(128, 'sessionId'),

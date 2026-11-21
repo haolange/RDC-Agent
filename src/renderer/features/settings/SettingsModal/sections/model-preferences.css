@@ -28,9 +28,9 @@
 
 .settings-model-details > summary {
   padding-block: var(--space-1);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
   cursor: pointer;
 }
 
@@ -59,8 +59,8 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-surface-raised);
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 
@@ -84,8 +84,8 @@
 .settings-model-capability-probe-result {
   display: grid;
   gap: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: var(--line-normal);
 }
 

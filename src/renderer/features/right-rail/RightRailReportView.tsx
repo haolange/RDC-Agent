@@ -1,32 +1,40 @@
+import React from 'react';
 import { useI18n } from '../../i18n';
+import { useUiLabels } from '../../lib/useUiLabels';
+import { Badge } from '../../ui/Badge';
+import { Details } from '../../ui/Details';
 import type { ClaimRecord, InvestigationReport } from '@shared/types/renderdocInvestigation';
 
 const prefix = 'control.rightRail.artifacts.preview.report' as const;
 
+/**
+ * The report reads as a document: what was asked, what was found, how it was checked, where it stops and what it
+ * concludes. Each claim carries one verification label. Record ids, scope pairs and settlement states sit under
+ * one「诊断」at the end.
+ */
 export const RightRailReportView: React.FC<{ report: InvestigationReport }> = ({ report }) => {
   const { t } = useI18n();
+  const labels = useUiLabels();
   const contract = report.reportContract;
   const missing = t(`${prefix}.notRecorded`);
   const text = (value: string | undefined) => value?.trim() || missing;
   const debuggerMission = report.mission === 'debugger';
+  const scopes = report.claims.flatMap((claim) => Object.entries(claim.scope).filter(([, value]) => Boolean(value))
+    .map(([key, value]) => `${key}=${value}`));
+  const diagnostics: Array<[string, string[]]> = [
+    [t(`${prefix}.evidenceIds`), report.evidenceIds],
+    [t(`${prefix}.experimentIds`), report.experimentIds],
+    [t(`${prefix}.artifactIds`), contract?.artifactIds ?? []],
+    [t(`${prefix}.scope`), scopes],
+    [t(`${prefix}.status`), contract?.status ? [contract.status] : []],
+    [t(`${prefix}.candidateStatus`), contract?.candidateStatus ? [contract.candidateStatus] : []],
+  ];
 
   return (
     <article className="investigation-report" aria-label={t(`${prefix}.title`)}>
-      <section>
-        <h3>{t(`${prefix}.goal`)}</h3>
-        <p>{text(report.summary)}</p>
-        <p className="investigation-report-meta">{t(`${prefix}.mission`)}: {t(`control.rightRail.artifacts.mission.${report.mission}`)}</p>
-      </section>
-      <section>
-        <h3>{t(`${prefix}.plan`)}</h3>
-        <p>{text(contract?.links)}</p>
-        <p className="investigation-report-note">{t(`${prefix}.timelineNotEmbedded`)}</p>
-      </section>
-      <section>
-        <h3>{t(debuggerMission ? `${prefix}.evidence` : `${prefix}.evidenceGeneral`)}</h3>
-        <p>{text(contract?.evidence)}</p>
-        <RecordIds label={t(`${prefix}.evidenceIds`)} ids={report.evidenceIds} missing={missing} />
-      </section>
+      <ReportSection title={t(`${prefix}.goal`)}>{text(report.summary)}</ReportSection>
+      <ReportSection title={t(`${prefix}.plan`)}>{text(contract?.links)}</ReportSection>
+      <ReportSection title={t(debuggerMission ? `${prefix}.evidence` : `${prefix}.evidenceGeneral`)}>{text(contract?.evidence)}</ReportSection>
       <section>
         <h3>{t(debuggerMission ? `${prefix}.claims` : `${prefix}.claimsGeneral`)}</h3>
         {report.claims.length ? (
@@ -34,42 +42,38 @@ export const RightRailReportView: React.FC<{ report: InvestigationReport }> = ({
             {report.claims.map((claim) => <ReportClaim key={claim.claimId} claim={claim} />)}
           </ul>
         ) : <p>{missing}</p>}
-        <p className="investigation-report-note">{t(debuggerMission ? `${prefix}.firstBadAndRootCauseSource` : `${prefix}.claimSource`)}</p>
       </section>
-      <section>
-        <h3>{t(debuggerMission ? `${prefix}.experiment` : `${prefix}.experimentGeneral`)}</h3>
-        <p>{text(contract?.verification)}</p>
-        <RecordIds label={t(`${prefix}.experimentIds`)} ids={report.experimentIds} missing={missing} />
-      </section>
-      <section>
-        <h3>{t(`${prefix}.limits`)}</h3>
-        <p>{text(contract?.limitations)}</p>
-        <p className="investigation-report-note">{t(`${prefix}.challengeSource`)}</p>
-      </section>
-      <section>
-        <h3>{t(`${prefix}.conclusion`)}</h3>
-        <p>{text(contract?.conclusion)}</p>
-        <p className="investigation-report-meta">{t(`${prefix}.status`)}: {text(contract?.status)}</p>
-        <p className="investigation-report-meta">{t(`${prefix}.candidateStatus`)}: {contract?.candidateStatus ?? missing}</p>
-        <RecordIds label={t(`${prefix}.artifactIds`)} ids={contract?.artifactIds ?? []} missing={missing} />
-      </section>
+      <ReportSection title={t(debuggerMission ? `${prefix}.experiment` : `${prefix}.experimentGeneral`)}>{text(contract?.verification)}</ReportSection>
+      <ReportSection title={t(`${prefix}.limits`)}>{text(contract?.limitations)}</ReportSection>
+      <ReportSection title={t(`${prefix}.conclusion`)}>{text(contract?.conclusion)}</ReportSection>
+      <Details className="investigation-report-diagnostics" summary={labels.diagnostics}>
+        <dl className="investigation-report-index">
+          {diagnostics.map(([label, values]) => (
+            <div key={label}><dt>{label}</dt><dd>{values.length ? values.join(' · ') : missing}</dd></div>
+          ))}
+        </dl>
+      </Details>
     </article>
   );
 };
 
+const ReportSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <section>
+    <h3>{title}</h3>
+    <p>{children}</p>
+  </section>
+);
+
 const ReportClaim: React.FC<{ claim: ClaimRecord }> = ({ claim }) => {
   const { t } = useI18n();
-  const scope = Object.entries(claim.scope).filter(([, value]) => Boolean(value));
+  const verdict = claim.decision ? t(`${prefix}.decision.${claim.decision.verdict}`) : '';
   return (
     <li>
       <p>{claim.statement}</p>
-      <p className="investigation-report-meta">
-        {claim.claimKind} · {claim.epistemic} · {claim.verification}
-        {claim.decision ? ` · ${claim.decision.verdict}` : ''}
-      </p>
-      {scope.length ? <p className="investigation-report-meta">
-        {t(`${prefix}.scope`)}: {scope.map(([key, value]) => `${key}=${value}`).join(' · ')}
-      </p> : null}
+      <span className="investigation-report-claim-tags">
+        <Badge variant="outline">{t(`${prefix}.verification.${claim.verification}`)}</Badge>
+        {verdict ? <Badge variant="outline">{verdict}</Badge> : null}
+      </span>
       {claim.rootCause ? (
         <div className="investigation-report-tuple">
           <strong>{t(`${prefix}.rootCause`)}</strong>
@@ -81,10 +85,3 @@ const ReportClaim: React.FC<{ claim: ClaimRecord }> = ({ claim }) => {
     </li>
   );
 };
-
-const RecordIds: React.FC<{ label: string; ids: string[]; missing: string }> = ({ label, ids, missing }) => (
-  <div className="investigation-report-index">
-    <strong>{label}</strong>
-    {ids.length ? <ul>{ids.map((id) => <li key={id}>{id}</li>)}</ul> : <span>{missing}</span>}
-  </div>
-);

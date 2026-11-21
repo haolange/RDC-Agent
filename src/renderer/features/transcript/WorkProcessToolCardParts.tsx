@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
-import { SourcePills, WebPageDestination } from './WorkProcessWebParts';
+import { WebPageList, WebPillStrip } from './WorkProcessWebParts';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import { ToolOutcomeSummary } from './ToolOutcomeSummary';
 import {
@@ -23,10 +23,6 @@ const resolveBodyText = (row: ToolRowModel): string => {
   }
   if (row.family === 'git') return row.commandText?.trim() || row.target || row.previewLines[0] || '';
   if (row.family === 'search') return row.target || row.previewLines[0] || '';
-  if (row.family === 'web') {
-    if (row.pageChip) return row.pageChip.domain;
-    return row.target || row.previewLines[0] || '';
-  }
   return row.pathChip?.trim() || row.target || row.previewLines[0] || '';
 };
 
@@ -47,35 +43,28 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const samples = resolveCollapsedSampleLines(row);
   // Collapse only an exact duplicate. Distinct output and the full raw receipt remain available.
   const sampleLines = samples.join('\n') === bodyText ? [] : samples;
-  if (!bodyText && sampleLines.length === 0 && !row.sourcePills?.length && !row.pageChip && !row.imagePreviews?.length) {
+  if (row.family === 'web') {
+    // A search lists its results; a read shows the site it opened (the title already names the page). One line of pills.
+    if (!row.webPages?.length) return null;
+    const isSearch = row.toolName === 'web_search';
+    return (
+      <div className={`work-process-tool-card-body family-web${isSearch ? ' is-search' : ' is-read'}`}>
+        <WebPillStrip pages={row.webPages} marksRead={isSearch} showDomains={!isSearch} />
+      </div>
+    );
+  }
+
+  if (!bodyText && sampleLines.length === 0 && !row.imagePreviews?.length) {
     return null;
   }
 
-  if (row.family === 'web') {
-    const fetchTitle = row.pageChip?.title?.trim();
-    return (
-      <div className="work-process-tool-card-body family-web">
-        {row.pageChip && fetchTitle ? (
-          <span className="work-process-tool-card-body-text is-summary" title={fetchTitle}>{fetchTitle}</span>
-        ) : null}
-        {row.pageChip ? <WebPageDestination chip={row.pageChip} /> : null}
-        {!row.pageChip && bodyText ? (
-          <span className="work-process-tool-card-body-text">{bodyText}</span>
-        ) : null}
-        {row.sourcePills?.length ? <SourcePills pills={row.sourcePills} /> : null}
-      </div>
-    );
-  }
-
   if (row.family === 'file') {
-    const copyPath = row.pathChip?.trim() || row.target;
-    return (
+    // The title already names the file; the body only carries images. Paths and copying live in the details.
+    return row.imagePreviews?.length ? (
       <div className="work-process-tool-card-body family-file">
-        {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
-        <code className="work-process-tool-card-path" title={bodyText || copyPath}>{bodyText}</code>
-        {copyPath ? <CopyPathButton path={copyPath} /> : null}
+        <WorkProcessImageThumbs previews={row.imagePreviews} />
       </div>
-    );
+    ) : null;
   }
 
   if (row.family === 'shell' || row.family === 'git') {
@@ -90,12 +79,12 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     return (
       <div className={`work-process-tool-card-body family-${row.family}`}>
         {bodyText ? (
-          <span className="work-process-tool-card-body-text is-summary" title={bodyText}>{bodyText}</span>
+          <span className="work-process-tool-card-body-text is-summary" data-tooltip={bodyText}>{bodyText}</span>
         ) : null}
         {sampleLines.length > 0 ? (
           <ul className="work-process-tool-card-body-list">
             {sampleLines.map((line) => (
-              <li key={line} className="work-process-tool-card-body-list-item" title={line}>{line}</li>
+              <li key={line} className="work-process-tool-card-body-list-item" data-tooltip={line}>{line}</li>
             ))}
           </ul>
         ) : null}
@@ -110,7 +99,7 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
           {row.chips.map((chip) => <span key={chip} className="work-process-path-chip">{chip}</span>)}
         </div>
       ) : null}
-      {bodyText ? <span className="work-process-tool-card-body-text" title={bodyText}>{bodyText}</span> : null}
+      {bodyText ? <span className="work-process-tool-card-body-text" data-tooltip={bodyText}>{bodyText}</span> : null}
       {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
     </div>
   );
@@ -135,10 +124,18 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   }
 
   if (row.family === 'file') {
-    if (lines.length === 0) return null;
+    const path = row.pathChip?.trim() || row.target;
+    if (lines.length === 0 && !path) return null;
     return (
       <div className="work-process-tool-card-detail family-file" data-testid="work-process-tool-preview">
-        <pre className="work-process-tool-card-preview">{lines.join('\n')}</pre>
+        {path ? (
+          <div className="work-process-tool-card-path-row">
+            <code className="work-process-tool-card-path">{path}</code>
+            <CopyPathButton path={path} />
+          </div>
+        ) : null}
+        {row.bodyText ? <p className="work-process-tool-card-caption">{row.bodyText}</p> : null}
+        {lines.length > 0 ? <pre className="work-process-tool-card-preview">{lines.join('\n')}</pre> : null}
       </div>
     );
   }
@@ -157,14 +154,10 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   }
 
   if (row.family === 'web') {
-    if (!row.sourcePills?.length && !row.pageChip && lines.length <= 1) return null;
+    if (!row.webPages?.length) return null;
     return (
-      <div className="work-process-tool-card-detail family-web" data-testid="work-process-tool-preview">
-        {row.pageChip ? <WebPageDestination chip={row.pageChip} /> : null}
-        {lines.length > 1 ? (
-          <pre className="work-process-tool-card-preview">{lines.slice(1).join('\n')}</pre>
-        ) : null}
-        {row.sourcePills?.length ? <SourcePills pills={row.sourcePills} /> : null}
+      <div className="work-process-tool-card-detail family-web">
+        <WebPageList pages={row.webPages} meta={row.webMeta} />
       </div>
     );
   }
@@ -174,7 +167,7 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className="work-process-tool-card-detail family-generic" data-testid="work-process-tool-preview">
       {lines[0] ? <p className="work-process-tool-card-caption">{lines[0]}</p> : null}
       {row.pathChip ? (
-        <span className="work-process-path-chip" title={row.pathChip}>{row.pathChip}</span>
+        <span className="work-process-path-chip" data-tooltip={row.pathChip}>{row.pathChip}</span>
       ) : null}
       {lines.length > 1 ? (
         <pre className="work-process-tool-card-preview">{lines.slice(1).join('\n')}</pre>

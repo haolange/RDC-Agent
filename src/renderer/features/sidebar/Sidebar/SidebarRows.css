@@ -13,10 +13,10 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background var(--transition-base) var(--ease-standard),
-    border-color var(--transition-base) var(--ease-standard),
-    transform var(--transition-base) var(--ease-standard),
-    box-shadow var(--transition-base) var(--ease-standard);
+    background var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .project-item {
@@ -36,7 +36,7 @@
 .project-item-title {
   min-width: 0;
   overflow: hidden;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   text-overflow: ellipsis;
@@ -47,9 +47,9 @@
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: color-mix(in srgb, var(--token-text-caption) 72%, transparent);
+  color: color-mix(in srgb, var(--token-text-secondary) 72%, transparent);
   font-size: var(--type-body-size);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -88,7 +88,7 @@
 }
 
 .session-subitem .session-item-title {
-  font-size: var(--type-heading-size);
+  font-size: var(--type-body-size);
 }
 
 .session-item-header {
@@ -124,7 +124,7 @@
 
 .session-item-select:focus-visible {
   outline: 1px solid var(--token-border-focus);
-  outline-offset: var(--space-1);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .project-item-chevron,
@@ -142,15 +142,15 @@
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   cursor: pointer;
   transition:
-    color var(--transition-base) var(--ease-standard),
-    background var(--transition-base) var(--ease-standard);
+    color var(--duration-base) var(--ease-standard),
+    background var(--duration-base) var(--ease-standard);
 }
 
 .project-item-chevron svg {
-  transition: transform var(--transition-base) var(--ease-standard);
+  transition: transform var(--duration-base) var(--ease-standard);
 }
 
 .project-item-chevron.is-expanded svg {
@@ -160,7 +160,7 @@
 .project-item-chevron:hover,
 .project-item-chevron:focus-visible {
   background: var(--token-bg-raised);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   outline: none;
 }
 
@@ -168,8 +168,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: color-mix(in srgb, var(--token-text-caption) 80%, transparent);
-  transition: color var(--transition-base) var(--ease-standard);
+  color: color-mix(in srgb, var(--token-text-secondary) 80%, transparent);
+  transition: color var(--duration-base) var(--ease-standard);
 }
 
 .session-subitem:hover .session-item-gutter,
@@ -184,17 +184,17 @@
   padding: var(--space-1) 0 0;
   border: 0;
   background: transparent;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: color var(--transition-base) var(--ease-standard);
+  transition: color var(--duration-base) var(--ease-standard);
 }
 
 .session-list-toggle:hover,
 .session-list-toggle:focus-visible {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   outline: none;
 }
 
@@ -209,7 +209,7 @@
 .session-item-title {
   flex: 1;
   min-width: 0;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   white-space: nowrap;
@@ -227,15 +227,15 @@
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   cursor: pointer;
   opacity: 0;
   transform: translateY(2px);
   transition:
-    opacity var(--transition-base) var(--ease-standard),
-    transform var(--transition-base) var(--ease-standard),
-    background var(--transition-base) var(--ease-standard),
-    color var(--transition-base) var(--ease-standard);
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    background var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard);
 }
 
 .session-item:hover .session-item-icon-button,
@@ -248,18 +248,36 @@
 .session-item-icon-button:hover,
 .session-item-icon-button:focus-visible {
   background: var(--token-bg-raised);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   outline: none;
 }
 
 .session-item-icon-button.danger:hover,
 .session-item-icon-button.danger:focus-visible {
-  background: rgb(190 48 58 / 0.16);
-  color: rgb(255 132 144);
+  background: color-mix(in srgb, var(--token-status-error) 14%, transparent);
+  color: var(--token-status-error);
 }
 
 .session-item-time {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.45;
+}
+
+/* A reply in flight: one small accent dot that breathes; still under reduced motion. */
+.session-item-running {
+  width: calc(var(--space-1) * 1.5);
+  height: calc(var(--space-1) * 1.5);
+  border-radius: var(--radius-full);
+  background: var(--token-accent-primary);
+  animation: session-running-breathe 1.6s var(--ease-standard) infinite;
+}
+
+@keyframes session-running-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-item-running { animation: none; }
 }

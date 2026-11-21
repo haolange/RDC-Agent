@@ -9,9 +9,9 @@
 .right-rail-artifact-copy strong,
 .project-capture-input-copy strong {
   overflow: hidden;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -19,8 +19,8 @@
 .right-rail-artifact-copy small,
 .project-capture-input-size {
   overflow: hidden;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -56,8 +56,8 @@
   justify-content: center;
   width: var(--space-6);
   height: var(--space-6);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
 }
 
@@ -79,7 +79,7 @@
 .project-capture-input-icon {
   width: var(--space-5);
   height: var(--space-5);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;

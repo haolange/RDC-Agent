@@ -5,47 +5,43 @@ import { EmptyState } from '../../ui/EmptyState';
 import { IconButton } from '../../ui/IconButton';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../lib/formatBytes';
+import { errorDetail } from '../../lib/errorDetail';
 import { importProjectInputs, refreshProjectInputs, removeProjectInput } from './projectCaptureActions';
 import { ProjectCaptureReferenceDialog } from './ProjectCaptureReferenceDialog';
 import type { ProjectInputRecord } from '@shared/types/session';
 import './CaptureReplay.css';
 
-const formatSize = (size: number): string => {
-  if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(size / 1024))} KB`;
-};
-
 const formatImportError = (reason: unknown, sessionExpired: string): string => {
-  const message = reason instanceof Error ? reason.message : String(reason);
+  const message = errorDetail(reason);
   return /^unauthorized(?:\s*\(401\))?$/i.test(message.trim())
     ? sessionExpired
     : message;
 };
 
 const CaptureFileIcon: React.FC = () => (
-  <svg className="project-capture-input-icon" viewBox="0 0 20 20" aria-hidden="true">
-    <path d="M5 2.75h6.2L15.5 7v10.25H5z" />
-    <path d="M11.2 2.75V7h4.3M7.5 10.5h5M7.5 13h4" />
-  </svg>
+  <Icon name="file" className="project-capture-input-icon" />
 );
 
-const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabled: boolean; removeLabel: string; referenceLabel: string }> = ({ input, remove, disabled, removeLabel, referenceLabel }) => (
-  <article
+const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabled: boolean; removeLabel: string; referenceLabel: string }> = ({ input, remove, disabled, removeLabel, referenceLabel }) => {
+  const { language } = useI18n();
+  const size = formatBytes(input.size, language);
+  return <article
     className="project-capture-input-row"
-    aria-label={`${input.fileName}, ${formatSize(input.size)}. ${input.filePath}`}
-    title={input.filePath}
+    aria-label={`${input.fileName}, ${size}. ${input.filePath}`}
+    data-tooltip={input.filePath}
     role="listitem"
   >
     <CaptureFileIcon />
     <span className="project-capture-input-copy">
-      <strong title={`${input.fileName}\n${input.filePath}`}>{input.fileName}</strong>
+      <strong data-tooltip={`${input.fileName}\n${input.filePath}`}>{input.fileName}</strong>
       {input.source === 'external_reference' ? <span>{referenceLabel}</span> : null}
     </span>
-    <span className="project-capture-input-actions"><span className="project-capture-input-size">{formatSize(input.size)}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}>×</Button></span>
-  </article>
-);
+    <span className="project-capture-input-actions"><span className="project-capture-input-size">{size}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}><Icon name="close" size={14} /></Button></span>
+  </article>;
+};
 
 export const ProjectCaptureImportPanel: React.FC = () => {
   const { t } = useI18n();
@@ -95,13 +91,13 @@ export const ProjectCaptureImportPanel: React.FC = () => {
           className="project-capture-header"
           title={t('projectCapture.title')}
           actions={<>
-            <IconButton label={t('projectCapture.reference')} title={t('projectCapture.reference')}
+            <IconButton label={t('projectCapture.reference')} data-tooltip={t('projectCapture.reference')}
               size="sm" disabled={activeAction !== null} onClick={() => setReferenceProjectId(currentProject.projectId)}>
               <Icon name="link" size={16} />
             </IconButton>
             <IconButton
               label={t(activeAction === 'import' ? 'projectCapture.importing' : 'projectCapture.import')}
-              title={t('projectCapture.import')}
+              data-tooltip={t('projectCapture.import')}
               size="sm"
               onClick={() => void run('import')}
               disabled={activeAction !== null}
@@ -111,7 +107,7 @@ export const ProjectCaptureImportPanel: React.FC = () => {
             </IconButton>
             <IconButton
               label={t(activeAction === 'refresh' ? 'projectCapture.refreshing' : 'sidebar.refresh')}
-              title={t('sidebar.refresh')}
+              data-tooltip={t('sidebar.refresh')}
               size="sm"
               onClick={() => void run('refresh')}
               disabled={activeAction !== null}
@@ -122,7 +118,7 @@ export const ProjectCaptureImportPanel: React.FC = () => {
           </>}
         />
         <div className="right-rail-section-content">
-          {error ? <div className="project-capture-import-error" role="alert">{error}</div> : null}
+          {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
           {inputs.length ? <div className="project-capture-input-list" role="list" aria-label={t('projectCapture.title')}>{inputs.map((input) => <InputRow key={input.inputId} input={input} remove={() => void remove(input.inputId)} disabled={activeAction !== null} referenceLabel={t('projectCapture.external')} removeLabel={t(input.source === 'external_reference' ? 'projectCapture.detach' : 'projectCapture.remove')} />)}</div> : <EmptyState className="right-rail-empty-state" title={t('projectCapture.empty')} />}
         </div>
       </section>

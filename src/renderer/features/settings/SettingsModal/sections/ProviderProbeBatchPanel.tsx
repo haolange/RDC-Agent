@@ -1,6 +1,7 @@
 import { useProviderProbeBatch } from '../useProviderProbeBatch';
 import { Button } from '../../../../ui/Button';
 import { Details } from '../../../../ui/Details';
+import { HelpTip } from '../../../../ui/HelpTip';
 import { providerProbeResultText } from './providerProbeResultText';
 import type { useI18n } from '../../../../i18n';
 import './provider-probe-batch.css';
@@ -15,7 +16,10 @@ export function ProviderProbeBatchPanel({ providerIds, disabled, t }: Props) {
   return (
     <section className="settings-provider-probe" aria-label={t('settings.providers.batch.title')} data-testid="settings-provider-probe-batch">
       <div className="settings-model-preferences-heading">
-        <strong>{t('settings.providers.batch.title')}</strong>
+        <span className="settings-provider-probe-title">
+          <strong>{t('settings.providers.batch.title')}</strong>
+          <HelpTip label={t('settings.providers.batch.title')}>{t('settings.providers.batch.hint')}</HelpTip>
+        </span>
         <div className="settings-model-capability-probe-actions">
           <Button variant="secondary" size="sm" disabled={disabled || busy || occupied} onClick={() => void action('prepare')}>
             {busy ? t('settings.providers.batch.preparing') : t('settings.providers.batch.prepare')}
@@ -31,10 +35,9 @@ export function ProviderProbeBatchPanel({ providerIds, disabled, t }: Props) {
           </Button> : null}
         </div>
       </div>
-      <p className="settings-help-text">{t('settings.providers.batch.hint')}</p>
       {error ? <div className="settings-model-capability-note settings-model-capability-note--error" role="alert">{error}</div> : null}
       {batch ? <>
-        <div className="settings-help-text" role="status" aria-live="polite">
+        <div className="settings-provider-probe-status" role="status" aria-live="polite">
           {t(`settings.providers.batch.state.${batch.state}`)} · {t('settings.providers.batch.counts', { models: batch.modelCount, requests: batch.requestCount, settled, total: batch.items.length, tokens: usage })}
         </div>
         {batch.discoveryErrors.map(entry => <div className="settings-model-capability-note settings-model-capability-note--warning" key={entry.providerId}>
@@ -49,8 +52,8 @@ export function ProviderProbeBatchPanel({ providerIds, disabled, t }: Props) {
                 <strong>{item.providerId} / {item.modelId}</strong>
                 <span>{t(`settings.providers.capability.probeMode.${item.mode}`)} · {resultText?.status
                   ?? t(`settings.providers.batch.item.${item.state}`)}</span>
-                {detail ? <span className="settings-help-text">{detail}</span> : null}
-                {resultText?.tiers ? <span className="settings-help-text">{resultText.tiers}</span> : null}
+                {detail ? <span className="settings-provider-probe-detail">{detail}</span> : null}
+                {resultText?.tiers ? <span className="settings-provider-probe-detail">{resultText.tiers}</span> : null}
               </li>;
             })}
           </ul>

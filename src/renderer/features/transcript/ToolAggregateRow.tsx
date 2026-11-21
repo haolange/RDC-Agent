@@ -1,4 +1,5 @@
 import React from 'react';
+import { Chevron } from '../../ui/Chevron';
 import { ToolRow } from './WorkProcessRows';
 import { useHasOpenWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
@@ -22,7 +23,7 @@ export const ToolAggregateRow: React.FC<{ row: ToolAggregateRowModel;
       <div className="work-process-step-content work-process-tool-aggregate-content">
         <details className="work-process-tool-aggregate-details" open={expanded}>
           <summary className="work-process-tool-aggregate-summary" data-work-node-heading onClick={(event) => { event.preventDefault(); toggle(); }}>
-            <span className="work-process-row-caret work-process-aggregate-caret" aria-hidden="true" />
+            <Chevron size={12} className="work-process-row-caret work-process-aggregate-caret" />
             <span className="work-process-tool-aggregate-text">{row.summary}</span>
             {row.duration ? <span className="work-process-tool-inline-meta">{row.duration}</span> : null}
           </summary>

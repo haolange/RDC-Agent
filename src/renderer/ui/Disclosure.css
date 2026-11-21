@@ -23,23 +23,23 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font: inherit;
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-line);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
   text-align: start;
   cursor: pointer;
   transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .ui-disclosure-trigger:hover {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   background: var(--token-interactive-hover);
 }
 
 .ui-disclosure-trigger:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 1px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-disclosure-chevron {

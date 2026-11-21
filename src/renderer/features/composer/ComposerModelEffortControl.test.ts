@@ -82,7 +82,7 @@ it('shows the main-confirmed request while disabled, and hides stale draft label
   await paint(null, true);
   expect(host.textContent).toContain('Model');
   expect(host.textContent).toContain('Low');
-  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('title')).toContain('composer.model.preparing');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('data-tooltip')).toContain('composer.model.preparing');
   await paint({ route: { providerId: 'p', effectiveModelId: 'confirmed-model' },
     controls: { reasoningLevel: 'high', fastModel: true, maxContextMode: true } } as PreparedTurnContextSummary, false);
   expect(host.textContent).toContain('confirmed-model');
@@ -94,7 +94,7 @@ it('retains the selected model identity when its provider is temporarily unavail
   mock.choice = true; mock.controls.capabilityState.status = 'unavailable';
   await render();
   expect(host.textContent).toBe('Model');
-  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('title')).toContain('composer.model.unavailable');
+  expect(host.querySelector('[data-testid="composer-model-effort-pill"]')?.getAttribute('data-tooltip')).toContain('composer.model.unavailable');
   expect(mock.clear).not.toHaveBeenCalled();
 });
 it('keeps the save barrier after closing the popup and reports a failed save without changing the model', async () => {
