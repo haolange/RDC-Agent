@@ -19,23 +19,31 @@
 }
 
 .settings-profile-row {
-  display: grid;
-  grid-template-columns: auto minmax(12rem, 1fr) auto;
-  gap: var(--space-4);
-  align-items: end;
-  margin-top: var(--space-2);
-}
-
-.settings-profile-avatar-group {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* The avatar is the change-avatar button; hover lifts its ring. */
+.settings-profile-avatar-button {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  transition: box-shadow var(--transition-fast);
+}
+
+.settings-profile-avatar-button:hover,
+.settings-profile-avatar-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--token-border-strong);
 }
 
 .settings-account-avatar,
 .settings-account-avatar-fallback {
-  width: var(--space-16);
-  height: var(--space-16);
+  width: var(--space-12);
+  height: var(--space-12);
   border-radius: var(--radius-full);
   object-fit: cover;
 }
@@ -51,17 +59,118 @@
   font-weight: var(--font-semibold);
 }
 
+/* The nickname reads as text and becomes a field on hover and focus. */
 .settings-profile-nickname {
+  flex: 0 1 18rem;
   min-width: 0;
+  height: var(--control-height-md);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--token-text-primary);
+  font: inherit;
+  font-size: var(--type-reading-size);
+  font-weight: var(--font-semibold);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
-.settings-profile-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.settings-profile-nickname:hover {
+  border-color: var(--token-border-muted);
+}
+
+.settings-profile-nickname:focus-visible {
+  border-color: var(--token-border-focus);
+  background: var(--token-surface-sunken);
+  outline: none;
+}
+
+/* Autosave: a spinner while saving, then a check that fades away. */
+.settings-save-mark {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   min-height: var(--control-height-sm);
+  color: var(--token-status-success);
+}
+
+.settings-save-mark-check {
+  opacity: 0;
+  transition: opacity var(--duration-slow) var(--ease-standard);
+}
+
+.settings-save-mark-check.is-visible {
+  opacity: 1;
+}
+
+/* Work process preference: two preview cards. */
+.work-process-expansion-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 12rem));
+  gap: var(--space-3);
+}
+
+.work-process-expansion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-card);
+  background: var(--token-bg-raised);
+  color: var(--token-text-primary);
+  text-align: left;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.work-process-expansion-card:hover,
+.work-process-expansion-card:focus-visible {
+  border-color: var(--token-border-strong);
+}
+
+.work-process-expansion-card.is-selected {
+  border-color: var(--token-accent-primary);
+  box-shadow: 0 0 0 1px var(--token-accent-primary);
+}
+
+.work-process-expansion-thumb {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  height: var(--space-16);
+  padding: var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+}
+
+.work-process-expansion-thumb.is-latest {
+  mask-image: linear-gradient(to bottom, transparent 0%, rgb(0 0 0 / 0.25) 18%, rgb(0 0 0) 45%);
+}
+
+.work-process-expansion-thumb.is-all {
+  justify-content: flex-start;
+}
+
+.work-process-expansion-thumb-step {
+  flex: 0 0 auto;
+  height: var(--space-1);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--token-text-secondary) 45%, transparent);
+}
+
+.work-process-expansion-thumb-step:nth-child(odd) {
+  width: 80%;
+}
+
+.work-process-expansion-thumb-step:nth-child(even) {
+  width: 56%;
+}
+
+.work-process-expansion-label {
+  padding: 0 var(--space-1);
 }
 
 .settings-personalization-textarea {
@@ -77,12 +186,13 @@
 }
 
 @container settings-panel (max-width: 48rem) {
-  .settings-profile-row {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-  }
-
   .settings-profile-actions {
     justify-content: flex-start;
   }
+}
+
+.settings-page-general .settings-language-section .settings-block-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }

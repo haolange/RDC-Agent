@@ -37,7 +37,6 @@ export interface AppSettingsState {
   setLanguage: (language: AppLanguage) => Promise<void>;
   setFontScale: (fontScale: FontScale) => Promise<void>;
   setComposerMarkdown: (composerMarkdown: boolean) => Promise<void>;
-  setUsePointerCursors: (usePointerCursors: boolean) => Promise<void>;
   setChromeTheme: (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => Promise<void>;
   setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
   setWorkProcessExpansion: (workProcessExpansion: import('@shared/types/settings').WorkProcessExpansion) => Promise<void>;

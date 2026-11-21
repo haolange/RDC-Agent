@@ -153,6 +153,7 @@
     "settings.agentModelCascadeSelect": "src/renderer/features/settings/SettingsModal/sections/AgentModelCascadeSelect.tsx",
     "settings.appearanceSettings": "src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.tsx",
     "settings.appearanceChromeParts": "src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx",
+    "settings.appearancePresetRow": "src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx",
     "settings.personalizationSettings": "src/renderer/features/settings/SettingsModal/sections/PersonalizationSettings.tsx",
     "settings.runtimeScopePanel": "src/renderer/features/settings/SettingsModal/sections/RuntimeScopePanel.tsx",
     "settings.runtimeScopeActions": "src/renderer/features/settings/SettingsModal/sections/runtimeScopeActions.ts",

@@ -55,7 +55,6 @@ export const enApp = {
   'app.closePanel': 'Close panel',
   'app.commandPaletteInput': "Command palette input",
   'app.noMatchingCommands': "No matching commands",
-  'app.appearanceUpdateFailed': "Unable to update appearance preferences.",
   'app.selectPlaceholder': "Select",
   'app.selectEmpty': "No options available",
   'app.commandsLoading': 'Loading commands…',

@@ -16,7 +16,6 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
   | 'setLanguage'
   | 'setFontScale'
   | 'setComposerMarkdown'
-  | 'setUsePointerCursors'
   | 'setChromeTheme'
   | 'setContextBreakdownExpanded'
   | 'setWorkProcessExpansion'
@@ -40,9 +39,6 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
     },
     setComposerMarkdown: async (composerMarkdown: boolean) => {
       await save({ appearance: { composerMarkdown } });
-    },
-    setUsePointerCursors: async (usePointerCursors: boolean) => {
-      await save({ appearance: { usePointerCursors } });
     },
     setChromeTheme: async (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => {
       await save(() => {

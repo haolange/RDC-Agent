@@ -80,11 +80,6 @@
   line-height: 1.35;
 }
 
-/* Respect pointer-cursor preference */
-html:not([data-pointer-cursors='true']) .ui-switch {
-  cursor: default;
-}
-
-html[data-pointer-cursors='true'] .ui-switch:not(:has(.ui-switch-input:disabled)) {
+.ui-switch:not(:has(.ui-switch-input:disabled)) {
   cursor: pointer;
 }

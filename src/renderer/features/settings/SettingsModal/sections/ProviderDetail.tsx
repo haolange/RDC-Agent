@@ -134,7 +134,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         )}
 
         {authMode === 'local' && provider.baseUrlEditable && (
-          <SettingsField label={t('settings.providerBaseUrl')} description={t('settings.localProviderConnectHint')}>
+          <SettingsField label={t('settings.providerBaseUrl')} help={t('settings.localProviderConnectHint')}>
             <Input
               data-testid="settings-provider-connect-base-url"
               value={connectionDraft.baseUrl}
@@ -153,7 +153,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         )}
 
         {authMode === 'environment' && (
-          <SettingsField label={t('settings.providers.authSource')} description={t('settings.environmentProviderConnectHint')}>
+          <SettingsField label={t('settings.providers.authSource')} help={t('settings.environmentProviderConnectHint')}>
             <div className="settings-provider-readonly" data-testid="settings-provider-environment-notice">
               <Icon name="lock" size={14} />
               {t('settings.providers.authSourceEnvironment')}

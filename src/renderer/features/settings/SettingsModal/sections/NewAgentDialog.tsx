@@ -28,7 +28,7 @@ export const NewAgentDialog: React.FC<{
         <Button variant="ghost" onClick={onClose}>{t('dialog.cancel')}</Button>
         <Button variant="primary" disabled={!trimmed} onClick={create}>{t('settings.newAgentCreate')}</Button>
       </>}>
-      <SettingsField label={t('settings.agentName')} description={t('settings.newAgentIdPreview', { id })}>
+      <SettingsField label={t('settings.agentName')}>
         <Input autoFocus aria-label={t('settings.agentName')} value={name} placeholder={t('settings.agentDefaultName')}
           onChange={(event) => setName(event.currentTarget.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); create(); } }} />

@@ -53,9 +53,6 @@ const App: React.FC = () => {
 
   const settings = useAppSettingsStore((state) => state.settings);
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
-  const setTheme = useAppSettingsStore((state) => state.setTheme);
-  const setLanguage = useAppSettingsStore((state) => state.setLanguage);
-  const setFontScale = useAppSettingsStore((state) => state.setFontScale);
 
   const resolvedTheme: ResolvedTheme = settings.appearance.theme === 'system'
     ? systemTheme
@@ -76,13 +73,6 @@ const App: React.FC = () => {
   const showNotice = useCallback((message: string) => {
     useNotificationStore.getState().add({ tone: 'info', title: message });
   }, []);
-
-  const applyAppearancePreference = useCallback((mutation: () => Promise<void>) => {
-    void mutation().catch((error: unknown) => {
-      console.error('[appearance] update failed', error);
-      useNotificationStore.getState().add({ tone: 'error', title: t('app.appearanceUpdateFailed') });
-    });
-  }, [t]);
 
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
   const handleToggleLeftSidebar = useCallback(() => {
@@ -232,9 +222,6 @@ const App: React.FC = () => {
             setUserMenuAnchor(null);
             setSettingsModalOpen(true);
           }}
-          onThemeChange={(theme) => applyAppearancePreference(() => setTheme(theme))}
-          onLanguageChange={(language) => applyAppearancePreference(() => setLanguage(language))}
-          onFontScaleChange={(fontScale) => applyAppearancePreference(() => setFontScale(fontScale))}
         />
 
         <SettingsModal

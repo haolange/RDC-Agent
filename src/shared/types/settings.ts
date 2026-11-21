@@ -278,7 +278,6 @@ export interface UiPreferences {
   /** Opt-in: Markdown syntax highlight + Write/Preview in composer; also renders user bubbles as Markdown. */
   composerMarkdown: boolean;
   /** Opt-in: use pointer cursor on interactive elements instead of the system default arrow. */
-  usePointerCursors: boolean;
   /** UI memory: whether the context usage sheet's details are expanded. Driven by its disclosure only. */
   contextBreakdownExpanded: boolean;
   /** Which Working steps open by default; a user's own toggle always wins. */

@@ -53,7 +53,7 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
         <Input id="settings-rdc-timeout" type="number" min={1000} max={600000} step={1000} disabled={installation.busy} value={draft.timeoutMs}
           onChange={(event) => patch({ timeoutMs: Number(event.currentTarget.value) })} />
       </SettingsField>
-      <SettingsField label={t('settings.rdcCliEnv')} htmlFor="settings-rdc-environment" description={t('settings.rdcCliEnvHint')}>
+      <SettingsField label={t('settings.rdcCliEnv')} htmlFor="settings-rdc-environment" help={t('settings.rdcCliEnvHint')}>
         <Textarea id="settings-rdc-environment" className="settings-rdc-cli-textarea" disabled={installation.busy}
           value={envText} placeholder="NAME=value" spellCheck={false}
           onChange={(event) => { setEnvText(event.currentTarget.value); patch({ env: textToEnv(event.currentTarget.value) }); }} />

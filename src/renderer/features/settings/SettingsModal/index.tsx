@@ -168,9 +168,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 <div className="settings-modal-title" id="settings-modal-title">
                   {activeSectionMeta?.label}
                 </div>
-                {activeSectionMeta?.subtitle ? (
-                  <p className="settings-modal-subtitle">{activeSectionMeta.subtitle}</p>
-                ) : null}
               </div>
               <IconButton
                 className="settings-modal-close"

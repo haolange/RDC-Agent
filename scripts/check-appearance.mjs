@@ -38,7 +38,7 @@ const defaults = createDefaultUiPreferences();
 assert(defaults.chromeThemes.light.presetId === 'rdc', 'Default light chrome is RDC');
 assert(defaults.chromeThemes.dark.presetId === 'rdc', 'Default dark chrome is RDC');
 assert(!('reduceMotion' in defaults), 'Removed motion preference must not persist in defaults');
-assert(defaults.usePointerCursors === false, 'Pointer cursors remain opt-in');
+assert(!('usePointerCursors' in defaults), 'Interactive controls always use the pointer cursor; there is no preference for it');
 
 const sanitized = sanitizeUiPreferences({
   theme: 'light',
@@ -230,9 +230,11 @@ const appearanceSource = scriptRead('src/renderer/features/settings/SettingsModa
 const appearanceChromeParts = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx');
 assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
 assert(!appearanceChromeParts.includes('appearance-preset-swatch'), 'Chrome parts must not keep a side-mounted preset Aa sibling');
-assert(appearanceChromeParts.includes('swatchColor'), 'Appearance preset options must supply swatchColor');
-assert(appearanceChromeParts.includes('minMenuWidth={280}'), 'Appearance preset menu must set a wide minMenuWidth');
-assert(appearanceChromeParts.includes('menuAlign="end"'), 'Appearance preset menu must right-align to the trigger');
+const appearancePresetRow = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx');
+assert(appearancePresetRow.includes('THEME_PRESET_CATALOG.map') && appearancePresetRow.includes('aria-pressed'), 'Each mode shows every preset as a pressable tile');
+assert(!appearanceChromeParts.includes('appearance-preset-picker'), 'The theme editor no longer repeats the preset picker the row already offers');
+assert(!appearanceSource.includes('appearance-variant-tabs'), 'Appearance has one theme switch; the second Light / Dark tab row is gone');
+assert(!appearanceSource.includes('usePointerCursors'), 'The pointer cursor preference is retired');
 assert(appearanceChromeParts.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
 assert(!appearanceChromeParts.includes('function ColorField'), 'Appearance must not inline a private ColorField');
 assert(appearanceSource.includes('ChromeThemeCard'), 'Appearance page must compose ChromeThemeCard');

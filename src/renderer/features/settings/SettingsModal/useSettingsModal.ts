@@ -36,7 +36,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setLanguage = useAppSettingsStore((state) => state.setLanguage);
   const setFontScale = useAppSettingsStore((state) => state.setFontScale);
   const setComposerMarkdown = useAppSettingsStore((state) => state.setComposerMarkdown);
-  const setUsePointerCursors = useAppSettingsStore((state) => state.setUsePointerCursors);
   const setChromeTheme = useAppSettingsStore((state) => state.setChromeTheme);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
@@ -103,15 +102,15 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const getResolvedProviderLabel = (provider: Pick<LlmProviderEntry, 'label'>) =>
     getProviderDisplayLabel(provider, t('settings.unnamedProvider'));
 
-  const sections: Array<{ id: typeof modalState.activeSection; label: string; subtitle: string }> = useMemo(() => [
-    { id: 'general', label: t('settings.general'), subtitle: t('settings.generalSubtitle') },
-    { id: 'appearance', label: t('settings.appearance'), subtitle: t('settings.appearanceSubtitle') },
-    { id: 'models', label: t('settings.models'), subtitle: t('settings.modelsSubtitle') },
-    { id: 'agents', label: t('settings.agentManifestTitle'), subtitle: t('settings.agentsSubtitle') },
-    { id: 'skills', label: t('settings.skills'), subtitle: t('settings.skillsSubtitle') },
-    { id: 'tools', label: t('settings.toolsAndExtensions'), subtitle: t('settings.toolsSubtitle') },
-    { id: 'hooks', label: t('settings.hooks'), subtitle: t('settings.hooksSubtitle') },
-    { id: 'policy', label: t('settings.policy'), subtitle: t('settings.policySubtitle') },
+  const sections: Array<{ id: typeof modalState.activeSection; label: string }> = useMemo(() => [
+    { id: 'general', label: t('settings.general') },
+    { id: 'appearance', label: t('settings.appearance') },
+    { id: 'models', label: t('settings.models') },
+    { id: 'agents', label: t('settings.agentManifestTitle') },
+    { id: 'skills', label: t('settings.skills') },
+    { id: 'tools', label: t('settings.toolsAndExtensions') },
+    { id: 'hooks', label: t('settings.hooks') },
+    { id: 'policy', label: t('settings.policy') },
   ], [t]);
 
   const blockSubmit = (draft: AgentManifestDraft) => {
@@ -191,7 +190,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     setLanguage,
     setFontScale,
     setComposerMarkdown,
-    setUsePointerCursors,
     setChromeTheme,
     ...actions,
     handleSaveAgentManifests: agentManifestAutosave.retry,
