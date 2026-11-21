@@ -71,11 +71,13 @@
   color: var(--token-text-caption);
 }
 
+/* One line of preview; the title carries the second line. */
 .knowledge-center-card-preview {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   overflow: hidden;
+  overflow-wrap: anywhere;
   line-height: var(--type-caption-line);
 }
 
