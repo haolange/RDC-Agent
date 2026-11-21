@@ -1,7 +1,8 @@
 .appearance-preview-pane {
-  --ap-surface: rgb(250 251 253);
-  --ap-ink: rgb(21 29 39);
-  --ap-accent: rgb(27 157 204);
+  /* The theme being edited sets these inline; until then the preview shows the window's own theme. */
+  --ap-surface: var(--token-bg-raised);
+  --ap-ink: var(--token-text-primary);
+  --ap-accent: var(--token-accent-primary);
   display: grid;
   grid-template-columns: 44px 1fr;
   min-height: 6rem;

@@ -14,7 +14,7 @@ const CEILINGS = {
   'inline-svg': 0,
   'text-glyph': 0,
   'raw-error-render': 0,
-  'literal-color': 3,
+  'literal-color': 0,
   'i18n-same-value': 0,
   'bare-alert': 0,
 };

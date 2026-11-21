@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { closeOverlays, openApp, openSettings, useTheme } from './qa-browser-shared.mjs';
+import { closeOverlays, openApp, openSettings, scanSurfaceForbidden, useTheme } from './qa-browser-shared.mjs';
 
 const args = process.argv.slice(2);
 const [logPath, shotDir] = args;
@@ -53,6 +53,12 @@ const shot = async (name) => {
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(shotDir, `${name}.png`) });
   console.log(`[walkthrough] shot ${name}`);
+  // Pseudo-locale shots stretch copy on purpose; every other default screen must keep 诊断 facts off the surface.
+  const forbidden = name.includes('pseudo') ? [] : await page.evaluate(scanSurfaceForbidden);
+  if (forbidden.length) {
+    failures.push(`surface:${name}`);
+    for (const hit of forbidden) console.log(`[walkthrough] SURFACE ${name} ${hit}`);
+  }
 };
 const step = async (name, action) => {
   try {
