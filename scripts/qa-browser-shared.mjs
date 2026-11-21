@@ -15,7 +15,9 @@ export function readBootstrapUrl(logPath) {
 
 export async function openApp(logPath, viewport = { width: 1440, height: 900 }) {
   const browser = await chromium.launch();
-  const page = await (await browser.newContext({ viewport })).newPage();
+  // QA_VIDEO_DIR records the whole run (for motion clips); without it nothing is written.
+  const recordVideo = process.env.QA_VIDEO_DIR ? { recordVideo: { dir: process.env.QA_VIDEO_DIR, size: viewport } } : {};
+  const page = await (await browser.newContext({ viewport, ...recordVideo })).newPage();
   page.setDefaultTimeout(8000);
   await page.goto(readBootstrapUrl(logPath));
   await page.waitForURL(/\/app/, { timeout: 60_000 });

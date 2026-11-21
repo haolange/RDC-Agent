@@ -49,10 +49,12 @@ function gradientPng(width, height) {
     chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
 }
 
+const startedAt = Date.now();
 const shot = async (name) => {
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(shotDir, `${name}.png`) });
-  console.log(`[walkthrough] shot ${name}`);
+  // The elapsed time lines a shot up with a recorded video (QA_VIDEO_DIR) for cutting motion clips.
+  console.log(`[walkthrough] shot ${name} t=${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
   // Pseudo-locale shots stretch copy on purpose; every other default screen must keep 诊断 facts off the surface.
   const forbidden = name.includes('pseudo') ? [] : await page.evaluate(scanSurfaceForbidden);
   if (forbidden.length) {
