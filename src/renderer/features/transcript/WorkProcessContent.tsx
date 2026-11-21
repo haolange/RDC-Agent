@@ -1,8 +1,8 @@
 import React from 'react';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
-import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { WorkProcessViewport } from './WorkProcessViewport';
 import { WorkProcessTrackContext } from './WorkProcessRailIcon';
 import { firstTrackEvent } from './workProcessTrack';
