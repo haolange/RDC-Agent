@@ -36,7 +36,7 @@ function harness(scope: string, validateCompletion: TurnCompletionValidator, app
     routeCapability: { toolCallingMode: 'disabled' }, mcpConnectionErrors: [],
     promptCache: {}, credentialHandle: 'fixture',
     effectivePlan: {
-      fingerprint: 'frozen-plan', toolAllowlist: [], completionContract: 'investigation-report', investigationMission: 'debugger',
+      fingerprint: 'frozen-plan', toolAllowlist: [], completionContract: 'investigation-report', investigationMission: 'debugger', profileHandoffs: [],
       policy: { maxTurns: 5, maxToolCalls: 5, maxSubagents: 1, maxChildDepth: 1, maxWallTimeMs: 10_000 },
     },
   } as unknown as PreparedAgentRuntime;
@@ -104,6 +104,27 @@ function harness(scope: string, validateCompletion: TurnCompletionValidator, app
 }
 
 describe('Agent turn completion boundary', () => {
+  it('continues a Mission planning turn until a plan is submitted or a report is declared for validation', async () => {
+    const validate = vi.fn();
+    const { run, preparedRuntime } = harness('mission-planning-boundary', validate, false, () => undefined, async (turn, request) => {
+      expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toContain('plan_artifact');
+      turn.approvedPlan = { toolCallId: 'plan-call', hash: 'hash', target: 'general', frozenUri: 'session://plans/plan.md', planId: 'plan' };
+      expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toBeUndefined();
+      turn.approvedPlan = null;
+      turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
+      expect(await request.beforeTerminalResponse?.({ content: [] } as never)).toBeUndefined();
+    });
+    preparedRuntime.effectivePlan = { ...preparedRuntime.effectivePlan, profileHandoffs: [{ agent: 'general', label: 'Execute', prompt: '', surface: 'plan-gate' }] };
+    await run();
+    expect(validate).toHaveBeenCalledWith(expect.objectContaining({ disposition: 'completed', investigationMission: 'debugger' }));
+  });
+
+  it('rejects a Mission planning turn that terminates without reaching a plan gate', async () => {
+    const { run, preparedRuntime } = harness('mission-planning-terminal', vi.fn(), false, () => undefined, undefined,
+      (turn) => { turn.completionDeclaration = null; });
+    preparedRuntime.effectivePlan = { ...preparedRuntime.effectivePlan, profileHandoffs: [{ agent: 'general', label: 'Execute', prompt: '', surface: 'plan-gate' }] };
+    await expect(run()).rejects.toThrow('MISSION_PLAN_REQUIRED');
+  });
   it('keeps an existing partial final after empty reassessment only when no later tool work changed it', async () => {
     const exercise = async (withLaterTool: boolean) => {
       const validate = vi.fn();

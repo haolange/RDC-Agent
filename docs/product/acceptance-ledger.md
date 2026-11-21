@@ -5388,3 +5388,166 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 终态回执 `rdc-lifecycle-14346da4-683e-4030-be11-9479081c8cd3.json` 确认同一 capture／本机／入口 EID 147、replacement 0；监工随后关闭回放并停止本轮进程。
 - 规划约 3 分 25 秒、执行约 52 分 25 秒；General 回报 input 12577362／output 56446 token（input 含缓存读取 2698752）。会话、Trace、Task 和回执归档 `.local/vertical-investigation-20261108/evidence/m3-20261116-round-03-sources.zip`，SHA-256 `792dd2b014df455971009ddd5a93762362ba81cac2e5cd833f8e681aef5bcbb4`；工程增量产物归档 `m3-20261116-round-03-project-output-delta.zip`，SHA-256 `93893763b325a8b7593e6f091256d87f043e4a0c9187f8453a6da94cf88aa2e8`，与第二轮工程产物合用。
 - 2026-11-16 M3 第三轮因果复验：独立会话经产品冻结目录核对 129 项，允许效果不含单 draw shading-rate 状态写入；目标 `rd.shader.get_source` 一次有效查询返回 `source_available=false`、`can_build=false`、`can_replace=false`。监工最初误给大写 `PS`，主进程校验拒绝且未触达回放；更正为小写 `ps` 后查询一次。新增该管线状态干预需扩大产品允许的效果及相应恢复／回执边界，按 3.5 阻塞；未将源码缺失当作 capture 不可用。诊断回到 EID 147 后关闭回放；原始返回、Trace 与会话归档 `m3-round03-intervention-product-recheck.zip`，SHA-256 `4ceeb59f18923e7bbd0c95b63b291f6fa8f82eeaae5dbfabe77cbb01a44e23c5`。
+
+## 2026-11-21：真实模型结果评测 gpt-6.1-sol
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_372435841c76'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_372435841c76\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 gpt-6-astra
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_94b6a06a4342'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_94b6a06a4342\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 deepseek-flash
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_4e111a5b5087'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_4e111a5b5087\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 grok-4.7
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_f223703d1ed8'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_f223703d1ed8\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 gpt-6.1-terra
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_f59dbbcfd2e2'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_f59dbbcfd2e2\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 gpt-6-sol
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_4686a8c54745'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_4686a8c54745\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 grok-4.6
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_1b92a2000571'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_1b92a2000571\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 deepseek-v4-pro
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：请求失败，六题没有可评分的完成答复；输出项 phase 冲突的来源待查。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\deepseek-v4-error.png`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_cb38a143a727\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 gpt-6-luna
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_f0f2ce17d48c'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_f0f2ce17d48c\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 gpt-5.6-sol
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_5f4f41fe3ce4'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_5f4f41fe3ce4\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 gpt-5.6-terra
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_870f889a630b'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_870f889a630b\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：真实模型结果评测 gpt-5.6-luna
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实回放问答评分 6/6；评分脚本为本轮未提交修复。
+- 证据：本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_3a70323d5cbd'`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_3a70323d5cbd\conversation.jsonl`。
+- 人工介入：通过产品 Composer 发出脚本原始提示。
+
+## 2026-11-21：重建后的原生回放与事件查询
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：软件 Vulkan 下真实打开 vkcube capture，产品答复前五个事件为 5、6、11、12、13；RDC-Tool 重建产物为未提交工作区变更。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\rebuilt-capture-query.png`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_9565540990c9\conversation.jsonl`。
+- 人工介入：通过 Capture 面板打开 fixture 并经 Composer 查询。
+
+## 2026-11-21：ChatGPT 账号推理摘要
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实调查显示三段摘要并与工具交替，完成事件计数及长度与界面逐段一致。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\chatgpt-reasoning.png`；请求字段汇总 `C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\chatgpt-reasoning-events.json`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_ddb11893b33a\conversation.jsonl`。
+- 人工介入：使用调查提示并展开摘要。
+
+## 2026-11-21：Grok 账号调查
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：已连接账号可完成调查；刚登录时模型分组加载和重试未复现。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\grok-investigation.png`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_dd809ef6a4a6\conversation.jsonl`。
+- 人工介入：使用调查提示；账号在开始前已连接。
+
+## 2026-11-21：工作过程与手动折叠
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：实测完成后收起、停止后展开；手动打开和关闭在后续流更新中保留。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\working-stream-manual.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\working-stopped.png`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_dab345d8ab46\conversation.jsonl`。
+- 人工介入：在流式更新时手动开合步骤。
+
+## 2026-11-21：计划审阅与交接
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：原调查提示未生成计划；补充要求后计划卡、阅读器、审批与双向跳转可用，执行回合验收跳转后由人工停止。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\plan-handoff.png`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_e4914b0a8c09\conversation.jsonl`。
+- 人工介入：补充要求提交计划、批准并在验证跳转后停止；按界面提示恢复入口 EID 14，再关闭回放。
+- 恢复回执：`C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_e4914b0a8c09\session-artifacts\tool-outputs\rdc-lifecycle-36dbd3ad-1db0-4aaa-b069-5b3db446d303.json`（resolved）。
+
+## 2026-11-21：后台任务与右栏
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实后台任务完成、另一任务受阻、第三任务取消；徽标与颜色状态可见；720 宽标签不重叠，选中标签保留名称符合设计，判定通过。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\tasks-desktop.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\tasks-720-open.png`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_ec7785bc9628\conversation.jsonl`。
+- 人工介入：要求代理只读委派并设置三种真实任务状态。
+
+## 2026-11-21：知识中心导入
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：测试案例导入与 Escape 关闭弹窗可用；长预览两行；草稿生命周期徽章为中性描边符合设计，徽章判定通过。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\knowledge-long-preview.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\frontend-report.md`。
+- 人工介入：导入项目测试案例并在验收后删除。
+
+## 2026-11-21：浅色和深色主题
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：两种主题下实测对话和设置，所检查界面未见不可读文字或水平溢出。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\theme-light-chat.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\theme-light-settings.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\theme-dark-chat.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\theme-dark-settings.png`。
+- 人工介入：切换两种主题，结束后恢复原主题。
+
+## 2026-11-21：ChatGPT Fast 能力验证
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：服务端报告 default，界面明确显示实际 Fast 处理未确认。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\chatgpt-fast.json`。
+- 人工介入：在设置中运行 GPT-6.1 Sol 的 Fast 验证。
+
+## 2026-11-21：vkcube fixture 跨驱动复现
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：强制在 NVIDIA RTX 5090 回放 lavapipe 录制的 fixture，原生回放报告深度附件内存布局不兼容；RDC-Tool fixture 分类已改为软件 Vulkan，修复尚未提交。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\nvidia-incompatibility.log`。
+- 人工介入：隔离测试目录显式运行真实回放；随后由测试关闭 daemon。
+
+## 2026-11-21：RenderDoc 同源原生回执重建
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`（RDC-Tool 改动尚未提交）
+- 结果：干净源码摘要为 `20b5f0c88580b52166c94ddb59b7125e600297bb6e256a67f37368642797252b`；Windows 与两个 Android 目标重建并打包校验，原生回执测试 31 项和 fixture 相关测试 3 项通过。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\native-tests.log`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\fixture-tests.log`。
+- 人工介入：安装指定 Android SDK／NDK 后执行重建；fixture 回放使用软件 Vulkan。
+
+## 2026-11-21：RDC-Tool 产品配置
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
+- 结果：真实工具设置执行验证并应用，界面显示 1.1.2、129 项操作。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\rdc-tool-settings.png`。
+- 人工介入：从真实工具设置手动触发验证并应用。
+
+## 2026-11-21：GPT-6.1 Sol Medium 结果评测
+- 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`（评分脚本修复尚未提交）
+- 结果：真实软件 Vulkan 回放，六题评分 6/6；请求快照记录 Medium。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\evaluation-medium.png`；本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_b7d280bec927'`。
+- 人工介入：新建会话，经 Composer 原样发送评测提示，完成后关闭回放。
+
+## 2026-11-21：Debugger 规划边界复测
+- 提交：`89f0a44896d6c699431edbad316b73ea1748b961`（运行时修复为未提交工作区变更）
+- 结果：GPT-6.1 Sol／Medium 使用同一调查提示；直接终答后同一回合收到运行时计划反馈，随后提交待审阅计划。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\debugger-plan-gate-retest.png`；请求快照目录 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\llm-calls\sess_ccc5968cae1c`。
+- 人工介入：停止待审阅计划，重开后确认无待恢复回放。
+
+## 2026-11-21：会话串显复测
+- 提交：`89f0a44896d6c699431edbad316b73ea1748b961`
+- 结果：两次运行中切换与一次第二回合完成后切换未复现；原串显会话重开及刷新后未见异会话消息。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\session-cross-display.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\ui04-reopened-dom.json`。
+- 人工介入：经侧栏切换并刷新页面。
