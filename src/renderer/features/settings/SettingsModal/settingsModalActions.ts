@@ -217,12 +217,15 @@ export function createSettingsModalActions({
   };
 
   const handleSavePersonalization = async () => {
+    const submitted = modalState.globalInstructionsDraft;
     const nextSettings = await patchSettings({
       agents: {
-        globalInstructions: modalState.globalInstructionsDraft,
+        globalInstructions: submitted,
       },
     });
-    modalState.setGlobalInstructionsDraft(nextSettings.agents.globalInstructions);
+    // Autosave runs while the user may still be typing: adopt the saved text only if the draft is unchanged,
+    // so newer input survives and is saved by the next idle tick.
+    modalState.setGlobalInstructionsDraft((current) => (current === submitted ? nextSettings.agents.globalInstructions : current));
   };
 
   return {

@@ -28,7 +28,7 @@ export const HANDOFF_SURFACES = ['turn-end', 'plan-gate', 'hidden'] as const sat
 
 export interface AgentHandoffDefinition {
   label: string;
-  labelTranslations?: HandoffLabelTranslations;
+  labelTranslations?: ManifestTextTranslations;
   agent: string;
   prompt: string;
   send?: boolean;
@@ -65,7 +65,8 @@ export function agentCompletionContract(profile: { completionContract?: AgentCom
   return profile?.completionContract ?? DEFAULT_AGENT_COMPLETION_CONTRACT;
 }
 
-export type HandoffLabelTranslations = Readonly<Partial<Record<AppLanguage, string>>>;
+/** Product copy a shipped manifest carries per interface language; the untranslated field is the fallback. */
+export type ManifestTextTranslations = Readonly<Partial<Record<AppLanguage, string>>>;
 
 export interface AgentManifestDefinition {
   id: string;
@@ -74,6 +75,9 @@ export interface AgentManifestDefinition {
   name: string;
   description: string;
   argumentHint: string;
+  /** Shipped builtins only; never written to user or project copies. */
+  descriptionTranslations?: ManifestTextTranslations;
+  argumentHintTranslations?: ManifestTextTranslations;
   target: string;
   /** Resolved from Settings → Agents (this Agent's setting, else the default); never read from the file. */
   reasoningLevel?: ReasoningSelection;
@@ -121,6 +125,7 @@ export interface AgentManifestProvenance {
 export interface AgentManifestDraft extends Omit<
   AgentManifestDefinition,
   'filePath' | 'builtin' | 'updatedAt' | 'provenance' | 'compiledRoute' | 'reasoningLevel' | 'modelSource' | 'builtinUpdate'
+  | 'descriptionTranslations' | 'argumentHintTranslations'
 > {
   delete?: boolean;
   writeScope?: AgentManifestWriteScope;

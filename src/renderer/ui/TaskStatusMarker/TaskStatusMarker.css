@@ -1,71 +1,62 @@
 .task-status-marker {
+  --task-status-color: var(--token-task-pending);
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: var(--space-4);
   height: var(--space-4);
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
-  font-variant-numeric: tabular-nums;
-  flex: 0 0 auto;
+  color: var(--task-status-color);
 }
 
-.task-status-marker.is-pending {
-  color: var(--token-text-caption);
-  font-weight: var(--font-medium);
-}
-
-.task-status-marker.is-snapshot.is-in-progress {
-  background: transparent;
-  color: var(--token-accent-primary);
-}
-
-.task-status-marker.is-snapshot.is-in-progress circle,
-.task-status-marker.is-snapshot.is-completed circle {
-  fill: currentColor;
-}
-
-.task-status-marker.is-snapshot.is-in-progress path,
-.task-status-marker.is-snapshot.is-completed path {
-  stroke: var(--token-text-inverse);
-}
-
-.task-status-marker.is-snapshot.is-completed {
-  color: var(--token-text-caption);
-}
-
-.task-status-marker.is-completed {
-  color: var(--token-status-success);
-}
-
-.task-status-marker.is-blocked {
-  color: var(--token-status-warning);
-}
-
-.task-status-marker.is-cancelled {
-  color: var(--token-text-caption);
+.task-status-marker.is-size-sm {
+  width: calc(var(--space-3) + var(--space-0-5));
+  height: calc(var(--space-3) + var(--space-0-5));
 }
 
 .task-status-marker svg {
-  width: var(--space-4);
-  height: var(--space-4);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.75;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.work-process-task-snapshot-item .task-status-marker {
-  width: var(--space-4);
-  height: var(--space-4);
+.task-status-marker.is-pending { --task-status-color: var(--token-task-pending); }
+.task-status-marker.is-in-progress { --task-status-color: var(--token-task-active); }
+.task-status-marker.is-completed { --task-status-color: var(--token-task-done); }
+.task-status-marker.is-blocked { --task-status-color: var(--token-task-blocked); }
+.task-status-marker.is-failed { --task-status-color: var(--token-task-failed); }
+.task-status-marker.is-cancelled { --task-status-color: var(--token-task-cancelled); }
+
+.task-status-marker-fill {
+  fill: currentColor;
+  stroke: none;
 }
 
-.work-process-task-snapshot-item .task-status-marker svg {
-  width: var(--transcript-card-icon-size);
-  height: var(--transcript-card-icon-size);
+/* Marks drawn on a filled disc use the fixed light control surface, never the accent ink. */
+.task-status-marker-mark {
+  stroke: var(--token-control-knob);
+  stroke-width: 1.8;
+}
+
+.task-status-marker-track {
+  opacity: 0.28;
+}
+
+.task-status-marker-core {
+  fill: currentColor;
+  stroke: none;
+}
+
+.task-status-marker-arc {
+  transform-origin: 8px 8px;
+  animation: task-status-marker-spin 1.1s linear infinite;
+}
+
+@keyframes task-status-marker-spin {
+  to { transform: rotate(360deg); }
 }

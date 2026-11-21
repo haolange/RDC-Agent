@@ -15,8 +15,8 @@ export const TaskSnapshotCard: React.FC<{
   const [expanded, toggle] = useScopedWorkDisclosure(`task-snapshot-${row.id}`, true);
   const listId = useId();
   const reasonText = (reason: string) => reason === TASK_STATUS_REASONS.parentTurnStopped
-    ? t('control.rightRail.progress.reason.parentTurnStopped') : reason === TASK_STATUS_REASONS.createdTurnStopped
-      ? t('control.rightRail.progress.reason.createdTurnStopped') : reason;
+    ? t('control.rightRail.tasks.reason.parentTurnStopped') : reason === TASK_STATUS_REASONS.createdTurnStopped
+      ? t('control.rightRail.tasks.reason.createdTurnStopped') : reason;
   const title = row.change === 'created' ? t('chat.workProcessTaskSnapshotCreated')
     : row.change === 'updated' ? t('chat.workProcessTaskSnapshotUpdated')
       : t('chat.workProcessTaskSnapshotList');
@@ -40,9 +40,9 @@ export const TaskSnapshotCard: React.FC<{
                   data-work-process-task-status={item.status}
                   tabIndex={-1}
                 >
-                  <TaskStatusMarker status={item.status}
+                  <TaskStatusMarker status={item.displayState ?? item.status}
                     label={item.status === 'pending' && item.waitingOn?.length
-                      ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${item.status}`)} />
+                      ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${item.displayState ?? item.status}`)} />
                   {item.statusReason || item.waitingOn?.length ? <details className="work-process-task-snapshot-copy">
                     <summary className="work-process-task-snapshot-title">{item.title}</summary>
                     {item.statusReason ? <p className="work-process-task-snapshot-reason">{reasonText(item.statusReason)}</p> : null}

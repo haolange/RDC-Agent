@@ -58,13 +58,13 @@
 .setup-checklist-step[data-state='active'] .setup-checklist-index {
   border-color: transparent;
   background: var(--token-accent-primary);
-  color: var(--token-text-inverse);
+  color: var(--token-text-on-accent);
 }
 
 .setup-checklist-step[data-state='done'] .setup-checklist-index {
   border-color: transparent;
   background: var(--token-status-success);
-  color: var(--token-text-inverse);
+  color: var(--token-text-on-accent);
 }
 
 .setup-checklist-copy {

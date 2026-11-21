@@ -160,7 +160,7 @@ export class TaskRegistry {
       const budget = inheritBudget(options.budget, previous.at(-1)?.budget, parent?.budget);
       validateBudget(budget, true);
       const now = Date.now();
-      const execution: TaskExecutionRecord = { schemaVersion: TASK_SCHEMA_VERSION, id: this.id('execution', now), taskId, taskRevision: task.revision, generation, runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID, parentExecutionId: options.parentExecutionId, rootBudgetId, mode: options.mode, status: 'running', budget, frozenPlanRef: options.frozenPlanRef, preparation: options.preparation ? structuredClone(options.preparation) : undefined, childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: now, updatedAt: now };
+      const execution: TaskExecutionRecord = { schemaVersion: TASK_SCHEMA_VERSION, id: this.id('execution', now), taskId, taskRevision: task.revision, generation, runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID, parentExecutionId: options.parentExecutionId, rootBudgetId, mode: options.mode, ...(options.dispatch ? { dispatch: options.dispatch } : {}), status: 'running', budget, frozenPlanRef: options.frozenPlanRef, preparation: options.preparation ? structuredClone(options.preparation) : undefined, childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: now, updatedAt: now };
       task.executionIds = [...task.executionIds, execution.id]; task.currentExecutionId = execution.id; task.status = 'in_progress'; task.statusReason = undefined; task.disposition = undefined; task.updatedAt = now;
       await this.store.commit({ tasks: [task], executions: [execution] });
       await this.emitTaskChange('updated', task); return execution;

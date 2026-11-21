@@ -17,43 +17,44 @@ describe('session rail projection composition', () => {
     const host = document.createElement('div'); const root = createRoot(host);
     try {
       state.tracePresentation = { rightPanel: {
-        progress: [
-          { id: 'started', sessionId: 'session', order: 0, title: 'Started', status: 'cancelled', blockerSummary: TASK_STATUS_REASONS.parentTurnStopped },
-          { id: 'pending', sessionId: 'session', order: 1, title: 'Pending', status: 'cancelled', blockerSummary: TASK_STATUS_REASONS.createdTurnStopped },
-          { id: 'custom', sessionId: 'session', order: 2, title: 'Custom', status: 'blocked', blockerSummary: '等待用户确认' },
+        tasks: [
+          { id: 'started', sessionId: 'session', order: 0, title: 'Started', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.parentTurnStopped },
+          { id: 'pending', sessionId: 'session', order: 1, title: 'Pending', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.createdTurnStopped },
+          { id: 'custom', sessionId: 'session', order: 2, title: 'Custom', status: 'blocked', displayState: 'blocked', blockerSummary: '等待用户确认' },
         ],
       } };
       act(() => root.render(createElement(SessionRightRail)));
-      expect(host.textContent).not.toContain('control.rightRail.progress.reason.parentTurnStopped');
-      expect(host.textContent).not.toContain('control.rightRail.progress.reason.createdTurnStopped');
+      expect(host.textContent).not.toContain('control.rightRail.tasks.reason.parentTurnStopped');
+      expect(host.textContent).not.toContain('control.rightRail.tasks.reason.createdTurnStopped');
       expect(host.textContent).not.toContain('等待用户确认');
       expect([...host.querySelectorAll('.right-rail-task-order')].map(el => el.textContent)).toEqual(['1','2','3']);
       expect(host.querySelectorAll('.right-rail-task-row .task-status-marker')).toHaveLength(3);
-      expect(zhControl['control.rightRail.progress.reason.parentTurnStopped']).toBe('主回合停止，所属执行已结束。');
-      expect(zhControl['control.rightRail.progress.reason.createdTurnStopped']).toBe('创建此待办的回合已停止，待办尚未开始。');
-      expect(enControl['control.rightRail.progress.reason.parentTurnStopped']).toBe(TASK_STATUS_REASONS.parentTurnStopped);
-      expect(enControl['control.rightRail.progress.reason.createdTurnStopped']).toBe(TASK_STATUS_REASONS.createdTurnStopped);
+      expect(zhControl['control.rightRail.tasks.reason.parentTurnStopped']).toBe('主回合停止，所属执行已结束。');
+      expect(zhControl['control.rightRail.tasks.reason.createdTurnStopped']).toBe('创建此任务的回合已停止，任务尚未开始。');
+      expect(enControl['control.rightRail.tasks.reason.parentTurnStopped']).toBe(TASK_STATUS_REASONS.parentTurnStopped);
+      expect(enControl['control.rightRail.tasks.reason.createdTurnStopped']).toBe(TASK_STATUS_REASONS.createdTurnStopped);
     } finally { act(() => root.unmount()); state.tracePresentation = null; host.remove(); }
   });
 
-  it('shows progress count from the current projection and removes populated density when cleared', () => {
+  it('shows the task count from the current projection and removes populated density when cleared', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const host = document.createElement('div'); const root = createRoot(host);
     try {
-      state.tracePresentation = { rightPanel: { progress: [
-        { id: 'done', sessionId: 'session', order: 0, title: 'Complete title retained', status: 'completed' },
-        { id: 'live', sessionId: 'session', order: 1, title: 'Live', status: 'in_progress' },
-        { id: 'cancelled', sessionId: 'session', order: 2, title: 'Cancelled', status: 'cancelled' },
+      state.tracePresentation = { rightPanel: { tasks: [
+        { id: 'done', sessionId: 'session', order: 0, title: 'Complete title retained', status: 'completed', displayState: 'completed' },
+        { id: 'live', sessionId: 'session', order: 1, title: 'Live', status: 'in_progress', displayState: 'in_progress' },
+        { id: 'cancelled', sessionId: 'session', order: 2, title: 'Cancelled', status: 'cancelled', displayState: 'cancelled' },
       ] } };
       act(() => root.render(createElement(SessionRightRail)));
-      const progress = host.querySelector('[data-testid="right-rail-progress"]')!;
+      const progress = host.querySelector('[data-testid="right-rail-tasks"]')!;
       expect(progress.classList.contains('is-populated')).toBe(true);
-      expect(progress.querySelector('.right-rail-section-meta')?.textContent).toBe('control.traceProgressCount:1/3');
+      expect(progress.querySelector('.right-rail-section-meta')?.textContent).toBe('control.rightRail.tasks.count:1/3');
       expect(host.querySelectorAll('.right-rail-section.is-populated')).toHaveLength(1);
       expect(progress.textContent).toContain('Complete title retained');
-      const title = progress.querySelector<HTMLElement>('.right-rail-task-copy .ui-overflow-fade')!;
+      const title = progress.querySelector<HTMLElement>('.right-rail-task-title')!;
       expect(title.textContent).toBe('Complete title retained');
-      expect(title.title).toBe('Complete title retained');
+      expect(title.closest('button')?.title).toContain('Complete title retained');
+      expect(progress.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('1');
       state.tracePresentation = null;
       act(() => root.render(createElement(SessionRightRail)));
       expect(progress.classList.contains('is-populated')).toBe(false);
@@ -65,7 +66,7 @@ describe('session rail projection composition', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const host = document.createElement('div'); const root = createRoot(host);
     const render = () => act(() => root.render(createElement(SessionRightRail)));
-    const tabs = ['progress', 'artifacts', 'outputs', 'context', 'capture'];
+    const tabs = ['tasks', 'artifacts', 'outputs', 'context', 'capture'];
     const visit = (onTab: (id: string) => void) => tabs.forEach((id, index) => {
       act(() => host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!.click());
       expect([...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid'))).toEqual([`right-rail-${id}`]);
@@ -77,13 +78,13 @@ describe('session rail projection composition', () => {
         tabs.map((id) => `control.rightRail.${id}.title`));
       visit(() => expect(host.querySelectorAll('[aria-expanded]')).toHaveLength(0));
       state.tracePresentation = { rightPanel: {
-        progress: [{ id: 'task', sessionId: 'session', order: 1, title: 'A blocked task', status: 'blocked', blockerSummary: 'Needs input' }],
+        tasks: [{ id: 'task', sessionId: 'session', order: 1, title: 'A blocked task', status: 'blocked', displayState: 'blocked', blockerSummary: 'Needs input' }],
         artifacts: { rows: [], storeDegraded: true, totalCount: 0 },
         outputs: { current: [{ id: 'output', displayName: 'A long output name', path: '/output', status: 'failed' }], previous: [] },
         context: { task: { resources: [{ id: 'resource', kind: 'skill', label: 'A loaded skill', summary: 'Scope retained' }] } },
       } }; render();
       visit((id) => {
-        if (id === 'progress') {
+        if (id === 'tasks') {
           expect(host.textContent).toContain('A blocked task');
           expect(host.textContent).not.toContain('Needs input');
         }

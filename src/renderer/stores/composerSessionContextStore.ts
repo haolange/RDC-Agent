@@ -28,7 +28,8 @@ export interface HandoffSuggestionRequest {
   label: string;
   prompt: string;
   send: boolean;
-  approvedPlanHash?: string;
+  /** Recovery path: the approved, still-unsent plan revision this handoff executes. */
+  approvedPlan?: { planId: string; revision: number; hash: string };
   sourcePlan?: { reviewId: string; turnId: string; toolCallId: string; planId: string; revision: number; hash: string };
 }
 

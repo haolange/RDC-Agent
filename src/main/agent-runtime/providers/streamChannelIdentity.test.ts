@@ -175,6 +175,38 @@ describe('OpenAI Responses item-scoped stream channels', () => {
     expect(textBlocks(message)).toEqual([expect.objectContaining({ text: 'Hello' })]);
   });
 
+  it.each([
+    ['only a text-done event', [
+      { type: 'response.reasoning_summary_text.done', output_index: 0, item_id: 'rs_1', summary_index: 0, text: '**Locating images** Listing the project.' },
+    ], { type: 'reasoning', id: 'rs_1' }, '**Locating images** Listing the project.'],
+    ['only part-done events', [
+      { type: 'response.reasoning_summary_part.added', output_index: 0, item_id: 'rs_1', summary_index: 0, part: { type: 'summary_text', text: '' } },
+      { type: 'response.reasoning_summary_part.done', output_index: 0, item_id: 'rs_1', summary_index: 0, part: { type: 'summary_text', text: 'first' } },
+      { type: 'response.reasoning_summary_part.done', output_index: 0, item_id: 'rs_1', summary_index: 1, part: { type: 'summary_text', text: 'second' } },
+    ], { type: 'reasoning', id: 'rs_1' }, 'first\n\nsecond'],
+    ['only the finished item summary', [], { type: 'reasoning', id: 'rs_1', summary: [{ type: 'summary_text', text: 'first' }, { type: 'summary_text', text: 'second' }] }, 'first\n\nsecond'],
+    ['a truncated stream completed by text-done', [
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, item_id: 'rs_1', summary_index: 0, delta: '**Locating images**' },
+      { type: 'response.reasoning_summary_text.done', output_index: 0, item_id: 'rs_1', summary_index: 0, text: '**Locating images**\n\nListing the project.' },
+    ], { type: 'reasoning', id: 'rs_1', summary: [{ type: 'summary_text', text: '**Locating images**\n\nListing the project.' }] }, '**Locating images**\n\nListing the project.'],
+  ] as const)('keeps the whole reasoning summary when it arrives through %s', async (_label, reasoningEvents, finishedItem, expected) => {
+    vi.stubGlobal('fetch', async () => sse(
+      { type: 'response.output_item.added', output_index: 0, item: { type: 'reasoning', id: 'rs_1' } },
+      ...reasoningEvents,
+      { type: 'response.output_item.done', output_index: 0, item: finishedItem },
+      { type: 'response.output_item.added', output_index: 1, item: { type: 'message', id: 'msg_1' } },
+      { type: 'response.output_text.delta', output_index: 1, item_id: 'msg_1', delta: 'Hello' },
+      { type: 'response.output_item.done', output_index: 1, item: { type: 'message', id: 'msg_1' } },
+      { type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [finishedItem, { type: 'message', id: 'msg_1' }] } },
+    ));
+    const message = await new OpenAIResponsesProvider({ apiKey: 'secret' })
+      .stream(model('openai-responses'), context, { requestPlan })
+      .result();
+    expect(thinkingBlocks(message)).toEqual([expect.objectContaining({ text: expected })]);
+    expect(message.execution?.reasoningEvents?.summaryParts.every((part) => part.completedChars !== undefined)).toBe(true);
+    expect(JSON.stringify(message.execution?.reasoningEvents)).not.toContain('Listing');
+  });
+
   it('assigns distinct refs to two reasoning items and replays each continuation once', async () => {
     const firstItem = { type: 'reasoning', id: 'rs_1', encrypted_content: 'enc_1' };
     const secondItem = { type: 'reasoning', id: 'rs_2', encrypted_content: 'enc_2' };

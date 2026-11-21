@@ -12,7 +12,8 @@ export function firstTrackEvent(rows: WorkProcessRow[]): string | undefined {
 
 export function isTrackActivity(row: WorkProcessRow): boolean {
   if (row.type === 'section') return Boolean(row.hasActiveTools) || row.visibleSteps.some(isTrackActivity);
-  if (row.type === 'tool') return row.status === 'running' && (!row.approval || row.approval.status === 'approved');
+  // A plan under review and an unapproved call are waiting on the user, not executing.
+  if (row.type === 'tool') return row.status === 'running' && !row.planReview && (!row.approval || row.approval.status === 'approved');
   if (row.type === 'output') return row.status === 'running';
   if (row.type === 'thinking') return row.thinkingStatus === 'streaming';
   if (row.type === 'subagent') return row.status === 'running';

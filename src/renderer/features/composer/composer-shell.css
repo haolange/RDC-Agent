@@ -16,7 +16,7 @@
   max-width: none;
   min-width: 0;
   min-height: 0;
-  padding: var(--space-3);
+  padding: var(--conversation-inset);
   border: 1px solid var(--token-border-default);
   border-radius: var(--composer-shell-radius);
   overflow: visible;

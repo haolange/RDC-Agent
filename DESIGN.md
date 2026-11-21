@@ -4,7 +4,7 @@
 
 ## 视觉定位
 
-**视觉定位（裁决）**：RDC-Agent 是 restrained、高密度、实色分层的精密工具，参照 VS Code / JetBrains / Linear 的信息密度与克制程度。每一处视觉选择都服务于聚焦与快速研判：不使用装饰性动效或插画；层次由 1px 边框与实色表面建立，阴影只用于 popover 与 modal；除模态全屏遮罩外禁止毛玻璃；单一 accent 只承担 focus / selected / primary CTA。该定位是 `docs/ui/design-system.md` 全部刻度的上位依据，冲突时以本段为准。
+**视觉定位（裁决）**：RDC-Agent 是现代精密工作台，参照 Linear / Raycast / Arc 的完成度：工作区高密度、其余处从容。层次由分层实色表面、柔和 elevation 与 1px 半透明描边共同建立（卡片 elevation 1，浮层 2，Sheet 与对话框 3）；圆角宽松（控件 8、卡片 10、Sheet 18）；动效只为可追踪的状态变化服务（披露展开、选中指示器滑动、浮层进出、运行指示），时长 120–240ms，遵守系统减少动效；随应用分发 Inter 与 JetBrains Mono，中文落到系统字体。单一主题 accent 承担 focus、选中与主要动作；状态色只表达状态，灰色只表示「未开始或不做了」。侧栏、弹层与 chrome 保持实色，毛玻璃只用于模态全屏遮罩。该定位是 `docs/ui/design-system.md` 全部刻度的上位依据，冲突时以本段为准。
 
 ## Token 合规
 
@@ -12,10 +12,10 @@
 
 ## 可读性与信息卫生
 
-- **字号下限**：可读文本不小于 12px。组件只引用排版角色（display / title / heading / body / reading / label / caption / code），不引用原始字号；正文 14px（紧凑 13px），控件与字段名 13px，说明 12px，回复与知识正文 15px。等宽字体只给代码、路径与数值。门禁 `pnpm run check:design-tokens` 拒绝非角色字号。
+- **字号下限**：可读文本不小于 12px。组件只引用排版角色（display / title / heading / body / reading / item / label / caption / overline / code），不引用原始字号；正文 14px，供人扫读的列表行（任务、设置列表、知识卡片）用 item 14px，控件与字段名 13px，说明 12px，回复与知识正文 15px。等宽字体只给代码、路径与数值。门禁 `pnpm run check:design-tokens` 拒绝非角色字号。
 - **信息卫生**：界面只说用户能理解的话。内部 ID、协议名、错误码、Provider 标识与探测细节只出现在折叠的「诊断信息 / 技术详情」里；主进程产生的诊断按当前语言给出，不夹杂另一种语言。
 - **首次使用**：不弹引导对话框。空工作台按真实配置列出仍缺的准备项（RDC 工具、模型服务、项目），每项直达对应设置或动作，全部完成后自然消失。
-- **画布**：设计稿在 Design 画布维护（工作台、首页清单、模型选择器、设置、知识中心、开发者面板、设计系统板），实现以画布为准。
+- **设计预览**：组件与组合的活文档是 `designs/rdc-agent-design-system`（`pnpm run design:dev`），它直接渲染生产组件；屏幕级验收用 `scripts/qa-walkthrough.mjs` 在真实运行状态下截图，改前改后成对比较。
 
 ## 权限切换反馈
 

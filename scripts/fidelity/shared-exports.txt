@@ -528,7 +528,6 @@ HAL_REASONING_LEVELS
 HalReasoningLevel
 halReasoningLevelFromCanonical
 HANDOFF_SURFACES
-HandoffLabelTranslations
 handoffLabelTranslationsSchema
 HandoffSurface
 handoffSurfaceOf
@@ -847,8 +846,6 @@ POLICY_UNLIMITED_COMPACTION_PERCENT
 PolicyApprovalFloor
 PreparedTurnContextSummary
 ProfileSettings
-ProgressTask
-ProgressTaskStatus
 ProjectApi
 ProjectInputRecord
 ProjectInputRemovePreparation
@@ -1146,6 +1143,7 @@ TaskExecutionRequirementsSchema
 TaskFrameNode
 TaskIndependentSource
 TaskIndependentSourceSchema
+TaskRailItem
 TaskRuntimeEpoch
 TaskRuntimeEpochSchema
 TERMINAL_DEFAULT_HEIGHT

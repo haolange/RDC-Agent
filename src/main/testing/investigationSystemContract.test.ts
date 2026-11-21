@@ -613,12 +613,12 @@ describe('investigation system contract', () => {
   it('investigation.contract.rail.five-cards', () => {
     expect.hasAssertions();
     const rail = readRepo('src/renderer/features/right-rail/SessionRightRail.tsx');
-    expect(rail).toContain('id="progress"');
+    expect(rail).toContain('id="tasks"');
     expect(rail).toContain('id="artifacts"');
     expect(rail).toContain('id="outputs"');
     expect(rail).toContain('id="context"');
     expect(rail).toContain('id="capture"');
-    expect(rail).toMatch(/id="progress"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/);
+    expect(rail).toMatch(/id="tasks"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/);
   });
 
   it('investigation.contract.analyzer.claimkind-layer', () => {

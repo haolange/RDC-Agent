@@ -75,3 +75,12 @@ export interface ThinkingArtifact {
   continuation?: ContinuationArtifactMetadata;
   providerOutputRef?: ProviderOutputRef;
 }
+
+/**
+ * Event-level shape of one provider response's reasoning stream: how many of each reasoning event arrived and,
+ * per summary part, how much text streamed versus what the completion events carried. Lengths only, never text.
+ */
+export interface ReasoningEventSummary {
+  events: Record<string, number>;
+  summaryParts: Array<{ itemKey: string; index: number; streamedChars: number; completedChars?: number; recovered: boolean }>;
+}

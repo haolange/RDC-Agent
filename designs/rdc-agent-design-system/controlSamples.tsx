@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, ColorField, Icon, IconButton, Input, ModeGlyph, Pill, Tabs,
+import { Badge, Button, ColorField, Icon, IconButton, Input, ModeGlyph, Pill, Tabs,
   Toast, ToastStack, UnsavedChangesDialog } from '../../src/renderer/ui';
 import { HelpTip } from '../../src/renderer/ui/HelpTip';
 
@@ -21,6 +21,15 @@ export function NavigationSample() {
         { id: 'disabled', label: '不可用', disabled: true }]}>
       {value === 'summary' ? '主要信息直接显示。' : '附属信息在所属详情中呈现。'}
     </Tabs>
+    <Tabs label="检查器" value={value} onChange={setValue} fullWidth collapsible
+      tabs={[{ id: 'summary', label: '任务', icon: <Icon name="tasks" />, count: 3 },
+        { id: 'detail', label: '制品', icon: <Icon name="artifact" />, count: 12 },
+        { id: 'context', label: '上下文', icon: <Icon name="layers" /> },
+        { id: 'capture', label: '抓帧', icon: <Icon name="capture" /> }]} />
+    <div className="catalog-row">
+      <Badge tone="success">已连接</Badge><Badge tone="warning">待复核</Badge><Badge tone="error">失败</Badge>
+      <Badge variant="outline">内置</Badge><Badge variant="outline" tone="accent">摘要</Badge>
+    </div>
     <div className="catalog-row">
       <Pill selected={selected} onClick={() => setSelected(!selected)}>选择状态</Pill>
       <Pill running>运行状态示例</Pill><Pill disabled>不可用</Pill>

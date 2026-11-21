@@ -1,12 +1,15 @@
+import { resolveManifestText } from '@shared/utils/handoffLabels';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { Translator, TranslationKey } from '../i18n/messages';
-const DESCRIPTION_KEYS: Record<string, TranslationKey> = {
-  general: 'settings.agentDescription.general', debugger: 'settings.agentDescription.debugger',
-  analyzer: 'settings.agentDescription.analyzer', optimizer: 'settings.agentDescription.optimizer',
-};
-/** Only shipped builtin metadata is product copy; user/project overrides remain original content. */
-export function agentDescription(agent: AgentManifestDefinition | undefined, t: Translator): string {
-  if (!agent) return '';
-  const key = agent.provenance?.scope === 'builtin' ? DESCRIPTION_KEYS[agent.id] : undefined;
-  return key ? t(key) : agent.description;
+import type { AppLanguage } from '@shared/types/settings';
+
+type AgentCopy = Pick<AgentManifestDefinition, 'description' | 'descriptionTranslations' | 'argumentHint' | 'argumentHintTranslations'>;
+
+/** A shipped Agent's description in the interface language; user and project copies keep their own text. */
+export function agentDescription(agent: AgentCopy | undefined, language: AppLanguage): string {
+  return agent ? resolveManifestText(agent.description, agent.descriptionTranslations, language) : '';
+}
+
+/** What to tell this Agent, in the interface language when the shipped manifest translates it. */
+export function agentArgumentHint(agent: AgentCopy | undefined, language: AppLanguage): string {
+  return agent ? resolveManifestText(agent.argumentHint, agent.argumentHintTranslations, language) : '';
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import { ContextBreakdownContent } from './ContextBreakdownSheet';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import type { ContextUsageSelectedProfile } from './contextUsageDisplay';
 
@@ -92,13 +92,13 @@ const profile = (overrides: Partial<ContextUsageSelectedProfile> = {}): ContextU
   ...overrides,
 });
 
-describe('ContextBreakdownPopover phase authority', () => {
+describe('ContextBreakdownContent phase authority', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('labels the full-history estimate while the execution window is unresolved', () => {
-    const html = renderToStaticMarkup(React.createElement(ContextBreakdownPopover, {
+    const html = renderToStaticMarkup(React.createElement(ContextBreakdownContent, {
       detailsExpanded: true,
       onDetailsExpandedChange: () => undefined,
       prepared: {
@@ -114,7 +114,6 @@ describe('ContextBreakdownPopover phase authority', () => {
       usage,
       selectedProfile: profile({ contextBudgetTokens: 272_000 }),
       stale: false,
-      onClose: () => undefined,
     }));
     expect(html).toContain('contextBreakdown.windowPending');
     expect(html).toContain('contextBreakdown.windowPendingNote');
@@ -125,7 +124,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('Preparing keeps the last actual structure instead of replacing it with a status card', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -133,7 +132,6 @@ describe('ContextBreakdownPopover phase authority', () => {
         usage,
         selectedProfile: profile(),
         stale: false,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('context-breakdown-hero');
@@ -147,7 +145,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('uses the same meter and details structure when telemetry has not arrived', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -155,7 +153,6 @@ describe('ContextBreakdownPopover phase authority', () => {
         usage: null,
         selectedProfile: profile(),
         stale: false,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('context-breakdown-hero');
@@ -170,7 +167,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('keeps authoritative zero values distinct from unavailable telemetry', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -186,7 +183,6 @@ describe('ContextBreakdownPopover phase authority', () => {
         },
         selectedProfile: profile(),
         stale: false,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('>0%</span>');
@@ -196,7 +192,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('Current request shows prepared hero without stacking historical Last actual meter', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared,
@@ -204,7 +200,6 @@ describe('ContextBreakdownPopover phase authority', () => {
         usage,
         selectedProfile: profile(),
         stale: false,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('contextBreakdown.currentRequest');
@@ -218,7 +213,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('idle Last actual owns three independent metric cards without phase eyebrow', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -226,7 +221,6 @@ describe('ContextBreakdownPopover phase authority', () => {
         usage,
         selectedProfile: profile(),
         stale: false,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('contextBreakdown.lastActual');
@@ -248,7 +242,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('shows projected occupancy against the selected model window', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -273,7 +267,6 @@ describe('ContextBreakdownPopover phase authority', () => {
         }),
         stale: false,
         estimated: true,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('contextBreakdown.projected');
@@ -286,7 +279,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('keeps the projected popover during preparing instead of reverting to Last actual', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -311,7 +304,6 @@ describe('ContextBreakdownPopover phase authority', () => {
         }),
         stale: false,
         estimated: true,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('contextBreakdown.projected');
@@ -322,7 +314,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('explains the compaction line and remaining generation budget', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -341,7 +333,6 @@ describe('ContextBreakdownPopover phase authority', () => {
           compactionThresholdTokens: 800_000,
         }),
         stale: false,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('data-testid="context-breakdown-window-note"');
@@ -354,7 +345,7 @@ describe('ContextBreakdownPopover phase authority', () => {
 
   it('adds the full window only when it is larger than the prompt budget', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ContextBreakdownPopover, {
+      React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
@@ -373,7 +364,6 @@ describe('ContextBreakdownPopover phase authority', () => {
           compactionThresholdTokens: 160_000,
         }),
         stale: false,
-        onClose: () => undefined,
       }),
     );
     expect(html).toContain('contextBreakdown.budgetNote.window:{&quot;window&quot;:&quot;264k&quot;}');

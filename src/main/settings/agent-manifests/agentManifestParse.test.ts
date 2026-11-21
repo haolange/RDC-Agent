@@ -44,6 +44,17 @@ handoffs:
     },
   );
 
+  it('reads shipped description and argument-hint translations but never writes them to a copy', () => {
+    const parsed = parseAgentMarkdownStrict(wrap([
+      'name: Review', 'description: Review evidence.', 'argument-hint: Task and evidence',
+      'description-translations:', '  zh-CN: 审查证据。', 'argument-hint-translations:', '  zh-CN: 任务与证据',
+    ].join('\n')), 'review.agent.md', 'review', 't', true);
+    if (!parsed.ok) throw new Error(parsed.reason);
+    expect(parsed.definition).toMatchObject({ descriptionTranslations: { 'zh-CN': '审查证据。' }, argumentHintTranslations: { 'zh-CN': '任务与证据' } });
+    expect(serializeAgentMarkdown(parsed.definition)).not.toContain('translations');
+    expect(parseAgentMarkdownStrict(wrap('name: Review\ndescription-translations:\n  fr: Revue'), 'review.agent.md', 'review', 't', true).ok).toBe(false);
+  });
+
   it('accepts omitted or empty handoffs as a legal no-handoff profile', () => {
     expect(parseAgentMarkdownStrict(wrap('name: Custom\ntools:\n  - read\n'), 'x.agent.md', 'custom', 't', false).ok).toBe(true);
     expect(parseAgentMarkdownStrict(wrap('name: Custom\ntools:\n  - read\nhandoffs: []\n'), 'x.agent.md', 'custom', 't', false).ok).toBe(true);

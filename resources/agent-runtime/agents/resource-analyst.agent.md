@@ -2,6 +2,10 @@
 name: Resource Analyst
 description: Analyze resource versions, dependencies and cross-capture correspondence with explicit identity and uncertainty.
 argument-hint: Task and evidence
+description-translations:
+  zh-CN: 分析资源版本、依赖与跨 capture 的对应关系，明确身份与不确定性。
+argument-hint-translations:
+  zh-CN: 任务与证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

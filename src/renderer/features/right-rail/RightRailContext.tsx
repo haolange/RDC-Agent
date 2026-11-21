@@ -24,12 +24,20 @@ const ResourceMark: React.FC<{ resource: TaskContextResource }> = ({ resource })
   return <svg viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4zM9 2.5v3h3" /></svg>;
 };
 
-const ResourceRow: React.FC<{ resource: TaskContextResource; select: (resource: TaskContextResource) => void }> = ({ resource, select }) => (
-  <Button variant="ghost" className="right-rail-compact-row" title={resource.label} onClick={() => select(resource)}>
-    <span className="right-rail-compact-icon" aria-hidden="true"><ResourceMark resource={resource} /></span>
-    <span className="right-rail-compact-title">{resource.label}</span><span aria-hidden="true">›</span>
-  </Button>
-);
+const ResourceRow: React.FC<{ resource: TaskContextResource; select: (resource: TaskContextResource) => void }> = ({ resource, select }) => {
+  const { t } = useI18n();
+  const kind = t(`control.rightRail.context.kind.${resource.kind}`);
+  return (
+    <Button variant="ghost" className="right-rail-compact-row" title={`${kind} · ${resource.label}`} onClick={() => select(resource)}>
+      <span className="right-rail-compact-icon" aria-hidden="true"><ResourceMark resource={resource} /></span>
+      <span className="right-rail-compact-copy">
+        <span className="right-rail-compact-title">{resource.label}</span>
+        <span className="right-rail-compact-kind">{kind}</span>
+      </span>
+      <span aria-hidden="true">›</span>
+    </Button>
+  );
+};
 
 function ScopedContext({ task }: { task: TaskContextPanelViewModel }) {
   const { t } = useI18n();

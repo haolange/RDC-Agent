@@ -16,9 +16,15 @@ interface Delivery {
 function current(request: HandoffSuggestionRequest): boolean {
   if (useComposerSessionContextStore.getState().handoffSuggestionRequest !== request
     || useProjectStore.getState().currentSession?.sessionId !== request.sessionId) return false;
-  if (request.approvedPlanHash) return usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash === request.approvedPlanHash;
+  if (request.approvedPlan) return usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash === request.approvedPlan.hash;
   if (!request.sourcePlan) return true;
   return isCurrentPlanReview({ sessionId: request.sessionId, reviewId: request.sourcePlan.reviewId }, 'approve');
+}
+
+/** A handoff that executes a reviewed plan says so, and main verifies the claim before accepting the message. */
+function executionReference(request: HandoffSuggestionRequest): Pick<HandoffSendPayload, 'planReference'> {
+  const plan = request.sourcePlan ?? request.approvedPlan;
+  return plan ? { planReference: { intent: 'execute', sessionId: request.sessionId, planId: plan.planId, revision: plan.revision, expectedHash: plan.hash } } : {};
 }
 
 export function useQueuedHandoffSuggestion(input: {
@@ -48,11 +54,11 @@ export function useQueuedHandoffSuggestion(input: {
     if (!request || request.phase === 'confirming' || request.sessionId !== input.sessionId || !current(request)) { setReady(null); return; }
     let mounted = true;
     const live = () => mounted && current(request);
-    void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label, live, request.approvedPlanHash ?? request.sourcePlan?.hash).then(result => {
+    void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label, live, request.approvedPlan?.hash ?? request.sourcePlan?.hash).then(result => {
       if (!live()) return;
       if (!result.ok) throw new Error(result.error || 'Agent switch failed.');
       const prompt = result.suggestion?.prompt || request.prompt;
-      if (request.send) setReady({ request, payload: { sessionId: request.sessionId, agentId: request.agentId, prompt } });
+      if (request.send) setReady({ request, payload: { sessionId: request.sessionId, agentId: request.agentId, prompt, ...executionReference(request) } });
       else {
         callbacks.current.setPromptValue(prompt);
         useComposerSessionContextStore.getState().clearHandoffSuggestion();

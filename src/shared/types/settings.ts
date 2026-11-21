@@ -268,6 +268,9 @@ export interface LayoutPreferences {
   window: WindowLayoutPreference;
 }
 
+/** `latest` opens only the step that is running now; `all` opens every step's actions. */
+export type WorkProcessExpansion = 'latest' | 'all';
+
 export interface UiPreferences {
   theme: AppTheme;
   language: AppLanguage;
@@ -276,9 +279,10 @@ export interface UiPreferences {
   composerMarkdown: boolean;
   /** Opt-in: use pointer cursor on interactive elements instead of the system default arrow. */
   usePointerCursors: boolean;
-  /** UI memory: whether Context breakdown popover details are expanded. Driven by popover toggle only. */
+  /** UI memory: whether the context usage sheet's details are expanded. Driven by its disclosure only. */
   contextBreakdownExpanded: boolean;
-  /** Reduce UI motion: match OS, force on, or force off. */
+  /** Which Working steps open by default; a user's own toggle always wins. */
+  workProcessExpansion: WorkProcessExpansion;
   /** Independent Light / Dark chrome themes for Settings → Appearance. */
   chromeThemes: ChromeThemesConfig;
 }

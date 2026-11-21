@@ -159,7 +159,7 @@
 }
 
 /* An empty project reads as one quiet caption line under its name, not a boxed placeholder. */
-.ui-empty-state.is-layout-compact.session-list-empty:not(:has(.ui-empty-state-visual)) {
+.session-list-empty.ui-empty-state {
   align-items: flex-start;
   padding: var(--space-1) var(--space-3);
 }

@@ -2,6 +2,7 @@ import React, { type Dispatch, type SetStateAction, useEffect, useMemo, useState
 import { agentDescription } from '../../../../lib/agentDescription';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
+import { SplitButton } from '../../../../ui/SplitButton';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
 import { SettingsScopeBar } from '../parts';
@@ -17,6 +18,7 @@ import { AgentDefaultModelSection } from './AgentDefaultModelSection';
 import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
 import { AgentModelMigrationDialog } from './AgentModelMigrationDialog';
 import { ProjectAgentTrustDialog } from './ProjectAgentTrustDialog';
+import { NewAgentDialog } from './NewAgentDialog';
 import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
 import type { AgentProvenanceScope } from './agentConfigStatus';
 import type { useI18n } from '../../../../i18n';
@@ -67,6 +69,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   const scopedDrafts = useMemo(() => activeDrafts.filter((draft) => draftScope(draft) === scope), [activeDrafts, scope]);
   const [selectedAgentId, setSelectedAgentId] = useState(scopedDrafts[0]?.id ?? '');
   const [pendingDelete, setPendingDelete] = useState<AgentManifestDraft | null>(null);
+  const [naming, setNaming] = useState(false);
   const selectedAgent = missingAgentId ? null : scopedDrafts.find((agent) => agent.id === selectedAgentId) ?? scopedDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
   const diagnostics = settings.agents.diagnostics ?? [];
@@ -95,14 +98,12 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
     )));
   };
 
-  const addAgent = () => {
+  const addAgent = (identity: { name: string; id: string }) => {
     if (scope === 'project' && !currentProjectId) return;
     setMissingAgentId(null);
-    onAgentManifestDraftsChange((current) => {
-      const next = createNewAgent(current, t, scope, currentProjectId);
-      setSelectedAgentId(next.id);
-      return [...current, next];
-    });
+    setNaming(false);
+    onAgentManifestDraftsChange((current) => [...current, createNewAgent(identity, t, scope, currentProjectId)]);
+    setSelectedAgentId(identity.id);
   };
 
   const duplicateAgent = () => {
@@ -138,6 +139,12 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
   return (
     <div className="settings-manifest-page">
+      <AgentDefaultModelSection
+        settings={settings}
+        error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
+        onChange={models.setDefaultBinding}
+        t={t}
+      />
       <div className="settings-manifest-toolbar settings-manifest-page-toolbar" data-testid="settings-agents-toolbar">
         <SettingsScopeBar
           scope={scope}
@@ -156,12 +163,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         />
       </div>
 
-      <AgentDefaultModelSection
-        settings={settings}
-        error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
-        onChange={models.setDefaultBinding}
-        t={t}
-      />
       <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics}
         onMigrate={(issue) => models.openOverrideAction('migrate', issue)}
         onDeleteOverride={(issue) => models.openOverrideAction('delete', issue)}
@@ -169,18 +170,13 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       {missingAgentId ? <p role="alert">{t('settings.agentNavigationNotFound', { id: missingAgentId })}</p> : null}
       <div className="settings-manifest-layout">
         <div className="settings-manifest-list-column">
-          <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
+          <div className="settings-manifest-list-toolbar">
             <span className="settings-manifest-count">
               {t('settings.agentListCount', { count: scopedDrafts.length })}
             </span>
-            <div className="settings-manifest-actions">
-              <Button variant="secondary" size="sm" onClick={() => void onImportAgentManifest()}>
-                {t('settings.importAgentManifest')}
-              </Button>
-              <Button variant="primary" size="sm" onClick={addAgent}>
-                {t('settings.newAgent')}
-              </Button>
-            </div>
+            <SplitButton dataTestId="settings-agent-create" label={t('settings.newAgent')} onClick={() => setNaming(true)}
+              disabled={scope === 'project' && !currentProjectId} menuLabel={t('settings.newAgentMore')}
+              items={[{ id: 'import', label: t('settings.importAgentManifest'), onSelect: () => void onImportAgentManifest() }]} />
           </div>
 
           <div className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
@@ -195,7 +191,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                 id={agent.id}
                 name={agent.name}
                 description={settings.agents.definitions.some(definition => definition.id === agent.id && definition.description === agent.description)
-                  ? agentDescription(settings.agents.definitions.find(definition => definition.id === agent.id), t) : agent.description}
+                  ? agentDescription(settings.agents.definitions.find(definition => definition.id === agent.id), settings.appearance.language) : agent.description}
                 icon={agent.icon}
                 selected={agent.id === selectedId}
                 onSelect={() => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agent.id); }}
@@ -241,7 +237,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           />
         ) : (
           <div className="settings-runtime-editor-placeholder">
-            <EmptyState title={t('settings.agentSelectOrCreate')} />
+            <EmptyState variant="page" title={t('settings.agentSelectOrCreate')} />
           </div>
         )}
       </div>
@@ -269,6 +265,10 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           onClose={models.closeTrustReview}
           t={t}
         />
+      ) : null}
+      {naming ? (
+        <NewAgentDialog scopeLabel={scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser')}
+          existingIds={agentManifestDrafts.map((agent) => agent.id)} onCreate={addAgent} onClose={() => setNaming(false)} t={t} />
       ) : null}
       {pendingDelete ? (
         <ConfirmationDialog

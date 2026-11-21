@@ -17,8 +17,23 @@ export const isPathInside = (rootPath: string, targetPath: string): boolean => {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 };
 
+/** Readable text inside a structured chapter: its string values in order, so a preview never shows JSON. */
+export function structuredText(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.map(structuredText).filter(Boolean).join(' · ');
+  if (value && typeof value === 'object') return Object.values(value).map(structuredText).filter(Boolean).join(' · ');
+  return '';
+}
+
 export function extractPreview(body: string): string | undefined {
-  const plain = body.replace(/^#+\s+.+$/gm, '').replace(/```[\s\S]*?```/g, '')
+  const title = /^#\s+(.+)$/m.exec(body)?.[1]?.trim();
+  // Structured chapters (scope, root cause) are rendered by the reader, not shown raw in a one-line preview,
+  // and a chapter that only repeats the title adds nothing.
+  const prose = body.replace(/```[\s\S]*?```/g, '').split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/^#+\s+.+$/gm, '').trim())
+    .filter((paragraph) => paragraph && paragraph !== title && !/^[[{]/.test(paragraph))
+    .join(' ');
+  const plain = prose
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`>#-]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!plain) return undefined;
   return plain.length > PREVIEW_MAX_CHARS ? `${plain.slice(0, PREVIEW_MAX_CHARS - 1)}…` : plain;

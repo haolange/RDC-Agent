@@ -35,7 +35,7 @@
   height: var(--space-4);
   border-radius: var(--radius-full);
   background: var(--token-accent-primary);
-  color: var(--token-text-inverse);
+  color: var(--token-text-on-accent);
 }
 
 .settings-agent-icon-option:focus-visible {

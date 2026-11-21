@@ -569,6 +569,7 @@ export class SubagentRunner {
           const startedAt = Date.now();
           execution = await registry.startExecution(taskId, {
             mode: 'subagent',
+            dispatch: 'wait',
             requestedProfileId: targetProfile,
             requiredSkillIds: capsule.requiredSkillIds,
             requestedInputArtifactRefs: delegationCapsuleArtifactRefs(capsule),

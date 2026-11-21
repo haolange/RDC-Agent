@@ -3,13 +3,12 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
-import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
-import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { traceService } from '../agent-trace/TraceService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { resolvePlanReference } from './planReferenceResolution';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import {
   answerConversationPlanReview,
@@ -306,7 +305,7 @@ export class ConversationService {
         preloadSkillIds: [...(input.preloadSkillIds ?? [])].sort(),
         branchAnchor,
         configurationCommit: input.configurationCommit ?? null,
-        planSource: input.planSource ?? null,
+        planReference: input.planReference ?? null,
       }))
       .digest('hex');
   }
@@ -729,23 +728,9 @@ export class ConversationService {
       : null;
     const activeOpenedCapture = openedCapture?.status === 'open' ? openedCapture : null;
     const replayDevice = conversationRdcHost().replayDevice(input.replayDeviceId || 'local') ?? conversationRdcHost().replayDevice('local');
-    let planSource: ResolvedConversationContext['planSource'];
-    if (input.planSource) {
-      if (input.planSource.sessionId !== resolvedSessionId) throw new Error('PLAN_SESSION_DENIED: revision belongs to another session.');
-      const source = readReferencedPlan(input.planSource);
-      const state = planReviewStateStore.read(source.ownerSessionId);
-      const history = storageAdapter.readConversationHistory(resolvedSessionId!);
-      const visible = resolveVisibleConversationMessages(history, storageAdapter.readConversationBranchState(resolvedSessionId!));
-      if (source.agentId !== (input.agentId ?? input.profileId) || state?.status !== 'rejected'
-        || state.ownerTurnId !== source.turnId
-        || state.planId !== input.planSource.planId || state.revision !== input.planSource.revision
-        || !visible.some(message => message.workTrace?.blocks.some(block => block.toolCalls.some(call =>
-          call.planReview?.planId === state.planId && call.planReview.revision === state.revision
-          && call.planReview.hash === input.planSource!.expectedHash)))) {
-        throw new Error('PLAN_REVIEW_SCOPE_CHANGED: revision source is no longer current.');
-      }
-      planSource = { reference: input.planSource, markdown: source.markdown };
-    }
+    const plan = input.planReference ? resolvePlanReference({
+      request: input.planReference, sessionId: resolvedSessionId, agentId: input.agentId ?? input.profileId ?? null, message: input.message,
+    }) : null;
 
     return {
       projectId,
@@ -755,7 +740,8 @@ export class ConversationService {
       openedCapture: activeOpenedCapture,
       openedCapturePath: activeOpenedCapture?.filePath ?? null,
       replayDevice,
-      ...(planSource ? { planSource } : {}),
+      ...(plan ? { planReference: plan.reference } : {}),
+      ...(plan?.revisionSource ? { planSource: plan.revisionSource } : {}),
     };
   }
 

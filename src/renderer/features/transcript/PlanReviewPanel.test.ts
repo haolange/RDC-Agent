@@ -24,7 +24,7 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('../../hooks/useElectronApi', () => ({ useElectronApi: () => ({}) }));
 vi.mock('../../lib/useModalFocus', () => ({ useModalFocus: () => undefined }));
 vi.mock('../../lib/overlayStack', () => ({ useOverlayLayer: () => ({ layerId: 'layer' }) }));
-vi.mock('../../lib/useReadingPanelGeometry', () => ({ useReadingPanelGeometry: () => ({ ready: true, style: {} }) }));
+vi.mock('../../lib/useReadingPanelGeometry', () => ({ useReadingPanelGeometry: () => ({ ready: true, anchored: true, style: {} }) }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentSession: { sessionId: 's' } }) }));
 vi.mock('../../stores/planReviewStore', () => ({ usePlanReviewStore: (select: (state: unknown) => unknown) => select({ bySession: {} }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('div', { 'data-markdown': true }, content) }));

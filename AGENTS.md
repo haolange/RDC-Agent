@@ -183,7 +183,7 @@
 
 ## Right Rail single-track gate
 
-Session 右栏是 Progress / Artifacts / Outputs / Context / Capture 单轨，投影契约见 `docs/contracts/session-projection.md`。改动右栏后运行 `pnpm run check:right-rail`。
+Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投影契约见 `docs/contracts/session-projection.md`。改动右栏后运行 `pnpm run check:right-rail`。
 
 ## 9. 产物、依赖与命名
 

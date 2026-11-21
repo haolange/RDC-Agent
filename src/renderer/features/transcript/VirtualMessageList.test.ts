@@ -2,6 +2,7 @@
 import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { requestPlanLocation } from '../../lib/transcriptPlanLocation';
 import { VirtualMessageList, measuredMessageOffsets } from './VirtualMessageList';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -36,7 +37,7 @@ it('renders short state samples and windows a long conversation while releasing 
     status: index % 3 === 0 ? 'error' : 'complete', content: `Message ${index}`,
   })) as ConversationMessage[];
   messages[75] = { ...messages[75], projectId: 'project', sessionId: 'session',
-    workTrace: { blocks: [{ toolCalls: [{ id: 'tool-target' }] }] },
+    workTrace: { blocks: [{ toolCalls: [{ id: 'tool-target', planReview: { planId: 'plan', revision: 1, hash: 'a'.repeat(64) } }] }] },
   } as ConversationMessage;
   const render = (items: ConversationMessage[]) => act(async () => root.render(createElement(StrictMode, null,
     createElement(VirtualMessageList, { messages: items, estimateHeight: 160, overscan: 2,
@@ -56,9 +57,7 @@ it('renders short state samples and windows a long conversation while releasing 
     expect(host.querySelectorAll('[data-message-id]')).toHaveLength(7);
     expect(host.querySelector('[data-message-id="message-50"]')).not.toBeNull();
     expect(host.querySelector('[data-message-id="message-0"]')).toBeNull();
-    const locate = () => window.dispatchEvent(new CustomEvent('rdc:locate-tool-call', {
-      detail: { projectId: 'project', sessionId: 'session', toolCallId: 'tool-target' },
-    }));
+    const locate = () => requestPlanLocation({ target: 'plan', plan: { planId: 'plan', revision: 1, hash: 'a'.repeat(64) } });
     await act(async () => { locate(); locate(); });
     expect(frames.size).toBe(1);
     expect(host.querySelector('[data-message-id="message-75"]')).not.toBeNull();

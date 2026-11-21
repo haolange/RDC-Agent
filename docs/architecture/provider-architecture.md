@@ -172,7 +172,7 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
 
-`OpenAIResponsesProvider` 与 Azure 共用 `consumeResponsesEventStream`。该循环必须处理 `response.reasoning_text.delta/done`、raw reasoning item、function-call continuation、terminal usage/error。DeepSeek 工具 loop 回放 Provider 要求的 raw reasoning/function-call item，且不使用 `previous_response_id`；Chat/Anthropic route 则按各自 continuation contract 回放 `reasoning_content`。Anthropic、AI SDK 与 Google Interactions 的内容通道经 `StreamChannelRefs` 分配。
+`OpenAIResponsesProvider` 与 Azure 共用 `consumeResponsesEventStream`。该循环必须处理 `response.reasoning_text.delta/done`、raw reasoning item、function-call continuation、terminal usage/error。推理摘要按 `item_id + summary_index` 分段：`reasoning_summary_text.delta` 累计流式文本；`reasoning_summary_text.done`、`reasoning_summary_part.done` 与完成 item 的 `summary[]` 携带整段时，只补流式缺失的部分（未流式则补全文，流式是前缀则补后缀，二者不一致时保留已显示文本）。每次响应的推理事件计数与各摘要段的流式/完成长度（不含正文）写入该请求快照的 `reasoningEvents`，用于对照真实上游与持久记录。DeepSeek 工具 loop 回放 Provider 要求的 raw reasoning/function-call item，且不使用 `previous_response_id`；Chat/Anthropic route 则按各自 continuation contract 回放 `reasoning_content`。Anthropic、AI SDK 与 Google Interactions 的内容通道经 `StreamChannelRefs` 分配。
 
 `OpenAIResponsesProvider` 的 function tool 显式发送 `strict: false`，保持 canonical `parameters.required` 的可选字段语义，不依赖服务端对省略 strict 的自动规范。否则“省略”可能变为必填默认值（例如图片读取意外携带启用 JSON 校验的空数组）。这是模型生成格式选项，不改变主进程参数验证、权限、委派引用或操作执行门禁；不通过删除参数或静默忽略不适用字段消除错误。依据：[OpenAI function calling strict mode](https://developers.openai.com/api/docs/guides/function-calling)。
 

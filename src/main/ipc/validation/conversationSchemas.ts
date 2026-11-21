@@ -78,7 +78,14 @@ const ConfigurationCommitSchema = z.object({
 const NullableId = z.union([ipcId(128, 'id'), z.null()]);
 
 export const ConversationSendRequestSchema = z.object({
-  planSource: z.object(planReference).strict().optional(),
+  planReference: z.discriminatedUnion('intent', [
+    z.object({ intent: z.literal('revise'), ...planReference }).strict(),
+    z.object({
+      intent: z.literal('execute'),
+      planId: planReference.planId, revision: planReference.revision, sessionId: planReference.sessionId,
+      expectedHash: planReference.expectedHash,
+    }).strict(),
+  ]).optional(),
   requestId: ipcNonEmptyString(200, 'requestId'),
   projectId: NullableId.optional(),
   sessionId: NullableId.optional(),
@@ -97,8 +104,9 @@ export const ConversationSendMessageArgsSchema = z.tuple([
   ConversationSendRequestSchema,
 ]);
 
+/** A rewrite starts a new turn from an earlier message; it can never execute or revise a reviewed plan. */
 export const ConversationRewriteFromMessageArgsSchema = z.tuple([
-  ConversationSendRequestSchema.extend({
+  ConversationSendRequestSchema.omit({ planReference: true }).extend({
     messageId: ipcId(200, 'messageId'),
   }).strict(),
 ]);

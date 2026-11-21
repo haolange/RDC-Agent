@@ -69,7 +69,11 @@ export const ComposerModelEffortControl: React.FC<{
   const currentOption = options.find((option) => (
     option.providerId === selected?.providerId && option.modelId === selected?.modelId
   ));
-  const modelLabel = currentOption?.label || selected?.modelId || t('settings.selectModelPlaceholder');
+  // The same model name offered by two providers is ambiguous on the pill; name the provider only then.
+  const sharedName = currentOption && options.some((option) => option.providerId !== currentOption.providerId && option.label === currentOption.label);
+  const modelLabel = currentOption
+    ? sharedName ? `${currentOption.providerLabel} · ${currentOption.label}` : currentOption.label
+    : selected?.modelId || t('settings.selectModelPlaceholder');
   const displayedControls = frozen?.controls ?? effort.turnControls;
   const displayedEffort = frozen ? t(EFFORT_LABEL_KEYS[displayedControls.reasoningLevel]) : effort.effortLabel;
   const capsule = buildModelEffortCapsulePresentation({
@@ -176,6 +180,7 @@ export const ComposerModelEffortControl: React.FC<{
           onTrackPointerUp={effort.sliderHandlers.handleTrackPointerUp}
           onTrackClick={effort.sliderHandlers.handleTrackClick}
           onThumbKeyDown={effort.sliderHandlers.handleThumbKeyDown}
+          onSelectLevel={effort.commitEffort}
           onToggleMaxContext={effort.toggleMaxContext}
           onToggleFastModel={effort.toggleFastModel}
           onMaxTimelineComplete={effort.completeMaxTimeline}

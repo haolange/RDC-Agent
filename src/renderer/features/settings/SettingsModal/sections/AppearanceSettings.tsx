@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Switch } from '../../../../ui/Switch';
 import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
@@ -33,8 +33,9 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   onChromeThemeChange,
   t,
 }) => {
-  const light = settings.appearance.chromeThemes.light;
-  const dark = settings.appearance.chromeThemes.dark;
+  // One editor at a time, opened on the variant the window currently shows.
+  const [editing, setEditing] = useState<ThemeVariant>(() =>
+    document.documentElement.dataset.resolvedTheme === 'light' ? 'light' : 'dark');
 
   return (
     <section className="settings-page settings-page-appearance" data-testid="settings-appearance-page" data-settings-search="appearance">
@@ -51,17 +52,19 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
       />
 
       <div className="appearance-theme-editors">
-        <ChromeThemeCard
-          variant="light"
-          chrome={light}
-          t={t}
-          onChange={(chrome) => void onChromeThemeChange('light', chrome)}
+        <Tabs
+          className="appearance-variant-tabs"
+          label={t('settings.appearanceEditVariant')}
+          value={editing}
+          onChange={(variant) => setEditing(variant === 'light' ? 'light' : 'dark')}
+          tabs={(['light', 'dark'] as ThemeVariant[]).map((variant) => ({ id: variant, label: t(`theme.${variant}`) }))}
         />
         <ChromeThemeCard
-          variant="dark"
-          chrome={dark}
+          key={editing}
+          variant={editing}
+          chrome={settings.appearance.chromeThemes[editing]}
           t={t}
-          onChange={(chrome) => void onChromeThemeChange('dark', chrome)}
+          onChange={(chrome) => void onChromeThemeChange(editing, chrome)}
         />
       </div>
 

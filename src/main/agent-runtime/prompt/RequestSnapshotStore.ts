@@ -104,12 +104,14 @@ export class RequestSnapshotStore {
     return deliveries;
   }
 
-  complete(snapshotId: string, sessionId: string | undefined, turnId: string | undefined, usage: RequestEnvelopeSnapshot['usage']): void {
+  complete(snapshotId: string, sessionId: string | undefined, turnId: string | undefined, usage: RequestEnvelopeSnapshot['usage'],
+    reasoningEvents?: RequestEnvelopeSnapshot['reasoningEvents']): void {
     const snapshotPath = this.findSnapshotPath(snapshotId, sessionId, turnId);
     if (!snapshotPath) return;
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8')) as RequestEnvelopeSnapshot;
     snapshot.completedAt = new Date().toISOString();
     snapshot.usage = usage;
+    if (reasoningEvents) snapshot.reasoningEvents = reasoningEvents;
     fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
   }
 

@@ -32,11 +32,11 @@ export const ProviderProtocolSummary: React.FC<{ provider: LlmProviderEntry; t: 
   </dl>
 );
 
-export type ProviderConnectionPhase = 'untested' | 'testing' | 'connected' | 'failed' | 'saving';
+export type ProviderConnectionPhase = 'untested' | 'testing' | 'testPassed' | 'connected' | 'failed' | 'saving';
 
 /**
  * The draft's connection state. `savedConnected` is a verified saved connection the draft has not changed,
- * which reads as connected without testing it again.
+ * which reads as connected without testing it again; a passing test of unsaved changes is only that.
  */
 export function connectionPhase(
   draft: ProviderConnectionDraft,
@@ -46,7 +46,8 @@ export function connectionPhase(
   if (draft.busy === 'testing') return 'testing';
   if (draft.busy === 'saving') return 'saving';
   if (draft.error) return 'failed';
-  if (hasFreshTest || savedConnected) return 'connected';
+  if (savedConnected) return 'connected';
+  if (hasFreshTest) return 'testPassed';
   return 'untested';
 }
 

@@ -124,6 +124,8 @@
     "postcss": "8.5.15"
   },
   "devDependencies": {
+    "@fontsource-variable/inter": "5.2.8",
+    "@fontsource-variable/jetbrains-mono": "5.2.8",
     "@swc/core": "^1.15.33",
     "@types/node": "^24.12.4",
     "@types/react": "^18.2.0",

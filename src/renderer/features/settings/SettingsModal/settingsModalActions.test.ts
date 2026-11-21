@@ -170,3 +170,34 @@ describe('settingsModalActions project scope save', () => {
     expect(setAgentManifestSaveState).not.toHaveBeenCalled();
   });
 });
+
+describe('settingsModalActions personalization autosave', () => {
+  it('keeps text typed while the save was in flight and adopts the saved text otherwise', async () => {
+    let draft = 'first';
+    const setGlobalInstructionsDraft = vi.fn((next: string | ((current: string) => string)) => {
+      draft = typeof next === 'function' ? next(draft) : next;
+    });
+    let release: () => void = () => undefined;
+    const patchSettings = vi.fn((patch: { agents?: { globalInstructions?: string } }) => new Promise((resolve) => {
+      release = () => resolve({ agents: { globalInstructions: patch.agents?.globalInstructions?.trim() } });
+    }));
+    const modalState = { get globalInstructionsDraft() { return draft; }, setGlobalInstructionsDraft };
+    const actions = createSettingsModalActions({
+      modalState: modalState as never, providerConnection: {} as never, updateProfile: vi.fn(async () => undefined),
+      patchSettings: patchSettings as never, saveAgentDefinition: vi.fn() as never, t: (key: string) => key,
+      replaceSettings: vi.fn(), rebaseAgentDrafts: vi.fn(),
+    });
+
+    const saving = actions.handleSavePersonalization();
+    draft = 'first and more';
+    release();
+    await saving;
+    expect(draft).toBe('first and more');
+
+    draft = ' settled ';
+    const settled = actions.handleSavePersonalization();
+    release();
+    await settled;
+    expect(draft).toBe('settled');
+  });
+});

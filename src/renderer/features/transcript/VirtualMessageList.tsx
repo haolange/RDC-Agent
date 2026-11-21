@@ -1,7 +1,7 @@
 /** Windowed messages with measured row heights, including expanded work cards. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDynStyle } from '../../lib/useDynStyle';
-import { findToolCallMessage } from '../../lib/findToolCallMessage';
+import { findPlanLocation, TRANSCRIPT_LOCATE_PLAN_EVENT, type TranscriptPlanLocationRequest } from '../../lib/transcriptPlanLocation';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 const VIRTUALIZE_THRESHOLD = 48;
@@ -110,9 +110,8 @@ export const VirtualMessageList: React.FC<Props> = ({
   useEffect(() => {
     let frame: number | undefined;
     const locate = (event: Event) => {
-      const detail = (event as CustomEvent<{ projectId: string; sessionId: string; toolCallId: string }>).detail;
-      if (!detail) return;
-      const index = findToolCallMessage(messages, detail);
+      const detail = (event as CustomEvent<TranscriptPlanLocationRequest>).detail;
+      const index = findPlanLocation(messages, detail);
       if (index < 0) return;
       const list = listRef.current;
       const parent = list?.closest('.chat-messages') as HTMLElement | null;
@@ -125,13 +124,15 @@ export const VirtualMessageList: React.FC<Props> = ({
       }
       frame = requestAnimationFrame(() => {
         frame = undefined;
-        const target = Array.from(list.querySelectorAll<HTMLElement>('[data-message-id]')).find((item) => item.dataset.messageId === messages[index].id);
-        target?.scrollIntoView({ block: 'center', behavior: 'auto' });
-        if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }); }
+        const message = Array.from(list.querySelectorAll<HTMLElement>('[data-message-id]')).find((item) => item.dataset.messageId === messages[index].id);
+        const selector = `[data-plan-target="${detail.target}"][data-plan-key="${detail.plan.planId}:${detail.plan.revision}"]`;
+        const target = message?.querySelector<HTMLElement>(selector) ?? message;
+        target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        target?.focus({ preventScroll: true });
       });
     };
-    window.addEventListener('rdc:locate-tool-call', locate);
-    return () => { window.removeEventListener('rdc:locate-tool-call', locate); if (frame !== undefined) cancelAnimationFrame(frame); };
+    document.addEventListener(TRANSCRIPT_LOCATE_PLAN_EVENT, locate);
+    return () => { document.removeEventListener(TRANSCRIPT_LOCATE_PLAN_EVENT, locate); if (frame !== undefined) cancelAnimationFrame(frame); };
   }, [messages, overscan]);
 
   if (messages.length <= VIRTUALIZE_THRESHOLD) return <ol ref={listRef} className={className} data-testid={testId}

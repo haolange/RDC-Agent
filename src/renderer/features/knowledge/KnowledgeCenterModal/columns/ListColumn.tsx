@@ -47,11 +47,9 @@ function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; act
       onClick={onSelect}
       data-testid={`knowledge-card-${card.cardId}`}
     >
-      <span className="knowledge-center-card-head">
-        <span className="knowledge-center-card-title">{card.title}</span>
-        <CardBadges type={card.type} lifecycle={card.lifecycle} />
-      </span>
+      <span className="knowledge-center-card-title">{card.title}</span>
       {card.preview && card.preview.trim() !== card.title.trim() ? <span className="knowledge-center-card-preview">{card.preview}</span> : null}
+      <CardBadges type={card.type} lifecycle={card.lifecycle} />
     </ListRow>
   );
 }
@@ -76,11 +74,9 @@ function RecordRow({
       data-testid={`knowledge-candidate-${record.cardId}`}
       trailing={<Badge tone="warning">{pendingLabel}</Badge>}
     >
-      <span className="knowledge-center-card-head">
-        <span className="knowledge-center-card-title">{record.title}</span>
-        <CardBadges type={record.type} lifecycle={record.lifecycle} />
-      </span>
+      <span className="knowledge-center-card-title">{record.title}</span>
       {record.preview && record.preview.trim() !== record.title.trim() ? <span className="knowledge-center-card-preview">{record.preview}</span> : null}
+      <CardBadges type={record.type} lifecycle={record.lifecycle} />
     </ListRow>
   );
 }

@@ -80,15 +80,17 @@ it('does not send a superseded source plan', async () => {
   await render(); expect(mock.apply).not.toHaveBeenCalled(); expect(send).not.toHaveBeenCalled(); expect(setPrompt).not.toHaveBeenCalled();
 });
 it('binds a recovered handoff to the currently projected approved hash', async () => {
-  const approvedHandoff = { agent: 'general', label: 'Execute with General', prompt: 'execute', send: true, planHash: 'a'.repeat(64) };
+  const approvedHandoff = { agent: 'general', label: 'Execute with General', prompt: 'execute', send: true, planHash: 'a'.repeat(64),
+    planId: 'plan-a', revision: 2, planUri: 'session://plans/plan-a/2.md', planTitle: 'Plan A' };
   usePlanReviewStore.getState().accept({ sessionId: 's', projectionVersion: 1, review: null, recoverable: null, approvedHandoff });
-  context.setState({ handoffSuggestionRequest: { ...request(), approvedPlanHash: approvedHandoff.planHash } });
+  context.setState({ handoffSuggestionRequest: { ...request(), approvedPlan: { planId: 'plan-a', revision: 2, hash: approvedHandoff.planHash } } });
   await render();
   expect(mock.apply).toHaveBeenCalledWith('s', 'general', 'Execute with General', expect.any(Function), approvedHandoff.planHash);
   expect(send).toHaveBeenCalledOnce();
+  expect(send.mock.calls[0]![0]).toMatchObject({ planReference: { intent: 'execute', sessionId: 's', planId: 'plan-a', revision: 2, expectedHash: approvedHandoff.planHash } });
 });
 it('does not dispatch a recovered handoff when its projected approval changed', async () => {
-  context.setState({ handoffSuggestionRequest: { ...request(), approvedPlanHash: 'a'.repeat(64) } });
+  context.setState({ handoffSuggestionRequest: { ...request(), approvedPlan: { planId: 'plan-a', revision: 2, hash: 'a'.repeat(64) } } });
   usePlanReviewStore.getState().accept({ sessionId: 's', projectionVersion: 1, review: null, recoverable: null });
   await render(); expect(mock.apply).not.toHaveBeenCalled(); expect(send).not.toHaveBeenCalled();
 });

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 import { Select } from '../../../../ui/Select';
+import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField } from '../parts';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 import { modelOptionLabel } from './agentConfigStatus';
@@ -43,6 +44,9 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
     ...(binding.reasoningLevel ? [binding.reasoningLevel] : []),
   ])];
   const fallbackModelLabel = modelOptionLabel(fallback?.model, options) ?? t('settings.agentModelNotSet');
+  // For one Agent the choice is explicit: follow the default, or pick a model for this Agent only.
+  const [customModel, setCustomModel] = useState(Boolean(binding.model));
+  const ownModel = !fallback || customModel || Boolean(binding.model);
   const fallbackReasoningLabel = fallback?.reasoningLevel ?? t('settings.agentReasoningDefault');
   const update = (patch: AgentModelBinding) => {
     const next = { ...binding, ...patch };
@@ -55,16 +59,26 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
   return (
     <div className="settings-agent-route-grid">
       <SettingsField label={t('settings.modelFieldLabel')} className="settings-model-route-row">
-        <AgentModelCascadeSelect
-          value={binding.model ?? ''}
-          options={options}
-          inherit={fallback ? {
-            label: t('settings.agentModelUseDefault', { model: fallbackModelLabel }),
-            description: t('settings.agentModelUseDefaultHint'),
-          } : undefined}
-          onChange={(model) => update({ model: model || undefined })}
-          t={t}
-        />
+        {fallback ? (
+          <Tabs variant="segmented" fullWidth label={t('settings.modelFieldLabel')} value={ownModel ? 'own' : 'default'}
+            tabs={[{ id: 'default', label: t('settings.agentModelFollowDefault') }, { id: 'own', label: t('settings.agentModelOwn') }]}
+            onChange={(choice) => {
+              setCustomModel(choice === 'own');
+              if (choice === 'default') update({ model: undefined });
+            }} />
+        ) : null}
+        {ownModel ? (
+          <AgentModelCascadeSelect
+            value={binding.model ?? ''}
+            options={options}
+            onChange={(model) => update({ model: model || undefined })}
+            t={t}
+          />
+        ) : (
+          <p className="settings-help-text" data-testid={`${testIdPrefix}-model-default`}>
+            {t('settings.agentModelUseDefault', { model: fallbackModelLabel })}
+          </p>
+        )}
       </SettingsField>
       <SettingsField label={t('settings.agentReasoningLevel')}>
         <Select

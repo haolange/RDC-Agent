@@ -123,7 +123,7 @@ export type WorkProcessRow =
     preview: string;
     label: string;
     kind?: ThinkingArtifact['kind'];
-    source?: string;
+    kindLabel?: string;
     visibility?: ThinkingArtifact['visibility'];
     thinkingStatus?: ConversationThinkingStatus;
     expandable: boolean;
@@ -227,13 +227,6 @@ export type WorkProcessRow =
     duration: string;
   }
   | {
-    type: 'planReview';
-    id: string;
-    status: WorkProcessRowStatus;
-    plan: import('@shared/types/planReview').ConversationPlanReview;
-    duration: string;
-  }
-  | {
     type: 'approval';
     id: string;
     status: WorkProcessRowStatus;
@@ -269,14 +262,11 @@ export type WorkProcessRow =
   | {
     type: 'section';
     id: string;
-    /** 1-based position among the turn's steps, assigned once the rows are assembled. */
-    ordinal?: number;
     status: WorkProcessRowStatus;
     /** Activity of task lifecycle calls represented by their snapshots rather than separate tool rows. */
     hasActiveTools?: boolean;
     stepCount: number;
     duration: string;
-    defaultOpen: boolean;
     steps: WorkProcessRow[];
     visibleSteps: WorkProcessRow[];
     outputPhase?: ConversationLoopOutputPhase;
@@ -292,6 +282,5 @@ export interface WorkProcessPresentation {
   toolEvidence?: ConversationToolExecutionEvidence;
   duration: string;
   actionCount: number;
-  defaultExpanded: boolean;
   important: boolean;
 }

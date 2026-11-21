@@ -4,7 +4,7 @@ import { ComposerMarkdownInput } from '../../src/renderer/features/composer/Comp
 import { PlanCard } from '../../src/renderer/features/transcript/PlanCard';
 import { TaskSnapshotCard } from '../../src/renderer/features/transcript/TaskSnapshotCard';
 import { ScopedWorkDisclosure } from '../../src/renderer/features/transcript/ScopedWorkDisclosure';
-import { RightRailProgressList } from '../../src/renderer/features/right-rail/RightRailProgressList';
+import { RightRailTaskList } from '../../src/renderer/features/right-rail/RightRailTaskList';
 import { MessageMarkdown } from '../../src/renderer/patterns/Markdown/MessageMarkdown';
 import type { ConversationPlanReview } from '../../src/shared/types/planReview';
 import '../../src/renderer/features/transcript/AgentChat.css';
@@ -52,9 +52,9 @@ export function TaskTrackSample() {
   </ol></ScopedWorkDisclosure>;
 }
 
-export function ProgressSample() {
-  return <RightRailProgressList locateLabel="示例定位" tasks={items.map(item => ({
-    id: item.taskId, title: item.title, status: item.status, order: item.order,
+export function TaskListSample() {
+  return <RightRailTaskList locateLabel="示例定位" tasks={items.map(item => ({
+    id: item.taskId, title: item.title, status: item.status, displayState: item.status, order: item.order,
     sessionId: 'catalog', traceLaneId: 'catalog', branchId: 'catalog',
     createdAt: '2026-10-30T00:00:00Z', updatedAt: '2026-10-30T00:00:00Z',
   }))} />;

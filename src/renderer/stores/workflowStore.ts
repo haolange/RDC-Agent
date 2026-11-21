@@ -15,7 +15,7 @@ interface WorkflowStoreState {
 
 function sameRightPanel(current: RightPanelViewModel, next: RightPanelViewModel): boolean {
   return current === next
-    || (current.progress === next.progress
+    || (current.tasks === next.tasks
       && current.artifacts === next.artifacts
       && current.outputs === next.outputs
       && current.context === next.context);

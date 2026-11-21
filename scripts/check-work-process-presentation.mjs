@@ -27,6 +27,13 @@ const assert = (condition, message) => {
 };
 
 const readSource = (relativePath) => scriptRead(relativePath);
+
+// The transcript scrolls only because the page shell bounds its height; losing this rule makes the
+// conversation grow past the viewport with nothing able to scroll it.
+const pageShellRule = readSource('src/renderer/styles/global/app-shell-columns.css').match(/\.main-page-shell \{([^}]*)\}/)?.[1] ?? '';
+for (const declaration of ['flex: 1;', 'min-height: 0;', 'overflow: hidden;', 'flex-direction: column;']) {
+  assert(pageShellRule.includes(declaration), `.main-page-shell must keep "${declaration}" so .chat-messages stays the transcript scroller`);
+}
 const activeSignalSource = readSource('src/renderer/ui/ActiveSignalText.tsx');
 const activeSignalStyles = readSource('src/renderer/styles/design-motion.css');
 const activeSignalHelper = readSource('src/renderer/features/transcript/workProcessActiveSignal.ts');
@@ -257,7 +264,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
       status: 'complete',
       result: { status: 'complete', toolCallIds: ['think-glob'] },
       items: [
-        thinkingItem(rawThinking('provider-visible raw thinking'), 0),
+        { ...thinkingItem(rawThinking('provider-visible raw thinking'), 0), startedAt: now + 200, completedAt: now + 1700 },
         textItem('Tool result reviewed.', 1),
       ],
       toolCalls: [{ id: 'think-glob', toolName: 'glob', status: 'complete', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), displayOrder: 2, startedAt: now + 200, completedAt: now + 220 }],
@@ -269,7 +276,14 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
 const rawThinkingRow = sectionThinking(rawThinkingSection);
-assert(rawThinkingRow?.label === '已思考 · 0ms', 'raw thinking should use 已思考 · duration settled label');
+assert(rawThinkingRow?.label === '已思考 · 1.5s', 'settled thinking reports its own streaming time, not the step time');
+const untimedThinking = buildWorkProcessPresentation({ status: 'complete', updatedAt: now, blocks: [{
+  id: 'runtime-loop-untimed', kind: 'llm_turn', title: 'LLM turn', status: 'complete', result: { status: 'complete', toolCallIds: ['untimed-glob'] },
+  items: [thinkingItem(rawThinking('arrived complete'), 0)],
+  toolCalls: [{ id: 'untimed-glob', toolName: 'glob', status: 'complete', argsPreview: '{}', displayOrder: 1, startedAt: now, completedAt: now + 5 }],
+  startedAt: now, completedAt: now + 5,
+}] }, t);
+assert(sectionThinking(untimedThinking.rows.find((row) => row.type === 'section'))?.label === '已思考', 'thinking without its own timing never borrows a duration');
 assert(rawThinkingRow.preview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
 assert(rawThinkingRow.openByDefault === false, 'settled process-loop raw thinking should fold by policy');
 
@@ -332,7 +346,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
       status: 'complete',
       result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
       items: [
-        thinkingItem(summaryThinking('The user asks in Chinese. Now answer in Chinese.'), 0),
+        { ...thinkingItem(summaryThinking('The user asks in Chinese. Now answer in Chinese.'), 0), startedAt: now + 225, completedAt: now + 230 },
         textItem('Turn result.', 1, { phase: 'final_answer' }),
       ],
       toolCalls: [],
@@ -350,6 +364,7 @@ assert(
 );
 const summaryThinkingRow = sectionThinking(summaryThinkingSection);
 assert(summaryThinkingRow?.label === '已思考 · 5ms', 'summary thinking should use 已思考 · duration settled label');
+assert(summaryThinkingRow.kindLabel === '摘要', 'a provider summary is labeled as a summary so a short one does not read as missing reasoning');
 assert(summaryThinkingRow.openByDefault === false, 'final-answer quiet thinking stays folded by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
@@ -1005,6 +1020,15 @@ const i18nSource = [
     .filter((entry) => String(entry).endsWith('.ts'))
     .map((entry) => fs.readFileSync(path.join(CONTRACT_ROOT, 'src/renderer/i18n/locales', entry), 'utf8')),
 ].join('\n');
+const sectionModelSource = scriptRead('src/renderer/features/transcript/workProcessSectionModel.ts', 'utf8');
+// Steps are not numbered: a step leads with its thinking or commentary, or reads as its actions line.
+for (const [label, source] of [['components', componentSource], ['section model', sectionModelSource], ['i18n', i18nSource]]) {
+  assert(!/workProcessSectionTitle|\bordinal\b|numberSections|markLastSectionOpen/.test(source), `${label} must not number Working steps`);
+}
+assert(/'thinking' \| 'thinking\+commentary' \| 'commentary' \| 'actions'/.test(sectionModelSource),
+  'section model must name the four step leads');
+assert(componentSource.includes("useScopedWorkDisclosure('root'"), 'Working root must use the scoped disclosure so a manual toggle wins');
+assert(!/setExpanded\(true\)/.test(componentSource), 'Working root must not force itself open after a turn ends');
 const userInputPanelSource = scriptRead('src/renderer/features/composer/UserInputRequestPanel.tsx', 'utf8');
 const userInputSubmitHookSource = scriptRead('src/renderer/features/composer/useUserInputRequestSubmit.ts', 'utf8');
 const toolApprovalPanelSource = scriptRead('src/renderer/features/composer/ToolApprovalRequestPanel.tsx', 'utf8');
@@ -1074,7 +1098,7 @@ assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic M
 assert(presentationSource.includes("label: status === 'streaming'"), 'thinking labels should follow the thinking lifecycle');
 assert(!presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'a pending plan must not keep settled thinking active');
 assert(presentationSource.includes('resolveSettledThinkingLabel'), 'settled thinking should resolve Thought-for labels centrally');
-assert(presentationSource.includes("t('chat.workProcessThoughtFor', { duration })"), 'settled thinking label should use 已思考 · duration copy');
+assert(presentationSource.includes("t('chat.workProcessThoughtFor', { duration: formatDurationMs(item.startedAt, item.completedAt) })"), 'settled thinking label should use 已思考 · duration copy from the item timing');
 assert(!presentationSource.includes('`思考了 ${duration}`') && !presentationSource.includes('思考了 ${duration}'), 'settled thinking must not use 思考了 duration copy');
 assert(!presentationSource.includes('深度思考'), 'depth-thinking copy must not appear in presentation');
 assert(componentSource.includes('work-process-thinking-icon'), 'thinking folds should show a quiet leading icon');
@@ -1238,8 +1262,8 @@ assert(
   'section turns should zero bottom padding so turn gap is only the next section top pad',
 );
 assert(
-  /\.work-process-steps\s*>\s*\.work-process-section\.has-narrative:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
-  'visible narrative entrances after events or spacers should use space-3',
+  /\.work-process-steps\s*>\s*\.work-process-section:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
+  'each step after the first enters with space-3',
 );
 assert(
   /\.work-process-steps\s*>\s*\.work-process-step:not\(:first-child\)\s*\{[^}]*padding-top:\s*var\(--space-2\)/.test(cssSource),
@@ -1287,9 +1311,11 @@ assert(
   'loop turns should nest under the header status dot with space-3 indent',
 );
 assert(
-  /\.conversation-thread\s*\{[^}]*padding-inline:\s*var\(--space-3\)/.test(cssSource),
-  'transcript thread should keep shared inline gutters away from rail/scrollbar seams',
+  /\.conversation-message-assistant \.conversation-message-stack,[^{]*\{[^}]*padding-inline:\s*var\(--conversation-inset\)/.test(cssSource),
+  'assistant content should start at the shared conversation inset, level with Composer text',
 );
+assert(!/--work-process-inline-end-inset|--chat-transcript-width|--workbench-outer-rail-width/.test(cssSource),
+  'the conversation column has one width and one inset; no Working-only end inset or second rail');
 assert(
   !/\.work-process\s*\{[^}]*padding-inline-end:\s*var\(--space-3\)/.test(cssSource),
   'Work Process must not keep a WP-only right gutter; share the thread gutter instead',

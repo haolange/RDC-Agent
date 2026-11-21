@@ -13,6 +13,8 @@ import { MessageActions } from './MessageActions';
 import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
+import { PlanDeliverable } from './PlanDeliverable';
+import { PlanReferenceCard } from './PlanReferenceCard';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import type {
@@ -160,17 +162,21 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
             />
           ) : (
             <>
-              <div className="conversation-bubble conversation-bubble-user">
-                {composerMarkdown ? (
-                  <MessageMarkdown content={message.content} />
-                ) : (
-                  <span className="conversation-bubble-text">{message.content}</span>
-                )}
-              </div>
+              {message.planReference ? (
+                <PlanReferenceCard reference={message.planReference} prompt={message.content} />
+              ) : (
+                <div className="conversation-bubble conversation-bubble-user">
+                  {composerMarkdown ? (
+                    <MessageMarkdown content={message.content} />
+                  ) : (
+                    <span className="conversation-bubble-text">{message.content}</span>
+                  )}
+                </div>
+              )}
               <MessageMetaBar
                 message={message}
                 time={time}
-                onEditResend={beginEdit}
+                onEditResend={message.planReference ? undefined : beginEdit}
               />
             </>
           )}
@@ -210,6 +216,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
               <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} />
           ) : null}
+          <PlanDeliverable trace={trace} />
           {message.workTraceDiscarded ? (
             <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>
           ) : null}

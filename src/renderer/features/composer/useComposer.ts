@@ -10,6 +10,7 @@ import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { usePreparedSessionDevice } from '../../hooks/useSessionDevicePreparation';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { hydrateComposerAgentFromSession } from '../../stores/sessionAgentHydration';
+import { agentArgumentHint } from '../../lib/agentDescription';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerPendingSkills } from './useComposerPendingSkills';
 import { useComposerSend } from './useComposerSend';
@@ -133,6 +134,7 @@ export function useComposer(options: {
     language,
     currentMode,
     currentModeLabel,
+    currentModeHint: agentArgumentHint(selectedAgent, language),
     hasProject: Boolean(currentProject),
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,

@@ -7,7 +7,7 @@ import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/ses
 import type {
   ContextPanelViewModel,
   OutputsPanelViewModel,
-  ProgressTask,
+  TaskRailItem,
   RdcContextDiagnostic,
   TaskContextResource,
   TraceArtifactRecord,
@@ -19,12 +19,12 @@ import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session'
 
 const toIso = (value: number | undefined): string => value ? new Date(value).toISOString() : nowIso();
 
-export function mapRightRailProgress(
+export function mapRightRailTasks(
   sessionId: string,
   branchId: string,
   records: TaskRecord[],
   executions: TaskExecutionRecord[] = [],
-): ProgressTask[] {
+): TaskRailItem[] {
   const byId = new Map(records.map((task) => [task.id, task] as const));
   return projectTaskItems(records, executions).map((item) => {
     const task = byId.get(item.taskId);
@@ -35,6 +35,8 @@ export function mapRightRailProgress(
       branchId,
       title: item.title,
       status: item.status,
+      displayState: item.displayState,
+      ...(item.execution ? { execution: item.execution } : {}),
       order: item.order,
       createdAt: toIso(task?.createdAt),
       updatedAt: toIso(task?.updatedAt),

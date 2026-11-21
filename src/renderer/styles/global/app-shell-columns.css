@@ -85,13 +85,14 @@
 }
 
 .app-main {
-  /* One outer rail for page shell, Local utilities, and composer — avoids
-     content-rail vs rail-max displacement at the right seam. */
-  --workbench-outer-rail-inset: 18px;
-  --workbench-outer-rail-width: min(
+  /* One conversation column for the page shell, transcript and Composer. The Composer's outer edge is the
+     column edge; its inner padding is the shared inset that assistant text and Working start from. */
+  --conversation-column-gutter: 18px;
+  --conversation-column-width: min(
     var(--workbench-rail-max-width, 100%),
-    calc(100% - (2 * var(--workbench-outer-rail-inset)))
+    calc(100% - (2 * var(--conversation-column-gutter)))
   );
+  --conversation-inset: var(--space-3);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -147,6 +148,18 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+}
+
+/* The page shell bounds the transcript: it owns the remaining main-column height so `.chat-messages`
+   is the one scroller, and it shares the Composer's outer rail width so the conversation is one column. */
+.main-page-shell {
+  flex: 1;
+  width: var(--conversation-column-width);
+  margin-inline: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .main-utility-toggle {
@@ -231,10 +244,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  width: var(--workbench-outer-rail-width);
+  width: var(--conversation-column-width);
   margin-inline: auto;
   justify-content: stretch;
-  /* Horizontal inset is already baked into --workbench-outer-rail-width. */
+  /* The column gutter is already part of --conversation-column-width. */
   padding: var(--space-2) 0 var(--space-4);
   border-top: none;
   background: transparent;

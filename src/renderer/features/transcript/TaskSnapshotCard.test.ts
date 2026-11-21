@@ -10,6 +10,10 @@ import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { WorkProcessContent } from './WorkProcessContent';
 import type { WorkProcessRow } from './workProcessTypes';
+vi.mock('./WorkProcessExpansion', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./WorkProcessExpansion')>(),
+  useWorkProcessExpansion: () => ({ preference: 'all', active: false }),
+}));
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({
   t: (key: string, values?: { completed: number; total: number }) => values
@@ -33,7 +37,7 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.body.textContent).toContain('chat.workProcessTaskSnapshotCreated');
   expect(document.body.textContent).toContain('1 / 5 completed');
   expect(document.body.textContent).not.toContain('0ms');
-  expect(document.querySelectorAll('.task-status-marker.is-snapshot svg')).toHaveLength(5);
+  expect(document.querySelectorAll('.task-status-marker svg')).toHaveLength(5);
   expect(document.querySelector('.task-pending .task-status-marker circle')).not.toBeNull();
   expect(document.querySelector('.task-pending .task-status-marker')?.getAttribute('aria-label')).toBe('chat.taskWaitingDependencies');
   expect(document.querySelector('.task-pending details')?.hasAttribute('open')).toBe(false);
@@ -78,14 +82,14 @@ it('keeps all snapshots open until the user collapses one and remembers that ges
 it('defaults historical cards to open even when they belong to separate turns', () => {
   const section = (id: string, step: Extract<WorkProcessRow, { type: 'taskSnapshot' }>): Extract<WorkProcessRow, { type: 'section' }> => ({
     type: 'section', id, status: 'complete',
-    stepCount: 1, duration: '', defaultOpen: true,
+    stepCount: 1, duration: '',
     steps: [step], visibleSteps: [step], loopId: id,
   });
   const html = renderToStaticMarkup(createElement(WorkProcessContent, {
     presentation: { rows: [section('turn-1', snapshot('first', 'created')),
       section('turn-2', snapshot('second', 'updated'))], stepCount: 2, toolCount: 0,
-    summary: '', duration: '', actionCount: 2, defaultExpanded: true, important: false },
-    disclosureScope: 'nested-task-test',
+    summary: '', duration: '', actionCount: 2, important: false },
+    disclosureScope: 'nested-task-test', active: false,
   }));
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   expect([...parsed.querySelectorAll('.kind-task-snapshot .work-card-trigger')]

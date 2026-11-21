@@ -35,7 +35,7 @@ it('subscribes before the query and ignores its older response and updates after
 
 function presentation(): AgentRunPresentation {
   return { projectId: 'p', sessionId: 'active-chat', activeBranchId: 'main', profileId: 'general', updatedAt: '2026-10-30T00:00:00Z', runs: [], rawAuditRefs: [], rightPanel: {
-    progress: [], artifacts: { rows: [], totalCount: 0, storeDegraded: false }, outputs: { current: [], previous: [] },
+    tasks: [], artifacts: { rows: [], totalCount: 0, storeDegraded: false }, outputs: { current: [], previous: [] },
     context: { task: { projectId: 'p', projectName: 'p', sessionId: 'active-chat', sessionTitle: 'chat', workingDirectory: '.', configurationPhase: 'current_turn', agentProfile: 'general', permission: 'default', resources: [] },
       rdc: { capture: null, availableCaptures: [], runtime: {}, diagnostics: [] } },
   } };

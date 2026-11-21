@@ -66,7 +66,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       </button>
-      {message.role === 'user' && (
+      {message.role === 'user' && onEditResend && (
         <button
           type="button"
           className="message-action-btn"

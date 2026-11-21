@@ -16,6 +16,8 @@ export function buildOptimisticConversationTurn(options: {
   currentRun: RunSummary | null;
   pendingAttachments: PendingAttachmentDraft[];
   selectedAgentId?: string;
+  /** Shown at once, so a plan handoff never flashes its raw prompt while main verifies the claim. */
+  planReference?: ConversationMessage['planReference'];
 }): { userMessage: ConversationMessage; assistantDraftMessage: ConversationMessage; optimisticIds: string[] } {
   const {
     requestId,
@@ -26,6 +28,7 @@ export function buildOptimisticConversationTurn(options: {
     currentRun,
     pendingAttachments,
     selectedAgentId,
+    planReference,
   } = options;
   const turnId = `optimistic-turn-${requestId}`;
   const now = Date.now();
@@ -46,6 +49,7 @@ export function buildOptimisticConversationTurn(options: {
     status: 'complete',
     updatedAt: now,
     workTrace: null,
+    ...(planReference ? { planReference } : {}),
     attachments: pendingAttachments.map((attachment) => ({
       attachmentId: `optimistic-${attachment.id}`,
       sessionId: currentSession?.sessionId ?? '',

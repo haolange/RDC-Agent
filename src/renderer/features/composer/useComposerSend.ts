@@ -159,7 +159,7 @@ export function useComposerSend(options: {
         showNotice,
         failedSummary: t('app.conversationRequestFailed'),
         preserveDraft: Boolean(handoff),
-        planSource: handoff?.planSource,
+        planReference: handoff?.planReference,
       });
     } finally {
       sendingRef.current = false;

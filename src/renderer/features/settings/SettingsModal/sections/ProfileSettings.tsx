@@ -1,23 +1,23 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { ProfileAvatar } from '../../../../patterns/ProfileAvatar';
-import { SettingsField, SettingsSection } from '../parts';
+import { SettingsField, SettingsSection, useSettingsAutosave, type SettingsAutosaveStatus } from '../parts';
 import type { useI18n } from '../../../../i18n';
 import type { AppSettings } from '@shared/types/settings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-
 interface ProfileSettingsProps {
   accountDraft: AppSettings['profile'];
+  /** The saved profile; the draft autosaves while it differs. */
+  savedProfile: AppSettings['profile'];
   onAccountDraftChange: React.Dispatch<React.SetStateAction<AppSettings['profile']>>;
   onAvatarSelect: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
   t: Translate;
 }
 
-function statusText(status: SaveStatus, t: Translate): string {
+function statusText(status: SettingsAutosaveStatus, t: Translate): string {
   if (status === 'saving') return t('settings.saving');
   if (status === 'saved') return t('settings.profileSaved');
   if (status === 'error') return t('settings.profileSaveFailed');
@@ -26,22 +26,15 @@ function statusText(status: SaveStatus, t: Translate): string {
 
 export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   accountDraft,
+  savedProfile,
   onAccountDraftChange,
   onAvatarSelect,
   onSave,
   t,
 }) => {
-  const [status, setStatus] = useState<SaveStatus>('idle');
-
-  const save = async () => {
-    setStatus('saving');
-    try {
-      await onSave();
-      setStatus('saved');
-    } catch {
-      setStatus('error');
-    }
-  };
+  // A chosen avatar and an edited nickname both persist without a separate save step.
+  const pending = accountDraft.nickname !== savedProfile.nickname || accountDraft.avatarPath !== savedProfile.avatarPath;
+  const { status, flush } = useSettingsAutosave(`${accountDraft.nickname}\u0000${accountDraft.avatarPath ?? ''}`, pending, onSave);
 
   const nicknameId = 'settings-profile-nickname';
 
@@ -67,20 +60,11 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
           <Input
             id={nicknameId}
             value={accountDraft.nickname}
-            onChange={(event) => {
-              setStatus('idle');
-              onAccountDraftChange((current) => ({ ...current, nickname: event.target.value }));
-            }}
+            onChange={(event) => onAccountDraftChange((current) => ({ ...current, nickname: event.target.value }))}
+            onBlur={flush}
           />
         </SettingsField>
-        <div className="settings-profile-actions">
-          <span className="settings-save-status" role="status" data-status={status}>
-            {statusText(status, t)}
-          </span>
-          <Button variant="secondary" size="sm" onClick={() => void save()} disabled={status === 'saving'}>
-            {t('settings.saveProfile')}
-          </Button>
-        </div>
+        <span className="settings-save-status settings-profile-status" role="status" data-status={status}>{statusText(status, t)}</span>
       </div>
     </SettingsSection>
   );

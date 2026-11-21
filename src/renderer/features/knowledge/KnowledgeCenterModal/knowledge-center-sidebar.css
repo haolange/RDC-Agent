@@ -27,10 +27,13 @@
 /* Scoped to the left rail: the middle column reuses `.knowledge-center-section-title`
  * for its Candidates separator and must keep its own scale. */
 .knowledge-center-spaces .knowledge-center-section-title {
-  margin-block-start: var(--space-2);
-  padding-inline-start: calc(var(--space-3) + var(--space-4) + var(--space-3));
+  margin-block-start: var(--space-3);
+  padding-inline-start: var(--space-3);
   color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-overline-size);
+  font-weight: var(--font-semibold);
+  line-height: var(--type-overline-line);
+  letter-spacing: var(--tracking-overline);
 }
 
 .knowledge-center-space-list .knowledge-center-empty-inline {
@@ -49,10 +52,14 @@
 }
 
 .knowledge-center-nav-item.ui-list-row.is-selected {
-  background: var(--token-bg-raised);
-  border-color: var(--token-border-default);
   color: var(--token-text-heading);
   font-weight: var(--font-medium);
+}
+
+.knowledge-center-nav-count {
+  color: var(--token-text-caption);
+  font-size: var(--type-caption-size);
+  font-variant-numeric: tabular-nums;
 }
 
 .knowledge-center-nav-item.ui-list-row.is-selected .ui-list-row-leading {

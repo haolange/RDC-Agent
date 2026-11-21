@@ -4,7 +4,7 @@ import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import { isAgentIconPreset } from '@shared/constants/agents';
 import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS, HANDOFF_SURFACES } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
-import { handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
+import { agentTextTranslationsSchema, handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft, AgentAccessCeiling, AgentCompletionContract, HandoffSurface } from '@shared/types/agentManifest';
 
 /** A manifest still declares a field that moved to Settings → Agents; the file is not applied until migrated. */
@@ -158,6 +158,13 @@ export function parseAgentMarkdownStrict(
     if (record.showContinueOn !== undefined) {
       return { ok: false, reason: 'showContinueOn was removed; declare handoff surface instead.' };
     }
+    const translations: Pick<AgentManifestDefinition, 'descriptionTranslations' | 'argumentHintTranslations'> = {};
+    for (const [key, field] of [['description-translations', 'descriptionTranslations'], ['argument-hint-translations', 'argumentHintTranslations']] as const) {
+      if (record[key] === undefined) continue;
+      const parsed = agentTextTranslationsSchema.safeParse(record[key]);
+      if (!parsed.success) return { ok: false, reason: `${key}: ${parsed.error.message}` };
+      translations[field] = parsed.data;
+    }
     return {
       ok: true,
       definition: {
@@ -167,6 +174,7 @@ export function parseAgentMarkdownStrict(
         name,
         description: typeof record.description === 'string' ? record.description.trim() : '',
         argumentHint: typeof record['argument-hint'] === 'string' ? record['argument-hint'].trim() : '',
+        ...translations,
         target: typeof record.target === 'string' && record.target.trim() ? record.target.trim() : 'rdc-agent',
         ...(typeof record['based-on'] === 'string' ? { basedOn: record['based-on'] } : {}),
         icon: isAgentIconPreset(record.icon) ? record.icon : 'message-orbit',

@@ -4,7 +4,8 @@ import type {
   InvestigationMission,
   InvestigationRecordType,
 } from './renderdocInvestigation';
-import type { TaskDependencyWait } from './taskExecution';
+import type { ConversationTaskStatus, TaskDisplayState } from './conversation';
+import type { TaskDependencyWait, TaskExecutionDispatch, TaskExecutionPreparation, TaskExecutionStatus } from './taskExecution';
 
 export interface RawAuditRef {
   id: string;
@@ -15,20 +16,26 @@ export interface RawAuditRef {
   ref?: string;
 }
 
-export type ProgressTaskStatus =
-  | 'pending'
-  | 'in_progress'
-  | 'completed'
-  | 'blocked'
-  | 'cancelled';
+/** Facts from a Task's current execution record, shown beside the Task; never inferred from text. */
+export interface TaskExecutionFacts {
+  mode: 'direct' | 'subagent' | 'handoff';
+  status: TaskExecutionStatus;
+  dispatch?: TaskExecutionDispatch;
+  /** The Agent that actually ran the execution, from its prepared runtime facts. */
+  agentId?: string;
+  model?: { providerId: string; modelId: string; reasoningLevel?: TaskExecutionPreparation['reasoningLevel'] };
+}
 
-export interface ProgressTask {
+/** One Task as the session right rail shows it, projected by main from TaskRegistry. */
+export interface TaskRailItem {
   id: string;
   sessionId: string;
   traceLaneId: string;
   branchId: string;
   title: string;
-  status: ProgressTaskStatus;
+  status: ConversationTaskStatus;
+  displayState: TaskDisplayState;
+  execution?: TaskExecutionFacts;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -237,7 +244,7 @@ export interface ContextPanelViewModel {
 }
 
 export interface RightPanelViewModel {
-  progress: ProgressTask[];
+  tasks: TaskRailItem[];
   artifacts: InvestigationArtifactsPanelViewModel;
   outputs: OutputsPanelViewModel;
   context: ContextPanelViewModel;

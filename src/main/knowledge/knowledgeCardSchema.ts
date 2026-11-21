@@ -251,6 +251,7 @@ export function serializeKnowledgeCard(record: KnowledgeCardRecord): string {
   ];
   if (record.sourceStatus) yamlLines.push(`sourceStatus: ${JSON.stringify(record.sourceStatus)}`);
   if (record.caseId) yamlLines.push(`caseId: ${JSON.stringify(record.caseId)}`);
+  if (record.preview && record.preview !== record.title) yamlLines.push(`preview: ${JSON.stringify(record.preview)}`);
   if (record.sourceHash) yamlLines.push(`sourceHash: ${JSON.stringify(record.sourceHash)}`);
   if (record.sourceMtimeMs != null) yamlLines.push(`sourceMtimeMs: ${record.sourceMtimeMs}`);
   if (record.sourceSize != null) yamlLines.push(`sourceSize: ${record.sourceSize}`);

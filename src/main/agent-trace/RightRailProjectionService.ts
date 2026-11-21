@@ -11,14 +11,14 @@ import {
   buildRdcContext,
   buildTaskContext,
   mapRightRailOutputs,
-  mapRightRailProgress,
+  mapRightRailTasks,
 } from './rightRailProjectionMappers';
 import type { RightPanelViewModel } from '@shared/types/trace';
 import type { RunSummary } from '@shared/types/session';
 import type { ActionEvent } from '@shared/types/evidence';
 
 const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
-  progress: [],
+  tasks: [],
   artifacts: { rows: [], totalCount: 0, storeDegraded: false },
   outputs: { current: [], previous: [] },
   context: {
@@ -61,7 +61,7 @@ export class RightRailProjectionService {
       projectId: session.projectId,
       sessionId: input.sessionId,
     });
-    const progress = mapRightRailProgress(input.sessionId, input.branchId, taskSnapshot.tasks, taskSnapshot.executions);
+    const tasks = mapRightRailTasks(input.sessionId, input.branchId, taskSnapshot.tasks, taskSnapshot.executions);
     const outputs = mapRightRailOutputs({
       sessionId: input.sessionId, branchId: input.branchId, sources, runs: input.runs,
     });
@@ -88,7 +88,7 @@ export class RightRailProjectionService {
       })),
     });
     return {
-      progress,
+      tasks,
       artifacts,
       outputs,
       context: { task, rdc },

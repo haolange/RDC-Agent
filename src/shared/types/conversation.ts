@@ -27,6 +27,12 @@ export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | '
 /** Durable TaskRegistry lifecycle state carried by task work-trace blocks. */
 export type ConversationTaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
 
+/**
+ * What a Task shows: its TaskRegistry status, or `failed` while the logical Task is still open but its current
+ * execution ended `failed` / `interrupted` (TaskRegistry records such a Task as `blocked` with the error as reason).
+ */
+export type TaskDisplayState = ConversationTaskStatus | 'failed';
+
 export type ConversationDiagnosticSeverity = 'info' | 'warning' | 'error';
 
 export type ConversationWorkBlockKind =
@@ -48,6 +54,8 @@ export interface ConversationTaskSnapshotItem {
   taskId: string;
   title: string;
   status: ConversationTaskStatus;
+  /** Projected display state at the moment of the snapshot; absent on snapshots recorded before it existed. */
+  displayState?: TaskDisplayState;
   statusReason?: string;
   waitingOn?: TaskDependencyWait[];
   order: number;
@@ -230,6 +238,10 @@ export interface ConversationThinkingItem {
   thinking: ThinkingArtifact;
   status: ConversationThinkingStatus;
   displayOrder: number;
+  /** When this block's first visible text arrived. */
+  startedAt?: number;
+  /** When it settled after streaming; absent for blocks that arrived already complete. */
+  completedAt?: number;
 }
 
 /** What a model turn produced, in the order it became visible. */
@@ -308,6 +320,8 @@ export interface ConversationMessage {
   preparedContext?: PreparedTurnContextSummary;
   /** Turn-end continue actions from frozen profile handoffs whose surface is `turn-end`. */
   handoffSuggestions?: PlanReviewHandoffSuggestion[];
+  /** User messages only: the reviewed plan this message executes or revises, verified by main at send. */
+  planReference?: import('./planReview').ConversationPlanReference;
 }
 
 export type AttachmentLayer = SessionAttachmentLayer;
@@ -408,7 +422,7 @@ export interface ConversationExecutionTransition {
 }
 
 export interface ConversationSendRequest {
-  planSource?: import('./planReview').PlanReadRequest;
+  planReference?: import('./planReview').PlanReferenceRequest;
   requestId: string;
   projectId?: string | null;
   sessionId?: string | null;

@@ -1,22 +1,15 @@
 import type { UnresolvedItem } from '@shared/types/unresolvedWork';
 import type { ConversationTaskStatus } from '@shared/types/conversation';
-import type { TaskExecutionRequirements, TaskExecutionPreparation, TaskIndependentSource, TaskRuntimeEpoch } from '@shared/types/taskExecution';
+import type {
+  TaskExecutionDispatch, TaskExecutionPreparation, TaskExecutionRequirements, TaskExecutionStatus, TaskIndependentSource, TaskRuntimeEpoch,
+} from '@shared/types/taskExecution';
+
+export type { TaskExecutionStatus } from '@shared/types/taskExecution';
 
 export const TASK_SCHEMA_VERSION = 2 as const;
 
 export type TaskStatus = ConversationTaskStatus;
 export type TaskDisposition = 'completed' | 'partial' | 'blocked' | 'cancelled';
-export type TaskExecutionStatus =
-  | 'queued'
-  | 'running'
-  | 'waiting'
-  | 'cancelling'
-  | 'completed'
-  | 'partial'
-  | 'blocked'
-  | 'failed'
-  | 'cancelled'
-  | 'interrupted';
 export type TaskMessageKind = 'progress' | 'blocked' | 'decision_required' | 'result';
 
 export interface TaskCompletionResult {
@@ -83,6 +76,8 @@ export interface TaskExecutionRecord {
   parentExecutionId?: string;
   rootBudgetId?: string;
   mode: 'direct' | 'subagent' | 'handoff';
+  /** Subagent executions only; absent on records written before dispatch was recorded. */
+  dispatch?: TaskExecutionDispatch;
   status: TaskExecutionStatus;
   budget: TaskBudgetState;
   frozenPlanRef?: string;
@@ -112,6 +107,7 @@ export interface TaskExecutionMessage {
 
 export interface StartTaskExecutionOptions {
   mode: TaskExecutionRecord['mode'];
+  dispatch?: TaskExecutionDispatch;
   /** Explicit new-turn continuation of the same goal after cancellation joined. */
   resumeCancelled?: boolean;
   parentExecutionId?: string;

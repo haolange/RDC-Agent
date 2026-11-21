@@ -13,9 +13,9 @@ vi.mock('./AgentListItem', () => ({ AgentListItem: ({ id, onSelect }: { id: stri
   React.createElement('button', { type: 'button', onClick: onSelect }, id) }));
 
 const t = ((key: string, params?: Record<string, string>) => `${key}${params?.id ? `:${params.id}` : ''}`) as Parameters<typeof createNewAgent>[1];
-const first = createNewAgent([], t, 'user', 'project-a');
-const target = { ...createNewAgent([first], t, 'project', 'project-a'), id: 'target' };
-const other = { ...createNewAgent([first, target], t, 'project', 'project-a'), id: 'other' };
+const first = createNewAgent({ name: 'First', id: 'first' }, t, 'user', 'project-a');
+const target = createNewAgent({ name: 'Target', id: 'target' }, t, 'project', 'project-a');
+const other = createNewAgent({ name: 'Other', id: 'other' }, t, 'project', 'project-a');
 const settings = { agents: { definitions: [], diagnostics: [], modelOptions: [] }, agentModels: { default: {}, byAgent: {} } } as never;
 
 it('waits for drafts, opens the target scope once, and reports a missing target without selecting another', async () => {

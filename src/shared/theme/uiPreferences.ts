@@ -5,11 +5,13 @@ import type {
   AppTheme,
   FontScale,
   UiPreferences,
+  WorkProcessExpansion,
 } from '../types/settings';
 
 const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
 const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
+const VALID_WORK_PROCESS_EXPANSIONS: WorkProcessExpansion[] = ['latest', 'all'];
 
 function pickEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === 'string' && (allowed as readonly string[]).includes(value)
@@ -25,6 +27,7 @@ export function createDefaultUiPreferences(): UiPreferences {
     composerMarkdown: false,
     usePointerCursors: false,
     contextBreakdownExpanded: true,
+    workProcessExpansion: 'latest',
     chromeThemes: createDefaultChromeThemes(),
   };
 }
@@ -51,6 +54,7 @@ export function sanitizeUiPreferences(
     contextBreakdownExpanded: typeof record.contextBreakdownExpanded === 'boolean'
       ? record.contextBreakdownExpanded
       : fallback.contextBreakdownExpanded,
+    workProcessExpansion: pickEnum(record.workProcessExpansion, VALID_WORK_PROCESS_EXPANSIONS, fallback.workProcessExpansion),
     chromeThemes: sanitizeChromeThemes(chromeSource, fallback.chromeThemes),
   };
 }

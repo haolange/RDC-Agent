@@ -2,6 +2,10 @@
 name: Debugger
 description: Planning Orchestrator that minimizes root-cause uncertainty for incorrect rendering results.
 argument-hint: Wrong result, capture, and expected behavior
+description-translations:
+  zh-CN: 规划编排者：针对错误的渲染结果，把根因的不确定性降到最低。
+argument-hint-translations:
+  zh-CN: 错误结果、capture 与期望行为
 target: rdc-agent
 icon: crosshair-bug
 accent: "#33d1ff"

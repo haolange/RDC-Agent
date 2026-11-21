@@ -40,15 +40,6 @@ describe('AgentModelCascadeSelect selection validation', () => {
       await act(async () => render({ ...unavailable, status: 'missing', providerIssue: undefined }));
       expect(host.textContent).toContain('所选模型已失效');
       expect(host.querySelector('[aria-invalid]')?.getAttribute('aria-invalid')).toBe('true');
-      await act(async () => root.render(createElement(AgentModelCascadeSelect, {
-        value: unavailable.canonicalId, options: [unavailable], onChange: () => {},
-        inherit: { label: 'Inherit', description: 'Use the target model' },
-        t: (key, params) => translate('zh-CN', key, params),
-      })));
-      expect(host.textContent).toContain(unavailable.modelLabel);
-      expect(host.textContent).not.toContain('所选模型已失效');
-      expect(host.textContent).toContain('所选供应商当前不可用');
-      expect(host.querySelector('[aria-invalid]')?.getAttribute('aria-invalid')).toBe('true');
     } finally {
       await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals();
     }

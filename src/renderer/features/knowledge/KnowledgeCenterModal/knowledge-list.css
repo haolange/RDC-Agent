@@ -19,8 +19,8 @@
   padding-block: var(--space-2);
 }
 
-.knowledge-center-card-button .ui-list-row-body,
-.knowledge-center-inbox-row .ui-list-row-body {
+.knowledge-center-card-button .ui-list-row-title,
+.knowledge-center-inbox-row .ui-list-row-title {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -30,9 +30,14 @@
 }
 
 .knowledge-center-card-title {
-  font-size: var(--type-label-size);
-  font-weight: var(--font-semibold);
-  line-height: var(--leading-tight);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--token-text-heading);
+  font-size: var(--type-item-size);
+  font-weight: var(--font-medium);
+  line-height: var(--type-item-line);
   overflow-wrap: anywhere;
 }
 
@@ -40,24 +45,6 @@
   width: 100%;
   min-height: var(--control-height-md);
   flex-shrink: 0;
-}
-
-.knowledge-center-card-button.is-active {
-  background: var(--token-interactive-active);
-  color: var(--token-text-heading);
-}
-
-.knowledge-center-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--control-height-sm);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--token-border-muted);
-  background: var(--token-bg-shell);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
 }
 
 .knowledge-center-badges {
@@ -84,20 +71,12 @@
   color: var(--token-text-caption);
 }
 
-.knowledge-center-card-head {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .knowledge-center-card-preview {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  line-height: 1.5;
+  line-height: var(--type-caption-line);
 }
 
 .knowledge-center-list-head {
@@ -135,7 +114,7 @@
   padding-block: var(--space-2);
 }
 
-.knowledge-center-conflict-row .ui-list-row-body {
+.knowledge-center-conflict-row .ui-list-row-title {
   white-space: normal;
   overflow: visible;
   text-overflow: unset;

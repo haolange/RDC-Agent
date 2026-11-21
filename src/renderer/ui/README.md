@@ -12,7 +12,7 @@
 
 `SearchMultiSelect` 接收 `value` ID 数组、`options`、`onChange`、`unavailable` 原因映射及 loading/error/retry 状态；展示文案由调用方提供。组件不扫描资源、不调用 IPC、不静默删除失效引用；候选去重，新增选择保持原顺序。
 
-`EmptyState` 提供 `layout="compact" | "fill"`，保留 visual 槽；填充模式由父容器传递剩余空间。
+`EmptyState` 提供 `variant="inline" | "panel" | "page"`：`inline` 是列表里没有行时的一行安静说明；`panel` 是带创建动作的空资源，有界表面；`page` 填满所在栏位并居中，保留 visual 槽。不要在消费方再包一层边框盒子。
 
 `OverflowFade` 保留完整单行 DOM 文本和 `title`，仅在实测溢出时添加线性渐隐；监听宽度、文本与字体加载变化，空字符串仍保留一行高度。`Tabs` 默认按内容宽度布局；仅在调用方明确传入 `fullWidth` 时占满容器并均分选项。
 

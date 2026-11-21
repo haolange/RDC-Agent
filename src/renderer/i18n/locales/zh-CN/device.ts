@@ -36,7 +36,7 @@ export const zhDevice = {
   'device.sessionDeviceTitle': "当前会话回放设备：{summary}",
   'device.discovery.available': "可连接",
   'device.status.unauthorized': "需要设备授权",
-  'device.discovery.failed': '设备发现失败，请刷新重试。',
+  'device.discovery.failed': '无法查找 Android 设备（ADB 不可用），本机回放不受影响。',
   'device.prepare.connected': "设备已连接",
   'device.issue.busy': "设备服务正在被使用",
   'device.issue.version': "设备服务版本不匹配",

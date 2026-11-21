@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '../../../lib/cn';
 import { SearchField } from '../../../ui/SearchField';
 import { SettingsNavIcon } from './SettingsNavIcon';
@@ -8,6 +8,13 @@ import {
 } from './settingsSearchIndex';
 import type { TranslationKey } from '../../../i18n';
 import type { SettingsSection } from './types';
+
+/** A model service the search can jump to, so a provider is found by its name. */
+export interface SettingsSearchProvider {
+  id: string;
+  label: string;
+  open: () => void;
+}
 
 export function focusSettingsSearchTarget(target: string): void {
   const node = document.querySelector<HTMLElement>(`[data-settings-search="${target}"]`);
@@ -21,15 +28,32 @@ export const SettingsCenterNav: React.FC<{
   sections: Array<{ id: SettingsSection; label: string }>;
   activeSection: SettingsSection;
   onSelectSection: (section: SettingsSection) => void;
+  providers: SettingsSearchProvider[];
   t: (key: TranslationKey) => string;
-}> = ({ sections, activeSection, onSelectSection, t }) => {
+}> = ({ sections, activeSection, onSelectSection, providers, t }) => {
   const [query, setQuery] = useState('');
+  const [activeResult, setActiveResult] = useState(0);
+  const resultsId = useId();
   const navRef = useRef<HTMLDivElement>(null);
   const [horizontal, setHorizontal] = useState(() => window.matchMedia('(max-width: 960px)').matches);
-  const results = useMemo(
-    () => matchSettingsSearchEntries(query, t),
-    [query, t],
-  );
+  const selectEntry = (entry: SettingsSearchEntry) => {
+    onSelectSection(entry.section);
+    window.setTimeout(() => focusSettingsSearchTarget(entry.target), 50);
+    setQuery('');
+  };
+
+  // Cheap to compute; the index and the provider list are both small.
+  const results = (() => {
+    const normalized = query.trim().toLowerCase();
+    const providerHits = normalized ? providers.filter((provider) => provider.label.toLowerCase().includes(normalized)).slice(0, 6) : [];
+    return [
+      ...matchSettingsSearchEntries(query, t).map((entry) => ({ key: entry.id, title: t(entry.titleKey), section: entry.section,
+        select: () => selectEntry(entry) })),
+      ...providerHits.map((provider) => ({ key: `provider-${provider.id}`, title: provider.label, section: 'models' as SettingsSection,
+        select: () => { setQuery(''); provider.open(); } })),
+    ];
+  })();
+  useEffect(() => setActiveResult(0), [query]);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 960px)');
@@ -48,10 +72,17 @@ export const SettingsCenterNav: React.FC<{
     });
   }, [activeSection, horizontal, sections]);
 
-  const selectEntry = (entry: SettingsSearchEntry) => {
-    onSelectSection(entry.section);
-    window.setTimeout(() => focusSettingsSearchTarget(entry.target), 50);
-    setQuery('');
+  // The field keeps focus; arrows move the active result, Enter opens it, Escape clears the search.
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape' && query) { event.preventDefault(); event.stopPropagation(); setQuery(''); return; }
+    if (results.length === 0) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveResult((index) => (index + (event.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      results[Math.min(activeResult, results.length - 1)].select();
+    }
   };
 
   const handleNavKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -85,20 +116,30 @@ export const SettingsCenterNav: React.FC<{
         placeholder={t('settings.searchPlaceholder')}
         aria-label={t('settings.searchPlaceholder')}
         onChange={(event) => setQuery(event.target.value)}
+        onKeyDown={handleSearchKeyDown}
         onClear={() => setQuery('')}
         clearLabel={t('app.clearSearch')}
+        role="combobox"
+        aria-expanded={results.length > 0}
+        aria-controls={resultsId}
+        aria-activedescendant={results.length > 0 ? `${resultsId}-${Math.min(activeResult, results.length - 1)}` : undefined}
       />
       {results.length > 0 ? (
-        <div className="settings-search-results" role="listbox" data-testid="settings-search-results">
-          {results.map((entry) => (
+        <div id={resultsId} className="settings-search-results" role="listbox" data-testid="settings-search-results">
+          {results.map((entry, index) => (
             <button
-              key={entry.id}
+              key={entry.key}
+              id={`${resultsId}-${index}`}
               type="button"
-              className="settings-search-result"
-              data-testid={`settings-search-result-${entry.id}`}
-              onClick={() => selectEntry(entry)}
+              role="option"
+              tabIndex={-1}
+              aria-selected={index === activeResult}
+              className={cn('settings-search-result', index === activeResult && 'is-active')}
+              data-testid={`settings-search-result-${entry.key}`}
+              onMouseEnter={() => setActiveResult(index)}
+              onClick={entry.select}
             >
-              <span>{t(entry.titleKey)}</span>
+              <span>{entry.title}</span>
               <span className="settings-search-result-section">
                 {sections.find((section) => section.id === entry.section)?.label}
               </span>

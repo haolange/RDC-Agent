@@ -120,11 +120,6 @@
   padding-top: 0;
 }
 
-.work-process-section-list > .work-process-thinking-row + .work-process-step,
-.work-process-section-list > .work-process-output + .work-process-step {
-  padding-top: var(--space-3);
-}
-
 
 
 .work-process-path-chip {
@@ -196,19 +191,4 @@
 .work-process-summary-line > .work-process-diagnostic-message {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-/* Keep the process rail left-anchored while calibrating the visible card edge
- * against its existing left hierarchy gutter. The agent-chat container owns
- * these breakpoints so a resized work area follows its actual width. */
-@container (max-width: 42rem) {
-  .work-process {
-    --work-process-inline-end-inset: var(--space-4);
-  }
-}
-
-@container (max-width: 32rem) {
-  .work-process {
-    --work-process-inline-end-inset: 0;
-  }
 }

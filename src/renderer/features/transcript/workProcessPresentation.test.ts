@@ -398,7 +398,7 @@ describe('buildWorkProcessPresentation', () => {
     ]);
   });
 
-  it('uses Thought-for settled labels with duration to the first tool', () => {
+  it('uses Thought-for settled labels with the thinking block\'s own streaming time', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now + 1000,
@@ -410,7 +410,7 @@ describe('buildWorkProcessPresentation', () => {
           status: 'complete',
           result: { status: 'complete', toolCallIds: ['tool-read'] },
           items: [
-            thinkingItem('raw chain-of-thought that must not be result text', 1, rawThinking),
+            { ...thinkingItem('raw chain-of-thought that must not be result text', 1, rawThinking), startedAt: now, completedAt: now + 1500 },
             textItem('Read files before answering.', 2),
           ],
           toolCalls: [
@@ -591,7 +591,7 @@ describe('buildWorkProcessPresentation', () => {
           title: 'LLM turn',
           status: 'complete',
           result: { status: 'complete', toolCallIds: ['tool-glob-raw-done'] },
-          items: [thinkingItem('settled raw thinking', 1, rawThinking)],
+          items: [{ ...thinkingItem('settled raw thinking', 1, rawThinking), startedAt: now, completedAt: now + 100 }],
           toolCalls: [
             {
               id: 'tool-glob-raw-done',
@@ -1467,7 +1467,7 @@ describe('buildWorkProcessPresentation', () => {
     );
   });
 
-  it('renders awaiting plan_artifact as a planReview card and rejected as a shell row', () => {
+  it('renders every plan_artifact revision as one compact Working row named by its review state', () => {
     const awaiting: ConversationPlanReview = {
       planId: 'plan-1',
       revision: 2,
@@ -1487,7 +1487,7 @@ describe('buildWorkProcessPresentation', () => {
       argsPreview: JSON.stringify({ title: awaiting.title }),
       startedAt: now,
     }, t);
-    expect(card).toMatchObject({ type: 'planReview', plan: awaiting });
+    expect(card).toMatchObject({ type: 'tool', verb: '计划 · 待审阅', planReview: awaiting, target: awaiting.title });
 
     const shell = createToolRowForPresentation({
       id: 'plan-rejected',

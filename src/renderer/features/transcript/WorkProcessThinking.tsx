@@ -17,14 +17,14 @@ export const WorkProcessThinking: React.FC<{ row: ThinkingRow }> = ({ row }) => 
   const [open, toggle] = useScopedWorkDisclosure(`thinking-${row.id}`, row.openByDefault);
   const label = <><WorkProcessIcon icon="spark" className="work-process-thinking-icon" />
     <ActiveSignalText active={active} tone="info">{row.label}</ActiveSignalText></>;
-  const source = row.source ? <span className="work-process-thinking-source">{row.source}</span> : null;
+  const kindLabel = row.kindLabel ? <span className="work-process-thinking-kind">{row.kindLabel}</span> : null;
   if (row.expandable) return <details className={className} open={open}>
     <summary className="work-process-thinking-summary" data-work-node-heading onClick={(event) => { event.preventDefault(); toggle(); }}>
-      {label}{source}<span className="work-process-row-caret" aria-hidden="true" />
+      {label}{kindLabel}<span className="work-process-row-caret" aria-hidden="true" />
     </summary>
     <div className="work-process-thinking-preview"><MessageMarkdown content={row.preview} deferHeavyPlugins={active} /></div>
   </details>;
-  return row.label ? <p className={`${className} work-process-thinking-caption`} data-work-node-heading>{label}{source}</p> : null;
+  return row.label ? <p className={`${className} work-process-thinking-caption`} data-work-node-heading>{label}{kindLabel}</p> : null;
 };
 
 export const WorkProcessThinkingRow: React.FC<{ row: ThinkingRow }> = ({ row }) => (

@@ -173,13 +173,18 @@ export function upsertLoopThinkingItem(
   const block = ensureLoopBlock(nextTrace, loopId);
   const items = block.items ?? [];
   const existing = items.find((item) => item.kind === 'thinking' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
+  const now = nowMs();
+  const visible = Boolean(thinking.text?.trim());
   if (existing?.kind === 'thinking') {
     if (shouldReplaceThinking(existing.thinking, thinking)) existing.thinking = cloneThinkingArtifact(thinking)!;
+    if (existing.startedAt === undefined && visible) existing.startedAt = now;
+    if (status === 'complete' && existing.status !== 'complete' && existing.startedAt !== undefined) existing.completedAt = now;
     existing.status = status;
   } else {
     items.push({
       kind: 'thinking', providerOutputRef: { ...ref }, thinking: cloneThinkingArtifact(thinking)!, status,
       displayOrder: nextDisplayOrder(nextTrace),
+      ...(visible ? { startedAt: now } : {}),
     });
   }
   block.items = items;
@@ -188,7 +193,7 @@ export function upsertLoopThinkingItem(
     delete block.completedAt;
   }
   nextTrace.status = 'running';
-  nextTrace.updatedAt = nowMs();
+  nextTrace.updatedAt = now;
   return nextTrace;
 }
 

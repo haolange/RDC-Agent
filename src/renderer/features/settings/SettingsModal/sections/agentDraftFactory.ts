@@ -13,24 +13,18 @@ export const toSlug = (value: string): string =>
 /** Read-only scope filter: `writeScope` mirrors the definition provenance (builtin drafts write to user). */
 export const draftScope = (draft: AgentManifestDraft): AgentScope => (draft.writeScope === 'project' ? 'project' : 'user');
 
+/** A named Agent draft; the caller has already chosen a unique id for it. */
 export const createNewAgent = (
-  existing: AgentManifestDraft[],
+  identity: { name: string; id: string },
   t: Translate,
   scope: AgentScope,
   currentProjectId: string | null,
 ): AgentManifestDraft => {
-  const base = 'custom-agent';
-  let index = 1;
-  let id = base;
-  const ids = new Set(existing.map((entry) => entry.id));
-  while (ids.has(id)) {
-    index += 1;
-    id = `${base}-${index}`;
-  }
+  const { id, name } = identity;
   return {
     id,
     fileName: `${id}.agent.md`,
-    name: t('settings.agentDefaultName'),
+    name,
     description: t('settings.agentDefaultDescription'),
     argumentHint: t('settings.agentDefaultArgumentHint'),
     target: 'rdc-agent',

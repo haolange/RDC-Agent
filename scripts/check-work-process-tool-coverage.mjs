@@ -370,9 +370,11 @@ for (const toolName of allTools) {
   }
 
   if (toolName === 'plan_artifact') {
-    assert(row.type === 'planReview', 'plan_artifact with planReview should render as planReview row');
-    assert(row.plan?.title === 'Plan', 'planReview row should expose the plan title');
-    assert(row.plan?.status === 'awaiting', 'planReview fixture should stay awaiting');
+    // The plan itself is delivered in the reply after Working; Working keeps one compact shell row.
+    assert(row.type === 'tool', 'plan_artifact should render as a compact tool shell row');
+    assert(row.target === 'Plan', 'plan shell row should name the plan title');
+    assert(row.planReview?.status === 'awaiting', 'plan shell row should keep the review status');
+    assert(row.icon === 'planArtifact', 'plan shell row should use the plan icon');
     continue;
   }
 

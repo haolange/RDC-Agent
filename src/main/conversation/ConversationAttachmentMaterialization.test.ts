@@ -1,11 +1,22 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { materializeAgentUserInput } from './ConversationAttachmentMaterializer';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-mat-'));
 
+const EMPTY_PDF = '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n';
+
+// The first PDF read imports pdf.js and its fake worker (both MB-sized ESM). On a busy cold runner that load
+// alone outlasts a test's 5 s budget, so it is paid once here through the same production path.
+beforeAll(async () => {
+  const warmPath = path.join(tempRoot, 'warm.pdf');
+  fs.writeFileSync(warmPath, EMPTY_PDF);
+  await materializeAgentUserInput('warm', [{
+    kind: 'file', layer: 'pdf', fileName: 'warm.pdf', filePath: warmPath, mimeType: 'application/pdf', size: fs.statSync(warmPath).size,
+  }], 'disabled', false);
+}, 60_000);
 beforeEach(() => fs.mkdirSync(tempRoot, { recursive: true }));
 afterEach(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 
@@ -81,7 +92,7 @@ describe('conversation attachment materialization', () => {
 
   it('writes an explicit diagnostic when a PDF has no text layer', async () => {
     const pdfPath = path.join(tempRoot, 'scan.pdf');
-    fs.writeFileSync(pdfPath, '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+    fs.writeFileSync(pdfPath, EMPTY_PDF);
     const result = await materializeAgentUserInput('inspect', [{
       kind: 'file',
       layer: 'pdf',

@@ -31,7 +31,7 @@ export const ComposerAgentMenu: React.FC<{
   setSelectedAgentId,
   setCurrentMode,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const menu = useComposerMenu('agent');
   const popupRef = useRef<HTMLDivElement>(null);
   const setRootRef = useCallback((node: HTMLDivElement | null) => {
@@ -113,7 +113,7 @@ export const ComposerAgentMenu: React.FC<{
         >
           {userInvocableAgents.map((agent) => {
             const agentMode: AgentMode = agent.id;
-            const description = agentDescription(agent, t);
+            const description = agentDescription(agent, language);
             const isSelected = selectedAgentId === agent.id;
             const isRunning = activeAgentId === agent.id;
             return (

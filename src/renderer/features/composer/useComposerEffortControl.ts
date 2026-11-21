@@ -153,6 +153,7 @@ export function useComposerEffortControl(options: {
     fastAvailable: capabilityReady && !disabled && hasSelectableFastMode(capability),
     fastModelStatusLabel,
     completeMaxTimeline,
+    commitEffort,
     sliderHandlers: createEffortSliderHandlers({
       trackRef,
       dragActiveRef,

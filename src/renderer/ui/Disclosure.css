@@ -1,0 +1,86 @@
+.ui-disclosure {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ui-disclosure-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ui-disclosure-trigger {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-1);
+  margin-inline-start: calc(var(--space-1) * -1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--token-text-caption);
+  font: inherit;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  text-align: start;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.ui-disclosure-trigger:hover {
+  color: var(--token-text-heading);
+  background: var(--token-interactive-hover);
+}
+
+.ui-disclosure-trigger:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 1px;
+}
+
+.ui-disclosure-chevron {
+  flex: 0 0 auto;
+  width: var(--space-3);
+  height: var(--space-3);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--motion-disclosure);
+}
+
+.ui-disclosure-trigger.is-expanded .ui-disclosure-chevron {
+  transform: rotate(90deg);
+}
+
+.ui-disclosure-summary {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ui-disclosure-trailing {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ui-disclosure-body {
+  min-width: 0;
+  animation: ui-disclosure-in var(--motion-disclosure);
+}
+
+@keyframes ui-disclosure-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--space-1) * -1));
+  }
+}

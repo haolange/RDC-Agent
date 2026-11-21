@@ -10,7 +10,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RenderDoc `.rdc`。�
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）fail-closed 剔除。用户附件 vision-input（读图）属 agent chat 能力，与生成 media 无关。
 
-产品不是固定模式向导。默认顶层入口为 `general` / `debugger` / `analyzer` / `optimizer`；另有 `generator` / `verifier` / `knowledge-scout` / `report-writer` / `shader-analyst` / `pass-analyst` / `resource-analyst` / `pixel-analyst` 八个默认内部 builtin。全部经同一 `builtin < user < project` 整资源解析与 Agents 设置管理；内部 profile 默认不出现在用户入口。历史 ask/plan/edit 及 S0 specialist id 一律拒绝。模型与推理档位按目标 Agent 从 Settings → Agents 解析，方法由默认 Skill 装载，二者都不扩大权限。Session rail 为 `Progress / Artifacts / Outputs / Context / Capture`。`handoffs` 只驱动建议行和计划门，用户批准并点声明后由 General 就地执行与交付，战略改变由用户切回 Mission。Knowledge 使用 markdown-first 六 lane。
+产品不是固定模式向导。默认顶层入口为 `general` / `debugger` / `analyzer` / `optimizer`；另有 `generator` / `verifier` / `knowledge-scout` / `report-writer` / `shader-analyst` / `pass-analyst` / `resource-analyst` / `pixel-analyst` 八个默认内部 builtin。全部经同一 `builtin < user < project` 整资源解析与 Agents 设置管理；内部 profile 默认不出现在用户入口。历史 ask/plan/edit 及 S0 specialist id 一律拒绝。模型与推理档位按目标 Agent 从 Settings → Agents 解析，方法由默认 Skill 装载，二者都不扩大权限。Session rail 为 `Tasks / Artifacts / Outputs / Context / Capture`。`handoffs` 只驱动建议行和计划门，用户批准并点声明后由 General 就地执行与交付，战略改变由用户切回 Mission。Knowledge 使用 markdown-first 六 lane。
 
 操作知识与执行权限分开：三条 Mission 可按需通过 `skills` / `skill_read` 读取共享 `rdc-tool-shell` 及各自一本专业手册和引用，用于规划参数、证据与调用成本；其它专业手册不可见。正文不自动预载，也不改变 profile 的工具集或在途权限。Mission 为 plan-only；General 经批准计划、声明交接及 requiredSkillIds 的真实预载后，按冻结 catalog、审批和 owning lease 执行。
 
@@ -101,7 +101,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - **图像预览单通道**：工具图只经 session `image-previews` + `conversation:getToolImagePreview`（Zod + active-session gate）给 renderer；大 base64 不进入 `resultPreview`。模型侧把 tool-result 图桥成紧随的 user image part，不静默丢图；卸货的原图写入受控 image artifact，JSON 清单只引用其 URI/hash，不把 base64 当文本 artifact 写入。用户附件缩略图走 `conversation:getAttachmentPreview`：staging 预览无 session；已提交附件必须带 `sessionId` 且过 active-session gate。
 - **用户附件管道**：Composer `+` 只附加图片/文件（path 或 bytes 经 `conversation:stageAttachments`）。`.rdc`、可执行文件与 **SVG** 硬拒（SVG 不进 vision / inline）。Staging 写 `{userData}/state/staging/attachments/`，进程启动清空，preparing 失败不落 session。prepare 冻结最终 session 逻辑路径与 inline 文本；run 只补 image 字节。物化分层：image → native vision；text/pdf → tokenizer 预算 inline；binary → 元数据路径。当前 session `attachments/` 仅对 `read_file`/`read_image`/`glob`/`grep` 自动只读授权。禁止 `session:attachments:list` / `import` IPC。
 - **session:// Artifact**：URI `session://<plans|investigation|tool-outputs>/<relative-path>` 只解析到 owning session 的 `<sessionPath>/session-artifacts/<category>/`。配额：文本单文件 2 MiB、原始图片 32 MiB，resolver 返回窗 200 KiB / 2000 行、模型侧 `artifact_read` 每页至多 16 KiB，自动卸货阈值 32 KiB（序列化后），session 合计 512 MiB，tool-outputs 最多 2048 文件；写入先对 incomingBytes（覆盖只计 delta）做 session 级 reservation，再 temp write / hash / atomic commit，失败回滚 reservation 并删除 temp；按磁盘 reconcile（丢弃未提交 reservation、清掉 `.tmp`）在启动 `initializeWorkspace`、session 打开/加载（`readSession` / `setCurrentSessionId`）以及 resolver 首次 read/write/list 时幂等执行；`artifact_read` 遇到卸货 envelope 时返回 payload 的 hash/size/mime 与 owner/source，不以 envelope 文件自身 hash 作为工具结果；MIME 白名单 text/plain、text/markdown、application/json、text/csv、text/yaml、image/png|jpeg|gif|webp；硬拒 SVG / 可执行 / `.rdc`。成功的 `rdc_probe` 只读查询即使低于卸货阈值也保留实际返回内容及截断状态的证据引用，委派仍需逐项授权。plans 活文件为 `session://plans/plan.md`（同意前覆盖写），同意后冻结为 `plan-<ISO>-<hash8>.md`；下一周期再写同一活文件。investigation 为调查记录。不进入 attachments 自动授权，`read_file` 不放宽。
-- **Tasks 历史卡**：主回合进行时，每次 `task.created` / `task.updated` 在原事件位置保留一张不可被后续更新改写的任务卡；批量创建只记一张。提交时捕获列表状态，事件 ID 用于重放去重。最新卡默认展开、旧卡默认收起，手动开合优先。父回复结束后的后台 Task 更新只刷新所属子代理卡、mailbox 和右栏，不倒插父工作过程。canonical order 与派生状态由 main 侧 `taskProjection` 单点投影；右栏 Progress 单独显示最新状态，历史卡显示各自发生时的状态。
+- **Tasks 历史卡**：主回合进行时，每次 `task.created` / `task.updated` 在原事件位置保留一张不可被后续更新改写的任务卡；批量创建只记一张。提交时捕获列表状态，事件 ID 用于重放去重。最新卡默认展开、旧卡默认收起，手动开合优先。父回复结束后的后台 Task 更新只刷新所属子代理卡、mailbox 和右栏，不倒插父工作过程。canonical order 与派生状态由 main 侧 `taskProjection` 单点投影；右栏 Tasks 单独显示最新状态，历史卡显示各自发生时的状态。
 - **唯一 Turn Preparation**：产品回合经 conversation `prepareTurn`、Subagent 经 `ProfileTurnPreparation` 冻结 `preparedRuntime`，二者都只经 `sendProfileMessage` 执行；`AgentTurnRunner` 无 preparedRuntime 抛 `TURN_NOT_PREPARED`，无 fallback plan。
 - **AgentState 复合键**：`sessionId|ephemeralScope` + `agentId`；renderer `agentStore` 与 IPC bridge 无 sessionId 的事件丢弃。
 - **存储 fail-closed**：StorageIo 区分不存在、损坏和不支持的版本；不支持的版本保留原件。Run 只读 run.json v3，run.yaml 是写入投影；attachments.json 只读 schemaVersion 1 的对象，usage.json 只读 schemaVersion 2 的对象。Settings 只接受 schemaVersion 8 且拒绝已移除的 embedding 字段。缺版本、旧版本和仅 YAML 的 Run 明确报 STORAGE_SCHEMA_UNSUPPORTED，不自动迁移、改写或隔离原件；Settings 旧版本同样报错并保留原文件；当前版本结构不合法报 STORAGE_SCHEMA。其他仍有版本升级责任的文档按各自契约处理。写入走 atomic rename，deepMerge 拒绝危险原型键。目录锁对活 pid 永不回收；owner 无法读取时可能仍在初始化，等待并在超时后报错，只自动回收可识别的死 pid 锁。跨进程回收以独占标记串行化，取得标记后重新读取 owner；标记本身不能安全确认失主时等待并超时，不抢占。
@@ -162,7 +162,7 @@ Settings 只读 `schemaVersion` **8**，经校验的 `appearance.chromeThemes` �
 详细字段与领域流程见设计书；工程合同冲突以本节为准。以下约束全局成立：
 
 - 无平台级 InvestigationGraph、第二 TaskStore 或第二 Agent Runtime。
-- `TaskRecord.metadata`、`AgentProfile.metadata`、`ConversationMessage` 不带领域字段；垂直记录只引用 task id。
+- `TaskRecord.metadata`、`AgentProfile.metadata`、`ConversationMessage` 不带领域字段；垂直记录只引用 task id。用户消息上的 `planReference`（计划 id、版本、hash、冻结 URI、标题、目标 Agent 与声明标签）是通用 harness 字段，记录该消息执行或修订哪一份已审计划。
 - RDC 操作集合不注册为独立模型工具，RDC 不是 MCP；RDC 是外部 CLI，无内置副本。**Live RDC** 要求冻结 `access-ceiling: full`、owning lease，以及 Settings 配置的 CLI 与结构化 `shell.rdc`。`read-only` 天花板的 profile（内置 Debugger / Analyzer / Optimizer）不能使用 `shell` 或 `code_interpreter`；它们用 `runtime_context` 读取会话身份，并在拥有 lease 时看到其中的 `rdc` 载荷，另用只读 `rdc_probe` 访问 RDC。Full access 不抬高天花板。
 - Knowledge 持久写入仅 human review；`FullAccess` 不可绕过；无自动 Memory / Knowledge / Candidate / Promote。
 - 新结构替代旧结构时直接收敛，不保留 legacy / deprecated shim。
@@ -183,7 +183,7 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
 
 ### D. Declared Continue and Execution Offer
 
-`AgentHandoffDefinition` 是 UI 声明（label / labelTranslations / agent / prompt / send / surface / requiredSkillIds / requiredToolIds）。`surface` 省略等于 `turn-end`；`plan-gate` 只出现在计划门；`hidden` 不出现。旧字段 `showContinueOn` 解析即失败，不静默映射。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。预载规则见「Plan 与 generation」。
+`AgentHandoffDefinition` 是 UI 声明（label / labelTranslations / agent / prompt / send / surface / requiredSkillIds / requiredToolIds）。`surface` 省略等于 `turn-end`；`plan-gate` 只出现在计划门；`hidden` 不出现。旧字段 `showContinueOn` 解析即失败，不静默映射。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。交接发送与修订请求带 `planReference`（`execute` / `revise`），主进程在接受消息前经 `planReferenceResolution` 核验：execute 必须是已批准、未消费的冻结版本，目标 Agent 与声明一致且正文就是声明的交接 prompt；revise 必须是当前被拒版本且由原规划 Agent 发起。核验通过的引用持久化在该用户消息上，转录据此渲染计划引用卡；没有引用的旧消息照原文显示，不推断。General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。预载规则见「Plan 与 generation」。
 
 ### E. Investigation Vertical Schema
 
@@ -283,9 +283,9 @@ Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件
 
 ## Right Rail Authority
 
-Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，不读取 session runtime。选中 Session 时渲染五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`：
+Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，不读取 session runtime。选中 Session 时渲染五张不可折叠圆角卡 `Tasks / Artifacts / Outputs / Context / Capture`：
 
-- Progress 消费 canonical `taskProjection`，是单一规范列表（`RightPanelViewModel.progress: ProgressTask[]`），创建序，已完成项就地保留，与 transcript 同序同态；始终分离任务序号、状态与标题，完成不划线。
+- Tasks 消费 canonical `taskProjection`，是单一规范列表（`RightPanelViewModel.tasks: TaskRailItem[]`），创建序，已完成项就地保留，与 transcript 同序同态；始终分离任务序号、状态与标题，完成不划线。每项带 TaskRegistry 状态 `status` 与展示态 `displayState`：未完成、未取消的 Task 当前执行为 `failed` / `interrupted` 时显示为 `failed`，其余等于 `status`；`execution` 只取当前执行记录的事实（`mode`、`dispatch` wait／background、实际 Agent、模型与推理档位），不从文本推断。
 - Artifacts 只投影 main-owned `rdc.investigation.v1` Investigation Artifacts（不是 Working Directory 扫描，也不是 `output_register`）。`InvestigationArtifactRow` 携带完整 `contentHash`（renderer 只缩显）。
 - Outputs 只接受 `output_register` 发布的用户输出文件，拒绝 inputs 与 plan；Investigation Artifacts 不混进 Outputs。
 - Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。
@@ -322,7 +322,7 @@ Task 可通过通用 `executionRequirements` 声明必要执行方式、必需�
 ## Session Capture 内嵌回放
 
 - 项目 RDC 列表为空时保持原 Capture 空态外观、文案与交互；不挂载新控件、历史或画面。非空时 Capture 内提供文件、设备、打开/关闭和唯一实际 EID 回放轨道。
-- 人工与 Agent 共用同一个 CaptureReplayState、当前图片、事件列表和控件，不设双 Tab 或独立足迹浏览/播放界面。Agent 接管仅锁定人工操作，控件原位显示并跟随实际回放，释放后恢复操作且不自动 apply。后台证据存档保留，不作为第二套回放投影。Progress 不提供会话级停止按钮，沿用 Composer Stop。
+- 人工与 Agent 共用同一个 CaptureReplayState、当前图片、事件列表和控件，不设双 Tab 或独立足迹浏览/播放界面。Agent 接管仅锁定人工操作，控件原位显示并跟随实际回放，释放后恢复操作且不自动 apply。后台证据存档保留，不作为第二套回放投影。Tasks 不提供会话级停止按钮，沿用 Composer Stop。
 - 完整文件扫描确认的输入列表独立提交和广播；最后一个 RDC 消失后，即使回放释放或足迹清理失败，也保持真实空态。清理待办单独持久化，不用旧输入列表保存恢复状态；扫描不完整或项目不可访问时不推断文件缺失。
 - `RdcSessionService` 按 project/session 管理独立 `RdcSessionRuntime`。native daemon context 由 main 分配，与 inputId 不等价；固定生命周期由主进程生成原生 argv，不提供自定义 lifecycle action 或参数模板，返回身份不一致拒绝绑定。关闭失败、半开失败和未确认子进程保留 owning context，不清空其他 session lease。
 - Android 设备由单个 session 独占，不抢占。Agent preparing 至 active turn 收口期间禁止人工改变回放；delegated child 未 join 与 native exit 未确认继续锁定。人工和 Agent 原生命令经过同一 context 队列。

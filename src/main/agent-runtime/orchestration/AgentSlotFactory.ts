@@ -229,7 +229,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
         outputTokens: message.usage.outputTokens,
         ...reportedUsageFields(message.usage),
         estimated: false,
-      });
+      }, message.execution?.reasoningEvents);
     },
     beforeRequestMessages,
   });

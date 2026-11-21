@@ -145,6 +145,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
         {page.error ? <button type="button" className="work-process-subagent-more" onClick={retry}>{t('chat.subagentRetry')}</button> : null}
         {!loading && !headerLoading && !page.error && page.steps.length === 0 ? <span className="work-process-subagent-note">{t('chat.subagentNoActions')}</span> : null}
         <WorkProcessContent embedded density="compact" presentation={presentation} sessionId={sessionId} renderToolDetail={renderToolDetail}
+          active={row.status === 'running'}
           leadingContent={hasEarlier ? <button type="button" className="work-process-subagent-more" onClick={() => void loadEarlierWithAnchor()}>{t('chat.subagentShowEarlier')}</button> : null}
           disclosureScope={`${sessionId ?? ''}\u0000${row.id}`} />
       </WorkDisclosure>

@@ -14,7 +14,7 @@ import { flushSessionModelSaves, persistSessionModelOverride } from './sessionMo
 import type { PendingPlanReviewRequest } from './planReviewRequestModel';
 import type { PlanReviewDecision } from '@shared/types/planReview';
 
-export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; agentId: string; prompt: string; planSource: import('@shared/types/planReview').PlanReadRequest }) => Promise<unknown>) => {
+export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; agentId: string; prompt: string; planReference: import('@shared/types/planReview').PlanReferenceRequest }) => Promise<unknown>) => {
   const api = useElectronApi();
   return useCallback(async (
   request: PendingPlanReviewRequest,
@@ -88,7 +88,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
     if (!result.success) throw new Error(result.error || 'Unable to submit the plan review.');
     if (result.replan && !invalidated && isCurrent()) {
       if (!onReplan) throw new Error('PLAN_REPLAN_UNAVAILABLE');
-      await onReplan({ sessionId: request.sessionId, agentId: result.replan.agentId, prompt: result.replan.feedback, planSource: result.replan.source });
+      await onReplan({ sessionId: request.sessionId, agentId: result.replan.agentId, prompt: result.replan.feedback, planReference: { intent: 'revise', ...result.replan.source } });
     }
     if (!invalidated && isCurrent() && decision.kind === 'approve' && request.sessionId) {
       useComposerSessionContextStore.getState().queueHandoffSuggestion({ ...continuation!, phase: 'handoff' });

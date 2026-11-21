@@ -44,7 +44,7 @@
   justify-content: center;
   border-radius: var(--radius-full);
   background: var(--token-accent-primary);
-  color: var(--token-text-inverse);
+  color: var(--token-text-on-accent);
   font-size: var(--type-label-size);
   font-weight: var(--font-semibold);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { finalizeTrace, upsertLoopResult, upsertLoopTextItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { finalizeTrace, upsertLoopResult, upsertLoopTextItem, upsertLoopThinkingItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 const finish = (trace: ConversationWorkTrace | undefined, id: string) => upsertLoopResult(trace, id, { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary' });
@@ -83,5 +83,24 @@ describe('structural sharing', () => {
     expect(after.blocks[0]).toBe(before.blocks[0]);
     expect(after.blocks[1]).not.toBe(before.blocks[1]);
     expect(after.blocks[1].items?.[0]).toMatchObject({ text: 'Second loop' });
+  });
+
+  it('times a thinking block from its first visible text to the moment it settles', () => {
+    vi.useFakeTimers();
+    try {
+      const ref = { protocol: 'fixture', providerBlockKey: 'output:reasoning:0', contentIndex: 0 };
+      const thinking = (text: string) => ({ text, kind: 'summary' as const, source: 'openai-responses-summary' as const, visibility: 'summary' as const });
+      vi.setSystemTime(1_000);
+      let trace = upsertLoopThinkingItem(undefined, 'loop', ref, thinking(''), 'streaming');
+      vi.setSystemTime(1_200);
+      trace = upsertLoopThinkingItem(trace, 'loop', ref, thinking('**Locating'), 'streaming');
+      vi.setSystemTime(2_700);
+      trace = upsertLoopThinkingItem(trace, 'loop', ref, thinking('**Locating images**'), 'complete');
+      vi.setSystemTime(9_000);
+      trace = upsertLoopThinkingItem(trace, 'loop', ref, thinking('**Locating images**'), 'complete');
+      expect(trace.blocks[0]!.items?.[0]).toMatchObject({ startedAt: 1_200, completedAt: 2_700 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,86 +1,15 @@
-.plan-review-panel-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal-backdrop);
-}
-
-.plan-review-panel {
-  position: absolute;
-  left: var(--reading-left);
-  bottom: calc(100dvh - var(--reading-bottom));
-  z-index: var(--z-modal);
-  display: flex;
-  flex-direction: column;
-  width: var(--reading-width);
-  max-height: var(--reading-height);
-  box-sizing: border-box;
-  min-height: 0;
-  overflow: auto;
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-xl);
-  background: var(--token-bg-overlay);
-  color: var(--token-text-heading);
-  box-shadow: var(--token-shadow-popover);
-}
-
-.plan-review-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--token-border-subtle);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.plan-review-panel__heading { min-width: 0; flex: 1 1 0; }
-.plan-review-panel__revision { color: var(--token-text-muted); font-size: var(--type-caption-size); }
-
-.plan-review-panel__title {
-  margin: 0;
-  font-size: var(--type-heading-size);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-  max-height: 3lh;
-  overflow: auto;
-}
-
-.plan-review-panel__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.plan-review-panel__body {
-  min-height: 0;
-  overflow: auto;
-  padding: var(--space-4);
-  font-size: var(--type-label-size);
-  overflow-wrap: anywhere;
-  overscroll-behavior: contain;
-}
-
 .plan-review-panel__body .markdown-body { min-width: 0; }
 .plan-review-panel__body pre { max-width: 100%; overflow-x: auto; }
 
+.plan-review-panel__notice,
 .plan-review-panel__error {
-  margin: 0 var(--space-4) var(--space-3);
-  color: var(--token-status-error);
+  margin: 0;
   font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
 }
 
-@media (max-width: 640px) {
-  .plan-review-panel__heading { flex-basis: 100%; }
-  .plan-review-panel__actions { margin-left: auto; }
-}
+.plan-review-panel__notice { color: var(--token-text-body); }
+.plan-review-panel__error { color: var(--token-status-error); }
 
-.plan-review-panel__notice {
-  margin: var(--space-3) var(--space-4) 0;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
-}
-
-.plan-review-panel__appendix { margin-top: var(--space-4); }
-.plan-review-panel__appendix > summary { color: var(--token-text-muted); }
+.plan-review-panel__appendix { margin-top: var(--space-5); }
+.plan-review-panel__appendix > summary { color: var(--token-text-caption); }

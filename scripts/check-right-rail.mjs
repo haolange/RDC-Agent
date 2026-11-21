@@ -72,23 +72,23 @@ if (lineCount('src/main/agent-trace/rightRailInvestigationArtifacts.ts') > 150) 
 }
 
 const tracePanel = read('src/renderer/features/right-rail/SessionRightRail.tsx');
-for (const requiredSection of ['id="progress"', 'id="artifacts"', 'id="outputs"', 'id="context"', 'id="capture"', 'Progress', 'Artifacts', 'Outputs', 'Context', 'Capture']) {
+for (const requiredSection of ['id="tasks"', 'id="artifacts"', 'id="outputs"', 'id="context"', 'id="capture"', 'Tasks', 'Artifacts', 'Outputs', 'Context', 'Capture']) {
   requireText(tracePanel, requiredSection, `SessionRightRail must render ${requiredSection}`);
 }
-if (!/id="progress"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/.test(tracePanel)) {
-  fail('SessionRightRail must offer Progress / Artifacts / Outputs / Context / Capture in that order');
+if (!/id="tasks"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/.test(tracePanel)) {
+  fail('SessionRightRail must offer Tasks / Artifacts / Outputs / Context / Capture in that order');
 }
 for (const required of [
   '<Tabs',
   'EmptyState',
   'RightRailArtifactList',
   'RightRailOutputList',
-  "t('control.rightRail.progress.title')",
+  "t('control.rightRail.tasks.title')",
   "t('control.rightRail.artifacts.title')",
   "t('control.rightRail.outputs.title')",
   "t('control.rightRail.context.title')",
   "t('control.rightRail.capture.title')",
-  "t('control.rightRail.progress.empty')",
+  "t('control.rightRail.tasks.empty')",
   "t('control.rightRail.artifacts.empty')",
   "t('control.rightRail.outputs.empty')",
   "t('control.rightRail.context.empty')",
@@ -171,8 +171,8 @@ for (const required of ['RdcContextPanelViewModel', 'control.captureOpen', 'capt
 for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus', 'role="tablist"', 'role="tabpanel"', 'capture-replay-tabs', 'CaptureHistoryControls', 'agentObservation', 'returnCurrent']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
 const workspace = read('src/renderer/features/right-rail/CaptureWorkspace.tsx');
 if ((workspace.match(/className="capture-replay-image"/g) ?? []).length !== 1) fail('CaptureWorkspace must own exactly one image viewport');
-const progress = read('src/renderer/features/right-rail/RightRailProgressList.tsx');
-for (const retired of ['stopLabel', 'useSessionWorkStop', 'stopBackgroundWork']) forbidText(progress + tracePanel, retired, `Progress must retire ${retired}`);
+const taskList = read('src/renderer/features/right-rail/RightRailTaskList.tsx');
+for (const retired of ['stopLabel', 'useSessionWorkStop', 'stopBackgroundWork']) forbidText(taskList + tracePanel, retired, `Tasks must retire ${retired}`);
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
 const emptyState = read('src/renderer/features/right-rail/RightRailEmptyState.tsx');
@@ -308,7 +308,7 @@ for (const [source, requiredTextValue, label] of [
   requireText(source, requiredTextValue, `missing ${label}`);
 }
 for (const [name, source] of Object.entries(docs)) {
-  requireText(source, 'Progress / Artifacts / Outputs / Context / Capture', `${name} must describe the five-card Session rail`);
+  requireText(source, 'Tasks / Artifacts / Outputs / Context / Capture', `${name} must describe the five-card Session rail`);
 }
 for (const forbiddenDocText of [
   'keeps `plan.md` first',
@@ -318,6 +318,7 @@ for (const forbiddenDocText of [
   'Context has only Task Context and RDC Context',
   'exactly three top-level sections: `Progress / Artifacts / Context`',
   '目标三卡',
+  'Progress / Artifacts / Outputs / Context / Capture',
   '当前四卡',
 ]) {
   for (const [name, source] of Object.entries(docs)) forbidText(source, forbiddenDocText, `${name} must not retain ${forbiddenDocText}`);

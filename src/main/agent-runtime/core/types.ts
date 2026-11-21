@@ -81,7 +81,7 @@ export interface AssistantMessage {
   /** Provider id（与 `Model.provider` 对应）。 */
   provider: string;
   /** Actual server response metadata; never inferred from the requested model/tier. */
-  execution?: { modelId?: string; serviceTier?: string };
+  execution?: { modelId?: string; serviceTier?: string; reasoningEvents?: import('@shared/types/reasoning').ReasoningEventSummary };
   /** Token 使用统计。 */
   usage: Usage;
   /** 助手消息结束的原因。 */

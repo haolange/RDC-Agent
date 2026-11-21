@@ -78,7 +78,8 @@ export function DeviceSelector() {
             </span>
           </Button>)}
         </div>
-        {scope && <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} transportError={error} hasCapture={Boolean(state?.inputId && state.contextId)} disabled={locked}
+        {/* The target's own preparation state is the one status; an idle, healthy target needs no second line. */}
+        {scope && (state?.preparation.phase !== 'idle' || actionFailure || error) && <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} transportError={error} hasCapture={Boolean(state?.inputId && state.contextId)} disabled={locked}
           onRetry={() => select(installUnconfirmed ? targetId : actionFailure?.deviceId ?? targetId)} onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />}
         {discoveryMessage && <div className="device-discovery-footer">
           {discoveryMessage && <span role="status" className={`device-discovery-status ${discovery.status === 'failed' ? 'is-error' : ''}`}>{discoveryMessage}</span>}

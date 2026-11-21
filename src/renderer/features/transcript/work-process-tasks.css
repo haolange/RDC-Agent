@@ -31,8 +31,7 @@
 }
 
 .work-process-task-snapshot-item .task-status-marker {
-  flex: 0 0 var(--space-4);
-  height: calc(var(--type-label-size) * 1.45);
+  margin-top: calc((var(--type-label-size) * var(--leading-normal) - var(--space-4)) / 2);
 }
 
 .work-process-task-snapshot-copy {
@@ -56,12 +55,14 @@
   line-height: 1.45;
 }
 
+/* Done stays readable (the green mark carries the state); only a cancelled title recedes. */
 .work-process-task-snapshot-item.task-completed .work-process-task-snapshot-title {
-  color: var(--token-text-caption);
+  color: var(--token-text-body);
 }
 
 .work-process-task-snapshot-item.task-cancelled .work-process-task-snapshot-title {
   color: var(--token-text-caption);
+  text-decoration: line-through;
 }
 
 .work-process-task-snapshot-item.task-in_progress .work-process-task-snapshot-title {

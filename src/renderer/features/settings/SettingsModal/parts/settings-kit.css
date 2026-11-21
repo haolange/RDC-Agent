@@ -112,14 +112,6 @@
 
 .settings-resource-empty .ui-empty-state-description {
   max-width: 64ch;
-  font-size: var(--type-label-size);
-  overflow-wrap: normal;
-}
-
-.settings-resource-empty.ui-empty-state {
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-raised);
 }
 
 .settings-resource-split {

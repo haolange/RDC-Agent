@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
@@ -170,12 +171,12 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           <div className="settings-agent-editor-copy">
             <div className="settings-agent-editor-name">
               {selectedAgent.name}
-              <Badge tone="primary" data-testid="settings-agent-provenance">{provenanceLabel(provenanceScope, t)}</Badge>
+              <Badge variant="outline" data-testid="settings-agent-provenance">{provenanceLabel(provenanceScope, t)}</Badge>
               {builtinUpdate?.status === 'updated' ? (
                 <Badge tone="warning" data-testid="settings-agent-builtin-updated">{t('settings.agentBuiltinUpdated')}</Badge>
               ) : null}
               {builtinUpdate?.status === 'unknown-base' ? (
-                <Badge tone="primary" data-testid="settings-agent-builtin-base-unknown">{t('settings.agentBuiltinBaseUnknown')}</Badge>
+                <Badge variant="outline" data-testid="settings-agent-builtin-base-unknown">{t('settings.agentBuiltinBaseUnknown')}</Badge>
               ) : null}
             </div>
             <code className="settings-agent-editor-id">{selectedAgent.id}</code>
@@ -190,9 +191,12 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               {t('settings.agentBuiltinDiffOpen')}
             </Button>
           ) : null}
-          <Button variant="danger" size="sm" onClick={onDeleteAgent}>
-            {t(builtinUpdate ? 'settings.agentRestoreBuiltin' : 'settings.deleteAgent')}
-          </Button>
+          {/* A builtin cannot be deleted, only switched off; an override can be dropped to restore the builtin. */}
+          {builtinUpdate ? (
+            <Button variant="secondary" size="sm" onClick={onDeleteAgent}>{t('settings.agentRestoreBuiltin')}</Button>
+          ) : provenanceScope !== 'builtin' ? (
+            <Button variant="danger" size="sm" onClick={onDeleteAgent}>{t('settings.deleteAgent')}</Button>
+          ) : null}
         </div>
       </div>
 
@@ -222,7 +226,8 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               <label className="settings-agent-flag">
                 <span className="settings-field-label">{t('settings.agentEnabled')}</span>
                 <span className="settings-switch-row">
-                  <Switch checked={selectedAgent.enabled} onCheckedChange={(enabled) => onUpdateAgent({ enabled })} aria-label={t('settings.agentEnabled')} />
+                  <Switch checked={selectedAgent.enabled} onCheckedChange={(enabled) => onUpdateAgent({ enabled })} aria-label={t('settings.agentEnabled')}
+                    disabled={selectedAgent.id === GENERAL_AGENT_ID} title={selectedAgent.id === GENERAL_AGENT_ID ? t('settings.agentDefaultRequired') : undefined} />
                 </span>
               </label>
               <label className="settings-agent-flag">

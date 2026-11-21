@@ -59,6 +59,7 @@ describe('theme compiler', () => {
     }, 'light');
     expect(light['--surface-elevated']).toBe('rgb(var(--color-bg-2))');
     expect(light['--token-surface-raised']).toBe('rgb(var(--color-bg-1))');
-    expect(light['--font-sans']).toMatch(/Inter/);
+    expect(light['--font-sans']).toBeUndefined();
+    expect(light['--font-mono']).toBeUndefined();
   });
 });

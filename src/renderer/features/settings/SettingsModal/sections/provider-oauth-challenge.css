@@ -49,12 +49,12 @@
 
 .settings-oauth-step[data-state='active'] .settings-oauth-step-index {
   background: var(--token-accent-primary);
-  color: var(--token-text-inverse);
+  color: var(--token-text-on-accent);
 }
 
 .settings-oauth-step[data-state='done'] .settings-oauth-step-index {
   background: var(--token-status-success);
-  color: var(--token-text-inverse);
+  color: var(--token-text-on-accent);
 }
 
 .settings-oauth-step[data-state='pending'] .settings-oauth-step-body {

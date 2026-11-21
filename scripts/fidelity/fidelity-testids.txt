@@ -227,7 +227,6 @@ settings-modal
 settings-model-cascade-search
 settings-model-cascade-trigger
 settings-model-option-custom-${option.canonicalId}
-settings-model-option-inherit
 settings-nav-${section.id}
 settings-nav-search
 settings-policy-tighten-note
@@ -294,7 +293,7 @@ settings-runtime-editor
 settings-runtime-editor-dirty
 settings-runtime-editor-error
 settings-runtime-scope
-settings-search-result-${entry.id}
+settings-search-result-${entry.key}
 settings-search-results
 settings-tools-save
 settings-tools-save-status
@@ -315,7 +314,6 @@ work-process-hook-diagnostic-card
 work-process-image-group
 work-process-image-thumbs
 work-process-output
-work-process-plan-review
 work-process-section
 work-process-source-pills
 work-process-subagent

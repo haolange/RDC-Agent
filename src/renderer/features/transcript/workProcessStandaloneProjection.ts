@@ -25,10 +25,7 @@ export function pushStandaloneBlock(
             if (sectionRow.status === 'complete' && planReviewRows.some((child) => child.status === 'running' || child.status === 'pending')) {
               sectionRow.status = 'running';
             }
-            if (planReviewRows.some((child) => child.status === 'error')) {
-              sectionRow.status = 'error';
-              sectionRow.defaultOpen = true;
-            }
+            if (planReviewRows.some((child) => child.status === 'error')) sectionRow.status = 'error';
             return;
           }
         }
@@ -54,10 +51,7 @@ export function pushStandaloneBlock(
             if (sectionRow.status === 'complete' && userInputRows.some((child) => child.status === 'running' || child.status === 'pending')) {
               sectionRow.status = 'running';
             }
-            if (userInputRows.some((child) => child.status === 'error')) {
-              sectionRow.status = 'error';
-              sectionRow.defaultOpen = true;
-            }
+            if (userInputRows.some((child) => child.status === 'error')) sectionRow.status = 'error';
             return;
           }
         }

@@ -2,6 +2,10 @@
 name: Verifier
 description: Independently review authorized evidence and claims; report coverage, limits and challenges.
 argument-hint: Describe the assigned task and authorized evidence
+description-translations:
+  zh-CN: 独立审查已授权的证据与结论，报告覆盖范围、局限与质疑。
+argument-hint-translations:
+  zh-CN: 分配的任务与已授权的证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

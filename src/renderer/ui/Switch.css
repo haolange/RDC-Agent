@@ -57,7 +57,7 @@
 
 .ui-switch-input:checked + .ui-switch-track::after {
   transform: translateX(16px);
-  background: var(--token-text-inverse);
+  background: var(--token-control-knob);
 }
 
 .ui-switch-input:focus-visible + .ui-switch-track {

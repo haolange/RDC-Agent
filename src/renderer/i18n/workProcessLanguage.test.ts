@@ -101,6 +101,10 @@ it('updates an already mounted historical tool without losing disclosure or focu
   try {
     await switchTo('zh-CN');
     await act(async () => root.render(createElement(WorkProcess, { trace, sessionId: 'language-test', messageId: 'history' })));
+    // A settled Working is folded: open it, then the step's action list, to reach the historical tool card.
+    await act(async () => { host.querySelector<HTMLButtonElement>('.work-process-header')!.click(); });
+    const sectionToggle = host.querySelector<HTMLButtonElement>('.work-process-section-toggle[aria-expanded="false"]');
+    if (sectionToggle) await act(async () => { sectionToggle.click(); });
     const trigger = host.querySelector<HTMLButtonElement>('.work-card-trigger')!;
     expect(trigger.textContent).toContain('已读取产物');
     await act(async () => { trigger.focus(); trigger.click(); });

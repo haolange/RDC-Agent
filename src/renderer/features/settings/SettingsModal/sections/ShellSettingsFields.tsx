@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { selectFiles } from '../../../../hooks/appShellBridge';
+import { useElectronApi } from '../../../../hooks/useElectronApi';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { InlineError } from '../../../../ui/InlineError';
@@ -20,7 +21,12 @@ interface ShellSettingsFieldsProps {
  * Agent Shell (machine-local): executable override with a real file picker, plus the
  * read-only detection result from main. Nothing here claims a shell is installed.
  */
+/** An example path for the host the app actually runs on, never another platform's. */
+const shellPlaceholder = (api: { isWindows: boolean; isMac: boolean } | undefined): string =>
+  api?.isWindows ? 'C:\\Program Files\\PowerShell\\7\\pwsh.exe' : api?.isMac ? '/bin/zsh' : '/bin/bash';
+
 export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft, onChange, t }) => {
+  const api = useElectronApi();
   const [resolved, setResolved] = useState<ResolvedShellSnapshot | null>(null);
 
   useEffect(() => {
@@ -68,7 +74,7 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
               value={draft.executable}
               spellCheck={false}
               onChange={(event) => onChange({ ...draft, executable: event.target.value })}
-              placeholder="C:\Program Files\PowerShell\7\pwsh.exe"
+              placeholder={shellPlaceholder(api)}
             />
             <Button variant="secondary" size="md" onClick={() => void browse()} data-testid="settings-agent-shell-browse">
               {t('settings.browse')}

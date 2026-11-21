@@ -265,7 +265,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
     id: 'investigation.forbidden.session.four-card',
     kind: 'forbidden',
     file: 'src/renderer/features/right-rail/SessionRightRail.tsx',
-    pattern: 'id="progress"[\\s\\S]*id="outputs"[\\s\\S]*id="context"[\\s\\S]*id="capture"',
+    pattern: 'id="tasks"[\\s\\S]*id="outputs"[\\s\\S]*id="context"[\\s\\S]*id="capture"',
     unlessPattern: 'id="artifacts"',
     probe: 'source-pattern',
     note: 'current four-card Session rail relative to target five cards',

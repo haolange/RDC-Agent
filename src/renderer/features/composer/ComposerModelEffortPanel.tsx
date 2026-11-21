@@ -2,6 +2,7 @@ import React from 'react';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
+import { Switch } from '../../ui/Switch';
 import { EFFORT_LABEL_KEYS, EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import { EffortMaxField } from './EffortMaxField';
@@ -63,6 +64,8 @@ export const ComposerModelEffortPanel: React.FC<{
   onTrackPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onThumbKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  /** Commits one of `displayLevels`; used by the on/off switch. */
+  onSelectLevel: (level: ReasoningSelection) => void;
   onToggleMaxContext: () => void;
   onToggleFastModel: () => void;
   onMaxTimelineComplete: (revision: number) => void;
@@ -103,6 +106,7 @@ export const ComposerModelEffortPanel: React.FC<{
   onTrackPointerUp,
   onTrackClick,
   onThumbKeyDown,
+  onSelectLevel,
   onToggleMaxContext,
   onToggleFastModel,
   onMaxTimelineComplete,
@@ -114,6 +118,8 @@ export const ComposerModelEffortPanel: React.FC<{
   const tooltipDynStyle = useDynStyle({ left: `${tooltipLeftPercent}%` });
   // While the slider moves the header follows it; otherwise it shows the level the turn uses.
   const reasoningLabel = hasAdjustableReasoning ? t(EFFORT_LABEL_KEYS[displayLevel]) : currentReasoningLabel;
+  // A model whose reasoning is only on or off gets a switch: a two-stop slider implies a range it does not have.
+  const onLevel = hasAdjustableReasoning && displayLevels.length === 2 && displayLevels[0] === 'off' ? displayLevels[1] : null;
 
   return (
     <div
@@ -173,6 +179,16 @@ export const ComposerModelEffortPanel: React.FC<{
         </EffortModeIconButton>
       </div>
 
+      {onLevel ? (
+        <div className="composer-effort-switch-row">
+          <span className="composer-effort-switch-copy">
+            <span className="composer-effort-switch-title">{t('composer.effort.thinkingSwitch')}</span>
+            <span className="composer-effort-switch-hint">{t('composer.effort.thinkingSwitchHint')}</span>
+          </span>
+          <Switch data-testid="composer-effort-switch" aria-label={t('composer.effort.thinkingSwitch')}
+            checked={displayLevel !== 'off'} onCheckedChange={(on) => onSelectLevel(on ? onLevel : 'off')} />
+        </div>
+      ) : (
       <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
         <div
           ref={trackRef}
@@ -241,6 +257,7 @@ export const ComposerModelEffortPanel: React.FC<{
           <span>{t('composer.effort.smarter')}</span>
         </div>
       </div>
+      )}
     </div>
   );
 };

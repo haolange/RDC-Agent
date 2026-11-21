@@ -8,7 +8,7 @@ import { ApprovedPlanHandoff } from './ApprovedPlanHandoff';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 let root: Root;
-const offer = { agent: 'general', label: 'Execute', prompt: 'Execute plan', send: true, planHash: 'a'.repeat(64) };
+const offer = { agent: 'general', label: 'Execute', prompt: 'Execute plan', send: true, planHash: 'a'.repeat(64), planId: 'plan-a', revision: 2, planUri: 'session://plans/plan-a/2.md', planTitle: 'Plan A' };
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   usePlanReviewStore.getState().reset(); useComposerSessionContextStore.getState().resetForSessionSwitch();
@@ -23,7 +23,7 @@ it('requires an explicit click and binds the queued handoff to the displayed app
   const button = document.querySelector<HTMLButtonElement>('button')!;
   expect(button.textContent).toContain('Execute');
   await act(async () => button.click());
-  expect(useComposerSessionContextStore.getState().handoffSuggestionRequest).toMatchObject({ sessionId: 's', agentId: 'general', approvedPlanHash: offer.planHash });
+  expect(useComposerSessionContextStore.getState().handoffSuggestionRequest).toMatchObject({ sessionId: 's', agentId: 'general', approvedPlan: { planId: 'plan-a', revision: 2, hash: offer.planHash } });
   expect(button.disabled).toBe(true);
 });
 

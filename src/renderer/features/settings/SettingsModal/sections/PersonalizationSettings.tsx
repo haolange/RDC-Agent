@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
-import { Button } from '../../../../ui/Button';
+import React from 'react';
 import { Textarea } from '../../../../ui/Textarea';
-import { SettingsField, SettingsSection } from '../parts';
+import { SettingsField, SettingsSection, useSettingsAutosave, type SettingsAutosaveStatus } from '../parts';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-
 interface PersonalizationSettingsProps {
   globalInstructionsDraft: string;
+  /** The saved value; the draft autosaves while it differs. */
+  savedGlobalInstructions: string;
   onGlobalInstructionsDraftChange: (value: string) => void;
   onSavePersonalization: () => void | Promise<void>;
   t: Translate;
 }
 
-function statusText(status: SaveStatus, t: Translate): string {
+function statusText(status: SettingsAutosaveStatus, t: Translate): string {
   if (status === 'saving') return t('settings.saving');
   if (status === 'saved') return t('settings.personalizationSaved');
   if (status === 'error') return t('settings.personalizationSaveFailed');
@@ -23,21 +22,13 @@ function statusText(status: SaveStatus, t: Translate): string {
 
 export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = ({
   globalInstructionsDraft,
+  savedGlobalInstructions,
   onGlobalInstructionsDraftChange,
   onSavePersonalization,
   t,
 }) => {
-  const [status, setStatus] = useState<SaveStatus>('idle');
-
-  const save = async () => {
-    setStatus('saving');
-    try {
-      await onSavePersonalization();
-      setStatus('saved');
-    } catch {
-      setStatus('error');
-    }
-  };
+  const { status, flush } = useSettingsAutosave(globalInstructionsDraft,
+    globalInstructionsDraft !== savedGlobalInstructions, onSavePersonalization);
 
   const textareaId = 'settings-global-instructions';
 
@@ -56,21 +47,13 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
           id={textareaId}
           className="settings-agent-instructions settings-personalization-textarea"
           value={globalInstructionsDraft}
-          onChange={(event) => {
-            setStatus('idle');
-            onGlobalInstructionsDraftChange(event.currentTarget.value);
-          }}
+          minRows={4}
+          onChange={(event) => onGlobalInstructionsDraftChange(event.currentTarget.value)}
+          onBlur={flush}
           placeholder={t('settings.globalInstructionsPlaceholder')}
         />
       </SettingsField>
-      <div className="settings-actions settings-actions-split">
-        <span className="settings-save-status" role="status" data-status={status}>
-          {statusText(status, t)}
-        </span>
-        <Button variant="primary" size="sm" onClick={() => void save()} disabled={status === 'saving'}>
-          {t('settings.savePersonalization')}
-        </Button>
-      </div>
+      <span className="settings-save-status" role="status" data-status={status}>{statusText(status, t)}</span>
     </SettingsSection>
   );
 };

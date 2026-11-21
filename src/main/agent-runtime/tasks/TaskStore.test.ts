@@ -146,6 +146,7 @@ describe('FileTaskStore', () => {
     const corruptions: Array<(state: any) => void> = [
       (state) => { const ids = Object.keys(state.tasks); state.tasks[ids[0]].blocks = []; },
       (state) => { const execution = Object.values(state.executions)[0] as any; execution.mode = 'unknown'; },
+      (state) => { const execution = Object.values(state.executions)[0] as any; execution.dispatch = 'detached'; },
       (state) => { const ids = Object.keys(state.tasks); const execution = Object.values(state.executions)[0] as any; state.tasks[ids[1]].currentExecutionId = execution.id; },
       (state) => { const messages = Object.values(state.messages)[0] as any[]; messages[0].kind = 'noise'; },
     ];

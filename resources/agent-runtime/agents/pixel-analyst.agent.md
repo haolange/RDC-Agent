@@ -2,6 +2,10 @@
 name: Pixel Analyst
 description: Analyze authorized image and pixel evidence and preserve sampling, mapping and quality limitations.
 argument-hint: Task and evidence
+description-translations:
+  zh-CN: 分析已授权的图像与像素证据，保留采样、映射与质量上的限制。
+argument-hint-translations:
+  zh-CN: 任务与证据
 target: rdc-agent
 icon: nodes
 accent: "#33d1ff"

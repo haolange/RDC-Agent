@@ -119,9 +119,10 @@
 }
 
 .appearance-theme-editors {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 44rem;
 }
 
 .appearance-theme-editors .appearance-text-field,
@@ -131,23 +132,6 @@
 }
 
 .appearance-theme-editors { --color-field-columns: minmax(5rem, 0.24fr) minmax(0, 0.76fr); --color-field-justify: stretch; }
-
-.appearance-chrome-card + .appearance-chrome-card {
-  border-left: 1px solid var(--token-border-muted);
-  padding-left: var(--space-6);
-}
-
-@container settings-panel (max-width: 60rem) {
-  .appearance-theme-editors {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .appearance-chrome-card + .appearance-chrome-card {
-    border-left: 0;
-    border-top: 1px solid var(--token-border-muted);
-    padding: var(--space-5) 0 0;
-  }
-}
 
 @container settings-panel (max-width: 48rem) {
   .appearance-theme-editors {

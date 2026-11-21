@@ -7,7 +7,7 @@ import {
   resolveDisplayedPromptBudget,
   type ContextUsageSelectedProfile,
 } from './contextUsageDisplay';
-import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import { ContextBreakdownSheet } from './ContextBreakdownSheet';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
@@ -133,7 +133,7 @@ export const ContextUsageIndicator: React.FC<{
         </span>
       </button>
       {open ? (
-        <ContextBreakdownPopover
+        <ContextBreakdownSheet
           prepared={showPrepared ? prepared : null}
           phase={phase}
           usage={usage}

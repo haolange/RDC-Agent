@@ -24,6 +24,7 @@ const task = (
   revision: 1,
   createdAt,
   updatedAt: extras.updatedAt ?? createdAt,
+  ...(extras.currentExecutionId ? { currentExecutionId: extras.currentExecutionId } : {}),
 });
 
 describe('taskProjection', () => {
@@ -81,4 +82,29 @@ it('uses current execution proof without changing task lifecycle or clearing a r
   }
   expect(projectTaskItems([upstream, { ...next, status: 'blocked', statusReason: 'Own blocker' }], [proof])[1])
     .toMatchObject({ status: 'blocked', statusReason: 'Own blocker' });
+});
+
+it('shows an open Task whose current execution failed as failed and carries that execution\'s facts', () => {
+  const execution = (id: string, status: TaskExecutionRecord['status'], extras: Partial<TaskExecutionRecord> = {}) => ({
+    schemaVersion: TASK_SCHEMA_VERSION, id, taskId: 'unused', taskRevision: 1, generation: 1, runtimeInstanceId: 'runtime',
+    mode: 'subagent', status, budget: { toolCalls: 0, subagents: 0, childDepth: 1, startedAt: 1 },
+    childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: 1, updatedAt: 1, ...extras,
+  }) as TaskExecutionRecord;
+  const items = projectTaskItems([
+    task('failed', 'blocked', 1, { currentExecutionId: 'run-failed' }),
+    task('done', 'completed', 2, { currentExecutionId: 'run-interrupted' }),
+    task('plain', 'blocked', 3),
+  ], [
+    execution('run-failed', 'failed', { dispatch: 'background', preparation: {
+      sessionId: 'session', turnId: 'turn', runtimeFingerprint: 'a'.repeat(24), profileId: 'pixel-analyst', providerId: 'ollama',
+      modelId: 'qa-stub:4b', reasoningLevel: 'high', skills: [], inputArtifacts: [], selectedTurnCount: null, requestsDomainCapability: false,
+    } }),
+    execution('run-interrupted', 'interrupted'),
+  ]);
+  expect(items.map((item) => item.displayState)).toEqual(['failed', 'completed', 'blocked']);
+  expect(items[0]!.execution).toEqual({
+    mode: 'subagent', status: 'failed', dispatch: 'background', agentId: 'pixel-analyst',
+    model: { providerId: 'ollama', modelId: 'qa-stub:4b', reasoningLevel: 'high' },
+  });
+  expect(items[2]!.execution).toBeUndefined();
 });

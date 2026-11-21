@@ -97,7 +97,7 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
   return (
     <div className="settings-handoff-editor" data-testid="settings-agent-handoffs">
       {handoffs.length === 0 ? (
-        <EmptyState layout="compact" title={t('settings.agentHandoffEmpty')} />
+        <EmptyState title={t('settings.agentHandoffEmpty')} />
       ) : (
         <div className="settings-handoff-list">
           {handoffs.map((handoff, index) => {

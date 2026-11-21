@@ -1,4 +1,4 @@
-import type { HandoffLabelTranslations } from './agentManifest';
+import type { ManifestTextTranslations } from './agentManifest';
 
 export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
 
@@ -15,7 +15,7 @@ export interface PlanReviewHandoffIdentity {
 }
 
 export interface PlanReviewHandoffOption extends PlanReviewHandoffIdentity {
-  labelTranslations?: HandoffLabelTranslations;
+  labelTranslations?: ManifestTextTranslations;
 }
 
 export interface PlanReviewHandoffSuggestion extends PlanReviewHandoffOption {
@@ -24,7 +24,11 @@ export interface PlanReviewHandoffSuggestion extends PlanReviewHandoffOption {
 }
 
 export interface RecoverableApprovedHandoff extends PlanReviewHandoffSuggestion {
+  planId: string;
+  revision: number;
   planHash: string;
+  planUri: string;
+  planTitle: string;
 }
 
 export type PlanReviewDecision =
@@ -72,6 +76,27 @@ export interface PlanReadRequest {
   sessionId: string;
   uri: string;
   expectedHash: string;
+}
+
+/**
+ * What a user message asks of a reviewed plan. `revise` re-plans from a rejected revision; `execute` is the
+ * declared handoff that runs an approved, frozen revision. Main verifies either against plan state before
+ * the message is accepted.
+ */
+export type PlanReferenceRequest =
+  | ({ intent: 'revise' } & PlanReadRequest)
+  | { intent: 'execute'; sessionId: string; planId: string; revision: number; expectedHash: string };
+
+/** The verified plan a user message refers to, persisted on that message so the transcript can link them. */
+export interface ConversationPlanReference {
+  intent: PlanReferenceRequest['intent'];
+  planId: string;
+  revision: number;
+  hash: string;
+  uri: string;
+  title: string;
+  /** The Agent the message is addressed to: the executing target, or the planner asked to revise. */
+  agentId: string;
 }
 
 export interface PlanReadResult {

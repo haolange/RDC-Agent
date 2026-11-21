@@ -1,4 +1,5 @@
-import { useConversationStore } from '../../stores/conversationStore';
+import { selectOrderedConversationMessages, useConversationStore } from '../../stores/conversationStore';
+import { findPlanReview } from '../../lib/transcriptPlanLocation';
 import { buildConversationConfigurationCommit } from '../../stores/conversationConfigurationCommit';
 import { useSessionStore } from '../../stores/sessionStore';
 import {
@@ -56,7 +57,7 @@ export async function sendComposerConversationTurn(options: {
   showNotice: (message: string) => void;
   failedSummary: string;
   preserveDraft?: boolean;
-  planSource?: import('@shared/types/planReview').PlanReadRequest;
+  planReference?: import('@shared/types/planReview').PlanReferenceRequest;
 }): Promise<ComposerSendOutcome> {
   const {
     electronAPI,
@@ -104,6 +105,9 @@ export async function sendComposerConversationTurn(options: {
     requestId,
     agentId: selectedAgentId,
   };
+  const claimedPlan = options.planReference;
+  const referencedPlan = claimedPlan ? findPlanReview(selectOrderedConversationMessages(useConversationStore.getState()),
+    { planId: claimedPlan.planId, revision: claimedPlan.revision, hash: claimedPlan.expectedHash }) : undefined;
   const optimistic = buildOptimisticConversationTurn({
     requestId,
     trimmed: sentPrompt,
@@ -113,6 +117,10 @@ export async function sendComposerConversationTurn(options: {
     currentRun,
     pendingAttachments: sentAttachments,
     selectedAgentId,
+    ...(claimedPlan && referencedPlan ? { planReference: {
+      intent: claimedPlan.intent, planId: claimedPlan.planId, revision: claimedPlan.revision, hash: claimedPlan.expectedHash,
+      uri: referencedPlan.uri, title: referencedPlan.title, agentId: selectedAgentId,
+    } } : {}),
   });
 
   const rollbackOptimistic = () => {
@@ -196,7 +204,7 @@ export async function sendComposerConversationTurn(options: {
       message: sentPrompt,
       attachments: toConversationAttachmentInputs(sentAttachments),
       preloadSkillIds: sentSkillIds,
-      ...(options.planSource ? { planSource: options.planSource } : {}),
+      ...(options.planReference ? { planReference: options.planReference } : {}),
       turnControls,
       configurationCommit: configuration.configurationCommit,
     });

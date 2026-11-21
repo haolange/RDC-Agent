@@ -55,5 +55,6 @@ export function useReadingPanelGeometry() {
     '--reading-width': `${bounds.width}px`, '--reading-height': `${bounds.height}px`,
     '--reading-bottom': `${bounds.top + bounds.height}px`,
   } : {});
-  return { ready: bounds !== null, style };
+  // Outside the workbench (component catalog, isolated tests) there is no reading area: callers center instead.
+  return { ready: bounds !== null, anchored: layout !== null, style };
 }

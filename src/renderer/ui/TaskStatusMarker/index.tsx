@@ -1,26 +1,46 @@
 import React from 'react';
+import { cn } from '../../lib/cn';
+import type { TaskDisplayState } from '@shared/types/conversation';
 import './TaskStatusMarker.css';
 
-export type TaskLifecycleStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+export type TaskStatusMarkerSize = 'sm' | 'md';
 
 export interface TaskStatusMarkerProps {
-  status: TaskLifecycleStatus;
-  label?: string;
+  /** Display state projected by main; `failed` is derived there from the current execution, never here. */
+  status: TaskDisplayState;
+  label: string;
+  size?: TaskStatusMarkerSize;
 }
 
-const stateClasses: Record<TaskLifecycleStatus, string> = { pending: 'is-pending', in_progress: 'is-in-progress', blocked: 'is-blocked', completed: 'is-completed', cancelled: 'is-cancelled' };
-
-export const TaskStatusMarker: React.FC<TaskStatusMarkerProps> = ({ status, label }) => {
-    const icon = status === 'pending'
-      ? <circle cx="8" cy="8" r="6" />
-      : status === 'in_progress'
-        ? <><circle cx="8" cy="8" r="6" /><path d="M5 8h6m-2-2 2 2-2 2" /></>
-        : status === 'completed'
-          ? <><circle cx="8" cy="8" r="6" /><path d="m5 8 2 2 4-4" /></>
-          : status === 'blocked'
-            ? <><circle cx="8" cy="8" r="6" /><path d="M8 4.75v4m0 2.5h.01" /></>
-            : <><circle cx="8" cy="8" r="6" /><path d="m6 6 4 4m0-4-4 4" /></>;
-    return <span className={`task-status-marker is-snapshot ${stateClasses[status]}`} aria-label={label ?? status} title={label ?? status}>
-      <svg viewBox="0 0 16 16" aria-hidden="true">{icon}</svg>
-    </span>;
+const glyphs: Record<TaskDisplayState, React.ReactNode> = {
+  pending: <circle className="task-status-marker-ring" cx="8" cy="8" r="5.5" />,
+  in_progress: <>
+    <circle className="task-status-marker-track" cx="8" cy="8" r="5.5" />
+    <path className="task-status-marker-arc" d="M8 2.5a5.5 5.5 0 0 1 5.5 5.5" />
+    <circle className="task-status-marker-core" cx="8" cy="8" r="2" />
+  </>,
+  completed: <>
+    <circle className="task-status-marker-fill" cx="8" cy="8" r="6.5" />
+    <path className="task-status-marker-mark" d="m5.25 8.25 1.9 1.9 3.6-3.9" />
+  </>,
+  blocked: <>
+    <circle className="task-status-marker-ring" cx="8" cy="8" r="5.5" />
+    <path className="task-status-marker-glyph" d="M6.6 6v4M9.4 6v4" />
+  </>,
+  failed: <>
+    <circle className="task-status-marker-fill" cx="8" cy="8" r="6.5" />
+    <path className="task-status-marker-mark" d="M8 4.9v3.6M8 11h.01" />
+  </>,
+  cancelled: <>
+    <circle className="task-status-marker-ring" cx="8" cy="8" r="5.5" />
+    <path className="task-status-marker-glyph" d="m4.4 11.6 7.2-7.2" />
+  </>,
 };
+
+/** One glyph per Task display state; color comes from the `--token-task-*` family. */
+export const TaskStatusMarker: React.FC<TaskStatusMarkerProps> = ({ status, label, size = 'md' }) => (
+  <span className={cn('task-status-marker', `is-${status.replace('_', '-')}`, `is-size-${size}`)}
+    role="img" aria-label={label} title={label}>
+    <svg viewBox="0 0 16 16" aria-hidden="true">{glyphs[status]}</svg>
+  </span>
+);

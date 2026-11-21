@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TASK_SCHEMA_VERSION } from '../agent-runtime/tasks/TaskContracts';
 import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
-import { buildRdcContext, buildTaskContext, mapRightRailOutputs, mapRightRailProgress } from './rightRailProjectionMappers';
+import { buildRdcContext, buildTaskContext, mapRightRailOutputs, mapRightRailTasks } from './rightRailProjectionMappers';
 import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/types/session';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
@@ -39,7 +39,7 @@ const contextSnapshot = {
 
 describe('right rail projection mappers', () => {
   it('projects only real task records and preserves lifecycle status', () => {
-    const rows = mapRightRailProgress('session-a', 'branch-a', [
+    const rows = mapRightRailTasks('session-a', 'branch-a', [
       task('done', 'completed', 1), task('active', 'in_progress', 2), task('blocked', 'blocked', 3, 'Waiting for device'), task('cancel', 'cancelled', 4),
     ]);
     expect(rows.map((entry) => entry.status)).toEqual(['completed', 'in_progress', 'blocked', 'cancelled']);

@@ -49,7 +49,12 @@ export type IconName =
   | 'link'
   | 'user'
   | 'lightning'
-  | 'max-mode';
+  | 'max-mode'
+  | 'tasks'
+  | 'artifact'
+  | 'output'
+  | 'layers'
+  | 'capture';
 
 type IconPart =
   | { d: string }
@@ -83,7 +88,7 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
     { c: [12, 12, 4] },
     { d: 'M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8' },
   ],
-  'nav-models': [{ r: [5, 5, 14, 14, 2.5] }, { d: 'M8.5 9h7M8.5 12h7M8.5 15h4' }],
+  'nav-models': [{ r: [6.5, 6.5, 11, 11, 2.5] }, { r: [9.5, 9.5, 5, 5, 1] }, { d: 'M10 3v3.5M14 3v3.5M10 17.5V21M14 17.5V21M3 10h3.5M3 14h3.5M17.5 10H21M17.5 14H21' }],
   'nav-skills': [
     { d: 'M5 5.5h10.5a2.5 2.5 0 0 1 2.5 2.5v10.5H7.5A2.5 2.5 0 0 1 5 16z' },
     { d: 'M8.5 9h6M8.5 12h5' },
@@ -134,6 +139,11 @@ const ICONS: Record<IconName, readonly IconPart[]> = {
     { r: [4, 3.5, 12.5, 10, 2] },
     { r: [7.5, 10.5, 12.5, 10, 2] },
   ],
+  tasks: [{ d: 'M11 6.5h9M11 12h9M11 17.5h9' }, { d: 'm3.75 6.5 1.5 1.5 2.75-3' }, { d: 'm3.75 12 1.5 1.5 2.75-3' }, { c: [5.75, 17.5, 1.75] }],
+  artifact: [{ d: 'M6 3h8l4 4v14H6V3Z' }, { d: 'M14 3v4h4M9 12h6M9 16h4' }],
+  output: [{ d: 'M4 6.5h10M4 12h7M4 17.5h10' }, { d: 'm16 9 3.5 3-3.5 3' }],
+  layers: [{ d: 'M12 4 3.5 8.5 12 13l8.5-4.5L12 4Z' }, { d: 'm3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5' }],
+  capture: [{ d: 'M4 8.5V5h3.5M16.5 5H20v3.5M20 15.5V19h-3.5M7.5 19H4v-3.5' }, { c: [12, 12, 3] }],
 };
 
 export interface IconProps {

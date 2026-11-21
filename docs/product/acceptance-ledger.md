@@ -1,5 +1,14 @@
 # Acceptance Ledger
 
+## 2026-11-20：第二轮收敛（视觉语言、对话与 Working、Tasks、计划交付、设置、知识中心；云端 Linux）
+
+- 提交：`5b4ad8e5`
+- 证据：本地：`pnpm run check:gates && pnpm test && pnpm run check:contracts && pnpm run test:coverage && pnpm run check:coverage-ratchet && pnpm run build && RDC_DIFF_BASE=b44a5aba pnpm run check:git-diff`（4734 通过/6 跳过；contracts 250 通过；覆盖率 lines 80.82%；其余通过）。GitHub Actions 未在本条核对。
+- 证据：本地：`node scripts/qa-ollama-stub.mjs` + 一次性 Browser QA `node scripts/qa-walkthrough.mjs`：粘贴导入两张案例卡、设置、Effort、模型选择、`qa:loops` / `qa:long` / `qa:plan` 三个剧本、计划门 → 阅读器 → 批准 → 交接引用卡 → 执行回合经 `turn_complete` 声明 blocked、浅色、720px，19 屏全部通过，滚轮上滚断言通过；改前改后对照在私有 Artifact。
+- 证据：本地：RDC-Tool `python scripts/native_source_digest.py <renderdoc> --revision dde8822…` 得 `20b5f0c8…`，回执为 `bce2094…`；base、upstream 修订，Windows CRLF 检出字节与常见排序、行格式、整树归档均不符，判定回执的源码出处不可核实，记录于 RDC-Tool `1308904`，修正需在 Windows 干净检出上重建。
+- 未验证：OpenAI Responses 与 ChatGPT OAuth 的推理摘要实机对照；Ollama 真实模型。
+- 人工介入：无。
+
 ## 2026-11-20：收敛计划收尾（云端 Linux，无 GPU、无模型账号）
 
 - 提交：`38c8db34`

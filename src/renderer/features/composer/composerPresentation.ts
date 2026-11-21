@@ -5,14 +5,18 @@ export function buildComposerPresentation(input: {
   language: AppLanguage;
   currentMode: AgentMode;
   currentModeLabel: string;
+  /** The Agent's own "what to tell me", already in the interface language; empty when it declares none. */
+  currentModeHint: string;
   hasProject: boolean;
   hasActiveDebugRun: boolean;
   isComposerBusy: boolean;
 }) {
   const zh = input.language === 'zh-CN';
-  const promptPlaceholder = zh
-    ? `向 ${input.currentModeLabel} 描述目标、异常或验证需求`
-    : `Describe the goal, anomaly, or verification request for ${input.currentModeLabel}`;
+  const hint = input.currentModeHint.trim();
+  const promptPlaceholder = hint
+    ? zh ? `向 ${input.currentModeLabel} 说明${hint}` : `${input.currentModeLabel}: ${hint}`
+    : zh ? `向 ${input.currentModeLabel} 描述目标、异常或验证需求`
+      : `Describe the goal, anomaly, or verification request for ${input.currentModeLabel}`;
   const attachButtonLabel = !input.hasProject
     ? (zh ? '选择项目后可附加图片或文件' : 'Select a project before attaching images or files')
     : (zh ? '附加图片或文件' : 'Attach images or files');
