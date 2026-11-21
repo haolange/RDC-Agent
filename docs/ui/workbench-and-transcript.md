@@ -118,7 +118,7 @@ Model/Effort控制状态由Composer稳定父层唯一持有，普通输入区、
 `MessageMarkdown`：GFM、KaTeX、Mermaid fail-closed；commentary、最终答案与 thinking/CoT 共用；禁用 raw HTML。
 
 - **来源引用**：提示词要求模型用 Markdown 链接标注实际读取过的页面。链接地址属于本回合真实读取过的页面（工具调用 `resourceRefs` 的 web 资源）时渲染成行内来源胶囊（网站图标 + 域名），悬停出标题与摘要；回答末尾一行「来源」列出本回合真正被引用的页面，不列搜索服务地址。其他链接照常显示，悬停出域名；外链只走 `openExternalHttps`，页内锚点（脚注）不开新窗口。
-- **媒体**：链接过滤器只放行受控地址：会话产物 `session://`、工具图片预览、附件与项目根内的相对路径经 `conversation:resolveMedia` 换成 `blob:`，远程 https 图片经 `web:fetchImage`（≤5MB、按内容嗅探类型、超时、不带 cookie）换成 `blob:`；其余地址照旧清空。图片渲染成带标题的图像块，点击打开 `ui/ImageViewer`（缩放、平移、上一张 / 下一张、打开原图）；mp4 / webm 以 `blob:` 播放。CSP 只新增 `media-src 'self' blob:`，不放宽 `img-src`。
+- **媒体**：链接过滤器只放行受控地址：会话产物 `session://`、本会话附件（按文件名）与项目根内的路径经 `conversation:resolveMedia` 换成 `blob:`（符号链接逃逸与根外路径一律拒绝），远程 https 图片经 `web:fetchImage`（≤5MB、按内容嗅探类型、超时、不带 cookie）换成 `blob:`；其余地址照旧清空。图片渲染成带标题的图像块，点击打开 `ui/ImageViewer`（缩放、平移、上一张 / 下一张、打开原图）；mp4 / webm 以 `blob:` 播放。CSP 只新增 `media-src 'self' blob:`，不放宽 `img-src`。
 - **代码块**：头部显示语言名，有文件名时一并显示；复制是图标，成功后变对勾；换行开关；超过约 30 行默认折叠并渐隐；diff 用增删配色；高亮语言集来自 `markdownHighlight.ts`（含 HLSL、GLSL）；流式输出时已闭合的代码块立即高亮。
 - **排版**：h1–h6 拉开层级；`> [!NOTE]` / `[!TIP]` / `[!WARNING]` 渲染为提示块；表格放进圆角容器、表头吸顶；脚注可点击、标题不放大；Mermaid 用主题类名，不依赖内联样式；用户气泡里的 Markdown 不继承 `pre-wrap`。
 

@@ -6,7 +6,6 @@
   border-radius: var(--radius-bubble);
   font-size: var(--type-body-size);
   line-height: 1.7;
-  white-space: pre-wrap;
   word-break: break-word;
   position: relative;
 }
@@ -130,6 +129,8 @@
 .conversation-bubble-text {
   display: inline;
   word-break: break-word;
+  /* Plain text keeps the author's line breaks; Markdown bubbles lay out their own blocks. */
+  white-space: pre-wrap;
 }
 
 /* ---------- streaming cursor ---------- */

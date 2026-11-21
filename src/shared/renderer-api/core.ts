@@ -32,7 +32,10 @@ export function createAppShellApi(transport: RendererApiTransport): AppShellApi 
 }
 
 export function createWebApi(transport: RendererApiTransport): ElectronAPI['web'] {
-  return { resolveFavicon: (domain) => transport.invoke(INVOKE.shell.resolveFavicon, domain) };
+  return {
+    resolveFavicon: (domain) => transport.invoke(INVOKE.shell.resolveFavicon, domain),
+    fetchImage: (url) => transport.invoke(INVOKE.shell.fetchImage, url),
+  };
 }
 
 export function createDialogApi(transport: RendererApiTransport): DialogApi {
@@ -72,6 +75,7 @@ export function createConversationApi(transport: RendererApiTransport): Conversa
     stageAttachments: (request) => transport.invoke(INVOKE.conversation.stageAttachments, request),
     releaseAttachments: (request) => transport.invoke(INVOKE.conversation.releaseAttachments, request),
     getAttachmentPreview: (request) => transport.invoke(INVOKE.conversation.getAttachmentPreview, request),
+    resolveMedia: (request) => transport.invoke(INVOKE.conversation.resolveMedia, request),
     onEvent: (callback): void => {
       transport.addListener(EVENT.conversation.event, callback as unknown as RendererEventCallback);
     },

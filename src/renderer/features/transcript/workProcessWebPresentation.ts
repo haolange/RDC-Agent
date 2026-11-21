@@ -1,3 +1,4 @@
+import { webHostname } from '@shared/utils/webUrl';
 import { toRecord, readNestedValue, stringifyPreview, parsePreview } from './workProcessContentText';
 import { normalizeToolName } from './workProcessToolCatalog';
 import type { WorkProcessRowStatus, WorkProcessWebPage } from './workProcessTypes';
@@ -9,24 +10,6 @@ export const getDetailsRecord = (record: Record<string, unknown> | null | undefi
     ?? toRecord(readNestedValue(record, ['result', 'details']));
 };
 
-const hostname = (url: string): string => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '') || url;
-  } catch {
-    return url;
-  }
-};
-
-/** One page identity for matching reads against search results: scheme, `www.`, fragments and trailing slashes do not count. */
-export const normalizeWebUrl = (url: string): string => {
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname.replace(/\/+$/, '');
-    return `${parsed.hostname.replace(/^www\./, '')}${path}${parsed.search}`.toLowerCase();
-  } catch {
-    return url.trim().toLowerCase();
-  }
-};
 
 const getRecordArray = (value: unknown): Array<Record<string, unknown>> => {
   if (!Array.isArray(value)) return [];
@@ -71,7 +54,7 @@ export const extractWebToolPresentation = (
       if (!url) return [];
       const title = stringifyPreview(result.title) || undefined;
       const snippet = stringifyPreview(result.snippet) || undefined;
-      return [{ url, domain: hostname(url), title, snippet, state: 'done' as const }];
+      return [{ url, domain: webHostname(url), title, snippet, state: 'done' as const }];
     });
     return { ...(webQuery ? { webQuery } : {}), ...(webPages.length ? { webPages } : {}) };
   }
@@ -92,7 +75,7 @@ export const extractWebToolPresentation = (
   }
   const failed = state === 'failed' || (statusCode !== undefined && statusCode >= 400);
   return {
-    webPages: [{ url, domain: hostname(url), title, state: failed ? 'failed' : state }],
+    webPages: [{ url, domain: webHostname(url), title, state: failed ? 'failed' : state }],
     webMeta: { ...(path ? { path } : {}), ...(statusCode !== undefined ? { status: statusCode } : {}), ...(bytes !== undefined ? { bytes } : {}) },
   };
 };

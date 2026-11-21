@@ -1,5 +1,5 @@
+import { normalizeWebUrl } from '@shared/utils/webUrl';
 import { webGroup } from './groupWebRows';
-import { normalizeWebUrl } from './workProcessWebPresentation';
 import type { WorkProcessRow } from './workProcessTypes';
 
 type ToolRow = Extract<WorkProcessRow, { type: 'tool' }>;

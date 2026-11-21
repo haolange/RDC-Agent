@@ -20,17 +20,22 @@
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
-.markdown-body h4 {
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   margin: var(--space-5) 0 var(--space-2);
   color: var(--token-text-primary);
   font-weight: var(--font-semibold);
   line-height: 1.35;
 }
 
-.markdown-body h1 { font-size: var(--type-title-size); }
-.markdown-body h2 { font-size: var(--type-title-size); }
+/* Six levels on the four type roles: size steps down, then weight and colour carry the last levels. */
+.markdown-body h1 { margin-top: var(--space-6); font-size: var(--type-title-size); }
+.markdown-body h2 { font-size: var(--type-reading-size); }
 .markdown-body h3 { font-size: var(--type-body-size); }
-.markdown-body h4 { font-size: var(--type-body-size); }
+.markdown-body h4 { margin-top: var(--space-4); font-size: var(--type-body-size); }
+.markdown-body h5 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); }
+.markdown-body h6 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); font-weight: var(--font-normal); }
 
 .markdown-body ul,
 .markdown-body ol {
@@ -84,15 +89,6 @@
   text-decoration: line-through;
 }
 
-.markdown-body-img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 0 0 var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--token-border-muted);
-}
-
 .markdown-body ul.contains-task-list {
   list-style: none;
   padding-left: var(--space-1);
@@ -142,7 +138,7 @@
 .markdown-code-block-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
   border-bottom: 1px solid var(--token-border-muted);
@@ -260,24 +256,30 @@
   border-top: 1px solid var(--token-border-muted);
 }
 
+/* The rounded container owns the border and both scroll axes, so a long table keeps its header in view. */
 .markdown-table-scroll {
   max-width: 100%;
+  max-height: min(60vh, 480px);
   margin: 0 0 var(--space-3);
-  overflow-x: auto;
+  overflow: auto;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-card);
 }
 
 .markdown-body table {
   width: max-content;
   min-width: 100%;
   margin: 0;
-  border-collapse: collapse;
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-md);
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--type-body-size);
 }
 
 .markdown-body thead th {
-  background: color-mix(in srgb, var(--token-bg-raised) 70%, transparent);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-local-1);
+  background: var(--token-bg-raised);
   color: var(--token-text-primary);
   font-weight: var(--font-semibold);
 }

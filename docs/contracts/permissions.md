@@ -52,7 +52,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - 导航：窗口只加载应用入口（开发服务器按 origin，打包按精确入口文件）；其它链接、重定向与拖入窗口的本地页面一律拒绝，不附加 webview。
 - IPC：每次 invoke 先核对发送方文档是应用入口，否则 `IPC_SENDER_REJECTED`；Browser QA 桥独立认证后直接调用已登记的处理器。
 - 外部链接：账号与登录页只经 https 打开（`EXTERNAL_URL_REJECTED`）。
-- CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。
+- CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`；`img-src 'self' data: blob:` 不放行远程主机，回答里的远程图片由主进程 `web:fetchImage` 代取（仅 https 公网地址、≤5MB、按内容嗅探、不带 cookie）；`media-src 'self' blob:` 只播放 `conversation:resolveMedia` 解析出的会话产物、附件与项目内视频。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。
 
 ## IPC Schema（Zod）
 

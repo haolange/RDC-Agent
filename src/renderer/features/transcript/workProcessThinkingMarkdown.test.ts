@@ -15,7 +15,7 @@ vi.mock('../../i18n', () => ({
   }),
 }));
 
-vi.mock('../../patterns/Markdown/markdownHighlight', () => ({}));
+vi.mock('../../patterns/Markdown/markdownHighlight', () => ({ MARKDOWN_LANGUAGES: {}, MARKDOWN_LANGUAGE_ALIASES: {} }));
 vi.mock('katex/dist/katex.min.css', () => ({}));
 
 const now = 1_700_000_000_000;

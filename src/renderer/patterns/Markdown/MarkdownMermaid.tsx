@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { errorDetail } from '../../lib/errorDetail';
+import { extractMermaidStyles, useAdoptedStyles } from './mermaidStyles';
 
 interface MarkdownMermaidProps {
   source: string;
@@ -8,7 +9,7 @@ interface MarkdownMermaidProps {
 
 type MermaidState =
   | { status: 'loading' }
-  | { status: 'ready'; svg: string }
+  | { status: 'ready'; svg: string; css: string }
   | { status: 'error' };
 
 /**
@@ -27,14 +28,18 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
     void (async () => {
       try {
         const mermaid = (await import('mermaid')).default;
+        // Labels are measured before the diagram's styles apply, so both use the transcript's own font.
+        const { fontFamily, fontSize } = getComputedStyle(document.body);
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'strict',
           theme: document.documentElement.dataset.resolvedTheme === 'light' ? 'default' : 'dark',
+          fontFamily,
+          themeVariables: { fontFamily, fontSize },
         });
         const { svg } = await mermaid.render(renderId, source);
         if (!cancelled) {
-          setState({ status: 'ready', svg });
+          setState({ status: 'ready', ...extractMermaidStyles(svg, renderId) });
         }
       } catch (error) {
         if (!cancelled) {
@@ -48,13 +53,14 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
       cancelled = true;
     };
   }, [reactId, source]);
+  useAdoptedStyles(state.status === 'ready' ? state.css : '');
 
   if (state.status === 'ready') {
     return (
       <div
         className="markdown-mermaid"
         data-testid="markdown-mermaid"
-        // Mermaid returns sanitized SVG under securityLevel: 'strict'.
+        // Mermaid returns sanitized SVG under securityLevel: 'strict'; its styles were moved into an adopted sheet.
         dangerouslySetInnerHTML={{ __html: state.svg }}
       />
     );

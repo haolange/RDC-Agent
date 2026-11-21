@@ -10,6 +10,8 @@ import type { ConversationToolCall, ConversationWorkBlock } from '../../src/shar
 import { ScopedWorkDisclosure } from '../../src/renderer/features/transcript/ScopedWorkDisclosure';
 import { RightRailTaskList } from '../../src/renderer/features/right-rail/RightRailTaskList';
 import { MessageMarkdown } from '../../src/renderer/patterns/Markdown/MessageMarkdown';
+import { MarkdownSourceProvider } from '../../src/renderer/patterns/Markdown/markdownSources';
+import { MarkdownSourcesRow } from '../../src/renderer/patterns/Markdown/MarkdownSourcesRow';
 import type { ConversationPlanReview } from '../../src/shared/types/planReview';
 import '../../src/renderer/features/transcript/AgentChat.css';
 import '../../src/renderer/features/transcript/work-process-tasks.css';
@@ -96,4 +98,20 @@ export function WorkProcessWebSample() {
     webTurn('single', '再确认一下仓库说明。', [read('repo', 'https://github.com/baldurk/renderdoc', 'baldurk/renderdoc', 2_000, 2_450)]),
   ] }, t);
   return <ScopedWorkDisclosure scope="catalog-web"><WorkProcessContent presentation={presentation} active={false} /></ScopedWorkDisclosure>;
+}
+
+const citedAnswer = [
+  '这一帧的 draw 调用只有一次，抓帧流程与 [RenderDoc 快速上手](https://renderdoc.org/docs/getting_started/quick_start.html) 一致；',
+  'Vulkan 侧的同步语义见 [Khronos 概览](https://www.khronos.org/vulkan/)，另可参考 [社区讨论](https://example.com/thread)。',
+].join('');
+
+/** Links to pages the turn read become citation pills; the answer ends with the pages it cited. */
+export function CitationSample() {
+  return <MarkdownSourceProvider sources={[
+    { url: 'https://renderdoc.org/docs/getting_started/quick_start.html', domain: 'renderdoc.org', title: 'Quick Start — RenderDoc', summary: 'Capturing a frame and inspecting the event browser.' },
+    { url: 'https://www.khronos.org/vulkan/', domain: 'khronos.org', title: 'Vulkan Overview' },
+  ]}>
+    <MessageMarkdown content={citedAnswer} />
+    <MarkdownSourcesRow content={citedAnswer} />
+  </MarkdownSourceProvider>;
 }

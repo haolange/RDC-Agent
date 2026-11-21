@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { assertPublicHttpUrl, fetchPinnedPublic } from '../agent-runtime/net/assertPublicHttpUrl';
 import { appPathService } from '../runtime/AppPathService';
+import { readLimitedBytes, sniffRasterImageMime } from './mediaBytes';
 
 const MAX_FAVICON_BYTES = 64 * 1024;
 const MAX_ICON_PAGE_BYTES = 80_000 * 4; // Receive bound for the existing 80k-character HTML window.
@@ -68,48 +69,12 @@ function mimeToExt(mime: string): string {
 function sniffMime(bytes: Uint8Array, contentType: string | null): string | null {
   const header = (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
   if (header && ALLOWED_MIME.has(header)) return header;
-  if (bytes.length >= 8) {
-    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
-    if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg';
-    if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
-    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return 'image/webp';
-    if (bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0x01 && bytes[3] === 0x00) return 'image/x-icon';
-  }
+  const raster = sniffRasterImageMime(bytes);
+  if (raster) return raster;
+  if (bytes.length >= 4 && bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0x01 && bytes[3] === 0x00) return 'image/x-icon';
   const asText = new TextDecoder('utf-8', { fatal: false }).decode(bytes.slice(0, 64)).trimStart();
   if (asText.startsWith('<svg') || asText.startsWith('<?xml')) return 'image/svg+xml';
   return header && header.startsWith('image/') ? header : null;
-}
-
-async function readLimitedBytes(response: Response, maxBytes: number): Promise<Uint8Array | null> {
-  if (!response.body) {
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return buffer.byteLength > maxBytes ? null : new Uint8Array(buffer);
-  }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    if (total + value.byteLength > maxBytes) {
-      try {
-        await reader.cancel();
-      } catch {
-        /* ignore */
-      }
-      return null;
-    }
-    chunks.push(value);
-    total += value.byteLength;
-  }
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return merged;
 }
 
 async function fetchPublicBytes(rawUrl: string): Promise<{ bytes: Uint8Array; mime: string } | null> {

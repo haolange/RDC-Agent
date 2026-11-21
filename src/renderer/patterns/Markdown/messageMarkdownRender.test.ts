@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { normalizeAssistantMarkdown } from './normalizeAssistantMarkdown';
 import { MessageMarkdown } from './MessageMarkdown';
 
-vi.mock('./markdownHighlight', () => ({}));
+vi.mock('./markdownHighlight', () => ({ MARKDOWN_LANGUAGES: {}, MARKDOWN_LANGUAGE_ALIASES: {} }));
 vi.mock('katex/dist/katex.min.css', () => ({}));
 
 function renderMarkdown(content: string, extras?: { highlight?: boolean; katex?: boolean }): string {

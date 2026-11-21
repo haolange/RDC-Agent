@@ -7,6 +7,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     copyText: 'app:copyText',
     readClipboardText: 'app:readClipboardText',
     resolveFavicon: 'web:resolveFavicon',
+    fetchImage: 'web:fetchImage',
     selectFiles: 'dialog:selectFiles',
     selectRdcFiles: 'dialog:selectRdcFiles',
     selectKnowledgeImport: 'dialog:selectKnowledgeImport',
@@ -34,6 +35,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     stageAttachments: 'conversation:stageAttachments',
     releaseAttachments: 'conversation:releaseAttachments',
     getAttachmentPreview: 'conversation:getAttachmentPreview',
+    resolveMedia: 'conversation:resolveMedia',
   },
   workflow: {
     getState: 'workflow:getState',

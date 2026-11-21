@@ -269,6 +269,7 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
       "style-src 'self'",
       "style-src-attr 'none'",
       "img-src 'self' data: blob:",
+      "media-src 'self' blob:",
       "font-src 'self' data:",
       "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
       "object-src 'none'",

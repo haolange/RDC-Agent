@@ -11,6 +11,8 @@
 //     qa:loops   thinking → task_create → commentary + glob → start two Tasks → complete, cancel and block → answer
 //     qa:long    five model steps of six parallel `glob` calls each, then a long Markdown answer
 //     qa:plan    (Mission agents) thinking → plan_artifact; the plan gate then pauses the turn
+//     qa:markdown an answer exercising the Markdown renderer: headings, callout, table, titled and long code, Mermaid,
+//                footnote and a project image (docs/frame.png, written by the walkthrough)
 //     qa:subagent thinking → tool_search loads `subagent` → one waited delegation to Verifier → answer; the child
 //                 (recognised by the delegated task text) declares a completed result through turn_complete
 //   An approved plan's execution turn (default scenario with `turn_complete` offered) declares an honest
@@ -37,6 +39,19 @@ const LONG_ANSWER = [
   ...Array.from({ length: 24 }, (_, index) => `- 第 ${index + 1} 项检查：列举结果与上一轮一致，没有新增或缺失的文件。\n`),
   '\n```text\nvkcube_lavapipe.rdc\n```\n\n',
   '## 下一步\n\n导入这个 capture 后再读取事件树与管线状态。\n',
+];
+const MARKDOWN_ANSWER = [
+  '# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n',
+  '## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n',
+  '> [!WARNING]\n> 修改着色器前先备份 capture。\n\n',
+  '| Pass | 耗时 | 结论 |\n| --- | --- | --- |\n',
+  ...Array.from({ length: 12 }, (_, index) => `| Pass ${index + 1} | ${((index + 1) * 0.4).toFixed(1)} ms | 正常 |\n`),
+  '\n```hlsl:shaders/lighting.hlsl\nfloat4 main(float4 pos : SV_Position) : SV_Target\n{\n    return saturate(float4(pos.xy / 512.0, 0.5, 1.0));\n}\n```\n\n',
+  '```diff\n- float exposure = 1.0;\n+ float exposure = 0.8;\n```\n\n',
+  `\`\`\`ts\n${Array.from({ length: 36 }, (_, index) => `const pass${index} = measure(${index});`).join('\n')}\n\`\`\`\n\n`,
+  '```mermaid\ngraph LR\n  A[Capture] --> B[Replay]\n  B --> C[Compare]\n```\n\n',
+  '![修复前的这一帧](docs/frame.png)\n\n',
+  '[^1]: 结论来自同一 capture 的两次回放。\n',
 ];
 const PLAN = {
   title: '定位 vkcube 帧的唯一 draw 调用',
@@ -123,7 +138,7 @@ function turnState(body) {
   const prompt = typeof messages[lastUser]?.content === 'string' ? messages[lastUser].content : '';
   return {
     scenario: prompt.includes(DELEGATION.task) ? 'qa:subagent-child'
-      : ['qa:loops', 'qa:long', 'qa:plan', 'qa:subagent'].find((keyword) => prompt.includes(keyword)) ?? 'default',
+      : ['qa:loops', 'qa:long', 'qa:plan', 'qa:subagent', 'qa:markdown'].find((keyword) => prompt.includes(keyword)) ?? 'default',
     step: after.filter((entry) => entry.role === 'assistant').length,
     toolResults: after.filter((entry) => entry.role === 'tool').map((entry) => String(entry.content ?? '')),
   };
@@ -169,6 +184,7 @@ function chatChunks(body) {
   const state = turnState(body);
   if (state.scenario === 'qa:loops') return loopsScenario(state, tools);
   if (state.scenario === 'qa:long') return longScenario(state, tools);
+  if (state.scenario === 'qa:markdown') return text(MARKDOWN_ANSWER);
   if (state.scenario === 'qa:subagent') {
     // subagent is a deferred tool: load it through tool_search first, then delegate once and answer.
     const delegated = state.toolResults.length >= 2;

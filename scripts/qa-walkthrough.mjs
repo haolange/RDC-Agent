@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { closeOverlays, openApp, openSettings, useTheme } from './qa-browser-shared.mjs';
 
 const args = process.argv.slice(2);
@@ -22,6 +23,32 @@ fs.mkdirSync(shotDir, { recursive: true });
 
 const { browser, page } = await openApp(logPath);
 const failures = [];
+/** A real raster image for the Markdown media path: a dark-to-accent gradient, encoded as RGB PNG. */
+function gradientPng(width, height) {
+  const chunk = (type, data) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(Buffer.concat([Buffer.from(type), data])));
+    return Buffer.concat([length, Buffer.from(type), data, crc]);
+  };
+  const rows = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = y * (width * 3 + 1) + 1 + x * 3;
+      rows[offset] = Math.round(20 + (x / width) * 40);
+      rows[offset + 1] = Math.round(30 + (y / height) * 90);
+      rows[offset + 2] = Math.round(60 + (x / width) * 160);
+    }
+  }
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header),
+    chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
+}
+
 const shot = async (name) => {
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(shotDir, `${name}.png`) });
@@ -60,6 +87,8 @@ const knowledgeCase = (caseId, title, symptom) => [
 ].join('\n');
 
 const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-qa-project-'));
+fs.mkdirSync(path.join(projectRoot, 'docs'));
+fs.writeFileSync(path.join(projectRoot, 'docs', 'frame.png'), gradientPng(480, 270));
 if (capture) fs.copyFileSync(capture, path.join(projectRoot, path.basename(capture)));
 
 try {
@@ -161,6 +190,20 @@ try {
     const stuck = positions.slice(1).some((value, index) => value >= positions[index] && positions[index] > 0);
     console.log(`[walkthrough] wheel positions ${positions.map(Math.round).join(' → ')}`);
     if (stuck) throw new Error('wheel scrolling did not move the transcript upward');
+  });
+
+  await step('markdown', async () => {
+    await send('qa:markdown 展示一份排版样例。');
+    await waitForText('结论来自同一 capture');
+    await page.waitForTimeout(1500);
+    const answer = page.locator('[data-testid="message-bubble-assistant"]').last();
+    await answer.locator('.markdown-body h1').first().scrollIntoViewIfNeeded();
+    await shot('11b-markdown-top');
+    await answer.locator('[data-testid="markdown-code-block"]').first().scrollIntoViewIfNeeded();
+    await shot('11c-markdown-code');
+    await answer.locator('.markdown-media, .markdown-media-missing').last().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    await shot('11d-markdown-media');
   });
 
   await step('subagent', async () => {

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { hasPlanReviewInteraction } from '@shared/conversation/planReviewPresentation';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { MarkdownSourceProvider } from '../../patterns/Markdown/markdownSources';
+import { MarkdownSourcesRow } from '../../patterns/Markdown/MarkdownSourcesRow';
 import { Details } from '../../ui/Details';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
@@ -18,6 +20,7 @@ import { PlanDeliverable } from './PlanDeliverable';
 import { PlanReferenceCard } from './PlanReferenceCard';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
+import { answerSources } from './answerSources';
 import type {
   ConversationMessage,
   ConversationMessageStatus,
@@ -205,52 +208,57 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
     message.diagnostic
     && message.diagnostic.userMessage.trim() !== (message.content ?? '').trim(),
   );
+  // Links to pages this turn read become citations, in the Work Process final answer and in the bubble alike.
+  const sources = useMemo(() => answerSources(trace), [trace]);
   return (
-    <article
-      className={`conversation-message conversation-message-assistant status-${status}`}
-      data-testid="message-bubble-assistant"
-      data-message-id={message.id}
-      data-agent-id={agentId ?? 'assistant'}
-    >
-      <div className="conversation-message-row">
-        <div className="conversation-message-stack">
-          {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
-              <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} />
-          ) : null}
-          <PlanDeliverable trace={trace} />
-          {message.workTraceDiscarded ? (
-            <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>
-          ) : null}
-          {message.attachments && message.attachments.length > 0 ? (
-            <MessageAttachments attachments={message.attachments} />
-          ) : null}
-          {showContentBubble ? (
-            <div className="conversation-bubble conversation-bubble-assistant">
-              {renderContentWithCursor(message.content, status)}
-            </div>
-          ) : null}
-          {!isInProgress && !hasPlanReviewInteraction(trace) && message.handoffSuggestions && message.handoffSuggestions.length > 0 ? (
-            <HandoffSuggestionRow suggestions={message.handoffSuggestions} />
-          ) : null}
-          {showDiagnosticBlock && message.diagnostic ? (
-            <div className="conversation-message-diagnostic" role="alert">
-              <span className="conversation-message-diagnostic-text">
-                {message.diagnostic.userMessage}
-              </span>
-              <Details className="conversation-message-diagnostic-details" summary={t('chat.diagnosticTechnicalDetails')}>
-                <code className="conversation-message-diagnostic-code">{message.diagnostic.code}</code>
-                {message.diagnostic.technicalMessage ? (
-                  <code className="conversation-message-diagnostic-code">{message.diagnostic.technicalMessage}</code>
-                ) : null}
-              </Details>
-            </div>
-          ) : null}
-          {!isInProgress ? (
-            <MessageMetaBar message={message} time={time} status={status} />
-          ) : null}
+    <MarkdownSourceProvider sources={sources} sessionId={message.sessionId}>
+      <article
+        className={`conversation-message conversation-message-assistant status-${status}`}
+        data-testid="message-bubble-assistant"
+        data-message-id={message.id}
+        data-agent-id={agentId ?? 'assistant'}
+      >
+        <div className="conversation-message-row">
+          <div className="conversation-message-stack">
+            {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
+                <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} />
+            ) : null}
+            <PlanDeliverable trace={trace} />
+            {message.workTraceDiscarded ? (
+              <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>
+            ) : null}
+            {message.attachments && message.attachments.length > 0 ? (
+              <MessageAttachments attachments={message.attachments} />
+            ) : null}
+            {showContentBubble ? (
+              <div className="conversation-bubble conversation-bubble-assistant">
+                {renderContentWithCursor(message.content, status)}
+              </div>
+            ) : null}
+            {!isInProgress && !hasPlanReviewInteraction(trace) && message.handoffSuggestions && message.handoffSuggestions.length > 0 ? (
+              <HandoffSuggestionRow suggestions={message.handoffSuggestions} />
+            ) : null}
+            {showDiagnosticBlock && message.diagnostic ? (
+              <div className="conversation-message-diagnostic" role="alert">
+                <span className="conversation-message-diagnostic-text">
+                  {message.diagnostic.userMessage}
+                </span>
+                <Details className="conversation-message-diagnostic-details" summary={t('chat.diagnosticTechnicalDetails')}>
+                  <code className="conversation-message-diagnostic-code">{message.diagnostic.code}</code>
+                  {message.diagnostic.technicalMessage ? (
+                    <code className="conversation-message-diagnostic-code">{message.diagnostic.technicalMessage}</code>
+                  ) : null}
+                </Details>
+              </div>
+            ) : null}
+            {!isInProgress && hasContent ? <MarkdownSourcesRow content={message.content} /> : null}
+            {!isInProgress ? (
+              <MessageMetaBar message={message} time={time} status={status} />
+            ) : null}
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </MarkdownSourceProvider>
   );
 };
 

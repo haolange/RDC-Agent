@@ -1,0 +1,217 @@
+/* Citations, sources, media, callouts and code block controls for MessageMarkdown. */
+
+/* ── Citation pill: a page this turn read, inline in the sentence ── */
+:is(.markdown-body, .markdown-sources) a.markdown-citation {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 14rem;
+  height: var(--chip-height);
+  margin: 0 var(--space-0-5);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-full);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--chip-height);
+  text-decoration: none;
+  vertical-align: middle;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+:is(.markdown-body, .markdown-sources) a.markdown-citation:hover,
+:is(.markdown-body, .markdown-sources) a.markdown-citation:focus-visible {
+  border-color: var(--token-border-strong);
+  color: var(--token-text-primary);
+}
+
+.markdown-citation-label {
+  min-width: 0;
+}
+
+/* ── Sources row under an answer ── */
+.markdown-sources {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-top: var(--space-2);
+}
+
+.markdown-sources-label {
+  flex: 0 0 auto;
+  color: var(--token-text-secondary);
+}
+
+.markdown-sources-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, rgb(0 0 0) 70%, transparent);
+}
+
+.markdown-sources-list a.markdown-citation {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+/* ── Media: images open the viewer; captions read as body text ── */
+.markdown-media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: fit-content;
+  max-width: 100%;
+  margin: var(--space-1) 0 var(--space-3);
+}
+
+.markdown-media-open {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-card);
+  background: var(--token-surface-sunken);
+  cursor: zoom-in;
+  transition: border-color var(--transition-fast);
+}
+
+.markdown-media-open:hover,
+.markdown-media-open:focus-visible {
+  border-color: var(--token-border-strong);
+}
+
+.markdown-media-image,
+.markdown-media-video {
+  display: block;
+  max-width: 100%;
+  max-height: min(60vh, 520px);
+  height: auto;
+  object-fit: contain;
+}
+
+.markdown-media-video {
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-card);
+  background: var(--token-surface-sunken);
+}
+
+.markdown-media-caption {
+  color: var(--token-text-secondary);
+}
+
+.markdown-media-missing {
+  color: var(--token-text-secondary);
+}
+
+.ui-skeleton-stack.markdown-media-skeleton {
+  display: flex;
+  width: min(100%, 320px);
+  height: 180px;
+  margin: var(--space-1) 0 var(--space-3);
+}
+
+/* ── Callouts: > [!NOTE] … ── */
+.markdown-callout {
+  --callout-tone: var(--token-status-info);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--callout-tone) 35%, var(--token-border-muted));
+  border-left-width: 3px;
+  border-left-color: var(--callout-tone);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--callout-tone) 6%, transparent);
+}
+
+.markdown-callout.is-tip { --callout-tone: var(--token-status-success); }
+.markdown-callout.is-important { --callout-tone: var(--token-accent-primary); }
+.markdown-callout.is-warning { --callout-tone: var(--token-status-warning); }
+.markdown-callout.is-caution { --callout-tone: var(--token-status-error); }
+
+.markdown-callout-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  color: var(--callout-tone);
+  font-weight: var(--font-semibold);
+}
+
+.markdown-callout > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── Code block: file name, actions, wrap and fold ── */
+.markdown-code-block-file {
+  min-width: 0;
+  color: var(--token-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--type-meta-size);
+}
+
+.markdown-code-block-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.markdown-code-block-wrap[aria-pressed='true'] {
+  color: var(--token-accent-primary);
+}
+
+.markdown-code-block.is-wrapped .markdown-code-block-pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* About thirty lines show while folded; the rest fades out under the fold control. */
+.markdown-code-block.is-folded .markdown-code-block-pre {
+  max-height: calc(var(--type-meta-size) * 1.6 * 30 + var(--space-3));
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, rgb(0 0 0) 70%, transparent);
+}
+
+.markdown-code-block-fold {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-top: 1px solid var(--token-border-muted);
+  background: transparent;
+  color: var(--token-text-secondary);
+  text-align: left;
+  transition: color var(--transition-fast);
+}
+
+.markdown-code-block-fold:hover,
+.markdown-code-block-fold:focus-visible {
+  color: var(--token-text-primary);
+}
+
+/* ── Footnotes: the section heading is for screen readers; references stay small and clickable ── */
+.markdown-body .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.markdown-body sup a[data-footnote-ref] {
+  text-decoration: none;
+}
+
+.markdown-body section[data-footnotes] {
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--token-border-muted);
+  color: var(--token-text-secondary);
+}

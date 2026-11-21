@@ -36,6 +36,13 @@ export const contracts = {
     motion: '运行中胶囊逐个淡入；靠近高亮只在指针设备出现；减少动效时停用进场。',
     consumers: 'features/transcript/WorkProcessWebParts.tsx',
   },
+  '正文 · 引用': {
+    avoid: '不把搜索服务地址或没读过的页面当来源；不在胶囊上写完整网址。',
+    states: '本回合读过的链接显示为来源胶囊，其他链接保持普通外链；回答末尾一行列出被引用的页面。',
+    layout: '胶囊与正文同行、垂直居中；来源行单行，超出部分从 70% 处渐隐。',
+    motion: '悬停只改描边与文字颜色（120ms）；标题与摘要在悬停提示里。',
+    consumers: 'patterns/Markdown/MarkdownLink.tsx、patterns/Markdown/MarkdownSourcesRow.tsx',
+  },
   RightRailTaskList: {
     avoid: '不从选中状态推断 running，不显示其它会话的后台任务。',
     states: '空任务、各任务终态、活动任务、长名称、定位目标不可见。',
