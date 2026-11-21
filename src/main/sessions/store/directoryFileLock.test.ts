@@ -42,6 +42,8 @@ it('does not steal an existing recovery marker', async () => {
   expect(existsSync(path.join(root, '.lock.recovery'))).toBe(true);
 });
 
+// Either contender may win once the dead owner's lock is gone; the contract is that one recovers it and the
+// holders never overlap, so each process checks the lock records itself for as long as it holds it.
 it('serializes asynchronous and synchronous dead-owner recovery across processes', { timeout: 15_000 }, async () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'rdc-lock-recovery-race-'));
   roots.push(root);
@@ -56,6 +58,7 @@ const dir = process.env.LOCK_TEST_ROOT;
 const role = process.env.LOCK_TEST_ROLE;
 const marker = name => path.join(dir, name);
 const wait = async name => { for(let i=0;i<500;i++){if(fs.existsSync(marker(name)))return;await new Promise(r=>setTimeout(r,10));}throw Error('timeout: '+name); };
+const checkOwner = () => { let pid; try { pid = JSON.parse(fs.readFileSync(marker('.lock'),'utf8')).pid; } catch {} if(pid!==process.pid) fs.writeFileSync(marker(role.toLowerCase()+'-lost'),''); };
 require(process.env.LOCK_TEST_REGISTER);
 if(role==='A') {
   const unlink = fs.promises.unlink;
@@ -68,12 +71,14 @@ const { acquireDirectoryFileLock, releaseDirectoryFileLock, withDirectoryFileLoc
 (async()=>{
   if(role==='A') {
     const held=await acquireDirectoryFileLock(dir,{lockFileName:'.lock',maxAttempts:30});
+    checkOwner();
     fs.writeFileSync(marker('a-acquired'),'');
     await wait('release-a');
+    checkOwner();
     await releaseDirectoryFileLock(held.lockPath);
   } else {
     fs.writeFileSync(marker('b-started'),'');
-    withDirectoryFileLockSync(dir,{lockFileName:'.lock',maxAttempts:30},()=>fs.writeFileSync(marker('b-acquired'),''));
+    withDirectoryFileLockSync(dir,{lockFileName:'.lock',maxAttempts:30},()=>{ checkOwner(); fs.writeFileSync(marker('b-acquired'),''); });
   }
 })().catch(e=>{console.error(e);process.exitCode=1;});
 `);
@@ -88,22 +93,27 @@ const { acquireDirectoryFileLock, releaseDirectoryFileLock, withDirectoryFileLoc
     }
     throw new Error(`Timed out waiting for ${name}`);
   };
+  const exitCode = (child: ReturnType<typeof start>) => new Promise<number | null>(resolve => child.once('close', code => resolve(code)));
   const a = start('A');
-  const aDone = new Promise<void>(resolve => a.once('close', () => resolve()));
+  const aDone = exitCode(a);
   let b: ReturnType<typeof start> | undefined;
-  let bDone: Promise<void> | undefined;
+  let bDone: Promise<number | null> | undefined;
   try {
     await waitFor('a-before-unlink');
     b = start('B');
-    bDone = new Promise<void>(resolve => b!.once('close', () => resolve()));
+    bDone = exitCode(b);
     await waitFor('b-started');
     await new Promise(resolve => setTimeout(resolve, 250));
     expect(existsSync(path.join(root, 'b-acquired'))).toBe(false);
     writeFileSync(path.join(root, 'allow-a'), '');
     await waitFor('a-acquired');
-    expect(existsSync(path.join(root, 'b-acquired'))).toBe(false);
+    // Hold long enough for B to retry several times against A's live lock before A checks and releases it.
+    await new Promise(resolve => setTimeout(resolve, 400));
     writeFileSync(path.join(root, 'release-a'), '');
-    await waitFor('b-acquired');
+    expect(await Promise.all([aDone, bDone])).toEqual([0, 0]);
+    expect(existsSync(path.join(root, 'b-acquired'))).toBe(true);
+    expect(existsSync(path.join(root, 'a-lost'))).toBe(false);
+    expect(existsSync(path.join(root, 'b-lost'))).toBe(false);
   } finally {
     a.kill();
     b?.kill();
