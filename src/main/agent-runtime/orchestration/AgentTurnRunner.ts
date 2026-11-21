@@ -416,6 +416,12 @@ export class AgentTurnRunner {
       }
     }
     const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
+    const missionPlanningFeedback = () => {
+      const plan = turnHandle.runtimePlan ?? effectivePlan;
+      if (!plan.investigationMission || !plan.profileHandoffs.some(handoff => handoff.surface === 'plan-gate')
+        || preparedRuntime.approvedExecution || turnHandle.approvedPlan || turnHandle.completionDeclaration?.disposition === 'completed') return undefined;
+      return '# Mission Plan Required\nSubmit a plan with plan_artifact for user review, or use ask_user when clarification is needed before planning.';
+    };
     slot = this.getOrCreateAgentSlot({
       agentId: input.agentId,
       providerId: input.providerId,
@@ -455,6 +461,8 @@ export class AgentTurnRunner {
           if (capsule && !turnHandle.completionDeclaration?.result) {
             return '# Delegated Result Required\nThe delegated execution has not declared a structured result. Use turn_complete with result.summary, result.outputs (including the Task completion keys), counterevidence, unresolved, scope, sideEffects and recoveryState. Preserve the actual evidence and choose an honest partial or blocked disposition when work cannot be completed. Do not invent results, reset consumption or alter the deadline.';
           }
+          const planningFeedback = missionPlanningFeedback();
+          if (planningFeedback) return planningFeedback;
           if (!turnHandle.requiresApprovedGoalClosure) return undefined;
           const incomplete = await approvedGoalContinuation();
           if (incomplete) return incomplete;
@@ -699,6 +707,7 @@ export class AgentTurnRunner {
     let completionReceipt: TurnCompletionReceipt | undefined;
     try {
       await activeSlot.agent.prompt(userMessage);
+      if (!turnHandle.isAborted && missionPlanningFeedback()) throw new Error('MISSION_PLAN_REQUIRED: the planning turn ended without a reviewed plan.');
       if (await settleDirectTasks(false)) throw new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.');
       if (turnHandle.completionDeclaration?.disposition === 'cancelled' && !turnHandle.isAborted) {
         throw new Error('TURN_COMPLETION_INVALID: cancelled requires an actual abort and joined execution.');

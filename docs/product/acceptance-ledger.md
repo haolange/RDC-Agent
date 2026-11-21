@@ -5494,13 +5494,13 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 
 ## 2026-11-21：后台任务与右栏
 - 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
-- 结果：真实后台任务完成、另一任务受阻、第三任务取消；徽标与颜色状态可见，720 宽选中标签仍有文字。
+- 结果：真实后台任务完成、另一任务受阻、第三任务取消；徽标与颜色状态可见；720 宽标签不重叠，选中标签保留名称符合设计，判定通过。
 - 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\tasks-desktop.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\tasks-720-open.png`；会话 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_ec7785bc9628\conversation.jsonl`。
 - 人工介入：要求代理只读委派并设置三种真实任务状态。
 
 ## 2026-11-21：知识中心导入
 - 提交：`cbbcc860dde13abe15c364b22dd148c2f9393c3b`
-- 结果：测试案例导入与 Escape 关闭弹窗可用；长预览两行且状态徽章未着色。
+- 结果：测试案例导入与 Escape 关闭弹窗可用；长预览两行；草稿生命周期徽章为中性描边符合设计，徽章判定通过。
 - 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\knowledge-long-preview.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\frontend-report.md`。
 - 人工介入：导入项目测试案例并在验收后删除。
 
@@ -5539,3 +5539,15 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 结果：真实软件 Vulkan 回放，六题评分 6/6；请求快照记录 Medium。
 - 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\evaluation-medium.png`；本地：`node scripts/eval-investigation.mjs 'C:\Users\Vip\AppData\Roaming\rdc-agent\state\sessions\proj_a8f2a2dcb7cd\sess_b7d280bec927'`。
 - 人工介入：新建会话，经 Composer 原样发送评测提示，完成后关闭回放。
+
+## 2026-11-21：Debugger 规划边界复测
+- 提交：`89f0a44896d6c699431edbad316b73ea1748b961`（运行时修复为未提交工作区变更）
+- 结果：GPT-6.1 Sol／Medium 使用同一调查提示；直接终答后同一回合收到运行时计划反馈，随后提交待审阅计划。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\debugger-plan-gate-retest.png`；请求快照目录 `C:\Users\Vip\AppData\Roaming\rdc-agent\state\llm-calls\sess_ccc5968cae1c`。
+- 人工介入：停止待审阅计划，重开后确认无待恢复回放。
+
+## 2026-11-21：会话串显复测
+- 提交：`89f0a44896d6c699431edbad316b73ea1748b961`
+- 结果：两次运行中切换与一次第二回合完成后切换未复现；原串显会话重开及刷新后未见异会话消息。
+- 证据：`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\session-cross-display.png`、`C:\Users\Vip\AppData\Local\Temp\rdc-agent-acceptance-e30459157f964886bc7bd20f212fc39d\evidence\ui04-reopened-dom.json`。
+- 人工介入：经侧栏切换并刷新页面。
