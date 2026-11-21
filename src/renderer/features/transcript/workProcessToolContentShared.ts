@@ -1,6 +1,6 @@
 import { normalizeToolName } from './workProcessToolCatalog';
 import { toRecord, stringifyPreview, createDetailLines, readNestedValue, collectReadableText, extractContentTextFromJsonishString, isJsonLike, isEnvelopeText, ENVELOPE_KEY_PATTERN } from './workProcessContentText';
-import { getDetailsRecord, getRecordArray } from './workProcessWebPresentation';
+import type { getDetailsRecord } from './workProcessWebPresentation';
 import type { Translator } from '../../i18n/messages';
 
 export interface ToolContentInput {
@@ -140,59 +140,10 @@ export const enhanceToolPreviewLines = (
     if (matches.length > 0) return matches;
   }
 
-  if (/read_file|^read$/.test(normalized)) {
-    const lineCount = record?.lineCount
-      ?? record?.lines
-      ?? record?.totalLines
-      ?? readNestedValue(record ?? {}, ['meta', 'lineCount'])
-      ?? readNestedValue(record ?? {}, ['data', 'details', 'totalLines'])
-      ?? readNestedValue(record ?? {}, ['data', 'details', 'lineCount']);
-    if (lineCount !== undefined && lineCount !== null) {
-      return [`${String(lineCount)} lines`, ...previewLines].filter(Boolean).slice(0, 4);
-    }
-  }
-
   if (normalized.startsWith('git_')) {
     const summary = stringifyPreview(record?.summary ?? record?.status ?? record?.output ?? contentRaw);
     const lines = filterEnvelopeLines(createDetailLines(summary, 3));
     if (lines.length > 0) return lines;
-  }
-
-  if (/web_fetch|web_search/.test(normalized)) {
-    const details = getDetailsRecord(record);
-    if (details?.kind === 'search' || normalized === 'web_search') {
-      const resultRecords = getRecordArray(
-        details?.results
-        ?? record?.results
-        ?? readNestedValue(record ?? {}, ['data', 'details', 'results']),
-      );
-      const resultLines = resultRecords.slice(0, 3).flatMap((result, index) => {
-        const title = stringifyPreview(result.title);
-        const url = stringifyPreview(result.url);
-        const source = stringifyPreview(result.source ?? result.domain);
-        const publishedAt = stringifyPreview(result.publishedAt ?? result.date);
-        return [
-          title ? `${index + 1}. ${title}` : '',
-          url,
-          source || publishedAt ? [source ? `Source: ${source}` : '', publishedAt ? `Date: ${publishedAt}` : ''].filter(Boolean).join(' / ') : '',
-        ].filter(Boolean);
-      });
-      const lines = [
-        stringifyPreview(details?.provider) ? `Provider: ${stringifyPreview(details?.provider)}` : '',
-        stringifyPreview(details?.resultCount) ? `Results: ${stringifyPreview(details?.resultCount)}` : '',
-        ...resultLines,
-      ].filter(Boolean);
-      if (lines.length > 0) return lines.slice(0, 8);
-    }
-
-    const status = stringifyPreview(details?.status ?? record?.status ?? record?.statusCode);
-    const statusText = stringifyPreview(details?.statusText ?? record?.statusText);
-    const url = stringifyPreview(details?.url ?? record?.url ?? readNestedValue(record ?? {}, ['data', 'details', 'url']));
-    const lines = [
-      status ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}` : '',
-      url,
-    ].filter(Boolean);
-    if (lines.length > 0) return [...lines, ...previewLines].slice(0, 4);
   }
 
   if (normalized.startsWith('task_') || normalized.startsWith('memory_')) {

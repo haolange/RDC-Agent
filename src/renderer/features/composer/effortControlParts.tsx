@@ -26,17 +26,6 @@ export function resolveSelectedLevel(
   return displayLevels[displayLevels.length - 1] ?? 'off';
 }
 
-export const EFFORT_LABEL_KEYS = {
-  off: 'composer.effort.levelOff',
-  on: 'composer.effort.levelOn',
-  minimal: 'composer.effort.levelMinimal',
-  low: 'composer.effort.levelLow',
-  medium: 'composer.effort.levelMedium',
-  high: 'composer.effort.levelHigh',
-  xhigh: 'composer.effort.levelExtra',
-  max: 'composer.effort.levelMax',
-} as const;
-
 export interface ModelEffortCapsulePresentation {
   modelLabel: string;
   reasoningLabel: string;

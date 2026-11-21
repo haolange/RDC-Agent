@@ -122,15 +122,6 @@
   z-index: var(--z-local-1);
 }
 
-.work-process-thinking-kind {
-  padding: 0 var(--space-1);
-  border: 1px solid var(--token-border-subtle);
-  border-radius: var(--radius-full);
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-line);
-}
-
 .work-process-thinking-preview {
   width: 100%;
   max-width: 100%;

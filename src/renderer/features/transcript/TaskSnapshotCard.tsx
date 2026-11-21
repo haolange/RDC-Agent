@@ -47,7 +47,7 @@ export const TaskSnapshotCard: React.FC<{
                     <summary className="work-process-task-snapshot-title">{item.title}</summary>
                     {item.statusReason ? <p className="work-process-task-snapshot-reason">{reasonText(item.statusReason)}</p> : null}
                     {item.waitingOn?.map(wait => <p className="work-process-task-snapshot-reason" key={wait.taskId}>
-                      {t(`chat.taskDependency.${wait.reason}`, { title: wait.title ?? wait.taskId })}
+                      {t(`chat.taskDependency.${wait.reason}`, { title: wait.title ?? t('chat.taskUntitled') })}
                     </p>)}
                   </details> : <span className="work-process-task-snapshot-title">{item.title}</span>}
                 </li>

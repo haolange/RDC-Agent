@@ -17,6 +17,7 @@ import {
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { usePlanReader } from './PlanReaderHost';
 import { isTrackActivity } from './workProcessTrack';
+import { toolHeadline } from './workProcessHeadline';
 
 const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }> = ({ plan }) => {
   const { t } = useI18n();
@@ -26,7 +27,13 @@ const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }
     onClick={() => { ref.current?.focus(); open(plan); }}>{t('chat.planReviewReadFull')}</Button>;
 };
 
-export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNode; density?: 'normal' | 'compact' }> = ({ row, extraDetail, density = 'normal' }) => {
+export const ToolRow: React.FC<{
+  row: ToolRowModel;
+  extraDetail?: React.ReactNode;
+  density?: 'normal' | 'compact';
+  /** A member of a read group: the group already shows its pill, so the card is its header and details only. */
+  grouped?: boolean;
+}> = ({ row, extraDetail, density = 'normal', grouped = false }) => {
   const { t } = useI18n();
   // A plan row's verb already names its review state; only a real failure adds a status.
   const statusLabel = row.status === 'complete' || (row.approval && row.approval.status !== 'approved') || (row.planReview && row.status !== 'error')
@@ -37,7 +44,8 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
     || Boolean(row.pathChip)
     || Boolean(row.chips?.length)
     || Boolean(row.imagePreviews?.length)
-    || Boolean(row.sourcePills?.length && row.family === 'web');
+    || Boolean(row.webPages?.length)
+    || (row.family === 'file' && Boolean(row.target || row.pathChip));
   const hasRaw = row.argsLines.length > 0 || row.rawLines.length > 0;
   const canExpand = hasDetail || hasRaw || Boolean(extraDetail) || Boolean(row.planReview) || Boolean(row.approval);
   const hasApproval = Boolean(row.approval);
@@ -48,8 +56,8 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
   // Collapsed by default — including while running — so live CoT stays quiet;
   // users expand individual cards when they want detail / Raw.
   const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`tool-${row.id}`, false);
-  const durationTitleFull = row.duration ? `${row.toolName} · ${row.duration}` : row.toolName;
-  const verbLabel = row.verb;
+  const verbLabel = toolHeadline(row, t);
+  const durationTitleFull = row.duration ? `${verbLabel} · ${row.duration}` : verbLabel;
   const approvalAttention = row.approval && row.approval.status !== 'approved'
     ? [row.approval.verb !== verbLabel ? row.approval.verb : '', row.approval.message].filter(Boolean).join(' · ')
     : '';
@@ -86,7 +94,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
             title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{verbLabel}</ActiveSignalText>}
             status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
 
-          {(!isBackgroundWait || expanded) ? <CardBody row={row} /> : null}
+          {(!isBackgroundWait || expanded) && !grouped ? <CardBody row={row} /> : null}
 
           {hasDiagnostic ? (
             <button

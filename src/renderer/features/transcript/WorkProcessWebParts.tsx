@@ -1,72 +1,115 @@
 import React from 'react';
+import { useI18n } from '../../i18n';
 import { FaviconImage } from '../../patterns/FaviconImage';
+import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { Icon } from '../../ui/Icon';
+import { ProximityGlow } from '../../ui/ProximityHost';
+import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
+import { WorkCardHeader } from './WorkCardHeader';
+import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import { isTrackActivity } from './workProcessTrack';
+import { webGroupHeadline } from './workProcessHeadline';
+import type { WorkProcessRow, WorkProcessWebPage } from './workProcessTypes';
 import type { ToolRowModel } from './workProcessToolTypes';
 
-const formatBytes = (bytes: number): string => {
-  if (!Number.isFinite(bytes) || bytes < 0) return '';
+const pageLabel = (page: WorkProcessWebPage) => page.title?.trim() || page.domain;
+
+/**
+ * One line of page pills (favicon + title). It never wraps or counts what is left: pills that do not fit run past the
+ * edge and fade out from 70% of the width. Search results that a later read opened stay bright; the rest dim a step.
+ */
+export const WebPillStrip: React.FC<{ pages: readonly WorkProcessWebPage[]; marksRead?: boolean; showDomains?: boolean }> = ({
+  pages, marksRead = false, showDomains = false,
+}) => {
+  const { t } = useI18n();
+  return (
+    <div className="work-process-web-pills" data-testid="work-process-web-pills">
+      {pages.map((page, index) => {
+        const label = showDomains ? page.domain : pageLabel(page);
+        const tooltip = page.state === 'failed'
+          ? t('chat.webPageFailed', { page: pageLabel(page) })
+          : [page.title, page.url].filter(Boolean).join('\n') || page.domain;
+        const className = `work-process-web-pill is-${page.state}${marksRead && !page.read ? ' is-unread' : ''}`;
+        const content = <>
+          {page.state === 'failed' ? <Icon name="warning" size={14} className="work-process-web-pill-mark" />
+            : <FaviconImage domain={page.domain} />}
+          <span className="work-process-web-pill-label">{label}</span>
+        </>;
+        return page.url && page.state !== 'pending' ? (
+          <a key={`${page.url}:${index}`} className={className} href={page.url} target="_blank" rel="noreferrer noopener"
+            data-tooltip={tooltip} onClick={(event) => event.stopPropagation()}>{content}</a>
+        ) : (
+          <span key={`${page.domain}:${index}`} className={className} data-tooltip={tooltip}>{content}</span>
+        );
+      })}
+    </div>
+  );
+};
+
+/** The expanded list: every page with its title, address and first lines; reads also show their HTTP facts. */
+export const WebPageList: React.FC<{ pages: readonly WorkProcessWebPage[]; meta?: ToolRowModel['webMeta'] }> = ({ pages, meta }) => {
+  const { t } = useI18n();
+  const facts = [
+    meta?.status !== undefined ? t('chat.webPageStatus', { status: meta.status }) : '',
+    meta?.bytes !== undefined ? t('chat.webPageSize', { size: formatSize(meta.bytes) }) : '',
+  ].filter(Boolean);
+  return (
+    <ul className="work-process-web-list" data-testid="work-process-tool-preview">
+      {pages.map((page, index) => (
+        <li key={`${page.url ?? page.domain}:${index}`} className={`work-process-web-item is-${page.state}`}>
+          <FaviconImage domain={page.domain} />
+          <div className="work-process-web-item-copy">
+            {page.url ? (
+              <a className="work-process-web-item-title" href={page.url} target="_blank" rel="noreferrer noopener"
+                onClick={(event) => event.stopPropagation()}>{pageLabel(page)}</a>
+            ) : <span className="work-process-web-item-title">{pageLabel(page)}</span>}
+            <span className="work-process-web-item-url">{page.url ?? page.domain}</span>
+            {page.snippet ? <p className="work-process-web-item-snippet">{page.snippet}</p> : null}
+            {facts.length > 0 && pages.length === 1 ? <span className="work-process-web-item-facts">{facts.join(' · ')}</span> : null}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const formatSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10_240 ? 1 : 0)} KB`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export const SourcePills: React.FC<{ pills: NonNullable<ToolRowModel['sourcePills']> }> = ({ pills }) => (
-  <div className="work-process-source-pills" data-testid="work-process-source-pills">
-    {pills.map((pill) => {
-      const content = (
-        <>
-          <FaviconImage domain={pill.domain} />
-          <span>{pill.domain}</span>
-        </>
-      );
-      return pill.url ? (
-        <a
-          key={`${pill.domain}-${pill.url}`}
-          className="work-process-source-pill"
-          href={pill.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          data-tooltip={pill.title || pill.url}
-          onClick={(event) => event.stopPropagation()}
-        >
-          {content}
-        </a>
-      ) : (
-        <span key={pill.domain} className="work-process-source-pill" data-tooltip={pill.title || pill.domain}>
-          {content}
-        </span>
-      );
-    })}
-  </div>
-);
-
-/** Singular destination row: same pill grammar as search, but one focus chip + soft meta. */
-export const WebPageDestination: React.FC<{ chip: NonNullable<ToolRowModel['pageChip']> }> = ({ chip }) => {
-  const statusLabel = typeof chip.status === 'number' ? String(chip.status) : '';
-  const bytesLabel = typeof chip.bytes === 'number' ? formatBytes(chip.bytes) : '';
-  const tooltip = [chip.title, chip.url].filter(Boolean).join('\n');
-
+/**
+ * Consecutive reads as one card: "读取了 N 个网页", one pill per page, the whole span as its duration. Expanded, each
+ * read is its own header-only card whose details and raw receipt open one level further down.
+ */
+export const WebGroupRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'webGroup' }>; renderMember: (member: ToolRowModel) => React.ReactNode }> = ({
+  row, renderMember,
+}) => {
+  const { t } = useI18n();
+  const [expanded, toggle] = useScopedWorkDisclosure(`web-group-${row.id}`, false);
+  const headline = webGroupHeadline(row, t);
   return (
-    <div className="work-process-web-destination" data-testid="work-process-web-page-chip">
-      <a
-        className="work-process-source-pill is-destination"
-        href={chip.url}
-        target="_blank"
-        rel="noreferrer noopener"
-        data-tooltip={tooltip || chip.url}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <FaviconImage domain={chip.domain} />
-        <span>{chip.domain}</span>
-      </a>
-      {chip.pathLabel ? (
-        <span className="work-process-meta-chip is-path" data-tooltip={chip.pathLabel}>{chip.pathLabel}</span>
-      ) : null}
-      {statusLabel ? (
-        <span className="work-process-meta-chip" data-tooltip={`HTTP ${statusLabel}`}>{statusLabel}</span>
-      ) : null}
-      {bytesLabel ? (
-        <span className="work-process-meta-chip" data-tooltip={bytesLabel}>{bytesLabel}</span>
-      ) : null}
-    </div>
+    <li className={`work-process-step is-appear status-${row.status} kind-tool family-web`} data-testid="work-process-web-group">
+      <WorkProcessRailIcon row={row} />
+      <div className="work-process-step-content">
+        <div className={`work-process-tool-card status-${row.status}${expanded ? ' is-expanded' : ''} is-expandable`}
+          data-testid="work-process-tool-card" data-family="web" data-proximity>
+          <ProximityGlow />
+          <WorkCardHeader onClick={(event) => { event.preventDefault(); toggle(); }} expanded={expanded}
+            tooltip={row.duration ? `${headline} · ${row.duration}` : headline} duration={row.duration}
+            icon={<Icon name="web-fetch" className="work-process-icon work-process-tool-card-icon" />}
+            title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{headline}</ActiveSignalText>} />
+          <div className="work-process-tool-card-body family-web">
+            <WebPillStrip pages={row.pages} />
+          </div>
+          {expanded ? (
+            <div className="work-process-tool-card-expand">
+              <ol className="work-process-steps work-process-web-group-members">{row.members.map(renderMember)}</ol>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </li>
   );
 };

@@ -128,7 +128,9 @@ it('shows the parent receipt and task when admission fails before a child trace 
   const failedRow = { ...row, status: 'error' as const, resultPreview: 'SUBAGENT_BUDGET: child wall time exceeded' };
   try {
     const opened = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row: failedRow, sessionId: 's1' })), 'text/html');
-    expect(opened.querySelector('.work-process-subagent-receipt-error[role="alert"]')?.textContent).toContain('SUBAGENT_BUDGET');
+    const failure = opened.querySelector('.ui-inline-error[role="alert"]');
+    expect(failure?.querySelector('.ui-inline-error-message')?.textContent).toBe('chat.subagentFailedSummary');
+    expect(failure?.querySelector('.ui-inline-error-detail-text')?.textContent).toContain('SUBAGENT_BUDGET');
     expect(opened.querySelector('.work-process-subagent-task')?.textContent).toContain(task);
     expect(opened.querySelector('.work-process-subagent-task')?.textContent).not.toContain('chat.subagentContentUnavailable');
   } finally {

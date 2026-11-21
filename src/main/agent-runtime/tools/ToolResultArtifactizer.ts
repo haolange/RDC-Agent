@@ -5,6 +5,7 @@ import {
   formatSessionArtifactUri,
   type SessionArtifactizedEnvelope,
 } from '@shared/types/sessionArtifact';
+import { toolResultDisplay } from '@shared/utils/toolResultDisplay';
 import { sha256Hex } from '../../runtime/contentHash';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
@@ -199,6 +200,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     // replacing them with a URI would make read_image look successful while the
     // model never receives pixels.
     const imageBlocks = result.content.filter((block) => block.type === 'image' && Boolean(block.data));
+    const display = toolResultDisplay(input.toolName, result.details);
     return {
       isError: result.isError,
       content: [
@@ -217,6 +219,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
         owner: record.owner,
         ownerScope: record.ownerScope,
         source: record.source,
+        ...(display ? { display } : {}),
       },
     };
   } catch (error) {

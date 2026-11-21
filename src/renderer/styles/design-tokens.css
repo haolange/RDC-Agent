@@ -510,6 +510,9 @@
   --control-radius:            var(--radius-lg);
   --control-radius-pill:       var(--radius-full);
   --control-padding-x:         var(--space-3);
+  /* Display chips (page pills, source pills): not controls, so one step below sm. */
+  --chip-height:               24px;
+  --chip-icon-size:            14px;
 
   /* ── Component: Button ── */
   --btn-height-sm:             var(--control-height-sm);

@@ -3,7 +3,7 @@ import { workProcessSectionModel } from './workProcessSectionModel';
 import type { WorkProcessRow } from './workProcessTypes';
 
 const thinking: WorkProcessRow = { type: 'thinking', id: 'think', status: 'complete', duration: '', preview: 'Checked the pass',
-  label: 'Thought', kind: 'summary', kindLabel: '', visibility: 'summary', thinkingStatus: 'complete', expandable: true, openByDefault: false };
+  label: 'Thought', kind: 'summary', visibility: 'summary', thinkingStatus: 'complete', expandable: true, openByDefault: false };
 const commentary: WorkProcessRow = { type: 'output', id: 'say', status: 'complete', text: 'Reading the draw', phase: 'commentary', duration: '' };
 const answer: WorkProcessRow = { type: 'output', id: 'answer', status: 'complete', text: 'Done', phase: 'final_answer', duration: '' };
 const tool = { type: 'tool', id: 'read', status: 'complete', duration: '0.4s' } as WorkProcessRow;

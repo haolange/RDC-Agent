@@ -4,7 +4,7 @@ import { formatToolApprovalReason } from '../../lib/toolApprovalText';
 import { type WorkProcessRow, type WorkProcessToolApproval, type WorkProcessRowStatus } from './workProcessTypes';
 import { normalizeToolName, getToolDisplay, getToolFamily, formatMcpTarget } from './workProcessToolCatalog';
 import { createUserInputRow, createPlanReviewShellRow } from './workProcessDecisionRows';
-import { parsePreview, createDetailLines, prettyPrint, toRecord, readNestedString, isJsonLike, readNestedValue, stringifyPreview, isRawPayloadPreview } from './workProcessContentText';
+import { parsePreview, createDetailLines, prettyPrint, toRecord, readNestedString, isJsonLike, readNestedValue, stringifyPreview, isRawPayloadPreview, isInternalAddress } from './workProcessContentText';
 import { unwrapToolContentLayer } from './workProcessToolContent';
 import { emptyUnwrappedContent, sanitizeContentText } from './workProcessToolContentShared';
 import { extractWebToolPresentation } from './workProcessWebPresentation';
@@ -72,8 +72,9 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
         : createDetailLines(sanitizeContentText(call.error), 4)
     )
     : unwrapped.previewLines;
-  const webPresentation = extractWebToolPresentation(call.toolName, parsedResult);
-  const diagnosticCaption = status === 'error'
+  const webPresentation = extractWebToolPresentation(call.toolName, parsedResult, call.argsPreview, status);
+  // A failed read or search already says so in its title and on its pill; the HTTP reason stays in the raw receipt.
+  const diagnosticCaption = status === 'error' && !webPresentation.webPages && !webPresentation.webQuery
     ? (extractDiagnosticCaption(
       parsePreview(call.resultPreview) ?? parsedResult,
       call.error || call.resultPreview,
@@ -93,6 +94,8 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
     toolName: call.toolName,
     target: getToolTarget(call.toolName, call.argsPreview),
     duration: formatDurationMs(call.executionStartedAt, call.completedAt),
+    startedAt: call.executionStartedAt,
+    completedAt: call.completedAt,
     argsLines: createDetailLines(prettyPrint(call.argsPreview), 10),
     previewLines,
     rawLines: suppressApprovalPreview ? [] : createDetailLines(prettyPrint(call.error || call.resultPreview), 40),
@@ -263,7 +266,7 @@ const getToolTarget = (toolName: string, argsPreview?: string): string => {
 
   for (const key of TARGET_KEYS) {
     const text = stringifyPreview(record[key]);
-    if (text) return compactText(text, 180);
+    if (text) return isInternalAddress(text) ? '' : compactText(text, 180);
   }
 
   const fallback = Object.entries(record)

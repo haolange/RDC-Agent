@@ -1,10 +1,11 @@
 import React from 'react';
+import { EFFORT_LABEL_KEYS } from '../../lib/reasoningLabels';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { Chevron } from '../../ui/Chevron';
 import { Switch } from '../../ui/Switch';
-import { EFFORT_LABEL_KEYS, EffortModeIconButton, getStopPosition } from './effortControlParts';
+import { EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import { EffortMaxField } from './EffortMaxField';
 import type { MaxVisualTimeline } from './maxVisual';

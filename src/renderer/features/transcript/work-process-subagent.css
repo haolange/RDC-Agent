@@ -186,3 +186,19 @@
 
 .work-process-subagent-more:hover,
 .work-process-subagent-more:focus-visible { background: color-mix(in srgb, var(--token-interactive-hover) 30%, var(--transcript-card-surface)); }
+
+/* Header identity: the agent's name, then its model and effort one text level down. */
+.work-process-subagent-identity {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.work-process-subagent-route {
+  overflow: hidden;
+  color: var(--token-text-secondary);
+  font-weight: var(--font-normal);
+  text-overflow: clip;
+  white-space: nowrap;
+}

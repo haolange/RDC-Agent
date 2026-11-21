@@ -315,7 +315,6 @@ work-process-image-group
 work-process-image-thumbs
 work-process-output
 work-process-section
-work-process-source-pills
 work-process-subagent
 work-process-subagent-details
 work-process-task-snapshot
@@ -329,4 +328,5 @@ work-process-tool-preview
 work-process-tool-raw
 work-process-user-input
 work-process-user-input-transcript
-work-process-web-page-chip
+work-process-web-group
+work-process-web-pills

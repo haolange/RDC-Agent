@@ -29,6 +29,13 @@ export const contracts = {
     motion: '运行标识来自任务状态；展开不重置历史，也不恢复已结束的运行效果。',
     consumers: 'features/transcript/WorkProcessRows.tsx',
   },
+  'Working · 网页': {
+    avoid: '不在卡片上显示状态码、字节数、哈希或 session:// 地址；不把网页卡并入通用「N 个工具」汇总。',
+    states: '读取中、已读取、读取失败；搜索结果已读与未读；连续读取合并为一张卡。',
+    layout: '胶囊单行不换行，从宽度 70% 处渐隐；展开后列出全部页面与摘要。',
+    motion: '运行中胶囊逐个淡入；靠近高亮只在指针设备出现；减少动效时停用进场。',
+    consumers: 'features/transcript/WorkProcessWebParts.tsx',
+  },
   RightRailTaskList: {
     avoid: '不从选中状态推断 running，不显示其它会话的后台任务。',
     states: '空任务、各任务终态、活动任务、长名称、定位目标不可见。',

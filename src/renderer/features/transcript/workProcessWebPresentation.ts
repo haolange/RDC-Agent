@@ -1,5 +1,6 @@
-import { toRecord, readNestedValue, stringifyPreview } from './workProcessContentText';
+import { toRecord, readNestedValue, stringifyPreview, parsePreview } from './workProcessContentText';
 import { normalizeToolName } from './workProcessToolCatalog';
+import type { WorkProcessRowStatus, WorkProcessWebPage } from './workProcessTypes';
 
 export const getDetailsRecord = (record: Record<string, unknown> | null | undefined): Record<string, unknown> | null => {
   if (!record) return null;
@@ -8,103 +9,90 @@ export const getDetailsRecord = (record: Record<string, unknown> | null | undefi
     ?? toRecord(readNestedValue(record, ['result', 'details']));
 };
 
-const resolveUrlHostname = (url: string): string => {
+const hostname = (url: string): string => {
   try {
-    return new URL(url).hostname || url;
+    return new URL(url).hostname.replace(/^www\./, '') || url;
   } catch {
     return url;
   }
 };
 
-const resolveSourceDomain = (result: Record<string, unknown>): string => {
-  const url = stringifyPreview(result.url);
-  const source = stringifyPreview(result.source ?? result.domain);
-  if (source) return source.replace(/^https?:\/\//i, '').split('/')[0] || source;
-  if (url) return resolveUrlHostname(url);
-  return '';
+/** One page identity for matching reads against search results: scheme, `www.`, fragments and trailing slashes do not count. */
+export const normalizeWebUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '');
+    return `${parsed.hostname.replace(/^www\./, '')}${path}${parsed.search}`.toLowerCase();
+  } catch {
+    return url.trim().toLowerCase();
+  }
 };
 
+const getRecordArray = (value: unknown): Array<Record<string, unknown>> => {
+  if (!Array.isArray(value)) return [];
+  return value.map(toRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+};
+
+const pageState = (status: WorkProcessRowStatus): WorkProcessWebPage['state'] =>
+  status === 'error' || status === 'cancelled' ? 'failed' : status === 'complete' || status === 'skipped' ? 'done' : 'pending';
+
+export interface WebToolPresentation {
+  /** Search results, or the one page a read targets, in order; each renders as a pill. */
+  webPages?: WorkProcessWebPage[];
+  /** The query a search ran. */
+  webQuery?: string;
+  /** Technical facts of a read, shown only in the expanded detail. */
+  webMeta?: { path?: string; status?: number; bytes?: number };
+}
+
+/**
+ * Pages and query for web_fetch and web_search, from the tool's details or, after the result was offloaded to a session
+ * file, from the display gist the offload kept. A running call already shows the page or query from its arguments.
+ */
 export const extractWebToolPresentation = (
   toolName: string,
   parsedResult: unknown,
-): {
-  sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
-  pageChip?: {
-    domain: string;
-    url: string;
-    pathLabel?: string;
-    title?: string;
-    status?: number;
-    bytes?: number;
-  };
-} => {
+  argsPreview: string | undefined,
+  status: WorkProcessRowStatus,
+): WebToolPresentation => {
   const normalized = normalizeToolName(toolName);
-  const record = toRecord(parsedResult);
-  const details = getDetailsRecord(record);
+  if (normalized !== 'web_fetch' && normalized !== 'web_search') return {};
+  const details = getDetailsRecord(toRecord(parsedResult));
+  const display = toRecord(details?.display);
+  const args = toRecord(parsePreview(argsPreview));
+  const state = pageState(status);
 
-  if (normalized === 'web_search' || details?.kind === 'search') {
-    const resultRecords = getRecordArray(
-      details?.results
-      ?? record?.results
-      ?? readNestedValue(record ?? {}, ['data', 'details', 'results']),
-    );
-    const sourcePills = resultRecords
-      .slice(0, 6)
-      .map((result) => {
-        const domain = resolveSourceDomain(result);
-        if (!domain) return null;
-        const url = stringifyPreview(result.url) || undefined;
-        const title = stringifyPreview(result.title) || undefined;
-        return { domain, url, title } as { domain: string; url?: string; title?: string };
-      })
-      .filter((entry): entry is { domain: string; url?: string; title?: string } => entry != null);
-    return sourcePills.length > 0 ? { sourcePills } : {};
+  if (normalized === 'web_search') {
+    const source = display ?? details;
+    const webQuery = stringifyPreview(source?.query ?? args?.query) || undefined;
+    const results = getRecordArray(source?.results);
+    const webPages = results.flatMap((result) => {
+      const url = stringifyPreview(result.url);
+      if (!url) return [];
+      const title = stringifyPreview(result.title) || undefined;
+      const snippet = stringifyPreview(result.snippet) || undefined;
+      return [{ url, domain: hostname(url), title, snippet, state: 'done' as const }];
+    });
+    return { ...(webQuery ? { webQuery } : {}), ...(webPages.length ? { webPages } : {}) };
   }
 
-  if (normalized === 'web_fetch' || details?.kind === 'fetch') {
-    const url = stringifyPreview(
-      details?.url
-      ?? record?.url
-      ?? readNestedValue(record ?? {}, ['data', 'details', 'url']),
-    );
-    if (!url) return {};
-    const domain = resolveUrlHostname(url);
-    if (!domain) return {};
-    let pathLabel: string | undefined;
-    try {
-      const parsed = new URL(url);
-      const combined = `${parsed.pathname || '/'}${parsed.search || ''}`;
-      if (combined && combined !== '/') {
-        pathLabel = combined.length > 48 ? `${combined.slice(0, 47)}…` : combined;
-      }
-    } catch {
-      pathLabel = undefined;
-    }
-    const statusRaw = details?.status ?? record?.status ?? readNestedValue(record ?? {}, ['data', 'details', 'status']);
-    const bytesRaw = details?.bytes ?? record?.bytes ?? readNestedValue(record ?? {}, ['data', 'details', 'bytes']);
-    const title = stringifyPreview(
-      details?.title
-      ?? record?.title
-      ?? readNestedValue(record ?? {}, ['data', 'details', 'title']),
-    ) || undefined;
-    const status = typeof statusRaw === 'number' && Number.isFinite(statusRaw) ? statusRaw : undefined;
-    const bytes = typeof bytesRaw === 'number' && Number.isFinite(bytesRaw) ? bytesRaw : undefined;
-    return {
-      pageChip: {
-        domain,
-        url,
-        ...(pathLabel ? { pathLabel } : {}),
-        ...(title ? { title } : {}),
-        ...(status !== undefined ? { status } : {}),
-        ...(bytes !== undefined ? { bytes } : {}),
-      },
-    };
+  const source = display ?? details;
+  const url = stringifyPreview(source?.url ?? args?.url);
+  if (!url) return {};
+  const title = stringifyPreview(source?.title) || undefined;
+  const statusCode = typeof source?.status === 'number' && Number.isFinite(source.status) ? source.status : undefined;
+  const bytes = typeof details?.bytes === 'number' && Number.isFinite(details.bytes) ? details.bytes : undefined;
+  let path: string | undefined;
+  try {
+    const parsed = new URL(url);
+    const combined = `${parsed.pathname || '/'}${parsed.search || ''}`;
+    path = combined !== '/' ? combined : undefined;
+  } catch {
+    path = undefined;
   }
-
-  return {};
-};
-
-export const getRecordArray = (value: unknown): Array<Record<string, unknown>> => {
-  if (!Array.isArray(value)) return [];
-  return value.map(toRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const failed = state === 'failed' || (statusCode !== undefined && statusCode >= 400);
+  return {
+    webPages: [{ url, domain: hostname(url), title, state: failed ? 'failed' : state }],
+    webMeta: { ...(path ? { path } : {}), ...(statusCode !== undefined ? { status: statusCode } : {}), ...(bytes !== undefined ? { bytes } : {}) },
+  };
 };

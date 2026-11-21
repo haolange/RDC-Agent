@@ -31,7 +31,7 @@ const total = asFiniteNumber(
 
 const bodyLines = previewLines.slice(0, 3);
 
-let bodyText = total != null ? `${total} items` : undefined;
+let bodyText = total != null ? t('chat.previewItems', { count: total }) : undefined;
 
 if (!bodyText && previewLines[0]) {
     bodyText = compactText(previewLines[0].replace(/\s+/g, ' ').trim(), 72);

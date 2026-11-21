@@ -6,11 +6,11 @@ import {
   isFastModeUnverified,
   isMaxContextUnverified,
 } from '../../lib/turnControlsUtils';
+import { EFFORT_LABEL_KEYS } from '../../lib/reasoningLabels';
 import { capabilityStatusPresentation } from './capabilityPresentation';
 import {
   buildDisplaySelections,
   clampSliderRatio,
-  EFFORT_LABEL_KEYS,
   getStopPosition,
   resolveNearestSnapLevel,
   resolveSelectedLevel,

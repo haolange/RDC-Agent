@@ -18,14 +18,13 @@ export const WorkProcessThinking: React.FC<{ row: ThinkingRow }> = ({ row }) => 
   const [open, toggle] = useScopedWorkDisclosure(`thinking-${row.id}`, row.openByDefault);
   const label = <><Icon name="spark" className="work-process-icon work-process-thinking-icon" />
     <ActiveSignalText active={active} tone="info">{row.label}</ActiveSignalText></>;
-  const kindLabel = row.kindLabel ? <span className="work-process-thinking-kind">{row.kindLabel}</span> : null;
   if (row.expandable) return <details className={className} open={open}>
     <summary className="work-process-thinking-summary" data-work-node-heading onClick={(event) => { event.preventDefault(); toggle(); }}>
-      {label}{kindLabel}<Chevron size={12} className="work-process-row-caret" />
+      {label}<Chevron size={12} className="work-process-row-caret" />
     </summary>
     <div className="work-process-thinking-preview"><MessageMarkdown content={row.preview} deferHeavyPlugins={active} /></div>
   </details>;
-  return row.label ? <p className={`${className} work-process-thinking-caption`} data-work-node-heading>{label}{kindLabel}</p> : null;
+  return row.label ? <p className={`${className} work-process-thinking-caption`} data-work-node-heading>{label}</p> : null;
 };
 
 export const WorkProcessThinkingRow: React.FC<{ row: ThinkingRow }> = ({ row }) => (

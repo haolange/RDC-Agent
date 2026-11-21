@@ -364,7 +364,7 @@ assert(
 );
 const summaryThinkingRow = sectionThinking(summaryThinkingSection);
 assert(summaryThinkingRow?.label === '已思考 · 5ms', 'summary thinking should use 已思考 · duration settled label');
-assert(summaryThinkingRow.kindLabel === '摘要', 'a provider summary is labeled as a summary so a short one does not read as missing reasoning');
+assert(!('kindLabel' in summaryThinkingRow), 'a provider summary carries no badge: the settled label and duration already say it was thought');
 assert(summaryThinkingRow.openByDefault === false, 'final-answer quiet thinking stays folded by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
@@ -749,12 +749,11 @@ const webSearchPresentation = buildWorkProcessPresentation({
 }, t);
 const webSearchRow = flattenRows(webSearchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_search');
 assert(webSearchRow?.verb === '已联网搜索', 'web_search should use dedicated web search verb');
-assert(webSearchRow.previewLines.includes('Provider: DuckDuckGo HTML'), 'web_search preview should include provider');
-assert(webSearchRow.previewLines.includes('https://renderdoc.org/'), 'web_search preview should include first result URL');
-assert(Array.isArray(webSearchRow.sourcePills) && webSearchRow.sourcePills.length > 0, 'web_search should expose source pills');
-assert(webSearchRow.sourcePills.some((pill) => pill.domain === 'renderdoc.org'), 'web_search source pill should include result domain');
-assert(webSearchRow.sourcePills.every((pill) => pill.domain), 'web_search source pills must carry domain labels');
-assert(!webSearchRow.pageChip, 'web_search must not use web_fetch pageChip');
+assert(webSearchRow.webQuery === 'RenderDoc', 'web_search carries its query for the 搜索「…」 headline');
+assert(webSearchRow.webPages?.length === 1 && webSearchRow.webPages[0].domain === 'renderdoc.org', 'web_search lists each result as a page pill with its domain');
+assert(webSearchRow.webPages[0].title === 'RenderDoc' && webSearchRow.webPages[0].snippet === 'Graphics debugger.', 'web_search keeps result titles and snippets for the expanded list');
+assert(webSearchRow.webPages[0].read !== true, 'a search result nobody read stays unread (dimmed)');
+assert(!webSearchRow.previewLines.some((line) => /Provider:|Results:/.test(line)), 'web_search surfaces no provider or count lines');
 
 const webFetchPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -800,13 +799,11 @@ const webFetchPresentation = buildWorkProcessPresentation({
 const webFetchRow = flattenRows(webFetchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_fetch');
 assert(webFetchRow?.verb === '已抓取', 'web_fetch should use Fetched page/已抓取 verb');
 assert(webFetchRow?.icon === 'web-fetch', 'web_fetch should use dedicated webFetch icon');
-assert(webFetchRow?.pageChip?.domain === 'www.example.com', 'web_fetch should expose pageChip domain');
-assert(webFetchRow?.pageChip?.url === 'https://www.example.com/docs/guide', 'web_fetch pageChip should keep url');
-assert(webFetchRow?.pageChip?.pathLabel === '/docs/guide', 'web_fetch pageChip should expose pathLabel');
-assert(webFetchRow?.pageChip?.status === 200, 'web_fetch pageChip should expose status');
-assert(webFetchRow?.pageChip?.bytes === 2048, 'web_fetch pageChip should expose bytes');
-assert(webFetchRow?.pageChip?.title === 'Example Guide', 'web_fetch pageChip should expose title');
-assert(!webFetchRow?.sourcePills?.length, 'web_fetch must not reuse search source pills');
+const fetchedPage = webFetchRow?.webPages?.[0];
+assert(webFetchRow?.webPages?.length === 1 && fetchedPage.domain === 'example.com', 'web_fetch shows the one page it read, www. dropped from the site');
+assert(fetchedPage.url === 'https://www.example.com/docs/guide' && fetchedPage.title === 'Example Guide' && fetchedPage.state === 'done', 'web_fetch page keeps url, title and a settled state');
+assert(webFetchRow.webMeta?.path === '/docs/guide' && webFetchRow.webMeta.status === 200 && webFetchRow.webMeta.bytes === 2048, 'path, HTTP status and bytes stay in the expanded facts');
+assert(!webFetchRow.bodyText && webFetchRow.previewLines.length === 0, 'web_fetch lifts no metadata line (URL, status, sha256) onto the card');
 assert(webFetchRow?.icon !== webSearchRow?.icon, 'web_fetch and web_search icons must differ');
 
 const shellEnvelopePresentation = buildWorkProcessPresentation({
@@ -1264,7 +1261,9 @@ assert(!componentSource.includes('work-process-preview-toggle'), 'nested Console
 
 assert(!cssSource.includes('.work-process-tool-group'), 'tool group styling must be removed');
 assert(!cssSource.includes('.work-process-step-group'), 'semantic step group styling must be removed');
-assert(cssSource.includes('.work-process-source-pills') || cssSource.includes('.work-process-source-pill'), 'web source pill styling should exist');
+assert(/\.work-process-web-pills\s*\{[^}]*flex-wrap:\s*nowrap[^}]*mask-image:\s*linear-gradient\(to right, rgb\(0 0 0\) 70%, transparent\)/.test(cssSource), 'page pills stay on one line and fade from 70% of the width');
+assert(cssSource.includes('.work-process-web-pill.is-unread'), 'unread search results dim one step');
+assert(!cssSource.includes('.work-process-source-pill') && !cssSource.includes('.work-process-meta-chip'), 'retired source pill and meta chip styling must not return');
 assert(cssSource.includes('.work-process-step.is-appear'), 'step appear animation should exist');
 assert(!cssSource.includes('.work-process-response'), 'response boundary styling must be removed');
 assert(

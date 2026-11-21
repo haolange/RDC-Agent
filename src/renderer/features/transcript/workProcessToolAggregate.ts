@@ -1,4 +1,6 @@
 import { groupImageRows } from './groupImageRows';
+import { groupWebRows } from './groupWebRows';
+import { formatDurationMs } from './workProcessFormat';
 import type { Translator } from '../../i18n/messages';
 import type { WorkProcessRow, WorkProcessRowStatus, WorkProcessToolGroupKind } from './workProcessTypes';
 
@@ -51,7 +53,11 @@ function deriveStatus(rows: ToolRow[]): WorkProcessRowStatus {
   return 'complete';
 }
 
+/** The summary row's time is the whole run, not the first tool's. */
 function formatDuration(rows: ToolRow[]): string {
+  const starts = rows.flatMap((row) => (row.startedAt ? [row.startedAt] : []));
+  const ends = rows.flatMap((row) => (row.completedAt ? [row.completedAt] : []));
+  if (starts.length && ends.length === rows.length) return formatDurationMs(Math.min(...starts), Math.max(...ends));
   return rows.map((row) => row.duration).find(Boolean) ?? '';
 }
 
@@ -80,8 +86,9 @@ export function aggregateSectionSteps(steps: WorkProcessRow[], t: Translator, se
     pendingTools = [];
   };
 
-  for (const step of groupImageRows(steps)) {
-    if (step.type === 'tool' && !step.imageCalls && !step.planReview) {
+  // Web reads group first, and no read or search card is ever folded into the generic "N tools" summary.
+  for (const step of groupImageRows(groupWebRows(steps))) {
+    if (step.type === 'tool' && step.family !== 'web' && !step.imageCalls && !step.planReview) {
       pendingTools.push(step);
       continue;
     }

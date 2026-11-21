@@ -128,9 +128,8 @@
   width: 100%;
 }
 
-.work-process-tool-card-body.family-web .work-process-source-pills {
+.work-process-tool-card-body.family-web .work-process-web-pills {
   width: 100%;
-  justify-content: flex-start;
 }
 
 .work-process-tool-card-body.family-search,

@@ -7,8 +7,8 @@ import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useOverlayDismiss } from '../../lib/overlayStack';
 import { Chevron } from '../../ui/Chevron';
+import { EFFORT_LABEL_KEYS } from '../../lib/reasoningLabels';
 import { useComposerMenu } from './useComposerMenuRegistry';
-import { EFFORT_LABEL_KEYS } from './effortControlParts';
 import { useComposerTurnControls } from './ComposerTurnControlsContext';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import { buildModelEffortCapsulePresentation } from './effortControlParts';

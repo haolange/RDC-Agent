@@ -16,7 +16,7 @@ const CEILINGS = {
   'raw-error-render': 0,
   'literal-color': 3,
   'i18n-same-value': 24,
-  'bare-alert': 7,
+  'bare-alert': 6,
 };
 
 /** Proper nouns stay English in every locale: Agent and mode names, product names, RenderDoc and protocol terms. */

@@ -4,9 +4,10 @@ import { ModeGlyph } from '../../ui/ModeGlyph';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useI18n } from '../../i18n';
-import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import { ProximityGlow } from '../../ui/ProximityHost';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
+import { EFFORT_LABEL_KEYS, isReasoningLevelLabel } from '../../lib/reasoningLabels';
 import { getToolVerb } from './workProcessToolRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
@@ -23,6 +24,7 @@ import { WorkCardHeader } from './WorkCardHeader';
 import { SubagentProgressDots } from './SubagentProgressDots';
 import { WorkDisclosure, FadingPreview } from './WorkDisclosure';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import { useModelDisplayLabel } from './useModelDisplayLabel';
 import type { AgentMode } from '@shared/types/layout';
 import type { WorkProcessRow } from './workProcessTypes';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
@@ -99,13 +101,19 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
   const latest = header?.latestAction
     ? getToolVerb(header.latestAction, header.latestActionStatus ?? 'complete', undefined, undefined, t)
     : active ? t('chat.subagentStillRunning') : t('chat.subagentProcessEnded');
-  const processPreview = page.total ? `${latest} · ${t('chat.subagentStepCount', { count: page.total })}` : latest;
+  const processPreview = latest;
   const finalPreview = headerLoading ? t('chat.subagentLoading') : header?.finalPreview || (header?.finalUnavailableReason
     ? t('chat.subagentContentUnavailable') : active ? t('chat.subagentStillRunning')
       : t('chat.subagentNoFinal'));
   const finalAvailable = !!header?.finalAvailable;
   const finalShownInProcess = workOpen && page.steps.some((step) => step.block.items
     ?.some((item) => item.kind === 'text' && item.phase === 'final_answer'));
+  const route = header?.preparedRoute;
+  const modelLabel = useModelDisplayLabel(route?.providerId, route?.modelId);
+  // The glyph already says this is a delegation; the header names the Agent, then the model and its reasoning level.
+  const routeLabel = route && modelLabel
+    ? [modelLabel, isReasoningLevelLabel(route.reasoningLevel) ? t(EFFORT_LABEL_KEYS[route.reasoningLevel]) : ''].filter(Boolean).join(' · ')
+    : '';
   const progressDots = <SubagentProgressDots state={active ? 'active' : status === 'complete' ? 'complete' : 'stopped'} />;
   return <li ref={cardRef} className="work-process-step kind-subagent" data-work-process-block-id={row.id}>
     <WorkProcessRailIcon row={row} active={status === 'running'} />
@@ -113,7 +121,8 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
     <ProximityGlow />
     <WorkCardHeader onClick={() => openCard(active)} expanded={expanded} controls={contentId}
       icon={<ModeGlyph mode={mode} icon={definition?.icon ?? undefined} className="work-process-tool-card-icon" />}
-      title={`${t('chat.subagentIdentity')} · ${agentLabel}${header?.preparedRoute ? ` · ${header.preparedRoute.providerId}/${header.preparedRoute.modelId} · ${header.preparedRoute.reasoningLevel}` : ''}`} duration={headerLoading ? undefined : duration}
+      title={<span className="work-process-subagent-identity">{agentLabel}{routeLabel ? <span className="work-process-subagent-route">{routeLabel}</span> : null}</span>}
+      tooltip={routeLabel ? `${agentLabel} · ${routeLabel}` : agentLabel} duration={headerLoading ? undefined : duration}
       status={<span className={`work-process-subagent-status is-${status}`}>
         {status === 'queued' ? t('chat.subagentQueued')
           : status === 'waiting' ? t('chat.subagentWaiting')
@@ -128,12 +137,13 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       trailingPreview={expanded ? undefined : progressDots} />
     {expanded ? <div id={contentId} className="work-process-subagent-body">
       {page.error ? <p className="work-process-subagent-receipt-error" role="status">{t('chat.subagentTraceUnavailable')}</p> : null}
-      {header?.status === 'failed' && header.configurationError ? <div role="alert">
-        <p className="work-process-subagent-receipt-error">{header.error}</p>
-        <Button size="sm" onClick={() => openAgentSettings(header.profile)}>{t('chat.subagentOpenAgentSettings')}</Button>
-      </div> : null}
+      {header?.status === 'failed' && header.configurationError ? (
+        <InlineError detail={header.error} onRetry={() => openAgentSettings(header.profile)} retryLabel={t('chat.subagentOpenAgentSettings')}>
+          {t('chat.subagentConfigurationFailed')}
+        </InlineError>
+      ) : null}
       {!headerLoading && !header && status === 'failed' && row.resultPreview
-        ? <p className="work-process-subagent-receipt-error" role="alert">{row.resultPreview}</p> : null}
+        ? <InlineError detail={row.resultPreview}>{t('chat.subagentFailedSummary')}</InlineError> : null}
       <div className="work-process-subagent-task" aria-label={t('chat.subagentTask')}>
         {headerLoading ? <span className="work-process-subagent-note">{t('chat.subagentLoading')}</span> : null}
         {!headerLoading && !header && row.task ? <span className="work-process-subagent-note">{row.task}</span> : null}
@@ -141,7 +151,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
           executionId={header?.executionId} generation={header?.generation} kind="task" taskDisclosure={{ factsOpen, constraintsOpen, toggle }} open={expanded} available={!!header?.taskAvailable} />
         {!headerLoading && header && !header.taskAvailable ? <span className="work-process-subagent-note">{t('chat.subagentContentUnavailable')}</span> : null}
       </div>
-      <WorkDisclosure title={t('chat.subagentProcess')} meta={page.total ? t('chat.subagentStepCount', { count: page.total }) : undefined} preview={processPreview} open={workOpen}
+      <WorkDisclosure title={t('chat.subagentProcess')} preview={processPreview} open={workOpen}
         onToggle={() => toggle('workOpen')} bodyClassName="work-process-subagent-process-body">
         {loading || headerLoading ? <span className="work-process-subagent-note">{t('chat.subagentLoading')}</span> : null}
         {page.error ? <button type="button" className="work-process-subagent-more" onClick={retry}>{t('chat.subagentRetry')}</button> : null}
@@ -157,7 +167,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
           : <DelegationBody sessionId={sessionId} parentToolCallId={row.id} childSessionId={header?.childSessionId}
             executionId={header?.executionId} generation={header?.generation} kind="final" open={finalOpen} available={finalAvailable} />}
       </WorkDisclosure>
-      <WorkDisclosure title={t('chat.subagentDetails')} preview={t('chat.subagentDetailsPreview')} open={detailsOpen}
+      <WorkDisclosure title={t('chat.subagentDetails')} open={detailsOpen}
         onToggle={() => toggle('detailsOpen')}>
         <ScopedWorkDisclosure scope={`${sessionId ?? ''}:${row.id}:details`}><SubagentCallDetails header={header} sessionId={sessionId} parentToolCallId={row.id}
           executionId={row.executionId} generation={row.generation} /></ScopedWorkDisclosure>
