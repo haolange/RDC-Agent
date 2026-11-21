@@ -8,6 +8,7 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
+import { Icon } from '../../ui/Icon';
 import { useI18n } from '../../i18n';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import {
@@ -104,7 +105,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     <div className="capture-replay-status-row">
       <h2 className="right-rail-section-heading">{t('control.rightRail.capture.title')}</h2>
       <CaptureReplayStatusChip label={t(captureStatusLabelKey({ pending, partial, phase: state?.phase }))} tone={statusTone} />
-      <Button variant="ghost" size="sm" aria-label={t('control.replay.more')} aria-expanded={more} onClick={() => setMore(!more)}>⋯</Button>
+      <Button variant="ghost" size="sm" aria-label={t('control.replay.more')} aria-expanded={more} onClick={() => setMore(!more)}><Icon name="more" /></Button>
     </div>
     {more && <div className="capture-replay-menu">
       <Button variant="ghost" size="sm" disabled={!state?.contextId} onClick={() => {
@@ -121,7 +122,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       <Select dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={targetDeviceId} disabled={deviceDisabled}
         options={[...devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: device.type === 'android' && device.adbState !== 'device' })), ...(devices.some((device) => device.id === targetDeviceId) ? [] : [{ value: targetDeviceId, label: targetDeviceId, disabled: true }])]}
         onChange={(deviceId) => { void useSessionDeviceStore.getState().prepare(scope, deviceId); }} />
-      <Button variant="ghost" size="sm" aria-label={t('control.replay.refresh')} aria-busy={action === 'refresh'} disabled={disabled} onClick={() => void run('refresh')}>↻</Button>
+      <Button variant="ghost" size="sm" aria-label={t('control.replay.refresh')} aria-busy={action === 'refresh'} disabled={disabled} onClick={() => void run('refresh')}><Icon name="refresh" /></Button>
       <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput || (!open && !deviceReady)} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
     </div>
     {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {devices.find((device) => device.id === actualDeviceId)?.label}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}

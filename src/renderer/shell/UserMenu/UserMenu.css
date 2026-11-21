@@ -17,8 +17,8 @@
   box-shadow: var(--shadow-lg);
   opacity: 0;
   transform: translateY(-4px) scale(0.98);
-  transition: opacity var(--transition-base) var(--ease-decelerate),
-              transform var(--transition-base) var(--ease-decelerate);
+  transition: opacity var(--duration-base) var(--ease-decelerate),
+              transform var(--duration-base) var(--ease-decelerate);
   pointer-events: auto;
 }
 

@@ -110,13 +110,9 @@ export function ComposerFooter({
             title={primaryButtonDescription}
           >
             {isComposerBusy ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1" />
-              </svg>
+              <Icon name="stop" filled />
             ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 19V5m-6 6 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <Icon name="arrow-up" />
             )}
           </Button>
         </div>

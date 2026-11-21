@@ -1,6 +1,6 @@
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
-import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 import { CardBadges } from './CardBadges';
@@ -35,7 +35,7 @@ function ConflictCardPane({
         {card ? (
           <Button variant="ghost" size="sm" onClick={onOpen} data-testid="knowledge-conflict-open-card">
             {t('knowledgeCenter.viewRelatedCard')}
-            <Icon name="chevron-right" size={14} />
+            <Chevron />
           </Button>
         ) : null}
       </header>

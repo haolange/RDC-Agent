@@ -93,32 +93,6 @@
   color: var(--token-text-primary);
 }
 
-.runtime-terminal-close-mark {
-  position: relative;
-  width: 12px;
-  height: 12px;
-}
-
-.runtime-terminal-close-mark::before,
-.runtime-terminal-close-mark::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 5px;
-  width: 1.5px;
-  height: 12px;
-  border-radius: var(--radius-full);
-  background: currentColor;
-}
-
-.runtime-terminal-close-mark::before {
-  transform: rotate(45deg);
-}
-
-.runtime-terminal-close-mark::after {
-  transform: rotate(-45deg);
-}
-
 .runtime-terminal-toolbar {
   display: flex;
   align-items: center;

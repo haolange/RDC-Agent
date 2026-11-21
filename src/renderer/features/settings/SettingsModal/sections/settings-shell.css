@@ -31,7 +31,7 @@
   background: var(--modal-bg);
   box-shadow: var(--shadow-xl);
   overflow: hidden;
-  animation: fadeInScale var(--transition-base) var(--ease-decelerate);
+  animation: fadeInScale var(--duration-base) var(--ease-decelerate);
 }
 
 .settings-center-sidebar {

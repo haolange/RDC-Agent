@@ -7,6 +7,7 @@ import {
 import { switchConversationBranch } from '../../hooks/conversationPreview';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useI18n } from '../../i18n';
+import { Chevron } from '../../ui/Chevron';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -77,7 +78,7 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
         disabled={navigator.variantIndex <= 0}
         onClick={() => void switchVariant(-1)}
       >
-        ‹
+        <Chevron direction="left" size={12} />
       </button>
       <span className="message-variant-nav-label" aria-live="polite">
         {t('chat.messageVariantLabel', {
@@ -92,7 +93,7 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
         disabled={navigator.variantIndex >= navigator.variantCount - 1}
         onClick={() => void switchVariant(1)}
       >
-        ›
+        <Chevron size={12} />
       </button>
     </div>
   );

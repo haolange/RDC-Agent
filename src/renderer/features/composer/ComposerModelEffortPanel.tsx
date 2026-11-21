@@ -2,6 +2,7 @@ import React from 'react';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
+import { Chevron } from '../../ui/Chevron';
 import { Switch } from '../../ui/Switch';
 import { EFFORT_LABEL_KEYS, EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
@@ -153,7 +154,7 @@ export const ComposerModelEffortPanel: React.FC<{
             onClick={onOpenModels}
           >
             <span>{modelLabel}</span>
-            <Icon name="chevron-right" size={12} />
+            <Chevron size={12} />
           </button>
           {capabilityStateDetail ? (
             <Button variant="ghost" size="sm" onClick={onRetryCapability}>

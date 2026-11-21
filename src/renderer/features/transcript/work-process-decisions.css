@@ -86,10 +86,6 @@
   white-space: nowrap;
 }
 
-.work-process-user-input .work-process-row-caret.is-open {
-  transform: rotate(90deg);
-}
-
 .work-process-user-input-verb {
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);

@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { Button } from '../../../ui/Button';
+import { Icon } from '../../../ui/Icon';
 import type {
   ProjectMenuPopoverState,
   ProjectRenamePopoverState,
@@ -136,9 +137,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             onClick={() => void onOpenExplorer()}
             title={t('sidebar.menuExplorer')}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
+            <Icon name="folder" size={14} />
             <span>{t('sidebar.openInExplorer') || 'Explorer'}</span>
           </button>
           <button
@@ -147,10 +146,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             onClick={onStartProjectRename}
             title={t('sidebar.menuRename')}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-            </svg>
+            <Icon name="edit" size={14} />
             <span>{t('sidebar.renameProject') || 'Rename'}</span>
           </button>
           <button
@@ -160,10 +156,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             title={t('sidebar.menuNewSession')}
             disabled={isBusy}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
+            <Icon name="plus" size={14} />
             <span>{t('sidebar.addSession') || 'New Session'}</span>
           </button>
           <div className="sidebar-context-menu-divider" role="separator" />
@@ -174,11 +167,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             title={t('sidebar.menuDelete')}
             disabled={isBusy}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M3 6h18" />
-              <path d="M8 6V4h8v2" />
-              <path d="M19 6l-1 14H6L5 6" />
-            </svg>
+            <Icon name="trash" size={14} />
             <span>{t('sidebar.removeProject') || 'Delete'}</span>
           </button>
         </PositionedSurface>

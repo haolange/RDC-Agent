@@ -4,6 +4,7 @@ import { openAppPath } from '../../hooks/appShellBridge';
 import { MaterialContextViewer } from '../../patterns/MaterialContextViewer';
 import { useConversationStore } from '../../stores/conversationStore';
 import { getAttachmentPreview } from '../../hooks/conversationPreview';
+import { Icon } from '../../ui/Icon';
 import type { SessionAttachmentRecord } from '@shared/types/session';
 
 const isImageAttachment = (attachment: SessionAttachmentRecord): boolean =>
@@ -15,9 +16,6 @@ const MessageAttachmentPill: React.FC<{
   onInspect: (attachment: SessionAttachmentRecord) => void;
 }> = ({ attachment, previewUrl, onInspect }) => {
   const image = isImageAttachment(attachment);
-  const ext = attachment.fileName.includes('.')
-    ? attachment.fileName.slice(attachment.fileName.lastIndexOf('.') + 1).toUpperCase()
-    : 'FILE';
 
   const openAttachment = () => {
     onInspect(attachment);
@@ -32,7 +30,7 @@ const MessageAttachmentPill: React.FC<{
       <span className="message-attachment-pill-icon" aria-hidden="true">
         {previewUrl ? (
           <img src={previewUrl} alt="" className="message-attachment-pill-thumb" />
-        ) : image ? 'IMG' : ext.slice(0, 4)}
+        ) : <Icon name={image ? 'image' : 'file'} />}
       </span>
       <span className="message-attachment-pill-copy">
         <span className="message-attachment-pill-name">{attachment.fileName}</span>

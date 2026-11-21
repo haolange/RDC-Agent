@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { useI18n } from '../../i18n';
 import { Icon } from '../../ui/Icon';
+import { Chevron } from '../../ui/Chevron';
 import { Pill } from '../../ui/Pill';
 import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
 import { Button } from '../../ui/Button';
@@ -58,7 +59,7 @@ export const PermissionModeSelector: React.FC = () => {
         </span>
         <span className="composer-permission-pill-label">{pendingMode ? t('composer.permission.saving') : snapshot ? t(labelKey(current)) : t('composer.permission.loading')}</span>
         <span className="composer-permission-pill-caret" aria-hidden="true">
-          <Icon name="chevron-down" size={12} />
+          <Chevron direction="down" size={12} />
         </span>
       </Pill>
       {menu.open ? (

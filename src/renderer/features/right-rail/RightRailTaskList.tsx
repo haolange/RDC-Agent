@@ -4,7 +4,7 @@ import { useDynStyle } from '../../lib/useDynStyle';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { Badge } from '../../ui/Badge';
-import { Icon } from '../../ui/Icon';
+import { Chevron } from '../../ui/Chevron';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import type { TaskRailItem } from '@shared/types/trace';
 import './RightRailTasks.css';
@@ -83,7 +83,7 @@ export const RightRailTaskList: React.FC<{ tasks: TaskRailItem[]; locateLabel: s
     <TaskProgress done={done} total={tasks.length} />
     {foldable ? (
       <button type="button" className="right-rail-task-fold" aria-expanded={showCompleted} onClick={() => setShowCompleted(!showCompleted)}>
-        <Icon name={showCompleted ? 'chevron-up' : 'chevron-down'} size={12} />
+        <Chevron direction="down" open={showCompleted} size={12} />
         <span>{t(showCompleted ? 'control.rightRail.tasks.hideCompleted' : 'control.rightRail.tasks.showCompleted', { count: done })}</span>
       </button>
     ) : null}

@@ -168,13 +168,7 @@
 .work-process-row-caret {
   flex: 0 0 auto;
   align-self: center;
-  width: 0;
-  height: 0;
-  border-left: 4px solid currentColor;
-  border-top: 3px solid transparent;
-  border-bottom: 3px solid transparent;
-  opacity: 0.55;
-  transition: transform var(--transition-fast);
+  color: var(--token-text-secondary);
 }
 
 .work-process-disclosure[open] .work-process-row-caret {

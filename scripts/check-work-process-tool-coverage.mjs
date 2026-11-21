@@ -374,7 +374,7 @@ for (const toolName of allTools) {
     assert(row.type === 'tool', 'plan_artifact should render as a compact tool shell row');
     assert(row.target === 'Plan', 'plan shell row should name the plan title');
     assert(row.planReview?.status === 'awaiting', 'plan shell row should keep the review status');
-    assert(row.icon === 'planArtifact', 'plan shell row should use the plan icon');
+    assert(row.icon === 'plan-artifact', 'plan shell row should use the plan icon');
     continue;
   }
 
@@ -424,14 +424,14 @@ for (const toolName of allTools) {
     assert(Array.isArray(row.sourcePills) && row.sourcePills.length > 0, 'web_search should expose source pills');
     assert(row.sourcePills.every((pill) => pill.domain), 'web_search pills must include domain');
     assert(!row.pageChip, 'web_search must not expose pageChip');
-    assert(row.icon === 'webSearch', 'web_search icon key must be webSearch');
+    assert(row.icon === 'web-search', 'web_search icon key must be webSearch');
   }
 
   if (toolName === 'web_fetch') {
     assert(row.pageChip?.domain === 'example.com', `web_fetch should expose pageChip domain, got ${JSON.stringify(row.pageChip)}`);
     assert(row.pageChip?.status === 200, 'web_fetch pageChip should include status');
     assert(!row.sourcePills?.length, 'web_fetch must not reuse source pills');
-    assert(row.icon === 'webFetch', 'web_fetch icon key must be webFetch');
+    assert(row.icon === 'web-fetch', 'web_fetch icon key must be webFetch');
     assert(row.verb === '已抓取', `web_fetch verb should be 已抓取, got "${row.verb}"`);
   }
 }

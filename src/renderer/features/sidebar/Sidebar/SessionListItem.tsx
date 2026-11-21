@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
+import { Icon } from '../../../ui/Icon';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export interface SessionListItemProps {
@@ -51,10 +52,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
           onClick={() => void onActivate(project, session)}
         >
           <span className="session-item-gutter" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" opacity="0.55" />
-              <circle cx="12" cy="12" r="2.5" fill="currentColor" opacity="0.9" />
-            </svg>
+            
           </span>
           <span className="session-item-title">{session.title}</span>
         </button>
@@ -66,10 +64,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
             onClick={(event) => onRenameClick(event, session)}
             onKeyDown={(event) => onRenameKeyDown(event, session)}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-            </svg>
+            <Icon name="edit" size={14} />
           </button>
           <button
             type="button"
@@ -78,11 +73,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
             onClick={(event) => onRemoveClick(event, session)}
             onKeyDown={(event) => onRemoveKeyDown(event, session)}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 6h18" />
-              <path d="M8 6V4h8v2" />
-              <path d="M19 6l-1 14H6L5 6" />
-            </svg>
+            <Icon name="trash" size={14} />
           </button>
         </span>
       </div>

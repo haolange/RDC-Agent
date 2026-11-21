@@ -1,5 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
+import { Icon } from '../../../ui/Icon';
+import { Chevron } from '../../../ui/Chevron';
 import { getProjectOriginName } from './useProjectTree';
 import { SessionList } from './SessionList';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
@@ -83,9 +85,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
                 }
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+              <Chevron open={isExpanded} />
             </button>
             <button
               type="button"
@@ -121,11 +121,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
                   }
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="1.5" />
-                  <circle cx="19" cy="12" r="1.5" />
-                  <circle cx="5" cy="12" r="1.5" />
-                </svg>
+                <Icon name="more" size={14} />
               </button>
             </span>
           )}

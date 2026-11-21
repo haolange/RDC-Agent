@@ -53,17 +53,7 @@
 .work-process-caret {
   order: 4;
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--token-text-disabled);
-  transition: transform var(--transition-fast);
-}
-
-.work-process-caret.is-open {
-  transform: rotate(90deg);
+  color: var(--token-text-secondary);
 }
 
 .work-process-status-dot {

@@ -25,10 +25,7 @@ const formatImportError = (reason: unknown, sessionExpired: string): string => {
 };
 
 const CaptureFileIcon: React.FC = () => (
-  <svg className="project-capture-input-icon" viewBox="0 0 20 20" aria-hidden="true">
-    <path d="M5 2.75h6.2L15.5 7v10.25H5z" />
-    <path d="M11.2 2.75V7h4.3M7.5 10.5h5M7.5 13h4" />
-  </svg>
+  <Icon name="file" className="project-capture-input-icon" />
 );
 
 const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabled: boolean; removeLabel: string; referenceLabel: string }> = ({ input, remove, disabled, removeLabel, referenceLabel }) => (
@@ -43,7 +40,7 @@ const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabl
       <strong title={`${input.fileName}\n${input.filePath}`}>{input.fileName}</strong>
       {input.source === 'external_reference' ? <span>{referenceLabel}</span> : null}
     </span>
-    <span className="project-capture-input-actions"><span className="project-capture-input-size">{formatSize(input.size)}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}>×</Button></span>
+    <span className="project-capture-input-actions"><span className="project-capture-input-size">{formatSize(input.size)}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}><Icon name="close" size={14} /></Button></span>
   </article>
 );
 

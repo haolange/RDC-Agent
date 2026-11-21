@@ -1,4 +1,5 @@
 import { ProductLogo } from '../../ui/ProductLogo';
+import { Icon } from '../../ui/Icon';
 import type { ReactNode } from 'react';
 import './TitleBar.css';
 
@@ -65,18 +66,11 @@ export function TitleBar({
           data-testid="titlebar-left-panel-toggle"
           onClick={!leftToggleDisabled ? onToggleLeft : undefined}
           aria-label={leftPanelToggleLabel}
+          aria-expanded={!effectiveLeftCollapsed}
           title={leftToggleDisabled ? autoCollapsedTitle : leftPanelToggleLabel}
           disabled={leftToggleDisabled}
         >
-          <span className="shell-panel-toggle-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              {effectiveLeftCollapsed ? (
-                <polyline points="9 18 15 12 9 6" />
-              ) : (
-                <polyline points="15 6 9 12 15 18" />
-              )}
-            </svg>
-          </span>
+          <Icon name="sidebar-left" size={18} className="shell-panel-toggle-icon" />
         </button>
       </div>
       <div className="app-titlebar-right no-drag">
@@ -88,18 +82,11 @@ export function TitleBar({
             data-testid="titlebar-right-panel-toggle"
             onClick={!rightToggleDisabled ? onToggleRight : undefined}
             aria-label={rightPanelToggleLabel}
+            aria-expanded={!effectiveRightCollapsed}
             title={rightToggleDisabled ? autoCollapsedTitle : rightPanelToggleLabel}
             disabled={rightToggleDisabled}
           >
-            <span className="shell-panel-toggle-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {effectiveRightCollapsed ? (
-                  <polyline points="15 18 9 12 15 6" />
-                ) : (
-                  <polyline points="9 18 15 12 9 6" />
-                )}
-              </svg>
-            </span>
+            <Icon name="sidebar-right" size={18} className="shell-panel-toggle-icon" />
           </button>
         )}
         <div className="window-controls" role="group" aria-label={windowControlsLabel}>
@@ -110,7 +97,7 @@ export function TitleBar({
             aria-label={windowMinimizeLabel}
             onClick={onMinimize}
           >
-            <span className="minimize" />
+            <Icon name="window-minimize" />
           </button>
           <button
             type="button"
@@ -119,7 +106,7 @@ export function TitleBar({
             aria-label={windowMaximized ? windowRestoreLabel : windowMaximizeLabel}
             onClick={onToggleMaximize}
           >
-            <span className={windowMaximized ? 'restore' : 'maximize'} />
+            <Icon name={windowMaximized ? 'window-restore' : 'window-maximize'} />
           </button>
           <button
             type="button"
@@ -128,7 +115,7 @@ export function TitleBar({
             aria-label={windowCloseLabel}
             onClick={onClose}
           >
-            <span className="close-mark" />
+            <Icon name="close" />
           </button>
         </div>
       </div>

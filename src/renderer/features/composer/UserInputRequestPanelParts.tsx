@@ -1,6 +1,6 @@
 import { Textarea } from '../../ui/Textarea';
 import { useI18n } from '../../i18n';
-import { CheckIcon } from './userInputRequestIcons';
+import { Icon } from '../../ui/Icon';
 import type { FC, RefObject } from 'react';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 
@@ -41,7 +41,7 @@ export const UserInputOptionList: FC<{
           </span>
           {isSelected ? (
             <span className="composer-user-input-option-check" aria-hidden="true">
-              <CheckIcon />
+              <Icon name="check" />
             </span>
           ) : null}
         </button>
@@ -78,7 +78,7 @@ export const UserInputCustomAnswer: FC<{
         <span className="composer-user-input-custom-label">{t('chat.userInputEnterCustomAnswer')}</span>
         {!selectedOptionId && customAnswer.trim() ? (
           <span className="composer-user-input-option-check" aria-hidden="true">
-            <CheckIcon />
+            <Icon name="check" />
           </span>
         ) : null}
       </button>

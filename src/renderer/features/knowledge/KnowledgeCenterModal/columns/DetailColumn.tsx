@@ -4,7 +4,7 @@ import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { InlineError } from '../../../../ui/InlineError';
-import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { Panel } from '../../../../ui/Panel';
 import { useI18n } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
@@ -79,7 +79,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 data-testid="knowledge-center-metadata-toggle"
               >
                 {t('knowledgeCenter.metadata')}
-                <Icon name={metadataOpen ? 'chevron-up' : 'chevron-down'} size={14} />
+                <Chevron direction="down" open={metadataOpen} />
               </Button>
             ) : null}
           </div>

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import { Button, type ButtonSize, type ButtonVariant } from './Button';
-import { Icon } from './Icon';
+import { Chevron } from './Chevron';
 import { Menu, type MenuItem } from './Menu';
 import './SplitButton.css';
 
@@ -30,7 +30,7 @@ export function SplitButton({
         trigger={(
           <Button variant={variant} size={size} disabled={disabled} className="ui-split-button-caret"
             aria-label={menuLabel} aria-haspopup="menu">
-            <Icon name="chevron-down" size={14} />
+            <Chevron direction="down" />
           </Button>
         )} />
     </div>

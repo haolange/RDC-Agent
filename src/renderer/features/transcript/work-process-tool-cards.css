@@ -311,11 +311,6 @@
   overflow-y: auto;
 }
 
-.work-card-trigger .work-process-row-caret.is-open,
-.work-disclosure-header .work-process-row-caret.is-open {
-  transform: rotate(90deg);
-}
-
 .work-process-tool-card-raw-pre.is-unbounded { max-height: none; overflow-y: visible; }
 
 .work-process-tool-diagnostic {

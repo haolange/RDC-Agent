@@ -4,7 +4,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  transition: opacity var(--transition-base) var(--ease-standard);
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
 
 .sidebar-scroll {
@@ -33,12 +33,12 @@
   opacity: 1;
   transform: translateX(0);
   transition:
-    opacity var(--transition-base) var(--ease-standard),
-    transform var(--transition-base) var(--ease-standard),
-    border-top-color var(--transition-base) var(--ease-standard),
-    max-height var(--transition-base) var(--ease-standard),
-    margin-top var(--transition-base) var(--ease-standard),
-    padding-top var(--transition-base) var(--ease-standard);
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    border-top-color var(--duration-base) var(--ease-standard),
+    max-height var(--duration-base) var(--ease-standard),
+    margin-top var(--duration-base) var(--ease-standard),
+    padding-top var(--duration-base) var(--ease-standard);
 }
 
 .session-section.hidden {
@@ -110,11 +110,11 @@
   color: var(--token-text-secondary);
   cursor: pointer;
   transition:
-    background var(--transition-base) var(--ease-standard),
-    border-color var(--transition-base) var(--ease-standard),
-    color var(--transition-base) var(--ease-standard),
-    transform var(--transition-base) var(--ease-standard),
-    box-shadow var(--transition-base) var(--ease-standard);
+    background var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .session-section-action:hover,

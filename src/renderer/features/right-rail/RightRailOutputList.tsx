@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../../i18n';
 import { copyAppText, openAppPath } from '../../hooks/appShellBridge';
 import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 
 interface RightRailOutputListProps { current: TraceArtifactRecord[]; previous: TraceArtifactRecord[]; }
@@ -9,10 +10,7 @@ interface RightRailOutputListProps { current: TraceArtifactRecord[]; previous: T
 const formatSize = (size?: number): string => typeof size !== 'number' ? '' : size >= 1024 * 1024 ? `${(size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(size / 1024))} KB`;
 
 const OutputFileGlyph: React.FC = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M6 3.5h7l5 5V20.5H6z" />
-    <path d="M13 3.5v5h5M9 14h6M9 17h4" />
-  </svg>
+  <Icon name="file" />
 );
 
 export const RightRailOutputList: React.FC<RightRailOutputListProps> = React.memo(({ current, previous }) => {

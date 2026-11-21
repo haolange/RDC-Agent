@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../../i18n';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { WorkProcessHighlightedCode } from './WorkProcessHighlightedCode';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import type { ToolRowModel } from './workProcessToolTypes';
@@ -38,7 +39,7 @@ export const CopyPathButton: React.FC<{ path: string }> = ({ path }) => {
       aria-label={copied ? copiedLabel : copyLabel}
       title={copied ? copiedLabel : copyLabel}
     >
-      {copied ? '✓' : '⧉'}
+      <Icon name={copied ? 'check' : 'copy'} size={14} />
     </Button>
   );
 };

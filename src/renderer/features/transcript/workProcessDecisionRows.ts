@@ -19,7 +19,7 @@ export const createPlanReviewShellRow = (call: ConversationToolCall, t: Translat
         : call.planReview?.status === 'awaiting' ? t('chat.planShellAwaiting')
           : call.planReview?.status === 'approved' ? t('chat.planShellApproved') : t('chat.planUpdated'),
     category: t('chat.toolDisplay.plan_artifact.category'),
-    icon: 'planArtifact',
+    icon: 'plan-artifact',
     groupKind: 'runtime',
     family: 'runtime',
     toolName: call.toolName,

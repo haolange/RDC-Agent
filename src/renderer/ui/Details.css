@@ -12,17 +12,8 @@
   border-radius: var(--radius-sm);
 }
 .ui-details > summary::-webkit-details-marker { display: none; }
-.ui-details > summary::before {
-  content: '';
-  flex: 0 0 auto;
-  width: var(--space-1);
-  height: var(--space-1);
-  border-right: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform var(--transition-fast);
-}
-.ui-details[open] > summary::before { transform: rotate(45deg); }
+.ui-details-chevron { color: var(--token-text-secondary); }
+.ui-details[open] > summary > .ui-details-chevron { transform: rotate(90deg); }
 .ui-details-panel {
   padding: var(--space-3);
   border: 1px solid var(--token-border-muted);

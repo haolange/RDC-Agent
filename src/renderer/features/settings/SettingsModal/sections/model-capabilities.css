@@ -10,14 +10,6 @@
   font-size: var(--type-meta-size);
 }
 
-.settings-model-capability-chevron {
-  transition: transform 0.15s ease;
-}
-
-.settings-model-capability-chevron.is-expanded {
-  transform: rotate(180deg);
-}
-
 .settings-model-capability-panel {
   display: grid;
   gap: var(--space-4);

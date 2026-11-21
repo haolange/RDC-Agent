@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
 import { TaskDialog } from '../../ui/TaskDialog';
+import { Chevron } from '../../ui/Chevron';
 import { RightRailArtifactGlyph } from './RightRailArtifactGlyphs';
 import { RightRailInvestigationPreview } from './RightRailInvestigationPreview';
 import { listInvestigationArtifacts } from './investigationPreviewActions';
@@ -14,7 +15,7 @@ function ArtifactRows({ rows, select }: { rows: InvestigationArtifactRow[]; sele
     className="right-rail-compact-row" title={row.title || row.artifactId} onClick={() => select(row)}>
     <span className="right-rail-compact-icon" aria-hidden="true"><RightRailArtifactGlyph kind={row.kind} /></span>
     <span className="right-rail-compact-title">{row.title || `${t(`control.rightRail.artifacts.kind.${row.kind}`)} · ${row.artifactId}`}</span>
-    <span aria-hidden="true">›</span>
+    <Chevron />
   </Button>)}</div>;
 }
 

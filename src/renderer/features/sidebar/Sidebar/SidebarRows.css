@@ -13,10 +13,10 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background var(--transition-base) var(--ease-standard),
-    border-color var(--transition-base) var(--ease-standard),
-    transform var(--transition-base) var(--ease-standard),
-    box-shadow var(--transition-base) var(--ease-standard);
+    background var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .project-item {
@@ -145,12 +145,12 @@
   color: var(--token-text-secondary);
   cursor: pointer;
   transition:
-    color var(--transition-base) var(--ease-standard),
-    background var(--transition-base) var(--ease-standard);
+    color var(--duration-base) var(--ease-standard),
+    background var(--duration-base) var(--ease-standard);
 }
 
 .project-item-chevron svg {
-  transition: transform var(--transition-base) var(--ease-standard);
+  transition: transform var(--duration-base) var(--ease-standard);
 }
 
 .project-item-chevron.is-expanded svg {
@@ -169,7 +169,7 @@
   align-items: center;
   justify-content: center;
   color: color-mix(in srgb, var(--token-text-secondary) 80%, transparent);
-  transition: color var(--transition-base) var(--ease-standard);
+  transition: color var(--duration-base) var(--ease-standard);
 }
 
 .session-subitem:hover .session-item-gutter,
@@ -189,7 +189,7 @@
   font-weight: var(--font-normal);
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: color var(--transition-base) var(--ease-standard);
+  transition: color var(--duration-base) var(--ease-standard);
 }
 
 .session-list-toggle:hover,
@@ -232,10 +232,10 @@
   opacity: 0;
   transform: translateY(2px);
   transition:
-    opacity var(--transition-base) var(--ease-standard),
-    transform var(--transition-base) var(--ease-standard),
-    background var(--transition-base) var(--ease-standard),
-    color var(--transition-base) var(--ease-standard);
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    background var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard);
 }
 
 .session-item:hover .session-item-icon-button,

@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import './Disclosure.css';
+import { Chevron } from './Chevron';
 
 export interface DisclosureProps {
   open: boolean;
@@ -36,7 +37,7 @@ export function Disclosure({
           aria-label={triggerLabel}
           onClick={() => onOpenChange(!open)}
         >
-          <svg className="ui-disclosure-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
+          <Chevron open={open} size={12} className="ui-disclosure-chevron" />
           <span className="ui-disclosure-summary">{summary}</span>
         </button>
         {trailing ? <div className="ui-disclosure-trailing">{trailing}</div> : null}

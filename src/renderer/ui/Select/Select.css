@@ -78,7 +78,7 @@
   color: var(--token-text-secondary);
   flex: 0 0 auto;
   transition:
-    transform var(--transition-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
     color var(--transition-fast);
 }
 

@@ -1,6 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
+import { Icon } from '../Icon';
+import { Chevron } from '../Chevron';
 import { normalizeTestIdSegment } from './selectUtils';
 import type { SelectOption } from './types';
 
@@ -19,20 +21,7 @@ function AaSwatch(props: { color: string; className?: string }) {
 
 function CheckIcon() {
   return (
-    <svg
-      className="dropdown-select-option-check-icon"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.25"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
+    <Icon name="check" size={14} className="dropdown-select-option-check-icon" />
   );
 }
 
@@ -88,9 +77,7 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
       <span className="dropdown-select-trigger-label">{triggerLabel}</span>
     </span>
     <span className={`dropdown-select-trigger-caret ${open ? 'open' : ''}`} aria-hidden="true">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <polyline points="6 9 12 15 18 9" />
-      </svg>
+      <Chevron direction="down" size={12} />
     </span>
   </button>
 );

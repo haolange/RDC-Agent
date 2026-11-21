@@ -5,6 +5,7 @@ import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { SplitButton } from '../../../../ui/SplitButton';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { SettingsScopeBar } from '../parts';
 import { useScopedSkillSelection } from '../useScopedSkillSelection';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
@@ -210,7 +211,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                 <Icon name="warning" size={14} className="settings-agent-diagnostics-icon" />
                 <span>{t('settings.agentDiagnosticsCount', { count: diagnostics.length })}</span>
                 <span className="settings-agent-diagnostics-link">{t('settings.agentDiagnosticsView')}</span>
-                <Icon name="chevron-right" size={14} />
+                <Chevron />
               </Button>
             </div>
           ) : null}

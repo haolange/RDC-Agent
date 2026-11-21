@@ -2,9 +2,9 @@ import React from 'react';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { Icon } from '../../ui/Icon';
 import { WorkCardHeader } from './WorkCardHeader';
 import { getRowStatusLabel } from './workProcessStatus';
-import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import {
   CardBody,
@@ -79,7 +79,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
         >
           <WorkCardHeader onClick={toggleExpanded} expanded={canExpand ? expanded : undefined}
             disabled={!canExpand} tooltip={durationTitleFull} duration={row.duration}
-            icon={<WorkProcessIcon icon={row.icon} className="work-process-tool-card-icon" />}
+            icon={<Icon name={row.icon} className="work-process-icon work-process-tool-card-icon" />}
             title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{verbLabel}</ActiveSignalText>}
             status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
 

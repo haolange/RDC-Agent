@@ -19,20 +19,6 @@
   display: none;
 }
 
-.settings-provider-summary > summary::before {
-  content: '';
-  width: 0;
-  height: 0;
-  margin-right: var(--space-2);
-  border-style: solid;
-  border-width: 4px 0 4px 5px;
-  border-color: transparent transparent transparent var(--token-text-secondary);
-}
-
-.settings-provider-summary[open] > summary::before {
-  transform: rotate(90deg);
-}
-
 .settings-provider-summary > summary:hover,
 .settings-provider-summary > summary:focus-visible {
   background: var(--token-interactive-hover);

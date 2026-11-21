@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
+import { Chevron } from '../../ui/Chevron';
 import { ScopedWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { WorkProcessContent } from './WorkProcessContent';
@@ -44,11 +45,7 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
     >
       <div className="work-process-header-row">
         <button type="button" className="work-process-header" onClick={toggle} aria-expanded={expanded}>
-          <span className={`work-process-caret ${expanded ? 'is-open' : ''}`} aria-hidden="true">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </span>
+          <Chevron open={expanded} size={12} className="work-process-caret" />
           <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
           {running ? (
             <ActiveSignalText active tone="info" className={`work-process-label status-${trace.status}`}>

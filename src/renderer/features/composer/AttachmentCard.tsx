@@ -5,15 +5,16 @@ import { MaterialContextEditor } from '../../patterns/MaterialContextEditor';
 import { fileExtensionLabel, formatBytes } from '../../services/attachmentHelpers';
 import { getAttachmentPreview } from '../../hooks/conversationPreview';
 import { useI18n } from '../../i18n';
+import { Icon, type IconName } from '../../ui/Icon';
 import { attachmentRejectKey } from './attachmentRejectCopy';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 import type { MaterialContext } from '@shared/types/materialContext';
 
-const LAYER_GLYPH: Record<PendingAttachmentDraft['layer'], string> = {
-  image: 'IMG',
-  text: 'TXT',
-  pdf: 'PDF',
-  binary: 'FILE',
+const LAYER_ICONS: Record<PendingAttachmentDraft['layer'], IconName> = {
+  image: 'image',
+  text: 'file-text',
+  pdf: 'file-text',
+  binary: 'file',
 };
 
 export const AttachmentCard: React.FC<{
@@ -57,7 +58,7 @@ export const AttachmentCard: React.FC<{
     ? t(attachmentRejectKey(attachment.error.code))
     : warning
       ? visionUnsupportedLabel
-      : `${fileExtensionLabel(attachment.fileName)} · ${formatBytes(attachment.size)}`;
+      : [fileExtensionLabel(attachment.fileName), formatBytes(attachment.size)].filter(Boolean).join(' · ');
 
   return (
     <div
@@ -68,7 +69,7 @@ export const AttachmentCard: React.FC<{
         {previewUrl ? (
           <img src={previewUrl} alt="" className="composer-attachment-card-thumb" />
         ) : (
-          <span className="composer-attachment-card-glyph">{LAYER_GLYPH[attachment.layer]}</span>
+          <span className="composer-attachment-card-glyph"><Icon name={LAYER_ICONS[attachment.layer]} size={20} /></span>
         )}
       </div>
       <span className="composer-attachment-card-copy">
@@ -85,15 +86,7 @@ export const AttachmentCard: React.FC<{
         onClick={() => onRemove(attachment.id)}
         aria-label={removeLabel}
       >
-        <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">
-          <path
-            d="M3.2 3.2 12.8 12.8M12.8 3.2 3.2 12.8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        </svg>
+        <Icon name="close" size={12} />
       </Button>
     </div>
   );

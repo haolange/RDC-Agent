@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Input } from '../../../../ui/Input';
 import { Button } from '../../../../ui/Button';
 import { IconButton } from '../../../../ui/IconButton';
-import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import type { ThemeVariant } from '@shared/types/settings';
@@ -100,7 +100,7 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
               size="sm"
               data-testid={`appearance-${kind}-font-menu-${variant}`}
             >
-              <Icon name="chevron-down" size={14} />
+              <Chevron direction="down" />
             </IconButton>
           )}
         >

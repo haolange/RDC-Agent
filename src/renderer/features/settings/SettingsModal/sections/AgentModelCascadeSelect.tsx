@@ -1,6 +1,7 @@
 import React, { useMemo, useState, type KeyboardEvent } from 'react';
 import { formatPricePerMillion } from '@shared/utils/cost';
 import { Icon } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { SearchField } from '../../../../ui/SearchField';
 import {
@@ -82,7 +83,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
               <strong>{triggerPrimary}</strong>
               {triggerSecondary ? <span>{triggerSecondary}</span> : null}
             </span>
-            <Icon name="chevron-down" size={14} />
+            <Chevron direction="down" />
           </button>
         )}
       >

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Switch } from '../../../../ui/Switch';
 import { resolveProviderModelAvailabilityBadge } from '../providerModelAvailabilityBadge';
+import { Chevron } from '../../../../ui/Chevron';
 import { ProviderModelCapabilitySummary } from './ProviderModelCapabilitySummary';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
@@ -92,18 +93,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
           onClick={() => onToggleExpanded(model.id)}
         >
           <span className="settings-model-capability-toggle-label">{t('settings.providers.capability.toggle')}</span>
-          <svg
-            className={`settings-model-capability-chevron${expanded ? ' is-expanded' : ''}`}
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <Chevron direction="down" open={expanded} />
         </button>
       </div>
       {expanded ? (

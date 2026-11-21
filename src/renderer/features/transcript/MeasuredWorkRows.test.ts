@@ -12,7 +12,7 @@ it('crosses the 24/25 row boundary without duplicate events or losing user discl
   const host = document.createElement('div'); host.className = 'chat-messages'; document.body.append(host);
   const root = createRoot(host);
   const rows: WorkProcessRow[] = Array.from({ length: 25 }, (_, i) => ({ type: 'tool', id: `window-${i}`,
-    status: 'complete', verb: 'Read', category: 'task', icon: 'fileRead', groupKind: 'task', family: 'file',
+    status: 'complete', verb: 'Read', category: 'task', icon: 'file-read', groupKind: 'task', family: 'file',
     toolName: 'read_file', target: 'file.txt', duration: '', argsLines: ['file.txt'], previewLines: ['original'], rawLines: ['receipt'] }));
   const render = (count: number) => act(async () => root.render(createElement(ScopedWorkDisclosure, {
     scope: 'window-boundary', children: createElement(MeasuredWorkRows, {

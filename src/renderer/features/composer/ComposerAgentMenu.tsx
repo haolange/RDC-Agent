@@ -4,6 +4,7 @@ import { Icon } from '../../ui/Icon';
 import { ModeGlyph } from '../../ui/ModeGlyph';
 import { Pill } from '../../ui/Pill';
 import { useI18n } from '../../i18n';
+import { Chevron } from '../../ui/Chevron';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
@@ -99,9 +100,7 @@ export const ComposerAgentMenu: React.FC<{
         </span>
         <span className="composer-agent-pill-label">{currentModeLabel}</span>
         <span className="composer-agent-pill-caret" aria-hidden="true">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <Chevron direction="down" size={12} />
         </span>
       </Pill>
       {menu.open ? (

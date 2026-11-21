@@ -294,7 +294,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 图标
 
-全应用只有 `ui/Icon` 一套图标：按域分组的 SVG 路径表（通用、transcript、knowledge、investigation、shell），统一 `viewBox 0 0 24 24`、线宽 1.6、`currentColor`、行内 16px。展开箭头只用 `ui/Chevron`（方向由 prop 决定，旋转走 `--motion-disclosure`）。组件不得内联 SVG，也不得用文字或符号充当图标（「SKL」「IMG」「✓」「⧉」「‹ ›」「↻」「⋯」「×」「ⓘ」）。`ModeGlyph` 是 Agent 身份字形，线宽与 `ui/Icon` 对齐。同类动作用同一个图标，不同类必须可分辨：网页读取用地球，网页搜索用放大镜，读文件用文档。门禁：`check:ui-contract`。
+全应用只有 `ui/Icon` 一套图标：`src/renderer/ui/icons/` 下按域分组的路径表（`commonIcons`、`shellIcons`、`transcriptIcons`、`knowledgeIcons`、`investigationIcons`）合并成唯一注册表，键名 kebab-case 且不跨表重名（`Icon.test.ts`），统一 `viewBox 0 0 24 24`、线宽 1.6、`currentColor`、行内 16px；实心图形（停止方块）用 `filled`。展开箭头只用 `ui/Chevron`（`direction` 决定静止方向，`open` 让同一个字形旋转，走 `--motion-disclosure`），其他代码不得直接引用 chevron 字形。组件不得内联 SVG（例外只有注册表本身、Agent 身份字形 `ModeGlyph`、实心状态标记 `TaskStatusMarker`、空态插画、上下文用量圆环与素材区域标注），也不得用文字或符号充当图标（「SKL」「IMG」「✓」「⧉」「‹ ›」「↻」「⋯」「×」「ⓘ」）。`ModeGlyph` 是 Agent 身份字形，线宽与 `ui/Icon` 对齐。同类动作用同一个图标，不同类必须可分辨：网页读取用地球，网页搜索用放大镜，读文件用文档。门禁：`check:ui-contract`。
 
 ## 动效
 

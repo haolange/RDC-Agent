@@ -6,71 +6,10 @@ import type {
   ConversationToolExecutionEvidence,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
+import type { IconName } from '../../ui/Icon';
 
 export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped' | 'cancelled';
 
-/** Per-builtin Work Process header glyph. Each catalog tool maps to a unique key. */
-export type WorkProcessIconKey =
-  | 'fileRead'
-  | 'artifactRead'
-  | 'fileWrite'
-  | 'fileEdit'
-  | 'fileDelete'
-  | 'fileMove'
-  | 'fileCopy'
-  | 'fileGlob'
-  | 'codeSearch'
-  | 'notebookEdit'
-  | 'webFetch'
-  | 'webSearch'
-  | 'terminal'
-  | 'gitStatus'
-  | 'gitDiff'
-  | 'gitLog'
-  | 'gitAdd'
-  | 'gitUnstage'
-  | 'gitCommit'
-  | 'question'
-  | 'toolSearch'
-  | 'handoff'
-  | 'planArtifact'
-  | 'outputPublish'
-  | 'memorySearch'
-  | 'memoryRead'
-  | 'memoryWrite'
-  | 'memoryDelete'
-  | 'skillsList'
-  | 'skillRead'
-  | 'plug'
-  | 'monitor'
-  | 'rdcProbe'
-  | 'brain'
-  | 'subagentReport'
-  | 'taskCreate'
-  | 'taskUpdate'
-  | 'taskGet'
-  | 'taskList'
-  | 'taskStop'
-  | 'turnComplete'
-  | 'backgroundQuery'
-  | 'backgroundWait'
-  | 'backgroundResult'
-  | 'backgroundMessage'
-  | 'backgroundCancel'
-  | 'backgroundJoin'
-  | 'imageRead'
-  | 'interpreter'
-  | 'knowledgeBrowse'
-  | 'knowledgeSearch'
-  | 'knowledgeRead'
-  | 'knowledgeCompile'
-  | 'knowledgeCandidate'
-  | 'investigationSchema'
-  | 'investigationRead'
-  | 'investigationWrite'
-  | 'investigationList'
-  | 'spark'
-  | 'tool';
 
 export type WorkProcessToolGroupKind =
   | 'explore'
@@ -155,7 +94,7 @@ export type WorkProcessRow =
     status: WorkProcessRowStatus;
     verb: string;
     category: string;
-    icon: WorkProcessIconKey;
+    icon: IconName;
     groupKind: WorkProcessToolGroupKind;
     /** Unified card family for body/detail templates. */
     family: WorkProcessToolFamily;

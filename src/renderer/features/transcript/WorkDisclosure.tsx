@@ -1,4 +1,5 @@
 import React from 'react';
+import { Chevron } from '../../ui/Chevron';
 
 export const FadingPreview: React.FC<{ text: string }> = ({ text }) => {
   const ref = React.useRef<HTMLSpanElement>(null);
@@ -23,7 +24,7 @@ export const WorkDisclosure: React.FC<{
   const contentId = React.useId();
   const heading = <><span className="work-disclosure-label">{title}</span>
     {!open || disabled ? <FadingPreview text={preview} /> : <span className="work-disclosure-meta">{meta}</span>}
-    {!disabled ? <span className={`work-process-row-caret${open ? ' is-open' : ''}`} aria-hidden="true" /> : null}</>;
+    {!disabled ? <Chevron open={open} size={12} className="work-process-row-caret" /> : null}</>;
   return <section className={`work-disclosure variant-${variant}${open ? ' is-open' : ''}`}>
     {disabled ? <div className="work-disclosure-header is-disabled">{heading}</div>
       : <button type="button" className="work-disclosure-header" aria-expanded={open}

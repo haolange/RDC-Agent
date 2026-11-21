@@ -14,5 +14,5 @@ export const formatBytes = (size: number | null | undefined): string => {
 
 export function fileExtensionLabel(fileName: string): string {
   const ext = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.') + 1) : '';
-  return ext ? ext.toUpperCase() : 'FILE';
+  return ext.toUpperCase();
 }

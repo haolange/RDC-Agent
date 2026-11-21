@@ -5,6 +5,7 @@ import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon, type IconName } from '../../../../ui/Icon';
+import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
@@ -270,7 +271,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                     {!open ? <span className="settings-agent-panel-hint">{panelHint(id)}</span> : null}
                   </span>
                   {open ? autosave : null}
-                  <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} className="settings-agent-panel-caret" />
+                  <Chevron open={open} className="settings-agent-panel-caret" />
                 </button>
                 {open ? (
                   <div id={`settings-agent-panel-${id}`} className="settings-agent-panel-body">

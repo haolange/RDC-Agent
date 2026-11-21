@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
+import { Chevron } from '../../ui/Chevron';
 import { createReplayApplyQueue } from './replayApplyQueue';
 import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
 import type { CaptureReplayApplyRequest, CaptureReplayState } from '@shared/types/captureReplay';
@@ -46,12 +47,12 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
         onChange={(textureId) => state?.appliedEventId != null && select(state.appliedEventId, true, { textureId })} />}
     </div>
     <div className="capture-event-controls">
-      <Button variant="ghost" size="sm" aria-label={t('control.replay.previous')} disabled={disabled || position === 0} onClick={() => select(events[position - 1].eventId, true)}>‹</Button>
+      <Button variant="ghost" size="sm" aria-label={t('control.replay.previous')} disabled={disabled || position === 0} onClick={() => select(events[position - 1].eventId, true)}><Chevron direction="left" /></Button>
       <label className="capture-event-input">EID <Input inputSize="sm" aria-label={t('control.replay.eventId')} value={draft} disabled={disabled || !events.length}
         inputMode="numeric" onChange={(event) => setDraft(event.target.value)}
         onBlur={() => { const value = Number(draft); if (events.some((event) => event.eventId === value)) { if (value !== eventId) select(value, true); } else setDraft(String(eventId ?? '')); }}
         onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>
-      <Button variant="ghost" size="sm" aria-label={t('control.replay.next')} disabled={disabled || !events.length || position >= events.length - 1} onClick={() => select(events[position + 1].eventId, true)}>›</Button>
+      <Button variant="ghost" size="sm" aria-label={t('control.replay.next')} disabled={disabled || !events.length || position >= events.length - 1} onClick={() => select(events[position + 1].eventId, true)}><Chevron /></Button>
     </div>
     <input className="capture-event-slider" type="range" min={0} max={Math.max(0, events.length - 1)} value={position} disabled={disabled || events.length < 2}
       aria-label={t('control.replay.eventSlider')} aria-valuetext={`EID ${eventId ?? '—'}`}

@@ -1,6 +1,7 @@
 import { ProfileAvatar } from '../patterns/ProfileAvatar';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
+import { Chevron } from '../ui/Chevron';
 import type { TranslationKey } from '../i18n';
 import type { MouseEvent } from 'react';
 
@@ -59,7 +60,7 @@ export function SidebarFooter({
         </span>
         <span className="footer-entry-trailing">
           <span className="footer-entry-chevron">
-            <Icon name="chevron-down" size={12} />
+            <Chevron direction="down" size={12} />
           </span>
         </span>
       </Button>

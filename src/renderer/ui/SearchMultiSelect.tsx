@@ -5,6 +5,7 @@ import { Checkbox } from './Checkbox';
 import { SearchField } from './SearchField';
 import { filterMultiSelectOptions, toggleMultiSelectId, type SearchMultiSelectOption } from './searchMultiSelectModel';
 import './SearchMultiSelect.css';
+import { Icon } from './Icon';
 
 export type { SearchMultiSelectOption } from './searchMultiSelectModel';
 
@@ -49,7 +50,7 @@ export function SearchMultiSelect({ value, options, onChange, unavailable = {}, 
           return <li key={selectedId} className={cn('ui-search-multi-select-selection', reason && 'is-unavailable')}>
             <span>{option?.label ?? selectedId}{reason && <small>{reason}</small>}</span>
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={removeLabel(selectedId)}
-              onClick={() => onChange(toggleMultiSelectId(value, selectedId, false))}>×</Button>
+              onClick={() => onChange(toggleMultiSelectId(value, selectedId, false))}><Icon name="close" size={14} /></Button>
           </li>;
         })}
       </ul>}

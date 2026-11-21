@@ -799,7 +799,7 @@ const webFetchPresentation = buildWorkProcessPresentation({
 }, t);
 const webFetchRow = flattenRows(webFetchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_fetch');
 assert(webFetchRow?.verb === '已抓取', 'web_fetch should use Fetched page/已抓取 verb');
-assert(webFetchRow?.icon === 'webFetch', 'web_fetch should use dedicated webFetch icon');
+assert(webFetchRow?.icon === 'web-fetch', 'web_fetch should use dedicated webFetch icon');
 assert(webFetchRow?.pageChip?.domain === 'www.example.com', 'web_fetch should expose pageChip domain');
 assert(webFetchRow?.pageChip?.url === 'https://www.example.com/docs/guide', 'web_fetch pageChip should keep url');
 assert(webFetchRow?.pageChip?.pathLabel === '/docs/guide', 'web_fetch pageChip should expose pathLabel');
@@ -983,7 +983,7 @@ const componentSource = [
   scriptRead('src/renderer/features/transcript/WorkProcessToolCardParts.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessFamilyLayers.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessHighlightedCode.tsx', 'utf8'),
-  scriptRead('src/renderer/features/transcript/WorkProcessIcons.tsx', 'utf8'),
+  scriptRead('src/renderer/ui/Icon.tsx', 'utf8'),
 ].join('\n');
 const cssSource = [
   scriptReadCssBundle('src/renderer/features/transcript/work-process-track.css', 'utf8'),

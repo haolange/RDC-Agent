@@ -10,9 +10,9 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const rendererRoot = path.join(repoRoot, 'src/renderer');
 
 const CEILINGS = {
-  'invalid-transition': 36,
-  'inline-svg': 45,
-  'text-glyph': 21,
+  'invalid-transition': 0,
+  'inline-svg': 0,
+  'text-glyph': 0,
   'raw-error-render': 19,
   'literal-color': 3,
   'i18n-same-value': 24,
@@ -34,14 +34,15 @@ const STYLE_DEFINITION_FILES = new Set([
   'src/renderer/styles/design-reduced-motion.css',
 ]);
 
-/** SVG that draws data or illustration rather than an icon: charts, rings, empty-state art, the Icon registry. */
+/** SVG that is not an icon: the registry itself, Agent identity glyphs, filled status markers, empty-state art,
+ *  the context usage ring and material region overlays. */
 const SVG_OWNERS = [
-  /^src\/renderer\/ui\/Icon/,
-  /^src\/renderer\/ui\/Chevron/,
+  /^src\/renderer\/ui\/Icon\.tsx$/,
+  /^src\/renderer\/ui\/ModeGlyph\.tsx$/,
+  /^src\/renderer\/ui\/TaskStatusMarker\//,
   /EmptyVisuals\.tsx$/,
-  /EmptyIllustration/,
-  /ContextUsageRing/,
-  /ProgressRing/,
+  /^src\/renderer\/patterns\/ContextUsageIndicator\.tsx$/,
+  /^src\/renderer\/patterns\/MaterialContext(?:Editor|Viewer)\.tsx$/,
 ];
 
 const walk = (directory) => fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -98,10 +99,15 @@ function inlineSvg() {
     const text = read(file);
     for (const match of text.matchAll(/<svg\b/g)) findings.push(`${file}:${lineOf(text, match.index)}`);
   }
+  // The chevron glyph is reachable only through ui/Chevron, which owns direction and the disclosure rotation.
+  for (const file of files.filter((name) => /\.tsx?$/.test(name) && !/^src\/renderer\/ui\/(?:Chevron\.tsx|icons\/)/.test(name))) {
+    const text = read(file);
+    for (const match of text.matchAll(/['"]chevron-(?:right|left|up|down)['"]/g)) findings.push(`${file}:${lineOf(text, match.index)} ${match[0]}`);
+  }
   return findings;
 }
 
-const GLYPHS = '✓✔✗✕×⧉‹›«»↻⟳⋯…ⓘ▸▾▶◀▲▼→←';
+const GLYPHS = '✓✔✗✕×⧉‹›«»↻⟳⋯ⓘ▸▾▶◀▲▼→←';
 function textGlyphs() {
   const findings = [];
   const jsxGlyph = new RegExp(`>\\s*[${GLYPHS}]\\s*<`, 'g');
