@@ -97,6 +97,20 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
   en: englishTranslations,
 };
 
+const HAN = /[\u3400-\u9fff\uf900-\ufaff]/u;
+const LATIN = /[A-Za-z0-9]/u;
+const meetsAcrossScripts = (left: string | undefined, right: string | undefined): boolean => Boolean(left && right)
+  && ((HAN.test(left!) && LATIN.test(right!)) || (LATIN.test(left!) && HAN.test(right!)));
+
+/**
+ * Chinese copy puts a space between Han characters and Latin letters or digits. Templates are written that way; a value
+ * dropped into a template gets the same space where it meets the surrounding text, so「编辑{kind}」reads「编辑钩子」and
+ * 「编辑 MCP」alike.
+ */
+const spaceAtSeams = (value: string, before: string | undefined, after: string | undefined): string => (
+  `${meetsAcrossScripts(before, value[0]) ? ' ' : ''}${value}${meetsAcrossScripts(value.at(-1), after) ? ' ' : ''}`
+);
+
 export const translate = (
   language: AppLanguage,
   key: TranslationKey,
@@ -104,7 +118,11 @@ export const translate = (
 ): string => {
   const text = translations[language][key] ?? key;
   if (!params) return text;
-  return text.replace(/\{(\w+)\}/g, (placeholder, name: string) => Object.hasOwn(params, name) ? String(params[name]) : placeholder);
+  return text.replace(/\{(\w+)\}/g, (placeholder, name: string, offset: number) => {
+    if (!Object.hasOwn(params, name)) return placeholder;
+    const value = String(params[name]);
+    return language === 'zh-CN' ? spaceAtSeams(value, text[offset - 1], text[offset + placeholder.length]) : value;
+  });
 };
 
 export type Translator = (key: TranslationKey, params?: Record<string, string | number>) => string;

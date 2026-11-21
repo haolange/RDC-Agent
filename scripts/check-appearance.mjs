@@ -292,13 +292,23 @@ assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the
 // Keep the shared component path authoritative for ordinary configuration disclosure.
 for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx',
-  'src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx',
+  'src/renderer/features/settings/SettingsModal/parts/SettingsDiagnostics.tsx',
   'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
   'src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx',
   'src/renderer/patterns/MaterialContextEditor.tsx',
 ]) {
   const source = scriptRead(file);
   assert(source.includes('<Details'), `${file} must use shared Details`);
+  assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
+}
+// A settings detail keeps ids, paths, protocols and hashes behind its one 「诊断」 entry.
+for (const file of [
+  'src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx',
+  'src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx',
+  'src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx',
+]) {
+  const source = scriptRead(file);
+  assert(source.includes('<SettingsDiagnostics'), `${file} must put its technical facts in SettingsDiagnostics`);
   assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
 }
 for (const file of ['Popover.tsx', 'Select/index.tsx', 'ContextMenu/index.tsx']) {

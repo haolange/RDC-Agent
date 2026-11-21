@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { contentFromForm, emptyForm, formFromContent, resourceCardMeta } from './scopedResourceForm';
+import { contentFromForm, emptyForm, formFromContent, resourceDisplayName } from './scopedResourceForm';
 
-describe('resource list summaries', () => {
-  it('keeps full skill descriptions in the document, not in list rows', () => {
-    const content = '---\nname: sample\ndescription: A long workflow description\n---\n\nFull instructions';
-    expect(resourceCardMeta('skill', content)).toBe('');
-    expect(contentFromForm('skill', formFromContent('skill', 'sample', content))).toBe(content);
+describe('resource list names', () => {
+  it('names a skill by its frontmatter and keeps the document intact', () => {
+    const content = '---\nname: "Frame review"\ndescription: A long workflow description\n---\n\nFull instructions';
+    expect(resourceDisplayName('skill', 'frame-review', content)).toBe('Frame review');
+    expect(resourceDisplayName('skill', 'bare', 'No frontmatter')).toBe('bare');
+    expect(contentFromForm('skill', formFromContent('skill', 'frame-review', content))).toBe(content);
   });
 
-  it('retains useful tool and hook metadata', () => {
-    expect(resourceCardMeta('mcp', '{"transport":"stdio","command":"tool"}')).toBe('stdio · tool');
-    expect(resourceCardMeta('hook', 'event: tool.before-call')).toBe('tool.before-call');
-    expect(resourceCardMeta('mcp', '{')).toBe('');
+  it('names an MCP server by its name and falls back to the id', () => {
+    expect(resourceDisplayName('mcp', 'fs', '{"name":"Files","transport":"stdio","command":"tool"}')).toBe('Files');
+    expect(resourceDisplayName('mcp', 'fs', '{')).toBe('fs');
+    expect(resourceDisplayName('hook', 'lint-on-edit', 'event: tool.before-call')).toBe('lint-on-edit');
   });
 });
 

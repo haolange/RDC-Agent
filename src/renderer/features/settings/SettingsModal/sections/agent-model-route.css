@@ -78,14 +78,6 @@
   gap: var(--space-4);
 }
 
-.settings-agent-status-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
 @container settings-panel (max-width: 48rem) {
   .settings-agent-route-grid,
   .settings-model-route-row {
@@ -108,7 +100,7 @@
 
 .settings-agent-defaults-copy {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-1);
   min-width: 0;
 }
@@ -118,10 +110,6 @@
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   color: var(--token-text-primary);
-}
-
-.settings-agent-defaults-copy .settings-help-text {
-  margin: 0;
 }
 
 .settings-agent-defaults > .ui-inline-error {

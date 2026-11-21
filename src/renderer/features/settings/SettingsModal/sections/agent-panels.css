@@ -44,25 +44,11 @@
   color: var(--token-text-secondary);
 }
 
-.settings-agent-panel-copy {
-  display: flex;
+.settings-agent-panel-title {
   min-width: 0;
   flex: 1;
-  flex-direction: column;
-  gap: var(--space-0-5);
-}
-
-.settings-agent-panel-title {
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);
-}
-
-.settings-agent-panel-hint {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .settings-agent-panel-body {

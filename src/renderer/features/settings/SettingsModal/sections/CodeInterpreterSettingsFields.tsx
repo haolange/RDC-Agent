@@ -20,7 +20,7 @@ interface CodeInterpreterSettingsFieldsProps {
 export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFieldsProps> = ({ draft, onChange, t }) => {
   const [envText, setEnvText] = useState(() => envToText(draft.env));
   const [argsText, setArgsText] = useState(() => draft.argsPrefix.join(' '));
-  const [timeoutText, setTimeoutText] = useState(() => String(draft.timeoutMs));
+  const [timeoutText, setTimeoutText] = useState(() => String(draft.timeoutMs / 1000));
 
   return (
     <section className="settings-local-tool-form" data-testid="settings-code-interpreter" data-settings-search="code-interpreter">
@@ -47,15 +47,16 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
           />
         </SettingsField>
         <SettingsField label={t('settings.codeInterpreterTimeout')}>
+          {/* Stored in milliseconds, edited in seconds. */}
           <Input
             type="number"
-            min={1000}
-            max={600000}
+            min={1}
+            max={600}
             required
             value={timeoutText}
             onChange={(event) => {
               setTimeoutText(event.target.value);
-              onChange({ ...draft, timeoutMs: Number(event.target.value) });
+              onChange({ ...draft, timeoutMs: Math.round(Number(event.target.value) * 1000) });
             }}
           />
         </SettingsField>

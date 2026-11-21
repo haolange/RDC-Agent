@@ -46,9 +46,9 @@
 
 .settings-model-cascade-invalid {
   display: block;
-  margin-top: var(--space-2);
+  margin: var(--space-2) 0 0;
   color: var(--token-status-error);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 
@@ -67,6 +67,5 @@
 
 .settings-model-cascade-trigger span {
   color: var(--token-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
 }

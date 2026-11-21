@@ -117,15 +117,6 @@
   white-space: nowrap;
 }
 
-.settings-model-option-id {
-  color: var(--token-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .settings-model-option-custom {
   flex: 0 0 auto;
   padding: 0 var(--space-1);

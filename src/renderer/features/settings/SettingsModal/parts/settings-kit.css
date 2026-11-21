@@ -69,21 +69,6 @@
   min-width: 0;
 }
 
-/* Secondary copy under labels, section heads and notes. */
-.settings-help-text {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-regular);
-  line-height: 1.5;
-}
-
-.settings-section-subtitle {
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  line-height: 1.5;
-}
-
 /* Scoped resource pages: toolbar + list/detail split, or one compact empty prompt. */
 .settings-resource-frame {
   display: flex;
@@ -306,4 +291,41 @@
 .settings-center-nav-item:focus-visible .settings-center-nav-icon,
 .settings-center-nav-item.is-active .settings-center-nav-icon {
   opacity: 1;
+}
+
+/* 「诊断」: one quiet disclosure at the foot of a detail; everything technical is inside. */
+.settings-diagnostics {
+  align-self: stretch;
+}
+
+.settings-diagnostics-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-inline-start: var(--space-5);
+}
+
+.settings-diagnostics-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--leading-normal);
+}
+
+.settings-diagnostics-grid > div {
+  display: contents;
+}
+
+.settings-diagnostics-grid dt {
+  color: var(--token-text-secondary);
+}
+
+.settings-diagnostics-grid dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--token-text-secondary);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }

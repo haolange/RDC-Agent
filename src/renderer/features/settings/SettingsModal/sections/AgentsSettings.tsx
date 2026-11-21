@@ -6,14 +6,13 @@ import { SplitButton } from '../../../../ui/SplitButton';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
-import { SettingsScopeBar } from '../parts';
+import { SettingsSaveMark, SettingsScopeBar } from '../parts';
 import { useScopedSkillSelection } from '../useScopedSkillSelection';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 import { uniqueResourceId } from './uniqueResourceId';
 import { createNewAgent, draftScope, toSlug, visibleDrafts, type AgentScope } from './agentDraftFactory';
 import { AgentManifestEditor } from './AgentManifestEditor';
 import { AgentListItem } from './AgentListItem';
-import { AgentAutosaveStatus } from './AgentAutosaveStatus';
 import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
 import { AgentDefaultModelSection } from './AgentDefaultModelSection';
 import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
@@ -73,6 +72,12 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   const [naming, setNaming] = useState(false);
   const selectedAgent = missingAgentId ? null : scopedDrafts.find((agent) => agent.id === selectedAgentId) ?? scopedDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
+  // A shipped description is shown in the interface language until the user edits it.
+  const displayDescription = (agent: AgentManifestDraft): string => {
+    const definition = settings.agents.definitions.find((entry) => entry.id === agent.id);
+    return definition && definition.description === agent.description
+      ? agentDescription(definition, settings.appearance.language) : agent.description;
+  };
   const diagnostics = settings.agents.diagnostics ?? [];
   useEffect(() => {
     if (!agentRequest || !agentManifestContextReady) return;
@@ -155,12 +160,16 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           projectLabel={t('settings.scopeProject')}
           groupLabel={t('settings.resourceScope')}
         />
-        <AgentAutosaveStatus
-          state={agentManifestSaveState}
-          message={agentManifestSaveMessage}
-          blocked={agentManifestSaveBlocked}
-          onRetry={onRetrySaveAgentManifests}
-          t={t}
+        {/* Agents autosave: one mark for the page. A blocked save names what to fix; a failed one can be retried. */}
+        <SettingsSaveMark
+          status={agentManifestSaveState}
+          savingLabel={t('settings.saving')}
+          savedLabel={t('settings.agentManifestSaved')}
+          errorLabel={agentManifestSaveBlocked && agentManifestSaveMessage ? agentManifestSaveMessage : t('settings.agentManifestSaveFailed')}
+          errorDetail={agentManifestSaveBlocked ? undefined : agentManifestSaveMessage || undefined}
+          onRetry={agentManifestSaveBlocked ? undefined : () => void onRetrySaveAgentManifests()}
+          retryLabel={t('settings.retry')}
+          testId="settings-agent-autosave-status"
         />
       </div>
 
@@ -191,8 +200,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                 key={agent.id}
                 id={agent.id}
                 name={agent.name}
-                description={settings.agents.definitions.some(definition => definition.id === agent.id && definition.description === agent.description)
-                  ? agentDescription(settings.agents.definitions.find(definition => definition.id === agent.id), settings.appearance.language) : agent.description}
+                description={displayDescription(agent)}
                 icon={agent.icon}
                 selected={agent.id === selectedId}
                 onSelect={() => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agent.id); }}
@@ -222,17 +230,15 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
             skills={skills}
             settings={settings}
             selectedAgent={selectedAgent}
-            provenanceScope={provenanceScope}
+            provenance={selectedDefinition?.provenance ?? null}
             builtinUpdate={builtinUpdate}
+            description={displayDescription(selectedAgent)}
             onUpdateAgent={updateAgent}
             onModelBindingChange={(binding) => models.setAgentBinding(selectedAgent.id, binding)}
             modelError={models.modelError?.target === selectedAgent.id ? models.modelError.message : null}
             onDuplicateAgent={duplicateAgent}
             onDeleteAgent={deleteAgent}
             onShowBuiltinDiff={() => models.showBuiltinDiff(selectedAgent, builtinUpdate?.status === 'updated')}
-            onRetrySaveAgentManifests={onRetrySaveAgentManifests}
-            agentManifestSaveState={agentManifestSaveState}
-            agentManifestSaveMessage={agentManifestSaveMessage}
             agentManifestSaveBlocked={agentManifestSaveBlocked}
             t={t}
           />

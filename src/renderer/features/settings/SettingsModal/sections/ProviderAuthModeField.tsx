@@ -69,7 +69,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
       </div>
       {selectedAvailability.state !== 'available' && selectedReason ? (
         <span
-          className={`settings-help-text settings-provider-auth-state settings-provider-auth-state--${selectedAvailability.state}`}
+          className={`settings-provider-auth-state settings-provider-auth-state--${selectedAvailability.state}`}
           data-testid="settings-provider-auth-state"
         >
           {selectedReason}

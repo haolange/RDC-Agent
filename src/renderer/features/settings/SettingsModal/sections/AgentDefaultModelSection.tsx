@@ -1,3 +1,4 @@
+import { HelpTip } from '../../../../ui/HelpTip';
 import { InlineError } from '../../../../ui/InlineError';
 import { AgentModelBindingFields } from './AgentModelBindingFields';
 import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
@@ -16,7 +17,7 @@ export function AgentDefaultModelSection({ settings, error, onChange, t }: {
     <section className="settings-agent-defaults" data-testid="settings-agent-default-model" aria-labelledby="settings-agent-defaults-title">
       <div className="settings-agent-defaults-copy">
         <h3 id="settings-agent-defaults-title" className="settings-agent-defaults-title">{t('settings.agentDefaultModelTitle')}</h3>
-        <p className="settings-help-text">{t('settings.agentDefaultModelHint')}</p>
+        <HelpTip label={t('settings.agentDefaultModelTitle')}>{t('settings.agentDefaultModelHint')}</HelpTip>
       </div>
       <AgentModelBindingFields
         binding={settings.agentModels.default}

@@ -17,15 +17,6 @@
   gap: var(--space-4);
 }
 
-.settings-local-tool-form-head .settings-section-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.settings-local-tool-form-head .settings-help-text {
-  margin: var(--space-1) 0 0;
-}
 
 .settings-switch-row {
   display: inline-flex;
@@ -81,11 +72,29 @@
   font-size: var(--type-body-size);
 }
 
-.settings-readonly-status code {
+.settings-readonly-status strong {
+  color: var(--token-text-primary);
+  font-weight: var(--font-normal);
+}
+
+.settings-rdc-candidates {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.settings-rdc-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
   color: var(--token-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
-  overflow-wrap: anywhere;
+  font-size: var(--type-body-size);
+}
+
+.settings-rdc-status .ui-icon {
+  color: var(--token-status-success);
 }
 
 .settings-interpreter-grid {

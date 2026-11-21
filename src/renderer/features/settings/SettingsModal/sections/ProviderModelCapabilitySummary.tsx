@@ -123,7 +123,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
           {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}
           {snapshot?.stale ? <div className="settings-model-capability-note">{t('settings.providers.capability.stale')}</div> : null}
           {snapshot?.lastRefreshError ? (
-            <div className="settings-model-capability-note settings-model-capability-note--warning">{t('settings.providers.capability.refreshFailed', { error: snapshot.lastRefreshError })}</div>
+            <div className="settings-model-capability-note settings-model-capability-note--warning" data-tooltip={snapshot.lastRefreshError}>{t('settings.providers.capability.refreshFailed')}</div>
           ) : null}
           {effectiveModel.quota ? (
             <div className="settings-model-capability-note settings-model-capability-note--warning">

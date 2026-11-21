@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { translate } from '../../../../i18n/messages';
-import { configStatus, modelSourceLabel } from './agentConfigStatus';
+import { configStatus } from './agentConfigStatus';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AgentModelSettings, AppSettings } from '@shared/types/settings';
 
@@ -19,18 +19,7 @@ it('checks the reasoning level the Agent resolves to, its own before the default
   expect(configStatus(agent, settingsWith([], { default: {}, byAgent: {} }), t)).toEqual({ label: 'settings.agentStatusNoModel', tone: 'warning' });
 });
 
-it('names the model that runs and whether it comes from the default or the Agent', () => {
-  const en = ((key, params) => translate('en', key, params)) as Parameters<typeof configStatus>[2];
-  const options = [{ canonicalId: 'provider:model', modelLabel: 'Model' }, { canonicalId: 'provider:own', modelLabel: 'Own' }];
-  const fromDefault = settingsWith(options, { default: { model: 'provider:model', reasoningLevel: 'medium' }, byAgent: {} });
-  expect(modelSourceLabel({ id: 'general' }, fromDefault, en)).toBe('Runs Model · medium, from the default model.');
-  const own = settingsWith(options, { default: { model: 'provider:model' }, byAgent: { general: { model: 'provider:own' } } });
-  expect(modelSourceLabel({ id: 'general' }, own, en)).toBe('Runs Own, set for this agent.');
-  const mixed = settingsWith(options, { default: { model: 'provider:model', reasoningLevel: 'medium' }, byAgent: { general: { reasoningLevel: 'high' } } });
-  expect(modelSourceLabel({ id: 'general' }, mixed, en)).toBe('Runs Model · high: the model follows the default, the reasoning level is set for this agent.');
-});
-
-it('localizes provider state and preserves provider diagnostics in both languages', () => {
+it('localizes provider state and keeps the provider reason as the detail', () => {
   const agent = { id: 'general', enabled: true, tools: ['read'] } as AgentManifestDraft;
   const makeSettings = (providerIssue: string, disabledReason?: string) => settingsWith(
     [{ canonicalId: 'provider:model', status: 'provider-unavailable', providerIssue, disabledReason }],
@@ -41,8 +30,8 @@ it('localizes provider state and preserves provider diagnostics in both language
 
   expect(configStatus(agent, makeSettings('unconfigured'), zh).label).toBe('供应商未配置');
   expect(configStatus(agent, makeSettings('unconfigured'), en).label).toBe('Provider is not configured');
-  expect(configStatus(agent, makeSettings('failed', 'HTTP 401: account denied'), zh).label)
-    .toBe('供应商连接失败：HTTP 401: account denied');
-  expect(configStatus(agent, makeSettings('unavailable', 'Account route is restricted'), en).label)
-    .toBe('Selected provider is unavailable: Account route is restricted');
+  expect(configStatus(agent, makeSettings('failed', 'HTTP 401: account denied'), zh))
+    .toEqual({ label: '供应商连接失败', tone: 'warning', detail: 'HTTP 401: account denied' });
+  expect(configStatus(agent, makeSettings('unavailable', 'Account route is restricted'), en))
+    .toEqual({ label: 'Selected provider is unavailable', tone: 'warning', detail: 'Account route is restricted' });
 });

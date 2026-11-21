@@ -28,6 +28,18 @@
   gap: var(--space-1);
   padding-block: var(--space-2);
   border-bottom: 1px solid var(--token-border-default);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
+}
+
+.settings-provider-probe-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.settings-provider-probe-status,
+.settings-provider-probe-detail {
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }

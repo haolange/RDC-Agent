@@ -161,12 +161,10 @@ runtime-terminal-search
 runtime-terminal-severity
 settings-agent-access-ceiling
 settings-agent-autosave-status
-settings-agent-builtin-base-unknown
 settings-agent-builtin-diff
 settings-agent-builtin-diff-dialog
 settings-agent-builtin-diff-open
 settings-agent-builtin-diff-restore
-settings-agent-builtin-updated
 settings-agent-completion-contract
 settings-agent-config-status
 settings-agent-default-model
@@ -183,10 +181,8 @@ settings-agent-model-invalid
 settings-agent-model-migration-binding
 settings-agent-model-migration-confirm
 settings-agent-model-migration-dialog
-settings-agent-model-source
 settings-agent-panel-${id}
 settings-agent-panels
-settings-agent-provenance
 settings-agent-runtime-block
 settings-agent-shell
 settings-agent-shell-browse
@@ -248,6 +244,7 @@ settings-provider-connection-fields
 settings-provider-connection-status
 settings-provider-credential-options
 settings-provider-detail
+settings-provider-diagnostics
 settings-provider-disconnect-${provider.id}
 settings-provider-discovery
 settings-provider-discovery-empty
@@ -276,8 +273,6 @@ settings-provider-probe-disclosure
 settings-provider-protocol-summary
 settings-provider-row-${provider.id}
 settings-provider-search
-settings-provider-summary
-settings-provider-test-${provider.id}
 settings-provider-tool-calling-unsupported
 settings-provider-tool-calling-unverified
 settings-provider-unavailable-summary

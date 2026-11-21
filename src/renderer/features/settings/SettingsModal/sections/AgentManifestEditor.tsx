@@ -2,27 +2,25 @@ import React, { useState } from 'react';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { useDynStyle } from '../../../../lib/useDynStyle';
-import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon, type IconName } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
-import { SettingsField, SettingsSection } from '../parts';
+import { SettingsDiagnostics, SettingsSection } from '../parts';
 import { InlineError } from '../../../../ui/InlineError';
 import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
 import { AgentHandoffEditor } from './AgentHandoffEditor';
 import { AgentModelBindingFields } from './AgentModelBindingFields';
-import { configStatus, modelSourceLabel, provenanceLabel, type AgentProvenanceScope } from './agentConfigStatus';
-import { AgentAutosaveStatus } from './AgentAutosaveStatus';
+import { configStatus, provenanceLabel } from './agentConfigStatus';
 import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
 import type { useI18n } from '../../../../i18n';
 import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
-import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type AgentPanel = 'identity' | 'permissions' | 'handoffs' | 'instructions';
@@ -30,10 +28,12 @@ interface AgentManifestEditorProps {
   skills: AgentSkillCatalog;
   settings: AppSettings;
   selectedAgent: AgentManifestDraft;
-  /** Read-only origin of the definition (builtin / user / project); new drafts have none yet. */
-  provenanceScope: AgentProvenanceScope | null;
+  /** Read-only origin of the definition (builtin / user / project, its file and hash); new drafts have none yet. */
+  provenance: AgentManifestProvenance | null;
   /** Present when the definition overrides a builtin profile. */
   builtinUpdate: AgentManifestDefinition['builtinUpdate'];
+  /** The description in the interface language; a builtin's stored text is translated, an edited one is shown as written. */
+  description: string;
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
   onModelBindingChange: (binding: AgentModelBinding) => void;
   modelError: string | null;
@@ -41,9 +41,7 @@ interface AgentManifestEditorProps {
   /** Deletes a custom Agent, or removes an override so the builtin applies again. */
   onDeleteAgent: () => void;
   onShowBuiltinDiff: () => void;
-  onRetrySaveAgentManifests: () => void | Promise<unknown>;
-  agentManifestSaveState: 'idle' | 'saving' | 'saved' | 'error';
-  agentManifestSaveMessage: string;
+  /** A save is blocked until required handoff fields are filled; the handoff editor then shows them. */
   agentManifestSaveBlocked?: boolean;
   t: Translate;
 }
@@ -59,37 +57,28 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   skills,
   settings,
   selectedAgent,
-  provenanceScope,
+  provenance,
   builtinUpdate,
+  description,
   onUpdateAgent,
   onModelBindingChange,
   modelError,
   onDuplicateAgent,
   onDeleteAgent,
   onShowBuiltinDiff,
-  onRetrySaveAgentManifests,
-  agentManifestSaveState,
-  agentManifestSaveMessage,
   agentManifestSaveBlocked = false,
   t,
 }) => {
   const [openPanel, setOpenPanel] = useState<AgentPanel | null>(null);
+  const provenanceScope = provenance?.scope ?? null;
   const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
   const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
   const status = configStatus(selectedAgent, settings, t);
+  // A healthy or switched-off Agent says nothing here: the switch already shows it is off.
+  const statusProblem = status.tone === 'warning' || status.tone === 'error';
   const agentAccentStyle = useDynStyle({
     '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
   });
-  const autosave = (
-    <AgentAutosaveStatus
-      state={agentManifestSaveState}
-      message={agentManifestSaveMessage}
-      blocked={agentManifestSaveBlocked}
-      onRetry={onRetrySaveAgentManifests}
-      compact
-      t={t}
-    />
-  );
 
   const panelLabel = (panel: AgentPanel): string => (
     panel === 'identity' ? t('settings.agentAdvancedIdentity')
@@ -145,11 +134,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
     }
     return (
       <>
-        <div className="settings-agent-instructions-meta">
-          <span className="settings-help-text">
-            {t('settings.agentInstructionsSource')}: <strong>{provenanceLabel(provenanceScope, t)}</strong>
-          </span>
-        </div>
         <Textarea
           sizing="content"
           minRows={2}
@@ -170,32 +154,29 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon ?? 'message-orbit'} size={20} strokeWidth={1.9} />
           </span>
           <div className="settings-agent-editor-copy">
-            <div className="settings-agent-editor-name">
-              {selectedAgent.name}
-              <Badge variant="outline" data-testid="settings-agent-provenance">{provenanceLabel(provenanceScope, t)}</Badge>
-              {builtinUpdate?.status === 'updated' ? (
-                <Badge tone="warning" data-testid="settings-agent-builtin-updated">{t('settings.agentBuiltinUpdated')}</Badge>
-              ) : null}
-              {builtinUpdate?.status === 'unknown-base' ? (
-                <Badge variant="outline" data-testid="settings-agent-builtin-base-unknown">{t('settings.agentBuiltinBaseUnknown')}</Badge>
-              ) : null}
-            </div>
-            <code className="settings-agent-editor-id">{selectedAgent.id}</code>
+            <div className="settings-agent-editor-name">{selectedAgent.name}</div>
+            {description ? <p className="settings-agent-editor-description">{description}</p> : null}
+            {builtinUpdate ? (
+              <div className="settings-agent-editor-override" data-testid="settings-agent-override"
+                data-tone={builtinUpdate.status === 'updated' ? 'warning' : undefined}>
+                {/* The change itself is one click away: the comparison, which can also restore. */}
+                <button type="button" className="settings-agent-editor-link" onClick={onShowBuiltinDiff} data-testid="settings-agent-builtin-diff-open"
+                  data-tooltip={t('settings.agentBuiltinDiffOpen')}>
+                  {t(builtinUpdate.status === 'updated' ? 'settings.agentBuiltinUpdated' : 'settings.agentOverridesBuiltin')}
+                </button>
+                <button type="button" className="settings-agent-editor-link" onClick={onDeleteAgent} data-testid="settings-agent-restore">
+                  {t('settings.agentRestore')}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="settings-manifest-editor-actions">
           <Button variant="ghost" size="sm" onClick={onDuplicateAgent}>
             {t('settings.duplicateAgent')}
           </Button>
-          {builtinUpdate ? (
-            <Button variant="ghost" size="sm" onClick={onShowBuiltinDiff} data-testid="settings-agent-builtin-diff-open">
-              {t('settings.agentBuiltinDiffOpen')}
-            </Button>
-          ) : null}
-          {/* A builtin cannot be deleted, only switched off; an override can be dropped to restore the builtin. */}
-          {builtinUpdate ? (
-            <Button variant="secondary" size="sm" onClick={onDeleteAgent}>{t('settings.agentRestoreBuiltin')}</Button>
-          ) : provenanceScope !== 'builtin' ? (
+          {/* A builtin cannot be deleted, only switched off; an override is restored from the header line. */}
+          {!builtinUpdate && provenanceScope !== 'builtin' ? (
             <Button variant="danger" size="sm" onClick={onDeleteAgent}>{t('settings.deleteAgent')}</Button>
           ) : null}
         </div>
@@ -213,15 +194,13 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               t={t}
             />
             {modelError ? <InlineError>{modelError}</InlineError> : null}
-            <SettingsField label={t('settings.agentStatus')}>
-              <div className="settings-agent-status-stack">
-                <div className="settings-agent-config-status" data-testid="settings-agent-config-status" data-tone={status.tone}>
-                  <span className="settings-agent-config-status-dot" aria-hidden="true" />
-                  {status.label}
-                </div>
-                <span className="settings-help-text" data-testid="settings-agent-model-source">{modelSourceLabel(selectedAgent, settings, t)}</span>
+            {statusProblem ? (
+              <div className="settings-agent-config-status" data-testid="settings-agent-config-status" data-tone={status.tone}
+                role="status" data-tooltip={status.detail}>
+                <span className="settings-agent-config-status-dot" aria-hidden="true" />
+                {status.label}
               </div>
-            </SettingsField>
+            ) : null}
 
             <div className="settings-agent-flags" role="group" aria-label={t('settings.agentAvailability')}>
               <label className="settings-agent-flag">
@@ -256,6 +235,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 <button
                   type="button"
                   className="settings-agent-panel-toggle"
+                  data-tooltip={open ? undefined : panelHint(id)}
                   aria-expanded={open}
                   aria-controls={`settings-agent-panel-${id}`}
                   data-testid={`settings-agent-panel-${id}`}
@@ -266,11 +246,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                   }}
                 >
                   <Icon name={icon} size={16} className="settings-agent-panel-icon" />
-                  <span className="settings-agent-panel-copy">
-                    <span className="settings-agent-panel-title">{panelLabel(id)}</span>
-                    {!open ? <span className="settings-agent-panel-hint">{panelHint(id)}</span> : null}
-                  </span>
-                  {open ? autosave : null}
+                  <span className="settings-agent-panel-title">{panelLabel(id)}</span>
                   <Chevron open={open} className="settings-agent-panel-caret" />
                 </button>
                 {open ? (
@@ -282,6 +258,18 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             );
           })}
         </div>
+
+        <SettingsDiagnostics
+          testId="settings-agent-diagnostics"
+          rows={[
+            { label: t('settings.resourceFieldId'), value: selectedAgent.id },
+            { label: t('settings.resourceScope'), value: provenanceLabel(provenanceScope, t) },
+            ...(provenance ? [
+              { label: t('settings.scopeResourceLocation'), value: provenance.sourcePath },
+              { label: t('settings.contentFingerprint'), value: provenance.sourceHash },
+            ] : []),
+          ]}
+        />
       </div>
     </div>
   );

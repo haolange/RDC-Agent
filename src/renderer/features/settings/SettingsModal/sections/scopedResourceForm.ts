@@ -120,16 +120,13 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
   return form.body;
 };
 
-export const resourceCardMeta = (kind: ScopedResourceKind, content: string): string => {
-  if (kind === 'mcp') {
-    try {
-      const parsed = JSON.parse(content) as { transport?: string; command?: string };
-      return [parsed.transport, parsed.command].filter(Boolean).join(' · ');
-    } catch { return ''; }
+/** The name a person gave the resource: a skill's frontmatter name, an MCP server's name, otherwise its id. */
+export const resourceDisplayName = (kind: ScopedResourceKind, id: string, content: string): string => {
+  if (kind === 'skill') {
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content)?.[1] ?? '';
+    const name = frontmatter.split(/\r?\n/).find((line) => line.startsWith('name:'))?.slice('name:'.length).trim();
+    return name ? name.replace(/^['"]|['"]$/g, '') : id;
   }
-  if (kind === 'hook') {
-    const event = content.split(/\r?\n/).find((line) => line.startsWith('event:'));
-    return event ? event.slice(6).trim() : '';
-  }
-  return '';
+  if (kind === 'mcp') return formFromContent('mcp', id, content).name || id;
+  return id;
 };

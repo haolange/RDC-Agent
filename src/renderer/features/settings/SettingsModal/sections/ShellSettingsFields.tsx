@@ -60,14 +60,11 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
 
   return (
     <section className="settings-local-tool-form" data-testid="settings-agent-shell" data-settings-search="agent-shell">
-      <header className="settings-local-tool-form-head">
-        <div>
-          <p className="settings-help-text">{t('settings.shellHint')}</p>
-        </div>
-      </header>
-
       <div className="settings-local-tool-grid">
-        <SettingsField label={t('settings.shellExecutable')} layout="row">
+        <SettingsField label={t('settings.shellExecutable')} layout="row" help={t('settings.shellHint')}
+          warning={resolved?.ok && resolved.kind === 'windows-powershell' ? (
+            <span data-testid="settings-agent-shell-upgrade">{t('settings.shellUpgradePwsh')}</span>
+          ) : undefined}>
           <div className="settings-input-with-action">
             <Input
               type="text"
@@ -87,26 +84,20 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
           <div className="settings-readonly-status" data-testid="settings-agent-shell-diagnostics">
             {resolved?.ok ? (
               <>
-                <strong>
+                <strong data-tooltip={resolved.executable}>
                   {resolved.label}
                   {resolved.version ? ` ${resolved.version}` : ''}
                 </strong>
-                <code>{resolved.executable}</code>
               </>
             ) : resolved ? (
-              <InlineError data-testid="settings-agent-shell-error">{resolved.error}</InlineError>
+              <InlineError data-testid="settings-agent-shell-error" detail={resolved.error}>{t('settings.shellResolveFailed')}</InlineError>
             ) : (
-              <span className="settings-help-text">{t('settings.shellDetecting')}</span>
+              <span className="settings-readonly-status-pending">{t('settings.shellDetecting')}</span>
             )}
           </div>
         </SettingsField>
       </div>
 
-      {resolved?.ok && resolved.kind === 'windows-powershell' ? (
-        <p className="settings-help-text settings-runtime-editor-note" data-testid="settings-agent-shell-upgrade">
-          {t('settings.shellUpgradePwsh')}
-        </p>
-      ) : null}
     </section>
   );
 };

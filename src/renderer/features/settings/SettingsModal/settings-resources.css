@@ -131,7 +131,20 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-bg-raised);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
 }
+
+.settings-runtime-editor-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+
+.settings-runtime-editor-status .ui-icon { color: var(--token-status-success); }
 
 .settings-runtime-editor-note .ui-icon {
   flex: none;

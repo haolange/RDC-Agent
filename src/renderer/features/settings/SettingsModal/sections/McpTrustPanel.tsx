@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useI18n } from '../../../../i18n';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
-import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { errorDetail } from '../../../../lib/errorDetail';
 import { revokeMcp, trustMcp } from './mcpTrustActions';
+import { ResourceTrustBlock } from './ResourceTrustBlock';
 import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
 type McpServerOverview = RdcRuntimeOverview['mcpServers'][number];
@@ -67,50 +67,31 @@ export const McpTrustPanel: React.FC<{
   };
 
   return (
-    <section className="settings-trust-block" data-testid="settings-mcp-trust-panel" data-trust-state={state}>
-      <header className="settings-trust-block-head">
-        <div>
-          <div className="settings-section-title">{t('settings.mcpTrustTitle')}</div>
-          <p className="settings-help-text">{t('settings.mcpTrustHint')}</p>
-        </div>
-        <McpTrustBadge state={state} />
-      </header>
-
-      <dl className="settings-trust-summary">
-        {server.descriptorHash ? (
-          <div><dt>{t('settings.mcpDescriptorHash')}</dt><dd><code data-tooltip={server.descriptorHash}>{server.descriptorHash.slice(0, 12)}</code></dd></div>
-        ) : null}
-      </dl>
-
-      {state === 'needs-retrust' ? (
-        <p className="settings-help-text settings-trust-change" data-testid="settings-mcp-trust-change">
-          <Icon name="warning" size={14} />
-          {t('settings.mcpTrustChanged')}
-        </p>
-      ) : null}
-      {state === 'override-rejected' && server.blockedReason ? <InlineError>{server.blockedReason}</InlineError> : null}
-
-      <footer className="settings-trust-block-foot">
-        <p className="settings-help-text settings-trust-gate">
-          <Icon name="info" size={14} />
-          {t('settings.mcpTrustGate')}
-        </p>
-        {state !== 'override-rejected' ? (
-          <div className="settings-runtime-actions">
-            {state === 'trusted' || state === 'needs-retrust' ? (
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run('revoke')}>
-                {t('settings.mcpRevoke')}
-              </Button>
-            ) : null}
-            {state !== 'trusted' ? (
-              <Button variant="primary" size="sm" disabled={busy} onClick={() => void run('trust')}>
-                {t('settings.mcpTrust')}
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-      </footer>
+    <ResourceTrustBlock
+      testId="settings-mcp-trust-panel"
+      state={state}
+      title={t('settings.mcpTrustTitle')}
+      hint={t('settings.mcpTrustHint')}
+      badge={<McpTrustBadge state={state} />}
+      changed={state === 'needs-retrust' ? { message: t('settings.mcpTrustChanged'), testId: 'settings-mcp-trust-change' } : undefined}
+      actions={state !== 'override-rejected' ? (
+        <>
+          {state === 'trusted' || state === 'needs-retrust' ? (
+            <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run('revoke')}>
+              {t('settings.mcpRevoke')}
+            </Button>
+          ) : null}
+          {state !== 'trusted' ? (
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => void run('trust')}>
+              {t('settings.mcpTrust')}
+            </Button>
+          ) : null}
+        </>
+      ) : undefined}
+    >
+      {state === 'override-rejected' && server.blockedReason
+        ? <InlineError detail={server.blockedReason}>{t('settings.mcpOverrideRejectedMessage')}</InlineError> : null}
       {message ? <InlineError detail={message}>{t('app.error.actionFailed')}</InlineError> : null}
-    </section>
+    </ResourceTrustBlock>
   );
 };

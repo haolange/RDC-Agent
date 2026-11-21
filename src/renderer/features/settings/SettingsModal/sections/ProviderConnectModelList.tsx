@@ -66,14 +66,10 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   return (
     <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
       <div className="settings-model-section-header">
-        <span>{provider.catalogOwnership !== 'user-managed'
-          ? t('settings.providers.capability.appManagedModels')
-          : t('settings.providers.capability.userManagedModels')}</span>
-        <span className="settings-help-text">
-          {t('settings.providerManagedModelCount', {
-            available: availableModelCount,
-            total: resolvedModels.length,
-          })}
+        <span data-tooltip={t('settings.providerManagedModelCount', { available: availableModelCount, total: resolvedModels.length })}>
+          {provider.catalogOwnership !== 'user-managed'
+            ? t('settings.providers.capability.appManagedModels')
+            : t('settings.providers.capability.userManagedModels')}
         </span>
       </div>
       {snapshot?.lastRefreshError ? (
@@ -95,14 +91,6 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
             aria-label={t('settings.searchModelPlaceholder')}
             data-testid="settings-provider-model-search"
           />
-        </div>
-      ) : null}
-      {resolvedModels.length > 0 ? (
-        <div className="settings-model-columns" aria-hidden="true">
-          <span>{t('settings.providers.columns.availability')}</span>
-          <span>{t('settings.providers.columns.model')}</span>
-          <span>{t('settings.providers.columns.enabled')}</span>
-          <span>{t('settings.providers.columns.capability')}</span>
         </div>
       ) : null}
       <div className="settings-model-list scrollbar-thin" data-empty-label={t('settings.testBeforeSaveHint')} data-testid="settings-provider-model-list">

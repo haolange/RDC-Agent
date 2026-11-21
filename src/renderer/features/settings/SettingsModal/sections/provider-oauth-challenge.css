@@ -75,8 +75,11 @@
   line-height: 1.6;
 }
 
-.settings-oauth-step-body .settings-help-text {
+.settings-oauth-step-description {
   margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--leading-normal);
 }
 
 .settings-oauth-link-button {

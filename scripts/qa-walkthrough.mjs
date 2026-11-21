@@ -123,7 +123,7 @@ try {
     await openSettings(page, 'models');
     await page.getByTestId('settings-provider-row-ollama').click();
     const detail = page.getByTestId('settings-provider-detail');
-    await detail.getByRole('button', { name: /^(测试|Test)$/ }).click();
+    await detail.getByRole('button', { name: /^(检查连接|Check connection)$/ }).click();
     await page.waitForTimeout(3000);
     await detail.getByRole('button', { name: /^(保存|连接|Save|Connect)$/ }).click();
     await page.waitForTimeout(2500);
@@ -136,6 +136,10 @@ try {
     await page.locator('.settings-model-option[data-model-id="qa-stub:4b"]').first().click();
     await page.waitForTimeout(1500);
     await shot('04-settings-agents');
+    await openSettings(page, 'tools');
+    await shot('04d-settings-tools');
+    await openSettings(page, 'hooks');
+    await shot('04e-settings-hooks');
     await openSettings(page, 'general');
     await shot('04b-settings-general');
     await openSettings(page, 'appearance');

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Button } from '../../../../ui/Button';
-import { Details } from '../../../../ui/Details';
+import { HelpTip } from '../../../../ui/HelpTip';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
 import { getProviderCategoryTranslation, getProviderProtocolLabel } from '../utils';
-import { SettingsField } from '../parts';
+import { SettingsDiagnostics, SettingsField } from '../parts';
 import { shouldUseProviderDocsLink } from '../providerConnectionState';
 import { hasProviderConnectionDefinitionChanged } from '../providerConnectionRequest';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
@@ -36,7 +36,6 @@ interface ProviderDetailProps {
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
   onStartAccountLogin: () => void | Promise<void>;
-  onRefreshModels: (provider: LlmProviderEntry) => void | Promise<void>;
   onDisconnect: (provider: LlmProviderEntry) => void | Promise<void>;
   t: Translate;
 }
@@ -60,7 +59,6 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
   onTest,
   onSave,
   onStartAccountLogin,
-  onRefreshModels,
   onDisconnect,
   t,
 }) => {
@@ -90,10 +88,6 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         </div>
         {provider.isConfigured ? (
           <div className="settings-provider-detail-actions">
-            <Button variant="secondary" size="sm" data-testid={`settings-provider-test-${provider.id}`}
-              disabled={busy} onClick={() => void onRefreshModels(provider)}>
-              {t('settings.providers.refreshModels')}
-            </Button>
             <Button variant="ghost" size="sm" data-testid={`settings-provider-disconnect-${provider.id}`}
               disabled={busy} onClick={() => void onDisconnect(provider)}>
               {authMode === 'account' ? t('settings.signOut') : t('settings.disconnect')}
@@ -184,7 +178,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         )}
 
         {connectionDraft.error && (
-          <InlineError data-testid="settings-provider-connect-error">{connectionDraft.error}</InlineError>
+          <InlineError data-testid="settings-provider-connect-error" detail={connectionDraft.error}>{t('settings.providerTestFailed')}</InlineError>
         )}
 
         {!connectionDraft.error && connectionDraft.discoveryDiagnostic && (
@@ -202,7 +196,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
           <section className="settings-provider-discovery" data-testid="settings-provider-discovery">
             <div className="settings-provider-discovery-head">
               <strong>{authMode === 'local' ? t('settings.localProviderModelsTitle') : t('settings.providers.discoveryTitle')}</strong>
-              <span className="settings-help-text">{t('settings.localProviderModelsHint')}</span>
+              <HelpTip label={t('settings.localProviderModelsTitle')}>{t('settings.localProviderModelsHint')}</HelpTip>
             </div>
             <ProviderDiscoveryEmpty t={t} />
           </section>
@@ -229,17 +223,19 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
           />
         )}
 
-        <Details className="settings-provider-summary" data-testid="settings-provider-summary" summary={t('settings.providers.diagnostics')}>
-          <dl className="settings-provider-diagnostics">
-            <div><dt>{t('settings.providers.serviceId')}</dt><dd>{provider.id}</dd></div>
-            <div>
-              <dt>{t('settings.providerProtocol')}</dt>
-              <dd>{routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel}</dd>
-            </div>
-          </dl>
+        <SettingsDiagnostics
+          testId="settings-provider-diagnostics"
+          rows={[
+            { label: t('settings.providers.serviceId'), value: provider.id },
+            {
+              label: t('settings.providerProtocol'),
+              value: routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel,
+            },
+          ]}
+        >
           {authMode !== 'account' ? <ProviderProtocolSummary provider={provider} t={t} /> : null}
           <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy || !provider.isConfigured} t={t} />
-        </Details>
+        </SettingsDiagnostics>
       </div>
 
       <footer className="settings-provider-detail-footer">

@@ -44,4 +44,6 @@
 
 .appearance-import-status {
   margin: var(--space-2) 0 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }

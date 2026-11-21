@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '../../../../ui/Button';
+import { HelpTip } from '../../../../ui/HelpTip';
 import {
   projectEndpointTemplate,
   resolvePrimarySecretField,
@@ -87,12 +88,18 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
             />
           </label>
         )}
-        <label className="settings-field">
-          <span className="settings-field-label">{t('settings.apiKey')}</span>
+        <div className="settings-field">
+          <div className="settings-field-label-row">
+            <span className="settings-field-label">{t('settings.apiKey')}</span>
+            <HelpTip label={t('settings.apiKey')}>
+              {connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredHint') : t('settings.apiKeyConnectHint')}
+            </HelpTip>
+          </div>
           <div className="settings-secret-field">
             <input
               className="input settings-secret-input"
               data-testid="settings-provider-connect-api-key"
+              aria-label={t('settings.apiKey')}
               type={connectionDraft.showApiKey && !connectionDraft.usingStoredSecret ? 'text' : 'password'}
               value={connectionDraft.usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.apiKey}
               readOnly={connectionDraft.usingStoredSecret || connectionDraft.busy !== 'idle'}
@@ -122,10 +129,7 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                 : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
             </Button>
           </div>
-          <span className="settings-help-text">
-            {connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredHint') : t('settings.apiKeyConnectHint')}
-          </span>
-        </label>
+        </div>
       </>
     );
   }
@@ -192,9 +196,6 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                 onChange={(event) => updateField(field, event.target.value)}
               />
             )}
-            {usingStoredSecret ? (
-              <span className="settings-help-text">{t('settings.connectionSecretStored')}</span>
-            ) : null}
           </label>
         );
       })}
@@ -202,7 +203,7 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
       {schema.credentialAlternatives?.length ? (
         <div className="settings-provider-credential-options" data-testid="settings-provider-credential-options">
           <span className="settings-field-label">{t('settings.connectionCredentialOptions')}</span>
-          <span className="settings-help-text">
+          <span className="settings-provider-credential-options-value">
             {schema.credentialAlternatives.map((alternative) => alternative.label ?? alternative.id).join(' / ')}
           </span>
         </div>

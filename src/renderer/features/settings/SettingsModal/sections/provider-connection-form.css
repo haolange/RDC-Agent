@@ -83,6 +83,11 @@
   background: var(--token-surface-sunken);
 }
 
+.settings-provider-credential-options-value {
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+}
+
 .settings-provider-endpoint-preview {
   grid-template-columns: minmax(8rem, 0.3fr) minmax(0, 0.7fr);
   align-items: center;

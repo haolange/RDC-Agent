@@ -71,8 +71,11 @@
 }
 
 .settings-model-capability-section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--token-text-primary);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 

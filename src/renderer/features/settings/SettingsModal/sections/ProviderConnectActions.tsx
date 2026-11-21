@@ -57,8 +57,9 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
         data-testid="settings-provider-connect-test"
         onClick={() => void onTest()}
         disabled={commonBlocked || accountTestBlocked || authModeUnavailable}
+        data-tooltip={t('settings.providers.checkConnectionHint')}
       >
-        {draft.busy === 'testing' ? t('settings.testing') : t('settings.test')}
+        {draft.busy === 'testing' ? t('settings.testing') : t('settings.providers.checkConnection')}
       </Button>
       <Button
         variant="primary"

@@ -1,4 +1,4 @@
-/* MCP overview is a table; selected metadata stays in a collapsed disclosure. */
+/* MCP overview: a list of name · status · switch above the selected server. */
 .settings-runtime-scope[data-resource-kind='mcp'] .settings-resource-split {
   display: flex;
   flex-direction: column;
@@ -12,56 +12,57 @@
   overflow: auto;
 }
 
-.settings-mcp-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+.settings-mcp-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-mcp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline-end: var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.settings-mcp-row:hover { background: var(--token-interactive-hover); }
+.settings-mcp-row.is-selected { background: var(--token-interactive-active); }
+
+.settings-mcp-row-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height-lg);
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--token-text-primary);
+  font: inherit;
+  text-align: start;
+}
+
+.settings-mcp-row-main:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.settings-mcp-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--type-body-size);
 }
 
-.settings-mcp-table th,
-.settings-mcp-table td {
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--token-border-muted);
-  text-align: start;
-  vertical-align: middle;
-}
-
-.settings-mcp-table th {
-  color: var(--token-text-secondary);
-  font-weight: var(--font-normal);
-  font-size: var(--type-meta-size);
-  word-break: keep-all;
-}
-
-.settings-mcp-table th:first-child { width: 22%; }
-.settings-mcp-table th:nth-child(2) { width: 40%; }
-.settings-mcp-table th:nth-child(3) { width: 26%; }
-.settings-mcp-table th:last-child { width: 12%; }
-
-.settings-mcp-table td code {
-  color: var(--token-text-secondary);
-  overflow-wrap: anywhere;
-}
-
-.settings-mcp-table .is-selected {
-  background: var(--token-interactive-active);
-}
-
-.settings-mcp-table .button {
-  max-width: 100%;
-}
-
-.settings-mcp-table .settings-mcp-row-trailing {
-  flex-wrap: wrap;
-}
-
-.settings-mcp-detail {
-  border-bottom: 1px solid var(--token-border-muted);
-}
-
-.settings-mcp-detail .settings-runtime-detail-title { flex: 1; }
-.settings-mcp-detail > .settings-runtime-detail { padding: var(--space-4); }
+.settings-mcp-detail { padding: var(--space-4) var(--space-1); }
 
 .settings-mcp-dialog .settings-runtime-form-grid {
   grid-template-columns: minmax(0, 1fr);

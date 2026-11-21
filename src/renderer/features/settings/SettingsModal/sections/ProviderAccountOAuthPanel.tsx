@@ -41,7 +41,7 @@ const Step: React.FC<{ index: number; state: StepState; title: string; descripti
     </span>
     <div className="settings-oauth-step-body">
       <div className="settings-oauth-step-title">{title}</div>
-      {description ? <p className="settings-help-text">{description}</p> : null}
+      {description ? <p className="settings-oauth-step-description">{description}</p> : null}
       {children}
     </div>
   </li>

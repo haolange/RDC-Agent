@@ -33,25 +33,12 @@
   color: var(--token-text-secondary);
 }
 
-.settings-local-tool-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
+.settings-local-tool-title {
   min-width: 0;
   flex: 1;
-}
-
-.settings-local-tool-title {
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);
-}
-
-.settings-local-tool-description {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  word-break: keep-all;
-  overflow-wrap: normal;
 }
 
 
@@ -81,21 +68,12 @@
   gap: var(--space-3);
 }
 
-.settings-page-tools :is(.settings-field-label, .settings-help-text, .settings-section-subtitle) {
+.settings-page-tools .settings-field-label {
   word-break: keep-all;
   overflow-wrap: normal;
 }
 
-.settings-page-tools .settings-help-text {
-  font-size: var(--type-meta-size);
-  line-height: var(--leading-normal);
-}
-
 @media (max-width: 48rem) {
-  .settings-mcp-table {
-    min-width: 36rem;
-  }
-
   .settings-mcp-dialog .settings-field:not(.settings-runtime-form-check) {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);

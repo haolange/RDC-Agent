@@ -80,18 +80,6 @@
   flex: 1 0 auto;
 }
 
-.settings-page-skills .settings-help-text {
-  font-size: var(--type-body-size);
-  line-height: 1.55;
-}
-
-.settings-page-skills .settings-help-text,
-.settings-page-policy .settings-help-text {
-  margin-top: var(--space-1);
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-}
-
 @container settings-panel (max-width: 48rem) {
   .settings-page-agents {
     display: block;

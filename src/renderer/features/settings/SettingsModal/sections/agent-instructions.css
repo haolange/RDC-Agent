@@ -48,13 +48,6 @@
   overflow-wrap: anywhere;
 }
 
-.settings-agent-instructions-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
 .settings-agent-instructions--editor {
   font-family: var(--font-mono);
   font-size: var(--type-body-size);

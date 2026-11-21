@@ -57,7 +57,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleTestProviderDraft,
     handleSaveProviderConnection,
     handleStartAccountLogin,
-    handleRefreshProviderModels,
     handleDisconnectProvider,
   } = modal;
 
@@ -97,7 +96,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
       onTest={handleTestProviderDraft}
       onSave={handleSaveProviderConnection}
       onStartAccountLogin={handleStartAccountLogin}
-      onRefreshModels={handleRefreshProviderModels}
       onDisconnect={handleDisconnectProvider}
       t={t}
     />
