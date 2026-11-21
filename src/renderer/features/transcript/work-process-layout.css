@@ -249,3 +249,51 @@
     gap: var(--space-1) var(--space-2);
   }
 }
+
+/* Follow-latest window (design-system.md「审美契约 · 跟随视窗」): capped height, a top fade once content hides
+   above, and a pill that returns to the newest step after the reader scrolls up. */
+.work-process-viewport {
+  position: relative;
+  min-width: 0;
+}
+
+.work-process-viewport.is-following > .work-process-viewport-scroller {
+  max-height: min(40vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.work-process-viewport.has-hidden-above > .work-process-viewport-scroller {
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0.25) 18%, rgb(0 0 0) 45%);
+}
+
+.work-process-viewport-latest {
+  position: absolute;
+  bottom: var(--space-2);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-full);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-shadow-popover);
+  color: var(--token-text-primary);
+  font-size: var(--type-meta-size);
+  transform: translateX(-50%);
+  cursor: pointer;
+  animation: popover-in var(--motion-overlay);
+}
+
+.work-process-viewport-latest:hover,
+.work-process-viewport-latest:focus-visible {
+  background: var(--token-interactive-hover);
+}
+
+.work-process-viewport-latest:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}

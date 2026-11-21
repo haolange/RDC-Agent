@@ -81,6 +81,7 @@
     "composer.turnControls": "src/renderer/features/composer/useTurnControls.ts",
     "transcript.workProcess": "src/renderer/features/transcript/WorkProcess.tsx",
     "transcript.workProcessContent": "src/renderer/features/transcript/WorkProcessContent.tsx",
+    "transcript.workProcessViewport": "src/renderer/features/transcript/WorkProcessViewport.tsx",
     "transcript.workProcessSectionRow": "src/renderer/features/transcript/WorkProcessSectionRow.tsx",
     "transcript.workProcessSectionModel": "src/renderer/features/transcript/workProcessSectionModel.ts",
     "transcript.workProcessThinking": "src/renderer/features/transcript/WorkProcessThinking.tsx",
@@ -237,6 +238,7 @@
     "testing.replayFixture": "src/renderer/testing/replayFixture.ts"
   },
   "retired": [
+    "src/renderer/features/transcript/WorkProcessExpansion.tsx",
     "src/renderer/features/transcript/WorkProcessIcons.tsx",
     "src/renderer/features/transcript/WorkProcessKnowledgeIcons.tsx",
     "src/renderer/features/transcript/WorkProcessInvestigationIcons.tsx",

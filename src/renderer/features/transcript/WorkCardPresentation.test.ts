@@ -14,10 +14,6 @@ import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessContent } from './WorkProcessContent';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { ToolAggregateRow } from './ToolAggregateRow';
-vi.mock('./WorkProcessExpansion', async (importOriginal) => ({
-  ...await importOriginal<typeof import('./WorkProcessExpansion')>(),
-  useWorkProcessExpansion: () => ({ preference: 'all', active: false }),
-}));
 
 const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 

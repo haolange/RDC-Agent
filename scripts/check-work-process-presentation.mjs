@@ -1028,6 +1028,16 @@ for (const [label, source] of [['components', componentSource], ['section model'
 assert(/'thinking' \| 'thinking\+commentary' \| 'commentary' \| 'actions'/.test(sectionModelSource),
   'section model must name the four step leads');
 assert(componentSource.includes("useScopedWorkDisclosure('root'"), 'Working root must use the scoped disclosure so a manual toggle wins');
+// Steps never fold: no per-step disclosure, no "N actions · time" toggle; the preference picks follow-latest or show-all.
+const sectionRowSource = scriptRead('src/renderer/features/transcript/WorkProcessSectionRow.tsx', 'utf8');
+assert(!/Disclosure|useScopedWorkDisclosure|actionsLabel/.test(sectionRowSource + sectionModelSource), 'Working steps must be laid out flat without a step toggle');
+assert(!/workProcessSectionRunning|workProcessSectionDone/.test(i18nSource), 'the step toggle copy must stay deleted');
+const viewportSource = scriptRead('src/renderer/features/transcript/WorkProcessViewport.tsx', 'utf8');
+const contentSource = scriptRead('src/renderer/features/transcript/WorkProcessContent.tsx', 'utf8');
+assert(contentSource.includes("following={active && preference === 'latest'}"), 'a running process follows its latest step only under the latest preference');
+assert(viewportSource.includes('FOLLOW_MS = 200') && viewportSource.includes('workProcessBackToLatest'), 'the follow window eases to the latest step and offers back-to-latest');
+assert(cssSource.includes('max-height: min(40vh, 360px)') && cssSource.includes('rgb(0 0 0 / 0.25) 18%, rgb(0 0 0) 45%'),
+  'the follow window keeps the contract height and top fade');
 assert(!/setExpanded\(true\)/.test(componentSource), 'Working root must not force itself open after a turn ends');
 const userInputPanelSource = scriptRead('src/renderer/features/composer/UserInputRequestPanel.tsx', 'utf8');
 const userInputSubmitHookSource = scriptRead('src/renderer/features/composer/useUserInputRequestSubmit.ts', 'utf8');

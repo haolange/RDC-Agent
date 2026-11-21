@@ -10,10 +10,6 @@ import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { WorkProcessContent } from './WorkProcessContent';
 import type { WorkProcessRow } from './workProcessTypes';
-vi.mock('./WorkProcessExpansion', async (importOriginal) => ({
-  ...await importOriginal<typeof import('./WorkProcessExpansion')>(),
-  useWorkProcessExpansion: () => ({ preference: 'all', active: false }),
-}));
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({
   t: (key: string, values?: { completed: number; total: number }) => values

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Chevron } from '../../ui/Chevron';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { ScopedWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { WorkProcessContent } from './WorkProcessContent';
@@ -14,14 +15,16 @@ interface WorkProcessProps {
 }
 
 /**
- * Working stays open while the turn runs and when it ends in an error or a stop, and folds once the turn
- * completes normally. Opening or closing it by hand is remembered for this message and always wins.
+ * Working stays open while the turn runs and when it ends in an error or a stop. Under "follow latest" it folds once
+ * the turn completes normally; under "show all" it stays laid out in full. Opening or closing it by hand is remembered
+ * for this message and always wins.
  */
 const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
   const { t } = useI18n();
   const presentation = useMemo(() => buildWorkProcessPresentation(trace, t), [trace, t]);
   const running = trace.status === 'running';
-  const [expanded, toggle] = useScopedWorkDisclosure('root', running || trace.status === 'error' || trace.status === 'stopped');
+  const showAll = useAppSettingsStore((state) => state.settings.appearance.workProcessExpansion) === 'all';
+  const [expanded, toggle] = useScopedWorkDisclosure('root', running || showAll || trace.status === 'error' || trace.status === 'stopped');
 
   const headlineCopy = trace.status === 'stopped'
     ? t('chat.workProcessHeadlineStopped')

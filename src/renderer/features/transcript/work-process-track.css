@@ -111,24 +111,6 @@
   margin-inline-start: calc(var(--work-track-gutter) * -1);
 }
 
-.work-process-section-lead + .work-process-section-actions {
+.work-process-section-lead + .work-process-section-list {
   margin-top: var(--space-2);
-}
-
-.work-process-section-toggle {
-  flex: 0 1 auto;
-  color: var(--token-text-secondary);
-  font-weight: var(--font-normal);
-}
-
-.work-process-section-toggle.is-running {
-  color: var(--token-text-secondary);
-}
-
-.work-process-section-label {
-  font-variant-numeric: tabular-nums;
-}
-
-.work-process-section-actions > .ui-disclosure-body {
-  padding-top: var(--space-2);
 }
