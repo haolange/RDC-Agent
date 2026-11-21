@@ -7,28 +7,28 @@
   border: var(--transcript-card-border);
   border-radius: var(--transcript-card-radius);
   background: var(--token-bg-panel);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   text-align: left;
   min-width: 0;
   cursor: var(--cursor-pointer, pointer);
 }
 
 .plan-card:hover { border-color: var(--token-border-focus); }
-.plan-card:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 2px; }
+.plan-card:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); }
 
 .plan-card__head {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-2);
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .plan-card__title {
   margin: 0;
   font-size: var(--type-title-size);
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -40,9 +40,9 @@
   max-height: min(6lh, 28dvh);
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: var(--type-label-size);
-  color: var(--token-text-body);
-  font-weight: 400;
+  font-size: var(--type-body-size);
+  color: var(--token-text-secondary);
+  font-weight: var(--font-normal);
   line-height: var(--leading-normal);
 }
 
@@ -66,7 +66,7 @@
 }
 
 .plan-card__revision {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .plan-card__status.is-awaiting { color: var(--token-accent-primary); }
@@ -83,7 +83,7 @@
 
 .plan-deliverable:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .plan-deliverable__handoff {
@@ -96,10 +96,10 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font: inherit;
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
 }
 
 button.plan-deliverable__handoff {
@@ -107,11 +107,11 @@ button.plan-deliverable__handoff {
 }
 
 button.plan-deliverable__handoff:hover {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   background: var(--token-interactive-hover);
 }
 
 button.plan-deliverable__handoff:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 1px;
+  outline-offset: var(--focus-ring-offset);
 }

@@ -24,7 +24,7 @@
   padding: var(--space-2) var(--space-4);
   border: 0;
   background: transparent;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   text-align: start;
   cursor: pointer;
 }
@@ -35,13 +35,13 @@
 
 .settings-agent-panel-toggle:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .settings-agent-panel-icon,
 .settings-agent-panel-caret {
   flex: none;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-agent-panel-copy {
@@ -53,13 +53,13 @@
 }
 
 .settings-agent-panel-title {
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .settings-agent-panel-hint {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

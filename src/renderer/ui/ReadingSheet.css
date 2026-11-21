@@ -18,7 +18,7 @@
   overflow: hidden;
   border-radius: var(--radius-sheet);
   background: var(--token-bg-overlay);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   box-shadow: var(--token-elevation-3), inset 0 0 0 1px var(--token-border-default);
   animation: ui-reading-sheet-in var(--motion-overlay);
 }
@@ -40,7 +40,7 @@
 
 .ui-reading-sheet:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-reading-sheet-header {
@@ -63,20 +63,20 @@
 
 .ui-reading-sheet-title {
   margin: 0;
-  max-height: calc(var(--type-heading-line) * 2);
+  max-height: calc(var(--type-body-line) * 2);
   overflow: hidden;
-  color: var(--token-text-heading);
-  font-size: var(--type-heading-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
-  line-height: var(--type-heading-line);
+  line-height: var(--type-body-line);
   letter-spacing: var(--tracking-heading);
   overflow-wrap: anywhere;
 }
 
 .ui-reading-sheet-meta {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
 }
 
 .ui-reading-sheet-actions {
@@ -92,7 +92,7 @@
   flex-direction: column;
   gap: var(--space-1);
   padding: 0 var(--space-5) var(--space-3);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .ui-reading-sheet-body {
@@ -103,7 +103,7 @@
   overscroll-behavior: contain;
   padding: var(--space-4) var(--space-5) var(--space-5);
   border-top: 1px solid var(--token-border-subtle);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-size: var(--type-reading-size);
   line-height: var(--type-reading-line);
   overflow-wrap: anywhere;
@@ -117,8 +117,8 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--token-border-subtle);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 @keyframes ui-reading-sheet-in {

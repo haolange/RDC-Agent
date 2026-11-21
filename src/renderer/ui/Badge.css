@@ -1,22 +1,22 @@
 .ui-badge {
-  --ui-badge-color: var(--token-text-caption);
+  --ui-badge-color: var(--token-text-secondary);
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   gap: var(--space-1);
-  min-height: calc(var(--type-caption-line) + var(--space-0-5) * 2);
+  min-height: calc(var(--type-meta-line) + var(--space-0-5) * 2);
   padding: 0 var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   color: var(--ui-badge-color);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
-  line-height: var(--type-caption-line);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
+  line-height: var(--type-meta-line);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.ui-badge.is-tone-neutral { --ui-badge-color: var(--token-text-body); }
+.ui-badge.is-tone-neutral { --ui-badge-color: var(--token-text-secondary); }
 .ui-badge.is-tone-accent { --ui-badge-color: var(--token-accent-primary); }
 .ui-badge.is-tone-success { --ui-badge-color: var(--token-status-success); }
 .ui-badge.is-tone-warning { --ui-badge-color: var(--token-status-warning); }
@@ -37,5 +37,5 @@
 
 .ui-badge.is-outline.is-tone-neutral {
   border-color: var(--token-border-default);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }

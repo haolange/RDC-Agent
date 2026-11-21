@@ -30,7 +30,7 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -41,7 +41,7 @@
 
 .work-process-header:hover {
   background: transparent;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .work-process-header:focus-visible {
@@ -58,7 +58,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--token-text-placeholder);
+  color: var(--token-text-disabled);
   transition: transform var(--transition-fast);
 }
 
@@ -73,7 +73,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--token-text-placeholder);
+  background: var(--token-text-disabled);
 }
 
 .work-process-status-dot.status-running {
@@ -107,15 +107,15 @@
 
 .work-process-label:not(.is-active) {
   order: 2;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .work-process-label.is-active {
   order: 2;
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .work-process-label.status-running {
@@ -134,8 +134,8 @@
   order: 3;
   display: inline-flex;
   align-items: center;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .work-process-meta::before {
@@ -151,8 +151,8 @@
 .work-process-summary {
   max-width: 100%;
   margin: 0 0 var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -190,7 +190,7 @@
 
 .work-process-tool-card.status-skipped .work-process-tool-card-verb,
 .work-process-tool-card.status-cancelled .work-process-tool-card-verb {
-  color: var(--token-text-muted);
+  color: var(--token-text-secondary);
 }
 
 @keyframes work-process-rail-pulse {
@@ -208,23 +208,23 @@
 .work-process-step-summary {
   max-width: 100%;
   margin: 0;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
 
 .work-process-diagnostic-message {
   width: 100%;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
 
 .work-process-diagnostic.severity-info .work-process-diagnostic-message {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.5;
 }
 
@@ -245,8 +245,8 @@
 .work-process-user-input,
 .work-process-approval {
   min-width: 0;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .work-process-approval {

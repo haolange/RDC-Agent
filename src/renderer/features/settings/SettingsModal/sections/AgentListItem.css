@@ -24,13 +24,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .settings-agent-list-item-description {
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-regular);
 }
 

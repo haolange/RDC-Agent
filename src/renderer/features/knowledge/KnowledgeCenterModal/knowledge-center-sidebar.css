@@ -29,11 +29,10 @@
 .knowledge-center-spaces .knowledge-center-section-title {
   margin-block-start: var(--space-3);
   padding-inline-start: var(--space-3);
-  color: var(--token-text-caption);
-  font-size: var(--type-overline-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  line-height: var(--type-overline-line);
-  letter-spacing: var(--tracking-overline);
+  line-height: var(--type-meta-line);
 }
 
 .knowledge-center-space-list .knowledge-center-empty-inline {
@@ -44,21 +43,21 @@
 
 .knowledge-center-nav-item.ui-list-row {
   align-items: center;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .knowledge-center-nav-item.ui-list-row:hover:not(:disabled) {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .knowledge-center-nav-item.ui-list-row.is-selected {
-  color: var(--token-text-heading);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-weight: var(--font-normal);
 }
 
 .knowledge-center-nav-count {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
 }
 
@@ -83,7 +82,7 @@
 
 .knowledge-center-space-row.ui-checkbox:has(.ui-checkbox-input:focus-visible) {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .knowledge-center-space-row .ui-checkbox-label {
@@ -92,14 +91,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .knowledge-center-space-row:has(.ui-checkbox-input:checked) .ui-checkbox-label {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .knowledge-center-space-meta {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }

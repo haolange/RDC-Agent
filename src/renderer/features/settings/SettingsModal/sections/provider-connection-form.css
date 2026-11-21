@@ -18,8 +18,8 @@
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--token-bg-raised) 36%, transparent);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.5;
 }
 
@@ -93,8 +93,8 @@
 
 .settings-provider-endpoint-preview code {
   min-width: 0;
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.5;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -117,7 +117,7 @@
 .settings-provider-auth-option.is-active {
   border-color: var(--token-border-focus);
   background: color-mix(in srgb, var(--token-border-focus) 14%, var(--token-surface-raised));
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--token-border-focus) 18%, transparent);
 }
 

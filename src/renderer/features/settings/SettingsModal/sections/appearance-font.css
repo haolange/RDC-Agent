@@ -24,9 +24,9 @@
 }
 
 .appearance-font-popover-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .appearance-font-popover-head .appearance-font-popover-note {
@@ -53,8 +53,8 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-regular);
   text-align: start;
   cursor: pointer;
@@ -62,17 +62,17 @@
 
 .appearance-font-option:hover {
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .appearance-font-option:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .appearance-font-option.is-selected {
   background: var(--token-interactive-active);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .appearance-font-option-mark {
@@ -98,17 +98,17 @@
 
 .appearance-font-option-sample {
   font-family: var(--ap-font-sample, inherit);
-  font-size: var(--type-heading-size);
+  font-size: var(--type-body-size);
   line-height: 1.3;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .appearance-font-option-name {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .appearance-font-preview {
@@ -121,8 +121,8 @@
 
 .appearance-font-preview-title {
   margin-bottom: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .appearance-font-preview-sample {
@@ -133,7 +133,7 @@
 .appearance-font-popover-note {
   margin: var(--space-2) 0 0;
   padding: 0 var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.5;
 }

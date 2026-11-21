@@ -34,23 +34,23 @@
 
 .composer-user-input-kicker,
 .composer-tool-approval-kicker {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .composer-user-input-header p,
 .composer-tool-approval-header p {
   margin: 0;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
 .composer-user-input-question-description {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -60,9 +60,9 @@
   align-items: center;
   gap: var(--space-1);
   flex: 0 0 auto;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .composer-user-input-nav-button {
@@ -76,9 +76,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .composer-tool-approval-meta span {

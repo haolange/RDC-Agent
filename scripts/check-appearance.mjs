@@ -112,7 +112,7 @@ const knowledgeSidebarCss = fs.readFileSync(
 );
 assert(
   checkboxTokenSource.includes('--checkbox-checked-bg:       transparent;')
-    && checkboxTokenSource.includes('--checkbox-check-color:      var(--token-text-heading);')
+    && checkboxTokenSource.includes('--checkbox-check-color:      var(--token-text-primary);')
     && !checkboxTokenSource.includes('--checkbox-checked-bg:       var(--token-accent-primary);'),
   'Checkbox tokens must stay outline + ink, not accent fill',
 );

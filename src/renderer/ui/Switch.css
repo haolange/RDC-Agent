@@ -39,7 +39,7 @@
   width: 14px;
   height: 14px;
   border-radius: var(--radius-full);
-  background: var(--token-text-body);
+  background: var(--token-text-secondary);
   box-shadow: var(--token-shadow-card);
   transition:
     transform var(--transition-fast),
@@ -75,8 +75,8 @@
 
 .ui-switch-label {
   min-width: 0;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   line-height: 1.35;
 }
 

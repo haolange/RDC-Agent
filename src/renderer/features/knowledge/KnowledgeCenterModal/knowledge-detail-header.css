@@ -25,7 +25,7 @@
 
 .knowledge-center-header-title {
   margin: 0;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: var(--type-title-line);
@@ -56,5 +56,5 @@
 
 .knowledge-center-error {
   color: var(--token-status-error);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }

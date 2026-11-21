@@ -101,7 +101,7 @@
 
 .appearance-contrast-value {
   margin-left: var(--space-2);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 

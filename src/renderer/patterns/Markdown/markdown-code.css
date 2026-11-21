@@ -10,15 +10,15 @@
   overflow-x: auto;
   padding: 0;
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: 1.6;
 }
 
 :is(.markdown-body, .work-process-highlighted-code) .hljs-comment,
 :is(.markdown-body, .work-process-highlighted-code) .hljs-quote {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-style: italic;
 }
 
@@ -53,17 +53,17 @@
 
 :is(.markdown-body, .work-process-highlighted-code) .hljs-meta,
 :is(.markdown-body, .work-process-highlighted-code) .hljs-meta .hljs-keyword {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 :is(.markdown-body, .work-process-highlighted-code) .hljs-function,
 :is(.markdown-body, .work-process-highlighted-code) .hljs-title.function_ {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 :is(.markdown-body, .work-process-highlighted-code) .hljs-params,
 :is(.markdown-body, .work-process-highlighted-code) .hljs-property {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 :is(.markdown-body, .work-process-highlighted-code) .hljs-tag,

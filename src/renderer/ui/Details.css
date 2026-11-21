@@ -6,8 +6,8 @@
   min-height: var(--control-height-sm);
   list-style: none;
   cursor: pointer;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: var(--leading-normal);
   border-radius: var(--radius-sm);
 }
@@ -30,9 +30,9 @@
   background: var(--token-bg-panel);
 }
 .ui-details > summary:hover,
-.ui-details > summary:focus-visible { color: var(--token-text-heading); }
+.ui-details > summary:focus-visible { color: var(--token-text-primary); }
 .ui-details > summary:focus-visible {
   outline: 2px solid var(--token-accent-primary);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 .ui-details[open] > summary { margin-bottom: var(--space-2); }

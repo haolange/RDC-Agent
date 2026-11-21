@@ -39,7 +39,7 @@
 }
 .work-process-tool-card.is-background-wait > .work-card-trigger:focus-visible {
   border-radius: var(--radius-sm);
-  outline-offset: var(--space-1);
+  outline-offset: var(--focus-ring-offset);
 }
 .work-process-tool-card.is-background-wait > .work-process-tool-card-body {
   padding: var(--space-1) 0 0;

@@ -43,7 +43,7 @@
 }
 
 .settings-agent-editor-name {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: 1.25;
@@ -51,9 +51,9 @@
 }
 
 .settings-agent-editor-id {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .settings-agent-editor-name {
@@ -95,7 +95,7 @@
 }
 
 .settings-agent-identity-grid .settings-field.is-row .settings-field-label {
-  padding-top: calc((var(--control-height-md) - var(--type-label-size) * 1.4) / 2);
+  padding-top: calc((var(--control-height-md) - var(--type-body-size) * 1.4) / 2);
 }
 
 .settings-agent-name-input {

@@ -28,6 +28,6 @@
   gap: var(--space-1);
   padding-block: var(--space-2);
   border-bottom: 1px solid var(--token-border-default);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }

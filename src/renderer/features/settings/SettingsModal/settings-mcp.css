@@ -16,7 +16,7 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .settings-mcp-table th,
@@ -28,9 +28,9 @@
 }
 
 .settings-mcp-table th {
-  color: var(--token-text-caption);
-  font-weight: var(--font-medium);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-weight: var(--font-normal);
+  font-size: var(--type-meta-size);
   word-break: keep-all;
 }
 
@@ -40,7 +40,7 @@
 .settings-mcp-table th:last-child { width: 12%; }
 
 .settings-mcp-table td code {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   overflow-wrap: anywhere;
 }
 

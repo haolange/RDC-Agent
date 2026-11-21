@@ -27,24 +27,24 @@ function documentRoot() {
 describe('CodeMirror style module under strict desktop CSP', () => {
   it('mounts document styles without an inline tag and deduplicates repeated mounts', () => {
     const root = documentRoot();
-    const module = new StyleModule({ '.editor': { color: 'var(--token-text-body)' } });
+    const module = new StyleModule({ '.editor': { color: 'var(--token-text-secondary)' } });
     StyleModule.mount(root, [module]);
     StyleModule.mount(root, [module]);
     expect(root.createElement).not.toHaveBeenCalled();
     expect(root.adoptedStyleSheets).toHaveLength(1);
-    expect(root.adoptedStyleSheets[0].rules).toEqual(['.editor {color: var(--token-text-body);}']);
+    expect(root.adoptedStyleSheets[0].rules).toEqual(['.editor {color: var(--token-text-secondary);}']);
   });
 
   it('preserves rule order and adoption in a shadow root from the same document', () => {
     const root = documentRoot();
     const first = new StyleModule({ '.editor': { color: 'inherit' } });
-    const second = new StyleModule({ '.editor': { color: 'var(--token-text-body)' } });
+    const second = new StyleModule({ '.editor': { color: 'var(--token-text-secondary)' } });
     StyleModule.mount(root, [first, second]);
     const shadow = { ownerDocument: root, adoptedStyleSheets: [] as ConstructedSheet[] };
     StyleModule.mount(shadow, [first, second]);
     expect(shadow.adoptedStyleSheets[0]).toBe(root.adoptedStyleSheets[0]);
     expect(shadow.adoptedStyleSheets[0].rules).toEqual([
-      '.editor {color: inherit;}', '.editor {color: var(--token-text-body);}',
+      '.editor {color: inherit;}', '.editor {color: var(--token-text-secondary);}',
     ]);
     expect(root.createElement).not.toHaveBeenCalled();
   });

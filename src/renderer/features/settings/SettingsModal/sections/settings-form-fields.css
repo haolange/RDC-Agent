@@ -6,7 +6,7 @@
 }
 
 .settings-section-title {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: 1.3;

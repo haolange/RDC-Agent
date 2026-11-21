@@ -13,7 +13,7 @@
 
 .conversation-bubble-user {
   background: var(--token-surface-raised);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
   box-shadow: var(--token-shadow-card), var(--token-elevation-edge);
@@ -40,7 +40,7 @@
   padding: 0;
   white-space: normal;
   background: transparent;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -54,8 +54,8 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.5;
 }
 
@@ -68,7 +68,7 @@
   width: 6px;
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--token-text-muted);
+  background: var(--token-text-secondary);
 }
 
 .conversation-bubble-system.severity-warning .conversation-system-dot {
@@ -95,8 +95,8 @@
   border: var(--transcript-card-border);
   border-radius: var(--transcript-card-radius);
   background: var(--transcript-card-surface);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.6;
 }
 
@@ -106,8 +106,8 @@
 
 .conversation-system-command-label {
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-meta-size);
+  color: var(--token-text-secondary);
 }
 
 .conversation-bubble-system.is-command.severity-error .conversation-system-command-label {
@@ -164,23 +164,23 @@
   background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--token-status-error) 24%, transparent);
   color: var(--token-status-error);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .conversation-message-diagnostic-details {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .conversation-message-diagnostic-code {
   display: block;
   margin-top: var(--space-1);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
 
 .conversation-message-diagnostic-text {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   line-height: 1.55;
 }

@@ -5,22 +5,22 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 .settings-mcp-status-neutral {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 .settings-mcp-status-neutral::before {
   content: '';
   width: var(--space-2);
   height: var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--token-text-placeholder);
+  background: var(--token-text-disabled);
 }
 .settings-runtime-detail {
   display: flex;
@@ -40,13 +40,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
 }
 .settings-runtime-detail-title small {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-regular);
 }
 .settings-runtime-detail-badges {
@@ -73,21 +73,21 @@
 }
 .settings-runtime-detail-grid dt,
 .settings-trust-summary dt {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 .settings-runtime-detail-grid dd,
 .settings-trust-summary dd {
   margin: 0;
   min-width: 0;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 .settings-runtime-detail-grid code,
 .settings-trust-summary code {
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 .settings-trust-block {
   display: flex;
@@ -126,7 +126,7 @@
 .settings-trust-gate .ui-icon {
   flex: none;
   margin-top: var(--space-0-5);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 .settings-trust-block-foot {
   display: flex;

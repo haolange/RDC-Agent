@@ -1,6 +1,6 @@
 .knowledge-center-index-hint {
-  font-size: var(--type-caption-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-meta-size);
+  color: var(--token-text-secondary);
 }
 .knowledge-center-index {
   display: flex;
@@ -31,14 +31,14 @@
   border-top: 1px solid var(--token-border-muted);
 }
 .knowledge-center-index-stats dt {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 .knowledge-center-index-stats dd {
   margin: 0;
-  color: var(--token-text-heading);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
   text-align: end;
   overflow-wrap: anywhere;
 }
@@ -51,7 +51,7 @@
   width: var(--space-2);
   height: var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--token-text-placeholder);
+  background: var(--token-text-disabled);
 }
 .knowledge-center-index[data-state='ready'] .knowledge-center-index-dot { background: var(--token-status-success); }
 .knowledge-center-index[data-state='rebuilding'] .knowledge-center-index-dot { background: var(--token-status-warning); }
@@ -65,8 +65,8 @@
   grid-column: 1 / -1;
 }
 .knowledge-center-index-label {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 .knowledge-center-index-revision-value {
   min-width: 0;
@@ -77,9 +77,9 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
   background: var(--token-bg-panel);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -90,19 +90,19 @@
   gap: var(--space-1);
 }
 .knowledge-center-index-note {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 .knowledge-center-index-disclosure > summary {
-  font-size: var(--type-label-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-body-size);
+  color: var(--token-text-secondary);
   padding: var(--space-2) 0;
 }
 .knowledge-center-index-disclosure > summary:hover,
 .knowledge-center-index-disclosure > summary:focus-visible {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 .knowledge-center-index-disclosure > summary:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }

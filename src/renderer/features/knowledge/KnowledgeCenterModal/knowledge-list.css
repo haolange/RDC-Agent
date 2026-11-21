@@ -1,6 +1,6 @@
 .knowledge-center-section-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
 }
@@ -34,10 +34,10 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  color: var(--token-text-heading);
-  font-size: var(--type-item-size);
-  font-weight: var(--font-medium);
-  line-height: var(--type-item-line);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
+  line-height: var(--type-body-line);
   overflow-wrap: anywhere;
 }
 
@@ -67,8 +67,8 @@
 .knowledge-center-empty-inline,
 .knowledge-center-missing,
 .knowledge-center-card-preview {
-  font-size: var(--type-caption-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-meta-size);
+  color: var(--token-text-secondary);
 }
 
 /* One line of preview; the title carries the second line. */
@@ -78,7 +78,7 @@
   -webkit-line-clamp: 1;
   overflow: hidden;
   overflow-wrap: anywhere;
-  line-height: var(--type-caption-line);
+  line-height: var(--type-meta-line);
 }
 
 .knowledge-center-list-head {
@@ -93,21 +93,21 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--token-text-heading);
-  font-size: var(--type-heading-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
 .knowledge-center-list-count {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-regular);
   font-variant-numeric: tabular-nums;
 }
 
 .knowledge-center-list-hint {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .knowledge-center-conflict-row.ui-list-row {
@@ -130,8 +130,8 @@
 }
 
 .knowledge-center-conflict-ids {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
 
@@ -144,11 +144,11 @@
   flex-direction: column;
   align-items: flex-end;
   gap: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .knowledge-center-conflict-swap {
   margin: 0 var(--space-2);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }

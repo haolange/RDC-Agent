@@ -16,8 +16,8 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   text-align: left;
   cursor: pointer;
 }
@@ -27,9 +27,13 @@
   background: var(--token-interactive-hover);
 }
 
+.ui-menu-item:active:not(:disabled) {
+  background: var(--token-interactive-active);
+}
+
 .ui-menu-item:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .ui-menu-item.is-selected {
@@ -44,7 +48,7 @@
 
 .ui-menu-check {
   color: var(--token-accent-primary);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .ui-menu-separator {

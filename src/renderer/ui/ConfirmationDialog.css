@@ -1,7 +1,7 @@
 .confirmation-message {
   margin: 0;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.6;
   overflow-wrap: anywhere;
   white-space: pre-line;
@@ -28,14 +28,14 @@
 
 .confirmation-detail-label {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .confirmation-detail-value {
   margin: var(--space-1) 0 0;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 

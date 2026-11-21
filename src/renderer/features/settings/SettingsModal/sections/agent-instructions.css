@@ -11,8 +11,8 @@
   border: 1px solid color-mix(in srgb, var(--token-status-error) 44%, var(--token-border-muted));
   border-radius: var(--radius-md);
   background: var(--token-surface-sunken);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .settings-agent-tool-diagnostics-list {
@@ -21,7 +21,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .settings-agent-tool-diagnostics-list li {
@@ -34,7 +34,7 @@
 .settings-agent-tool-diagnostics-list code {
   color: var(--token-status-error);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .settings-agent-instructions,
@@ -57,7 +57,7 @@
 
 .settings-agent-instructions--editor {
   font-family: var(--font-mono);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: 1.7;
 }
 
@@ -84,5 +84,5 @@
 .settings-agent-diagnostics-link {
   margin-inline-start: auto;
   color: var(--token-accent-primary);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }

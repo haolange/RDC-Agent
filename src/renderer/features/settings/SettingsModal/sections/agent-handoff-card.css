@@ -43,7 +43,7 @@
   padding: 0 var(--space-3);
   border: 0;
   background: transparent;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   text-align: start;
   cursor: pointer;
 }
@@ -54,12 +54,12 @@
 
 .settings-handoff-card-toggle:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .settings-handoff-card-toggle .ui-icon {
   flex: none;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-handoff-card-index {
@@ -67,15 +67,15 @@
   flex: none;
   min-width: var(--space-6);
   justify-content: center;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   font-variant-numeric: tabular-nums;
 }
 
 .settings-handoff-card-title {
   min-width: 0;
   overflow: hidden;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   text-overflow: ellipsis;
@@ -85,8 +85,8 @@
 .settings-handoff-card-target {
   min-width: 0;
   overflow: hidden;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -125,7 +125,7 @@
 }
 
 .settings-handoff-card-body .settings-field.is-row .settings-field-label {
-  padding-top: calc((var(--control-height-md) - var(--type-label-size) * 1.4) / 2);
+  padding-top: calc((var(--control-height-md) - var(--type-body-size) * 1.4) / 2);
 }
 
 .settings-handoff-card-body .settings-field-control {
@@ -143,7 +143,7 @@
 
 .settings-handoff-error {
   color: var(--token-status-error);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
 

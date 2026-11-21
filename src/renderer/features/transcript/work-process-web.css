@@ -13,8 +13,8 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-full);
   background: var(--token-bg-app);
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   text-decoration: none;
   max-width: 100%;
 }
@@ -22,7 +22,7 @@
 .work-process-source-pill:hover,
 .work-process-source-pill:focus-visible {
   border-color: var(--token-border-strong);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .work-process-source-pill span {
@@ -33,8 +33,8 @@
 
 .work-process-source-pill.is-destination {
   border-color: var(--token-border-strong);
-  color: var(--token-text-heading);
-  font-weight: 600;
+  color: var(--token-text-primary);
+  font-weight: var(--font-semibold);
 }
 
 .work-process-source-pill.is-destination:hover {
@@ -60,8 +60,8 @@
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   background: var(--token-surface-sunken);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -91,8 +91,8 @@
   align-items: center;
   justify-content: center;
   background: var(--token-surface-sunken);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: 700;
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-semibold);
   line-height: 1;
 }

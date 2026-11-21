@@ -88,8 +88,8 @@
 .settings-page-skills .settings-help-text,
 .settings-page-policy .settings-help-text {
   margin-top: var(--space-1);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 @container settings-panel (max-width: 48rem) {

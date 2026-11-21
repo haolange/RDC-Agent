@@ -14,7 +14,7 @@ const CEILINGS = {
   'inline-svg': 45,
   'text-glyph': 21,
   'raw-error-render': 19,
-  'literal-color': 33,
+  'literal-color': 3,
   'i18n-same-value': 24,
 };
 
@@ -128,11 +128,17 @@ function rawErrorRender() {
   return findings;
 }
 
+/** Color pickers paint the color space itself, so their gradients are literal by nature. */
+const COLOR_SPACE_FILES = new Set(['src/renderer/ui/ColorPickerSurface.css']);
+
 function literalColors() {
   const findings = [];
   const pattern = /:\s*[^;{}]*?(#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\bwhite\b|\bblack\b)/g;
-  for (const file of files.filter((name) => name.endsWith('.css') && !STYLE_DEFINITION_FILES.has(name))) {
-    const text = read(file).replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '));
+  for (const file of files.filter((name) => name.endsWith('.css') && !STYLE_DEFINITION_FILES.has(name) && !COLOR_SPACE_FILES.has(name))) {
+    // Mask images encode opacity, not color, so their black and white stops are not theme colors.
+    const text = read(file)
+      .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '))
+      .replace(/(?:-webkit-)?mask(?:-image)?\s*:[^;]*;/g, (declaration) => declaration.replace(/[^\n]/g, ' '));
     for (const match of text.matchAll(pattern)) {
       // Custom-property names such as --token-text-white are names, not literal colors.
       if (/--[\w-]*$/.test(match[0].slice(0, match[0].length - match[1].length))) continue;

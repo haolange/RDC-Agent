@@ -91,12 +91,12 @@
   gap: var(--space-2);
   min-width: 0;
   min-height: var(--control-height-md);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .knowledge-center-brand-title {
   margin: 0;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);

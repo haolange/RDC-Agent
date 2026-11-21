@@ -4,7 +4,7 @@
   gap: var(--space-2);
   margin: var(--space-1) 0 0;
   color: var(--token-status-error);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: var(--leading-normal);
 }
 

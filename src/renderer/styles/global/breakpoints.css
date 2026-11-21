@@ -1,8 +1,12 @@
 /**
- * Narrow layout widths. Media queries cannot read custom properties, so this
- * table is the single list and the rules below use the same numbers.
+ * The breakpoint table. Media queries cannot read custom properties, so this list is the single
+ * source and every stylesheet uses exactly these numbers; no other max-width breakpoints exist.
  *
- * 900px  shell hides the docked right rail (responsive.css) and loosens the composer.
+ * 1280px settings modal narrows its navigation column.
+ * 1100px terminal activity table drops secondary columns.
+ * 960px  settings and knowledge center switch from columns to one column.
+ * 920px  shell turns the docked right rail into the drawer (RIGHT_RAIL_DRAWER_BREAKPOINT in
+ *        src/shared/constants/layout.ts) and loosens the composer.
  * 720px  shell collapses the left sidebar. Transcript, work process, and the
  *        empty workbench use the same width; work-process rules stay in the
  *        transcript stylesheets.
@@ -23,14 +27,14 @@
   }
 
   .empty-workbench-content[data-variant='no-project'] .empty-workbench-title {
-    font-size: var(--type-display-size);
+    font-size: var(--type-title-size);
   }
 
   .empty-workbench-title {
-    font-size: var(--type-display-size);
+    font-size: var(--type-title-size);
   }
 
   .empty-workbench-subtitle {
-    font-size: var(--type-label-size);
+    font-size: var(--type-body-size);
   }
 }

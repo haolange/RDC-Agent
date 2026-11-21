@@ -21,9 +21,9 @@
   padding: var(--space-2) var(--space-3);
   border: 0;
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font: inherit;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   text-align: left;
   cursor: pointer;
   border-radius: var(--radius-sm);
@@ -35,27 +35,27 @@
 .slash-command-item:focus-visible,
 .slash-command-item.is-selected {
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .slash-command-name {
   font-weight: var(--font-semibold);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   min-width: var(--space-20);
 }
 
 .slash-command-desc {
   flex: 1;
-  font-size: var(--type-caption-size);
-  color: var(--token-text-body);
+  font-size: var(--type-meta-size);
+  color: var(--token-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .slash-command-cat {
-  font-size: var(--type-caption-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-meta-size);
+  color: var(--token-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -64,8 +64,8 @@
 .slash-command-footer {
   padding: var(--space-2) var(--space-3);
   border-top: 1px solid var(--token-border-subtle);
-  color: var(--token-text-placeholder);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-disabled);
+  font-size: var(--type-meta-size);
   text-align: right;
 }
 
@@ -75,6 +75,6 @@
   padding: 0 var(--space-1);
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   font-family: inherit;
 }

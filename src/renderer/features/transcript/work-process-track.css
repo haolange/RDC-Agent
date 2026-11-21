@@ -51,7 +51,7 @@
   margin: 0 auto;
   transform: translateY(-50%);
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--token-text-caption) 60%, var(--token-bg-app));
+  background: color-mix(in srgb, var(--token-text-secondary) 60%, var(--token-bg-app));
 }
 
 .work-process-rail-marker.is-running {
@@ -117,12 +117,12 @@
 
 .work-process-section-toggle {
   flex: 0 1 auto;
-  color: var(--token-text-caption);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-weight: var(--font-normal);
 }
 
 .work-process-section-toggle.is-running {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .work-process-section-label {

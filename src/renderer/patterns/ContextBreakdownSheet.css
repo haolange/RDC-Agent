@@ -29,32 +29,32 @@
 }
 
 .context-breakdown-pct-large {
-  color: var(--token-text-heading);
-  font-size: var(--type-display-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
-  line-height: var(--type-display-line);
+  line-height: var(--type-title-line);
   letter-spacing: var(--tracking-tight);
 }
 
 .context-breakdown-summary-caption {
-  color: var(--token-text-body);
-  font-size: var(--type-heading-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
 }
 
 .context-breakdown-hero-tokens {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .context-breakdown-window-note {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
 }
 
 /* Stacked bar — thicker Cursor-style track */
@@ -76,7 +76,7 @@
   left: var(--context-threshold-left, 80%);
   width: 2px;
   margin-left: -var(--space-0-5);
-  background: var(--token-text-caption);
+  background: var(--token-text-secondary);
   pointer-events: none;
   z-index: var(--z-local-1);
 }

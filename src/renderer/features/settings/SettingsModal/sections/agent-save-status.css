@@ -3,8 +3,8 @@
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-height-sm);
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .settings-agent-autosave-icon {
@@ -17,7 +17,7 @@
 }
 
 .settings-agent-autosave[data-state='saving'] .settings-agent-autosave-icon {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-agent-autosave[data-state='error'] {
@@ -26,7 +26,7 @@
 
 .settings-agent-autosave.is-compact {
   margin-inline-start: auto;
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .settings-agent-config-status {
@@ -38,15 +38,15 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-bg-raised);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .settings-agent-config-status-dot {
   width: var(--space-2);
   height: var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--token-text-placeholder);
+  background: var(--token-text-disabled);
 }
 
 .settings-agent-config-status[data-tone='success'] .settings-agent-config-status-dot { background: var(--token-status-success); }

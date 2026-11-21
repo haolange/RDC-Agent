@@ -77,9 +77,9 @@
 
 .session-section-title,
 .project-sessions-title {
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -93,8 +93,8 @@
   padding: 0 var(--space-1);
   border-radius: var(--radius-full);
   background: var(--token-bg-raised);
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
 }
 
@@ -107,7 +107,7 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--token-border-card);
   background: color-mix(in srgb, var(--token-bg-panel) 72%, transparent);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   cursor: pointer;
   transition:
     background var(--transition-base) var(--ease-standard),
@@ -121,7 +121,7 @@
 .session-section-action:focus-visible {
   background: color-mix(in srgb, var(--token-bg-raised) 96%, transparent);
   border-color: var(--token-border-default);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .session-list {
@@ -139,11 +139,11 @@
 
 .sidebar-inline-error {
   padding: var(--space-2) var(--space-2);
-  border: 1px solid rgb(190 48 58 / 0.32);
+  border: 1px solid color-mix(in srgb, var(--token-status-error) 32%, transparent);
   border-radius: var(--radius-lg);
-  background: rgb(190 48 58 / 0.12);
-  color: rgb(255 174 184);
-  font-size: var(--type-label-size);
+  background: color-mix(in srgb, var(--token-status-error) 10%, transparent);
+  color: var(--token-status-error);
+  font-size: var(--type-body-size);
   line-height: 1.45;
 }
 
@@ -165,9 +165,9 @@
 }
 
 .session-list-empty .ui-empty-state-title {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
   font-weight: var(--font-normal);
   text-align: left;
 }

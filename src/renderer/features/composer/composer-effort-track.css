@@ -133,14 +133,14 @@
 }
 
 .composer-effort-switch-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
-  line-height: var(--type-label-line);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
+  line-height: var(--type-body-line);
 }
 
 .composer-effort-switch-hint {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
 }

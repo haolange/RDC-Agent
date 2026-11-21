@@ -14,8 +14,8 @@
 }
 
 .loading-text {
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .loading-bar {

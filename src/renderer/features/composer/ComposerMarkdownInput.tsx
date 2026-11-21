@@ -27,7 +27,7 @@ const composerEditorTheme = EditorView.theme({
     width: '100%',
     height: '100%',
     backgroundColor: 'transparent',
-    color: 'var(--token-text-body)',
+    color: 'var(--token-text-secondary)',
     /* Inherit host (= .composer-textarea → --type-body-size); never a larger role. */
     fontSize: 'inherit',
     lineHeight: 'inherit',
@@ -68,23 +68,23 @@ const composerEditorTheme = EditorView.theme({
     borderLeftColor: 'var(--token-accent-primary)',
   },
   '.cm-placeholder': {
-    color: 'var(--token-text-caption)',
+    color: 'var(--token-text-secondary)',
     fontStyle: 'normal',
     fontSize: 'inherit',
     lineHeight: 'inherit',
   },
-  '.tok-header': { color: 'var(--token-text-heading)', fontWeight: 'var(--font-semibold)' },
-  '.tok-strong': { color: 'var(--token-text-heading)', fontWeight: 'var(--font-semibold)' },
+  '.tok-header': { color: 'var(--token-text-primary)', fontWeight: 'var(--font-semibold)' },
+  '.tok-strong': { color: 'var(--token-text-primary)', fontWeight: 'var(--font-semibold)' },
   '.tok-emphasis': { fontStyle: 'italic' },
   '.tok-link': { color: 'var(--token-text-link)' },
   '.tok-url': { color: 'var(--token-text-link)' },
   '.tok-monospace, .tok-code': {
-    color: 'var(--token-text-heading)',
+    color: 'var(--token-text-primary)',
     fontFamily: 'var(--font-mono)',
   },
-  '.tok-meta': { color: 'var(--token-text-caption)' },
+  '.tok-meta': { color: 'var(--token-text-secondary)' },
   '.tok-heading1, .tok-heading2, .tok-heading3, .tok-heading4': {
-    color: 'var(--token-text-heading)',
+    color: 'var(--token-text-primary)',
     fontWeight: 'var(--font-semibold)',
   },
 });

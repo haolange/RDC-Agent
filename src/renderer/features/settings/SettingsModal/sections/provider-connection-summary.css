@@ -9,8 +9,8 @@
   padding: 0 var(--space-3);
   display: flex;
   align-items: center;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   cursor: pointer;
   list-style: none;
 }
@@ -26,7 +26,7 @@
   margin-right: var(--space-2);
   border-style: solid;
   border-width: 4px 0 4px 5px;
-  border-color: transparent transparent transparent var(--token-text-caption);
+  border-color: transparent transparent transparent var(--token-text-secondary);
 }
 
 .settings-provider-summary[open] > summary::before {
@@ -40,7 +40,7 @@
 
 .settings-provider-summary > summary:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .settings-provider-summary-grid {
@@ -56,18 +56,18 @@
   display: grid;
   grid-template-columns: minmax(5rem, 0.4fr) minmax(0, 1fr);
   gap: var(--space-2);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .settings-provider-summary-grid dt {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.7;
 }
 
 .settings-provider-summary-grid dd {
   margin: 0;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   overflow-wrap: anywhere;
 }
 
@@ -81,19 +81,19 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-bg-raised);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .settings-provider-readonly .ui-icon {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-provider-connection-status-dot {
   width: var(--space-2);
   height: var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--token-text-placeholder);
+  background: var(--token-text-disabled);
 }
 
 .settings-provider-connection-status[data-phase='connected'] .settings-provider-connection-status-dot { background: var(--token-status-success); }

@@ -1,7 +1,7 @@
 .composer-shell.is-drop-active {
   border-color: var(--composer-mode-accent);
   outline: 2px dashed color-mix(in srgb, var(--composer-mode-accent) 55%, transparent);
-  outline-offset: -4px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .composer-drop-overlay {
@@ -13,8 +13,8 @@
   justify-content: center;
   border-radius: inherit;
   background: color-mix(in srgb, var(--token-bg-overlay) 88%, transparent);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   pointer-events: none;
 }
 
@@ -68,9 +68,9 @@
   overflow: hidden;
   border-radius: var(--control-radius);
   background: var(--token-bg-muted);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-bold);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-semibold);
   letter-spacing: 0.06em;
   flex-shrink: 0;
 }
@@ -102,8 +102,8 @@
 
 .composer-attachment-card-name,
 .composer-skill-chip-name {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -111,8 +111,8 @@
 
 .composer-attachment-card-meta,
 .composer-skill-chip-meta {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .composer-attachment-card-remove,
@@ -128,7 +128,7 @@
   border-radius: var(--radius-full);
   border: 1px solid var(--token-border-default);
   background: var(--token-bg-overlay);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   cursor: pointer;
   opacity: 0;
   pointer-events: none;

@@ -7,13 +7,13 @@
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-sm);
   background: var(--token-bg-panel);
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .ui-search-multi-select-label {
-  color: var(--token-text-heading);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-weight: var(--font-normal);
 }
 
 .ui-search-multi-select-selected,
@@ -47,8 +47,8 @@
 
 .ui-search-multi-select small {
   display: block;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
 

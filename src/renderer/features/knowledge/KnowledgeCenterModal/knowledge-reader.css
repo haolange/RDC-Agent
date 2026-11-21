@@ -6,14 +6,14 @@
 }
 
 .knowledge-center-markdown {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-size: var(--type-reading-size);
   line-height: var(--type-reading-line);
   overflow-wrap: anywhere;
 }
 
 .knowledge-center-markdown :is(h1, h2, h3) {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .knowledge-center-relation-list {
@@ -30,11 +30,11 @@
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-height-sm);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .knowledge-center-relation-kind {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .knowledge-center-relation-target {
@@ -51,7 +51,7 @@
 
 .knowledge-center-relation-target:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .knowledge-conflict-compare {
@@ -90,8 +90,8 @@
   gap: var(--space-2);
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--token-border-muted);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
 }
 
 .knowledge-conflict-pane-grid {
@@ -105,18 +105,18 @@
   display: grid;
   grid-template-columns: 3.5rem minmax(0, 1fr);
   gap: var(--space-2);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .knowledge-conflict-pane-grid dt {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: 1.7;
 }
 
 .knowledge-conflict-pane-grid dd {
   margin: 0;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   overflow-wrap: anywhere;
 }
 

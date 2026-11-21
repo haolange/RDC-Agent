@@ -8,8 +8,8 @@
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-sm);
   background: var(--token-bg-raised);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
   line-height: var(--leading-tight);
 }

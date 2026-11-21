@@ -59,9 +59,9 @@
 }
 
 .settings-field-label {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
   line-height: var(--leading-tight);
 }
 
@@ -72,15 +72,15 @@
 /* Secondary copy under labels, section heads and notes. */
 .settings-help-text {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-regular);
   line-height: 1.5;
 }
 
 .settings-section-subtitle {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.5;
 }
 
@@ -146,8 +146,8 @@
 }
 
 .settings-resource-status {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
@@ -175,8 +175,8 @@
   gap: var(--space-1);
   margin-inline-start: var(--space-2);
   color: var(--token-status-warning);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
 }
 
 .settings-editor-dirty::before {
@@ -201,14 +201,14 @@
 .settings-link {
   width: fit-content;
   color: var(--token-accent-primary);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
 .settings-required-field {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
 }
 
 .settings-actions-split {
@@ -221,8 +221,8 @@
 
 .settings-save-status {
   min-height: var(--space-5);
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 /* Scope stays a compact User | Project control; it never spans the page. */
@@ -256,13 +256,13 @@
 }
 
 .settings-scope-row-copy small {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .settings-center-nav-item {
   min-height: var(--control-height-md);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .settings-center-search.ui-search-field {
@@ -279,24 +279,24 @@
 .settings-modal-close.icon-button:hover,
 .settings-modal-close.icon-button:focus-visible {
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   border-color: var(--token-border-muted);
 }
 
 .settings-center-nav-item:hover,
 .settings-center-nav-item:focus-visible {
   background: var(--token-interactive-hover);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .settings-center-nav-item:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: -2px;
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .settings-center-nav-item.is-active {
   background: var(--token-interactive-active);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   font-weight: var(--font-semibold);
   box-shadow: inset 2px 0 0 var(--token-border-focus);
   border-color: var(--token-border-muted);

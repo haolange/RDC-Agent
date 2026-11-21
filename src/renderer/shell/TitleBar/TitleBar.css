@@ -6,7 +6,7 @@
   justify-content: center;
   border-radius: 0;
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
@@ -21,13 +21,13 @@
 
 .window-control:hover,
 .window-control:focus-visible {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   background: color-mix(in srgb, var(--token-bg-raised) 92%, transparent);
 }
 
 .window-control:focus-visible {
   outline: none;
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   background: var(--token-bg-raised);
   box-shadow: inset 0 0 0 1px var(--token-border-strong);
 }
@@ -83,13 +83,13 @@
 
 .window-control.close:hover,
 .window-control.close:focus-visible {
-  color: white;
+  color: var(--token-text-on-danger);
   background: color-mix(in srgb, var(--token-status-error) 92%, transparent);
 }
 
 .window-control.close:focus-visible,
 .window-control.close:active {
-  color: white;
+  color: var(--token-text-on-danger);
   background: color-mix(in srgb, var(--token-status-error) 92%, transparent);
   box-shadow: none;
 }

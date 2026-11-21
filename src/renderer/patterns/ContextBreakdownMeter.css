@@ -30,11 +30,10 @@
 
 .context-breakdown-run-col-title {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-overline-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  line-height: var(--type-overline-line);
-  letter-spacing: var(--tracking-overline);
+  line-height: var(--type-meta-line);
 }
 
 .context-breakdown-meter-stats {
@@ -55,14 +54,14 @@
 
 .context-breakdown-meter-primary-label,
 .context-breakdown-meter-detail dt {
-  color: var(--token-text-placeholder);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-disabled);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
 }
 
 .context-breakdown-meter-primary-value {
-  color: var(--token-text-heading);
-  font-size: var(--type-display-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
   font-variant-numeric: tabular-nums;
@@ -71,8 +70,8 @@
 
 .context-breakdown-meter-primary.is-empty .context-breakdown-meter-primary-value,
 .context-breakdown-meter-detail.is-empty dd {
-  color: var(--token-text-placeholder);
-  font-weight: var(--font-medium);
+  color: var(--token-text-disabled);
+  font-weight: var(--font-normal);
 }
 
 .context-breakdown-meter-details {
@@ -96,8 +95,8 @@
 .context-breakdown-meter-detail dd { margin: 0; }
 
 .context-breakdown-meter-detail dd {
-  color: var(--token-text-body);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
   text-align: right;
   overflow-wrap: anywhere;
@@ -111,16 +110,16 @@
 }
 
 .context-breakdown-meter-stat-label {
-  color: var(--token-text-placeholder);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-disabled);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .context-breakdown-meter-stat-value {
-  color: var(--token-text-heading);
-  font-size: var(--type-heading-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
@@ -128,8 +127,8 @@
 }
 
 .context-breakdown-meter-stat.is-empty .context-breakdown-meter-stat-value {
-  color: var(--token-text-placeholder);
-  font-weight: var(--font-medium);
+  color: var(--token-text-disabled);
+  font-weight: var(--font-normal);
 }
 
 .context-breakdown-cost-card {

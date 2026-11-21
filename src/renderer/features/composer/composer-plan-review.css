@@ -30,8 +30,8 @@
 
 .composer-plan-review__title {
   margin: 0;
-  font-size: var(--type-heading-size);
-  font-weight: 600;
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
 }
 
 .composer-plan-review__feedback {
@@ -40,9 +40,9 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: inherit;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: var(--leading-normal);
   padding: 0;
   margin: 0;
@@ -58,10 +58,10 @@
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-md);
   background: var(--token-bg-panel);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   min-height: var(--control-height-md);
   box-sizing: border-box;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: var(--leading-normal);
 }
 
@@ -76,7 +76,7 @@
 .composer-plan-review__revision:focus-within {
   border-color: var(--token-border-focus);
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 .composer-plan-review__footer { display: flex; flex-shrink: 0; min-height: var(--control-height-sm); }
 .composer-plan-review__stop .ui-icon { fill: currentColor; }
@@ -84,12 +84,12 @@
 .composer-plan-review__error {
   margin: 0;
   color: var(--token-status-error);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .composer-transition-status {
   margin: 0;
   padding: var(--space-1) var(--space-3);
-  font-size: var(--type-caption-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-meta-size);
+  color: var(--token-text-secondary);
 }

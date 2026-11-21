@@ -15,16 +15,16 @@
 
 .ui-section-header-title {
   margin: 0;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
 }
 
 .ui-section-header-description {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: var(--leading-normal);
 }
 

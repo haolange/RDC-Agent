@@ -16,9 +16,9 @@
 
 .color-field--inline .color-field-label {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -37,8 +37,8 @@
   height: 28px;
   flex-shrink: 0;
   border-radius: var(--radius-full);
-  border: 2px solid color-mix(in srgb, var(--token-text-heading) 18%, transparent);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
+  border: 2px solid color-mix(in srgb, var(--token-text-primary) 18%, transparent);
+  box-shadow: var(--token-hairline-swatch);
   cursor: pointer;
   padding: 0;
   background: var(--color-field-swatch-bg, transparent);
@@ -51,14 +51,14 @@
 .color-field-swatch:hover,
 .color-field-swatch:focus-visible {
   transform: scale(1.04);
-  border-color: color-mix(in srgb, var(--token-text-heading) 28%, transparent);
+  border-color: color-mix(in srgb, var(--token-text-primary) 28%, transparent);
 }
 
 .color-field-swatch:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--token-border-focus) 18%, transparent),
-    inset 0 0 0 1px rgb(0 0 0 / 0.18);
+    var(--token-hairline-swatch);
 }
 
 .color-field-popover.ui-popover {
@@ -68,9 +68,9 @@
 
 .color-field-popover-title {
   margin-bottom: var(--space-3);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .color-field-popover-body {
@@ -88,8 +88,8 @@
 }
 
 .color-field-live-label {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .color-field-live-swatch {
@@ -106,9 +106,9 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
   background: var(--token-bg-panel);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .color-field-hex {
@@ -162,20 +162,20 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 
 .color-field--inline .color-field-control:focus-within {
   border-color: var(--token-border-focus);
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 
 .color-field-label {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .color-field-label.is-visually-hidden {

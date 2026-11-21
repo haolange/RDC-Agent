@@ -21,7 +21,7 @@
   border: 1px solid var(--token-border-default);
   border-radius: var(--control-radius);
   background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), opacity var(--transition-fast);
 }
@@ -35,25 +35,25 @@
 
 .composer-permission-pill[data-mode='default'] .composer-permission-pill-label,
 .composer-permission-pill[data-mode='default'] .composer-permission-pill-caret {
-  color: color-mix(in srgb, var(--token-status-success) 58%, var(--token-text-heading));
+  color: color-mix(in srgb, var(--token-status-success) 58%, var(--token-text-primary));
 }
 
 .composer-permission-pill[data-mode='auto-review'] .composer-permission-pill-label,
 .composer-permission-pill[data-mode='auto-review'] .composer-permission-pill-caret {
-  color: color-mix(in srgb, var(--token-status-info) 58%, var(--token-text-heading));
+  color: color-mix(in srgb, var(--token-status-info) 58%, var(--token-text-primary));
 }
 
 .composer-permission-pill[data-mode='full-access'] .composer-permission-pill-label,
 .composer-permission-pill[data-mode='full-access'] .composer-permission-pill-caret {
-  color: color-mix(in srgb, var(--token-status-warning) 58%, var(--token-text-heading));
+  color: color-mix(in srgb, var(--token-status-warning) 58%, var(--token-text-primary));
 }
 
 .composer-permission-pill[data-mode='custom'] .composer-permission-pill-label {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .composer-permission-pill[data-mode='custom'] .composer-permission-pill-caret {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .composer-permission-pill:disabled {
@@ -64,7 +64,7 @@
 .composer-permission-pill:focus-visible,
 .composer-permission-menu-item:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .composer-permission-pill-label {
@@ -72,7 +72,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: 1;
 }
@@ -82,7 +82,7 @@
   align-items: center;
   justify-content: center;
   line-height: 0;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .composer-permission-pill-caret svg {
@@ -115,7 +115,7 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   text-align: left;
   cursor: pointer;
 }
@@ -124,7 +124,7 @@
 .composer-permission-menu-item:focus-visible,
 .composer-permission-menu-item.is-selected {
   background: var(--token-bg-muted);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .composer-permission-menu-item:disabled {
@@ -133,21 +133,21 @@
 }
 
 .composer-permission-menu-label {
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
 .composer-permission-menu-desc {
-  font-size: var(--type-caption-size);
-  color: var(--token-text-caption);
+  font-size: var(--type-meta-size);
+  color: var(--token-text-secondary);
   line-height: 1.45;
   font-weight: var(--font-normal);
 }
 
 .composer-permission-status {
   margin: var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: var(--leading-normal);
   white-space: normal;
 }

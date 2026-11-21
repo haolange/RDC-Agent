@@ -3,9 +3,9 @@
   grid-template-columns: 5.5rem minmax(0, 1fr) 4rem 5.5rem;
   gap: var(--space-2);
   padding: 0 var(--space-3);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
   letter-spacing: 0.02em;
 }
 
@@ -28,8 +28,8 @@
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--token-bg-raised) 38%, transparent);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   text-align: left;
 }
 
@@ -45,14 +45,14 @@
 .settings-model-row-check {
   flex-shrink: 0;
   white-space: nowrap;
-  color: var(--token-text-caption);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-weight: var(--font-normal);
 }
 
 .settings-model-row--disabled {
   border-color: var(--token-border-muted);
   background: var(--token-surface-sunken);
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-model-row--disabled .settings-model-row-check {
@@ -64,7 +64,7 @@
 }
 
 .settings-model-row--disabled .settings-model-row-label {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .settings-model-row--expanded {

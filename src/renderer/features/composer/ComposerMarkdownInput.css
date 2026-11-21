@@ -40,7 +40,7 @@
   overflow: auto;
   font-size: inherit;
   line-height: inherit;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .composer-markdown-pane.is-inactive {
@@ -84,12 +84,12 @@
 }
 
 .composer-markdown-editor .cm-placeholder {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-style: normal;
 }
 
 .composer-markdown-preview {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .composer-markdown-preview .markdown-body {
@@ -100,7 +100,7 @@
 
 .composer-markdown-preview-empty {
   margin: 0;
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
   font-size: inherit;
   line-height: inherit;
   font-style: normal;

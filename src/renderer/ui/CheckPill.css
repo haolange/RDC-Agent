@@ -7,8 +7,8 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: var(--leading-tight);
   text-align: start;
   cursor: pointer;
@@ -22,9 +22,13 @@
   background: var(--token-interactive-hover);
 }
 
+.ui-check-pill:active:not(:disabled) {
+  background: var(--token-interactive-active);
+}
+
 .ui-check-pill:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 1px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-check-pill-box {
@@ -54,7 +58,7 @@
 }
 
 .ui-check-pill.is-selected {
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .ui-check-pill-text {
@@ -69,8 +73,8 @@
 }
 
 .ui-check-pill-hint {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
 

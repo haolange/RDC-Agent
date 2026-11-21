@@ -8,7 +8,7 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--token-bg-raised) 42%, transparent);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
@@ -40,7 +40,7 @@
 
 .settings-agent-icon-option:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .settings-agent-icon-popover.ui-popover {
@@ -56,9 +56,9 @@
 
 .settings-agent-icon-popover-title {
   margin-bottom: var(--space-3);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
 }
 
 .settings-agent-icon-grid {
@@ -77,7 +77,7 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--token-bg-raised) 52%, transparent);
-  color: var(--token-text-heading);
+  color: var(--token-text-primary);
 }
 
 .settings-agent-icon-trigger {
@@ -86,7 +86,7 @@
 }
 
 .settings-page-agents .settings-agent-editor-icon {
-  color: var(--settings-agent-accent, var(--token-text-heading));
+  color: var(--settings-agent-accent, var(--token-text-primary));
   background: color-mix(in srgb, var(--settings-agent-accent, var(--token-border-focus)) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--settings-agent-accent, var(--token-border-focus)) 34%, transparent);
 }

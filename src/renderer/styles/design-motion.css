@@ -44,7 +44,7 @@
 .animate-spin { animation: spin 1s linear infinite; }
 /* Active runtime signal text — left-to-right energy shimmer on live phrases */
 .active-signal-text {
-  --active-signal-highlight: var(--token-text-heading);
+  --active-signal-highlight: var(--token-text-primary);
   color: inherit;
 }
 
@@ -57,7 +57,7 @@
 }
 
 .active-signal-text.tone-response {
-  --active-signal-highlight: var(--token-text-body);
+  --active-signal-highlight: var(--token-text-secondary);
 }
 
 .active-signal-text.is-active {

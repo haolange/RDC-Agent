@@ -10,7 +10,7 @@
   gap: var(--space-3);
   padding: var(--space-3);
   background: var(--token-bg-shell);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
 }
 
 .right-rail-section {
@@ -27,8 +27,8 @@
 .right-rail-section-heading {
   min-height: var(--control-height-md);
   margin: 0;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
 }
@@ -64,8 +64,8 @@
 
 .right-rail-empty-state .ui-empty-state-title {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-normal);
   line-height: var(--leading-normal);
   text-align: left;

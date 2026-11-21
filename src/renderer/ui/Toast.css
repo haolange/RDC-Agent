@@ -19,7 +19,7 @@
   border-radius: var(--radius-md);
   background: var(--token-bg-shell);
   box-shadow: var(--token-shadow-popover);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   pointer-events: auto;
 }
 
@@ -44,14 +44,14 @@
 }
 
 .ui-toast-title {
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
 .ui-toast-message {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   line-height: var(--leading-normal);
 }
 

@@ -5,7 +5,7 @@
 }
 
 .context-breakdown-details-toggle {
-  font-weight: var(--font-medium);
+  font-weight: var(--font-normal);
 }
 
 .context-breakdown-legend {
@@ -21,11 +21,10 @@
 
 .context-breakdown-group-header {
   padding: var(--space-4) var(--space-2) var(--space-2);
-  color: var(--token-text-caption);
-  font-size: var(--type-overline-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  line-height: var(--type-overline-line);
-  letter-spacing: var(--tracking-overline);
+  line-height: var(--type-meta-line);
   list-style: none;
 }
 
@@ -57,7 +56,7 @@
 
 .context-breakdown-row.is-deferred .context-breakdown-label,
 .context-breakdown-row.is-deferred .context-breakdown-tokens {
-  color: var(--token-text-caption);
+  color: var(--token-text-secondary);
 }
 
 .context-breakdown-swatch {
@@ -71,8 +70,8 @@
 .context-breakdown-label {
   flex: 1 1 auto;
   min-width: 0;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -81,17 +80,17 @@
 
 .context-breakdown-count {
   flex: 0 0 auto;
-  color: var(--token-text-placeholder);
-  font-size: var(--type-label-size);
+  color: var(--token-text-disabled);
+  font-size: var(--type-body-size);
   line-height: 1;
   white-space: nowrap;
 }
 
 .context-breakdown-tokens {
   flex: 0 0 auto;
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: right;
@@ -102,7 +101,7 @@
   margin: 0;
   padding-top: var(--space-3);
   border-top: 1px solid var(--token-border-subtle);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-line);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
 }

@@ -9,7 +9,7 @@
   border-radius: var(--control-radius);
   border: 1px solid var(--token-border-default);
   background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
 
@@ -30,7 +30,7 @@
 
 .composer-usage-indicator:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .composer-usage-ring-track,
@@ -57,10 +57,10 @@
 
 /* The used share sits beside the ring at caption size; readable text never shrinks below it. */
 .composer-usage-value-number {
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-medium);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -86,9 +86,9 @@
 }
 
 .composer-usage-indicator.is-stale .composer-usage-ring-progress {
-  stroke: var(--token-text-placeholder);
+  stroke: var(--token-text-disabled);
 }
 
 .composer-usage-indicator.is-estimated .composer-usage-ring-progress {
-  stroke: color-mix(in srgb, var(--composer-mode-accent) 72%, var(--token-text-caption));
+  stroke: color-mix(in srgb, var(--composer-mode-accent) 72%, var(--token-text-secondary));
 }

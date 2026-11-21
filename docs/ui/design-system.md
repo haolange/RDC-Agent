@@ -78,7 +78,7 @@ RDC-Agent 是 **现代精密工作台**：工作区高密度，其余处从容�
 | 字号 | `--type-<角色>-size` / `-line` | 见下表 | 只引用四个角色；`data-font-scale` 的 small / large 同时重映射全部角色；meta 是 12px 下限 |
 | 行高 | `--leading-none/tight/snug/normal/relaxed` | 1 / 1.25 / 1.375 / 1.5 / 1.625 | 正文 `normal`，紧凑标题 `tight` |
 | 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | `--transition-*` 是 `duration + --ease-standard`；状态动效用 `--motion-disclosure` / `--motion-indicator`（`--ease-emphasized`）与 `--motion-overlay` |
-| 字距 | `--tracking-tight/heading/normal/wide/overline` | -0.02 / -0.011 / 0 / 0.04 / 0.06em | 大标题收紧、标题轻收、正文默认、标签与 overline 加宽 |
+| 字距 | `--tracking-tight/heading/normal/wide` | -0.02 / -0.011 / 0 / 0.04em | 大标题收紧、标题轻收、正文默认、kbd 等少量标签加宽 |
 | 阴影 | `--token-elevation-1/2/3` | 卡片 / 浮层 / Sheet 与对话框 | 只表达层级；不叠加装饰光晕 |
 
 
@@ -110,10 +110,9 @@ CSS 写法：`font-size: var(--type-body-size); line-height: var(--type-body-lin
 | `rgb(var(--color-border-strong))` | `var(--token-border-strong)` |
 | `rgb(var(--color-accent-500))` | 焦点环 `var(--token-border-focus)` |
 | `rgb(var(--color-accent-ink))` | 强调文本/图标/描边 CTA `var(--token-accent-primary)`、链接 `var(--token-text-link)` |
-| `rgb(var(--color-text-primary))` | `var(--token-text-heading)` |
-| `rgb(var(--color-text-secondary))` | `var(--token-text-body)` |
-| `rgb(var(--color-text-tertiary))` | `var(--token-text-caption)` |
-| `rgb(var(--color-text-muted))` | `var(--token-text-placeholder)` |
+| `rgb(var(--color-text-primary))` | `var(--token-text-primary)`（主文） |
+| `rgb(var(--color-text-secondary))` | `var(--token-text-secondary)`（次要） |
+| `rgb(var(--color-text-muted))` | `var(--token-text-disabled)`（禁用与占位） |
 | `rgb(var(--color-text-disabled))` | `var(--token-text-disabled)` |
 | `rgb(var(--color-success \| warning \| error \| info))` | `var(--token-status-success \| warning \| error \| info)` |
 
@@ -152,7 +151,7 @@ Settings 页面没有副标题，字段下没有说明行；需要解释的放�
 
 ## CSS 入口
 
-- 唯一全局入口：`src/renderer/main.tsx` → `styles/global.css` → `design-system.css`。`design-system.css` 只按 token、motion、base、reduced-motion 顺序导入，不在入口文件里写规则。窄屏宽度表在 `styles/global/breakpoints.css`：900 / 720 / 640 / 480，另有两个局部断点：960（Settings / Knowledge 模态改为堆叠导航）与 920（`RIGHT_RAIL_DRAWER_BREAKPOINT`，右栏改为覆盖式抽屉，见 `src/shared/constants/layout.ts`）。720 与侧栏折叠对齐；feature 选择器留在所属 feature 样式，不写进 global。
+- 唯一全局入口：`src/renderer/main.tsx` → `styles/global.css` → `design-system.css`。`design-system.css` 只按 token、motion、base、reduced-motion 顺序导入，不在入口文件里写规则。唯一的断点表在 `styles/global/breakpoints.css`：1280（设置导航收窄）/ 1100（终端活动表）/ 960（Settings / Knowledge 模态改为单列）/ 920（`RIGHT_RAIL_DRAWER_BREAKPOINT`，右栏改为覆盖式抽屉，见 `src/shared/constants/layout.ts`）/ 720 / 640 / 480，不得新增其他 max-width 断点。左右抽屉各自从所在一侧滑入。720 与侧栏折叠对齐；feature 选择器留在所属 feature 样式，不写进 global。
 - 禁止恢复 `styles/tokens/*` 或未接线的 `oklch-themes.css`。
 - 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
 - 当前 Settings 只接受 `schemaVersion` **8**；合法的 `appearance.chromeThemes` 用户配置经主题校验保留，缺版本或旧版本明确报错并保留原文件。历史版本升级的主题重置不属于现行读取路径。
@@ -393,7 +392,7 @@ Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属
 - Composer 编辑／预览使用共享 segmented `Tabs`。Tabs 的 DOM ID 按实例生成；没有对应面板的选择控件不输出 `aria-controls`。编辑器内部焦点由 Composer 外壳呈现，不全局关闭焦点样式。
 - 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 是无边框的扁平行，悬停给底色，选中用 `--token-selection-bg` 加左侧指示条；可选 `description` 作为第二行。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。单行长文本使用 `OverflowFade`：保留完整 DOM / `title`，根据真实 overflow、ResizeObserver、字体加载与文本变化决定是否渐隐，空值仍占一行。ColorField 的紧凑布局与隐藏标签由组件自身管理。
 - Provider、Agents、Tools、Appearance 与 Knowledge 的样式按展示职责组织；响应式规则跟随所属组件。CSS 入口仅声明加载关系，不恢复已替代的集中覆盖文件。
-- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用 ListRow 的扁平行与选中指示条，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 label 角色 / `--font-medium`，描述 caption 角色 / `--token-text-body`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
+- Settings 的 `AgentListItem` 在 feature 内组合 `ListRow` / `ModeGlyph` / `OverflowFade`，父级持有数据与选择状态。每行沿用 ListRow 的扁平行与选中指示条，行间 `--space-1`；图形为 18px，位于 28px（`--control-height-sm`）无底色、无边框的图标列，不再使用图标底座。名称 body 角色 / `--font-semibold`，描述 body 角色 / `--token-text-secondary`，各一行、间隔 `--space-0-5`；空描述仍占位。上下内边距 `--space-2`，行高随字体与两行内容自然增长，不固定高度裁切。布局经 ListRow 变量配置，不依赖全局 kit 与 feature CSS 的加载顺序。同字号行高差不超过 1 CSS px，空描述占位，选中不改变尺寸。等高与渐隐的工程证据不能替代图标比例、条目分隔和深浅主题的真实视觉验收。
 - 交接预载技能与能力配置的候选来自真实解析，可搜索多选；缺失或目标不可用的已选 ID 明示且不丢失，读取失败不显示为「没有技能」。策略资源排在全局运行设置之前，MCP 紧凑空态不遮蔽本机工具。
 - 模型服务页是列表 + 详情：左侧服务列表先列「已连接 · N」，再按连接方式分组列出可添加的服务（OAuth 登录、第一方直连、云平台、本机等），每行是首字母标记、名称和一行状态（已连接显示「N 个模型可用」，失败显示失败原因标签，未连接显示怎么连：浏览器登录 / 设备码登录 / 需要 API Key / 无需密钥）；行是扁平 `ListRow`，选中时出现指示条与选中底色。右侧是所选服务的详情：名称与账号身份、刷新模型 / 断开（或退出登录）、连接字段、连接状态、模型列表，最后是折叠的「诊断信息」（服务标识、接口、协议摘要、单服务能力验证）。保存或登录成功后详情停留在该服务上，从保存后的设置重新读取。两栏各自滚动，浏览长目录时详情不会被滚走。连接状态分为尚未测试、测试中、测试通过但尚未保存、已连接、连接失败、保存中；只有已保存且未改动的连接才显示「已连接」，已配置服务的主按钮是「保存」。能力未声明显示中性的「未声明」。未配置为中性色，只有真实失败才用 error。
 

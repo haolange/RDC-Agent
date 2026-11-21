@@ -58,8 +58,8 @@
 }
 
 .settings-center-brand-subtitle {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   line-height: 1.4;
 }
 

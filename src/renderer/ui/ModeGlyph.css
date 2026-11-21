@@ -3,5 +3,5 @@
   align-items: center;
   justify-content: center;
   line-height: 0;
-  color: var(--mode-glyph-color, var(--token-text-heading));
+  color: var(--mode-glyph-color, var(--token-text-primary));
 }

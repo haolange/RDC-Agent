@@ -20,7 +20,7 @@
 .ui-input.is-size-sm {
   min-height: var(--input-height-sm);
   padding: var(--space-1) var(--space-2);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
 }
 
 .ui-input.is-size-lg,

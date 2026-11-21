@@ -17,7 +17,7 @@
   border-inline-start: 1px solid var(--token-border-default);
   background: var(--token-bg-shell);
   box-shadow: var(--token-shadow-popover);
-  animation: right-rail-drawer-enter var(--transition-base) both;
+  animation: right-rail-drawer-enter var(--motion-overlay) both;
 }
 .right-rail-drawer-header {
   display: flex;
@@ -26,14 +26,15 @@
   min-height: var(--space-12);
   padding: 0 var(--space-3);
   border-bottom: 1px solid var(--token-border-subtle);
-  color: var(--token-text-heading);
-  font-size: var(--type-heading-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 .right-rail-drawer-content { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .right-rail-drawer[hidden] { display: none; }
 
 .left-navigation-drawer {
+  --drawer-enter-offset: calc(-1 * var(--space-3));
   grid-template-columns: minmax(0, min(88vw, 22rem)) minmax(0, 1fr);
 }
 .left-navigation-drawer .right-rail-drawer-backdrop { grid-column: 2; grid-row: 1; }
@@ -43,7 +44,8 @@
 .left-navigation-drawer .app-sidebar-footer .footer-entry-copy,
 .left-navigation-drawer .app-sidebar-footer .footer-entry-trailing { display: flex; }
 
-@keyframes right-rail-drawer-enter { from { opacity: 0; transform: translateX(var(--space-3)); } to { opacity: 1; transform: translateX(0); } }
+/* The sheet enters from its own edge: the right rail from the right, the left navigation from the left. */
+@keyframes right-rail-drawer-enter { from { opacity: 0; transform: translateX(var(--drawer-enter-offset, var(--space-3))); } to { opacity: 1; transform: translateX(0); } }
 
 @media (max-width: 32rem) {
   .right-rail-section,

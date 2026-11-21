@@ -13,13 +13,13 @@
 }
 
 .investigation-preview-meta dt {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .investigation-preview-meta dd {
   margin: 0;
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
@@ -39,9 +39,9 @@
 .investigation-preview-hash strong {
   min-width: 0;
   overflow: hidden;
-  color: var(--token-text-body);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-medium);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -49,14 +49,14 @@
 .investigation-preview-error {
   margin: 0;
   color: var(--token-status-error);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 
 .investigation-preview-message {
   margin: 0;
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
 }
 
 .investigation-preview-body {
@@ -66,9 +66,9 @@
   border: 1px solid var(--token-border-subtle);
   border-radius: var(--radius-md);
   background: var(--token-surface-sunken);
-  color: var(--token-text-body);
+  color: var(--token-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -89,14 +89,14 @@
 
 .investigation-report h3 {
   margin: 0 0 var(--space-2);
-  color: var(--token-text-heading);
-  font-size: var(--type-label-size);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
 }
 
 .investigation-report p {
   margin: 0 0 var(--space-2);
-  font-size: var(--type-label-size);
+  font-size: var(--type-body-size);
   line-height: var(--leading-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -106,8 +106,8 @@
 
 .investigation-report .investigation-report-meta,
 .investigation-report .investigation-report-note {
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .investigation-report-claims,
@@ -125,14 +125,14 @@
 .investigation-report-index {
   display: grid;
   gap: var(--space-1);
-  color: var(--token-text-caption);
-  font-size: var(--type-caption-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
 }
 
 .investigation-report-tuple {
   display: grid;
   gap: var(--space-2);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-meta-size);
 }
 
 .investigation-report-tuple dl {
@@ -147,18 +147,18 @@
   gap: var(--space-2);
 }
 
-.investigation-report-tuple dt { color: var(--token-text-caption); }
+.investigation-report-tuple dt { color: var(--token-text-secondary); }
 .investigation-report-tuple dd { margin: 0; overflow-wrap: anywhere; }
 
 .investigation-preview-source summary {
-  color: var(--token-text-caption);
-  font-size: var(--type-label-size);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
   cursor: pointer;
 }
 
 .investigation-preview-source summary:focus-visible {
   outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--space-1);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .investigation-preview-source .investigation-preview-body { margin-top: var(--space-2); }
