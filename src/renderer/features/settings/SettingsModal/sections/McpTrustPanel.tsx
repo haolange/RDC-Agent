@@ -4,6 +4,7 @@ import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { revokeMcp, trustMcp } from './mcpTrustActions';
 import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
@@ -59,7 +60,7 @@ export const McpTrustPanel: React.FC<{
         : await revokeMcp(projectRoot, server.id);
       if (next) onChanged(next);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorDetail(error));
     } finally {
       setBusy(false);
     }
@@ -77,7 +78,7 @@ export const McpTrustPanel: React.FC<{
 
       <dl className="settings-trust-summary">
         {server.descriptorHash ? (
-          <div><dt>{t('settings.mcpDescriptorHash')}</dt><dd><code title={server.descriptorHash}>{server.descriptorHash.slice(0, 12)}</code></dd></div>
+          <div><dt>{t('settings.mcpDescriptorHash')}</dt><dd><code data-tooltip={server.descriptorHash}>{server.descriptorHash.slice(0, 12)}</code></dd></div>
         ) : null}
       </dl>
 
@@ -109,7 +110,7 @@ export const McpTrustPanel: React.FC<{
           </div>
         ) : null}
       </footer>
-      {message ? <InlineError>{message}</InlineError> : null}
+      {message ? <InlineError detail={message}>{t('app.error.actionFailed')}</InlineError> : null}
     </section>
   );
 };

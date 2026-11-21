@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { TaskDialog } from '../../ui/TaskDialog';
 import { Input } from '../../ui/Input';
 import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
+import { errorDetail } from '../../lib/errorDetail';
 import { referenceProjectInput } from './projectCaptureActions';
 import type { ProjectInputRecord } from '@shared/types/session';
 
@@ -22,7 +24,7 @@ export function ProjectCaptureReferenceDialog({ projectId, onClose, onRegistered
       if (!result.success) throw new Error(result.error ?? t('projectCapture.referenceFailed'));
       onRegistered(projectId, result.inputs);
       onClose();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    } catch (reason) { setError(errorDetail(reason)); }
     finally { setBusy(false); }
   };
   return <TaskDialog open title={t('projectCapture.reference')} description={t('projectCapture.referenceHint')}
@@ -34,6 +36,6 @@ export function ProjectCaptureReferenceDialog({ projectId, onClose, onRegistered
     <Input aria-label={t('projectCapture.referencePath')} value={filePath} disabled={busy}
       onChange={event => setFilePath(event.target.value)}
       onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void submit(); } }} />
-    {error ? <p role="alert">{error}</p> : null}
+    {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
   </TaskDialog>;
 }

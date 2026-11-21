@@ -72,7 +72,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
             className={`settings-agent-icon-option${value === preset.id ? ' is-selected' : ''}`}
             role="menuitemradio"
             aria-checked={value === preset.id}
-            title={preset.label}
+            data-tooltip={preset.label}
             onClick={() => chooseIcon(preset.id)}
           >
             <ModeGlyph mode="general" icon={preset.id} size={18} strokeWidth={1.9} />

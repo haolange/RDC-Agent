@@ -22,7 +22,7 @@ export const RightRailOutputList: React.FC<RightRailOutputListProps> = React.mem
         return (
           <article key={artifact.id} className={`right-rail-artifact-row status-${artifact.status}`}>
             <span className="right-rail-artifact-icon" aria-hidden="true"><OutputFileGlyph /></span>
-            <span className="right-rail-artifact-copy"><strong title={artifact.displayName}>{artifact.displayName}</strong>{formatSize(artifact.sizeBytes) ? <small>{formatSize(artifact.sizeBytes)}</small> : null}</span>
+            <span className="right-rail-artifact-copy"><strong data-tooltip={artifact.displayName}>{artifact.displayName}</strong>{formatSize(artifact.sizeBytes) ? <small>{formatSize(artifact.sizeBytes)}</small> : null}</span>
             <span className="right-rail-output-actions">
               <Button variant="ghost" size="sm" onClick={() => artifact.path && void openAppPath(artifact.path)} disabled={!artifact.path || failed}>{failed ? t('control.rightRail.outputs.missing') : t('control.rightRail.outputs.open')}</Button>
               <Button variant="ghost" size="sm" onClick={() => artifact.path && void copyAppText(artifact.path)} disabled={!artifact.path}>{t('control.rightRail.outputs.copy')}</Button>

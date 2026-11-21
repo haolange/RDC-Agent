@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { Details } from '../../../../ui/Details';
 import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { testModelCapability } from './providerCatalogActions';
 import { ProviderModelProbe } from './ProviderModelProbe';
 import { ProviderModelPreferences } from './ProviderModelPreferences';
@@ -74,7 +75,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
         success: false,
         status: 'failed',
         requestSent: false,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: errorDetail(error),
       });
     } finally {
       setProbeMode(null);

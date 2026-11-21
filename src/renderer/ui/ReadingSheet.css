@@ -20,7 +20,11 @@
   background: var(--token-bg-overlay);
   color: var(--token-text-primary);
   box-shadow: var(--token-elevation-3), inset 0 0 0 1px var(--token-border-default);
-  animation: ui-reading-sheet-in var(--motion-overlay);
+  animation: surface-rise-in var(--motion-overlay);
+}
+
+[data-state='closing'] > .ui-reading-sheet {
+  animation: surface-rise-out var(--motion-overlay) forwards;
 }
 
 .ui-reading-sheet-overlay.is-viewport {
@@ -119,13 +123,6 @@
   border-top: 1px solid var(--token-border-subtle);
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-}
-
-@keyframes ui-reading-sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--space-2));
-  }
 }
 
 @media (max-width: 640px) {

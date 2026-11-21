@@ -73,7 +73,7 @@ export const AttachmentCard: React.FC<{
         )}
       </div>
       <span className="composer-attachment-card-copy">
-        <span className="composer-attachment-card-name" title={attachment.fileName}>
+        <span className="composer-attachment-card-name" data-tooltip={attachment.fileName}>
           <OverflowFade text={attachment.fileName} />
         </span>
         <span className="composer-attachment-card-meta">{meta}</span>

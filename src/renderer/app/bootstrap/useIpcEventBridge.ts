@@ -79,7 +79,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     const unsubscribeRunStatusChanged = subscribeRunStatusChanged(electronAPI);
     const unsubscribeDeviceStatusChanged = subscribeDeviceStatusChanged(electronAPI);
     const unsubscribeProjectInputsChanged = subscribeProjectInputsChanged(electronAPI);
-    const unsubscribeProjectInputsError = subscribeProjectInputsError(electronAPI, showNotice, t);
+    const unsubscribeProjectInputsError = subscribeProjectInputsError(electronAPI, t);
     const unsubscribeOpenedCaptureStateChanged = electronAPI.events.onOpenedCaptureStateChanged((event) => {
       projectScopedOpenedCapture(event);
     });

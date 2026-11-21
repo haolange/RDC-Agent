@@ -40,7 +40,7 @@ const glyphs: Record<TaskDisplayState, React.ReactNode> = {
 /** One glyph per Task display state; color comes from the `--token-task-*` family. */
 export const TaskStatusMarker: React.FC<TaskStatusMarkerProps> = ({ status, label, size = 'md' }) => (
   <span className={cn('task-status-marker', `is-${status.replace('_', '-')}`, `is-size-${size}`)}
-    role="img" aria-label={label} title={label}>
+    role="img" aria-label={label} data-tooltip={label}>
     <svg viewBox="0 0 16 16" aria-hidden="true">{glyphs[status]}</svg>
   </span>
 );

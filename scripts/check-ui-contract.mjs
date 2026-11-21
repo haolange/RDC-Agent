@@ -13,9 +13,10 @@ const CEILINGS = {
   'invalid-transition': 0,
   'inline-svg': 0,
   'text-glyph': 0,
-  'raw-error-render': 19,
+  'raw-error-render': 0,
   'literal-color': 3,
   'i18n-same-value': 24,
+  'bare-alert': 7,
 };
 
 /** Proper nouns stay English in every locale: Agent and mode names, product names, RenderDoc and protocol terms. */
@@ -137,6 +138,16 @@ function rawErrorRender() {
 /** Color pickers paint the color space itself, so their gradients are literal by nature. */
 const COLOR_SPACE_FILES = new Set(['src/renderer/ui/ColorPickerSurface.css']);
 
+/** An alert is the unified InlineError, or at least a styled element; a bare <p role="alert"> prints raw text unstyled. */
+function bareAlerts() {
+  const findings = [];
+  for (const file of files.filter((name) => name.endsWith('.tsx') && name !== 'src/renderer/ui/InlineError.tsx')) {
+    const text = read(file);
+    for (const match of text.matchAll(/<(p|div|span|small)\s+role="alert"/g)) findings.push(`${file}:${lineOf(text, match.index)}`);
+  }
+  return findings;
+}
+
 function literalColors() {
   const findings = [];
   const pattern = /:\s*[^;{}]*?(#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\bwhite\b|\bblack\b)/g;
@@ -199,6 +210,7 @@ const results = {
   'raw-error-render': rawErrorRender(),
   'literal-color': literalColors(),
   'i18n-same-value': i18nSameValues(),
+  'bare-alert': bareAlerts(),
 };
 
 const verbose = process.argv.includes('--verbose');

@@ -67,7 +67,7 @@ export function SpacesColumn({ state, candidateCount }: SpacesColumnProps) {
         </Details>
       </div>
       {state.error && (
-        <InlineError className="knowledge-center-error" data-severity="error" data-testid="knowledge-center-error">
+        <InlineError className="knowledge-center-error" data-testid="knowledge-center-error">
           {state.error}
         </InlineError>
       )}

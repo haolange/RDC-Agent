@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n';
 import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import { useProjectStore } from '../../../stores/projectStore';
 import { Icon } from '../../../ui/Icon';
+import { Skeleton } from '../../../ui/Skeleton';
 import { ProjectGroup } from './ProjectGroup';
 import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
@@ -84,12 +85,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
             </div>
             <div className="session-section-actions">
               {selection.currentProject && (
-                <button type="button" className="session-section-action" title={t('sidebar.removeProject')}
+                <button type="button" className="session-section-action" data-tooltip={t('sidebar.removeProject')}
                   onClick={() => setPendingRemoval({ kind: 'project', project: selection.currentProject! })} disabled={selection.isBusy}>
                   <Icon name="trash" size={14} />
                 </button>
               )}
-              <button type="button" className="session-section-action" title={t('sidebar.addProject')}
+              <button type="button" className="session-section-action" data-tooltip={t('sidebar.addProject')}
                 onClick={() => setAddingProject(true)} disabled={selection.isBusy}>
                 <Icon name="plus" size={14} />
               </button>
@@ -98,9 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
 
           {selection.isLoading ? (
             <div className="session-list project-list">
-              <div className="ui-skeleton ui-skeleton--card ui-skeleton--card-stack" />
-              <div className="ui-skeleton ui-skeleton--card ui-skeleton--card-stack" />
-              <div className="ui-skeleton ui-skeleton--card" />
+              <Skeleton shape="row" count={3} />
             </div>
           ) : selection.projects.length > 0 ? (
             <div className="project-stack">

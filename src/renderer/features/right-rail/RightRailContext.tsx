@@ -23,7 +23,7 @@ const ResourceRow: React.FC<{ resource: TaskContextResource; select: (resource: 
   const { t } = useI18n();
   const kind = t(`control.rightRail.context.kind.${resource.kind}`);
   return (
-    <Button variant="ghost" className="right-rail-compact-row" title={`${kind} · ${resource.label}`} onClick={() => select(resource)}>
+    <Button variant="ghost" className="right-rail-compact-row" data-tooltip={`${kind} · ${resource.label}`} onClick={() => select(resource)}>
       <span className="right-rail-compact-icon" aria-hidden="true"><ResourceMark resource={resource} /></span>
       <span className="right-rail-compact-copy">
         <span className="right-rail-compact-title">{resource.label}</span>

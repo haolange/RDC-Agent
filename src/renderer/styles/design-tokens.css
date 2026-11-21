@@ -186,10 +186,11 @@
   --z-modal-backdrop: 400;
   --z-modal: 500;
   --z-popover: 600;
-  --z-tooltip: 700;
   --z-overlay: 900;
   /* Transient menus / popovers must float above whichever surface opened them, including task dialogs. */
   --z-floating: 950;
+  /* Tooltips describe whatever is under the pointer, including items inside floating menus. */
+  --z-tooltip: 975;
   --z-notification: 1000;
 
   /* Easing */

@@ -51,7 +51,7 @@ export const PermissionModeSelector: React.FC = () => {
         aria-busy={pendingMode !== null}
         aria-haspopup="menu"
         aria-expanded={menu.open}
-        title={`${snapshot ? t(labelKey(current)) : t('composer.permission.loading')} — ${status} ${t('composer.permission.scope')}`}
+        data-tooltip={`${snapshot ? t(labelKey(current)) : t('composer.permission.loading')} — ${status} ${t('composer.permission.scope')}`}
         onClick={() => menu.toggle()}
       >
         <span className="composer-permission-pill-icon" aria-hidden="true">

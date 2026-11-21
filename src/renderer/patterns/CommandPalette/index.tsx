@@ -48,7 +48,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ commands, loadin
               key={cmd.name}
               type="button"
               className="command-palette-item"
-              title={cmd.description}
+              data-tooltip={cmd.description}
               onClick={() => {
                 onExecute?.(`/${cmd.name}`);
                 close();

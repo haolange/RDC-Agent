@@ -10,7 +10,6 @@
 }
 .work-process-tool-thumb-button:hover,
 .work-process-tool-thumb-button:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); }
-.work-process-tool-preview-image { display: block; max-width: 100%; max-height: 70dvh; margin: auto; object-fit: contain; }
 .work-process-tool-thumb.is-pending {
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--token-text-secondary); font-size: var(--type-meta-size); overflow-wrap: anywhere;
@@ -25,18 +24,3 @@
 @container (max-width: 30rem) {
   .work-process-tool-thumb { width: var(--space-16); height: var(--space-16); }
 }
-
-.tool-image-preview-dialog > .task-dialog-header {
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-}
-.tool-image-preview-dialog .task-dialog-title {
-  font-size: var(--type-body-size);
-  font-weight: var(--font-normal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tool-image-preview-dialog > .task-dialog-body { padding: var(--space-3); overflow: hidden; }
-.tool-image-preview-dialog .work-process-tool-preview-image { min-height: 0; flex: 0 1 auto; max-height: 100%; }

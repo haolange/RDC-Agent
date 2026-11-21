@@ -15,6 +15,19 @@
   color: var(--token-text-secondary);
 }
 
+.ui-popover {
+  --popover-enter-offset: calc(-1 * var(--space-1));
+  animation: popover-in var(--motion-overlay);
+}
+
+.ui-popover[data-side='top'] {
+  --popover-enter-offset: var(--space-1);
+}
+
+.ui-popover[data-state='closing'] {
+  animation: popover-out var(--motion-overlay) forwards;
+}
+
 .ui-popover[data-ready='false'] {
   visibility: hidden;
 }

@@ -64,7 +64,7 @@ RDC-Agent 是 **现代精密工作台**：工作区高密度，其余处从容�
 | 图标 | 只有 `ui/Icon` 一套，线宽 1.6，行内 16px；文字当图标为 0 |
 | 胶囊 | 高 22–24px，网站图标 14px，标题 13px，胶囊间距 6px |
 | 圆角与间距 | 卡片 10，面板 14–18，胶囊全圆；间距走 4px 网格，行间距 8–10 |
-| 解释的去处 | 需要解释的放进 `Tooltip` 或 `HelpTip`，或让控件自己说明（预览缩略图），不写进界面 |
+| 解释的去处 | 需要解释的放进 `data-tooltip` 或 `HelpTip`，或让控件自己说明（预览缩略图），不写进界面 |
 
 **保留资产**：Working 工具卡片体系（卡壳、卡头「图标 · 标题 · 状态 · 耗时 · 箭头」、正文层、展开详情、原始回执层）、「已思考 · 时长」、Active 扫光、Composer 折射边缘、Max 粒子、子代理点阵和光标靠近高亮。减法不碰它们，只清理其中露出的调试字段；`check:ui-contract` 为每项保留一条回归检查。
 
@@ -305,10 +305,18 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 | 循环氛围 | 1.5–2.9s | Active 扫光 1.6s、Composer 折射边缘 2.85s、子代理点阵 |
 
 - 一条 transition 只写一条缓动曲线（`transition: opacity var(--duration-fast) var(--ease-standard), transform …`），把两条曲线写进同一条声明会让整条失效，门禁拒绝。
-- 每个进场都有退场：TaskDialog、ReadingSheet、Settings、知识中心、Popover、ContextMenu、斜杠菜单、Toast、Tooltip 共用 `design-motion.css` 的 enter / exit 关键帧，组件在卸载前播放退场（`ui/usePresence`）。
+- 每个进场都有退场：TaskDialog、ReadingSheet、Settings、知识中心、Popover、Select、ContextMenu、Toast、Tooltip 共用 `design-motion.css` 的成对关键帧（`overlay-fade-*`、`surface-rise-*`、`popover-*`），关闭时元素带 `data-state="closing"` 播放退场，`ui/usePresence` 在它自己的 animationend 后卸载；没有退场动画或减少动效时立即卸载。
 - **光标靠近高亮**：`ui/proximity` 一个 document 级 `pointermove` 监听，按 rAF 合帧，只为当前悬停的 `[data-proximity]` 元素经 CSSOM 写入 `--proximity-x` / `--proximity-y`；纯 CSS 画以光标为中心的柔光（半径 160–220px，峰值约 0.2）与描边高亮段（约 0.7），离开后 120ms 淡出。范围：Working 的工具卡、子代理卡、计划卡与 Composer 外框；思考行与正文不加。触屏、键盘导航与系统减少动效下不出现；叠加扫光或折射边缘时不额外加亮。
 - **跟随视窗**：Working 在「跟随最新」偏好下的限高容器，内容增长时用 200ms 缓动滚到底；用户上滚即暂停跟随。
 - 系统 `prefers-reduced-motion: reduce` 时，`design-reduced-motion.css` 把时长 token 置零，停掉 spin、骨架屏、子代理点阵、trace flash、agent 菜单运行点、靠近高亮与跟随缓动（直接跳到最新）；保留资产 Active Signal 与 Composer 折射边缘由真实运行状态驱动，不受系统偏好影响；Max 画布由 `EffortMaxField` 自己收束。
+
+## 反馈原语
+
+- **提示**：任何元素写 `data-tooltip` 即可获得悬停提示，`ui/TooltipHost`（挂在 `AppProviders`）统一呈现：悬停 450ms 后出现，刚关闭一个后下一个立即出现，键盘聚焦立即出现，Escape、按下指针与离开即消失，触屏不出现；提示文字与元素可访问名称不同时以 `aria-describedby` 关联。组件不写原生 `title`；截断文字用 `OverflowFade`，只在真正溢出时提供完整文字。`HelpTip` 用于需要点击展开的较长说明。
+- **Toast**：`ui/Toast` + `NotificationToast` 是唯一的操作结果反馈：语气图标、一句标题、可选一句正文、关闭按钮；信息与成功 4s、警告 6s 自动消失，错误等待用户关闭，悬停或聚焦时暂停计时，最多同时 3 条。来源只有 `notificationStore`，技术细节不进 Toast。
+- **错误**：`ui/InlineError` 是唯一的错误呈现：错误图标 + 一句人话（正文字号）+ 可选「重试」+ 可选折叠的「诊断」（原始原因，等宽小字）。原始报错经 `lib/errorDetail` 只进诊断，门禁拒绝在组件里渲染 `String(error)` 或裸 `<p role="alert">`。
+- **复制**：`ui/CopyButton` 是唯一的复制入口：复制图标，成功后 1.6s 内变成绿色对勾，提示同步切换为「已复制」。
+- **加载**：`ui/Skeleton`（`line` / `row` / `card` / `block`）按将要出现的内容形状占位，不与「加载中…」文字同时出现；减少动效时停止流光。
 
 ## 浅色主题
 

@@ -150,7 +150,7 @@ export const ComposerModelEffortPanel: React.FC<{
             className="composer-model-effort-model"
             data-testid="composer-model-effort-open-picker"
             aria-label={t('composer.model.openPicker')}
-            title={modelLabel}
+            data-tooltip={modelLabel}
             onClick={onOpenModels}
           >
             <span>{modelLabel}</span>

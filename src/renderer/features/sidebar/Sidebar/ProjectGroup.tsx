@@ -73,7 +73,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
             <button
               type="button"
               className={`project-item-chevron ${isExpanded ? 'is-expanded' : ''}`}
-              title={t('sidebar.toggleProjectSessions')}
+              data-tooltip={t('sidebar.toggleProjectSessions')}
               aria-label={t('sidebar.toggleProjectSessions')}
               aria-expanded={isExpanded}
               onClick={(event) => void onProjectChevronClick(event, project)}
@@ -90,7 +90,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
             <button
               type="button"
               className="session-item-select project-item-select"
-              title={shouldShowProjectOriginName ? `${project.name} / ${projectOriginName}` : project.name}
+              data-tooltip={shouldShowProjectOriginName ? `${project.name} / ${projectOriginName}` : project.name}
               onClick={() => void onProjectSelect(project)}
             >
               <span className="project-item-title-wrap">
@@ -106,7 +106,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
               <button
                 type="button"
                 className="session-item-icon-button"
-                title={t('sidebar.menu')}
+                data-tooltip={t('sidebar.menu')}
                 onClick={(e) => {
                   e.stopPropagation();
                   const rect = e.currentTarget.getBoundingClientRect();

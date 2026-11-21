@@ -91,7 +91,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
               className={`work-process-tool-diagnostic${expanded ? ' is-open' : ''}`}
               data-testid="work-process-tool-diagnostic"
               aria-expanded={expanded}
-              title={t('chat.workProcessShowDiagnostic')}
+              data-tooltip={t('chat.workProcessShowDiagnostic')}
               onClick={toggleExpanded}
             >
               <span className="work-process-tool-diagnostic-text">{diagnosticCaption}</span>

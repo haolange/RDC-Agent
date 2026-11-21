@@ -8,6 +8,7 @@ import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useI18n } from '../../i18n';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { errorDetail } from '../../lib/errorDetail';
 import { WorkProcess } from './WorkProcess';
 import { MessageActions } from './MessageActions';
 import { UserMessageEditForm } from './UserMessageEditForm';
@@ -133,7 +134,7 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
     } catch (error) {
       setDraft(nextContent);
       setIsEditing(true);
-      setEditError(error instanceof Error ? error.message : String(error));
+      setEditError(errorDetail(error));
     } finally {
       setIsSubmittingEdit(false);
     }

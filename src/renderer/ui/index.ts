@@ -14,6 +14,7 @@ export { DiffBlock, type DiffBlockProps } from './DiffBlock';
 export { Divider, type DividerProps } from './Divider';
 export { Disclosure, type DisclosureProps } from './Disclosure';
 export { EmptyState, type EmptyStateProps, type EmptyStateVariant } from './EmptyState';
+export { Chevron, type ChevronDirection, type ChevronProps } from './Chevron';
 export { Icon, type IconName, type IconProps, type IconSize } from './Icon';
 export { IconButton, type IconButtonProps, type IconButtonSize } from './IconButton';
 export { InlineError, type InlineErrorProps } from './InlineError';
@@ -40,3 +41,7 @@ export { UnsavedChangesDialog, type UnsavedChangesDialogProps } from './UnsavedC
 export { Toast, ToastStack, type ToastProps, type ToastTone } from './Toast';
 
 export { Details, type DetailsProps } from './Details';
+export { TooltipHost } from './TooltipHost';
+export { usePresence, type PresenceState } from './usePresence';
+export { Skeleton, type SkeletonProps, type SkeletonShape } from './Skeleton';
+export { CopyButton, type CopyButtonProps } from './CopyButton';

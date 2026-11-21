@@ -113,7 +113,7 @@ export const ContextUsageIndicator: React.FC<{
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={windowLabel}
+        data-tooltip={windowLabel}
         onClick={togglePopover}
       >
         <svg className="composer-usage-ring" viewBox="0 0 36 36" aria-hidden="true">
@@ -132,8 +132,8 @@ export const ContextUsageIndicator: React.FC<{
           <span className="composer-usage-value-number">{valueText}</span>
         </span>
       </button>
-      {open ? (
-        <ContextBreakdownSheet
+      <ContextBreakdownSheet
+          open={open}
           prepared={showPrepared ? prepared : null}
           phase={phase}
           usage={usage}
@@ -144,7 +144,6 @@ export const ContextUsageIndicator: React.FC<{
           onDetailsExpandedChange={onDetailsExpandedChange}
           onClose={closePopover}
         />
-      ) : null}
     </div>
   );
 };

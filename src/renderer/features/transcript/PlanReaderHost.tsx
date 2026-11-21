@@ -8,14 +8,16 @@ const PlanReaderContext = createContext<((plan: ConversationPlanReview) => void)
 /** Keep the reader alive when transcript rows remount during layout changes. */
 export function PlanReaderHost({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<ConversationPlanReview | null>(null);
+  const [readerOpen, setReaderOpen] = useState(false);
   const opened = useRef<{ planId: string; sessionId: string | undefined } | null>(null);
   const open = useCallback((next: ConversationPlanReview) => {
     opened.current = { planId: next.planId, sessionId: useProjectStore.getState().currentSession?.sessionId };
     setPlan(next);
+    setReaderOpen(true);
   }, []);
   const close = useCallback(() => {
     const target = opened.current;
-    setPlan(null);
+    setReaderOpen(false);
     requestAnimationFrame(() => {
       if (!target || useProjectStore.getState().currentSession?.sessionId !== target.sessionId) return;
       // The original trigger may have remounted while the reader stayed open.
@@ -23,10 +25,11 @@ export function PlanReaderHost({ children }: { children: ReactNode }) {
         .find((button) => button.dataset.planId === target.planId)?.focus({ preventScroll: true });
     });
   }, []);
+  const dropPlan = useCallback(() => setPlan(null), []);
   return (
     <PlanReaderContext.Provider value={open}>
       {children}
-      {plan ? <PlanReviewPanel plan={plan} onClose={close} /> : null}
+      {plan ? <PlanReviewPanel open={readerOpen} plan={plan} onClose={close} onExited={dropPlan} /> : null}
     </PlanReaderContext.Provider>
   );
 }

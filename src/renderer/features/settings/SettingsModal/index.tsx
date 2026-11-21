@@ -7,6 +7,7 @@ import { ProductLogo } from '../../../ui/ProductLogo';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { IconButton } from '../../../ui/IconButton';
 import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
+import { usePresence } from '../../../ui/usePresence';
 import { useSettingsNavigationStore } from '../../../stores/settingsNavigationStore';
 import { useSettingsModal } from './useSettingsModal';
 import { ProviderDetail } from './sections/ProviderDetail';
@@ -29,6 +30,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const theme = settings.appearance.theme === 'system' ? systemTheme : settings.appearance.theme;
   const dialogRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const presence = usePresence(open, backdropRef);
   const runtime = useRdcRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
   const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
@@ -114,13 +117,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     clearSectionRequest(sectionRequest.sequence);
   }, [open, sectionRequest, setActiveSection, clearSectionRequest]);
 
-  if (!open) return null;
+  if (!presence.mounted) return null;
 
   const activeSectionMeta = sections.find((section) => section.id === activeSection);
 
   return createPortal(
     <>
-      <div className="settings-modal-backdrop" onMouseDown={(event) => {
+      <div ref={backdropRef} className="settings-modal-backdrop" data-state={presence.state} onMouseDown={(event) => {
         if (event.target === event.currentTarget && isTopOverlayLayer(layerId)) requestClose();
       }}>
         <div

@@ -61,7 +61,7 @@ export function ComposerFooter({
             data-testid="composer-attach-button"
             size="sm"
             label={attachButtonLabel}
-            title={attachButtonLabel}
+            data-tooltip={attachButtonLabel}
             disabled={isComposerBusy}
             onClick={() => void handleAttachmentSelect()}
           >
@@ -107,7 +107,7 @@ export function ComposerFooter({
             onClick={() => void (isComposerBusy ? handlePrimaryStop() : handlePromptSend())}
             disabled={primaryButtonDisabled}
             aria-label={primaryButtonDescription}
-            title={primaryButtonDescription}
+            data-tooltip={primaryButtonDescription}
           >
             {isComposerBusy ? (
               <Icon name="stop" filled />

@@ -25,13 +25,13 @@ export const SourcePills: React.FC<{ pills: NonNullable<ToolRowModel['sourcePill
           href={pill.url}
           target="_blank"
           rel="noreferrer noopener"
-          title={pill.title || pill.url}
+          data-tooltip={pill.title || pill.url}
           onClick={(event) => event.stopPropagation()}
         >
           {content}
         </a>
       ) : (
-        <span key={pill.domain} className="work-process-source-pill" title={pill.title || pill.domain}>
+        <span key={pill.domain} className="work-process-source-pill" data-tooltip={pill.title || pill.domain}>
           {content}
         </span>
       );
@@ -52,20 +52,20 @@ export const WebPageDestination: React.FC<{ chip: NonNullable<ToolRowModel['page
         href={chip.url}
         target="_blank"
         rel="noreferrer noopener"
-        title={tooltip || chip.url}
+        data-tooltip={tooltip || chip.url}
         onClick={(event) => event.stopPropagation()}
       >
         <FaviconImage domain={chip.domain} />
         <span>{chip.domain}</span>
       </a>
       {chip.pathLabel ? (
-        <span className="work-process-meta-chip is-path" title={chip.pathLabel}>{chip.pathLabel}</span>
+        <span className="work-process-meta-chip is-path" data-tooltip={chip.pathLabel}>{chip.pathLabel}</span>
       ) : null}
       {statusLabel ? (
-        <span className="work-process-meta-chip" title={`HTTP ${statusLabel}`}>{statusLabel}</span>
+        <span className="work-process-meta-chip" data-tooltip={`HTTP ${statusLabel}`}>{statusLabel}</span>
       ) : null}
       {bytesLabel ? (
-        <span className="work-process-meta-chip" title={bytesLabel}>{bytesLabel}</span>
+        <span className="work-process-meta-chip" data-tooltip={bytesLabel}>{bytesLabel}</span>
       ) : null}
     </div>
   );

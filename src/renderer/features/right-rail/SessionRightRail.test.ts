@@ -53,7 +53,7 @@ describe('session rail projection composition', () => {
       expect(progress.textContent).toContain('Complete title retained');
       const title = progress.querySelector<HTMLElement>('.right-rail-task-title')!;
       expect(title.textContent).toBe('Complete title retained');
-      expect(title.closest('button')?.title).toContain('Complete title retained');
+      expect(title.closest('button')?.dataset.tooltip).toContain('Complete title retained');
       expect(progress.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('1');
       state.tracePresentation = null;
       act(() => root.render(createElement(SessionRightRail)));

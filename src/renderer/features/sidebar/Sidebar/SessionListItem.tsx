@@ -60,7 +60,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
           <button
             type="button"
             className="session-item-icon-button"
-            title={t('sidebar.renameSession')}
+            data-tooltip={t('sidebar.renameSession')}
             onClick={(event) => onRenameClick(event, session)}
             onKeyDown={(event) => onRenameKeyDown(event, session)}
           >
@@ -69,7 +69,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
           <button
             type="button"
             className="session-item-icon-button danger"
-            title={t('sidebar.removeSession')}
+            data-tooltip={t('sidebar.removeSession')}
             onClick={(event) => onRemoveClick(event, session)}
             onKeyDown={(event) => onRemoveKeyDown(event, session)}
           >

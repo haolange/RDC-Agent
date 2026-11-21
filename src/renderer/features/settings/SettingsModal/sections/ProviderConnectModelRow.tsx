@@ -74,9 +74,9 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
       aria-disabled={isUnavailable}
     >
       <div className="settings-model-row-main">
-        <span className="settings-model-row-check" title={statusTitle}>{statusLabel}</span>
+        <span className="settings-model-row-check" data-tooltip={statusTitle}>{statusLabel}</span>
         <span className="settings-model-row-identity">
-          <span className="settings-model-row-label" title={model.label}>{model.label}</span>
+          <span className="settings-model-row-label" data-tooltip={model.label}>{model.label}</span>
         </span>
         <Switch
           checked={model.enabled}

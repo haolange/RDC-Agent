@@ -57,7 +57,7 @@ const ProviderRow: React.FC<{
       data-testid={`settings-provider-row-${provider.id}`}
       selected={selected}
       disabled={blocked}
-      title={status.detail || undefined}
+      data-tooltip={status.detail || undefined}
       leading={<span className="settings-provider-row-glyph" aria-hidden="true">{label.slice(0, 1).toUpperCase()}</span>}
       trailing={provider.isConfigured ? <span className="settings-provider-row-dot" aria-hidden="true" /> : undefined}
       onClick={() => onSelect(provider)}

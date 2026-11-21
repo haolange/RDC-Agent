@@ -130,7 +130,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                       role="option"
                       aria-label={accessibleLabel}
                       aria-selected={selectedRow}
-                      title={accessibleLabel}
+                      data-tooltip={accessibleLabel}
                       onClick={() => select(option.canonicalId)}
                     >
                       <span className="settings-model-option-copy">

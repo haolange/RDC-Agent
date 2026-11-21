@@ -66,7 +66,7 @@ function StructuredValue({ value, depth = 0 }: { value: Value; depth?: number })
   if (!Object.keys(value).length) return <span>{t('knowledgeCenter.case.noFields')}</span>;
   return <dl className="knowledge-case-fields">{Object.entries(value).map(([key, item]) => (
     <div key={key} className={!isCompactList(item) && (typeof item === 'object' && item !== null || String(item).length > 75) ? 'is-wide' : undefined}>
-      <dt title={key}>{FIELD_LABELS[key] ? t(FIELD_LABELS[key]) : key}</dt>
+      <dt data-tooltip={key}>{FIELD_LABELS[key] ? t(FIELD_LABELS[key]) : key}</dt>
       <dd><StructuredValue value={item} depth={depth + 1} /></dd>
     </div>
   ))}</dl>;

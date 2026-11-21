@@ -1,5 +1,6 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '../../../../ui/Button';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { RdcCliInvokerSettingsFields } from './RdcCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
@@ -47,7 +48,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
       setStatus('saved');
     } catch (failure) {
       setStatus('error');
-      setError(failure instanceof Error ? failure.message : String(failure));
+      setError(errorDetail(failure));
     }
   };
 

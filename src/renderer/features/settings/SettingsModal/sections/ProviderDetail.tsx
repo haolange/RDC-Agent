@@ -86,7 +86,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
       <header className="settings-provider-detail-header">
         <div className="settings-provider-detail-identity">
           <h3 className="settings-provider-detail-title">{getResolvedProviderLabel(provider)}</h3>
-          <p className="settings-provider-detail-subtitle" title={subtitle}>{subtitle}</p>
+          <p className="settings-provider-detail-subtitle" data-tooltip={subtitle}>{subtitle}</p>
         </div>
         {provider.isConfigured ? (
           <div className="settings-provider-detail-actions">

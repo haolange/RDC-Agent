@@ -4,6 +4,7 @@ import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
 import { getRdcOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
@@ -74,7 +75,7 @@ export const HooksSettings: React.FC<{
           : next,
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorDetail(error));
     } finally {
       setBusyId('');
     }
@@ -104,7 +105,7 @@ export const HooksSettings: React.FC<{
               variant="secondary"
               size="sm"
               disabled={busy || !canTest}
-              title={!canTest ? t('settings.hookTestBlocked') : undefined}
+              data-tooltip={!canTest ? t('settings.hookTestBlocked') : undefined}
               onClick={() => hook && void run(hook, 'test')}
               data-testid="settings-hook-detail-test"
             >
@@ -164,7 +165,7 @@ export const HooksSettings: React.FC<{
           </section>
         ) : null}
 
-        {message && busyId === '' ? <InlineError>{message}</InlineError> : null}
+        {message && busyId === '' ? <InlineError detail={message}>{t('app.error.actionFailed')}</InlineError> : null}
         {testResult?.id === resource.id && testResult.scope === resource.scope
           && testResult.fingerprint === hook?.trustFingerprint && canTest ? (
           <pre className="settings-runtime-result" data-testid="settings-hook-test-result">{testResult.text}</pre>

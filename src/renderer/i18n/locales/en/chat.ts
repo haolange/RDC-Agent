@@ -245,7 +245,6 @@ export const enChat = {
   'chat.imageMissingReference': 'No image preview was retained for this record',
   'chat.imagesShowMore': 'Show {count} more images',
   'chat.imagesLoadMore': 'Load more',
-  'chat.workProcessCloseImage': 'Close image preview',
   'chat.workProcessInterpreterStdout': 'Stdout',
   'chat.workProcessRiskLow': 'Operation risk: Low',
   'chat.workProcessRiskMedium': 'Operation risk: Medium',

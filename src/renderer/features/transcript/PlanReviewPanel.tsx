@@ -8,18 +8,22 @@ import { Details } from '../../ui/Details';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
 import { ReadingSheet } from '../../ui/ReadingSheet';
+import { InlineError } from '../../ui/InlineError';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import { errorDetail } from '../../lib/errorDetail';
 import { usePlanReviewActions } from './usePlanReviewActions';
 import { planAppendixMarkdown } from './planPreview';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import './plan-review-panel.css';
 
 export const PlanReviewPanel: React.FC<{
+  open: boolean;
+  onExited: () => void;
   plan: ConversationPlanReview;
   onClose: () => void;
-}> = ({ plan, onClose }) => {
+}> = ({ open, onExited, plan, onClose }) => {
   const { t } = useI18n();
   const api = useElectronApi();
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId);
@@ -46,7 +50,7 @@ export const PlanReviewPanel: React.FC<{
         if (!cancelled) setMarkdown(result.markdown);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
+        if (!cancelled) setError(errorDetail(reason));
       }).finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
@@ -61,7 +65,7 @@ export const PlanReviewPanel: React.FC<{
     try {
       if (await action()) setNotice(message);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(errorDetail(reason));
     } finally {
       setBusy(false);
     }
@@ -74,7 +78,9 @@ export const PlanReviewPanel: React.FC<{
       title={plan.title}
       meta={t('chat.planReviewRevision', { revision: plan.revision })}
       closeLabel={t('chat.planReviewClose')}
+      open={open}
       onClose={onClose}
+      onExited={onExited}
       actions={<>
         {canReopen ? <Button variant="secondary" size="sm" disabled={busy || loading} onClick={() => void runAction(async () => {
           const restored = await reopenPlanReview(api, reference);
@@ -95,7 +101,7 @@ export const PlanReviewPanel: React.FC<{
       </>}
       status={notice || error || projection?.error ? <>
         {notice ? <p className="plan-review-panel__notice" role="status">{notice}</p> : null}
-        {error || projection?.error ? <p className="plan-review-panel__error" role="alert">{error || projection?.error}</p> : null}
+        {error || projection?.error ? <InlineError detail={error || projection?.error}>{t('app.error.actionFailed')}</InlineError> : null}
       </> : undefined}
     >
       <div className="plan-review-panel__body" aria-busy={loading}>

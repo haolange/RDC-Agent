@@ -45,7 +45,7 @@ export function DeviceSelector() {
   return <div className="device-selector-container">
     <Popover open={open} onOpenChange={setOpen} align="end" className="device-selector-dropdown"
       trigger={<Button variant="ghost" size="sm" className="device-selector-trigger device-selector-trigger-utility main-utility-toggle"
-        data-testid="utility-device-selector-trigger" aria-haspopup="dialog" title={t('device.sessionDeviceTitle', { summary: name })}>
+        data-testid="utility-device-selector-trigger" aria-haspopup="dialog" data-tooltip={t('device.sessionDeviceTitle', { summary: name })}>
         <DeviceTypeIcon type={targetId === 'local' ? 'local' : 'android'} />
         <span className="device-selector-utility-label">{t('device.sessionDeviceShort', { summary: name })}</span>
       </Button>}>
@@ -66,7 +66,7 @@ export function DeviceSelector() {
             className={`device-selector-option ${device.id === targetId ? 'is-selected' : ''}`} aria-selected={device.id === targetId}
             aria-busy={device.id === targetId && Boolean(state && isDevicePreparing(state.preparation.phase))}
             disabled={!scope || !state || locked || installUnconfirmed || (device.type === 'android' && device.adbState !== 'device')}
-            onClick={() => select(device.id)} title={[device.type === 'local' ? t('device.local') : device.label, device.serial].filter(Boolean).join('\n')}>
+            onClick={() => select(device.id)} data-tooltip={[device.type === 'local' ? t('device.local') : device.label, device.serial].filter(Boolean).join('\n')}>
             <span className="device-selector-option-main"><span className="device-option-leading"><DeviceTypeIcon type={device.type} />
               <span className="device-option-identity"><span className="device-option-name">{device.type === 'local' ? t('device.local') : device.label}</span>
                 {device.serial && <span className="device-option-serial">{device.serial}</span>}</span></span>

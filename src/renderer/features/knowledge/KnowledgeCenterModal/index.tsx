@@ -7,6 +7,7 @@ import { Icon } from '../../../ui/Icon';
 import { IconButton } from '../../../ui/IconButton';
 import { Tabs } from '../../../ui/Tabs';
 import { Button } from '../../../ui/Button';
+import { usePresence } from '../../../ui/usePresence';
 import { SpacesColumn } from './columns/SpacesColumn';
 import { ListColumn } from './columns/ListColumn';
 import { DetailColumn } from './columns/DetailColumn';
@@ -76,6 +77,8 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
   });
   const dialogRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const presence = usePresence(open, backdropRef);
   const busy = state.loadingOverview || state.loadingQuery || importer.busy || write.busy || exporter.busy || topics.busy;
   // Sub-dialogs register their own overlay layers, so Escape here only ever
   // closes the Knowledge Center itself.
@@ -93,7 +96,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     bodyRef.current?.scrollTo({ top: 0, left: 0 });
   }, [open, state.selectedCardId]);
 
-  if (!open) return null;
+  if (!presence.mounted) return null;
 
   const showSpaces = !state.narrow || state.narrowPane === 'spaces';
   const showList = !state.narrow || state.narrowPane === 'list';
@@ -104,7 +107,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     // bubble through the React tree, so nesting them would route every click
     // inside a dialog into the backdrop's close handler.
     <>
-      <div className="knowledge-center-backdrop" onClick={onClose} data-testid="knowledge-center-backdrop">
+      <div ref={backdropRef} className="knowledge-center-backdrop" data-state={presence.state} onClick={onClose} data-testid="knowledge-center-backdrop">
         <div
           ref={dialogRef}
           className={`knowledge-center ${state.narrow ? 'is-narrow' : ''}`}

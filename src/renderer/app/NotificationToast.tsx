@@ -1,30 +1,60 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n';
 import { Toast, ToastStack } from '../ui/Toast';
-import { useNotificationStore } from '../stores/notificationStore';
+import { useNotificationStore, type NotificationTone } from '../stores/notificationStore';
+
+/** Errors wait for the user; everything else leaves on its own. */
+const AUTO_DISMISS_MS: Record<NotificationTone, number | null> = { info: 4000, success: 4000, warning: 6000, error: null };
+const VISIBLE_LIMIT = 3;
 
 export const NotificationToast: React.FC = () => {
-  const { notifications, markRead, remove } = useNotificationStore();
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const { t } = useI18n();
+  const notifications = useNotificationStore((state) => state.notifications);
+  const remove = useNotificationStore((state) => state.remove);
+  const [closing, setClosing] = useState<ReadonlySet<string>>(new Set());
+  const [held, setHeld] = useState<string | null>(null);
+  const timers = useRef(new Map<string, number>());
 
-  const handleDismiss = useCallback((id: string) => {
-    setDismissed((prev) => new Set(prev).add(id));
-    setTimeout(() => remove(id), 300);
-  }, [remove]);
+  const dismiss = useCallback((id: string) => setClosing((current) => new Set(current).add(id)), []);
+  const visible = notifications.slice(0, VISIBLE_LIMIT);
 
-  const visible = notifications.filter((n) => !n.read && !dismissed.has(n.id)).slice(0, 3);
+  useEffect(() => {
+    const active = timers.current;
+    for (const notification of visible) {
+      const delay = AUTO_DISMISS_MS[notification.tone];
+      const running = active.has(notification.id);
+      if (delay === null || closing.has(notification.id) || held === notification.id) {
+        if (running) window.clearTimeout(active.get(notification.id));
+        active.delete(notification.id);
+        continue;
+      }
+      if (!running) active.set(notification.id, window.setTimeout(() => dismiss(notification.id), delay));
+    }
+  }, [visible, closing, held, dismiss]);
+
+  useEffect(() => () => {
+    for (const timer of timers.current.values()) window.clearTimeout(timer);
+  }, []);
 
   return (
-    <ToastStack className="notification-toast-container">
-      {visible.map((n) => (
+    <ToastStack>
+      {visible.map((notification) => (
         <Toast
-          key={n.id}
-          className={`notification-toast notification-toast-${n.type}`}
-          title={n.title}
-          message={n.message}
-          tone={n.type}
-          onDismiss={() => {
-            markRead(n.id);
-            handleDismiss(n.id);
+          key={notification.id}
+          open={!closing.has(notification.id)}
+          tone={notification.tone}
+          title={notification.title}
+          message={notification.message}
+          dismissLabel={t('app.dismissNotice')}
+          onDismiss={() => dismiss(notification.id)}
+          onHoldChange={(isHeld) => setHeld(isHeld ? notification.id : null)}
+          onExited={() => {
+            remove(notification.id);
+            setClosing((current) => {
+              const next = new Set(current);
+              next.delete(notification.id);
+              return next;
+            });
           }}
         />
       ))}

@@ -58,7 +58,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
               data-testid={`settings-provider-auth-mode-${mode}`}
               role="radio"
               aria-checked={mode === value}
-              title={reason}
+              data-tooltip={reason}
               disabled={disabled || unavailable}
               onClick={() => onChange(mode)}
             >

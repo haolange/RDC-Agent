@@ -12,7 +12,7 @@ import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, In
 function ArtifactRows({ rows, select }: { rows: InvestigationArtifactRow[]; select: (row: InvestigationArtifactRow) => void }) {
   const { t } = useI18n();
   return <div className="right-rail-investigation-list">{rows.map(row => <Button key={row.artifactId} variant="ghost"
-    className="right-rail-compact-row" title={row.title || row.artifactId} onClick={() => select(row)}>
+    className="right-rail-compact-row" data-tooltip={row.title || row.artifactId} onClick={() => select(row)}>
     <span className="right-rail-compact-icon" aria-hidden="true"><RightRailArtifactGlyph kind={row.kind} /></span>
     <span className="right-rail-compact-title">{row.title || `${t(`control.rightRail.artifacts.kind.${row.kind}`)} · ${row.artifactId}`}</span>
     <Chevron />

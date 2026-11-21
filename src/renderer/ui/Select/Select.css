@@ -113,6 +113,15 @@
   border-radius: var(--radius-lg);
   background: var(--token-bg-shell);
   box-shadow: var(--token-shadow-popover);
+  animation: popover-in var(--motion-overlay);
+}
+
+.dropdown-select-menu.placement-top {
+  --popover-enter-offset: var(--space-1);
+}
+
+.dropdown-select-menu[data-state='closing'] {
+  animation: popover-out var(--motion-overlay) forwards;
 }
 
 .dropdown-select-menu-panel {

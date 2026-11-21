@@ -135,7 +135,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             type="button"
             className="sidebar-context-menu-item"
             onClick={() => void onOpenExplorer()}
-            title={t('sidebar.menuExplorer')}
+            data-tooltip={t('sidebar.menuExplorer')}
           >
             <Icon name="folder" size={14} />
             <span>{t('sidebar.openInExplorer') || 'Explorer'}</span>
@@ -144,7 +144,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             type="button"
             className="sidebar-context-menu-item"
             onClick={onStartProjectRename}
-            title={t('sidebar.menuRename')}
+            data-tooltip={t('sidebar.menuRename')}
           >
             <Icon name="edit" size={14} />
             <span>{t('sidebar.renameProject') || 'Rename'}</span>
@@ -153,7 +153,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             type="button"
             className="sidebar-context-menu-item"
             onClick={() => void onSessionCreate()}
-            title={t('sidebar.menuNewSession')}
+            data-tooltip={t('sidebar.menuNewSession')}
             disabled={isBusy}
           >
             <Icon name="plus" size={14} />
@@ -164,7 +164,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             type="button"
             className="sidebar-context-menu-item is-destructive"
             onClick={() => void onRemoveProject()}
-            title={t('sidebar.menuDelete')}
+            data-tooltip={t('sidebar.menuDelete')}
             disabled={isBusy}
           >
             <Icon name="trash" size={14} />

@@ -5,6 +5,7 @@ import { useOverlayLayer } from '../lib/overlayStack';
 import { useModalFocus } from '../lib/useModalFocus';
 import { IconButton } from './IconButton';
 import { Icon } from './Icon';
+import { usePresence } from './usePresence';
 import './TaskDialog.css';
 
 export type TaskDialogSize = 'sm' | 'md' | 'lg';
@@ -50,16 +51,19 @@ export function TaskDialog({
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const { layerId } = useOverlayLayer(open);
+  const presence = usePresence(open, overlayRef);
 
   useModalFocus({ open, containerRef: dialogRef, onClose, busy, layerId });
 
-  if (!open || typeof document === 'undefined') return null;
+  if (!presence.mounted || typeof document === 'undefined') return null;
 
   return createPortal(
     <div
+      ref={overlayRef}
       className="task-dialog-overlay"
-      data-overlay-layer
+      data-state={presence.state}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && dismissOnBackdrop && !busy) onClose();
       }}
@@ -78,7 +82,7 @@ export function TaskDialog({
       >
         <header className="task-dialog-header">
           <div className="task-dialog-heading">
-            <h2 id={titleId} className="task-dialog-title" title={title}>{title}</h2>
+            <h2 id={titleId} className="task-dialog-title" data-tooltip={title}>{title}</h2>
             {description ? (
               <p id={descriptionId} className="task-dialog-description">{description}</p>
             ) : null}

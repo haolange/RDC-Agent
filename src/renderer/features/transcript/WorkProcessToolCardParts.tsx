@@ -56,7 +56,7 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     return (
       <div className="work-process-tool-card-body family-web">
         {row.pageChip && fetchTitle ? (
-          <span className="work-process-tool-card-body-text is-summary" title={fetchTitle}>{fetchTitle}</span>
+          <span className="work-process-tool-card-body-text is-summary" data-tooltip={fetchTitle}>{fetchTitle}</span>
         ) : null}
         {row.pageChip ? <WebPageDestination chip={row.pageChip} /> : null}
         {!row.pageChip && bodyText ? (
@@ -72,7 +72,7 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     return (
       <div className="work-process-tool-card-body family-file">
         {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
-        <code className="work-process-tool-card-path" title={bodyText || copyPath}>{bodyText}</code>
+        <code className="work-process-tool-card-path" data-tooltip={bodyText || copyPath}>{bodyText}</code>
         {copyPath ? <CopyPathButton path={copyPath} /> : null}
       </div>
     );
@@ -90,12 +90,12 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     return (
       <div className={`work-process-tool-card-body family-${row.family}`}>
         {bodyText ? (
-          <span className="work-process-tool-card-body-text is-summary" title={bodyText}>{bodyText}</span>
+          <span className="work-process-tool-card-body-text is-summary" data-tooltip={bodyText}>{bodyText}</span>
         ) : null}
         {sampleLines.length > 0 ? (
           <ul className="work-process-tool-card-body-list">
             {sampleLines.map((line) => (
-              <li key={line} className="work-process-tool-card-body-list-item" title={line}>{line}</li>
+              <li key={line} className="work-process-tool-card-body-list-item" data-tooltip={line}>{line}</li>
             ))}
           </ul>
         ) : null}
@@ -110,7 +110,7 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
           {row.chips.map((chip) => <span key={chip} className="work-process-path-chip">{chip}</span>)}
         </div>
       ) : null}
-      {bodyText ? <span className="work-process-tool-card-body-text" title={bodyText}>{bodyText}</span> : null}
+      {bodyText ? <span className="work-process-tool-card-body-text" data-tooltip={bodyText}>{bodyText}</span> : null}
       {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
     </div>
   );
@@ -174,7 +174,7 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className="work-process-tool-card-detail family-generic" data-testid="work-process-tool-preview">
       {lines[0] ? <p className="work-process-tool-card-caption">{lines[0]}</p> : null}
       {row.pathChip ? (
-        <span className="work-process-path-chip" title={row.pathChip}>{row.pathChip}</span>
+        <span className="work-process-path-chip" data-tooltip={row.pathChip}>{row.pathChip}</span>
       ) : null}
       {lines.length > 1 ? (
         <pre className="work-process-tool-card-preview">{lines.slice(1).join('\n')}</pre>

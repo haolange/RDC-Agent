@@ -82,7 +82,7 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
           className={`slash-command-item${idx === selectedIndex ? ' is-selected' : ''}`}
           role="option"
           aria-selected={idx === selectedIndex}
-          title={cmd.description}
+          data-tooltip={cmd.description}
           onClick={() => onSelect(cmd.name)}
           onMouseEnter={() => setSelectedIndex(idx)}
         >

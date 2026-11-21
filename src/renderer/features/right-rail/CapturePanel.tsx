@@ -10,6 +10,7 @@ import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { Icon } from '../../ui/Icon';
 import { useI18n } from '../../i18n';
+import { errorDetail } from '../../lib/errorDetail';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import {
   CaptureReplayCallouts,
@@ -84,7 +85,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
         useProjectStore.getState().updateProjectInputs(scope.projectId, result.inputs);
       }
       if (operation === 'refresh') await refreshProjection();
-    } catch (reason) { setError({ message: reason instanceof Error ? reason.message : String(reason), action: operation }); }
+    } catch (reason) { setError({ message: errorDetail(reason), action: operation }); }
     finally { setAction(null); }
   };
   const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
@@ -109,10 +110,10 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     </div>
     {more && <div className="capture-replay-menu">
       <Button variant="ghost" size="sm" disabled={!state?.contextId} onClick={() => {
-        if (state?.contextId) void copyAppText(state.contextId).then(() => setCopied(true)).catch((reason) => setError({ message: String(reason), action: 'refresh' }));
+        if (state?.contextId) void copyAppText(state.contextId).then(() => setCopied(true)).catch((reason) => setError({ message: errorDetail(reason), action: 'refresh' }));
       }}>{t(copied ? 'control.replay.copied' : 'control.replay.copyContext')}</Button>
     </div>}
-    <div className="capture-replay-file-row" title={selectedInput?.filePath}>
+    <div className="capture-replay-file-row" data-tooltip={selectedInput?.filePath}>
       <Select dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
         options={capture.availableCaptures.map((input) => ({ value: input.inputId, label: input.fileName }))} disabled={disabled}
         onChange={(inputId) => setDraft({ ...chosen, inputId })} />

@@ -1,47 +1,60 @@
+import { useRef, type ReactNode } from 'react';
 import { cn } from '../lib/cn';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
-import type { HTMLAttributes, ReactNode } from 'react';
+import { usePresence } from './usePresence';
 import './Toast.css';
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'error';
 
-export interface ToastProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
+const TONE_ICONS: Record<ToastTone, IconName> = {
+  info: 'info',
+  success: 'check',
+  warning: 'warning',
+  error: 'error',
+};
+
+export interface ToastProps {
+  open: boolean;
   title: ReactNode;
   message?: ReactNode;
   tone?: ToastTone;
-  onDismiss?: () => void;
-  dismissLabel?: string;
+  dismissLabel: string;
+  onDismiss: () => void;
+  /** Runs after the exit animation, when the owner can drop the toast. */
+  onExited: () => void;
+  /** Hovering or focusing a toast pauses its timer. */
+  onHoldChange?: (held: boolean) => void;
 }
 
-export function Toast({
-  title,
-  message,
-  tone = 'info',
-  onDismiss,
-  dismissLabel = 'Dismiss',
-  className,
-  ...rest
-}: ToastProps) {
+/** One toast: a tone icon, one sentence and an optional second, a dismiss button; enters and leaves with motion. */
+export function Toast({ open, title, message, tone = 'info', dismissLabel, onDismiss, onExited, onHoldChange }: ToastProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const presence = usePresence(open, ref, onExited);
+  if (!presence.mounted) return null;
   return (
     <div
-      className={cn('ui-toast', `is-tone-${tone}`, className)}
-      role="status"
-      {...rest}
+      ref={ref}
+      className={cn('ui-toast', `is-tone-${tone}`)}
+      role={tone === 'error' ? 'alert' : 'status'}
+      data-state={presence.state}
+      onPointerEnter={() => onHoldChange?.(true)}
+      onPointerLeave={() => onHoldChange?.(false)}
+      onFocus={() => onHoldChange?.(true)}
+      onBlur={() => onHoldChange?.(false)}
     >
+      <Icon name={TONE_ICONS[tone]} className="ui-toast-icon" />
       <div className="ui-toast-copy">
-        <span className="ui-toast-title notification-toast-title">{title}</span>
-        {message ? <span className="ui-toast-message notification-toast-message">{message}</span> : null}
+        <span className="ui-toast-title">{title}</span>
+        {message ? <span className="ui-toast-message">{message}</span> : null}
       </div>
-      {onDismiss ? (
-        <IconButton label={dismissLabel} size="sm" className="ui-toast-dismiss notification-toast-close" onClick={onDismiss}>
-          <Icon name="close" size={12} />
-        </IconButton>
-      ) : null}
+      <IconButton label={dismissLabel} size="sm" className="ui-toast-dismiss" onClick={onDismiss}>
+        <Icon name="close" size={14} />
+      </IconButton>
     </div>
   );
 }
 
 export function ToastStack({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('ui-toast-stack', className)}>{children}</div>;
+  return <div className={cn('ui-toast-stack', className)} aria-live="polite">{children}</div>;
 }

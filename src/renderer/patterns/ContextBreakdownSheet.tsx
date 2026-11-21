@@ -40,7 +40,7 @@ const ContextBarSegment: React.FC<{
     <span
       className="context-breakdown-bar-segment"
       data-segment={id}
-      title={title}
+      data-tooltip={title}
       {...dynStyle}
     />
   );
@@ -58,10 +58,10 @@ interface ContextBreakdownContentProps {
 }
 
 /** Context usage in the shared reading sheet: same area, size and single scroller as the plan reader. */
-export const ContextBreakdownSheet: React.FC<ContextBreakdownContentProps & { onClose: () => void }> = ({ onClose, ...content }) => {
+export const ContextBreakdownSheet: React.FC<ContextBreakdownContentProps & { open: boolean; onClose: () => void }> = ({ open, onClose, ...content }) => {
   const { t } = useI18n();
   return (
-    <ReadingSheet title={t('contextBreakdown.title')} closeLabel={t('contextBreakdown.close')} onClose={onClose}
+    <ReadingSheet open={open} title={t('contextBreakdown.title')} closeLabel={t('contextBreakdown.close')} onClose={onClose}
       className="context-breakdown" dataTestId="context-breakdown">
       <ContextBreakdownContent {...content} />
     </ReadingSheet>

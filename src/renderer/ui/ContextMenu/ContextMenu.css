@@ -14,6 +14,11 @@
   background: var(--token-bg-overlay);
   border: 1px solid var(--token-border-card);
   box-shadow: var(--token-shadow-popover);
+  animation: popover-in var(--motion-overlay);
+}
+
+.app-context-menu[data-state='closing'] {
+  animation: popover-out var(--motion-overlay) forwards;
 }
 
 .app-context-menu-item {

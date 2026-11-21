@@ -176,7 +176,7 @@ describe('populated session rail', () => {
       render();
       openRailTab(host, 4);
       expect(host.querySelectorAll('[data-testid="right-rail-capture"]')).toHaveLength(1);
-      expect(host.querySelector('.capture-replay-file-row')?.getAttribute('title')).toBe('/captures/Scene.rdc');
+      expect(host.querySelector('.capture-replay-file-row')?.getAttribute('data-tooltip')).toBe('/captures/Scene.rdc');
       expect(host.querySelector('.capture-replay-status')?.textContent).toBe('control.replay.ready');
       expect(button('control.replay.close')?.disabled).toBe(false);
       expect(host.querySelector<HTMLInputElement>('.capture-event-input input')?.value).toBe('42');

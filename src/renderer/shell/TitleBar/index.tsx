@@ -67,7 +67,7 @@ export function TitleBar({
           onClick={!leftToggleDisabled ? onToggleLeft : undefined}
           aria-label={leftPanelToggleLabel}
           aria-expanded={!effectiveLeftCollapsed}
-          title={leftToggleDisabled ? autoCollapsedTitle : leftPanelToggleLabel}
+          data-tooltip={leftToggleDisabled ? autoCollapsedTitle : leftPanelToggleLabel}
           disabled={leftToggleDisabled}
         >
           <Icon name="sidebar-left" size={18} className="shell-panel-toggle-icon" />
@@ -83,7 +83,7 @@ export function TitleBar({
             onClick={!rightToggleDisabled ? onToggleRight : undefined}
             aria-label={rightPanelToggleLabel}
             aria-expanded={!effectiveRightCollapsed}
-            title={rightToggleDisabled ? autoCollapsedTitle : rightPanelToggleLabel}
+            data-tooltip={rightToggleDisabled ? autoCollapsedTitle : rightPanelToggleLabel}
             disabled={rightToggleDisabled}
           >
             <Icon name="sidebar-right" size={18} className="shell-panel-toggle-icon" />
@@ -92,7 +92,7 @@ export function TitleBar({
         <div className="window-controls" role="group" aria-label={windowControlsLabel}>
           <button
             type="button"
-            className="window-control window-control-minimize tooltip"
+            className="window-control window-control-minimize"
             data-tooltip={windowMinimizeLabel}
             aria-label={windowMinimizeLabel}
             onClick={onMinimize}
@@ -101,7 +101,7 @@ export function TitleBar({
           </button>
           <button
             type="button"
-            className="window-control window-control-maximize tooltip"
+            className="window-control window-control-maximize"
             data-tooltip={windowMaximized ? windowRestoreLabel : windowMaximizeLabel}
             aria-label={windowMaximized ? windowRestoreLabel : windowMaximizeLabel}
             onClick={onToggleMaximize}
@@ -110,7 +110,7 @@ export function TitleBar({
           </button>
           <button
             type="button"
-            className="window-control close tooltip"
+            className="window-control close"
             data-tooltip={windowCloseLabel}
             aria-label={windowCloseLabel}
             onClick={onClose}

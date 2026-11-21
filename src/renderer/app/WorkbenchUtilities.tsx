@@ -22,7 +22,7 @@ export function WorkbenchUtilities({ isTerminalOpen, activityAlertSeverity, onTo
         data-testid="terminal-toggle"
         aria-label={label}
         aria-pressed={isTerminalOpen}
-        title={label}
+        data-tooltip={label}
       >
         <Icon name="terminal" />
         {activityAlertSeverity && <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />}

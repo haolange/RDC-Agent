@@ -52,12 +52,12 @@ export function IndexStatusBar({ index, rebuilding, onRebuild }: IndexStatusBarP
         </div>
         <div>
           <dt>{t('knowledgeCenter.indexBuiltAt')}</dt>
-          <dd title={index?.builtAt}>{index?.builtAt ? formatKnowledgeTime(Date.parse(index.builtAt)) : t('knowledgeCenter.indexNeverBuilt')}</dd>
+          <dd data-tooltip={index?.builtAt}>{index?.builtAt ? formatKnowledgeTime(Date.parse(index.builtAt)) : t('knowledgeCenter.indexNeverBuilt')}</dd>
         </div>
       </dl>
       <div className="knowledge-center-index-revision">
         <span className="knowledge-center-index-label">{t('knowledgeCenter.indexRevision')}</span>
-        <code className="knowledge-center-index-revision-value" title={index?.revision}>{index?.revision ?? '—'}</code>
+        <code className="knowledge-center-index-revision-value" data-tooltip={index?.revision}>{index?.revision ?? '—'}</code>
         <IconButton
           label={copied ? t('knowledgeCenter.indexCopied') : t('knowledgeCenter.indexCopyRevision')}
           size="sm"

@@ -25,7 +25,7 @@ export const PlanReferenceCard: React.FC<{ reference: ConversationPlanReference;
         <Icon name={reference.intent === 'execute' ? 'play' : 'edit'} size={14} />
         <span>{t(reference.intent === 'execute' ? 'chat.planReference.execute' : 'chat.planReference.revise')}</span>
       </div>
-      <button type="button" className="plan-reference-card__title" onClick={showPlan} title={t('chat.planReference.show')}>
+      <button type="button" className="plan-reference-card__title" onClick={showPlan} data-tooltip={t('chat.planReference.show')}>
         {reference.title}
       </button>
       <div className="plan-reference-card__meta">

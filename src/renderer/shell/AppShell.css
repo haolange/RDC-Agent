@@ -1,17 +1,3 @@
-.shell-notice {
-  position: absolute;
-  top: var(--space-4);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: var(--z-notification);
-  max-width: calc(100% - var(--space-8));
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--token-border-default);
-  background: var(--token-bg-panel);
-  color: var(--token-text-primary);
-}
-
 .sidebar-footer-entry {
   --btn-radius: var(--radius-sm);
   width: 100%;

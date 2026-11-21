@@ -119,10 +119,9 @@ export function subscribeProjectInputsChanged(electronAPI: ElectronAPI) {
   });
 }
 
-export function subscribeProjectInputsError(electronAPI: ElectronAPI, showNotice: EventBridgeOptions['showNotice'], t: EventBridgeOptions['t']) {
+export function subscribeProjectInputsError(electronAPI: ElectronAPI, t: EventBridgeOptions['t']) {
   return electronAPI.events.onProjectInputsError((payload) => {
-    const title = t('project.inputs.reconcileFailed');
-    useNotificationStore.getState().add({ type: 'error', title, message: `${t('project.inputs.reconcileRetry')} ${payload.error}` });
-    if (useProjectStore.getState().currentProject?.projectId === payload.projectId) showNotice(title);
+    console.error('[project-inputs] reconcile failed', payload.error);
+    useNotificationStore.getState().add({ tone: 'error', title: t('project.inputs.reconcileFailed'), message: t('project.inputs.reconcileRetry') });
   });
 }

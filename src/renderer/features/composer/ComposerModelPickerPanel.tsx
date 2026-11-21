@@ -180,7 +180,7 @@ export const ComposerModelPickerPanel: React.FC<{
           data-testid="composer-model-agent-default"
           role="menuitemradio"
           aria-checked={!hasChoice}
-          title={agentDefaultTitle}
+          data-tooltip={agentDefaultTitle}
           disabled={saving || !agentDefault.selectable}
           onClick={() => void selectAgentDefault()}
         >

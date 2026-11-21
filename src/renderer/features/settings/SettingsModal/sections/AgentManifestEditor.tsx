@@ -228,7 +228,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 <span className="settings-field-label">{t('settings.agentEnabled')}</span>
                 <span className="settings-switch-row">
                   <Switch checked={selectedAgent.enabled} onCheckedChange={(enabled) => onUpdateAgent({ enabled })} aria-label={t('settings.agentEnabled')}
-                    disabled={selectedAgent.id === GENERAL_AGENT_ID} title={selectedAgent.id === GENERAL_AGENT_ID ? t('settings.agentDefaultRequired') : undefined} />
+                    disabled={selectedAgent.id === GENERAL_AGENT_ID} data-tooltip={selectedAgent.id === GENERAL_AGENT_ID ? t('settings.agentDefaultRequired') : undefined} />
                 </span>
               </label>
               <label className="settings-agent-flag">

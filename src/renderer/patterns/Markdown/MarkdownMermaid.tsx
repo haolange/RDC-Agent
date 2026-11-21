@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../i18n';
+import { errorDetail } from '../../lib/errorDetail';
 
 interface MarkdownMermaidProps {
   source: string;
@@ -8,7 +9,7 @@ interface MarkdownMermaidProps {
 type MermaidState =
   | { status: 'loading' }
   | { status: 'ready'; svg: string }
-  | { status: 'error'; message: string };
+  | { status: 'error' };
 
 /**
  * Lazily render a Mermaid diagram. Fail-closed: show source + error on parse/render failure.
@@ -37,10 +38,8 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
         }
       } catch (error) {
         if (!cancelled) {
-          setState({
-            status: 'error',
-            message: error instanceof Error ? error.message : String(error),
-          });
+          console.error('[markdown] mermaid render failed', errorDetail(error));
+          setState({ status: 'error' });
         }
       }
     })();
@@ -65,7 +64,7 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
     <div className="markdown-mermaid markdown-mermaid-fallback" data-testid="markdown-mermaid-fallback">
       {state.status === 'error' ? (
         <p className="markdown-mermaid-error" role="status">
-          {t('chat.markdownMermaidFailed')}: {state.message}
+          {t('chat.markdownMermaidFailed')}
         </p>
       ) : (
         <p className="markdown-mermaid-loading" role="status">

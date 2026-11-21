@@ -76,7 +76,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
               <dl className="knowledge-center-meta knowledge-center-meta--compact">
                 {axes.map((axis) => (
                   <div key={axis}>
-                    <dt title={axis}>{t(SCOPE_LABEL_KEYS[axis])}</dt>
+                    <dt data-tooltip={axis}>{t(SCOPE_LABEL_KEYS[axis])}</dt>
                     <dd>
                       {card.scope[axis] ?? '—'}
                       {exclusions[axis]?.length ? (

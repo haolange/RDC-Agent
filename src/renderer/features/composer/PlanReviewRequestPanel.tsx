@@ -4,10 +4,12 @@ import { Textarea } from '../../ui/Textarea';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
+import { InlineError } from '../../ui/InlineError';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { cancelPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import { errorDetail } from '../../lib/errorDetail';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
 import { capabilityStatusPresentation } from './capabilityPresentation';
 import { useComposerTurnControls } from './ComposerTurnControlsContext';
@@ -63,7 +65,7 @@ export const PlanReviewRequestPanel: React.FC<{
     try {
       await submit(request, decision);
     } catch (reason) {
-      if (mounted.current) setError(reason instanceof Error ? reason.message : String(reason));
+      if (mounted.current) setError(errorDetail(reason));
     } finally {
       submitting.current = false;
       if (mounted.current) setIsSubmitting(false);
@@ -78,7 +80,7 @@ export const PlanReviewRequestPanel: React.FC<{
     try {
       await cancelPlanReview(api, { sessionId: request.sessionId, reviewId: request.reviewId });
     } catch (reason) {
-      if (mounted.current) setError(reason instanceof Error ? reason.message : String(reason));
+      if (mounted.current) setError(errorDetail(reason));
     } finally {
       submitting.current = false;
       if (mounted.current) setIsSubmitting(false);
@@ -90,7 +92,7 @@ export const PlanReviewRequestPanel: React.FC<{
       <div className="composer-plan-review__header">
         <h2 className="composer-plan-review__title">{t('chat.planReviewImplement')}</h2>
         <IconButton className="composer-plan-review__stop" size="sm" label={t('chat.planReviewStop')}
-          title={t('chat.planReviewStop')} disabled={isSubmitting} onClick={() => void stop()}>
+          data-tooltip={t('chat.planReviewStop')} disabled={isSubmitting} onClick={() => void stop()}>
           <Icon name="stop" size={16} />
         </IconButton>
       </div>
@@ -129,9 +131,9 @@ export const PlanReviewRequestPanel: React.FC<{
           <Icon name="arrow-up" size={16} />
         </IconButton>
       </div>
-      {modelSave.error ? <p className="composer-plan-review__error" role="alert">{modelSave.error}{modelSave.retry ? <Button variant="ghost" size="sm" onClick={modelSave.retry}>{t('composer.model.retrySave')}</Button> : null}</p> : null}
+      {modelSave.error ? <InlineError detail={modelSave.error} onRetry={modelSave.retry ?? undefined} retryLabel={t('composer.model.retrySave')}>{t('app.error.saveFailed')}</InlineError> : null}
       {isSubmitting || transition ? <p className="composer-transition-status" role="status">{t(transition?.phase === 'handoff' ? 'composer.handoff.switching' : 'composer.handoff.confirming')}</p> : null}
-      {error ? <p className="composer-plan-review__error" role="alert">{error}</p> : null}
+      {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
       {modelStatus.labelKey ? <p className="composer-transition-status" role="status">
         {t(modelStatus.labelKey)}
         {capabilityState.status === 'error' || capabilityState.status === 'unavailable' ? <>

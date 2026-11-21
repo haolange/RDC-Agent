@@ -1,4 +1,4 @@
-/** Shared scrollbar, selection and skeleton rules. */
+/** Shared scrollbar and selection rules. */
 
 /* Scrollbar styling */
 .scrollbar-thin {
@@ -28,40 +28,4 @@
 ::selection {
   background: color-mix(in srgb, var(--token-accent-primary) 30%, transparent);
   color: var(--token-text-primary);
-}
-
-/* Skeleton Loading */
-.ui-skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--token-bg-raised) 25%,
-    var(--token-bg-panel) 50%,
-    var(--token-bg-raised) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer var(--animation-shimmer) var(--ease-standard) infinite;
-  border-radius: var(--radius-md);
-}
-
-.ui-skeleton--text {
-  height: 14px;
-  margin-bottom: 8px;
-}
-
-.ui-skeleton--text-sm {
-  height: 10px;
-  margin-bottom: 6px;
-}
-
-.ui-skeleton--circle {
-  border-radius: var(--radius-full);
-}
-
-.ui-skeleton--card {
-  height: 56px;
-  border-radius: var(--radius-card);
-}
-
-.ui-skeleton--card-stack {
-  margin-bottom: var(--space-2);
 }

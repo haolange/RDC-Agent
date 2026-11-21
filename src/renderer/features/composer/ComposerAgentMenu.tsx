@@ -93,7 +93,7 @@ export const ComposerAgentMenu: React.FC<{
         onClick={() => menu.toggle()}
         aria-haspopup="menu"
         aria-expanded={menu.open}
-        title={selectedAgentCapability || currentModeLabel}
+        data-tooltip={selectedAgentCapability || currentModeLabel}
       >
         <span className="composer-agent-pill-icon" aria-hidden="true">
           <ModeGlyph mode={currentMode} icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon} size={16} strokeWidth={2} />
@@ -124,7 +124,7 @@ export const ComposerAgentMenu: React.FC<{
                 data-selected={isSelected}
                 role="menuitemradio"
                 aria-checked={isSelected}
-                title={description || agent.name}
+                data-tooltip={description || agent.name}
                 onClick={() => selectAgent(agent)}
               >
                 <span className="composer-agent-menu-item-icon" aria-hidden="true">

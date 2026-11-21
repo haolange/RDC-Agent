@@ -109,7 +109,7 @@ Send 不因打字/改模型触发 Context preview IPC。在途 turn 冻结创建
 
 Stop：Preparing 一次干净撤销（prompt 回填、无 stopped↔streaming 闪烁）；Turn 已开始后单调落停（按钮与 Work Process 不回跳运行态）。停止只在 Work Process 标题显示一次，不生成重复摘要、兜底回复或底部徽标；原模型输出和真实错误保留。通用工作块/运行中工具因取消进入 cancelled，未执行工具为 skipped，真实失败为 error，用户修改意见为 rejected，不能互相代替。main 与乐观停止复用同一纯结算函数。Edit and resend 提交后立即离开编辑态并 optimistic 切入新分支 draft，再进入工作过程。
 
-Stacking：`composer < modal backdrop < modal < tooltip < notification`。
+Stacking：`composer < modal backdrop < modal < popover < overlay < floating menus < tooltip < notification`。
 
 ## Transcript Markdown
 

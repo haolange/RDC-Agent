@@ -4,6 +4,7 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 import { Chevron } from '../../ui/Chevron';
+import { errorDetail } from '../../lib/errorDetail';
 import { createReplayApplyQueue } from './replayApplyQueue';
 import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
 import type { CaptureReplayApplyRequest, CaptureReplayState } from '@shared/types/captureReplay';
@@ -21,7 +22,7 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
     if (next.generation !== state?.generation) return;
     receive(next);
     setRequested((value) => value === request.eventId ? null : value);
-  }, (reason) => { setError(String(reason)); setRequested(null); }), [scope, state?.generation, receive, disabled]);
+  }, (reason) => { setError(errorDetail(reason)); setRequested(null); }), [scope, state?.generation, receive, disabled]);
   useEffect(() => () => queue.dispose(), [queue]);
   useEffect(() => {
     if (disabled) { queue.dispose(); setRequested(null); setError(null); }
@@ -61,6 +62,6 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
       onKeyUp={(event) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) queue.flush(); }} />
     <div className="capture-replay-feedback" role="status">{error ?? feedback}</div>
     {state?.contextId && state.devicePresentation.status === 'presented' && <small>{t('control.replay.synced')}</small>}
-    {state?.contextId && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small title={state.devicePresentation.reason ?? undefined}>{t('control.replay.remoteUnavailable')}</small>}
+    {state?.contextId && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small data-tooltip={state.devicePresentation.reason ?? undefined}>{t('control.replay.remoteUnavailable')}</small>}
   </div>;
 }

@@ -57,7 +57,7 @@ const TaskRow: React.FC<{ task: TaskRailItem; locateLabel: string }> = ({ task, 
   const stateLabel = waiting ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${task.displayState}`);
   return (
     <li className={`right-rail-task-row status-${task.displayState}`}>
-      <button type="button" onClick={() => focusWorkProcessTask(task.id)} title={`${task.title} — ${stateLabel} — ${locateLabel}`}>
+      <button type="button" onClick={() => focusWorkProcessTask(task.id)} data-tooltip={`${task.title} — ${stateLabel} — ${locateLabel}`}>
         <span className="right-rail-task-order">{task.order + 1}</span>
         <TaskStatusMarker size="sm" status={task.displayState} label={stateLabel} />
         <span className="right-rail-task-copy">

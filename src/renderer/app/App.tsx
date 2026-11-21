@@ -15,6 +15,7 @@ import { useI18n } from '../i18n';
 import { useWindowControls } from '../hooks/useWindowControls';
 import { ProductLogo } from '../ui/ProductLogo';
 import { useSettingsNavigationStore } from '../stores/settingsNavigationStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { WorkbenchUtilities } from './WorkbenchUtilities';
 import { resolveActiveChrome } from './theme/applyChromeTheme';
 import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
@@ -31,7 +32,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [, setConnectionStatus] = useState<'connected' | 'degraded' | 'offline'>('offline');
   const [windowMaximized, setWindowMaximized] = useState(false);
-  const [shellNotice, setShellNotice] = useState<string | null>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<{ element: HTMLButtonElement; rect: DOMRect } | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
@@ -73,14 +73,15 @@ const App: React.FC = () => {
   );
 
   const showNotice = useCallback((message: string) => {
-    setShellNotice(message);
+    useNotificationStore.getState().add({ tone: 'info', title: message });
   }, []);
 
   const applyAppearancePreference = useCallback((mutation: () => Promise<void>) => {
     void mutation().catch((error: unknown) => {
-      showNotice(error instanceof Error ? error.message : t('app.appearanceUpdateFailed'));
+      console.error('[appearance] update failed', error);
+      useNotificationStore.getState().add({ tone: 'error', title: t('app.appearanceUpdateFailed') });
     });
-  }, [showNotice, t]);
+  }, [t]);
 
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
   const handleToggleLeftSidebar = useCallback(() => {
@@ -116,12 +117,6 @@ const App: React.FC = () => {
     setWindowMaximized,
     t,
   });
-
-  useEffect(() => {
-    if (!shellNotice) return;
-    const timeoutId = window.setTimeout(() => setShellNotice(null), 3200);
-    return () => window.clearTimeout(timeoutId);
-  }, [shellNotice]);
 
   const activityAlertSeverity = activityEntries.some((entry) => entry.severity === 'error')
     ? 'error'
@@ -201,7 +196,6 @@ const App: React.FC = () => {
           isTerminalOpen={isTerminalOpen}
           bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
           workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
-          shellNotice={shellNotice}
           nickname={nickname}
           avatarPath={avatarPath}
           composer={composer}

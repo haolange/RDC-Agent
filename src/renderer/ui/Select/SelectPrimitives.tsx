@@ -5,6 +5,7 @@ import { Icon } from '../Icon';
 import { Chevron } from '../Chevron';
 import { normalizeTestIdSegment } from './selectUtils';
 import type { SelectOption } from './types';
+import type { PresenceState } from '../usePresence';
 
 function AaSwatch(props: { color: string; className?: string }) {
   const dynStyle = useDynStyle({ '--dropdown-swatch-bg': props.color });
@@ -84,6 +85,7 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
 
 interface SelectMenuProps {
   menuRef: React.Ref<HTMLDivElement>;
+  state: PresenceState;
   variant: 'field' | 'inline';
   dataTestId: string;
   triggerAriaLabel: string;
@@ -107,6 +109,7 @@ interface SelectMenuProps {
 
 const SelectMenuPortal: React.FC<SelectMenuProps> = ({
   menuRef,
+  state,
   variant,
   dataTestId,
   triggerAriaLabel,
@@ -139,6 +142,7 @@ const SelectMenuPortal: React.FC<SelectMenuProps> = ({
     ].filter(Boolean).join(' ')}
     data-testid={`${dataTestId}-menu`}
     data-placement={menuPosition.placement}
+    data-state={state}
     role="listbox"
     aria-label={triggerAriaLabel}
     {...dynStyle}

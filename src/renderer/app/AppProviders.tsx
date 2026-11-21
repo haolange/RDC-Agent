@@ -1,3 +1,4 @@
+import { TooltipHost } from '../ui/TooltipHost';
 import { AppContextMenuHost } from './AppContextMenuHost';
 import type { ReactNode } from 'react';
 
@@ -7,6 +8,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <>
       {children}
       <AppContextMenuHost />
+      <TooltipHost />
     </>
   );
 }

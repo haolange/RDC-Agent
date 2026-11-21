@@ -147,7 +147,9 @@ it('always offers revisions, disallows empty feedback and preserves it on failed
   await click('.composer-plan-review__revision button');
   expect(mock.submit).toHaveBeenCalledWith(request, { kind: 'reject', feedback: 'Clarify inputs' });
   expect(textarea.value).toBe('  Clarify inputs  ');
-  expect(host.querySelector('[role="alert"]')?.textContent).toBe('Retry available');
+  // The alert leads with a human sentence; the raw reason stays under diagnostics.
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('app.error.actionFailed');
+  expect(host.querySelector('[role="alert"]')?.querySelector('.ui-inline-error-detail-text')?.textContent).toBe('Retry available');
   await click('.composer-plan-review__revision button');
   expect(mock.submit).toHaveBeenCalledTimes(2);
 });
@@ -175,7 +177,9 @@ it('holds approval while a model saves, retains failures and still allows stop',
   await act(async () => stop.click());
   expect(onStop).toHaveBeenCalledOnce();
   await act(async () => mock.modelSave({ saving: false, error: 'Save failed' }));
-  expect(host.querySelector('[role="alert"]')?.textContent).toBe('Save failed');
+  // The alert leads with a human sentence; the raw reason stays under diagnostics.
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('app.error.saveFailed');
+  expect(host.querySelector('[role="alert"]')?.querySelector('.ui-inline-error-detail-text')?.textContent).toBe('Save failed');
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
 });
 

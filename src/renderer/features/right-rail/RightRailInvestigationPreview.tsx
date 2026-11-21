@@ -5,6 +5,8 @@ import { Details } from '../../ui/Details';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { copyAppText } from '../../hooks/appShellBridge';
 import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
+import { errorDetail } from '../../lib/errorDetail';
 import { RightRailReportView } from './RightRailReportView';
 import { readInvestigationArtifact } from './investigationPreviewActions';
 import type { InvestigationArtifactRow } from '@shared/types/trace';
@@ -55,7 +57,7 @@ export const RightRailInvestigationPreview: React.FC<{
       setResult({
         ok: false,
         status: 'error',
-        error: error instanceof Error ? error.message : String(error),
+        error: errorDetail(error),
       });
       setStatus('error');
     });
@@ -114,7 +116,7 @@ export const RightRailInvestigationPreview: React.FC<{
           </Button>
         </section>
         {result?.error ? (
-          <p className="investigation-preview-error" role="alert">{result.error}</p>
+          <InlineError detail={result.error}>{t('app.error.loadFailed')}</InlineError>
         ) : null}
         {status === 'loading' ? (
           <p className="investigation-preview-message">{statusLabel}</p>

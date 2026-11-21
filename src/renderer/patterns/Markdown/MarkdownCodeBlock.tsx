@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React from 'react';
 import { useClipboardBridge } from '../../hooks/useClipboardBridge';
 import { useI18n } from '../../i18n';
+import { CopyButton } from '../../ui/CopyButton';
 
 interface MarkdownCodeBlockProps {
   language: string;
@@ -15,13 +16,6 @@ export const MarkdownCodeBlock: React.FC<MarkdownCodeBlockProps> = ({
 }) => {
   const { t } = useI18n();
   const { copyText } = useClipboardBridge();
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(async () => {
-    const didCopy = await copyText(code);
-    setCopied(didCopy);
-    if (didCopy) window.setTimeout(() => setCopied(false), 1600);
-  }, [code, copyText]);
 
   const label = language.trim() || t('chat.markdownCodePlain');
 
@@ -29,14 +23,8 @@ export const MarkdownCodeBlock: React.FC<MarkdownCodeBlockProps> = ({
     <div className="markdown-code-block" data-testid="markdown-code-block">
       <div className="markdown-code-block-header">
         <span className="markdown-code-block-lang">{label}</span>
-        <button
-          type="button"
-          className="button button-ghost markdown-code-block-copy"
-          onClick={() => void handleCopy()}
-          aria-label={t('chat.markdownCopyCode')}
-        >
-          {copied ? t('chat.markdownCopied') : t('chat.markdownCopyCode')}
-        </button>
+        <CopyButton className="markdown-code-block-copy" onCopy={() => copyText(code)}
+          label={t('chat.markdownCopyCode')} copiedLabel={t('chat.markdownCopied')} />
       </div>
       <pre className="markdown-code-block-pre">{children}</pre>
     </div>

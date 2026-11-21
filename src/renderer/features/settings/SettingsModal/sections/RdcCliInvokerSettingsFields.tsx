@@ -24,7 +24,7 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
     <p className="settings-help-text">{t('settings.rdcFolderHint')}</p>
     <SettingsField label={t('settings.rdcFolder')} htmlFor="settings-rdc-installation-root">
       <Input id="settings-rdc-installation-root" readOnly value={installation.root || draft.command}
-        title={installation.root || draft.command} placeholder={t('settings.rdcNotSelected')} />
+        data-tooltip={installation.root || draft.command} placeholder={t('settings.rdcNotSelected')} />
     </SettingsField>
     <div className="settings-actions">
       <Button size="sm" disabled={installation.busy} onClick={() => void installation.detect()}>{t('settings.rdcDetect')}</Button>

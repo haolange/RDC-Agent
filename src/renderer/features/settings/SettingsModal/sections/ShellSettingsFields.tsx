@@ -5,6 +5,7 @@ import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { InlineError } from '../../../../ui/InlineError';
 import { SettingsField } from '../parts';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { getResolvedShell } from './shellSettingsActions';
 import type { useI18n } from '../../../../i18n';
 import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
@@ -40,7 +41,7 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
           if (!cancelled) {
             setResolved({
               ok: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: errorDetail(error),
             });
           }
         });

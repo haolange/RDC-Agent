@@ -229,7 +229,6 @@ export const zhChat = {
   'chat.imageMissingReference': '此记录未保留图片预览',
   'chat.imagesShowMore': '查看其余 {count} 张图片',
   'chat.imagesLoadMore': '加载更多',
-  'chat.workProcessCloseImage': '关闭图片预览',
   'chat.workProcessInterpreterStdout': '标准输出',
   'chat.workProcessRiskLow': '操作风险：低',
   'chat.workProcessRiskMedium': '操作风险：中',

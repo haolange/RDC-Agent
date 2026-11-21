@@ -9,5 +9,5 @@
 }
 
 .ui-overflow-fade.is-overflowing {
-  mask-image: linear-gradient(to right, rgb(0 0 0) calc(100% - 1.25rem), transparent);
+  mask-image: linear-gradient(to right, rgb(0 0 0) 70%, transparent);
 }

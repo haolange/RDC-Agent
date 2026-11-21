@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback } from 'react';
 import { useClipboardBridge } from '../../hooks/useClipboardBridge';
 import { useI18n } from '../../i18n';
+import { CopyButton } from '../../ui/CopyButton';
 import { Icon } from '../../ui/Icon';
 import { MessageVariantNavigator } from './MessageVariantNavigator';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -21,29 +22,13 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
 }) => {
   const { t } = useI18n();
   const { copyText } = useClipboardBridge();
-  const [copied, setCopied] = useState(false);
-  const resetTimerRef = useRef<number | null>(null);
-  const copyLabel = t('chat.markdownCopyCode');
-  const copiedLabel = t('chat.markdownCopied');
-  const copyMessageLabel = t('chat.copyMessage');
   const editResendLabel = t('chat.editResend');
 
-  useEffect(() => () => {
-    if (resetTimerRef.current !== null) {
-      window.clearTimeout(resetTimerRef.current);
-    }
-  }, []);
-
   const handleCopy = useCallback(async () => {
-    if (!message.content) return;
+    if (!message.content) return false;
     const didCopy = await copyText(message.content);
     await onCopy?.(message.content);
-    if (!didCopy) return;
-    setCopied(true);
-    if (resetTimerRef.current !== null) {
-      window.clearTimeout(resetTimerRef.current);
-    }
-    resetTimerRef.current = window.setTimeout(() => setCopied(false), 1200);
+    return didCopy;
   }, [copyText, message.content, onCopy]);
 
   const handleEditResend = useCallback(() => {
@@ -54,21 +39,12 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
 
   return (
     <div className="message-actions" data-testid="message-actions">
-      <button
-        type="button"
-        className="message-action-btn"
-        data-copied={copied ? 'true' : 'false'}
-        title={copied ? copiedLabel : copyLabel}
-        aria-label={copied ? copiedLabel : copyMessageLabel}
-        onClick={handleCopy}
-      >
-        <Icon name="copy" size={14} />
-      </button>
+      <CopyButton className="message-action-btn" onCopy={handleCopy} label={t('chat.copyMessage')} copiedLabel={t('chat.markdownCopied')} />
       {message.role === 'user' && onEditResend && (
         <button
           type="button"
           className="message-action-btn"
-          title={editResendLabel}
+          data-tooltip={editResendLabel}
           aria-label={editResendLabel}
           onClick={handleEditResend}
         >
