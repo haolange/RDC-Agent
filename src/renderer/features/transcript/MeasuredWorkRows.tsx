@@ -53,15 +53,28 @@ export const MeasuredWorkRows: React.FC<{
     setRange((current) => current.start === start && current.end === end ? current : { start, end });
   }, [rows.length]);
 
-  React.useEffect(() => {
+  // The scroller changes when the Working window switches between following and showing everything, without the
+  // row count changing; after every render the listeners move to whichever element actually scrolls.
+  const updateRangeRef = React.useRef(updateRange);
+  updateRangeRef.current = updateRange;
+  const binding = React.useRef<{ scroller: HTMLElement; release: () => void } | null>(null);
+  React.useLayoutEffect(() => {
     const scroller = listRef.current ? nearestScroller(listRef.current) : null;
+    if (binding.current?.scroller === scroller) return;
+    binding.current?.release();
+    binding.current = null;
     if (!scroller) return;
-    scroller.addEventListener('scroll', updateRange, { passive: true });
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateRange);
+    const onChange = () => updateRangeRef.current();
+    scroller.addEventListener('scroll', onChange, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onChange);
     observer?.observe(scroller);
-    updateRange();
-    return () => { scroller.removeEventListener('scroll', updateRange); observer?.disconnect(); };
-  }, [updateRange]);
+    binding.current = { scroller, release: () => { scroller.removeEventListener('scroll', onChange); observer?.disconnect(); } };
+    onChange();
+  });
+  React.useEffect(() => () => {
+    binding.current?.release();
+    binding.current = null;
+  }, []);
   React.useEffect(updateRange, [rows.length, revision, updateRange]);
 
   React.useEffect(() => {

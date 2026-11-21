@@ -89,6 +89,16 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
   return { ...base, id, body: content };
 };
 
+/** The descriptor the form was opened from, as an object; a new or unreadable one starts empty. */
+const parseDescriptor = (body: string): Record<string, unknown> => {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+};
+
 export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormState): string => {
   if (kind === 'skill' || kind === 'policy' || kind === 'agent') return form.body;
   if (kind === 'mcp') {
@@ -96,7 +106,10 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
     if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
       throw new Error('Arguments must be a JSON array of strings.');
     }
+    // The form edits a few fields of the descriptor; everything else it carries (env, description, …) stays as written.
+    const { url: _url, ...original } = parseDescriptor(form.body);
     return JSON.stringify({
+      ...original,
       id: form.id,
       name: form.name || form.id,
       transport: form.transport || 'stdio',
