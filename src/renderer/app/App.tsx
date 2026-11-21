@@ -6,6 +6,7 @@ import { SettingsModal } from '../features/settings/SettingsModal';
 import { KnowledgeCenterModal } from '../features/knowledge/KnowledgeCenterModal';
 import { useComposer } from '../features/composer/useComposer';
 import { AppShell } from '../shell/AppShell';
+import { WindowControls } from '../shell/TitleBar/WindowControls';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -144,9 +145,17 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="loading-screen">
+      <div className="loading-screen" role="status" aria-label={t('app.loadingShell')}>
+        <div className="loading-titlebar">
+          <WindowControls
+            maximized={windowMaximized}
+            labels={{ group: t('app.windowControls'), minimize: t('app.windowMinimize'), maximize: t('app.windowMaximize'), restore: t('app.windowRestore'), close: t('app.windowClose') }}
+            onMinimize={handleWindowMinimize}
+            onToggleMaximize={handleWindowToggleMaximize}
+            onClose={handleWindowClose}
+          />
+        </div>
         <ProductLogo className="loading-logo" accent={resolveActiveChrome(settings.appearance, resolvedTheme).accent} />
-        <div className="loading-text">{t('app.loadingShell')}</div>
         <div className="loading-bar" />
       </div>
     );

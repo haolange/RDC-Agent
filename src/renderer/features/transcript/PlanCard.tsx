@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useI18n } from '../../i18n';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { ProximityGlow } from '../../ui/ProximityHost';
 import { planPreview } from './planPreview';
 import { usePlanPreviewOverflow } from './usePlanPreviewOverflow';
 import type { ConversationPlanReview } from '@shared/types/planReview';
@@ -34,6 +35,7 @@ export const PlanCard: React.FC<{
         data-plan-id={plan.planId}
         aria-label={`${t('chat.planReviewReadFull')} · ${plan.title}`}
         data-testid="plan-card"
+        data-proximity
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
           event.preventDefault();
@@ -45,6 +47,7 @@ export const PlanCard: React.FC<{
           showPlan();
         }}
       >
+        <ProximityGlow />
         <div className="plan-card__head">
           <span className="plan-card__kind">
             {t('chat.planReviewCardKind')}

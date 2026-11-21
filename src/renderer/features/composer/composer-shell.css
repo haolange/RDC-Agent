@@ -32,3 +32,12 @@
 .composer-shell.is-disabled {
   opacity: 0.94;
 }
+
+.composer-shell[data-proximity] {
+  --proximity-tint: var(--composer-mode-accent);
+}
+
+/* The running orbit already lights the frame; the proximity glow stays off so the two never stack. */
+.composer-shell.is-running > .ui-proximity-glow {
+  display: none;
+}

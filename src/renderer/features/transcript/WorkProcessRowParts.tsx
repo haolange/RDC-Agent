@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
+import { ProximityGlow } from '../../ui/ProximityHost';
 import { WorkCardHeader } from './WorkCardHeader';
 import { getRowStatusLabel } from './workProcessStatus';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
@@ -76,7 +77,9 @@ export const ToolRow: React.FC<{ row: ToolRowModel; extraDetail?: React.ReactNod
           className={`work-process-tool-card status-${row.status}${expanded ? ' is-expanded' : ''}${canExpand ? ' is-expandable' : ''}${compact ? ' is-compact' : ''}${isBackgroundWait ? ' is-background-wait' : ''}${hasPayloadSurface ? ' has-payload' : ''}`}
           data-testid="work-process-tool-card"
           data-family={row.family}
+          data-proximity
         >
+          <ProximityGlow />
           <WorkCardHeader onClick={toggleExpanded} expanded={canExpand ? expanded : undefined}
             disabled={!canExpand} tooltip={durationTitleFull} duration={row.duration}
             icon={<Icon name={row.icon} className="work-process-icon work-process-tool-card-icon" />}

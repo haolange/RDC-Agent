@@ -40,6 +40,7 @@ import {
   resolveWindowCreationOptions,
 } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
+import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
 import { isTrustedRendererUrl, trustRendererEntry } from './window/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
@@ -387,20 +388,23 @@ function createMainWindow(): void {
     frame: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    backgroundColor: '#08080c',
+    backgroundColor: windowBackgroundColor(settingsService.getAll().appearance),
   });
   bindProductIcon(mainWindow);
 
-  // Load the renderer.
+  // Load the renderer. The boot theme rides along so the first paint already uses the chosen light or dark palette.
+  const bootTheme = resolvedAppearanceMode(settingsService.getAll().appearance);
   if (isDev) {
     const rendererUrl = getDevRendererUrl();
     trustRendererEntry(rendererUrl);
-    mainWindow.loadURL(rendererUrl);
+    const entry = new URL(rendererUrl);
+    entry.searchParams.set('theme', bootTheme);
+    mainWindow.loadURL(entry.href);
   } else {
     // Production mode loads the bundled renderer.
     const rendererEntry = path.join(__dirname, '../renderer/index.html');
     trustRendererEntry(pathToFileURL(rendererEntry).href);
-    mainWindow.loadFile(rendererEntry);
+    mainWindow.loadFile(rendererEntry, { query: { theme: bootTheme } });
   }
 
   // Show after the window is ready.

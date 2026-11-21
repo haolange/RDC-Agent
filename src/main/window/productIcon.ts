@@ -1,20 +1,13 @@
 import path from 'path';
-import { app, nativeImage, nativeTheme, type BrowserWindow, type NativeImage } from 'electron';
+import { app, nativeImage, type BrowserWindow, type NativeImage } from 'electron';
 import { maskLogoCircleRgba, recolorLogoRgba } from '@shared/theme/recolorLogo';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import type { UiPreferences } from '@shared/types/settings';
+import { activeChromeAccent } from './appearanceChrome';
 
 let target: BrowserWindow | null = null;
 let source: NativeImage | undefined;
 let cached: { accent: string; image: NativeImage } | undefined;
-
-export function activeChromeAccent(appearance: UiPreferences): string {
-  const mode = appearance.theme === 'system'
-    ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
-    : appearance.theme;
-  return appearance.chromeThemes[mode].accent;
-}
 
 export function bindProductIcon(window: BrowserWindow): void {
   target = window;

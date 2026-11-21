@@ -173,6 +173,8 @@ function preservedAssets() {
     ['Composer energy orbit keyframes', /@keyframes\s+composerEnergyOrbit\b/.test(css)],
     ['Max particle field', fs.existsSync(path.join(rendererRoot, 'features/composer/EffortMaxField.tsx'))],
     ['Subagent progress dots animation', /\.work-process-subagent-dots[^{]*\{[^}]*animation/.test(css) || /work-process-subagent-dots[\s\S]{0,400}animation/.test(css)],
+    ['Proximity highlight on tool, subagent and plan cards and the Composer', ['WorkProcessRowParts.tsx', 'SubagentRow.tsx', 'PlanCard.tsx', 'Composer.tsx']
+      .every((name) => files.some((file) => file.endsWith(`/${name}`) && read(file).includes('data-proximity') && read(file).includes('<ProximityGlow')))],
     ['Thinking duration label', [...parseLocale('zh-CN').values()].some((value) => value.startsWith('已思考 · '))],
   ];
   return checks.filter(([, present]) => !present).map(([name]) => name);

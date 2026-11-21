@@ -3,6 +3,7 @@ import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { agentDescription } from '../../lib/agentDescription';
 import { InlineError } from '../../ui/InlineError';
 import { Button } from '../../ui/Button';
+import { ProximityGlow } from '../../ui/ProximityHost';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -138,7 +139,9 @@ export const Composer: React.FC<ComposerProps> = ({
       onDragLeave={attachmentDrop.handleDragLeave}
       onDrop={attachmentDrop.handleDrop}
       onPaste={attachmentDrop.handlePaste}
+      data-proximity
     >
+      <ProximityGlow />
       <ApprovedPlanHandoff sessionId={currentSession?.sessionId} disabled={isComposerBusy} />
       <ComposerAttachIngest
         fileInputRef={fileInputRef}

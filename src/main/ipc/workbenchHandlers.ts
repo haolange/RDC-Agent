@@ -12,6 +12,7 @@ import { projectSessionForClient } from '../sessions/store/projectSessionHandoff
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { applyProductIcon } from '../window/productIcon';
+import { applyWindowBackgrounds } from '../window/appearanceChrome';
 import { sessionResumeService } from '../sessions/store/SessionResumeService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import { registerMemoryHandlers } from './memoryHandlers';
@@ -252,6 +253,7 @@ function registerNativeThemeBridge(): void {
   nativeTheme.on('updated', () => {
     broadcastToRenderer('app:themeChanged', nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
     applyProductIcon();
+    applyWindowBackgrounds();
   });
   nativeThemeSubscribed = true;
 }

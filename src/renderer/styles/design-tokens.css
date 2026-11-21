@@ -127,6 +127,12 @@
   --font-normal: 400;
   --font-semibold: 600;
 
+  /* Proximity highlight: glow radius and the tint strength of the fill and the lit rim (dark values). */
+  --proximity-radius: 190px;
+  --proximity-fill: 20%;
+  --proximity-rim: 70%;
+  --proximity-rim-width: 1px;
+
   /* Focus ring: one outside offset for free-standing controls, one inside offset for rows clipped by a scroller. */
   --focus-ring-offset: 2px;
   --focus-ring-offset-inset: -2px;
@@ -297,6 +303,8 @@
   --shadow-panel-hover: 0 4px 10px rgb(20 30 44 / 0.10), 0 18px 36px rgb(20 30 44 / 0.14);
   --highlight-edge: inset 0 1px 0 rgb(255 255 255 / 0.85);
   --highlight-faint: inset 0 1px 0 rgb(255 255 255 / 0.6);
+  --proximity-fill: 10%;
+  --proximity-rim: 45%;
   --shadow-drawer: 0 -18px 34px rgb(20 30 44 / 0.08);
   --shadow-well: inset 0 1px 3px rgb(20 30 44 / 0.06);
   --hairline-swatch: inset 0 0 0 1px rgb(20 30 44 / 0.14);

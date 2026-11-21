@@ -229,6 +229,7 @@ export const zhKnowledgeCenter = {
   'knowledgeCenter.imageBefore': '修复前',
   'knowledgeCenter.imageAfter': '修复后',
   'knowledgeCenter.imageMissing': '对照图未入库',
+  'knowledgeCenter.imageOpen': '放大查看{name}',
   'knowledgeCenter.imageRole.observed': '修复前',
   'knowledgeCenter.imageRole.reference': '修复后',
   'knowledgeCenter.imageRole.illustration': '附图',

@@ -229,6 +229,7 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.imageBefore': 'Before fix',
   'knowledgeCenter.imageAfter': 'After fix',
   'knowledgeCenter.imageMissing': 'Comparison image not in the library',
+  'knowledgeCenter.imageOpen': 'View {name} larger',
   'knowledgeCenter.imageRole.observed': 'Before fix',
   'knowledgeCenter.imageRole.reference': 'After fix',
   'knowledgeCenter.imageRole.illustration': 'Illustration',

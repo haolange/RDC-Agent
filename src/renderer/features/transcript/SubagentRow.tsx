@@ -5,6 +5,7 @@ import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
+import { ProximityGlow } from '../../ui/ProximityHost';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 import { getToolVerb } from './workProcessToolRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
@@ -108,7 +109,8 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
   const progressDots = <SubagentProgressDots state={active ? 'active' : status === 'complete' ? 'complete' : 'stopped'} />;
   return <li ref={cardRef} className="work-process-step kind-subagent" data-work-process-block-id={row.id}>
     <WorkProcessRailIcon row={row} active={status === 'running'} />
-    <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent">
+    <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent" data-proximity>
+    <ProximityGlow />
     <WorkCardHeader onClick={() => openCard(active)} expanded={expanded} controls={contentId}
       icon={<ModeGlyph mode={mode} icon={definition?.icon ?? undefined} className="work-process-tool-card-icon" />}
       title={`${t('chat.subagentIdentity')} · ${agentLabel}${header?.preparedRoute ? ` · ${header.preparedRoute.providerId}/${header.preparedRoute.modelId} · ${header.preparedRoute.reasoningLevel}` : ''}`} duration={headerLoading ? undefined : duration}

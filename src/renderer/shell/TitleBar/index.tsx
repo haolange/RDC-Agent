@@ -1,5 +1,6 @@
 import { ProductLogo } from '../../ui/ProductLogo';
 import { Icon } from '../../ui/Icon';
+import { WindowControls } from './WindowControls';
 import type { ReactNode } from 'react';
 import './TitleBar.css';
 
@@ -89,35 +90,13 @@ export function TitleBar({
             <Icon name="sidebar-right" size={18} className="shell-panel-toggle-icon" />
           </button>
         )}
-        <div className="window-controls" role="group" aria-label={windowControlsLabel}>
-          <button
-            type="button"
-            className="window-control window-control-minimize"
-            data-tooltip={windowMinimizeLabel}
-            aria-label={windowMinimizeLabel}
-            onClick={onMinimize}
-          >
-            <Icon name="window-minimize" />
-          </button>
-          <button
-            type="button"
-            className="window-control window-control-maximize"
-            data-tooltip={windowMaximized ? windowRestoreLabel : windowMaximizeLabel}
-            aria-label={windowMaximized ? windowRestoreLabel : windowMaximizeLabel}
-            onClick={onToggleMaximize}
-          >
-            <Icon name={windowMaximized ? 'window-restore' : 'window-maximize'} />
-          </button>
-          <button
-            type="button"
-            className="window-control close"
-            data-tooltip={windowCloseLabel}
-            aria-label={windowCloseLabel}
-            onClick={onClose}
-          >
-            <Icon name="close" />
-          </button>
-        </div>
+        <WindowControls
+          maximized={windowMaximized}
+          labels={{ group: windowControlsLabel, minimize: windowMinimizeLabel, maximize: windowMaximizeLabel, restore: windowRestoreLabel, close: windowCloseLabel }}
+          onMinimize={onMinimize}
+          onToggleMaximize={onToggleMaximize}
+          onClose={onClose}
+        />
       </div>
     </header>
   );
