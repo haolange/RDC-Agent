@@ -3,6 +3,7 @@ import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { Details } from '../../../../ui/Details';
 import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
 import { errorDetail } from '../../../../lib/errorDetail';
+import { Skeleton } from '../../../../ui/Skeleton';
 import { testModelCapability } from './providerCatalogActions';
 import { ProviderModelProbe } from './ProviderModelProbe';
 import { ProviderModelPreferences } from './ProviderModelPreferences';
@@ -86,7 +87,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   return (
     <div className="settings-model-capability-panel" data-testid={`settings-provider-model-capability-panel-${model.id}`}>
       {loading ? (
-        <div className="settings-model-capability-note">{t('settings.providers.capability.loading')}</div>
+        <div role="status" aria-label={t('settings.providers.capability.loading')}><Skeleton shape="line" count={2} /></div>
       ) : loadFailed ? (
         <div className="settings-model-capability-note settings-model-capability-note--error">{t('settings.providers.capability.loadFailed')}</div>
       ) : effectiveModel ? (

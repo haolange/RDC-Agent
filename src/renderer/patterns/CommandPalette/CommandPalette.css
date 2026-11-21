@@ -1,0 +1,132 @@
+/* Ctrl/Cmd+K: a centered panel over a soft backdrop; same rows and captions as the slash menu and model picker. */
+.command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: min(18vh, 10rem) var(--space-4) var(--space-4);
+  background: var(--modal-backdrop);
+  backdrop-filter: var(--modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--modal-backdrop-filter);
+  animation: overlay-fade-in var(--motion-overlay);
+}
+
+.command-palette-overlay[data-state='closing'] {
+  animation: overlay-fade-out var(--motion-overlay) forwards;
+}
+
+.command-palette {
+  display: flex;
+  flex-direction: column;
+  width: min(36rem, 100%);
+  max-height: min(28rem, 70vh);
+  overflow: hidden;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-xl);
+  background: var(--token-bg-overlay);
+  box-shadow: var(--token-elevation-3);
+  animation: surface-rise-in var(--motion-overlay);
+}
+
+[data-state='closing'] > .command-palette {
+  animation: surface-rise-out var(--motion-overlay) forwards;
+}
+
+.command-palette-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  min-height: var(--space-12);
+  border-bottom: 1px solid var(--token-border-muted);
+  color: var(--token-text-secondary);
+}
+
+.command-palette-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--token-text-primary);
+  font: inherit;
+  font-size: var(--type-reading-size);
+}
+
+.command-palette-input::placeholder {
+  color: var(--token-text-secondary);
+}
+
+.command-palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.command-palette-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.command-palette-group-label {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
+}
+
+.command-palette-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height-lg);
+  padding: 0 var(--space-3);
+  border-radius: var(--control-radius);
+  color: var(--token-text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.command-palette-item.is-selected {
+  background: var(--token-interactive-hover);
+}
+
+.command-palette-item-icon {
+  color: var(--token-text-secondary);
+}
+
+.command-palette-item.is-selected .command-palette-item-icon {
+  color: var(--token-accent-primary);
+}
+
+.command-palette-item-name {
+  font-family: var(--font-mono);
+  font-size: var(--type-body-size);
+}
+
+.command-palette-item-desc {
+  overflow: hidden;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, rgb(0 0 0) 70%, transparent);
+}
+
+.command-palette-state,
+.command-palette-empty {
+  padding: var(--space-3);
+}
+
+.command-palette-empty {
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  text-align: center;
+}

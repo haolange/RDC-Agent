@@ -25,7 +25,7 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({ filter
     command.name.startsWith(query) || command.aliases.some((alias) => alias.startsWith(query))), [commands, query]);
   const groups = useMemo(() => {
     const byCategory = new Map<string, typeof filtered>();
-    for (const command of filtered) byCategory.set(command.category, [...(byCategory.get(command.category) ?? []), command]);
+    for (const command of filtered) byCategory.set(command.categoryLabel, [...(byCategory.get(command.categoryLabel) ?? []), command]);
     return [...byCategory.entries()];
   }, [filtered]);
   const ordered = useMemo(() => groups.flatMap(([, entries]) => entries), [groups]);

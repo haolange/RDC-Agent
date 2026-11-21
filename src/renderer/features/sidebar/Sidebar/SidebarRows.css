@@ -263,3 +263,21 @@
   font-size: var(--type-body-size);
   line-height: 1.45;
 }
+
+/* A reply in flight: one small accent dot that breathes; still under reduced motion. */
+.session-item-running {
+  width: calc(var(--space-1) * 1.5);
+  height: calc(var(--space-1) * 1.5);
+  border-radius: var(--radius-full);
+  background: var(--token-accent-primary);
+  animation: session-running-breathe 1.6s var(--ease-standard) infinite;
+}
+
+@keyframes session-running-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-item-running { animation: none; }
+}

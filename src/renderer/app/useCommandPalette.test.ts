@@ -17,7 +17,8 @@ describe('command palette controller lifecycle', () => {
       act(() => root.render(createElement(StrictMode, null, createElement(Controller))));
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })));
       expect(useCommandPaletteStore.getState().open).toBe(true);
-      act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+      // One listener: a second Ctrl+K closes it again (Escape belongs to the palette's overlay layer).
+      act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })));
       expect(useCommandPaletteStore.getState().open).toBe(false);
       act(() => root.unmount());
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));

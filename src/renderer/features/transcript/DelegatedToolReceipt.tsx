@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
+import { Skeleton } from '../../ui/Skeleton';
 import { WorkDisclosure } from './WorkDisclosure';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { useDelegationContent } from './useDelegationContent';
@@ -19,7 +20,7 @@ export const DelegatedToolReceipt: React.FC<{
   return <WorkDisclosure variant="inline" title={t('chat.subagentToolReceipt')} open={open} onToggle={toggle}>
     <div className="work-process-subagent-record-body">
       {content.text ? <pre>{content.text}</pre> : null}
-      {content.loading ? <span>{t('chat.subagentLoading')}</span> : null}
+      {content.loading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" count={2} inline /></span> : null}
       {content.error ? <button type="button" className="work-process-subagent-more" onClick={content.retry}>{t('chat.subagentRetry')}</button> : null}
       {content.hasMore ? <button type="button" className="work-process-subagent-more" onClick={() => void content.loadMore()}>{t('chat.subagentShowMore')}</button> : null}
     </div>

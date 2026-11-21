@@ -180,7 +180,7 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.viewRelatedCard': 'Open card',
   'knowledgeCenter.metaSpace': 'Space',
   'knowledgeCenter.metaRelativePath': 'Relative path',
-  'knowledgeCenter.metaSourceHash': 'sourceHash',
+  'knowledgeCenter.metaSourceHash': 'Source fingerprint',
   'knowledgeCenter.metaSourceMtime': 'Source modified',
   'knowledgeCenter.metaSourceSize': 'Source size',
   'knowledgeCenter.metaProvenanceNone': 'This card has no import provenance.',

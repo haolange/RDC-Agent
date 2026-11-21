@@ -46,6 +46,7 @@ const projectMessages = (
 
 export const useConversationStore = create<ConversationState>((set, get) => ({
   ...initialConversationState,
+  setHistoryLoadingSessionId: (historyLoadingSessionId) => set({ historyLoadingSessionId }),
 
   setConversationMessages: (messages) => set((state) => {
     const allConversationMessages = sortConversationMessages(messages);

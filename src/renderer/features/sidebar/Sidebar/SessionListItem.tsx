@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
+import { useSessionRunning } from '../../../hooks/useSessionRunning';
 import { Icon } from '../../../ui/Icon';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
@@ -27,6 +28,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
   onRemoveKeyDown,
 }) => {
   const { t } = useI18n();
+  const running = useSessionRunning(session.sessionId);
 
   if (session.storageDiagnostic === 'unsupported-schema') {
     return (
@@ -51,8 +53,9 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
           className="session-item-select"
           onClick={() => void onActivate(project, session)}
         >
-          <span className="session-item-gutter" aria-hidden="true">
-            
+          {/* Rows carry no icon of their own; the gutter only marks a session with a reply in flight. */}
+          <span className="session-item-gutter">
+            {running ? <span className="session-item-running" role="img" aria-label={t('sidebar.sessionRunning')} data-tooltip={t('sidebar.sessionRunning')} /> : null}
           </span>
           <span className="session-item-title">{session.title}</span>
         </button>

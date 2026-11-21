@@ -8,3 +8,10 @@ it('spaces a Chinese template where an interpolated value meets Han text across 
   expect(translate('zh-CN', 'settings.mcpStatusToolCount', { count: 3 })).toBe('3 个工具');
   expect(translate('en', 'settings.scopeEditTitle', { kind: 'hook' })).toBe('Edit hook');
 });
+
+it('pseudo-localizes English templates longer and accented while keeping placeholders', async () => {
+  const { pseudoLocalize } = await import('./pseudoLocale');
+  const text = pseudoLocalize('Edit {kind}');
+  expect(text).toMatch(/^\[Édít \{kind\}~+\]$/u);
+  expect(text.length).toBeGreaterThanOrEqual(Math.ceil('Edit {kind}'.length * 1.4));
+});

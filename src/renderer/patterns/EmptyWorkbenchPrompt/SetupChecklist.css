@@ -92,3 +92,23 @@
 .setup-checklist-copy > .button {
   margin-top: var(--space-2);
 }
+
+/* Finished steps fold into one checked line: 「✓ RDC 工具已就绪 · 模型服务已连接」. */
+.setup-checklist-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+
+.setup-checklist-done > .ui-icon {
+  color: var(--token-status-success);
+}
+
+.setup-checklist-done-item + .setup-checklist-done-item::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+}

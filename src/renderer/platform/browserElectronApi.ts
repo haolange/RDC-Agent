@@ -1,1 +1,1 @@
-export { installBrowserAppBridge } from './browserAppBridge/BrowserAppBridge';
+export { browserAppBridgeInstalled, installBrowserAppBridge } from './browserAppBridge/BrowserAppBridge';

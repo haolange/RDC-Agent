@@ -1,6 +1,7 @@
 import React, { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
 import { agentDescription } from '../../../../lib/agentDescription';
 import { Button } from '../../../../ui/Button';
+import { InlineError } from '../../../../ui/InlineError';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { SplitButton } from '../../../../ui/SplitButton';
 import { EmptyState } from '../../../../ui/EmptyState';
@@ -177,7 +178,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         onMigrate={(issue) => models.openOverrideAction('migrate', issue)}
         onDeleteOverride={(issue) => models.openOverrideAction('delete', issue)}
         onReviewTrust={models.openTrustReview} t={t} />
-      {missingAgentId ? <p role="alert">{t('settings.agentNavigationNotFound', { id: missingAgentId })}</p> : null}
+      {missingAgentId ? <InlineError>{t('settings.agentNavigationNotFound', { id: missingAgentId })}</InlineError> : null}
       <div className="settings-manifest-layout">
         <div className="settings-manifest-list-column">
           <div className="settings-manifest-list-toolbar">

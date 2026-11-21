@@ -3,6 +3,7 @@ import { Button } from '../../../../ui/Button';
 import { Chevron } from '../../../../ui/Chevron';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
+import { Skeleton } from '../../../../ui/Skeleton';
 import { KnowledgeStatusTag } from './KnowledgeStatusTag';
 import type { KnowledgeCardDetail, KnowledgePackConflict } from '@shared/types/knowledge';
 
@@ -40,7 +41,7 @@ function ConflictCardPane({
         ) : null}
       </header>
       {loading && !card ? (
-        <p className="knowledge-center-status">{t('knowledgeCenter.loading')}</p>
+        <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={4} /></div>
       ) : card ? (
         <dl className="knowledge-conflict-pane-grid">
           <div>

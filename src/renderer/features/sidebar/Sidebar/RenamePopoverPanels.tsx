@@ -138,7 +138,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             data-tooltip={t('sidebar.menuExplorer')}
           >
             <Icon name="folder" size={14} />
-            <span>{t('sidebar.openInExplorer') || 'Explorer'}</span>
+            <span>{t('sidebar.openInExplorer')}</span>
           </button>
           <button
             type="button"
@@ -147,7 +147,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             data-tooltip={t('sidebar.menuRename')}
           >
             <Icon name="edit" size={14} />
-            <span>{t('sidebar.renameProject') || 'Rename'}</span>
+            <span>{t('sidebar.renameProject')}</span>
           </button>
           <button
             type="button"
@@ -157,7 +157,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             disabled={isBusy}
           >
             <Icon name="plus" size={14} />
-            <span>{t('sidebar.addSession') || 'New Session'}</span>
+            <span>{t('sidebar.addSession')}</span>
           </button>
           <div className="sidebar-context-menu-divider" role="separator" />
           <button
@@ -168,7 +168,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             disabled={isBusy}
           >
             <Icon name="trash" size={14} />
-            <span>{t('sidebar.removeProject') || 'Delete'}</span>
+            <span>{t('sidebar.removeProject')}</span>
           </button>
         </PositionedSurface>
       )}
@@ -180,7 +180,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
           x={projectRenamePopover.x}
           y={projectRenamePopover.y}
         >
-          <div className="session-rename-popover-title">{t('sidebar.renameProjectTitle') || 'Rename Project'}</div>
+          <div className="session-rename-popover-title">{t('sidebar.renameProjectTitle')}</div>
           <input
             ref={projectRenameInputRef}
             type="text"
@@ -208,7 +208,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               onClick={onCloseProjectRename}
               disabled={isBusy}
             >
-              {t('sidebar.cancel') || 'Cancel'}
+              {t('sidebar.cancel')}
             </Button>
             <Button
               variant="primary"
@@ -217,7 +217,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               onClick={() => void onCommitProjectRename()}
               disabled={isBusy}
             >
-              {t('sidebar.save') || 'Save'}
+              {t('sidebar.save')}
             </Button>
           </div>
         </PositionedSurface>

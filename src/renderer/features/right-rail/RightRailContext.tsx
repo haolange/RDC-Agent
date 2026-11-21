@@ -3,6 +3,7 @@ import { TaskDialog } from '../../ui/TaskDialog';
 import { openAppPath } from '../../hooks/appShellBridge';
 import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Chevron } from '../../ui/Chevron';
 import type { TaskContextPanelViewModel, TaskContextResource } from '@shared/types/trace';
@@ -58,7 +59,7 @@ function ScopedContext({ task }: { task: TaskContextPanelViewModel }) {
     <TaskDialog open={Boolean(detail)} title={detail?.label ?? ''} closeLabel={t('control.rightRail.browse.close')} onClose={() => setDetail(null)}>
       {detail && <div className="right-rail-resource-detail"><code>{detail.id}</code><p>{detail.summary}</p>
         {detail.path && <code>{detail.path}</code>}{detail.url && <code>{detail.url}</code>}
-        {error && <p role="alert">{t('control.rightRail.browse.error')}</p>}</div>}
+        {error && <InlineError>{t('control.rightRail.browse.error')}</InlineError>}</div>}
     </TaskDialog>
   </div>;
 }

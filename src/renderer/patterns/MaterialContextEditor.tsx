@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MaterialContextSchema, type MaterialContext } from '@shared/types/materialContext';
 import { Details } from '../ui/Details';
-import { Button, Input, Textarea, Select } from '../ui';
+import { Button, Input, InlineError, Textarea, Select } from '../ui';
 import { TaskDialog } from '../ui/TaskDialog';
 import { useI18n } from '../i18n';
 import './MaterialContextEditor.css';
@@ -84,6 +84,6 @@ export const MaterialContextEditor: React.FC<{
           <label>{t('material.comparisonConditions')}<Textarea value={draft.comparison.conditions} maxLength={2000} onChange={event => setDraft(current => ({ ...current, comparison: { ...current.comparison!, conditions: event.target.value } }))} /></label>
         </>}
       </Details>
-      {error && <p role="alert">{error}</p>}
+      {error && <InlineError>{error}</InlineError>}
   </TaskDialog>;
 };

@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
+import { Button } from '../../../ui/Button';
 import { EmptyState } from '../../../ui/EmptyState';
+import { Skeleton } from '../../../ui/Skeleton';
 import {
   formatRaw,
   formatTimestamp,
@@ -13,7 +15,25 @@ import {
   TERMINAL_WINDOW_THRESHOLD,
   terminalActivityWindow,
 } from './terminalActivityWindow';
-import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
+import type { TranslationKey } from '../../../i18n';
+import type { RuntimeLogEntry, RuntimeLogNamespace, RuntimeLogSeverity } from '@shared/types/runtimeLog';
+
+const SEVERITY_LABEL_KEYS: Record<RuntimeLogSeverity, TranslationKey> = {
+  info: 'terminal.severityInfo',
+  success: 'terminal.severitySuccess',
+  warning: 'terminal.severityWarning',
+  error: 'terminal.severityError',
+};
+
+const NAMESPACE_LABEL_KEYS: Record<RuntimeLogNamespace, TranslationKey> = {
+  system: 'terminal.namespaceSystem',
+  agent: 'terminal.namespaceAgent',
+  tool: 'terminal.namespaceTool',
+  device: 'terminal.namespaceDevice',
+  capture: 'terminal.namespaceCapture',
+  context: 'terminal.namespaceContext',
+  llm: 'terminal.namespaceLlm',
+};
 import type { TerminalDrawerViewModel } from './useTerminalDrawer';
 
 interface TerminalActivityPaneProps {
@@ -89,7 +109,7 @@ export const TerminalActivityPane: React.FC<TerminalActivityPaneProps> = ({ vm }
     >
       <div ref={activityBodyRef} className="runtime-terminal-activity-body scrollbar-thin">
         {isLoading ? (
-          <div role="status"><EmptyState title={t('terminal.loading')} /></div>
+          <div role="status" aria-label={t('terminal.loading')}><Skeleton shape="row" count={6} /></div>
         ) : filteredEntries.length === 0 ? (
           <EmptyState variant="page" title={emptyCopy} />
         ) : (
@@ -131,7 +151,7 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
   const { t } = useI18n();
   return (
   <article
-    className={`runtime-terminal-entry namespace-${entry.namespace} severity-${entry.severity} ${isExpanded ? 'expanded' : ''}`}
+    className={`runtime-terminal-entry severity-${entry.severity} ${isExpanded ? 'expanded' : ''}`}
     data-testid={`runtime-log-entry-${entry.id}`}
   >
     <button
@@ -140,9 +160,9 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
       onClick={onToggle}
       aria-expanded={isExpanded}
     >
+      <span className={`runtime-terminal-severity-dot severity-${entry.severity}`} role="img"
+        aria-label={t(SEVERITY_LABEL_KEYS[entry.severity])} data-tooltip={t(SEVERITY_LABEL_KEYS[entry.severity])} />
       <span className="runtime-terminal-entry-time">{formatTimestamp(entry.timestamp)}</span>
-      <span className={`runtime-terminal-severity severity-${entry.severity}`}>{entry.severity}</span>
-      <span className={`runtime-terminal-entry-namespace namespace-${entry.namespace}`}>{entry.namespace}</span>
       <span className="runtime-terminal-entry-title">{entry.title}</span>
       <span className="runtime-terminal-entry-summary">{entry.summary}</span>
     </button>
@@ -153,6 +173,7 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
           <div className="runtime-terminal-entry-detail">{entry.detail}</div>
         )}
         <div className="runtime-terminal-entry-meta">
+          <span>{t('terminal.namespace')} {t(NAMESPACE_LABEL_KEYS[entry.namespace])}</span>
           <span>{t('terminal.metaSession')} {formatShortId(entry.sessionId)}</span>
           <span>{t('terminal.metaRun')} {formatShortId(entry.runId)}</span>
           <span>{t('terminal.metaProject')} {formatShortId(entry.projectId)}</span>
@@ -161,9 +182,7 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
           <pre className="runtime-terminal-entry-raw">{formatRaw(entry.raw)}</pre>
         )}
         <div className="runtime-terminal-entry-actions">
-          <button type="button" onClick={onCopy}>
-            {copyLabel}
-          </button>
+          <Button variant="ghost" size="sm" onClick={onCopy}>{copyLabel}</Button>
         </div>
       </div>
     )}

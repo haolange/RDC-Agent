@@ -13,6 +13,7 @@ import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
 import { errorDetail } from '../../lib/errorDetail';
+import { Skeleton } from '../../ui/Skeleton';
 import { usePlanReviewActions } from './usePlanReviewActions';
 import { planAppendixMarkdown } from './planPreview';
 import type { ConversationPlanReview } from '@shared/types/planReview';
@@ -105,7 +106,7 @@ export const PlanReviewPanel: React.FC<{
       </> : undefined}
     >
       <div className="plan-review-panel__body" aria-busy={loading}>
-        {loading ? <p role="status">{t('chat.planReviewLoading')}</p> : markdown ? <>
+        {loading ? <div role="status" aria-label={t('chat.planReviewLoading')}><Skeleton shape="line" count={5} /></div> : markdown ? <>
           <MessageMarkdown content={parts.body} />
           {parts.appendix ? <Details variant="panel" className="plan-review-panel__appendix" data-testid="plan-review-appendix"
             summary={t('chat.planReviewExecutionReferences')}>

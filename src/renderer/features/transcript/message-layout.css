@@ -163,6 +163,12 @@
   justify-content: stretch;
 }
 
+.conversation-thread.conversation-thread-loading {
+  width: 100%;
+  margin-inline: auto;
+  padding-block: var(--space-6);
+}
+
 .conversation-thread-virtual {
   position: relative;
   gap: 0;

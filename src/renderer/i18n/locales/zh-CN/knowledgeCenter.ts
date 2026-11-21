@@ -180,7 +180,7 @@ export const zhKnowledgeCenter = {
   'knowledgeCenter.viewRelatedCard': '查看相关卡片',
   'knowledgeCenter.metaSpace': '存储空间',
   'knowledgeCenter.metaRelativePath': '相对路径',
-  'knowledgeCenter.metaSourceHash': 'sourceHash',
+  'knowledgeCenter.metaSourceHash': '来源指纹',
   'knowledgeCenter.metaSourceMtime': '来源修改时间',
   'knowledgeCenter.metaSourceSize': '来源大小',
   'knowledgeCenter.metaProvenanceNone': '此卡片没有导入来源记录。',

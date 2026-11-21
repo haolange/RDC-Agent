@@ -17,7 +17,6 @@ export const enComposer = {
   'composer.effort.popupTitle': 'Model and effort',
   'composer.effort.thinkingSwitch': 'Thinking',
   'composer.effort.thinkingSwitchHint': 'This model only turns thinking on or off; it has no levels.',
-  'composer.effort.reasoning': 'Reasoning',
   'composer.effort.providerManaged': 'Provider-managed',
   'composer.effort.unverified': 'Unverified',
   'composer.effort.fixed': 'Fixed',

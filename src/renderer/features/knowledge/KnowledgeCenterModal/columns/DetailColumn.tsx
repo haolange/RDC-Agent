@@ -20,6 +20,7 @@ import '../parts/KnowledgeDetail.css';
 import { KnowledgeStatusTag } from '../parts/KnowledgeStatusTag';
 import { CardMetaGrid } from '../parts/CardMetaGrid';
 import { ConflictCompare } from '../parts/ConflictCompare';
+import { Skeleton } from '../../../../ui/Skeleton';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 
@@ -120,7 +121,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
       ) : null}
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">
-        {state.loadingDetail && <div className="knowledge-center-status">{t('knowledgeCenter.loading')}</div>}
+        {state.loadingDetail && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={8} /></div>}
         {conflict ? (
           <ConflictCompare
             conflict={conflict}

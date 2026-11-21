@@ -266,9 +266,31 @@ try {
     await page.locator('.knowledge-center-card-button').first().click();
     await shot('21-en-knowledge');
     await closeOverlays(page);
+    // Pseudo-localized English: accented and 40% longer, so an untranslated literal or a cramped layout shows.
+    const pseudo = new URL(page.url());
+    pseudo.searchParams.set('pseudoLocale', '1');
+    await page.goto(pseudo.toString());
+    await page.waitForTimeout(1500);
+    await shot('22-pseudo-conversation');
+    await openSettings(page, 'agents');
+    await shot('23-pseudo-settings-agents');
+    await closeOverlays(page);
+    pseudo.searchParams.delete('pseudoLocale');
+    await page.goto(pseudo.toString());
+    await page.waitForTimeout(1500);
     await openSettings(page, 'general');
     await page.locator('.settings-page-general').getByRole('tab', { name: /^简体中文$/ }).click();
     await closeOverlays(page);
+  });
+
+  await step('command-palette', async () => {
+    await useTheme(page, 'dark');
+    await page.keyboard.press('Control+k');
+    await page.getByTestId('command-palette').waitFor();
+    await page.waitForTimeout(600);
+    await shot('24-command-palette');
+    await page.keyboard.press('Escape');
+    await page.getByTestId('command-palette').waitFor({ state: 'detached' });
   });
 
   await step('narrow', async () => {

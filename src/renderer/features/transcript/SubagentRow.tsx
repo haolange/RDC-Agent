@@ -9,6 +9,7 @@ import { ProximityGlow } from '../../ui/ProximityHost';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 import { EFFORT_LABEL_KEYS, isReasoningLevelLabel } from '../../lib/reasoningLabels';
 import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
+import { Skeleton } from '../../ui/Skeleton';
 import { getToolVerb } from './workProcessToolRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
@@ -43,7 +44,7 @@ function DelegationBody({ sessionId, parentToolCallId, childSessionId, execution
     {content.text ? kind === 'task'
       ? !content.hasMore && taskDisclosure && <DelegationTaskDocument text={content.text} {...taskDisclosure} />
       : <div className="work-process-subagent-final"><MessageMarkdown content={content.text} deferHeavyPlugins={content.hasMore} /></div> : null}
-    {content.loading ? <span className="work-process-subagent-note">{t('chat.subagentLoading')}</span> : null}
+    {content.loading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" count={2} inline /></span> : null}
     {content.error ? <button type="button" className="work-process-subagent-more" onClick={content.retry}>{t('chat.subagentRetry')}</button> : null}
     {content.hasMore ? <button type="button" className="work-process-subagent-more" onClick={() => void content.loadMore()}>{t('chat.subagentShowMore')}</button> : null}
   </>;
@@ -145,7 +146,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       {!headerLoading && !header && status === 'failed' && row.resultPreview
         ? <InlineError detail={row.resultPreview}>{t('chat.subagentFailedSummary')}</InlineError> : null}
       <div className="work-process-subagent-task" aria-label={t('chat.subagentTask')}>
-        {headerLoading ? <span className="work-process-subagent-note">{t('chat.subagentLoading')}</span> : null}
+        {headerLoading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" inline /></span> : null}
         {!headerLoading && !header && row.task ? <span className="work-process-subagent-note">{row.task}</span> : null}
         <DelegationBody sessionId={sessionId} parentToolCallId={row.id} childSessionId={header?.childSessionId}
           executionId={header?.executionId} generation={header?.generation} kind="task" taskDisclosure={{ factsOpen, constraintsOpen, toggle }} open={expanded} available={!!header?.taskAvailable} />
@@ -153,7 +154,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       </div>
       <WorkDisclosure title={t('chat.subagentProcess')} preview={processPreview} open={workOpen}
         onToggle={() => toggle('workOpen')} bodyClassName="work-process-subagent-process-body">
-        {loading || headerLoading ? <span className="work-process-subagent-note">{t('chat.subagentLoading')}</span> : null}
+        {loading || headerLoading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" count={2} inline /></span> : null}
         {page.error ? <button type="button" className="work-process-subagent-more" onClick={retry}>{t('chat.subagentRetry')}</button> : null}
         {!loading && !headerLoading && !page.error && page.steps.length === 0 ? <span className="work-process-subagent-note">{t('chat.subagentNoActions')}</span> : null}
         <WorkProcessContent embedded density="compact" presentation={presentation} sessionId={sessionId} renderToolDetail={renderToolDetail}

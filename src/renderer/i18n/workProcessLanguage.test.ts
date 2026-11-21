@@ -128,7 +128,8 @@ it('localizes builtin command descriptions without replacing custom descriptions
   const localized = localizeCommands(commands, translator('zh-CN'));
   expect(localized[0].description).toBe('列出可用命令或查看命令详情');
   expect(localized[0].name).toBe('help');
-  expect(localized[1]).toEqual(commands[1]);
+  expect(localized[1]).toEqual({ ...commands[1], categoryLabel: 'custom' });
+  expect(localized[0]).toMatchObject({ category: 'system', categoryLabel: '系统' });
   expect(commands[0].description).toBe('original');
 });
 

@@ -11,6 +11,7 @@ import { KnowledgeFilters } from '../parts/KnowledgeFilters';
 import { KnowledgeStatusTag } from '../parts/KnowledgeStatusTag';
 import { TYPE_ICONS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { ConflictRow } from '../parts/ConflictRow';
+import { Skeleton } from '../../../../ui/Skeleton';
 import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeCardType, KnowledgeLaneHit } from '@shared/types/knowledge';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
@@ -141,7 +142,7 @@ export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
         </div>
       )}
       <div className="knowledge-center-tree" data-testid="knowledge-center-tree">
-        {loading && <div className="knowledge-center-empty-inline">{t('knowledgeCenter.loading')}</div>}
+        {loading && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="row" count={5} /></div>}
         {!loading && reason && (
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list">
             <EmptyState

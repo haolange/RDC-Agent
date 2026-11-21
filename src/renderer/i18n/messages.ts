@@ -40,6 +40,7 @@ import { zhSidebar } from './locales/zh-CN/sidebar';
 import { zhTerminal } from './locales/zh-CN/terminal';
 import { zhTheme } from './locales/zh-CN/theme';
 import { zhUserMenu } from './locales/zh-CN/userMenu';
+import { pseudoLocaleEnabled, pseudoLocalize } from './pseudoLocale';
 import type { AppLanguage } from '@shared/types/settings';
 
 export const englishTranslations = {
@@ -116,7 +117,8 @@ export const translate = (
   key: TranslationKey,
   params?: Record<string, string | number>,
 ): string => {
-  const text = translations[language][key] ?? key;
+  const stored = translations[language][key] ?? key;
+  const text = language === 'en' && pseudoLocaleEnabled() ? pseudoLocalize(stored) : stored;
   if (!params) return text;
   return text.replace(/\{(\w+)\}/g, (placeholder, name: string, offset: number) => {
     if (!Object.hasOwn(params, name)) return placeholder;

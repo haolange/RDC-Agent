@@ -66,6 +66,9 @@ export interface ConversationState {
   monotonicStoppedRequestIds: string[];
   revokedRequestIds: string[];
   latestMessageActivityAt: number;
+  /** The session whose saved history is being read; the transcript shows a placeholder, not the empty home. */
+  historyLoadingSessionId: string | null;
+  setHistoryLoadingSessionId: (sessionId: string | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
   setConversationSnapshot: (messages: ConversationMessage[], branchState?: ConversationBranchState | null) => void;
@@ -95,4 +98,5 @@ export const initialConversationState = {
   monotonicStoppedRequestIds: [] as string[],
   revokedRequestIds: [] as string[],
   latestMessageActivityAt: 0,
+  historyLoadingSessionId: null as string | null,
 };

@@ -15,8 +15,8 @@ const CEILINGS = {
   'text-glyph': 0,
   'raw-error-render': 0,
   'literal-color': 3,
-  'i18n-same-value': 24,
-  'bare-alert': 6,
+  'i18n-same-value': 0,
+  'bare-alert': 0,
 };
 
 /** Proper nouns stay English in every locale: Agent and mode names, product names, RenderDoc and protocol terms. */
@@ -199,7 +199,7 @@ function i18nSameValues() {
   for (const [key, value] of parseLocale('zh-CN')) {
     if (english.get(key) !== value) continue;
     const words = value.replace(/\{[^}]+\}/g, ' ').split(/[\s·/→,:%()+-]+/).filter((word) => /[A-Za-z]/.test(word));
-    if (words.length === 0 || words.every((word) => PROPER_NOUNS.has(word))) continue;
+    if (PROPER_NOUNS.has(value.trim()) || words.length === 0 || words.every((word) => PROPER_NOUNS.has(word))) continue;
     findings.push(`${key} = ${JSON.stringify(value)}`);
   }
   return findings;
