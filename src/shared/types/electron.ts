@@ -104,8 +104,6 @@ import type {
   KnowledgePack,
   KnowledgeQueryRequest,
   KnowledgeQueryResult,
-  KnowledgeReadRequest,
-  KnowledgeReadResult,
   KnowledgeTopicChanges,
   KnowledgeTopicPreview,
   KnowledgeTopicProposal,
@@ -291,7 +289,6 @@ export interface ElectronAPI {
     topicApply: (request: { changes: KnowledgeTopicChanges; changeHash: string; confirmation: KnowledgeHumanConfirmation }) => Promise<{ revision: string } | { cancelled: true }>;
     query: (request: KnowledgeQueryRequest) => Promise<KnowledgeQueryResult>;
     card: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
-    read: (request: KnowledgeReadRequest) => Promise<KnowledgeReadResult>;
     compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
     indexRebuild: () => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
     candidates: (sessionId: string) => Promise<KnowledgeCandidatesResult>;

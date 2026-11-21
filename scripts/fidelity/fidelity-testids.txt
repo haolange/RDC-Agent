@@ -72,7 +72,6 @@ knowledge-center-confirm
 knowledge-center-confirm-diff
 knowledge-center-confirm-submit
 knowledge-center-conflict-row
-knowledge-center-create-candidate
 knowledge-center-detail
 knowledge-center-detail-column
 knowledge-center-empty-detail
@@ -80,7 +79,6 @@ knowledge-center-empty-list
 knowledge-center-error
 knowledge-center-explicit-confirm
 knowledge-center-export
-knowledge-center-export-open
 knowledge-center-export-result
 knowledge-center-export-run
 knowledge-center-export-space
@@ -96,9 +94,6 @@ knowledge-center-import-run
 knowledge-center-import-source
 knowledge-center-import-space
 knowledge-center-import-status-hint
-knowledge-center-index
-knowledge-center-index-copy
-knowledge-center-index-tools
 knowledge-center-list
 knowledge-center-list-head
 knowledge-center-meta
@@ -106,7 +101,6 @@ knowledge-center-meta-line
 knowledge-center-metadata-toggle
 knowledge-center-modal
 knowledge-center-narrow-tabs
-knowledge-center-primary-write
 knowledge-center-provenance
 knowledge-center-rebuild
 knowledge-center-search
@@ -118,11 +112,8 @@ knowledge-conflict-open-card
 knowledge-conflict-pane
 knowledge-export-${name}-${option.id}
 knowledge-filter-${group.id}-${option.id}
-knowledge-read-heading
-knowledge-read-submit
 knowledge-topics-dialog
 knowledge-topics-next
-knowledge-topics-open
 left-navigation-drawer
 markdown-code-block
 markdown-mermaid

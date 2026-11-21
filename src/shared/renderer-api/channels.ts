@@ -69,7 +69,6 @@ export const RENDERER_INVOKE_CHANNEL = {
     topicApply: 'knowledge:topics:apply',
     query: 'knowledge:query',
     card: 'knowledge:card',
-    read: 'knowledge:read',
     compile: 'knowledge:compile',
     indexRebuild: 'knowledge:index:rebuild',
     candidates: 'knowledge:candidates',

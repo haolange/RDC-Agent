@@ -14,7 +14,7 @@ interface ConflictRowProps {
   onSelect?: () => void;
 }
 
-/** One contradicts pair: topic (left ↔ right titles), pending-review status, latest update. */
+/** One contradicts pair: left ↔ right titles, pending-review status, latest update. Card ids live in card details. */
 export function ConflictRow({ leftCardId, rightCardId, left, right, selected = false, onSelect }: ConflictRowProps) {
   const { t } = useI18n();
   const leftTitle = left?.title || leftCardId;
@@ -34,15 +34,10 @@ export function ConflictRow({ leftCardId, rightCardId, left, right, selected = f
         </span>
       )}
     >
-      <span className="knowledge-center-conflict-copy">
-        <span className="knowledge-center-card-title">
-          {leftTitle}
-          <span className="knowledge-center-conflict-swap" aria-hidden="true">↔</span>
-          {rightTitle}
-        </span>
-        <small className="knowledge-center-conflict-ids">
-          <code>{leftCardId}</code> · <code>{rightCardId}</code> · {t('knowledgeCenter.conflictsKind')}
-        </small>
+      <span className="knowledge-center-card-title">
+        {leftTitle}
+        <span className="knowledge-center-conflict-swap" aria-hidden="true">↔</span>
+        {rightTitle}
       </span>
     </ListRow>
   );

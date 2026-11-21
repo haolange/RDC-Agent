@@ -66,7 +66,6 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'knowledge:topics:apply': 'high-impact',
   'knowledge:query': 'read',
   'knowledge:card': 'read',
-  'knowledge:read': 'read',
   'knowledge:compile': 'read',
   'knowledge:index:rebuild': 'mutation',
   'knowledge:candidates': 'read',

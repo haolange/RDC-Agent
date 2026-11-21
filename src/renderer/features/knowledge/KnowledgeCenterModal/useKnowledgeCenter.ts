@@ -1,9 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  KNOWLEDGE_RETRIEVAL_LANES,
-  type KnowledgeCardDetail, type KnowledgeIndexOverview,
-  type KnowledgeLaneHit, type KnowledgePack, type KnowledgeSpace,
-} from '@shared/types/knowledge';
 import { useProjectStore } from '../../../stores/projectStore';
 import {
   createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, toggleSetValue,
@@ -15,6 +10,9 @@ import { useKnowledgeViewport } from './useKnowledgeViewport';
 import { useKnowledgeFilters } from './useKnowledgeFilters';
 import { useKnowledgeLoadMore } from './useKnowledgeLoadMore';
 import { useKnowledgeQueryRunner } from './useKnowledgeQueryRunner';
+import type {
+  KnowledgeCardDetail, KnowledgeIndexOverview, KnowledgeLaneHit, KnowledgePack, KnowledgeSpace,
+} from '@shared/types/knowledge';
 
 export function useKnowledgeCenter(open: boolean) {
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
@@ -26,7 +24,7 @@ export function useKnowledgeCenter(open: boolean) {
   const [spaces, setSpaces] = useState<KnowledgeSpace[]>([]);
   const [index, setIndex] = useState<KnowledgeIndexOverview | null>(null);
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
-  const { types, lifecycles, lanes, toggleType, toggleLifecycle, toggleLane } = useKnowledgeFilters();
+  const { types, lifecycles, toggleType, toggleLifecycle } = useKnowledgeFilters();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [hits, setHits] = useState<KnowledgeLaneHit[]>([]);
@@ -65,8 +63,7 @@ export function useKnowledgeCenter(open: boolean) {
     text: debouncedSearch,
     type: types,
     lifecycle: lifecycles,
-    lanes,
-  }), [debouncedSearch, lanes, lifecycles, selectedSpaceIds, types]);
+  }), [debouncedSearch, lifecycles, selectedSpaceIds, types]);
   const runQuery = useKnowledgeQueryRunner({ querySeq, setLoadingQuery, setPage, setHits, setPack, setPackQueryKey, setError });
   const refreshQuery = useCallback(async () => { await runQuery(viewMode, queryRequest); }, [queryRequest, runQuery, viewMode]);
 
@@ -75,7 +72,7 @@ export function useKnowledgeCenter(open: boolean) {
   });
 
   const showDetail = useCallback(() => { if (narrow) setNarrowPane('detail'); }, [narrow, setNarrowPane]);
-  const { selectedCardId, selectedCard, reading, readingBusy, readSelection, ensureFullCard, loadingDetail, clearCardSelection,
+  const { selectedCardId, selectedCard, loadingDetail, clearCardSelection,
     selectedConflict, conflictCards, selectConflict, clearConflict, selectCard, selectRecord } =
     useKnowledgeSelection({ open, queryKey: knowledgeQueryKey(queryRequest), hits, pack,
       onShowDetail: showDetail, setError });
@@ -157,10 +154,10 @@ export function useKnowledgeCenter(open: boolean) {
 
   return {
     sessionId, viewMode, setViewMode: changeViewMode, narrow, narrowPane, setNarrowPane, spaces, index,
-    selectedSpaceIds, types, lifecycles, lanes, allLanes: KNOWLEDGE_RETRIEVAL_LANES,
-    searchQuery, setSearchQuery, hits, page, loadingMore, loadMore, pack, packQueryKey, selectedCardId, selectedCard, reading, readingBusy, readSelection, ensureFullCard, loadingOverview,
+    selectedSpaceIds, types, lifecycles,
+    searchQuery, setSearchQuery, hits, page, loadingMore, loadMore, pack, packQueryKey, selectedCardId, selectedCard, loadingOverview,
     loadingQuery, loadingDetail, rebuilding, error, setError, toggleSpace, toggleType,
-    toggleLifecycle, toggleLane, selectCard, selectRecord, rebuildIndex, refreshOverview, refreshQuery, queryRequest,
+    toggleLifecycle, selectCard, selectRecord, rebuildIndex, refreshOverview, refreshQuery, queryRequest,
     selectedConflict, conflictCards, selectConflict, openRelatedCard, revealImportedCard,
   };
 }

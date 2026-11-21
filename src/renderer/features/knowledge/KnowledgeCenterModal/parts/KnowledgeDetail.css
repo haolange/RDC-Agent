@@ -11,17 +11,19 @@
   padding-bottom: var(--space-5);
   border-bottom: 1px solid var(--token-border-muted);
 }
-.knowledge-center-chapters a {
-  padding: var(--space-2) var(--space-3);
+.knowledge-center-outline-link {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--token-bg-muted);
   color: var(--token-text-secondary);
+  font: inherit;
   font-size: var(--type-body-size);
-  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.knowledge-center-chapters a:hover,
-.knowledge-center-chapters a:focus-visible { background: var(--token-interactive-hover); color: var(--token-text-primary); }
-.knowledge-center-chapters a:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); }
+.knowledge-center-outline-link:hover,
+.knowledge-center-outline-link:focus-visible { background: var(--token-interactive-hover); color: var(--token-text-primary); }
+.knowledge-center-outline-link:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); }
 .knowledge-center-chapters .knowledge-center-missing { flex-basis: 100%; margin: var(--space-2) 0 0; }
 .knowledge-case-section { font-size: var(--type-body-size); padding-bottom: var(--space-6); margin-bottom: var(--space-6); border-bottom: 1px solid var(--token-border-muted); scroll-margin-top: var(--space-5); }
 .knowledge-case-section:last-child { border-bottom: 0; margin-bottom: 0; }
@@ -121,3 +123,19 @@
   .knowledge-case-fields, .knowledge-symptom-comparison, .knowledge-card-images-pair { grid-template-columns: 1fr; }
   .knowledge-detail-info .knowledge-center-meta { grid-template-columns: 1fr; }
 }
+
+/* Headings the outline jumps to land below the sticky header edge, not under it. */
+.knowledge-center-markdown :is(h1, h2, h3) { scroll-margin-top: var(--space-5); }
+
+.knowledge-center-index-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  font-size: var(--type-body-size);
+}
+.knowledge-center-index-facts > div { display: contents; }
+.knowledge-center-index-facts dt { color: var(--token-text-secondary); }
+.knowledge-center-index-facts dd { margin: 0; min-width: 0; color: var(--token-text-secondary); overflow-wrap: anywhere; }
+.knowledge-center-index-revision { font-family: var(--font-mono); }

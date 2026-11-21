@@ -30,7 +30,7 @@
   margin-block-start: var(--space-3);
   padding-inline-start: var(--space-3);
   color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: var(--type-meta-line);
 }

@@ -2,25 +2,33 @@ import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail } from '@shared/types/kn
 import { Details } from '../../../../ui/Details';
 import { useI18n } from '../../../../i18n';
 import { formatBytes } from '../../../../lib/formatBytes';
-import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
+import { useUiLabels } from '../../../../lib/useUiLabels';
+import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, RELATION_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { Button } from '../../../../ui/Button';
-import { CardBadges } from './CardBadges';
 
 interface CardMetaGridProps {
   card: KnowledgeCardDetail;
   /** Human label of the card's space (User / project label). */
   spaceLabel: string;
+  /** The title of a related card when it is loaded; otherwise its file name stands in. */
+  resolveTitle?: (targetCardId: string) => string | undefined;
   /** Present when a relation target can be opened from here. */
   onOpenRelation?: (targetCardId: string) => void;
 }
 
+/** A related card named by its title, or by its file name when the card is not loaded. */
+const relationTargetName = (targetCardId: string, title: string | undefined): string => (
+  title || (targetCardId.split('/').pop() ?? targetCardId).replace(/\.md$/u, '')
+);
+
 /**
  * Metadata for the selected card: type / lifecycle / source status / caseId / updatedAt /
- * space / relative path, scope axes with exclusions, relations, and a collapsed
- * provenance block (import hash / mtime / size) when the card was ingested.
+ * space / relative path, scope axes with exclusions, relations named by title, and a
+ * collapsed 诊断 group (import hash / mtime / size) when the card was ingested.
  */
-export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridProps) {
+export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }: CardMetaGridProps) {
   const { t, language } = useI18n();
+  const labels = useUiLabels();
   const exclusions = card.scope.exclusions ?? {};
   const axes = KNOWLEDGE_SCOPE_AXES.filter((axis) => card.scope[axis] || exclusions[axis]?.length);
   const hasProvenance = Boolean(card.sourceHash || card.sourceMtimeMs != null || card.sourceSize != null);
@@ -42,10 +50,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
           </div>
           <div>
             <dt>{t('knowledgeCenter.metaSourceStatus')}</dt>
-            <dd>
-              <CardBadges sourceStatus={card.sourceStatus} />
-              {!card.sourceStatus && '—'}
-            </dd>
+            <dd>{card.sourceStatus ?? '—'}</dd>
           </div>
           <div>
             <dt>{t('knowledgeCenter.metaCaseId')}</dt>
@@ -71,7 +76,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
               <dl className="knowledge-center-meta knowledge-center-meta--compact">
                 {axes.map((axis) => (
                   <div key={axis}>
-                    <dt data-tooltip={axis}>{t(SCOPE_LABEL_KEYS[axis])}</dt>
+                    <dt>{t(SCOPE_LABEL_KEYS[axis])}</dt>
                     <dd>
                       {card.scope[axis] ?? '—'}
                       {exclusions[axis]?.length ? (
@@ -91,12 +96,13 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
               <ul className="knowledge-center-relation-list">
                 {card.relations.map((relation) => (
                   <li key={`${relation.kind}:${relation.targetCardId}`}>
-                    <span className="knowledge-center-relation-kind">{relation.kind}</span>
+                    <span className="knowledge-center-relation-kind">{t(RELATION_LABEL_KEYS[relation.kind])}</span>
                     {onOpenRelation ? (
-                      <Button variant="ghost" size="sm" className="knowledge-center-relation-target" onClick={() => onOpenRelation(relation.targetCardId)}>
-                        <code>{relation.targetCardId}</code>
+                      <Button variant="ghost" size="sm" className="knowledge-center-relation-target" data-tooltip={relation.targetCardId}
+                        onClick={() => onOpenRelation(relation.targetCardId)}>
+                        {relationTargetName(relation.targetCardId, resolveTitle?.(relation.targetCardId))}
                       </Button>
-                    ) : <code>{relation.targetCardId}</code>}
+                    ) : <span data-tooltip={relation.targetCardId}>{relationTargetName(relation.targetCardId, resolveTitle?.(relation.targetCardId))}</span>}
                   </li>
                 ))}
               </ul>
@@ -104,7 +110,7 @@ export function CardMetaGrid({ card, spaceLabel, onOpenRelation }: CardMetaGridP
           </section>
         </div>
       </div>
-      <Details className="knowledge-center-meta-details" data-testid="knowledge-center-provenance" summary={t('knowledgeCenter.metaProvenance')}>
+      <Details className="knowledge-center-meta-details" data-testid="knowledge-center-provenance" summary={labels.diagnostics}>
         {hasProvenance ? (
           <dl className="knowledge-center-meta knowledge-center-meta--compact">
             <div>

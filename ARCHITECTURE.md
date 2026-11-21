@@ -209,7 +209,7 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
 
 ### G. Knowledge
 
-Knowledge 位于 `src/main/knowledge/`。主进程服务：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`，另有 `KnowledgeImportService`、`KnowledgeExportService`、`KnowledgeReadService`、`KnowledgeTopicService`。Knowledge Center IPC 映射这些服务（含 `knowledge:import` / `knowledge:export`，均为 high-impact）。五个 deferred 工具 `knowledge_browse/search/read/compile/candidate_create` 与 canonical `knowledge` token 已注册；`$knowledge-scout` / `$knowledge-candidate` 是 builtin Skill；deferred 工具遵守真实 caller 与 skill 交集。Knowledge Center 为三列 UI（Spaces / List / Detail）。
+Knowledge 位于 `src/main/knowledge/`。主进程服务：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`，另有 `KnowledgeImportService`、`KnowledgeExportService`、`KnowledgeReadService`、`KnowledgeTopicService`。Knowledge Center IPC 映射这些服务（含 `knowledge:import` / `knowledge:export`，均为 high-impact）；`KnowledgeReadService` 的渐进读取只服务 `knowledge_read` 工具，界面经 `knowledge:card` 读整张卡片。五个 deferred 工具 `knowledge_browse/search/read/compile/candidate_create` 与 canonical `knowledge` token 已注册；`$knowledge-scout` / `$knowledge-candidate` 是 builtin Skill；deferred 工具遵守真实 caller 与 skill 交集。Knowledge Center 为三列 UI（Spaces / List / Detail）。
 
 - **六 retrieval lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。
 - **单一事实源**：`knowledge_*` 由 main-owned `KnowledgeIndexService` 提供；grep/glob/read 只是补充证据；无第二索引或 renderer 事实源。index revision 绑定 content hash。

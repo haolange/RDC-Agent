@@ -9,7 +9,6 @@ import {
   KnowledgePromoteArgsSchema,
   KnowledgeQueryArgsSchema,
   KnowledgeWriteArgsSchema,
-  KnowledgeReadArgsSchema,
   KnowledgeTopicApplyArgsSchema,
 } from './knowledgeSchemas';
 
@@ -26,9 +25,7 @@ const card = {
 };
 
 describe('knowledge IPC schemas', () => {
-  it('requires source identity for progressive reads and explicit confirmation for topic changes', () => {
-    expect(() => parseIpcArgs(KnowledgeReadArgsSchema, [{ spaceId: 'user', relativePath: 'a.md', mode: 'full' }], { label: 'read' })).toThrow(IpcValidationError);
-    expect(() => parseIpcArgs(KnowledgeReadArgsSchema, [{ spaceId: 'user', relativePath: 'a.md', mode: 'section', contentHash: 'a'.repeat(64) }], { label: 'read' })).toThrow(IpcValidationError);
+  it('requires explicit confirmation for topic changes', () => {
     const changes = { expectedRevision: 'a'.repeat(64), expectedCorpusRevision: 'b'.repeat(64), topics: [], assignments: [] };
     expect(() => parseIpcArgs(KnowledgeTopicApplyArgsSchema, [{ changes, changeHash: 'c'.repeat(64), confirmation: { explicitHumanConfirmation: false } }], { label: 'topics' })).toThrow(IpcValidationError);
   });

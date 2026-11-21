@@ -221,6 +221,7 @@
     "settings.providerDetail": "src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx",
     "settings.localToolDisclosure": "src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx",
     "knowledge.spacesColumn": "src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx",
+    "knowledge.rebuildIndexDialog": "src/renderer/features/knowledge/KnowledgeCenterModal/panels/RebuildIndexDialog.tsx",
     "patterns.materialContextEditor": "src/renderer/patterns/MaterialContextEditor.tsx",
     "ui.popover": "src/renderer/ui/Popover.tsx",
     "ui.contextMenu": "src/renderer/ui/ContextMenu/index.tsx",

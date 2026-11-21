@@ -1,20 +1,35 @@
 import { cn } from '../../../../lib/cn';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
+import { Icon } from '../../../../ui/Icon';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
 import { SearchField } from '../../../../ui/SearchField';
 import { useI18n, type TranslationKey } from '../../../../i18n';
-import { CardBadges } from '../parts/CardBadges';
 import { KnowledgeFilters } from '../parts/KnowledgeFilters';
+import { KnowledgeStatusTag } from '../parts/KnowledgeStatusTag';
+import { TYPE_ICONS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { ConflictRow } from '../parts/ConflictRow';
-import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeLaneHit } from '@shared/types/knowledge';
+import type { KnowledgeCandidatesResult, KnowledgeCardRecord, KnowledgeCardType, KnowledgeLaneHit } from '@shared/types/knowledge';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
 interface ListColumnProps {
   state: ReturnType<typeof useKnowledgeCenter>;
   inbox: KnowledgeCandidatesResult | null;
+  /** Opens the import dialog; an empty card list offers it where the cards would be. */
+  onImport: () => void;
+}
+
+/** The card type as a small icon before the title; its name is the tooltip. */
+function TypeIcon({ type }: { type?: KnowledgeCardType }) {
+  const { t } = useI18n();
+  if (!type) return null;
+  return (
+    <span className="knowledge-center-card-type" data-tooltip={t(TYPE_LABEL_KEYS[type])} aria-label={t(TYPE_LABEL_KEYS[type])} role="img">
+      <Icon name={TYPE_ICONS[type]} size={14} />
+    </span>
+  );
 }
 
 function emptyReason(
@@ -38,7 +53,7 @@ function emptyReason(
   return null;
 }
 
-/** Title, meaningful preview and badges. Order follows the service hits. */
+/** Up to two lines of title led by the type icon, one line of preview, and a status only when it is not a draft. */
 function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; active: boolean; onSelect: () => void }) {
   return (
     <ListRow
@@ -47,9 +62,9 @@ function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; act
       onClick={onSelect}
       data-testid={`knowledge-card-${card.cardId}`}
     >
-      <span className="knowledge-center-card-title">{card.title}</span>
+      <span className="knowledge-center-card-title"><TypeIcon type={card.type} />{card.title}</span>
       {card.preview && card.preview.trim() !== card.title.trim() ? <span className="knowledge-center-card-preview">{card.preview}</span> : null}
-      <CardBadges type={card.type} lifecycle={card.lifecycle} />
+      <KnowledgeStatusTag lifecycle={card.lifecycle} hideDraft />
     </ListRow>
   );
 }
@@ -74,14 +89,13 @@ function RecordRow({
       data-testid={`knowledge-candidate-${record.cardId}`}
       trailing={<Badge tone="warning">{pendingLabel}</Badge>}
     >
-      <span className="knowledge-center-card-title">{record.title}</span>
+      <span className="knowledge-center-card-title"><TypeIcon type={record.type} />{record.title}</span>
       {record.preview && record.preview.trim() !== record.title.trim() ? <span className="knowledge-center-card-preview">{record.preview}</span> : null}
-      <CardBadges type={record.type} lifecycle={record.lifecycle} />
     </ListRow>
   );
 }
 
-export function ListColumn({ state, inbox }: ListColumnProps) {
+export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
   const { t } = useI18n();
   const reason = emptyReason(state, inbox);
   const loading = state.loadingQuery || state.loadingOverview;
@@ -104,6 +118,16 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
             clearLabel={t('app.clearSearch')}
           />
           <KnowledgeFilters state={state} />
+          {/* The index keeps itself current; only when it could not be built does the list ask for a rebuild. */}
+          {state.spaces.length > 0 && !state.index && !state.loadingOverview ? (
+            <div className="knowledge-center-index-notice" role="status" data-testid="knowledge-center-index-notice">
+              <span>{t('knowledgeCenter.indexMissing')}</span>
+              <Button variant="secondary" size="sm" disabled={state.rebuilding} onClick={() => void state.rebuildIndex()}
+                data-testid="knowledge-center-rebuild">
+                {state.rebuilding ? t('knowledgeCenter.indexRebuilding') : t('knowledgeCenter.indexRebuild')}
+              </Button>
+            </div>
+          ) : null}
         </>
       ) : (
         <div className="knowledge-center-list-head" data-testid="knowledge-center-list-head">
@@ -122,6 +146,11 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list">
             <EmptyState
               title={t(reason)}
+              actions={reason === 'knowledgeCenter.emptyNoCards' ? (
+                <Button variant="primary" size="sm" onClick={onImport} data-testid="knowledge-center-empty-import">
+                  {t('knowledgeCenter.importKnowledge')}
+                </Button>
+              ) : undefined}
             />
           </div>
         )}

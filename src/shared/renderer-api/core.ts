@@ -120,7 +120,6 @@ export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeAp
     topicApply: (request) => transport.invoke(INVOKE.knowledge.topicApply, request),
     query: (request) => transport.invoke(INVOKE.knowledge.query, request),
     card: (spaceId, relativePath) => transport.invoke(INVOKE.knowledge.card, spaceId, relativePath),
-    read: (request) => transport.invoke(INVOKE.knowledge.read, request),
     compile: (request) => transport.invoke(INVOKE.knowledge.compile, request),
     indexRebuild: () => transport.invoke(INVOKE.knowledge.indexRebuild),
     candidates: (sessionId) => transport.invoke(INVOKE.knowledge.candidates, sessionId),

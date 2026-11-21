@@ -41,8 +41,14 @@
 }
 
 .knowledge-center-actions {
+  align-items: center;
+  justify-content: flex-end;
   padding: var(--space-3);
   border-top: 1px solid var(--token-border-muted);
+}
+
+.knowledge-center-actions > .ui-inline-error {
+  flex: 1 1 100%;
 }
 
 .knowledge-center-empty,
@@ -55,6 +61,5 @@
 }
 
 .knowledge-center-error {
-  color: var(--token-status-error);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
 }

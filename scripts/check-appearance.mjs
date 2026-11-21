@@ -294,7 +294,7 @@ for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx',
   'src/renderer/features/settings/SettingsModal/parts/SettingsDiagnostics.tsx',
   'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
-  'src/renderer/features/knowledge/KnowledgeCenterModal/columns/SpacesColumn.tsx',
+  'src/renderer/features/knowledge/KnowledgeCenterModal/panels/RebuildIndexDialog.tsx',
   'src/renderer/patterns/MaterialContextEditor.tsx',
 ]) {
   const source = scriptRead(file);

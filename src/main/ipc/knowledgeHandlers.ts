@@ -16,7 +16,6 @@ import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { knowledgeQueryService } from '../knowledge/KnowledgeQueryService';
 import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import { knowledgeTopicService } from '../knowledge/KnowledgeTopicService';
-import { projectKnowledgeRead } from '../knowledge/KnowledgeReadService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -37,7 +36,6 @@ import {
   KnowledgeTopicSuggestArgsSchema,
   KnowledgeTopicPreviewArgsSchema,
   KnowledgeTopicApplyArgsSchema,
-  KnowledgeReadArgsSchema,
 } from './validation/knowledgeSchemas';
 import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -124,8 +122,12 @@ function consumeKnowledgeToken(
   }
 }
 
-function toIndexOverview(): KnowledgeIndexOverview | null {
-  const snapshot = knowledgeIndexService.getSnapshot();
+/**
+ * The index follows the cards on its own: queries rebuild a stale snapshot, and the overview reads the same current
+ * index. It is null only when the index could not be built, which is when the Knowledge Center offers a rebuild.
+ */
+async function toIndexOverview(): Promise<KnowledgeIndexOverview | null> {
+  const snapshot = await knowledgeIndexService.getOrRebuild().catch(() => null);
   if (!snapshot) return null;
   const cardsBySpace: Record<string, number> = {};
   for (const card of snapshot.cards) {
@@ -202,7 +204,7 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     parseIpcArgs(KnowledgeOverviewArgsSchema, rawArgs, { label: 'knowledge:overview', maxBytes: 1024 });
     return {
       spaces: knowledgeQueryService.listSpaces(),
-      index: toIndexOverview(),
+      index: await toIndexOverview(),
     };
   });
 
@@ -232,14 +234,6 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     } catch (error) {
       rethrowKnowledgeError(error);
     }
-  });
-
-  ipcMain.handle('knowledge:read', async (_event, ...rawArgs: unknown[]) => {
-    const [request] = parseIpcArgs(KnowledgeReadArgsSchema, rawArgs, { label: 'knowledge:read', maxBytes: 8 * 1024 });
-    assertKnownSpaces([request.spaceId]);
-    const card = await knowledgeQueryService.getCard(request.spaceId, request.relativePath);
-    if (!card) throw new Error('KNOWLEDGE_CARD_NOT_FOUND');
-    return projectKnowledgeRead(card, request);
   });
 
   ipcMain.handle('knowledge:compile', async (_event, ...rawArgs: unknown[]) => {
