@@ -11,12 +11,14 @@ import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, In
 
 function ArtifactRows({ rows, select }: { rows: InvestigationArtifactRow[]; select: (row: InvestigationArtifactRow) => void }) {
   const { t } = useI18n();
-  return <div className="right-rail-investigation-list">{rows.map(row => <Button key={row.artifactId} variant="ghost"
-    className="right-rail-compact-row" data-tooltip={row.title || row.artifactId} onClick={() => select(row)}>
+  return <div className="right-rail-investigation-list">{rows.map(row => {
+    const title = row.title || t(`control.rightRail.artifacts.kind.${row.kind}`);
+    return <Button key={row.artifactId} variant="ghost" className="right-rail-compact-row" data-tooltip={title} onClick={() => select(row)}>
     <span className="right-rail-compact-icon" aria-hidden="true"><RightRailArtifactGlyph kind={row.kind} /></span>
-    <span className="right-rail-compact-title">{row.title || `${t(`control.rightRail.artifacts.kind.${row.kind}`)} · ${row.artifactId}`}</span>
+    <span className="right-rail-compact-title">{title}</span>
     <Chevron />
-  </Button>)}</div>;
+  </Button>;
+  })}</div>;
 }
 
 function ScopedArtifactList({ artifacts, projectId, sessionId }: {

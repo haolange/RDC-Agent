@@ -1,4 +1,4 @@
-import { useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
+import { useEffectiveCatalogStore } from '../stores/effectiveCatalogStore';
 
 /** The catalog's display name for a provider model ("GPT-6.1 Sol"), or the model id's last segment before the catalog loads. */
 export function useModelDisplayLabel(providerId: string | undefined, modelId: string | undefined): string | undefined {

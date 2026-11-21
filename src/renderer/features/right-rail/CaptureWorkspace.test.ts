@@ -33,7 +33,7 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-describe('one EID replay track', () => {
+describe('one event replay track', () => {
   it('does not replay when tabbing through an unchanged event input or slider', async () => {
     await render();
     await act(async () => { input().focus(); input().blur(); });
@@ -86,7 +86,7 @@ describe('one EID replay track', () => {
   });
   it('keeps requested and shown events distinct while applying and does not relabel the old image', async () => {
     state = { ...state, requestedEventId: 21, phase: 'applying' }; await render();
-    expect(input().value).toBe('21'); expect(host.querySelector('img')?.getAttribute('alt')).toBe('EID 42');
+    expect(input().value).toBe('21'); expect(host.querySelector('img')?.getAttribute('alt')).toBe('control.replay.eventNumber{"id":42}');
     expect(host.textContent).toContain('"requested":21,"shown":42');
   });
   it('keeps controls in place but disables them and clears stale pixels after closing', async () => {

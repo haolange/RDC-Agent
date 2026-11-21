@@ -78,7 +78,8 @@ describe('populated session rail', () => {
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
       openRailTab(host, 4);
-      expect(host.textContent).toContain('Scene.rdc · local · EID 21');
+      expect(host.textContent).toContain('Scene.rdc · device.local · control.replay.eventNumber');
+      expect(host.textContent).not.toContain('EID');
       expect(button()?.disabled).toBe(true); expect(state.restoreRecovery).not.toHaveBeenCalled();
       state.replay = { ...replay(), interactionLock: null, revision: 2 };
       await act(async () => root.render(createElement(SessionRightRail)));
@@ -141,7 +142,9 @@ describe('populated session rail', () => {
       expect(dialog?.textContent).toContain('The root cause remains unknown.');
       expect(dialog?.textContent).toContain('Partial; no causal fix verified.');
       expect(dialog?.textContent).toContain('No intervention or restored-state receipt.');
-      expect(dialog?.querySelector('.investigation-preview-source')?.hasAttribute('open')).toBe(false);
+      expect(dialog?.querySelector('.investigation-report-diagnostics')?.hasAttribute('open')).toBe(false);
+      const sections = [...(dialog?.querySelectorAll('.investigation-report section') ?? [])].map((section) => section.textContent).join('\n');
+      expect(sections).not.toMatch(/\b0\d\b|partial|ev-1248/);
       expect(dialog?.querySelector('.investigation-report-index')?.textContent).toContain('ev-1248');
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
       expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
@@ -176,7 +179,8 @@ describe('populated session rail', () => {
       render();
       openRailTab(host, 4);
       expect(host.querySelectorAll('[data-testid="right-rail-capture"]')).toHaveLength(1);
-      expect(host.querySelector('.capture-replay-file-row')?.getAttribute('data-tooltip')).toBe('/captures/Scene.rdc');
+      expect(host.querySelector('.capture-replay-file-row')?.getAttribute('data-tooltip')).toMatch(/^Scene\.rdc · /);
+      expect(host.querySelector('.capture-replay-diagnostics-list')?.textContent).toContain('/captures/Scene.rdc');
       expect(host.querySelector('.capture-replay-status')?.textContent).toBe('control.replay.ready');
       expect(button('control.replay.close')?.disabled).toBe(false);
       expect(host.querySelector<HTMLInputElement>('.capture-event-input input')?.value).toBe('42');

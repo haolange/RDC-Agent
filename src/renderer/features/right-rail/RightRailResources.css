@@ -48,3 +48,15 @@
 }
 
 .right-rail-diagnostic > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.right-rail-output-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.right-rail-output-missing {
+  padding: 0 var(--space-2);
+  color: var(--token-status-error);
+}

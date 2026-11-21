@@ -16,14 +16,6 @@
   padding: var(--space-1) var(--space-1) var(--space-3);
 }
 
-.right-rail-task-progress-label {
-  flex: 0 0 auto;
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-line);
-  font-variant-numeric: tabular-nums;
-}
-
 .right-rail-task-progress-track {
   position: relative;
   flex: 1 1 auto;
@@ -64,7 +56,7 @@
 
 .right-rail-task-row > button {
   display: grid;
-  grid-template-columns: var(--space-3) calc(var(--space-3) + var(--space-0-5)) minmax(0, 1fr);
+  grid-template-columns: calc(var(--space-3) + var(--space-0-5)) minmax(0, 1fr);
   align-items: start;
   column-gap: var(--space-2);
   width: 100%;
@@ -84,22 +76,8 @@
 .right-rail-task-row > button:hover { background: var(--token-interactive-hover); }
 .right-rail-task-row > button:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
 
-.right-rail-task-order {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-body-line);
-  font-variant-numeric: tabular-nums;
-}
-
 .right-rail-task-row .task-status-marker {
   margin-top: calc((var(--type-body-line) - var(--space-3) - var(--space-0-5)) / 2);
-}
-
-.right-rail-task-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
 }
 
 /* Two lines of title: enough to tell tasks apart without truncating them to a fragment. */
@@ -112,12 +90,6 @@
   font-size: var(--type-body-size);
   line-height: var(--type-body-line);
   overflow-wrap: anywhere;
-}
-
-.right-rail-task-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
 }
 
 .right-rail-task-row.status-in_progress .right-rail-task-title,

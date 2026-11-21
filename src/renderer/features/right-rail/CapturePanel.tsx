@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { copyAppText } from '../../hooks/appShellBridge';
+import { useUiLabels } from '../../lib/useUiLabels';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 import { DevicePreparationStatus, isDevicePreparing, isDeviceInstallationUnconfirmed } from '../../patterns/DevicePreparationStatus';
@@ -9,6 +10,9 @@ import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { Icon } from '../../ui/Icon';
+import { CopyButton } from '../../ui/CopyButton';
+import { Details } from '../../ui/Details';
+import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
 import { errorDetail } from '../../lib/errorDetail';
 import { CaptureWorkspace } from './CaptureWorkspace';
@@ -28,10 +32,22 @@ import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@share
 import './CaptureReplay.css';
 
 type Action = 'open' | 'close' | 'refresh' | 'image';
-const sizeLabel = (size: number) => size >= 1024 ** 3 ? `${(size / 1024 ** 3).toFixed(1)} GB` : `${(size / 1024 ** 2).toFixed(1)} MB`;
+const sizeLabel = (size: number, locale: string) => new Intl.NumberFormat(locale, {
+  style: 'unit', unit: size >= 1024 ** 3 ? 'gigabyte' : 'megabyte', maximumFractionDigits: 1,
+}).format(size >= 1024 ** 3 ? size / 1024 ** 3 : size / 1024 ** 2);
+
+const copied = (value: string) => async () => {
+  try {
+    await copyAppText(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdcContextPanelViewModel }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const labels = useUiLabels();
   const { state, selection, error: connectionError, actionFailure, reload, receive } = useCaptureReplay(scope);
   const recovery = useCaptureRecovery(scope, state?.revision);
   const devices = useDeviceStore((value) => value.devices);
@@ -39,8 +55,6 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const [action, setAction] = useState<Action | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState<{ message: string; action: Action } | null>(null);
-  const [more, setMore] = useState(false);
-  const [copied, setCopied] = useState(false);
   const actualInputId = state?.inputId ?? selection?.inputId ?? capture.availableCaptures[0]?.inputId ?? '';
   const actualDeviceId = state?.replayDeviceId ?? 'local';
   const targetDeviceId = state?.preparation.targetDeviceId ?? actualDeviceId;
@@ -102,42 +116,38 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       export_failure: t(FACT_LABELS.export_failure),
     },
   });
+  const deviceLabel = (deviceId: string) => (deviceId === 'local' ? t('device.local')
+    : devices.find((device) => device.id === deviceId)?.label ?? t('control.replay.unknownDevice'));
+  // The rail tab already names this panel; the status chip leads instead of a second title.
   return <div className="capture-replay-panel" aria-label={t('control.rightRail.capture.controls')}>
     <div className="capture-replay-status-row">
-      <h2 className="right-rail-section-heading">{t('control.rightRail.capture.title')}</h2>
       <CaptureReplayStatusChip label={t(captureStatusLabelKey({ pending, partial, phase: state?.phase }))} tone={statusTone} />
-      <Button variant="ghost" size="sm" aria-label={t('control.replay.more')} aria-expanded={more} onClick={() => setMore(!more)}><Icon name="more" /></Button>
     </div>
-    {more && <div className="capture-replay-menu">
-      <Button variant="ghost" size="sm" disabled={!state?.contextId} onClick={() => {
-        if (state?.contextId) void copyAppText(state.contextId).then(() => setCopied(true)).catch((reason) => setError({ message: errorDetail(reason), action: 'refresh' }));
-      }}>{t(copied ? 'control.replay.copied' : 'control.replay.copyContext')}</Button>
-    </div>}
-    <div className="capture-replay-file-row" data-tooltip={selectedInput?.filePath}>
+    <div className="capture-replay-file-row" data-tooltip={selectedInput ? `${selectedInput.fileName} · ${sizeLabel(selectedInput.sizeBytes, language)}` : undefined}>
       <Select dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
         options={capture.availableCaptures.map((input) => ({ value: input.inputId, label: input.fileName }))} disabled={disabled}
         onChange={(inputId) => setDraft({ ...chosen, inputId })} />
-      <small>{selectedInput ? sizeLabel(selectedInput.sizeBytes) : ''}</small>
     </div>
     <div className="capture-replay-device-row">
       <Select dataTestId="right-rail-replay-device" ariaLabel={t('control.sessionContextDevice')} value={targetDeviceId} disabled={deviceDisabled}
-        options={[...devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: device.type === 'android' && device.adbState !== 'device' })), ...(devices.some((device) => device.id === targetDeviceId) ? [] : [{ value: targetDeviceId, label: targetDeviceId, disabled: true }])]}
+        options={[...devices.map((device) => ({ value: device.id, label: device.type === 'local' ? t('device.local') : device.label, disabled: device.type === 'android' && device.adbState !== 'device' })), ...(devices.some((device) => device.id === targetDeviceId) ? [] : [{ value: targetDeviceId, label: deviceLabel(targetDeviceId), disabled: true }])]}
         onChange={(deviceId) => { void useSessionDeviceStore.getState().prepare(scope, deviceId); }} />
       <Button variant="ghost" size="sm" aria-label={t('control.replay.refresh')} aria-busy={action === 'refresh'} disabled={disabled} onClick={() => void run('refresh')}><Icon name="refresh" /></Button>
       <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput || (!open && !deviceReady)} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
     </div>
-    {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {devices.find((device) => device.id === actualDeviceId)?.label}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
+    {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {deviceLabel(actualDeviceId)}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
     {recovery.status && <div className="capture-replay-callout is-warning" aria-live="polite">
       <div className="capture-replay-callout-copy"><strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
-        <small>{recovery.status.original ? `${recovery.status.original.fileName} · ${recovery.status.original.deviceId} · EID ${recovery.status.original.eventId}` : t('control.replay.recoveryNoCapture')}</small>
-        <small>{t('control.replay.recoveryDescription')}</small></div>
-      <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} onClick={() => {
+        <small>{recovery.status.original
+          ? [recovery.status.original.fileName, deviceLabel(recovery.status.original.deviceId), t('control.replay.eventNumber', { id: recovery.status.original.eventId })].join(' · ')
+          : t('control.replay.recoveryNoCapture')}</small></div>
+      <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} data-tooltip={t('control.replay.recoveryDescription')} onClick={() => {
         if (!state) return;
         setRestoring(true);
         void recovery.restore(state.generation).then(async next => { if (next) { receive(next); await refreshProjection(); } }).finally(() => setRestoring(false));
       }}>{t('control.replay.recoveryAction')}</Button>
     </div>}
-    {recovery.error && <div className="capture-replay-callout is-error" role="alert"><div className="capture-replay-callout-copy"><strong>{t('control.replay.recoveryFailed')}</strong><small>{recovery.error}</small></div></div>}
+    {recovery.error && <InlineError detail={recovery.error}>{t('control.replay.recoveryFailed')}</InlineError>}
     <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} hasCapture={open} disabled={locked}
       onRetry={() => { void useSessionDeviceStore.getState().prepare(scope, installUnconfirmed ? targetDeviceId : actionFailure?.deviceId ?? targetDeviceId); }}
       onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />
@@ -150,6 +160,14 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     />
     <CaptureWorkspace scope={scope} state={state}
       disabled={disabled || !open || pending || state?.error?.retry === 'close'} receive={receive} />
+    <Details className="capture-replay-diagnostics" summary={labels.diagnostics}>
+      <dl className="capture-replay-diagnostics-list">
+        <div><dt>{t('control.replay.contextId')}</dt><dd>{state?.contextId ? <><code>{state.contextId}</code>
+          <CopyButton onCopy={copied(state.contextId)} label={t('control.replay.copyContext')} copiedLabel={t('control.rightRail.artifacts.copied')} /></> : '—'}</dd></div>
+        <div><dt>{t('control.replay.deviceId')}</dt><dd><code>{actualDeviceId}</code></dd></div>
+        {selectedInput ? <div><dt>{t('control.replay.inputPath')}</dt><dd><code>{selectedInput.filePath}</code></dd></div> : null}
+      </dl>
+    </Details>
   </div>;
 }
 

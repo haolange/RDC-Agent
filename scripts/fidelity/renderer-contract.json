@@ -131,6 +131,7 @@
     "hooks.appShellBridge": "src/renderer/hooks/appShellBridge.ts",
     "rightRail.artifactList": "src/renderer/features/right-rail/RightRailArtifactList.tsx",
     "rightRail.investigationPreview": "src/renderer/features/right-rail/RightRailInvestigationPreview.tsx",
+    "rightRail.reportView": "src/renderer/features/right-rail/RightRailReportView.tsx",
     "rightRail.artifactGlyphs": "src/renderer/features/right-rail/RightRailArtifactGlyphs.tsx",
     "rightRail.outputList": "src/renderer/features/right-rail/RightRailOutputList.tsx",
     "rightRail.context": "src/renderer/features/right-rail/RightRailContext.tsx",

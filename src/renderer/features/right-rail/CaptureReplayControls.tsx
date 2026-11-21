@@ -44,19 +44,19 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
       <span>{t(state?.isFinalOutput ? 'control.replay.final' : 'control.replay.event')}</span>
       {(state?.targets.length ?? 0) > 0 && <Select dataTestId="capture-color-target" ariaLabel={t('control.replay.color')}
         value={state?.target?.textureId ?? ''} disabled={disabled || state?.appliedEventId == null}
-        options={(state?.targets ?? []).map((target) => ({ value: target.textureId, label: target.outputSlot === null ? t('control.replay.final') : `Color ${target.outputSlot}` }))}
+        options={(state?.targets ?? []).map((target) => ({ value: target.textureId, label: target.outputSlot === null ? t('control.replay.final') : t('control.replay.colorTarget', { slot: target.outputSlot }) }))}
         onChange={(textureId) => state?.appliedEventId != null && select(state.appliedEventId, true, { textureId })} />}
     </div>
     <div className="capture-event-controls">
       <Button variant="ghost" size="sm" aria-label={t('control.replay.previous')} disabled={disabled || position === 0} onClick={() => select(events[position - 1].eventId, true)}><Chevron direction="left" /></Button>
-      <label className="capture-event-input">EID <Input inputSize="sm" aria-label={t('control.replay.eventId')} value={draft} disabled={disabled || !events.length}
+      <label className="capture-event-input">{t('control.replay.eventLabel')} <Input inputSize="sm" aria-label={t('control.replay.eventId')} value={draft} disabled={disabled || !events.length}
         inputMode="numeric" onChange={(event) => setDraft(event.target.value)}
         onBlur={() => { const value = Number(draft); if (events.some((event) => event.eventId === value)) { if (value !== eventId) select(value, true); } else setDraft(String(eventId ?? '')); }}
         onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>
       <Button variant="ghost" size="sm" aria-label={t('control.replay.next')} disabled={disabled || !events.length || position >= events.length - 1} onClick={() => select(events[position + 1].eventId, true)}><Chevron /></Button>
     </div>
     <input className="capture-event-slider" type="range" min={0} max={Math.max(0, events.length - 1)} value={position} disabled={disabled || events.length < 2}
-      aria-label={t('control.replay.eventSlider')} aria-valuetext={`EID ${eventId ?? '—'}`}
+      aria-label={t('control.replay.eventSlider')} aria-valuetext={eventId != null ? t('control.replay.eventNumber', { id: eventId }) : t('control.replay.event')}
       onChange={(event) => select(events[Number(event.target.value)].eventId)}
       onPointerUp={() => queue.flush()}
       onKeyUp={(event) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) queue.flush(); }} />

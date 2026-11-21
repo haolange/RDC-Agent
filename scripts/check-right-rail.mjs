@@ -131,7 +131,7 @@ const artifactPreview = [
 for (const required of ['investigation.read', 'expectedHash', 'TaskDialog', 'control.rightRail.artifacts.copyId', 'hash-mismatch']) {
   requireText(artifactPreview, required, `RightRailInvestigationPreview must retain ${required}`);
 }
-for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'ArtifactViewer', 'title={hash}', 'title={row.contentHash}']) {
+for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'ArtifactViewer', 'title={hash}', 'title={row.contentHash}', 'investigation-preview-id', 'browse.copy.']) {
   forbidText(artifactPreview, forbidden, `RightRailInvestigationPreview must not retain ${forbidden}`);
 }
 
@@ -141,7 +141,7 @@ for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:
 }
 
 const outputList = read('src/renderer/features/right-rail/RightRailOutputList.tsx');
-for (const required of ['OutputFileGlyph', "artifact.status === 'failed'", 'control.rightRail.outputs.missing', 'control.rightRail.outputs.open']) {
+for (const required of ['<Icon name="file"', "artifact.status === 'failed'", 'control.rightRail.outputs.missing', 'control.rightRail.outputs.open', 'control.rightRail.outputs.copyPath', '<Menu']) {
   requireText(outputList, required, `RightRailOutputList must retain ${required}`);
 }
 for (const forbidden of ['PlanArtifactPreview', 'isPlanArtifact', "artifact.type === 'plan'", 'previewMarkdown', 'plan.md', 'session_plan', 'artifact_store', 'run_report', 'action_output']) {
@@ -171,7 +171,13 @@ for (const required of ['RdcContextPanelViewModel', 'control.captureOpen', 'capt
 for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus', 'role="tablist"', 'role="tabpanel"', 'capture-replay-tabs', 'CaptureHistoryControls', 'agentObservation', 'returnCurrent']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
 const workspace = read('src/renderer/features/right-rail/CaptureWorkspace.tsx');
 if ((workspace.match(/className="capture-replay-image"/g) ?? []).length !== 1) fail('CaptureWorkspace must own exactly one image viewport');
+for (const retired of ['EID ', 'control.replay.more', '<h2 className="right-rail-section-heading">']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
+requireText(capturePanel, 'capture-replay-diagnostics', 'Capture keeps context and device ids under its diagnostics');
+const reportView = read('src/renderer/features/right-rail/RightRailReportView.tsx');
+for (const retired of ['investigation-report-note', 'investigation-report-meta', 'claim.claimKind}', 'claim.epistemic}']) forbidText(reportView, retired, `Report view must retire ${retired}`);
+requireText(reportView, 'labels.diagnostics', 'Report view keeps record ids under one diagnostics disclosure');
 const taskList = read('src/renderer/features/right-rail/RightRailTaskList.tsx');
+for (const retired of ['right-rail-task-order', 'right-rail-task-facts', 'right-rail-task-progress-label']) forbidText(taskList, retired, `Tasks must retire ${retired}`);
 for (const retired of ['stopLabel', 'useSessionWorkStop', 'stopBackgroundWork']) forbidText(taskList + tracePanel, retired, `Tasks must retire ${retired}`);
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
