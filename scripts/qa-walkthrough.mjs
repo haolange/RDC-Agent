@@ -38,6 +38,8 @@ const step = async (name, action) => {
 const composer = () => page.locator('.composer-textarea').first();
 const send = async (text) => {
   await closeOverlays(page);
+  // A turn still settling (a plan execution, a background delegation) keeps the Composer busy.
+  await page.getByTestId('debugger-start-button').waitFor({ timeout: 90_000 });
   await composer().click();
   await page.keyboard.type(text);
   await page.keyboard.press('Enter');
@@ -100,7 +102,15 @@ try {
   });
   await step('settings-agents', async () => {
     await openSettings(page, 'agents');
+    // Delegated Agents run on their own configured route, so the stub model becomes the default model.
+    await page.getByTestId('settings-agent-default-model').getByTestId('settings-model-cascade-trigger').click();
+    await page.locator('.settings-model-option[data-model-id="qa-stub:4b"]').first().click();
+    await page.waitForTimeout(1500);
     await shot('04-settings-agents');
+    await openSettings(page, 'general');
+    await shot('04b-settings-general');
+    await openSettings(page, 'appearance');
+    await shot('04c-settings-appearance');
     await closeOverlays(page);
   });
 
@@ -153,6 +163,25 @@ try {
     if (stuck) throw new Error('wheel scrolling did not move the transcript upward');
   });
 
+  await step('subagent', async () => {
+    await send('qa:subagent 请让一个子代理核对工作区里有没有 capture。');
+    const card = page.locator('[data-testid="work-process-subagent"]').last();
+    await card.waitFor({ timeout: 90_000 });
+    await page.waitForTimeout(1500);
+    await card.scrollIntoViewIfNeeded();
+    await shot('14b-subagent-running');
+    await waitForText('Verifier 核对完了');
+    await page.waitForTimeout(1200);
+    // A settled turn folds its work process; open it once so the settled card is in view.
+    if (!(await page.locator('[data-testid="work-process-subagent"]').last().isVisible())) {
+      await page.locator('.work-process-header').last().click();
+      await page.waitForTimeout(400);
+    }
+    await page.locator('.work-process-header').last().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await shot('14c-subagent-settled');
+  });
+
   await step('plan', async () => {
     await page.getByTestId('composer-mode-pill').click();
     await page.getByRole('menuitemradio', { name: /Debugger/ }).or(page.getByRole('option', { name: /Debugger/ })).first().click();
@@ -179,6 +208,22 @@ try {
     await shot('17-light-knowledge');
     await closeOverlays(page);
   });
+  await step('english', async () => {
+    await openSettings(page, 'general');
+    await page.locator('.settings-page-general').getByRole('tab', { name: /^English$/ }).click();
+    await page.waitForTimeout(800);
+    await shot('19-en-settings-general');
+    await closeOverlays(page);
+    await shot('20-en-conversation');
+    await page.getByTestId('sidebar-knowledge-center-trigger').click();
+    await page.locator('.knowledge-center-card-button').first().click();
+    await shot('21-en-knowledge');
+    await closeOverlays(page);
+    await openSettings(page, 'general');
+    await page.locator('.settings-page-general').getByRole('tab', { name: /^简体中文$/ }).click();
+    await closeOverlays(page);
+  });
+
   await step('narrow', async () => {
     await useTheme(page, 'dark');
     await page.setViewportSize({ width: 720, height: 900 });
