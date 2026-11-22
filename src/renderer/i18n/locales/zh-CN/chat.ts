@@ -221,7 +221,7 @@ export const zhChat = {
   'chat.taskWaitingDependencies': '等待前置任务',
   'chat.taskUntitled': '未命名任务',
   'chat.taskDependency.unfinished': '等待前置任务：{title}',
-  'chat.taskDependency.unverified': '前置任务完成证明待核验：{title}',
+  'chat.taskDependency.unverified': '等待「{title}」完成',
   'chat.taskDependency.missing': '前置任务记录不可用：{title}',
   'chat.workProcessTaskStatus.completed': '已完成',
   'chat.workProcessTaskStatus.cancelled': '已取消',

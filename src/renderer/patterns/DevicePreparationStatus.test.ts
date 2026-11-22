@@ -11,14 +11,15 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 const locale = vi.hoisted(() => ({ language: 'en' as 'en' | 'zh-CN' }));
 vi.mock('../i18n', () => ({ useI18n: () => ({ t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate(locale.language, key, params) }) }));
-it.each(['en', 'zh-CN'] as const)('uses a short localized failure with raw diagnostics only in disclosure (%s)', (language) => {
+it.each(['en', 'zh-CN'] as const)('uses a short localized failure and hands raw diagnostics to the copy action (%s)', (language) => {
   locale.language = language;
   const diagnostic = 'CheckRemoteServerConnection(127.0.0.1:51867) failed: '.repeat(30);
   const html = renderToStaticMarkup(createElement(DevicePreparationStatus, {
     preparation: { targetDeviceId: 'android', phase: 'failed', issue: { code: 'remote_version_mismatch', stage: 'verifying', diagnostic, recovery: 'retry', expectedVersion: '1.45', actualVersion: '1.36' } }, onRetry: () => {}, onCancel: () => {},
   }));
   expect(html).toContain(translate(language, 'device.issue.version'));
-  expect(html).toContain('<details'); expect(html).toContain('<pre');
+  expect(html).not.toContain('<details'); expect(html).not.toContain('CheckRemoteServerConnection');
+  expect(html).toContain(`aria-label="${translate(language, 'app.copyDiagnostics')}"`);
   expect(html).not.toMatch(/<p role="status"[^>]*>CheckRemoteServerConnection/);
   expect(html).toContain(translate(language, 'device.prepare.retry'));
 });
@@ -36,16 +37,18 @@ it.each(['en', 'zh-CN'] as const)('offers only explicit installation verificatio
     expect(html).toContain(translate(language, 'device.prepare.installUnconfirmed'));
     expect(html).toContain(translate(language, 'device.prepare.previousHelperRemoved'));
     expect(html).toContain(translate(language, 'device.prepare.retry'));
-    expect(html).toContain('<pre class="device-preparation-diagnostic">Package Manager did not settle</pre>');
-    expect(html.match(/<button/g)).toHaveLength(1);
+    expect(html).not.toContain('Package Manager did not settle');
+    expect(html).toContain(`aria-label="${translate(language, 'app.copyDiagnostics')}"`);
     const container = document.createElement('div'); container.innerHTML = html;
-    const actionLabels = [...container.querySelectorAll('button')].map(button => button.textContent);
+    const actionLabels = [...container.querySelectorAll('button')].map(button => button.textContent).filter(Boolean);
     expect(actionLabels).toEqual([translate(language, 'device.prepare.retry')]);
     expect(html).not.toContain('Verify and reconnect');
   }
-  expect(render(issue.code, null, 'cancelled')).not.toContain('<button');
+  // Only the copy glyph remains when no recovery is offered; a pending verification keeps one action besides it.
+  const actionButtons = (html: string) => (html.match(/<button[^>]*class="button[^"]*"/g) ?? []).length;
+  expect(actionButtons(render(issue.code, null, 'cancelled'))).toBe(0);
   const pending = render(issue.code, 'retry', 'verifying');
-  expect(pending.match(/<button/g)).toHaveLength(1);
+  expect(actionButtons(pending)).toBe(1);
   expect(pending).toContain('aria-busy="true"');
   expect(pending).toContain('aria-disabled="true"');
 });

@@ -206,7 +206,8 @@ try {
 
   await step('long', async () => {
     await send('qa:long 多轮核对工作区文件。');
-    await waitForText('导入这个 capture 后');
+    // Three hundred actions take minutes even against the local stub.
+    await waitForText('导入这个 capture 后', 360_000);
     await page.waitForTimeout(1200);
     await shot('11-long-settled');
   });

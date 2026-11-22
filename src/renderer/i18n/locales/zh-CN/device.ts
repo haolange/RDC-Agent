@@ -19,7 +19,6 @@ export const zhDevice = {
   'device.issue.installUnconfirmed': '设备上的安装结果尚未确认',
   'device.prepare.installUnconfirmed': '未能确认安装结果。重试会先检查设备再继续连接；已发生的安装不会回滚。',
   'device.prepare.previousHelperRemoved': '此次安装尝试前，原有服务已被卸载。',
-  'device.prepare.details': "诊断详情",
   'device.prepare.cancel': "取消连接",
   'device.prepare.retry': "重试连接",
   'device.prepare.configureTools': "请在设置中检查 RDC-Tool 安装。",

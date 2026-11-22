@@ -124,7 +124,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     {recovery.status && <div className="capture-replay-callout is-warning" aria-live="polite">
       <div className="capture-replay-callout-copy"><strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
         <small>{recovery.status.original
-          ? [recovery.status.original.fileName, deviceLabel(recovery.status.original.deviceId), t('control.replay.eventNumber', { id: recovery.status.original.eventId })].join(' · ')
+          ? [recovery.status.original.fileName, deviceLabel(recovery.status.original.deviceId)].join(' · ')
           : t('control.replay.recoveryNoCapture')}</small></div>
       <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} data-tooltip={t('control.replay.recoveryDescription')} onClick={() => {
         if (!state) return;
@@ -138,7 +138,6 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />
     <CaptureReplayCallouts
       callouts={callouts}
-      detailLabel={t('device.prepare.details')}
       disabled={disabled}
       retryLabels={{ open: t('control.replay.retryOpen'), close: t('control.replay.retryClose'), image: t('control.replay.retryImage') }}
       onRetry={(operation) => void run(operation)}

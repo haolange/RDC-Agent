@@ -117,4 +117,10 @@ export const formatMcpTarget = (toolName: string): string => {
 };
 
 /** The Work Process card family for a tool: the catalog entry's, MCP tools share one, others are generic. */
+/** What a tool does, in the interface language; wire names never reach the surface. MCP tools read as server/tool. */
+export const toolDisplayName = (toolName: string, t: (key: TranslationKey) => string): string => {
+  const display = (WORK_PROCESS_TOOL_DISPLAY_CATALOG as Record<string, WorkProcessToolDisplay | undefined>)[normalizeToolName(toolName)];
+  return display ? t(display.category) : formatMcpTarget(toolName) || toolName;
+};
+
 export const getToolFamily = (toolName: string): WorkProcessToolFamily => getToolDisplay(toolName).family;

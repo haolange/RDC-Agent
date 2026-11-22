@@ -19,7 +19,6 @@ export const enDevice = {
   'device.issue.installUnconfirmed': 'Device installation outcome is unconfirmed',
   'device.prepare.installUnconfirmed': 'Installation could not be verified. Retry to check the device and continue connecting; the previous installation is not rolled back.',
   'device.prepare.previousHelperRemoved': 'The previous helper was uninstalled before this installation attempt.',
-  'device.prepare.details': "Diagnostic details",
   'device.prepare.cancel': "Cancel connection",
   'device.prepare.retry': "Retry connection",
   'device.prepare.configureTools': "Check the RDC-Tool installation in Settings.",

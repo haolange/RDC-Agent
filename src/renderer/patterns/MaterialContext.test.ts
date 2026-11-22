@@ -75,7 +75,9 @@ describe('Material task dialogs', () => {
     act(() => button('material.openOriginal').click());
     expect(onOpenOriginal).toHaveBeenCalledWith('a');
     expect(document.querySelector('.material-context-preview rect')?.getAttribute('width')).toBe('1');
-    expect(document.querySelector('.material-context-gallery code')?.textContent).toBe('abc');
+    // The source fingerprint is not shown; it leaves through the copy action.
+    expect(document.querySelector('.material-context-gallery')?.textContent).not.toContain('abc');
+    expect(document.querySelector('.material-context-gallery button[aria-label="app.copyDiagnostics"]')).not.toBeNull();
     act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(viewerClose).toHaveBeenCalledTimes(1);
     expect(outerClose).not.toHaveBeenCalled();

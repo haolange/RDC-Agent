@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
 import { OverflowFade } from '../../ui/OverflowFade';
+import { toolDisplayName } from './workProcessToolCatalog';
 import type { ToolOutcome } from './workProcessOutcome';
 
 export const ToolOutcomeSummary: React.FC<{ outcome: ToolOutcome }> = ({ outcome }) => {
@@ -14,7 +15,7 @@ export const ToolOutcomeSummary: React.FC<{ outcome: ToolOutcome }> = ({ outcome
   } else if (outcome.type === 'completion') {
     title = t(`chat.toolOutcomeCompletion.${outcome.disposition}`);
   } else {
-    title = outcome.names.join(t('chat.listSeparator')) || t('chat.toolOutcomeNoTools');
+    title = outcome.names.map((name) => toolDisplayName(name, t)).join(t('chat.listSeparator')) || t('chat.toolOutcomeNoTools');
     meta = t(outcome.count === 1 ? 'chat.toolOutcomeToolOne' : 'chat.toolOutcomeToolsCount', { count: outcome.count });
   }
   const items = outcome.type === 'completion' ? outcome.unresolved ?? [] : [];

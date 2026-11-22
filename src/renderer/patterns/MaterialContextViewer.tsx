@@ -1,5 +1,5 @@
 import React from 'react';
-import { Details } from '../ui/Details';
+import { CopyDiagnosticsButton } from './CopyDiagnostics';
 import { Button } from '../ui';
 import { TaskDialog } from '../ui/TaskDialog';
 import { useI18n } from '../i18n';
@@ -28,7 +28,7 @@ export const MaterialContextViewer: React.FC<{
         {item.material?.timeRange && <p>{item.material.timeRange.startSeconds}–{item.material.timeRange.endSeconds} s</p>}
         {item.material?.comparison && <p>{({ baseline: t('material.viewerBaseline'), reference: t('material.viewerReference'), after: t('material.viewerAfter'), diff: t('material.viewerDiff') })[item.material.comparison.role]} · {item.material.comparison.group}<br />{item.material.comparison.conditions}</p>}
         <Button variant="ghost" onClick={() => onOpenOriginal(item.id)}>{t('material.openOriginal')}</Button>
-        {item.hash && <Details summary={t('material.fingerprint')}><code>{item.hash}</code></Details>}
+        {item.hash ? <CopyDiagnosticsButton facts={[{ label: t('material.fingerprint'), value: item.hash }]} /> : null}
       </figure>)}</div>
   </TaskDialog>;
 };

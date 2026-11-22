@@ -237,7 +237,7 @@ export const enChat = {
   'chat.taskWaitingDependencies': 'Waiting for prerequisites',
   'chat.taskUntitled': 'Untitled task',
   'chat.taskDependency.unfinished': 'Waiting for: {title}',
-  'chat.taskDependency.unverified': 'Completion evidence required: {title}',
+  'chat.taskDependency.unverified': 'Waiting for “{title}” to finish',
   'chat.taskDependency.missing': 'Prerequisite record unavailable: {title}',
   'chat.workProcessTaskStatus.completed': 'Completed',
   'chat.workProcessTaskStatus.cancelled': 'Cancelled',

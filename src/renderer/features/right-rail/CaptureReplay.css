@@ -94,5 +94,3 @@
 
 .capture-workspace-owner { color: var(--token-text-secondary); }
 .capture-workspace-owner.is-locked { color: var(--token-status-info); }
-
-.capture-replay-diagnostic { max-width: 100%; max-height: calc(var(--control-height-md) * 5); overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; font-size: var(--type-meta-size); }
