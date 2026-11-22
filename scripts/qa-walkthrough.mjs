@@ -285,6 +285,8 @@ try {
 
   await step('partial', async () => {
     // An approved execution that can only finish part of its goal: one honest reply, no reports stacked inside Working.
+    // The previous execution must settle first; the Agent pill is locked while a turn runs.
+    await page.getByTestId('debugger-start-button').waitFor({ timeout: 180_000 });
     await page.getByTestId('composer-mode-pill').click();
     await page.getByRole('menuitemradio', { name: /Debugger/ }).or(page.getByRole('option', { name: /Debugger/ })).first().click();
     await send('qa:partial 定位这一帧唯一的 draw 调用，并读取它的管线状态。');

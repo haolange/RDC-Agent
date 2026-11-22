@@ -1,6 +1,7 @@
 import React from 'react';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
+import { useWorkProcessFolded } from './workProcessFold';
 import type { WorkProcessRow } from './workProcessTypes';
 
 const THRESHOLD = 24;
@@ -34,6 +35,9 @@ export const MeasuredWorkRows: React.FC<{
   className: string;
 }> = ({ rows, renderRow, className }) => {
   const listRef = React.useRef<HTMLOListElement>(null);
+  // Folded rows take no space; windowing by their earlier heights would hide the reply behind empty spacers.
+  const folded = useWorkProcessFolded();
+  const windowed = rows.length > THRESHOLD && !folded;
   const heights = React.useRef(new Map<string, number>());
   const [revision, setRevision] = React.useState(0);
   const [range, setRange] = React.useState({ start: 0, end: Math.min(rows.length, 12) });
@@ -44,14 +48,14 @@ export const MeasuredWorkRows: React.FC<{
   const updateRange = React.useCallback(() => {
     const list = listRef.current;
     const scroller = list ? nearestScroller(list) : null;
-    if (!list || !scroller || rows.length <= THRESHOLD) return;
+    if (!list || !scroller || !windowed) return;
     const listTop = list.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
     const viewStart = Math.max(0, scroller.scrollTop - listTop);
     const viewEnd = viewStart + scroller.clientHeight;
     const start = Math.max(0, indexAt(offsetsRef.current, viewStart) - OVERSCAN);
     const end = Math.min(rows.length, indexAt(offsetsRef.current, viewEnd) + OVERSCAN + 1);
     setRange((current) => current.start === start && current.end === end ? current : { start, end });
-  }, [rows.length]);
+  }, [rows.length, windowed]);
 
   // The scroller changes when the Working window switches between following and showing everything, without the
   // row count changing; after every render the listeners move to whichever element actually scrolls.
@@ -94,7 +98,7 @@ export const MeasuredWorkRows: React.FC<{
       const rowId = rows[index].id;
       detail.candidates.push({ element: list, reveal: () => {
         const scroller = nearestScroller(list);
-        if (scroller && rows.length > THRESHOLD) {
+        if (scroller && windowed) {
           const listTop = list.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
           scroller.scrollTop = listTop + (offsetsRef.current[index] ?? 0);
           updateRange();
@@ -129,10 +133,10 @@ export const MeasuredWorkRows: React.FC<{
     };
     document.addEventListener(WORK_PROCESS_LOCATE_TASK_EVENT, locate);
     return () => document.removeEventListener(WORK_PROCESS_LOCATE_TASK_EVENT, locate);
-  }, [rows, updateRange]);
+  }, [rows, updateRange, windowed]);
 
   React.useEffect(() => {
-    if (rows.length <= THRESHOLD || typeof ResizeObserver === 'undefined') return;
+    if (!windowed || typeof ResizeObserver === 'undefined') return;
     const list = listRef.current;
     if (!list) return;
     const scroller = nearestScroller(list);
@@ -164,9 +168,9 @@ export const MeasuredWorkRows: React.FC<{
     });
     children.forEach((child) => observer.observe(child));
     return () => observer.disconnect();
-  }, [rows, range.start, range.end]);
+  }, [rows, range.start, range.end, windowed]);
 
-  if (rows.length <= THRESHOLD) return <ol ref={listRef} className={className}>{rows.map(renderRow)}</ol>;
+  if (!windowed) return <ol ref={listRef} className={className}>{rows.map(renderRow)}</ol>;
   return <ol ref={listRef} className={className} data-virtualized="true">
     {range.start > 0 ? <Spacer height={offsets[range.start] ?? 0} /> : null}
     {rows.slice(range.start, range.end).map(renderRow)}

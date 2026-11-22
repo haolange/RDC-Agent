@@ -7,6 +7,7 @@ import { ScopedWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDiscl
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { WorkProcessContent } from './WorkProcessContent';
 import { planDeliverables } from './planDeliverables';
+import { WorkProcessFoldProvider } from './workProcessFold';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 interface WorkProcessProps {
@@ -65,7 +66,11 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
         </button>
       </div>
 
-      {hasBody ? <WorkProcessContent presentation={presentation} sessionId={sessionId} active={running} /> : null}
+      {hasBody ? (
+        <WorkProcessFoldProvider value={!expanded}>
+          <WorkProcessContent presentation={presentation} sessionId={sessionId} active={running} />
+        </WorkProcessFoldProvider>
+      ) : null}
     </section>
   );
 };
