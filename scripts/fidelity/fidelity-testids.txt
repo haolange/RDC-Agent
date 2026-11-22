@@ -261,7 +261,6 @@ settings-provider-oauth-summary
 settings-provider-oauth-waiting
 settings-provider-probe-batch
 settings-provider-probe-disclosure
-settings-provider-protocol-summary
 settings-provider-row-${provider.id}
 settings-provider-search
 settings-provider-tool-calling-unsupported

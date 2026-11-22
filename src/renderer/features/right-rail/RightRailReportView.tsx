@@ -1,8 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
-import { useUiLabels } from '../../lib/useUiLabels';
+import { CopyDiagnosticsButton } from '../../patterns/CopyDiagnostics';
 import { Badge } from '../../ui/Badge';
-import { Details } from '../../ui/Details';
 import type { ClaimRecord, InvestigationReport } from '@shared/types/renderdocInvestigation';
 
 const prefix = 'control.rightRail.artifacts.preview.report' as const;
@@ -14,7 +13,6 @@ const prefix = 'control.rightRail.artifacts.preview.report' as const;
  */
 export const RightRailReportView: React.FC<{ report: InvestigationReport }> = ({ report }) => {
   const { t } = useI18n();
-  const labels = useUiLabels();
   const contract = report.reportContract;
   const missing = t(`${prefix}.notRecorded`);
   const text = (value: string | undefined) => value?.trim() || missing;
@@ -46,13 +44,8 @@ export const RightRailReportView: React.FC<{ report: InvestigationReport }> = ({
       <ReportSection title={t(debuggerMission ? `${prefix}.experiment` : `${prefix}.experimentGeneral`)}>{text(contract?.verification)}</ReportSection>
       <ReportSection title={t(`${prefix}.limits`)}>{text(contract?.limitations)}</ReportSection>
       <ReportSection title={t(`${prefix}.conclusion`)}>{text(contract?.conclusion)}</ReportSection>
-      <Details className="investigation-report-diagnostics" summary={labels.diagnostics}>
-        <dl className="investigation-report-index">
-          {diagnostics.map(([label, values]) => (
-            <div key={label}><dt>{label}</dt><dd>{values.length ? values.join(' · ') : missing}</dd></div>
-          ))}
-        </dl>
-      </Details>
+      <CopyDiagnosticsButton className="investigation-report-copy-diagnostics"
+        facts={diagnostics.map(([label, values]) => ({ label, value: values.join(' · ') }))} />
     </article>
   );
 };

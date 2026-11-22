@@ -5,13 +5,14 @@ import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { errorDetail } from '../../../../lib/errorDetail';
-import { SettingsDiagnostics, type SettingsDiagnosticsRow } from '../parts';
+import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
 import { getRdcOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
 import { ResourceTrustBlock } from './ResourceTrustBlock';
 import { commandLine, hookEventLabel, timeoutSeconds } from './resourceLabels';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 import { formFromContent } from './scopedResourceForm';
+import type { DiagnosticFact } from '../../../../patterns/CopyDiagnostics';
 import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 
 type HookOverview = RdcRuntimeOverview['hooks'][number];
@@ -91,7 +92,7 @@ export const HooksSettings: React.FC<{
     const busy = busyId === resource.id;
     const canTest = Boolean(hook) && (trust === 'builtin' || trust === 'trusted');
     const seconds = timeoutSeconds(form.timeoutMs);
-    const diagnostics: SettingsDiagnosticsRow[] = [
+    const diagnostics: DiagnosticFact[] = [
       { label: t('settings.resourceScope'), value: resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') },
       { label: t('settings.scopeResourceLocation'), value: resource.sourcePath },
       ...(hook ? [
@@ -164,7 +165,7 @@ export const HooksSettings: React.FC<{
           && testResult.fingerprint === hook?.trustFingerprint && canTest ? (
           <pre className="settings-runtime-result" data-testid="settings-hook-test-result">{testResult.text}</pre>
         ) : null}
-        <SettingsDiagnostics testId="settings-hook-diagnostics" rows={diagnostics} />
+        <CopyDiagnosticsButton testId="settings-hook-diagnostics" facts={diagnostics} />
       </div>
     );
   };

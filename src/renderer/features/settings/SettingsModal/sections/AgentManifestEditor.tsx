@@ -8,7 +8,8 @@ import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
-import { SettingsDiagnostics, SettingsSection } from '../parts';
+import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
+import { SettingsSection } from '../parts';
 import { InlineError } from '../../../../ui/InlineError';
 import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
@@ -259,9 +260,9 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           })}
         </div>
 
-        <SettingsDiagnostics
+        <CopyDiagnosticsButton
           testId="settings-agent-diagnostics"
-          rows={[
+          facts={[
             { label: t('settings.resourceFieldId'), value: selectedAgent.id },
             { label: t('settings.resourceScope'), value: provenanceLabel(provenanceScope, t) },
             ...(provenance ? [

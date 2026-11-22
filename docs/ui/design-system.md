@@ -18,9 +18,9 @@
 |------|------|------|
 | L1 表面 | 默认 | 动词加对象的标题、失败及原因（红色一句话）、Working 耗时、需要用户处理的状态、主要动作 |
 | L2 展开 | 点开这一项 | 排好版的内容预览（网页标题与首段、文件片段、命令输出）、参数与原始回执（工具卡片体系的 Raw 层，默认收起）、执行事实（后台、Agent、模型）的悬停与详情 |
-| L3 诊断 | 每个对象唯一的「诊断」入口，或运行记录抽屉 | `session://` 地址、call id、哈希、revision、canonicalId、agent id、内部路径、HTTP 状态码、字节数、行数、协议、端点、证据来源、能力协商、上下文档位授权方式 |
+| 不上界面 | 只经「⋯ › 复制诊断信息」或错误旁的「复制详情」进剪贴板；运行时事件看运行记录抽屉 | `session://` 地址、call id、哈希、revision、canonicalId、agent id、内部路径、HTTP 状态码、字节数、行数、协议、端点、证据来源、能力协商、上下文档位授权方式 |
 
-诊断入口统一叫「诊断」，在对象底部或「⋯」菜单里，只有一层，不再在详情里套折叠。失败的 HTTP 状态码写进 L1 的错误句，其余状态码留在诊断。原生披露统一使用 `Details`；已有复杂交互继续由专属组件组合，不能在整行按钮内嵌套开关或其他按钮。
+没有「诊断」折叠块：技术事实不是界面的一层，只是一次复制动作（`patterns/CopyDiagnostics` 的 `CopyDiagnosticsButton` / `useCopyDiagnostics`）。Working 卡片的原始回执层是用户定的保留资产，不在此列。失败的 HTTP 状态码写进 L1 的错误句。原生披露统一使用 `Details`；已有复杂交互继续由专属组件组合，不能在整行按钮内嵌套开关或其他按钮。
 
 减法有边界：错误、权限待确认、未保存、写入确认、会产生费用的操作始终可见；原始回执、子代理实际发送的载荷、产物哈希校验失败的状态一次点击可达；未知显示「—」、真实零值显示「0」、未声明的能力不显示成「关闭」；中途失败不汇总成全部成功，隐藏的思考不补造；移进悬停提示的信息必须有可访问名称或 `aria-*`，键盘聚焦可达。
 
@@ -51,22 +51,22 @@ RDC-Agent 是 **现代精密工作台**：工作区高密度，其余处从容�
 | 维度 | 契约值 |
 |------|------|
 | 表面信息量 | 每行最多 1 个图标 + 1 句主文 + 1 个紧贴对象的数字（耗时）；不出现第二句 |
-| 说明性小字 | 14px 以下的说明句为 0；12px 只给时间戳和耗时；最浅的说明灰只给占位与禁用；设置页的说明只保留风险与不可逆项 |
+| 说明 | 需要解释的用次级正文（正文字号、次级色）写在标签下，不用 12px 灰字，也不全靠 ⓘ；12px 只给时间戳和耗时；最浅的说明灰只给占位与禁用 |
 | 字号与字重 | 4 档：18 / 15 / 14 / 12；字重只用 400 与 600 |
 | 文字层级 | 3 级：主文、次要、禁用；强调色只用于进行中、选中、主操作 |
 | 状态色 | 完成绿、进行中强调色、受阻琥珀、失败红、取消灰加删除线；完成项标题保持主文色 |
-| 表面禁止项 | `session://`、8 位以上十六进制哈希、原始工具 id、HTTP 状态码、字节数、原始 provider / model id、原始枚举：默认画面出现 0 次 |
+| 表面禁止项 | `session://`、8 位以上十六进制哈希、原始工具 id 与 `snake_case` 标识、HTTP 状态码、字节数、原始 provider / model id、原始枚举、回执句、「诊断」折叠：默认画面出现 0 次 |
 | 溢出渐隐 | 单行放不下时不换行、不写「+N」；从宽度 70% 处开始渐隐，到末端完全透明（`OverflowFade`） |
 | 跟随视窗 | 高 `min(40vh, 360px)`；顶部遮罩 0% 全透明、18% 处 25% 不透明、45% 处完全不透明；跟随滚动 200ms 缓动 |
 | 动效时长 | 微交互 120ms；展开与面板 180–240ms；循环氛围动效 1.5–2.9s；每个进场都有退场；一条 transition 只有一条缓动 |
-| 靠近高亮 | 柔光半径 160–220px，背景峰值不透明度约 0.2，描边高亮段约 0.7；离开后 120ms 淡出；只在指针设备上出现 |
+| 悬停定位 | 只作用于 Working 里可点开的行标题：静止为次级色、字重 400，悬停或键盘聚焦时变主色、600，颜色 120ms 过渡；用隐藏的粗体副本预留宽度，文字不跳；图标、耗时、状态、展开正文、叙述与思考段落不变；不加背景、不加描边；只在 `hover: hover` 指针设备上出现 |
 | 控件唯一 | 一个概念一个控件；同一个数字一屏只出现一次 |
 | 图标 | 只有 `ui/Icon` 一套，线宽 1.6，行内 16px；文字当图标为 0 |
 | 胶囊 | 高 `--chip-height`（24px），网站图标 `--chip-icon-size`（14px），标题用正文角色，胶囊间距 8px（4px 网格） |
 | 圆角与间距 | 卡片 10，面板 14–18，胶囊全圆；间距走 4px 网格，行间距 8–10 |
 | 解释的去处 | 需要解释的放进 `data-tooltip` 或 `HelpTip`，或让控件自己说明（预览缩略图），不写进界面 |
 
-**保留资产**：Working 工具卡片体系（卡壳、卡头「图标 · 标题 · 状态 · 耗时 · 箭头」、正文层、展开详情、原始回执层）、「已思考 · 时长」、Active 扫光、Composer 折射边缘、Max 粒子、子代理点阵和光标靠近高亮。减法不碰它们，只清理其中露出的调试字段；`check:ui-contract` 为每项保留一条回归检查。
+**保留资产**：Working 工具卡片体系（卡壳、卡头「图标 · 标题 · 状态 · 耗时 · 箭头」、正文层、展开详情、原始回执层）、「已思考 · 时长」、Active 扫光、Composer 折射边缘、Max 粒子、子代理点阵和 Working 行的悬停定位。减法不碰它们，只清理其中露出的调试字段；`check:ui-contract` 为每项保留一条回归检查。
 
 ## 刻度（唯一真值：`src/renderer/styles/design-tokens.css`）
 
@@ -306,7 +306,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 - 一条 transition 只写一条缓动曲线（`transition: opacity var(--duration-fast) var(--ease-standard), transform …`），把两条曲线写进同一条声明会让整条失效，门禁拒绝。
 - 每个进场都有退场：TaskDialog、ReadingSheet、Settings、知识中心、Popover、Select、ContextMenu、Toast、Tooltip 共用 `design-motion.css` 的成对关键帧（`overlay-fade-*`、`surface-rise-*`、`popover-*`），关闭时元素带 `data-state="closing"` 播放退场，`ui/usePresence` 在它自己的 animationend 后卸载；没有退场动画或减少动效时立即卸载。
-- **光标靠近高亮**：`ui/proximity` 一个 document 级 `pointermove` 监听，按 rAF 合帧，只为当前悬停的 `[data-proximity]` 元素经 CSSOM 写入 `--proximity-x` / `--proximity-y`；纯 CSS 画以光标为中心的柔光（半径 160–220px，峰值约 0.2）与描边高亮段（约 0.7），离开后 120ms 淡出。范围：Working 的工具卡、子代理卡、计划卡与 Composer 外框；思考行与正文不加。触屏、键盘导航与系统减少动效下不出现；叠加扫光或折射边缘时不额外加亮。
+- **悬停定位**：浏览 Working 时帮人定位正在看的那一条，纯 CSS，没有 JS 监听。可点开的行（工具卡头、网页组卡头、子代理卡头、计划卡标题、可展开的思考行）的标题统一用 `.work-row-title`：静止 `--token-text-secondary` / 400，`@media (hover: hover)` 下行 `:hover` 或 `:focus-visible` 时 `--token-text-primary` / 600，颜色 `--transition-fast`；`::after { content: attr(data-text) }` 以 600 叠放并隐藏，撑住粗体宽度。卡头触发区不铺悬停底色。Composer 不参与，它只在聚焦时边缘增亮。
 - **跟随视窗**：Working 在「跟随最新」偏好下的限高容器，内容增长时用 200ms 缓动滚到底；用户上滚即暂停跟随。
 - 系统 `prefers-reduced-motion: reduce` 时，`design-reduced-motion.css` 把时长 token 置零，停掉 spin、骨架屏、子代理点阵、trace flash、agent 菜单运行点、靠近高亮与跟随缓动（直接跳到最新）；保留资产 Active Signal 与 Composer 折射边缘由真实运行状态驱动，不受系统偏好影响；Max 画布由 `EffortMaxField` 自己收束。
 
@@ -314,14 +314,14 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 - **提示**：任何元素写 `data-tooltip` 即可获得悬停提示，`ui/TooltipHost`（挂在 `AppProviders`）统一呈现：悬停 450ms 后出现，刚关闭一个后下一个立即出现，键盘聚焦立即出现，Escape、按下指针与离开即消失，触屏不出现；提示文字与元素可访问名称不同时以 `aria-describedby` 关联。组件不写原生 `title`；截断文字用 `OverflowFade`，只在真正溢出时提供完整文字。`HelpTip` 用于需要点击展开的较长说明。
 - **Toast**：`ui/Toast` + `NotificationToast` 是唯一的操作结果反馈：语气图标、一句标题、可选一句正文、关闭按钮；信息与成功 4s、警告 6s 自动消失，错误等待用户关闭，悬停或聚焦时暂停计时，最多同时 3 条。来源只有 `notificationStore`，技术细节不进 Toast。
-- **错误**：`ui/InlineError` 是唯一的错误呈现：错误图标 + 一句人话（正文字号）+ 可选「重试」+ 可选折叠的「诊断」（原始原因，等宽小字）。原始报错经 `lib/errorDetail` 只进诊断，门禁拒绝在组件里渲染 `String(error)` 或裸 `<p role="alert">`。
+- **错误**：`ui/InlineError` 是唯一的错误呈现：错误图标 + 一句人话（正文字号）+ 可选「重试」+ 有技术原因时一个「复制详情」图标按钮（经 `lib/clipboard` 的 `ClipboardContext`，由 `AppProviders` 注入）。原始报错经 `lib/errorDetail` 只进复制内容，门禁拒绝在组件里渲染 `String(error)` 或裸 `<p role="alert">`。
 - **复制**：`ui/CopyButton` 是唯一的复制入口：复制图标，成功后 1.6s 内变成绿色对勾，提示同步切换为「已复制」。
 - **图片**：`ui/ImageViewer` 是唯一的图片查看器：人话标题、缩放（按钮、滚轮、双击）、放大后拖动平移、上一张 / 下一张（方向键）与「打开原图」；Working 图片组、知识卡片图片与正文图片共用。
 - **加载**：`ui/Skeleton`（`line` / `row` / `card` / `block`）按将要出现的内容形状占位，不与「加载中…」文字同时出现；减少动效时停止流光。
 
 ## 浅色主题
 
-浅色不是深色的数值反转：它有自己的中性色阶与表面层级（`ThemeChromeCompiler` 的 light 预设），两套主题都过 WCAG AA（正文 4.5:1，大字与控件边界 3:1）。组件 CSS 不写任何字面颜色（含 `white`、`black`、`rgb(...)`、`rgba(...)`），旧的 `rgb(var(--color-*))` 写法已删除。保留动效按主题校准：扫光在浅色上用略深的光带，靠近高亮在浅色上降低不透明度并改用更深的强调色，折射边缘、Max 粒子与点阵分别校准亮度。窗口背景色与启动画面跟随所选主题。
+浅色不是深色的数值反转：它有自己的中性色阶与表面层级（`ThemeChromeCompiler` 的 light 预设），两套主题都过 WCAG AA（正文 4.5:1，大字与控件边界 3:1）。组件 CSS 不写任何字面颜色（含 `white`、`black`、`rgb(...)`、`rgba(...)`），旧的 `rgb(var(--color-*))` 写法已删除。保留动效按主题校准：扫光在浅色上用略深的光带，折射边缘、Max 粒子与点阵分别校准亮度。窗口背景色与启动画面跟随所选主题。
 
 ## 多语言与术语表
 
@@ -332,7 +332,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 | 任务 | Task | 右栏与 Working 的任务 |
 | 智能体 | Agent | 名称本身保持英文，如 General、Verifier |
 | 工作过程 | Working / Work process | 运行中叫「工作中」 |
-| 诊断 | Diagnostics | 每个对象唯一的技术详情入口 |
+| 复制诊断信息 | Copy diagnostics | 技术事实离开界面的唯一动作，放在对象的「⋯」或详情底部 |
 | 模型服务 | Model providers | 设置页 |
 | 推理 | Reasoning | Effort 面板标题与档位 |
 | 产物 | Artifacts | 调查记录 |
@@ -384,7 +384,7 @@ pnpm run typecheck
 | 右栏五标签单轨 | `check:right-rail` | — |
 | i18n 双语 key 一致、中英同值仅限白名单专有名词 | `check:i18n` | 0 |
 | 无效过渡（一条 transition 两条缓动）、图标只来自 `ui/Icon`、组件不内联 SVG 或文字图标、不把 `String(error)` / `error.message` 直接上屏、组件 CSS 无字面颜色、保留资产回归 | `check:ui-contract` | 0 |
-| 默认画面无 `session://`、长哈希、原始工具 id、裸状态码 | `qa-walkthrough.mjs` 可见文字扫描 | 0 |
+| 默认画面无 `session://`、长哈希、原始标识、裸状态码、字节数、回执句与「诊断」折叠 | `qa-walkthrough.mjs` 可见文字扫描 | 0 |
 | `:hover` 必配 `:focus-visible`、禁无替代 `outline: none` | 无自动门禁 | — |
 
 `check:design-tokens` 豁免仅限 token 与动效定义层：`design-system.css`、`design-tokens.css`、`design-motion.css`、`design-base.css`、`design-reduced-motion.css`（与脚本的 `EXEMPT_PREFIXES` 一致）。新增豁免必须先改本文件再改脚本。

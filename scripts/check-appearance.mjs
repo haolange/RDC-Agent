@@ -292,23 +292,22 @@ assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the
 // Keep the shared component path authoritative for ordinary configuration disclosure.
 for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx',
-  'src/renderer/features/settings/SettingsModal/parts/SettingsDiagnostics.tsx',
   'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
-  'src/renderer/features/knowledge/KnowledgeCenterModal/panels/RebuildIndexDialog.tsx',
   'src/renderer/patterns/MaterialContextEditor.tsx',
 ]) {
   const source = scriptRead(file);
   assert(source.includes('<Details'), `${file} must use shared Details`);
   assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
 }
-// A settings detail keeps ids, paths, protocols and hashes behind its one 「诊断」 entry.
+// Ids, paths, protocols and hashes never sit on a settings surface; they leave through one copy action.
 for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx',
   'src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx',
   'src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx',
 ]) {
   const source = scriptRead(file);
-  assert(source.includes('<SettingsDiagnostics'), `${file} must put its technical facts in SettingsDiagnostics`);
+  assert(source.includes('<CopyDiagnosticsButton') && !/SettingsDiagnostics|summary=\{labels\.diagnostics\}/.test(source),
+    `${file} must hand its technical facts to CopyDiagnosticsButton instead of a 诊断 disclosure`);
   assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
 }
 for (const file of ['Popover.tsx', 'Select/index.tsx', 'ContextMenu/index.tsx']) {

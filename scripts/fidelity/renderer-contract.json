@@ -164,7 +164,6 @@
     "settings.rdcInstallationFlow": "src/renderer/features/settings/SettingsModal/sections/useRdcInstallation.ts",
     "settings.mcpServicesPanel": "src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx",
     "settings.hooksSettings": "src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx",
-    "settings.diagnostics": "src/renderer/features/settings/SettingsModal/parts/SettingsDiagnostics.tsx",
     "settings.policySettings": "src/renderer/features/settings/SettingsModal/sections/PolicySettings.tsx",
     "settings.generalSettings": "src/renderer/features/settings/SettingsModal/sections/GeneralSettings.tsx",
     "settings.resourceListDetail": "src/renderer/features/settings/SettingsModal/parts/ResourceListDetail.tsx",

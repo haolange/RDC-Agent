@@ -25,17 +25,7 @@
   overflow-wrap: anywhere;
 }
 
-.ui-inline-error-detail {
-  margin-inline-start: var(--space-6);
-  color: var(--token-text-secondary);
-}
-
-.ui-inline-error-detail-text {
-  margin: var(--space-1) 0 0;
-  font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-line);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.ui-inline-error-copy {
+  flex-shrink: 0;
   color: var(--token-text-secondary);
 }

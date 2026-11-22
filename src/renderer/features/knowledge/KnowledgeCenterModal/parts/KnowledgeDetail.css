@@ -138,4 +138,3 @@
 .knowledge-center-index-facts > div { display: contents; }
 .knowledge-center-index-facts dt { color: var(--token-text-secondary); }
 .knowledge-center-index-facts dd { margin: 0; min-width: 0; color: var(--token-text-secondary); overflow-wrap: anywhere; }
-.knowledge-center-index-revision { font-family: var(--font-mono); }

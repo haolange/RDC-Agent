@@ -5,7 +5,8 @@ import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
 import { getProviderCategoryTranslation, getProviderProtocolLabel } from '../utils';
-import { SettingsDiagnostics, SettingsField } from '../parts';
+import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
+import { SettingsField } from '../parts';
 import { shouldUseProviderDocsLink } from '../providerConnectionState';
 import { hasProviderConnectionDefinitionChanged } from '../providerConnectionRequest';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
@@ -14,7 +15,7 @@ import { ProviderAuthModeField } from './ProviderAuthModeField';
 import { ProviderConnectModelList } from './ProviderConnectModelList';
 import { ProviderConnectActions } from './ProviderConnectActions';
 import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
-import { ProviderConnectionStatusLine, ProviderDiscoveryEmpty, ProviderProtocolSummary, connectionPhase } from './ProviderConnectSummary';
+import { ProviderConnectionStatusLine, ProviderDiscoveryEmpty, connectionPhase } from './ProviderConnectSummary';
 import type { ProviderConnectionDraft } from '../types';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
@@ -223,19 +224,12 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
           />
         )}
 
-        <SettingsDiagnostics
-          testId="settings-provider-diagnostics"
-          rows={[
-            { label: t('settings.providers.serviceId'), value: provider.id },
-            {
-              label: t('settings.providerProtocol'),
-              value: routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel,
-            },
-          ]}
-        >
-          {authMode !== 'account' ? <ProviderProtocolSummary provider={provider} t={t} /> : null}
-          <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy || !provider.isConfigured} t={t} />
-        </SettingsDiagnostics>
+        <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy || !provider.isConfigured} t={t} />
+        <CopyDiagnosticsButton testId="settings-provider-diagnostics" facts={[
+          { label: t('settings.providers.serviceId'), value: provider.id },
+          { label: t('settings.providerProtocol'),
+            value: routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel },
+        ]} />
       </div>
 
       <footer className="settings-provider-detail-footer">

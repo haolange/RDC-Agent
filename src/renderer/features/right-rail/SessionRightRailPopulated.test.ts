@@ -142,10 +142,11 @@ describe('populated session rail', () => {
       expect(dialog?.textContent).toContain('The root cause remains unknown.');
       expect(dialog?.textContent).toContain('Partial; no causal fix verified.');
       expect(dialog?.textContent).toContain('No intervention or restored-state receipt.');
-      expect(dialog?.querySelector('.investigation-report-diagnostics')?.hasAttribute('open')).toBe(false);
       const sections = [...(dialog?.querySelectorAll('.investigation-report section') ?? [])].map((section) => section.textContent).join('\n');
       expect(sections).not.toMatch(/\b0\d\b|partial|ev-1248/);
-      expect(dialog?.querySelector('.investigation-report-index')?.textContent).toContain('ev-1248');
+      // Record ids leave through the copy action; none is printed in the report.
+      expect(dialog?.textContent).not.toContain('ev-1248');
+      expect(dialog?.querySelector('.investigation-report-copy-diagnostics')).not.toBeNull();
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
       expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
     } finally { act(() => root.unmount()); host.remove(); }
@@ -164,8 +165,8 @@ describe('populated session rail', () => {
       expect(readInvestigationArtifact).toHaveBeenCalledExactlyOnceWith({ sessionId: 'session', artifactId: artifact.artifactId, expectedHash: artifact.contentHash });
       const dialog = document.querySelector('[data-testid="investigation-preview"]');
       expect(dialog?.textContent).toContain(artifact.title);
-      expect(dialog?.textContent).toContain('control.rightRail.artifacts.preview.state.error');
-      expect(dialog?.textContent).toContain('Artifact storage unavailable');
+      expect(dialog?.textContent).toContain('app.error.loadFailed');
+      expect(dialog?.textContent).not.toContain('Artifact storage unavailable');
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
       expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
     } finally { act(() => root.unmount()); host.remove(); }
@@ -180,7 +181,8 @@ describe('populated session rail', () => {
       openRailTab(host, 4);
       expect(host.querySelectorAll('[data-testid="right-rail-capture"]')).toHaveLength(1);
       expect(host.querySelector('.capture-replay-file-row')?.getAttribute('data-tooltip')).toMatch(/^Scene\.rdc · /);
-      expect(host.querySelector('.capture-replay-diagnostics-list')?.textContent).toContain('/captures/Scene.rdc');
+      expect(host.querySelector('[data-testid="capture-replay-copy-diagnostics"]')).not.toBeNull();
+      expect(host.querySelector('[data-testid="right-rail-capture"]')?.textContent).not.toContain('/captures/Scene.rdc');
       expect(host.querySelector('.capture-replay-status')?.textContent).toBe('control.replay.ready');
       expect(button('control.replay.close')?.disabled).toBe(false);
       expect(host.querySelector<HTMLInputElement>('.capture-event-input input')?.value).toBe('42');

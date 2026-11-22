@@ -1,15 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { bareInvestigationHash, type InvestigationReadIpcResult, type InvestigationReport } from '@shared/types/renderdocInvestigation';
 import { TaskDialog } from '../../ui/TaskDialog';
-import { Details } from '../../ui/Details';
 import { Badge } from '../../ui/Badge';
-import { CopyButton } from '../../ui/CopyButton';
 import { Skeleton } from '../../ui/Skeleton';
 import { useI18n, type TranslationKey } from '../../i18n';
-import { copyAppText } from '../../hooks/appShellBridge';
 import { InlineError } from '../../ui/InlineError';
+import { CopyDiagnosticsButton } from '../../patterns/CopyDiagnostics';
 import { errorDetail } from '../../lib/errorDetail';
-import { useUiLabels } from '../../lib/useUiLabels';
 import { RightRailReportView } from './RightRailReportView';
 import { readInvestigationArtifact } from './investigationPreviewActions';
 import type { InvestigationArtifactRow } from '@shared/types/trace';
@@ -17,14 +14,6 @@ import './RightRailInvestigationPreview.css';
 
 type PreviewStatus = 'empty' | 'loading' | 'ready' | 'degraded' | 'error' | 'hash-mismatch';
 
-const copied = (value: string) => async () => {
-  try {
-    await copyAppText(value);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /** The sentence a non-report record is about: its statement or summary, whichever it carries. */
 const recordText = (record: unknown): string => {
@@ -44,7 +33,6 @@ export const RightRailInvestigationPreview: React.FC<{
   onClose: () => void;
 }> = ({ sessionId, row, onClose }) => {
   const { t } = useI18n();
-  const labels = useUiLabels();
   const [status, setStatus] = useState<PreviewStatus>(row.contentHash ? 'loading' : 'empty');
   const [result, setResult] = useState<InvestigationReadIpcResult | null>(null);
 
@@ -103,36 +91,13 @@ export const RightRailInvestigationPreview: React.FC<{
     {status === 'empty' ? <p className="investigation-preview-message">{t('control.rightRail.artifacts.preview.empty')}</p> : null}
     {result?.record && manifest?.kind === 'report' ? <RightRailReportView report={result.record as InvestigationReport} /> : null}
     {statement ? <p className="investigation-preview-statement">{statement}</p> : null}
-    <Details className="investigation-preview-diagnostics" summary={labels.diagnostics}>
-      <dl className="investigation-preview-meta">
-        <div>
-          <dt>ID</dt>
-          <dd><code>{row.artifactId}</code><CopyButton onCopy={copied(row.artifactId)}
-            label={t('control.rightRail.artifacts.copyId')} copiedLabel={t('control.rightRail.artifacts.copied')} /></dd>
-        </div>
-        <div>
-          <dt>{t('control.rightRail.artifacts.preview.hash')}</dt>
-          <dd>{bareHash ? <><code>{`sha256:${bareHash}`}</code><CopyButton onCopy={copied(hash)}
-            label={t('control.rightRail.artifacts.preview.copyHash')} copiedLabel={t('control.rightRail.artifacts.copied')} /></>
-            : t('control.rightRail.artifacts.preview.hashMissing')}</dd>
-        </div>
-        <div>
-          <dt>{t('control.rightRail.artifacts.preview.version')}</dt>
-          <dd>{manifest?.createdAt ?? row.createdAt}</dd>
-        </div>
-        <div>
-          <dt>{t('control.rightRail.artifacts.preview.stateLabel')}</dt>
-          <dd>{t(`control.rightRail.artifacts.preview.state.${status}` as TranslationKey)}</dd>
-        </div>
-        {manifest?.supersedes ? (
-          <div>
-            <dt>{t('control.rightRail.artifacts.preview.supersedes')}</dt>
-            <dd><code>{manifest.supersedes}</code></dd>
-          </div>
-        ) : null}
-      </dl>
-      {result?.record ? <pre className="investigation-preview-body">{JSON.stringify(result.record, null, 2)}</pre> : null}
-    </Details>
+    <CopyDiagnosticsButton className="investigation-preview-copy-diagnostics" facts={[
+      { label: 'ID', value: row.artifactId },
+      { label: t('control.rightRail.artifacts.preview.hash'), value: bareHash ? `sha256:${bareHash}` : null },
+      { label: t('control.rightRail.artifacts.preview.version'), value: manifest?.createdAt ?? row.createdAt },
+      { label: t('control.rightRail.artifacts.preview.stateLabel'), value: status },
+      { label: t('control.rightRail.artifacts.preview.supersedes'), value: manifest?.supersedes },
+    ]} />
   </TaskDialog>;
 };
 

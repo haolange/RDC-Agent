@@ -94,30 +94,6 @@
   font-size: var(--type-body-size);
 }
 
-.knowledge-center-meta-details {
-  border-top: 1px solid var(--token-border-muted);
-  padding-top: var(--space-2);
-}
-
-.knowledge-center-meta-details > summary {
-  min-height: var(--control-height-sm);
-  display: flex;
-  align-items: center;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  cursor: pointer;
-}
-
-.knowledge-center-meta-details > summary:hover,
-.knowledge-center-meta-details > summary:focus-visible {
-  color: var(--token-text-primary);
-}
-
-.knowledge-center-meta-details > summary:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset);
-}
-
 @media (max-width: 960px) {
   .knowledge-center-meta-columns {
     grid-template-columns: minmax(0, 1fr);

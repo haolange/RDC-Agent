@@ -1,8 +1,6 @@
 import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail } from '@shared/types/knowledge';
-import { Details } from '../../../../ui/Details';
 import { useI18n } from '../../../../i18n';
-import { formatBytes } from '../../../../lib/formatBytes';
-import { useUiLabels } from '../../../../lib/useUiLabels';
+import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, RELATION_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { Button } from '../../../../ui/Button';
 
@@ -27,11 +25,9 @@ const relationTargetName = (targetCardId: string, title: string | undefined): st
  * collapsed 诊断 group (import hash / mtime / size) when the card was ingested.
  */
 export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }: CardMetaGridProps) {
-  const { t, language } = useI18n();
-  const labels = useUiLabels();
+  const { t } = useI18n();
   const exclusions = card.scope.exclusions ?? {};
   const axes = KNOWLEDGE_SCOPE_AXES.filter((axis) => card.scope[axis] || exclusions[axis]?.length);
-  const hasProvenance = Boolean(card.sourceHash || card.sourceMtimeMs != null || card.sourceSize != null);
   return (
     <div className="knowledge-center-meta-block" data-testid="knowledge-center-meta">
       <div className="knowledge-center-meta-columns">
@@ -110,26 +106,11 @@ export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }:
           </section>
         </div>
       </div>
-      <Details className="knowledge-center-meta-details" data-testid="knowledge-center-provenance" summary={labels.diagnostics}>
-        {hasProvenance ? (
-          <dl className="knowledge-center-meta knowledge-center-meta--compact">
-            <div>
-              <dt>{t('knowledgeCenter.metaSourceHash')}</dt>
-              <dd><code>{card.sourceHash ?? '—'}</code></dd>
-            </div>
-            <div>
-              <dt>{t('knowledgeCenter.metaSourceMtime')}</dt>
-              <dd>{formatKnowledgeTime(card.sourceMtimeMs) || '—'}</dd>
-            </div>
-            <div>
-              <dt>{t('knowledgeCenter.metaSourceSize')}</dt>
-              <dd>{card.sourceSize != null ? formatBytes(card.sourceSize, language) : '—'}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="knowledge-center-meta-empty">{t('knowledgeCenter.metaProvenanceNone')}</p>
-        )}
-      </Details>
+      <CopyDiagnosticsButton className="knowledge-center-copy-diagnostics" testId="knowledge-center-provenance" facts={[
+        { label: t('knowledgeCenter.metaSourceHash'), value: card.sourceHash },
+        { label: t('knowledgeCenter.metaSourceMtime'), value: card.sourceMtimeMs ? new Date(card.sourceMtimeMs).toISOString() : null },
+        { label: t('knowledgeCenter.metaSourceSize'), value: card.sourceSize },
+      ]} />
     </div>
   );
 }

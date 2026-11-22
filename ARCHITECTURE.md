@@ -289,7 +289,7 @@ Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**�
 - Artifacts 只投影 main-owned `rdc.investigation.v1` Investigation Artifacts（不是 Working Directory 扫描，也不是 `output_register`）。`InvestigationArtifactRow` 携带完整 `contentHash`（renderer 只缩显）。
 - Outputs 只接受 `output_register` 发布的用户输出文件，拒绝 inputs 与 plan；Investigation Artifacts 不混进 Outputs。
 - Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。
-- Capture 在 session 中始终可见：诚实空态或 owner-session 操作面，保留 scoped `.rdc` 选择、Replay Device、open / close / 单一实际 EID 回放轨道 / refresh 与紧凑诊断。
+- Capture 在 session 中始终可见：诚实空态或 owner-session 操作面，保留 scoped `.rdc` 选择、Replay Device、open / close / 单一实际 EID 回放轨道 / refresh；技术标识只经「复制诊断信息」离开界面。
 
 Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。
 
