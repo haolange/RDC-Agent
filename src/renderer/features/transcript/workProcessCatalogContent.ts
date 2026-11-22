@@ -58,14 +58,13 @@ if (normalized === 'output_register' || normalized === 'plan_artifact') {
   }
 
 if (normalized === 'runtime_context') {
-    const target = sanitizeContentText(stringifyPreview(
-      argsRecord?.target ?? argsRecord?.agent ?? details?.target,
-    ));
+    // The payload is identity for the model (session, scope, capture hashes); people see what it means for replay.
+    const state = details?.available === true ? 'replayReady' : details?.requiresRecovery === true ? 'replayRecovery'
+      : details?.available === false ? 'noCapture' : null;
     return {
       previewKind: 'generic',
-      chips: target ? [target] : undefined,
-      bodyText: contentText || target || undefined,
-      previewLines: filterEnvelopeLines(createDetailLines(contentText, 6)),
+      bodyText: state ? t(`chat.runtimeContext.${state}`) : undefined,
+      previewLines: [],
     };
   }
 

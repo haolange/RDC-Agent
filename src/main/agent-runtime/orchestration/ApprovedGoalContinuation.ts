@@ -2,13 +2,26 @@ import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { investigationArtifactService, type InvestigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { describeOpenInvestigationWork } from '../../investigation/openInvestigationWork';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
-import type { TurnHandle } from './TurnCoordinator';
+import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
+
+export interface ApprovedGoalContinuation {
+  /**
+   * Reviews a partial or blocked declaration the moment `turn_complete` records it. The facts about unfinished
+   * approved work travel back inside that tool result, so the Agent decides whether to keep working before it
+   * writes any reply. A turn therefore ends with one reply, not a reply that the runtime later sends back.
+   */
+  reviewDeclaration(declaration: TurnCompletionDeclaration): Promise<string | undefined>;
+  /** What must still hold before the turn may end: a current declaration and every approved obligation met. */
+  closingCheck(validate?: () => void): Promise<string | undefined>;
+  /** A host-verified change (a restored capture position) makes the open work worth one fresh review. */
+  noteConditionsChanged(note: string): void;
+}
 
 /** Provide facts about the approved goal without deciding whether the Agent can progress. */
 export function createApprovedGoalContinuation(
   turn: TurnHandle, sessionId: string, registry = new TaskRegistry(createSessionTaskStore(sessionId)),
   investigation: InvestigationArtifactService = investigationArtifactService,
-): (validate?: () => void) => Promise<string | undefined> {
+): ApprovedGoalContinuation {
   const openWork = () => {
     try { return describeOpenInvestigationWork(investigation, sessionId); }
     catch (error) {
@@ -16,50 +29,62 @@ export function createApprovedGoalContinuation(
       return `\n## Open work you recorded\nRecorded investigation work could not be read: ${error instanceof Error ? error.message : String(error)}`;
     }
   };
-  const reassessed = new Set<string>();
-  let pendingReassessment: { declaration: NonNullable<TurnHandle['completionDeclaration']>; toolCalls: number } | undefined;
-  return async (validate) => {
+  const reviewed = new Set<string>();
+  let conditions = { version: 0, note: '' };
+  let reviewedDeclaration: { declaration: TurnCompletionDeclaration; toolCalls: number } | undefined;
+
+  /** The incomplete approved Task, if any; other Task-store failures are not hidden. */
+  const incompleteApprovedWork = async (): Promise<{ message: string; task: Awaited<ReturnType<TaskRegistry['getTask']>> } | null> => {
+    try { await registry.assertApprovedTasksCompleted(); return null; }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.startsWith('TASK_EXECUTION_REQUIREMENTS:')) throw error;
+      const incomplete = /^TASK_EXECUTION_REQUIREMENTS: approved Task is not completed: (.+)$/u.exec(message);
+      const task = incomplete ? await registry.getTask(incomplete[1]) : null;
+      if (incomplete && !task) throw new Error(`Approved Task disappeared during completion check: ${incomplete[1]}`);
+      return { message, task };
+    }
+  };
+
+  const reviewDeclaration: ApprovedGoalContinuation['reviewDeclaration'] = async (declaration) => {
+    if (!turn.requiresApprovedGoalClosure || turn.isAborted || turn.pendingHandoff) return undefined;
+    if (declaration.disposition !== 'partial' && declaration.disposition !== 'blocked') return undefined;
+    // Too little loop budget is left to act on a review; the declaration stands as it is.
+    if (turn.providerLoopBudget && turn.providerLoopBudget.remaining <= 2) return undefined;
+    // Background work may legitimately outlive a partial parent response.
+    if ((await listActiveDelegations(sessionId)).length) return undefined;
+    const gap = await incompleteApprovedWork();
+    if (gap?.task?.status === 'cancelled' || turn.isAborted || turn.pendingHandoff) return undefined;
+    if (!gap && (declaration.disposition !== 'partial' || !declaration.result?.unresolved.length)) return undefined;
+    // One review per state of the open work: the same unresolved items and Task state are not reviewed again,
+    // however often the Agent rewrites its evidence in between.
+    const unresolved = (declaration.result?.unresolved ?? []).map(item => JSON.stringify([item.gap, item.blocker, item.resumeWhen])).sort();
+    const taskState = gap ? (gap.task ? [gap.task.id, gap.task.status, gap.task.statusReason ?? ''] : gap.message) : null;
+    const key = JSON.stringify([conditions.version, taskState, unresolved]);
+    if (reviewed.has(key)) return undefined;
+    reviewed.add(key);
+    reviewedDeclaration = { declaration, toolCalls: turn.policyBudget.toolCalls };
+    const changed = conditions.note ? `${conditions.note}\n` : '';
+    const next = 'If a useful, permitted check remains within the approved scope, perform the next check now and call turn_complete again before your reply; do not stop after merely listing or acknowledging it. Do not repeat an unchanged failed or denied action, expand permissions, reset consumption or extend the deadline. If no useful permitted work remains, write your reply now: this declaration stands, and the reply reports the concrete blocker and remaining work.';
+    if (gap) {
+      const status = gap.task ? ` Current status: ${gap.task.status}; reason: ${gap.task.statusReason || 'not recorded'}.` : '';
+      return `# Approved Goal Reassessment\n${changed}${gap.message}${status}\nCompare the unfinished approved work with the actual evidence; an unproved result or a partial Task is not itself a blocker. Resume the same Task if the next check needs it. If a derived context may have omitted approved work, reread the frozen plan by its verified URI and hash before deciding. ${next}${openWork()}`;
+    }
+    return `# Approved Goal Reassessment\n${changed}The approved Tasks are settled, but the partial result still lists unresolved work. Compare it with the approved goal and actual evidence. ${next}${openWork()}`;
+  };
+
+  const closingCheck: ApprovedGoalContinuation['closingCheck'] = async (validate) => {
     if (turn.isAborted || turn.pendingHandoff) return undefined;
-    if (pendingReassessment) {
-      if (turn.completionDeclaration === pendingReassessment.declaration
-        && turn.policyBudget.toolCalls > pendingReassessment.toolCalls) {
-        // A prior partial cannot describe work performed after it was declared.
+    if (reviewedDeclaration) {
+      if (turn.completionDeclaration === reviewedDeclaration.declaration && turn.policyBudget.toolCalls > reviewedDeclaration.toolCalls) {
+        // A reviewed partial cannot describe work performed after it was declared.
         turn.completionDeclaration = null;
       }
-      pendingReassessment = undefined;
+      reviewedDeclaration = undefined;
     }
     const disposition = turn.completionDeclaration?.disposition;
-    if (disposition === 'partial' || disposition === 'blocked') {
-      // The last remaining request is text-only, so it cannot redeclare completion.
-      if (turn.providerLoopBudget && turn.providerLoopBudget.remaining <= 2) return undefined;
-      // Background work may legitimately outlive a partial parent response.
-      if ((await listActiveDelegations(sessionId)).length) return undefined;
-      try { await registry.assertApprovedTasksCompleted(); }
-      catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.startsWith('TASK_EXECUTION_REQUIREMENTS:')) throw error;
-        const incomplete = /^TASK_EXECUTION_REQUIREMENTS: approved Task is not completed: (.+)$/u.exec(message);
-        const task = incomplete ? await registry.getTask(incomplete[1]) : null;
-        if (incomplete && !task) throw new Error(`Approved Task disappeared during completion check: ${incomplete[1]}`);
-        if (turn.isAborted || turn.pendingHandoff || task?.status === 'cancelled') return undefined;
-        const key = task ? JSON.stringify([task.id, task.revision, task.currentExecutionId ?? null, task.status]) : message;
-        if (reassessed.has(key)) return undefined;
-        reassessed.add(key);
-        pendingReassessment = { declaration: turn.completionDeclaration!, toolCalls: turn.policyBudget.toolCalls };
-        const status = task ? ` Current status: ${task.status}; reason: ${task.statusReason || 'not recorded'}.` : '';
-        return `# Approved Goal Reassessment\n${message}${status}\nCompare the unfinished approved work with the actual evidence; an unproved result or a partial Task is not itself a blocker. If a useful, permitted check remains within the approved scope, resume the same Task if needed and perform the next check now; do not stop after merely listing or acknowledging it. If a derived context may have omitted approved work, reread the frozen plan by its verified URI and hash before deciding. Do not repeat an unchanged failed or denied action, expand permissions, reset consumption or extend the deadline. After further tool work, call turn_complete again with the updated result. If no useful permitted work remains, preserve the existing partial or blocked declaration and report the concrete blocker and remaining work accurately.${openWork()}`;
-      }
-      if (disposition === 'partial' && turn.completionDeclaration?.result?.unresolved.length) {
-        const references = turn.completionDeclaration.evidenceRefs.map(ref => `${ref.uri}\u0000${ref.hash}`).sort();
-        const key = JSON.stringify(['settled-goal', references]);
-        if (!reassessed.has(key)) {
-          reassessed.add(key);
-          pendingReassessment = { declaration: turn.completionDeclaration, toolCalls: turn.policyBudget.toolCalls };
-          return '# Approved Goal Reassessment\nThe approved Tasks are settled, but the partial result still lists unresolved work. Compare it with the approved goal and actual evidence. If a useful, permitted action remains within the approved scope, perform it now; do not stop after merely listing it. If no such action remains, retain the partial result and report the concrete blocker. Do not repeat unchanged failures, expand permissions, reset consumption or extend the deadline. After further tool work, declare the updated result again.' + openWork();
-        }
-      }
-      return undefined;
-    }
+    // Partial and blocked declarations were reviewed when they were recorded.
+    if (disposition === 'partial' || disposition === 'blocked') return undefined;
     if (disposition && disposition !== 'completed') {
       if (disposition !== 'budget_paused' || !validate) return undefined;
       try { validate(); return undefined; }
@@ -74,12 +99,9 @@ export function createApprovedGoalContinuation(
     if (active.length) {
       gap = `Active delegated executions must be joined before completion: ${active.map(item => item.id).join(', ')}.`;
     } else {
-      try { await registry.assertApprovedTasksCompleted(); }
-      catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.startsWith('TASK_EXECUTION_REQUIREMENTS:')) throw error;
-        const incomplete = /^TASK_EXECUTION_REQUIREMENTS: approved Task is not completed: (.+)$/u.exec(message);
-        const task = incomplete ? await registry.getTask(incomplete[1]) : null;
+      const incomplete = await incompleteApprovedWork();
+      if (incomplete) {
+        const { message, task } = incomplete;
         gap = task && (task.status === 'blocked' || task.status === 'cancelled')
           ? `${message} Current status: ${task.status}; reason: ${task.statusReason || 'not recorded'}.`
           : message;
@@ -102,5 +124,11 @@ export function createApprovedGoalContinuation(
       ? '\nThe previous completed declaration is no longer active. After addressing the gap, call turn_complete again before the final response.'
       : '';
     return `# Incomplete Approved Obligation\n${gap}${redeclare}\nContinue useful work within the approved scope, or declare an accurate blocked/partial disposition when further work cannot proceed. Do not reset consumption or alter the approved requirement.`;
+  };
+
+  return {
+    reviewDeclaration,
+    closingCheck,
+    noteConditionsChanged: (note) => { conditions = { version: conditions.version + 1, note }; },
   };
 }

@@ -41,6 +41,20 @@ export function settleTextPhase(
 }
 
 /**
+ * Loops whose answer the turn did not end on: the runtime sent them back and another loop followed. Their text
+ * reads as commentary; only the last answering loop of a turn is its answer.
+ */
+export function supersededAnswerLoopIds(blocks: ReadonlyArray<Pick<ConversationWorkBlock, 'id' | 'kind' | 'result'>>): Set<string> {
+  const loops = blocks.filter((block) => block.kind === 'llm_turn');
+  return new Set(loops.slice(0, -1).filter((block) => block.result?.outputPhase === 'final_answer').map((block) => block.id));
+}
+
+/** The phase a text block presents with once its loop is known to be superseded. */
+export function presentedTextPhase(phase: ConversationLoopOutputPhase | undefined, superseded: boolean): ConversationLoopOutputPhase | undefined {
+  return superseded ? 'commentary' : phase;
+}
+
+/**
  * What a stopped turn keeps as its reply: the text the last answering loop had streamed, minus anything
  * already marked as commentary. The person saw it, so it stays the message body.
  */

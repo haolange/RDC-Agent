@@ -1048,8 +1048,8 @@ assert(
   'commentary should project from loop text items into output rows',
 );
 assert(
-  presentationSource.includes('phase: item.phase') && !/phase:\s*'commentary'/.test(presentationSource),
-  'only explicitly classified commentary may render as Work Process narrative: output rows keep the item phase and never stamp one',
+  presentationSource.includes('phase: presentedTextPhase(item.phase, superseded)') && !/phase:\s*'commentary'/.test(presentationSource),
+  'only explicitly classified commentary may render as Work Process narrative: output rows keep the item phase, changed only by the shared superseded-answer rule',
 );
 assert(
   /settleLoopItems\([\s\S]*?\{\s*stopReason,\s*outputPhase\s*\}/.test(conversationEventHandlerSource)

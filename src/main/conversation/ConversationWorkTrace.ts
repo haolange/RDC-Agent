@@ -1,5 +1,5 @@
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
-import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
+import { loopTextItems, loopThinkingItems, presentedTextPhase, sameProviderBlock, settleTextPhase, supersededAnswerLoopIds } from '@shared/conversation/loopItems';
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { normalizeWorkBlockKind, providerOutputRefKey } from './StoredWorkTrace';
@@ -127,8 +127,18 @@ function ensureLoopBlock(trace: ConversationWorkTrace, loopId: string): Conversa
     block = createWorkBlock(loopId, 'LLM turn', 'model', 'llm_turn');
     block.status = 'running';
     trace.blocks.push(block);
+    demoteSupersededAnswers(trace);
   }
   return block;
+}
+
+/** A new loop means the previous answer did not end the turn; its text is recorded as commentary. */
+function demoteSupersededAnswers(trace: ConversationWorkTrace): void {
+  for (const loopId of supersededAnswerLoopIds(trace.blocks)) {
+    const loop = writableBlock(trace, (entry) => entry.id === loopId)!;
+    loop.result = { ...loop.result!, outputPhase: 'commentary' };
+    for (const item of loop.items ?? []) if (item.kind === 'text') item.phase = presentedTextPhase(item.phase, true);
+  }
 }
 
 /** Text of one provider block. It keeps the position it first appeared at, whatever arrives later. */
@@ -175,16 +185,20 @@ export function upsertLoopThinkingItem(
   const existing = items.find((item) => item.kind === 'thinking' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
   const now = nowMs();
   const visible = Boolean(thinking.text?.trim());
+  // Text that first shows up already complete (a whole summary) was thought out while the loop waited for it,
+  // so it is timed from the loop's start rather than reading as an instant.
+  const visibleSince = status === 'complete' ? block.startedAt ?? now : now;
   if (existing?.kind === 'thinking') {
     if (shouldReplaceThinking(existing.thinking, thinking)) existing.thinking = cloneThinkingArtifact(thinking)!;
-    if (existing.startedAt === undefined && visible) existing.startedAt = now;
+    if (existing.startedAt === undefined && visible) existing.startedAt = visibleSince;
     if (status === 'complete' && existing.status !== 'complete' && existing.startedAt !== undefined) existing.completedAt = now;
     existing.status = status;
   } else {
     items.push({
       kind: 'thinking', providerOutputRef: { ...ref }, thinking: cloneThinkingArtifact(thinking)!, status,
       displayOrder: nextDisplayOrder(nextTrace),
-      ...(visible ? { startedAt: now } : {}),
+      ...(visible ? { startedAt: visibleSince } : {}),
+      ...(visible && status === 'complete' ? { completedAt: now } : {}),
     });
   }
   block.items = items;

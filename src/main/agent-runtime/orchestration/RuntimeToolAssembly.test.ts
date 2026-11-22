@@ -261,6 +261,19 @@ describe('RuntimeToolAssembly', () => {
     })).toThrow('未声明字段');
   });
 
+  it('returns the review of a recorded partial declaration in the same tool result', async () => {
+    const review = vi.fn(async () => '# Approved Goal Reassessment\nOne approved check remains.');
+    const turn = { completionDeclaration: undefined, reviewCompletionDeclaration: review } as unknown as TurnHandle;
+    const tool = createAssembly().createTurnCompletionTool(turn);
+    const result = await tool.execute('partial', toolValidator.validate(toolToDefinition(tool), { disposition: 'partial',
+      result: { summary: 'Half done', outputs: {}, counterevidence: [], scope: 'fixture', sideEffects: [], recoveryState: [],
+        unresolved: [{ gap: 'Second check', attempted: 'First check only.', blocker: 'external', resumeWhen: 'Input arrives.' }] } }));
+    expect(turn.completionDeclaration?.disposition).toBe('partial');
+    expect(review).toHaveBeenCalledWith(turn.completionDeclaration);
+    expect(JSON.stringify(result.content)).toContain('Turn completion recorded: partial.');
+    expect(JSON.stringify(result.content)).toContain('One approved check remains.');
+  });
+
   it('returns domain rejection before recording completion so the model can correct its declaration', async () => {
     const turn = { completionDeclaration: undefined } as unknown as TurnHandle;
     const tool = createAssembly().createTurnCompletionTool(turn, async value => {
@@ -377,14 +390,14 @@ describe('RuntimeToolAssembly', () => {
       turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
       const task = await registry.createTask('Late child');
       const execution = await registry.startExecution(task.id, { mode: 'subagent' });
-      expect(await approvedGoalContinuation()).toContain(execution.id);
+      expect(await approvedGoalContinuation.closingCheck()).toContain(execution.id);
       expect(turn.completionDeclaration).toBeNull();
       turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
-      expect(await approvedGoalContinuation()).toBeUndefined();
+      expect(await approvedGoalContinuation.closingCheck()).toBeUndefined();
       await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
         result: { disposition: 'completed', summary: 'done', outputs: {} } });
       turn.completionDeclaration = null;
-      expect(await approvedGoalContinuation()).toContain('turn_complete');
+      expect(await approvedGoalContinuation.closingCheck()).toContain('turn_complete');
     } finally {
       await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
     }
@@ -397,7 +410,7 @@ describe('RuntimeToolAssembly', () => {
     const approvedGoalContinuation = createApprovedGoalContinuation(turn, sessionId);
     try {
       await tool.execute('first-declaration', { disposition: 'completed' });
-      const feedback = await approvedGoalContinuation(() => {
+      const feedback = await approvedGoalContinuation.closingCheck(() => {
         throw new MissionCompletionError('report_not_bound', 'The declared report version is no longer current.');
       });
       expect(feedback).toContain('declared report version is no longer current');

@@ -48,9 +48,12 @@ const resolveOutputPhase = (
   return 'final_answer';
 };
 
-/** "Thought for" only when this block's own reasoning start and settle times are known; never the step's time. */
+/**
+ * "Thought for" only when this block's own reasoning start and settle times are known and apart; never the step's
+ * time, and never an invented instant.
+ */
 const resolveSettledThinkingLabel = (item: ConversationThinkingItem, t: Translator): string =>
-  item.startedAt !== undefined && item.completedAt !== undefined
+  item.startedAt !== undefined && item.completedAt !== undefined && item.completedAt > item.startedAt
     ? t('chat.workProcessThoughtFor', { duration: formatDurationMs(item.startedAt, item.completedAt) })
     : t('chat.workProcessThinkingComplete');
 

@@ -92,7 +92,7 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
     groupKind: display.groupKind,
     family: getToolFamily(call.toolName),
     toolName: call.toolName,
-    target: getToolTarget(call.toolName, call.argsPreview),
+    target: normalizeToolName(call.toolName) === 'artifact_read' ? artifactObject(call.argsPreview, t) : getToolTarget(call.toolName, call.argsPreview),
     duration: formatDurationMs(call.executionStartedAt, call.completedAt),
     startedAt: call.executionStartedAt,
     completedAt: call.completedAt,
@@ -247,6 +247,15 @@ const resultIndicatesFailure = (parsedResult: unknown, raw?: string): boolean =>
     if (/approval required|no changes were made/i.test(errorMessage)) return true;
   }
   return /approval required|no changes were made/i.test(raw ?? '');
+};
+
+const ARTIFACT_KINDS = ['tool-outputs', 'plans', 'investigation', 'outputs'] as const;
+
+/** A stored artifact is named by the kind of record it is; its address and hash stay in the raw receipt. */
+const artifactObject = (argsPreview: string | undefined, t: Translator): string => {
+  const kind = /session:\/\/([a-z-]+)\//u.exec(argsPreview ?? '')?.[1];
+  const known = ARTIFACT_KINDS.find((candidate) => candidate === kind);
+  return known ? t(`chat.artifactObject.${known}`) : '';
 };
 
 const getToolTarget = (toolName: string, argsPreview?: string): string => {

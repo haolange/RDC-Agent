@@ -12,7 +12,8 @@ vi.mock('./DirectTaskTurnLifecycle', () => ({
   listUnfinishedDirectTasks: vi.fn(async () => []),
   settleUnfinishedDirectTasks: vi.fn(async () => 0), settleJoinedTurnTaskExecutions: vi.fn(async () => undefined),
 }));
-vi.mock('./ApprovedGoalContinuation', () => ({ createApprovedGoalContinuation: () => vi.fn(async () => undefined) }));
+const goal = vi.hoisted(() => ({ reviewDeclaration: vi.fn(async () => undefined), closingCheck: vi.fn(async () => undefined), noteConditionsChanged: vi.fn() }));
+vi.mock('./ApprovedGoalContinuation', () => ({ createApprovedGoalContinuation: () => goal }));
 
 import { MissionCompletionError } from '../../investigation/missionCompletionContract';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
@@ -321,7 +322,7 @@ describe('Agent turn completion boundary', () => {
     await run();
   });
 
-  it('asks the same approved execution to reassess work when a capture mismatch has been restored', async () => {
+  it('records the partial and reviews the open work again once a capture mismatch has been restored', async () => {
     const { run, preparedRuntime } = harness('completion-recovered-goal', vi.fn(), false, () => undefined, async turn => {
       let restored = false;
       const status = vi.fn(async () => ({ restored, original: { inputId: 'capture' },
@@ -334,9 +335,12 @@ describe('Agent turn completion boundary', () => {
       const budget = turn.policyBudget;
       await expect(turn.validateCompletionReadiness?.(partial)).rejects.toThrow('Capture Restoration Required');
       restored = true;
-      await expect(turn.validateCompletionReadiness?.(partial)).rejects.toThrow('continue useful work that is now possible');
+      goal.noteConditionsChanged.mockClear();
+      await expect(turn.validateCompletionReadiness?.(partial)).resolves.toBeUndefined();
+      expect(goal.noteConditionsChanged).toHaveBeenCalledWith(expect.stringContaining('verifies the signed entry position'));
       expect(turn.policyBudget).toBe(budget);
       await expect(turn.validateCompletionReadiness?.(partial)).resolves.toBeUndefined();
+      expect(goal.noteConditionsChanged).toHaveBeenCalledTimes(1);
       expect(status).toHaveBeenCalledTimes(3);
       turn.captureControl = null;
     });

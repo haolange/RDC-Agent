@@ -142,7 +142,8 @@ export class RuntimeToolAssembly {
           const declaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
           await validate?.(declaration);
           turnHandle.completionDeclaration = declaration;
-          return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }],
+          const review = await turnHandle.reviewCompletionDeclaration?.(declaration);
+          return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.${review ? `\n\n${review}` : ''}` }],
             details: { disposition, unresolved: declaration.result?.unresolved ?? [] } };
         }
         return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }] };

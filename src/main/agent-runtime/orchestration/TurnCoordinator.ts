@@ -255,6 +255,8 @@ export class TurnHandle {
   completionDeclaration: TurnCompletionDeclaration | null = null;
   /** Frozen domain preconditions checked before a completion declaration is recorded. */
   validateCompletionReadiness: ((declaration: TurnCompletionDeclaration) => void | Promise<void>) | null = null;
+  /** Facts about unfinished approved work returned with a recorded declaration, before the Agent writes a reply. */
+  reviewCompletionDeclaration: ((declaration: TurnCompletionDeclaration) => Promise<string | undefined>) | null = null;
   /** This turn executes an approved plan and must not complete while delegated work remains active. */
   requiresApprovedGoalClosure = false;
   /** A Mission without a reviewed capture scope may continue offline but cannot use live RDC. */
