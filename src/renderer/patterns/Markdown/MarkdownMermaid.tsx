@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
+import { useResolvedTheme } from '../../lib/useResolvedTheme';
 import { useI18n } from '../../i18n';
 import { errorDetail } from '../../lib/errorDetail';
 import { extractMermaidStyles, useAdoptedStyles } from './mermaidStyles';
@@ -20,6 +21,7 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
   const { t } = useI18n();
   const reactId = useId().replace(/:/g, '');
   const [state, setState] = useState<MermaidState>({ status: 'loading' });
+  const theme = useResolvedTheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +35,7 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'strict',
-          theme: document.documentElement.dataset.resolvedTheme === 'light' ? 'default' : 'dark',
+          theme: theme === 'light' ? 'default' : 'dark',
           fontFamily,
           themeVariables: { fontFamily, fontSize },
         });
@@ -52,7 +54,7 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
     return () => {
       cancelled = true;
     };
-  }, [reactId, source]);
+  }, [reactId, source, theme]);
   useAdoptedStyles(state.status === 'ready' ? state.css : '');
 
   if (state.status === 'ready') {

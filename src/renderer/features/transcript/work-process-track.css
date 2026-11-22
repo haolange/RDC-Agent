@@ -1,9 +1,12 @@
+/* The rail hangs outside the conversation's content edge: cards, headings and text keep the same left and right
+   edges as the user bubble and the Composer frame, and the rail sits in the column gutter. The marker keeps its
+   fixed 16px slot and the 4px gap to the content, so the rail centre is half a slot plus the gap. */
+.work-process {
+  --work-rail-hang: calc(var(--space-4) / 2 + var(--space-1));
+}
+
 .work-process-track {
   position: relative;
-  /* The rail hangs outside the conversation's content edge: cards, headings and text keep the same left and
-     right edges as the user bubble and the Composer frame, and the rail sits in the column gutter. The marker
-     keeps its fixed 16px slot and the 4px gap to the content, so the rail centre is half a slot plus the gap. */
-  --work-rail-hang: calc(var(--space-4) / 2 + var(--space-1));
   --work-track-start: 0px;
   --work-track-length: 0px;
 }
