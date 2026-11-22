@@ -34,8 +34,9 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
   const actionMeta = presentation.actionCount > 0
     ? t(presentation.actionCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: presentation.actionCount })
     : '';
+  // While working the clock is the whole label; a settled turn says how long it took.
   const durationMeta = presentation.duration
-    ? t(running ? 'chat.workProcessDurationRunning' : 'chat.workProcessDuration', { duration: presentation.duration })
+    ? running ? presentation.duration : t('chat.workProcessDuration', { duration: presentation.duration })
     : '';
   const metaParts = [durationMeta, actionMeta].filter(Boolean);
   const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;

@@ -1,6 +1,6 @@
 export const enComposer = {
   'composer.slashCommands': 'Commands',
-  'composer.placeholderHint': '{agent}: {hint}',
+  'composer.placeholderHint': '{hint}',
   'composer.placeholder': 'Describe the goal, anomaly, or verification request for {agent}',
   'composer.attach': 'Attach images or files',
   'composer.attachNeedsProject': 'Select a project before attaching images or files',

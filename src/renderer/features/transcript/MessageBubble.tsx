@@ -18,7 +18,6 @@ import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
 import { PlanDeliverable } from './PlanDeliverable';
-import { PlanReferenceCard } from './PlanReferenceCard';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { answerSources } from './answerSources';
@@ -171,17 +170,14 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
             />
           ) : (
             <>
-              {message.planReference ? (
-                <PlanReferenceCard reference={message.planReference} prompt={message.content} />
-              ) : (
-                <div className="conversation-bubble conversation-bubble-user">
-                  {composerMarkdown ? (
-                    <MessageMarkdown content={message.content} />
-                  ) : (
-                    <span className="conversation-bubble-text">{message.content}</span>
-                  )}
-                </div>
-              )}
+              <div className="conversation-bubble conversation-bubble-user">
+                {composerMarkdown ? (
+                  <MessageMarkdown content={message.content} />
+                ) : (
+                  <span className="conversation-bubble-text">{message.content}</span>
+                )}
+              </div>
+              {/* A handoff that executes or revises a reviewed plan is bound to it; a rewrite could not carry that. */}
               <MessageMetaBar
                 message={message}
                 time={time}

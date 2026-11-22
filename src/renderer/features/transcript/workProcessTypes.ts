@@ -194,6 +194,13 @@ export type WorkProcessRow =
     metaLines: string[];
   }
   | {
+    type: 'planReview';
+    id: string;
+    status: WorkProcessRowStatus;
+    plan: import('@shared/types/planReview').ConversationPlanReview;
+    duration: string;
+  }
+  | {
     type: 'diagnostic';
     id: string;
     status: WorkProcessRowStatus;

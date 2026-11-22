@@ -14,7 +14,8 @@ export function buildComposerPresentation(input: {
   const hint = input.currentModeHint.trim();
   const stopLabel = t(input.hasActiveDebugRun ? 'composer.stopDebugRun' : 'composer.stopRequest');
   return {
-    promptPlaceholder: hint ? t('composer.placeholderHint', { agent, hint }) : t('composer.placeholder', { agent }),
+    // The Agent pill already names who receives the message; the placeholder only says what to tell it.
+    promptPlaceholder: hint ? t('composer.placeholderHint', { hint }) : t('composer.placeholder', { agent }),
     attachButtonLabel: t(input.hasProject ? 'composer.attach' : 'composer.attachNeedsProject'),
     primaryButtonDescription: input.isComposerBusy ? stopLabel : t('composer.sendTo', { agent }),
   };

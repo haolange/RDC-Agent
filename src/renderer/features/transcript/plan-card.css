@@ -59,59 +59,7 @@
 .plan-card__preview .markdown-body > :first-child { margin-top: 0; }
 .plan-card__preview .markdown-body > :last-child { margin-bottom: 0; }
 
-.plan-card__kind {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
-.plan-card__revision {
-  color: var(--token-text-secondary);
-}
-
-.plan-card__status.is-awaiting { color: var(--token-accent-primary); }
-.plan-card__status.is-approved { color: var(--token-status-success); }
-
 /* The plan a reply delivers sits after Working, in the reply flow. */
 .plan-deliverable {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
   min-width: 0;
-  border-radius: var(--transcript-card-radius);
-}
-
-.plan-deliverable:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset);
-}
-
-.plan-deliverable__handoff {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0 var(--space-1);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--token-text-secondary);
-  font: inherit;
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-line);
-}
-
-button.plan-deliverable__handoff {
-  cursor: pointer;
-}
-
-button.plan-deliverable__handoff:hover {
-  color: var(--token-text-primary);
-  background: var(--token-interactive-hover);
-}
-
-button.plan-deliverable__handoff:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset);
 }

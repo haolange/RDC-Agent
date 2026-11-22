@@ -1,5 +1,5 @@
 import { type ToolContentInput, type UnwrappedToolContent, asFiniteNumber, sanitizeContentText, filterEnvelopeLines } from './workProcessToolContentShared';
-import { formatMcpTarget } from './workProcessToolCatalog';
+import { WORK_PROCESS_TOOL_DISPLAY_CATALOG, formatMcpTarget, normalizeToolName } from './workProcessToolCatalog';
 import { stringifyPreview, createDetailLines, readNestedValue, collectReadableText } from './workProcessContentText';
 import { compactText } from './workProcessFormat';
 
@@ -36,10 +36,14 @@ if (normalized === 'mcp' || normalized.startsWith('mcp__')) {
   }
 
 if (normalized === 'tool_search') {
-    const hits = collectReadableText(record?.matches ?? record?.tools ?? details?.matches, 8);
+    // Found tools read by what they do, never by their wire names.
+    const hits = collectReadableText(record?.matches ?? record?.tools ?? details?.matches, 8).map((name) => {
+      const display = WORK_PROCESS_TOOL_DISPLAY_CATALOG[normalizeToolName(name) as keyof typeof WORK_PROCESS_TOOL_DISPLAY_CATALOG];
+      return display ? t(display.category) : formatMcpTarget(name) || name;
+    });
     return {
       previewKind: 'generic',
-      bodyText: hits.length > 0 ? t(hits.length === 1 ? 'chat.previewToolsOne' : 'chat.previewToolsMany', { count: hits.length }) : contentText || undefined,
+      bodyText: hits.length > 0 ? t(hits.length === 1 ? 'chat.previewToolsOne' : 'chat.previewToolsMany', { count: hits.length }) : undefined,
       bodyLines: hits.slice(0, 3),
       previewLines: hits,
     };

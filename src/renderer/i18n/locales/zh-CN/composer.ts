@@ -1,6 +1,6 @@
 export const zhComposer = {
   'composer.slashCommands': '命令',
-  'composer.placeholderHint': '向 {agent} 说明{hint}',
+  'composer.placeholderHint': '说明{hint}',
   'composer.placeholder': '向 {agent} 描述目标、异常或验证需求',
   'composer.attach': '附加图片或文件',
   'composer.attachNeedsProject': '选择项目后可附加图片或文件',

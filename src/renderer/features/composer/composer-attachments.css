@@ -162,36 +162,3 @@
     height: var(--composer-attachment-card-size-narrow);
   }
 }
-
-/* The approved plan waiting to continue: the same card language as the plan reference it becomes once sent. */
-.composer-approved-plan {
-  display: grid;
-  gap: var(--space-1);
-  margin: var(--space-2) var(--space-2) 0;
-  padding: var(--transcript-card-padding);
-  border: var(--transcript-card-border);
-  border-radius: var(--transcript-card-radius);
-  background: var(--token-bg-raised);
-  animation: composer-approved-plan-enter var(--duration-base) var(--ease-decelerate) both;
-}
-
-.composer-approved-plan-kind {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--token-accent-primary);
-}
-
-.composer-approved-plan-title {
-  color: var(--token-text-primary);
-  font-weight: var(--font-semibold);
-}
-
-@keyframes composer-approved-plan-enter {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .composer-approved-plan { animation: none; }
-}

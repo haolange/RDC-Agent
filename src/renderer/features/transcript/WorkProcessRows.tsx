@@ -10,6 +10,8 @@ import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveWorkProcessStatus } from './workProcessActiveSignal';
 import { ToolRow } from './WorkProcessRowParts';
 import { WorkCardHeader } from './WorkCardHeader';
+import { PlanCard } from './PlanCard';
+import { usePlanReader } from './PlanReaderHost';
 
 export { ToolRow };
 
@@ -89,6 +91,19 @@ export const DiagnosticRow: React.FC<{
     </div>
   </li>
 );
+
+/** The current plan revision inside Working: the card follows each revision and fades toward its foot. */
+export const PlanReviewRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'planReview' }> }> = ({ row }) => {
+  const openPlan = usePlanReader();
+  return (
+    <li className={`work-process-step is-appear status-${row.status} kind-plan-review`} data-testid="work-process-plan-review">
+      <WorkProcessRailIcon row={row} />
+      <div className="work-process-step-content">
+        <PlanCard plan={row.plan} onOpen={openPlan} />
+      </div>
+    </li>
+  );
+};
 
 export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'userInput' }> }> = ({ row }) => {
   const { t } = useI18n();

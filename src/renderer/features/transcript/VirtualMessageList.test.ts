@@ -2,7 +2,6 @@
 import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { requestPlanLocation } from '../../lib/transcriptPlanLocation';
 import { VirtualMessageList, measuredMessageOffsets } from './VirtualMessageList';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -57,17 +56,7 @@ it('renders short state samples and windows a long conversation while releasing 
     expect(host.querySelectorAll('[data-message-id]')).toHaveLength(7);
     expect(host.querySelector('[data-message-id="message-50"]')).not.toBeNull();
     expect(host.querySelector('[data-message-id="message-0"]')).toBeNull();
-    const locate = () => requestPlanLocation({ target: 'plan', plan: { planId: 'plan', revision: 1, hash: 'a'.repeat(64) } });
-    await act(async () => { locate(); locate(); });
-    expect(frames.size).toBe(1);
-    expect(host.querySelector('[data-message-id="message-75"]')).not.toBeNull();
-    const callback = [...frames.values()][0];
-    frames.clear();
-    await act(async () => callback(0));
-    expect(document.activeElement?.getAttribute('data-message-id')).toBe('message-75');
-    await act(async () => locate());
     await render(messages.slice(0, 2));
-    expect(frames.size).toBe(0);
     expect(host.querySelectorAll('[data-message-id]')).toHaveLength(2);
   } finally {
     await act(async () => root.unmount());

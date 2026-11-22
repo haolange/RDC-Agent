@@ -1457,7 +1457,8 @@ describe('buildWorkProcessPresentation', () => {
       expect.objectContaining({
         type: 'tool',
         family: 'runtime',
-        bodyLines: ['read_image', 'code_interpreter'],
+        // Found tools read by what they do, not by wire names.
+        bodyLines: [t('chat.toolDisplay.read_image.category'), t('chat.toolDisplay.code_interpreter.category')],
       }),
     );
     expect(rows.find((row) => row.type === 'tool' && row.toolName === 'output_register')).toEqual(
@@ -1469,7 +1470,7 @@ describe('buildWorkProcessPresentation', () => {
     );
   });
 
-  it('renders every plan_artifact revision as one compact Working row named by its review state', () => {
+  it('shows the current plan revision as the Working plan card and folds replaced revisions into one row', () => {
     const awaiting: ConversationPlanReview = {
       planId: 'plan-1',
       revision: 2,
@@ -1489,7 +1490,7 @@ describe('buildWorkProcessPresentation', () => {
       argsPreview: JSON.stringify({ title: awaiting.title }),
       startedAt: now,
     }, t);
-    expect(card).toMatchObject({ type: 'tool', verb: '计划 · 待审阅', planReview: awaiting, target: awaiting.title });
+    expect(card).toMatchObject({ type: 'planReview', plan: awaiting, status: 'running' });
 
     const shell = createToolRowForPresentation({
       id: 'plan-rejected',

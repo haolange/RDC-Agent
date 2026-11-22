@@ -46,11 +46,8 @@ export const PlanCard: React.FC<{
         }}
       >
         <div className="plan-card__head">
-          <span className="plan-card__kind">
-            {t('chat.planReviewCardKind')}
-            {plan.revision > 1 ? <span className="plan-card__revision">{t('chat.planReviewRevision', { revision: plan.revision })}</span> : null}
-          </span>
-          <span className={`plan-card__status is-${plan.status}`}>{t(STATUS_KEY[plan.status])}</span>
+          <span>{t('chat.planReviewCardKind')}</span>
+          <span>{t(STATUS_KEY[plan.status])}</span>
         </div>
         <h3 className="plan-card__title" data-tooltip={plan.title} data-work-node-prose>{plan.title}</h3>
         <div ref={previewRef} className={`plan-card__preview${overflowing ? ' is-overflowing' : ''}`}>
