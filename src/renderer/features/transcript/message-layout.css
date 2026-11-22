@@ -60,7 +60,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-5);
-  padding: calc(var(--space-3) + var(--chat-top-safe-zone)) 0 var(--control-height-lg);
+  padding: calc(var(--space-3) + var(--chat-top-safe-zone)) var(--conversation-column-gutter) var(--control-height-lg);
   position: relative;
   z-index: var(--z-base);
 }
@@ -68,7 +68,7 @@
 .chat-messages.chat-messages-empty {
   align-items: stretch;
   gap: 0;
-  padding: var(--control-height-sm) 0 var(--control-height-sm);
+  padding: var(--control-height-sm) var(--conversation-column-gutter);
 }
 
 .message-attachments {

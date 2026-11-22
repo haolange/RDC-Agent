@@ -15,11 +15,6 @@
  */
 
 @media (max-width: 720px) {
-  .chat-messages {
-    padding-left: var(--space-3);
-    padding-right: var(--space-3);
-  }
-
   .empty-workbench-content {
     width: min(100%, calc(100% - var(--space-10)));
     gap: var(--space-8);

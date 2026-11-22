@@ -125,10 +125,11 @@
 }
 
 /* The page shell bounds the transcript: it owns the remaining main-column height so `.chat-messages`
-   is the one scroller, and it shares the Composer's outer rail width so the conversation is one column. */
+   is the one scroller. It is the conversation column plus its gutter on both sides: the Working rail hangs
+   in that gutter, and `.chat-messages` pads it back so content keeps the Composer's two edges. */
 .main-page-shell {
   flex: 1;
-  width: var(--conversation-column-width);
+  width: min(100%, calc(var(--conversation-column-width) + 2 * var(--conversation-column-gutter)));
   margin-inline: auto;
   min-height: 0;
   display: flex;
