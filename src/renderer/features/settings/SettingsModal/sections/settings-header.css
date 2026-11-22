@@ -30,10 +30,7 @@
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.45;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--leading-normal);
 }
 
 .settings-modal-close,
