@@ -174,7 +174,7 @@ describe('knowledge system contract', () => {
     expect(readRepo('src/main/ipc/knowledgeHandlers.ts')).toMatch(/knowledgeCandidateService/);
     expect(readRepo('src/main/ipc/knowledgeHandlers.ts')).not.toMatch(/knowledgeBrowseService|knowledge:listSpaces/);
     expect(readRepo('src/shared/renderer-api/channels.ts')).not.toMatch(/knowledge:listSpaces/);
-    expect(readRepo('src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeImport.ts'))
+    expect(readRepo('src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeCandidateInbox.ts'))
       .toMatch(/window\.electronAPI\.knowledge\.candidates/);
     expect(readRepo('src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeCenter.ts'))
       .toMatch(/window\.electronAPI\.knowledge\.(?:overview|query|card)/);

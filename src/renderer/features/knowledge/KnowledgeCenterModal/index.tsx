@@ -19,6 +19,7 @@ import { KnowledgeTopicsDialog } from './panels/KnowledgeTopicsDialog';
 import { RebuildIndexDialog } from './panels/RebuildIndexDialog';
 import { useKnowledgeCenter } from './useKnowledgeCenter';
 import { useKnowledgeImport } from './useKnowledgeImport';
+import { useKnowledgeCandidateInbox } from './useKnowledgeCandidateInbox';
 import { useKnowledgeExport } from './useKnowledgeExport';
 import { useKnowledgeWriteConfirm } from './useKnowledgeWriteConfirm';
 import { useKnowledgeTopics } from './useKnowledgeTopics';
@@ -34,11 +35,13 @@ interface KnowledgeCenterModalProps {
 export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open, onClose }) => {
   const { t } = useI18n();
   const state = useKnowledgeCenter(open);
+  const candidates = useKnowledgeCandidateInbox({ open, sessionId: state.sessionId });
   const importer = useKnowledgeImport({
     open,
     sessionId: state.sessionId,
     spaces: state.spaces,
     onImported: async (imported) => {
+      await candidates.refreshInbox();
       const first = firstImportedSpaceCard(imported);
       if (first) {
         await state.revealImportedCard(first);
@@ -67,7 +70,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     onWritten: async () => {
       await state.refreshOverview();
       await state.refreshQuery();
-      await importer.refreshInbox();
+      await candidates.refreshInbox();
     },
   });
   const topics = useKnowledgeTopics(open, async () => {
@@ -83,7 +86,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
   const bodyRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const presence = usePresence(open, backdropRef);
-  const busy = state.loadingOverview || state.loadingQuery || importer.busy || write.busy || exporter.busy || topics.busy;
+  const busy = state.loadingOverview || state.loadingQuery || importer.busy || candidates.busy || write.busy || exporter.busy || topics.busy;
   // Sub-dialogs register their own overlay layers, so Escape here only ever
   // closes the Knowledge Center itself.
   const { layerId } = useOverlayLayer(open);
@@ -131,7 +134,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               </h2>
             </div>
             <div className="knowledge-center-topbar-actions">
-              {/* Importing is the one primary action; organizing, exporting and rebuilding are occasional. */}
+              {/* Moving knowledge in and out are the two things people come here to do; organizing is occasional. */}
               <Button
                 variant="primary"
                 size="sm"
@@ -140,6 +143,15 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               >
                 {t('knowledgeCenter.importKnowledge')}
               </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!exporter.canExport}
+                onClick={exporter.openPanel}
+                data-testid="knowledge-center-export-open"
+              >
+                {t('knowledgeCenter.exportKnowledge')}
+              </Button>
               <Menu
                 open={moreOpen}
                 onOpenChange={setMoreOpen}
@@ -147,7 +159,6 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
                 label={t('knowledgeCenter.moreActions')}
                 items={[
                   { id: 'topics', label: t('knowledgeCenter.topicsTitle'), onSelect: () => void topics.openPanel() },
-                  { id: 'export', label: t('knowledgeCenter.exportKnowledge'), disabled: !exporter.canExport, onSelect: exporter.openPanel },
                   { id: 'rebuild', label: t('knowledgeCenter.indexRebuild'), onSelect: () => setRebuildOpen(true) },
                 ]}
                 trigger={(
@@ -188,18 +199,18 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
             </div>
           )}
           <div className="knowledge-center-grid" ref={bodyRef}>
-            {showSpaces && <SpacesColumn state={state} candidateCount={importer.inbox?.candidates.length} />}
-            {showList && <ListColumn state={state} inbox={importer.inbox} onImport={importer.openPanel} />}
+            {showSpaces && <SpacesColumn state={state} candidateCount={candidates.inbox?.candidates.length} />}
+            {showList && <ListColumn state={state} inbox={candidates.inbox} inboxError={candidates.error} onImport={importer.openPanel} />}
             {showDetail && (
               <DetailColumn
                 state={state}
                 write={write}
-                candidateHasSession={importer.hasSession}
-                candidateBusy={importer.busy}
-                candidateError={importer.candidateError?.cardId === state.selectedCard?.cardId
-                  ? importer.candidateError?.message ?? null : null}
+                candidateHasSession={candidates.hasSession}
+                candidateBusy={candidates.busy}
+                candidateError={candidates.candidateError?.cardId === state.selectedCard?.cardId
+                  ? candidates.candidateError?.message ?? null : null}
                 onCreateCandidate={() => {
-                  if (state.selectedCard) void importer.createCandidate(detailToRecord(state.selectedCard));
+                  if (state.selectedCard) void candidates.createCandidate(detailToRecord(state.selectedCard));
                 }}
               />
             )}
@@ -207,7 +218,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
           </div>
         </div>
 
-      <ImportKnowledgeDialog importer={importer} spaces={state.spaces} />
+      <ImportKnowledgeDialog importer={importer} candidates={candidates} spaces={state.spaces} />
       <ExportKnowledgeDialog exporter={exporter} spaces={state.spaces} />
       <WriteConfirmDialog write={write} />
       <KnowledgeTopicsDialog topics={topics} />

@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { KNOWLEDGE_CASE_CHAPTERS } from '@shared/types/knowledge';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Icon } from '../../../../ui/Icon';
@@ -9,7 +8,7 @@ import { Chevron } from '../../../../ui/Chevron';
 import { Menu } from '../../../../ui/Menu';
 import { Panel } from '../../../../ui/Panel';
 import { useI18n, type TranslationKey } from '../../../../i18n';
-import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
+import { CHAPTER_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { detailToRecord, type KnowledgeWriteAction } from '../knowledgeCenterModel';
 import { knowledgeCardActions, type KnowledgeCardAction } from '../knowledgeCardActions';
 import { bodyWithoutTitle, markdownOutline } from '../knowledgeOutline';
@@ -23,6 +22,7 @@ import { ConflictCompare } from '../parts/ConflictCompare';
 import { Skeleton } from '../../../../ui/Skeleton';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
+import type { KnowledgeCardDetail, KnowledgeCaseChapter, KnowledgeScopeAxis } from '@shared/types/knowledge';
 
 interface DetailColumnProps {
   state: ReturnType<typeof useKnowledgeCenter>;
@@ -42,8 +42,26 @@ const ACTION_LABEL_KEYS: Record<KnowledgeCardAction, TranslationKey> = {
   retire: 'knowledgeCenter.retire',
 };
 
-/** An outline earns its place once there is more than one section to move between. */
-const OUTLINE_MIN_ENTRIES = 2;
+/** An outline earns its place once there are a few sections to move between. */
+const OUTLINE_MIN_ENTRIES = 3;
+
+/**
+ * A case reads like a write-up: what was seen, the evidence, why it happened, the fix and how it was verified, then
+ * where it applies. The claim is the lead sentence under the title, not a section of its own.
+ */
+const CASE_READING_ORDER: readonly KnowledgeCaseChapter[] = [
+  'symptoms', 'evidence', 'rootCause', 'fix', 'experimentVerification', 'derived', 'negative', 'openChallenges', 'scopeExclusions',
+];
+
+/** The scope axes that say at a glance where a card applies, in the order people name them. */
+const HEADLINE_AXES: readonly KnowledgeScopeAxis[] = ['platform', 'api', 'gpuVendor', 'gpuArch', 'device', 'engine'];
+
+const sameText = (left: string, right: string) => left.replace(/\s+/gu, '') === right.replace(/\s+/gu, '');
+
+function headlineFacts(card: KnowledgeCardDetail, typeLabel: string | null): string[] {
+  const axes = HEADLINE_AXES.map((axis) => card.scope[axis]?.trim()).filter((value): value is string => Boolean(value) && value!.toLowerCase() !== 'unknown');
+  return [...(typeLabel ? [typeLabel] : []), ...axes];
+}
 
 export function DetailColumn({ state, write, onCreateCandidate, candidateHasSession, candidateBusy, candidateError }: DetailColumnProps) {
   const { t } = useI18n();
@@ -56,9 +74,11 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
   const space = card ? state.spaces.find((entry) => entry.spaceId === card.spaceId) : undefined;
   const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : (space?.label ?? '');
   const chapters = card?.type === 'case' && card.chapters
-    ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => card.chapters?.[chapter]?.trim())
+    ? CASE_READING_ORDER.filter((chapter) => card.chapters?.[chapter]?.trim())
     : null;
-  const missing = card?.type === 'case' ? KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => !card.chapters?.[chapter]?.trim()) : [];
+  const claim = card?.chapters?.claim?.trim();
+  const lead = card && claim && !sameText(claim, card.title) ? claim : null;
+  const facts = card ? headlineFacts(card, card.type ? t(TYPE_LABEL_KEYS[card.type]) : null) : [];
   const body = card && !chapters ? bodyWithoutTitle(card.body, card.title) : '';
   const outline = chapters
     ? chapters.map((chapter) => t(CHAPTER_LABEL_KEYS[chapter]))
@@ -69,7 +89,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
 
   const jumpTo = (index: number) => {
     // Chapters and Markdown headings of levels 1–3 are drawn in outline order, so the nth entry is the nth heading.
-    textRef.current?.querySelectorAll(chapters ? '.knowledge-case-section > h3' : 'h1, h2, h3')[index]
+    textRef.current?.querySelectorAll(chapters ? '.knowledge-case-section > h2' : 'h1, h2, h3')[index]
       ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
   const run = (action: KnowledgeCardAction) => {
@@ -96,6 +116,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
               <>
                 <h1 className="knowledge-center-header-title">{card.title}</h1>
                 <div className="knowledge-center-meta-line" data-testid="knowledge-center-meta-line">
+                  {facts.length ? <span className="knowledge-center-facts">{facts.join(' · ')}</span> : null}
                   <KnowledgeStatusTag lifecycle={card.lifecycle} sourceStatus={card.sourceStatus} reviewing={reviewing} />
                 </div>
               </>
@@ -157,31 +178,27 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 />
               </div>
             ) : null}
-            {outline.length >= OUTLINE_MIN_ENTRIES || missing.length > 0 ? (
-              <nav className="knowledge-center-chapters" aria-label={t('knowledgeCenter.outline')} data-testid="knowledge-center-chapters">
-                {outline.length >= OUTLINE_MIN_ENTRIES ? outline.map((label, index) => (
-                  <button key={`${label}:${index}`} type="button" className="knowledge-center-outline-link" onClick={() => jumpTo(index)}>
-                    {label}
-                  </button>
-                )) : null}
-                {missing.length > 0 && (
-                  <p className="knowledge-center-missing">
-                    {t('knowledgeCenter.chaptersMissing', { chapters: missing.map((chapter) => t(CHAPTER_LABEL_KEYS[chapter])).join(t('knowledgeCenter.listSeparator')) })}
-                  </p>
-                )}
-              </nav>
-            ) : null}
-            <div className="knowledge-center-markdown">
+            <div className="knowledge-center-document">
+              {lead ? <p className="knowledge-case-claim">{lead}</p> : null}
               {card.images?.length ? <KnowledgeCardImages spaceId={card.spaceId} images={card.images} /> : null}
-              <div ref={textRef}>
-              {chapters
-                ? chapters.map((chapter) => (
-                  <section className="knowledge-case-section" key={chapter}>
-                    <h3>{t(CHAPTER_LABEL_KEYS[chapter])}</h3>
-                    <CaseChapterContent spaceId={card.spaceId} chapter={chapter} content={card.chapters?.[chapter] ?? ''} />
-                  </section>
-                ))
-                : <KnowledgeMarkdown content={body} spaceId={card.spaceId} />}
+              {outline.length >= OUTLINE_MIN_ENTRIES ? (
+                <nav className="knowledge-center-chapters" aria-label={t('knowledgeCenter.outline')} data-testid="knowledge-center-chapters">
+                  {outline.map((label, index) => (
+                    <button key={`${label}:${index}`} type="button" className="knowledge-center-outline-link" onClick={() => jumpTo(index)}>
+                      {label}
+                    </button>
+                  ))}
+                </nav>
+              ) : null}
+              <div ref={textRef} className={chapters ? 'knowledge-case-sections' : 'knowledge-center-markdown'}>
+                {chapters
+                  ? chapters.map((chapter) => (
+                    <section className="knowledge-case-section" key={chapter} data-chapter={chapter}>
+                      <h2>{t(CHAPTER_LABEL_KEYS[chapter])}</h2>
+                      <CaseChapterContent spaceId={card.spaceId} chapter={chapter} content={card.chapters?.[chapter] ?? ''} />
+                    </section>
+                  ))
+                  : <KnowledgeMarkdown content={body} spaceId={card.spaceId} />}
               </div>
             </div>
           </article>

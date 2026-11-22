@@ -131,22 +131,16 @@
   }
 }
 
-.knowledge-center-scope-chip {
-  display: inline-flex;
-  margin-right: var(--space-2);
-  margin-top: var(--space-1);
-}
-
-.knowledge-center-chapters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
 .knowledge-center-content .knowledge-center-body {
   padding: var(--space-5);
 }
 
 .knowledge-center-content .knowledge-center-markdown {
   line-height: var(--leading-normal);
+}
+
+.knowledge-center-scope-chip {
+  display: inline-flex;
+  margin-right: var(--space-2);
+  margin-top: var(--space-1);
 }

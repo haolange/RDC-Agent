@@ -45,10 +45,6 @@ function ConflictCardPane({
       ) : card ? (
         <dl className="knowledge-conflict-pane-grid">
           <div>
-            <dt>{t('knowledgeCenter.sourceLabel')}</dt>
-            <dd>{card.relativePath}</dd>
-          </div>
-          <div>
             <dt>{t('knowledgeCenter.conflictTitle')}</dt>
             <dd>
               {card.title}

@@ -235,7 +235,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 知识中心与 Settings 居中，外壳在 `88vw × 86vh`（硬顶 `120rem × 70rem`）内接最大 16:10，不写死 `aspect-ratio`；带 `min(45rem/40rem, 视窗 − 2×inset)` 下限。backdrop `padding: var(--modal-workbench-inset)`（`--space-4`，`≤640px` 为 0），底为 `--modal-backdrop`（`--token-bg-app` 40% 压暗）加 `--modal-backdrop-filter`（`blur(16px)`）；组件 CSS 只写 `var(--modal-backdrop-filter)`，禁止字面量 `blur()`。960 堆叠导航，640 全屏去圆角。禁止再写互相覆盖的多段 media query。设置内容列与面板同宽，只靠 panel padding 留白，不再用居中 `--settings-content-max`。内部表单分栏按 `.settings-center-panel` 容器宽度查询，不按视口猜测。
 
-知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（`grid-template-columns: 14rem minmax(17.5rem, 0.65fr) minmax(0, 1.35fr)`），左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持八项导航（常规 / 外观 / Provider / Agents / Skills / Tools / Hooks / Policy；左侧导航可搜索并跳转高亮；搜索结果用方向键移动、Enter 打开、Esc 清空，服务商也能按名字搜到并直接打开）与均分 User / Project 作用域；常规页不提供「资源与诊断」，只保留资源各自编辑页的只读「资源位置」。640px 以下导航单行横向滚动，内容全屏。保存方式按内容分三类：偏好（昵称、头像、全局指令、主题、开关与分段选择）自动保存，停止输入约一秒或离开字段即保存，失败就地提示并保留草稿；文档类资源（技能、钩子、MCP、策略文档、Agent 之外的清单）在编辑对话框里显式保存，因为要经主进程校验；凭据与安全边界（服务商密钥、自定义权限规则）显式提交，不自动保存。外观页只有一个主题编辑器，用浅色 / 深色分段切换要编辑的那一套，默认打开窗口当前显示的那套。新建技能、钩子、MCP 等资源时标识留空，模板标识只作占位，保存时为空就地报错。Agent Shell 的占位路径按宿主平台给出。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
+知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（`grid-template-columns: 14rem minmax(17.5rem, 0.65fr) minmax(0, 1.35fr)`），左栏仅放视图与空间导航；类型与生命周期收进列表的筛选入口，以文字按钮表达多选；卡片信息默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持八项导航（常规 / 外观 / Provider / Agents / Skills / Tools / Hooks / Policy；左侧导航可搜索并跳转高亮；搜索结果用方向键移动、Enter 打开、Esc 清空，服务商也能按名字搜到并直接打开）与均分 User / Project 作用域；常规页不提供「资源与诊断」，只保留资源各自编辑页的只读「资源位置」。640px 以下导航单行横向滚动，内容全屏。保存方式按内容分三类：偏好（昵称、头像、全局指令、主题、开关与分段选择）自动保存，停止输入约一秒或离开字段即保存，失败就地提示并保留草稿；文档类资源（技能、钩子、MCP、策略文档、Agent 之外的清单）在编辑对话框里显式保存，因为要经主进程校验；凭据与安全边界（服务商密钥、自定义权限规则）显式提交，不自动保存。外观页只有一个主题编辑器，用浅色 / 深色分段切换要编辑的那一套，默认打开窗口当前显示的那套。新建技能、钩子、MCP 等资源时标识留空，模板标识只作占位，保存时为空就地报错。Agent Shell 的占位路径按宿主平台给出。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
 
 ## 任务子弹窗（TaskDialog）
 
@@ -394,14 +394,14 @@ pnpm run typecheck
 
 浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 [`appearance-checklist.md`](appearance-checklist.md)）。验收前须重启最新 `start:agent-browser`，并删除该 QA project 下全部 session 后新建隔离 session。
 
-Knowledge Case 详情正文按章节分节，目录使用可换行的链接控件；缺失章节统一提示，不重复渲染空白章节。卡片信息使用带 aria-expanded 的统一 Button 展开，元数据分组排版。完整 JSON 对象 / 数组仅在阅读层转为字段与列表，保留未知字段及所有值；普通 Markdown 和无法解析的内容保持原文，禁止回写或改变知识事实。
+Knowledge Case 详情是一篇写好的文档：对照图为主视觉，章节按「现象 → 证据 → 根因 → 修复 → 验证」排列并各有形态，目录是一行安静的文字链接；空章节不出现，也不提示缺了哪些章。卡片信息使用带 aria-expanded 的统一 Button 展开。JSON 章节只在阅读层转为人话事实与列表（键与枚举转成词，工程标识按行内代码，内部引用不显示），普通 Markdown 和无法解析的内容保持原文，禁止回写或改变知识事实。细则见 `docs/ui/knowledge-center.md`。
 
 Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属性使用紧凑网格与行内列表；禁止递归缩进线和宽标签列。证据摘要常驻，来源及参数由统一按钮按需展开，不将编号、参数置于摘要之前占据正文。窄屏对照改为纵向排列。
 
 ### Settings / Knowledge / Composer 组件所有权
 
 - Settings 入口装配导航与弹层，`SettingsPageContent` 组合页面；`useSettingsNavigation` 统一未保存导航，各领域 controller 保留独立草稿、校验与保存语义。页面展示组件不直接调用 IPC。
-- Knowledge 查询、选中详情、导入、导出和写入各有明确 controller。`useKnowledgeSelection` 是详情选择的唯一来源；查询或会话切换、关闭及卸载使旧请求失效。失效只阻止迟到结果更新界面，不冒充取消已经提交的写操作。
+- Knowledge 查询、选中详情、导入、候选队列、导出和写入各有明确 controller（候选队列是 `useKnowledgeCandidateInbox`）。`useKnowledgeSelection` 是详情选择的唯一来源；查询或会话切换、关闭及卸载使旧请求失效。失效只阻止迟到结果更新界面，不冒充取消已经提交的写操作。
 - Composer 编辑／预览使用共享 segmented `Tabs`。Tabs 的 DOM ID 按实例生成；没有对应面板的选择控件不输出 `aria-controls`。编辑器内部焦点由 Composer 外壳呈现，不全局关闭焦点样式。
 - 基础控件负责焦点、选中、禁用与内容尺寸；领域层通过语义变量配置布局。ListRow 是无边框的扁平行，悬停给底色，选中用 `--token-selection-bg` 加左侧指示条；可选 `description` 作为第二行。ListRow 不因父列表高度不足而压缩内容，列表自己滚动。单行长文本使用 `OverflowFade`：保留完整 DOM / `title`，根据真实 overflow、ResizeObserver、字体加载与文本变化决定是否渐隐，空值仍占一行。ColorField 的紧凑布局与隐藏标签由组件自身管理。
 - Provider、Agents、Tools、Appearance 与 Knowledge 的样式按展示职责组织；响应式规则跟随所属组件。CSS 入口仅声明加载关系，不恢复已替代的集中覆盖文件。

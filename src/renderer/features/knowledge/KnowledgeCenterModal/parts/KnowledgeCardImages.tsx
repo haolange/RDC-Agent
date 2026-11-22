@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useI18n } from '../../../../i18n';
 import { ImageViewer } from '../../../../ui/ImageViewer';
-import { groupKnowledgeImages } from '../knowledgeCardImages';
+import { groupKnowledgeImages, knowledgeImageRoleLabelKey } from '../knowledgeCardImages';
 import { KnowledgeCardImage } from './KnowledgeCardImage';
 import type { KnowledgeImageRef } from '@shared/types/knowledge';
 
@@ -24,7 +24,7 @@ export function KnowledgeCardImages({ spaceId, images }: KnowledgeCardImagesProp
       { path: pair.observed.relativePath, title: pair.observed.alt ?? t('knowledgeCenter.imageBefore') },
       { path: pair.reference.relativePath, title: pair.reference.alt ?? t('knowledgeCenter.imageAfter') },
     ]),
-    ...singles.map((image) => ({ path: image.relativePath, title: image.alt ?? image.relativePath })),
+    ...singles.map((image) => ({ path: image.relativePath, title: image.alt ?? t(knowledgeImageRoleLabelKey(image.role)) })),
   ].flatMap((item) => (loaded[item.path] ? [{ ...item, src: loaded[item.path] }] : [])), [pairs, singles, loaded, t]);
   const index = items.findIndex((item) => item.path === opened);
   if (images.length === 0) return null;

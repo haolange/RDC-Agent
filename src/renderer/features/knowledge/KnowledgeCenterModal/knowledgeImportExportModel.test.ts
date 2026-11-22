@@ -61,7 +61,7 @@ describe('knowledge import/export model', () => {
 
   it('counts export space from the space listing, not the filtered hits', () => {
     expect(knowledgeExportScopeCounts({
-      selected: { spaceId: 'user', relativePath: 'cases/one.md' },
+      picked: 1,
       hits: [hit('one')],
       spaceCount: 7,
     })).toEqual({

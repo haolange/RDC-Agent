@@ -3,6 +3,7 @@ import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { EmptyState } from '../../../../ui/EmptyState';
+import { InlineError } from '../../../../ui/InlineError';
 import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
 import { SearchField } from '../../../../ui/SearchField';
@@ -18,6 +19,8 @@ import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 interface ListColumnProps {
   state: ReturnType<typeof useKnowledgeCenter>;
   inbox: KnowledgeCandidatesResult | null;
+  /** Why the review queue could not be read, when it could not. */
+  inboxError?: string | null;
   /** Opens the import dialog; an empty card list offers it where the cards would be. */
   onImport: () => void;
 }
@@ -96,7 +99,7 @@ function RecordRow({
   );
 }
 
-export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
+export function ListColumn({ state, inbox, inboxError, onImport }: ListColumnProps) {
   const { t } = useI18n();
   const reason = emptyReason(state, inbox);
   const loading = state.loadingQuery || state.loadingOverview;
@@ -143,6 +146,9 @@ export function ListColumn({ state, inbox, onImport }: ListColumnProps) {
       )}
       <div className="knowledge-center-tree" data-testid="knowledge-center-tree">
         {loading && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="row" count={5} /></div>}
+        {!loading && state.viewMode === 'candidates' && inboxError ? (
+          <InlineError detail={inboxError}>{t('app.error.loadFailed')}</InlineError>
+        ) : null}
         {!loading && reason && (
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list">
             <EmptyState

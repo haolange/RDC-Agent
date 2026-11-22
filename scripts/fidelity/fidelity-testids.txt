@@ -89,11 +89,9 @@ knowledge-center-import-create-candidate
 knowledge-center-import-error
 knowledge-center-import-file
 knowledge-center-import-open
-knowledge-center-import-pending
 knowledge-center-import-run
 knowledge-center-import-source
 knowledge-center-import-space
-knowledge-center-import-status-hint
 knowledge-center-list
 knowledge-center-list-head
 knowledge-center-meta

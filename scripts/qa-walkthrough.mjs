@@ -108,11 +108,14 @@ try {
   await step('knowledge', async () => {
     await page.getByTestId('sidebar-knowledge-center-trigger').click();
     await shot('02-knowledge');
-    // Two pasted cases give the list and the reader real content to show.
-    for (const [caseId, title, symptom] of KNOWLEDGE_CASES) {
+    // Two pasted cases give the list and the reader real content to show; each goes through preview, then import.
+    for (const [index, [caseId, title, symptom]] of KNOWLEDGE_CASES.entries()) {
       await page.getByTestId('knowledge-center-import-open').first().click();
       await page.getByRole('tab', { name: /粘贴|Paste/ }).click();
       await page.getByTestId('knowledge-center-import-source').fill(knowledgeCase(caseId, title, symptom));
+      await page.getByTestId('knowledge-center-import-preview').click();
+      await page.getByTestId('knowledge-center-import-items').waitFor({ timeout: 30_000 });
+      if (index === 0) await shot('02a-knowledge-import-preview');
       await page.getByTestId('knowledge-center-import-run').click();
       await page.getByTestId('knowledge-center-import-run').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => undefined);
       await closeOverlays(page, 1);

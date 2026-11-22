@@ -20,9 +20,9 @@ const relationTargetName = (targetCardId: string, title: string | undefined): st
 );
 
 /**
- * Metadata for the selected card: type / lifecycle / source status / caseId / updatedAt /
- * space / relative path, scope axes with exclusions, relations named by title, and a
- * collapsed 诊断 group (import hash / mtime / size) when the card was ingested.
+ * What a reader may want to know about the selected card: its type, topics, lifecycle, when it changed and where it
+ * lives, the scope it applies to and how it relates to other cards. Identifiers and source facts (case id, file,
+ * import hash, size) are not shown; they leave through the copy action.
  */
 export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }: CardMetaGridProps) {
   const { t } = useI18n();
@@ -45,24 +45,12 @@ export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }:
             <dd>{card.lifecycle ? t(LIFECYCLE_LABEL_KEYS[card.lifecycle]) : '—'}</dd>
           </div>
           <div>
-            <dt>{t('knowledgeCenter.metaSourceStatus')}</dt>
-            <dd>{card.sourceStatus ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>{t('knowledgeCenter.metaCaseId')}</dt>
-            <dd>{card.caseId ?? '—'}</dd>
-          </div>
-          <div>
             <dt>{t('knowledgeCenter.metaUpdatedAt')}</dt>
             <dd>{formatKnowledgeTime(card.updatedAt) || '—'}</dd>
           </div>
           <div>
             <dt>{t('knowledgeCenter.metaSpace')}</dt>
             <dd>{spaceLabel}</dd>
-          </div>
-          <div>
-            <dt>{t('knowledgeCenter.metaRelativePath')}</dt>
-            <dd><code>{card.relativePath}</code></dd>
           </div>
         </dl>
         <div className="knowledge-center-meta-side">
@@ -74,7 +62,7 @@ export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }:
                   <div key={axis}>
                     <dt>{t(SCOPE_LABEL_KEYS[axis])}</dt>
                     <dd>
-                      {card.scope[axis] ?? '—'}
+                      {card.scope[axis]?.trim().toLowerCase() === 'unknown' ? t('knowledgeCenter.valueUnknown') : card.scope[axis] ?? '—'}
                       {exclusions[axis]?.length ? (
                         <span className="knowledge-center-scope-chip">
                           {t('knowledgeCenter.metaExclusions')}: {exclusions[axis]?.join(', ')}
@@ -107,6 +95,9 @@ export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }:
         </div>
       </div>
       <CopyDiagnosticsButton className="knowledge-center-copy-diagnostics" testId="knowledge-center-provenance" facts={[
+        { label: 'cardId', value: card.cardId },
+        { label: 'caseId', value: card.caseId },
+        { label: 'sourceStatus', value: card.sourceStatus },
         { label: t('knowledgeCenter.metaSourceHash'), value: card.sourceHash },
         { label: t('knowledgeCenter.metaSourceMtime'), value: card.sourceMtimeMs ? new Date(card.sourceMtimeMs).toISOString() : null },
         { label: t('knowledgeCenter.metaSourceSize'), value: card.sourceSize },

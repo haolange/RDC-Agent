@@ -1,10 +1,10 @@
-import { Details } from '../../../../ui/Details';
 import { DiffBlock } from '../../../../ui/DiffBlock';
 import { Button } from '../../../../ui/Button';
 import { Checkbox } from '../../../../ui/Checkbox';
 import { InlineError } from '../../../../ui/InlineError';
 import { Textarea } from '../../../../ui/Textarea';
 import { TaskDialog } from '../../../../ui/TaskDialog';
+import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { useI18n } from '../../../../i18n';
 import { ConflictRow } from '../parts/ConflictRow';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
@@ -111,12 +111,15 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
         <span className="knowledge-write-hint">{t('knowledgeCenter.confirmChangeReasonRequired')}</span>
       </label>
 
-      <Details className="knowledge-write-basis" summary={t('knowledgeCenter.confirmRollbackBasis')}>
-        <p className="knowledge-write-basis-value">
-          {write.basis ? `${write.basis.hash} · ${write.basis.bytes}` : '—'}
-        </p>
-        <p className="knowledge-write-hint">{t('knowledgeCenter.confirmNoAutoRollback')}</p>
-      </Details>
+      <p className="knowledge-write-hint knowledge-write-rollback">
+        {t('knowledgeCenter.confirmNoAutoRollback')}
+        {write.basis ? (
+          <CopyDiagnosticsButton facts={[
+            { label: t('knowledgeCenter.confirmRollbackBasis'), value: write.basis.hash },
+            { label: 'bytes', value: write.basis.bytes },
+          ]} />
+        ) : null}
+      </p>
 
       {write.block === 'draft-to-verified' && <InlineError>{t('knowledgeCenter.confirmBlockedLifecycle')}</InlineError>}
       {write.block?.startsWith('missing-chapters') && <InlineError>{t('knowledgeCenter.confirmMissingChapters')}</InlineError>}
