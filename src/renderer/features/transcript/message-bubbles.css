@@ -104,7 +104,7 @@
 }
 
 .conversation-system-command-label {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
   color: var(--token-text-secondary);
 }

@@ -1,6 +1,5 @@
 import { useClipboardBridge } from '../hooks/useClipboardBridge';
 import { ClipboardContext } from '../lib/clipboard';
-import { ProximityHost } from '../ui/ProximityHost';
 import { TooltipHost } from '../ui/TooltipHost';
 import { AppContextMenuHost } from './AppContextMenuHost';
 import type { ReactNode } from 'react';
@@ -13,7 +12,6 @@ export function AppProviders({ children }: { children: ReactNode }) {
       {children}
       <AppContextMenuHost />
       <TooltipHost />
-      <ProximityHost />
     </ClipboardContext.Provider>
   );
 }

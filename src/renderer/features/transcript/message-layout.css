@@ -145,8 +145,8 @@
   width: 100%;
   max-width: 100%;
   margin: 0;
-  /* The thread spans the conversation column edge to edge: the user bubble ends at the Composer's outer
-     edge; assistant content starts at the shared inset, level with Composer text. */
+  /* One content edge: the user bubble, Working (cards, headings, text), the reply and the Composer frame all
+     sit on the conversation column's two edges; only the Working rail hangs in the gutter outside them. */
   padding: 0;
   box-sizing: border-box;
   list-style: none;
@@ -232,7 +232,6 @@
   align-items: stretch;
   flex: 1 1 auto;
   max-width: 100%;
-  padding-inline: var(--conversation-inset);
 }
 
 /* System notice: centred annotation; slash-command output stretches left. */

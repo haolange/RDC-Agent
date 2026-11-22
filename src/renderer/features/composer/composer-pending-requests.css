@@ -35,7 +35,7 @@
 .composer-user-input-kicker,
 .composer-tool-approval-kicker {
   color: var(--token-text-secondary);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
 }
 
@@ -61,7 +61,7 @@
   gap: var(--space-1);
   flex: 0 0 auto;
   color: var(--token-text-secondary);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
 }
 

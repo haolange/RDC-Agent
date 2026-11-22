@@ -1320,8 +1320,10 @@ assert(
   'loop turns should nest under the header status dot with space-3 indent',
 );
 assert(
-  /\.conversation-message-assistant \.conversation-message-stack,[^{]*\{[^}]*padding-inline:\s*var\(--conversation-inset\)/.test(cssSource),
-  'assistant content should start at the shared conversation inset, level with Composer text',
+  !/\.conversation-message-assistant \.conversation-message-stack,[^{]*\{[^}]*padding-inline/.test(cssSource)
+    && /\.work-process-track::before\s*\{[^}]*left:\s*calc\(var\(--work-rail-hang\)\s*\*\s*-1\)/.test(cssSource)
+    && !/--work-track-gutter/.test(cssSource),
+  'the conversation has one content edge: assistant content is not inset, and only the Working rail hangs outside it',
 );
 assert(!/--work-process-inline-end-inset|--chat-transcript-width|--workbench-outer-rail-width/.test(cssSource),
   'the conversation column has one width and one inset; no Working-only end inset or second rail');
@@ -1330,7 +1332,7 @@ assert(
   'Work Process must not keep a WP-only right gutter; share the thread gutter instead',
 );
 assert(cssSource.includes('.work-process-track::before'), 'one process container must own its continuous guide');
-assert(cssSource.includes('var(--space-4) + var(--space-1)'), 'track must reserve the fixed 16px slot and 4px content gap');
+assert(cssSource.includes('--work-rail-hang: calc(var(--space-4) / 2 + var(--space-1))'), 'the hanging rail keeps the fixed 16px marker slot and 4px content gap');
 assert(
   !/\.work-process-section-list\s*\{[^}]*padding-left:\s*calc\(14px\s*\+\s*var\(--space-1\)\)/.test(cssSource),
   'section tool rows must not keep spark-aligned padding-left; they share commentary left edge',
@@ -1418,7 +1420,7 @@ assert(!componentSource.includes('work-process-console-head'), 'Console chrome h
 assert(cssSource.includes('.work-process-shell-command'), 'shell command styling should exist');
 assert(cssSource.includes('.work-process-tool-card-detail'), 'family detail styling should exist');
 assert(cssSource.includes('.work-process-tool-diagnostic'), 'failed-tool diagnostic caption styling should exist');
-assert(cssSource.includes('.work-process-tool-card.status-error .work-process-tool-card-verb'), 'failed tool verbs should use error color only on the verb');
+assert(cssSource.includes('.work-process-tool-card.status-error .work-row-title'), 'failed tool titles should use error color only on the title');
 assert(i18nSource.includes("'chat.workProcessShowDiagnostic': 'Show details'"), 'diagnostic detail affordance English copy should exist');
 assert(i18nSource.includes("'chat.workProcessShowDiagnostic': '查看详情'"), 'diagnostic detail affordance Chinese copy should exist');
 assert(!i18nSource.includes('workProcessShowLoopDetail'), 'grouped/detail view i18n keys must be removed');

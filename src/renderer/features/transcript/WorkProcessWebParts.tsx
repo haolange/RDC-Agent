@@ -4,7 +4,6 @@ import { formatBytes } from '../../lib/formatBytes';
 import { FaviconImage } from '../../patterns/FaviconImage';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
-import { ProximityGlow } from '../../ui/ProximityHost';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkCardHeader } from './WorkCardHeader';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
@@ -89,10 +88,9 @@ export const WebGroupRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'webGr
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
         <div className={`work-process-tool-card status-${row.status}${expanded ? ' is-expanded' : ''} is-expandable`}
-          data-testid="work-process-tool-card" data-family="web" data-proximity>
-          <ProximityGlow />
+          data-testid="work-process-tool-card" data-family="web" data-locate>
           <WorkCardHeader onClick={(event) => { event.preventDefault(); toggle(); }} expanded={expanded}
-            tooltip={row.duration ? `${headline} · ${row.duration}` : headline} duration={row.duration}
+            titleText={headline} duration={row.duration}
             icon={<Icon name="web-fetch" className="work-process-icon work-process-tool-card-icon" />}
             title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{headline}</ActiveSignalText>} />
           <div className="work-process-tool-card-body family-web">

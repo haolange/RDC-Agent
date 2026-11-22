@@ -3,6 +3,8 @@
   inset: 0;
   z-index: var(--z-overlay);
   display: flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--space-6);
   background: var(--modal-backdrop);
   backdrop-filter: var(--modal-backdrop-filter);
@@ -14,12 +16,17 @@
   animation: overlay-fade-out var(--motion-overlay) forwards;
 }
 
+/* The panel fits the image: its natural size, capped at 90% of the viewport, never a full-screen frame with an
+   image floating in it. The bar keeps a width that holds its tools. */
 .ui-image-viewer-stage {
+  --ui-image-viewer-max-width: 90vw;
+  --ui-image-viewer-max-height: 90vh;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+  flex: 0 1 auto;
+  min-width: min(22rem, 100%);
+  max-width: var(--ui-image-viewer-max-width);
+  max-height: var(--ui-image-viewer-max-height);
   overflow: hidden;
   border-radius: var(--radius-sheet);
   background: var(--token-bg-overlay);
@@ -72,15 +79,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   background: var(--token-surface-sunken);
 }
 
 .ui-image-viewer-image {
-  max-width: 100%;
-  max-height: 100%;
+  display: block;
+  max-width: var(--ui-image-viewer-max-width);
+  max-height: calc(var(--ui-image-viewer-max-height) - var(--space-12));
   object-fit: contain;
   transform-origin: center;
   transition: transform var(--duration-base) var(--ease-emphasized);
@@ -119,6 +127,8 @@
   }
 
   .ui-image-viewer-stage {
+    --ui-image-viewer-max-width: 100vw;
+    --ui-image-viewer-max-height: 100vh;
     border-radius: 0;
   }
 }

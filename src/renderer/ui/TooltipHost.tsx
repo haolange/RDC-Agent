@@ -18,6 +18,18 @@ interface ActiveTooltip {
 const tooltipTarget = (node: EventTarget | null): HTMLElement | null =>
   node instanceof Element ? node.closest<HTMLElement>('[data-tooltip]') : null;
 
+const normalized = (text: string) => text.replace(/\s+/gu, ' ').trim();
+
+/**
+ * A tooltip that repeats text already fully visible adds nothing: it shows only when it says something more, or
+ * when the visible text is cut off and the tooltip is the way to read all of it.
+ */
+const repeatsVisibleText = (target: HTMLElement, text: string): boolean => {
+  if (normalized(target.textContent ?? '') !== normalized(text)) return false;
+  return ![target, ...target.querySelectorAll<HTMLElement>('*')]
+    .some((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1);
+};
+
 /** The accessible name a tooltip would repeat; describing an element with its own name adds nothing. */
 const accessibleName = (element: HTMLElement) => (element.getAttribute('aria-label') ?? element.textContent ?? '').trim();
 
@@ -48,7 +60,7 @@ export function TooltipHost() {
   const show = useCallback((target: HTMLElement, immediate: boolean) => {
     const text = target.dataset.tooltip?.trim();
     window.clearTimeout(timer.current);
-    if (!text) return;
+    if (!text || repeatsVisibleText(target, text)) return;
     const warm = Date.now() - lastHiddenAt.current < WARM_WINDOW_MS;
     if (immediate || warm) {
       setActive({ target, text });

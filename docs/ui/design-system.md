@@ -249,7 +249,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 ## 轻量选择控件
 
 - **多选**用 `CheckPill`（勾选 + 文字，`role="checkbox"`，`aria-checked`，`is-selected`）或列表里的 `Checkbox`。两者共用空心方框 + 字色勾（`--checkbox-*`）。禁止 accent 实心方砖，禁止为多选画大方框卡片。`Switch` 是唯一胶囊，开态才灌 accent。
-- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、导入输入方式、导出范围与格式：下沉的轨道里一个凸起滑块滑到选中项。页面导航用默认 `underline`：细分隔线上一条强调色指示条滑动。默认按内容宽度布局；同组需要统一铺满时显式使用 `fullWidth`。Tab 可带 `icon` 与 `count`（计数徽标）；`collapsible` 在带标签的一行放不下时整体降为图标加悬停提示，容器变宽后恢复，永不重叠或换行（Right Rail 检查器）。语言选项在所有界面语言下统一使用自称 `简体中文` / `English`，便于用户在不熟悉当前界面语言时识别切换入口，并避免紧凑选择器因外语全称溢出。
+- **单选**用 `Tabs` 的 `variant="segmented"`（`role="tablist"` / `radiogroup`），用于主题模式、字号、导入输入方式、导出范围与格式，以及「用户 / 项目」这类视角切换：下沉的轨道里一个凸起滑块滑到选中项。页面导航用默认 `underline`：细分隔线上一条强调色指示条滑动。默认按内容宽度布局；同组需要统一铺满时显式使用 `fullWidth`。Tab 可带图标与计数；下划线标签悬停只把文字提亮，不铺底色，指示条始终在最上层。空间不够时收起成图标：每个标签是等宽的一格，只显示图标，名称在悬停提示里，选中靠指示条表示，选中项不拉长；计数贴在图标右上角、格子之内，不被裁切。
 - 动作按钮与选择控件不混同：普通执行 `ghost` / `secondary`，主要动作 `primary`，危险动作 `danger`。
 
 ## 颜色选择浮层
@@ -306,7 +306,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 - 一条 transition 只写一条缓动曲线（`transition: opacity var(--duration-fast) var(--ease-standard), transform …`），把两条曲线写进同一条声明会让整条失效，门禁拒绝。
 - 每个进场都有退场：TaskDialog、ReadingSheet、Settings、知识中心、Popover、Select、ContextMenu、Toast、Tooltip 共用 `design-motion.css` 的成对关键帧（`overlay-fade-*`、`surface-rise-*`、`popover-*`），关闭时元素带 `data-state="closing"` 播放退场，`ui/usePresence` 在它自己的 animationend 后卸载；没有退场动画或减少动效时立即卸载。
-- **悬停定位**：浏览 Working 时帮人定位正在看的那一条，纯 CSS，没有 JS 监听。可点开的行（工具卡头、网页组卡头、子代理卡头、计划卡标题、可展开的思考行）的标题统一用 `.work-row-title`：静止 `--token-text-secondary` / 400，`@media (hover: hover)` 下行 `:hover` 或 `:focus-visible` 时 `--token-text-primary` / 600，颜色 `--transition-fast`；`::after { content: attr(data-text) }` 以 600 叠放并隐藏，撑住粗体宽度。卡头触发区不铺悬停底色。Composer 不参与，它只在聚焦时边缘增亮。
+- **悬停定位**：浏览 Working 时帮人定位正在看的那一条，纯 CSS，没有 JS 监听。可点开的行（工具卡头、网页组卡头、子代理卡头、可展开的思考行，行根带 `data-locate`）的标题统一用 `.work-row-title`；计划卡是用户定的大卡片，保持原样不参与。静止 `--token-text-secondary` / 400，`@media (hover: hover)` 下行 `:hover`（`:has()` 保证只点亮光标正下方的那一层）、`:focus-visible` 或展开时 `--token-text-primary` / 600，颜色 `--transition-fast`；`::after { content: attr(data-text) }` 以 600 叠放并隐藏，撑住粗体宽度。卡头触发区不铺悬停底色。Composer 不参与，它只在聚焦时边缘增亮。
 - **跟随视窗**：Working 在「跟随最新」偏好下的限高容器，内容增长时用 200ms 缓动滚到底；用户上滚即暂停跟随。
 - 系统 `prefers-reduced-motion: reduce` 时，`design-reduced-motion.css` 把时长 token 置零，停掉 spin、骨架屏、子代理点阵、trace flash、agent 菜单运行点、靠近高亮与跟随缓动（直接跳到最新）；保留资产 Active Signal 与 Composer 折射边缘由真实运行状态驱动，不受系统偏好影响；Max 画布由 `EffortMaxField` 自己收束。
 
@@ -316,7 +316,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 - **Toast**：`ui/Toast` + `NotificationToast` 是唯一的操作结果反馈：语气图标、一句标题、可选一句正文、关闭按钮；信息与成功 4s、警告 6s 自动消失，错误等待用户关闭，悬停或聚焦时暂停计时，最多同时 3 条。来源只有 `notificationStore`，技术细节不进 Toast。
 - **错误**：`ui/InlineError` 是唯一的错误呈现：错误图标 + 一句人话（正文字号）+ 可选「重试」+ 有技术原因时一个「复制详情」图标按钮（经 `lib/clipboard` 的 `ClipboardContext`，由 `AppProviders` 注入）。原始报错经 `lib/errorDetail` 只进复制内容，门禁拒绝在组件里渲染 `String(error)` 或裸 `<p role="alert">`。
 - **复制**：`ui/CopyButton` 是唯一的复制入口：复制图标，成功后 1.6s 内变成绿色对勾，提示同步切换为「已复制」。
-- **图片**：`ui/ImageViewer` 是唯一的图片查看器：人话标题、缩放（按钮、滚轮、双击）、放大后拖动平移、上一张 / 下一张（方向键）与「打开原图」；Working 图片组、知识卡片图片与正文图片共用。
+- **图片**：`ui/ImageViewer` 是唯一的图片查看器：人话标题、缩放（按钮、滚轮、双击）、放大后拖动平移、上一张 / 下一张（方向键）与「打开原图」；Working 图片组、知识卡片图片与正文图片共用。面板贴合图片：取图片原尺寸，上限为视口的 90%（窄屏铺满），工具条附在面板顶部；遮罩铺满全屏，但不会出现一个巨大的空面板里浮着一张小图。
 - **加载**：`ui/Skeleton`（`line` / `row` / `card` / `block`）按将要出现的内容形状占位，不与「加载中…」文字同时出现；减少动效时停止流光。
 
 ## 浅色主题

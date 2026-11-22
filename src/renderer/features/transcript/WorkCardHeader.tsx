@@ -3,14 +3,16 @@ import { Chevron } from '../../ui/Chevron';
 
 /** Shared tool-card geometry; callers own identity, state and disclosure. */
 export const WorkCardHeader: React.FC<{
-  icon: React.ReactNode; title: React.ReactNode; status?: React.ReactNode; duration?: string;
+  icon: React.ReactNode; title: React.ReactNode;
+  /** The title as plain text: it reserves the bold width so the hover locate never shifts the row. */
+  titleText?: string; status?: React.ReactNode; duration?: string;
   expanded?: boolean; disabled?: boolean; onClick: React.MouseEventHandler<HTMLButtonElement>;
-  controls?: string; tooltip?: string; preview?: React.ReactNode; trailingPreview?: React.ReactNode;
-}> = ({ icon, title, status, duration, expanded, disabled, onClick, controls, tooltip, preview, trailingPreview }) => (
+  controls?: string; preview?: React.ReactNode; trailingPreview?: React.ReactNode;
+}> = ({ icon, title, titleText, status, duration, expanded, disabled, onClick, controls, preview, trailingPreview }) => (
   <button type="button" className={`work-card-trigger${preview ? ' has-preview' : ''}`}
-    onClick={onClick} aria-expanded={expanded} aria-controls={controls} disabled={disabled} data-tooltip={tooltip}>
+    onClick={onClick} aria-expanded={expanded} aria-controls={controls} disabled={disabled}>
     <span className="work-process-tool-card-header" data-work-node-heading>
-      <span className="work-process-tool-card-title">{icon}<span className="work-process-tool-card-verb">{title}</span></span>
+      <span className="work-process-tool-card-title">{icon}<span className="work-process-tool-card-verb work-row-title" data-text={titleText}>{title}</span></span>
       <span className="work-process-tool-card-meta">
         {status}{duration ? <span>{duration}</span> : null}
         {expanded !== undefined ? <Chevron open={expanded} size={12} className="work-process-row-caret" /> : null}
