@@ -24,6 +24,7 @@ import {
   KnowledgeCandidatesArgsSchema,
   KnowledgeCardArgsSchema,
   KnowledgeImportArgsSchema,
+  KnowledgeImportPreviewArgsSchema,
   KnowledgeImageArgsSchema,
   KnowledgeCompileArgsSchema,
   KnowledgeIndexRebuildArgsSchema,
@@ -303,6 +304,22 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
         sessionId: input.sessionId,
         card: input.card,
         explicitUserIntent: true,
+      });
+    } catch (error) {
+      rethrowKnowledgeError(error);
+    }
+  });
+
+  ipcMain.handle('knowledge:previewImport', async (_event, ...rawArgs: unknown[]) => {
+    const [input] = parseIpcArgs(KnowledgeImportPreviewArgsSchema, rawArgs, {
+      label: 'knowledge:previewImport',
+      maxBytes: KNOWLEDGE_IMPORT_MAX_BYTES + 8 * 1024,
+    });
+    try {
+      assertKnownSpaces([input.spaceId]);
+      return await knowledgeImportService.previewImport({
+        spaceId: input.spaceId,
+        ...(input.filePath ? { filePath: input.filePath } : { source: input.source ?? '' }),
       });
     } catch (error) {
       rethrowKnowledgeError(error);

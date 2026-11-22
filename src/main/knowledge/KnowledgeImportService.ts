@@ -7,6 +7,7 @@ import {
   ingestKnowledge,
   ingestKnowledgeFromPath,
   type KnowledgeImportPathResult,
+  type KnowledgeStagedImage,
 } from './knowledgeIngest';
 import {
   createSessionScopedKnowledgeStore,
@@ -43,6 +44,13 @@ export interface KnowledgeImportRequest {
   availableImagePaths?: Iterable<string>;
 }
 
+/** What an import would do with one item, decided before anything is written. */
+export interface PlannedKnowledgeImportItem {
+  item: KnowledgeImportItem;
+  /** Present only for a new card the import writes as a draft. */
+  write?: { card: KnowledgeCardRecord; stagedImages?: KnowledgeStagedImage[] };
+}
+
 export interface KnowledgeImportDependencies {
   listSpaces(): KnowledgeSpace[];
   listCards(spaceId: string): Promise<KnowledgeCardSummary[]>;
@@ -75,6 +83,12 @@ function attachInlineSourceHash(
     }
   }
   return { ...result, sourceHash, sourceSize };
+}
+
+/** The result a caller sees: the ingested source facts with the planned or written items, never staged bytes. */
+function publicResult(ingested: KnowledgeImportPathResult, items: KnowledgeImportItem[]): KnowledgeImportResult {
+  const { stagedImagesByCardId: _staged, ...source } = ingested;
+  return { ...source, items };
 }
 
 function sameSource(occupant: KnowledgeSpaceOccupant, hash: string | undefined): boolean {
@@ -148,6 +162,37 @@ function spaceConflictItem(
   };
 }
 
+/**
+ * The one judgment of an import against a space: quarantined items stay as they are, an item whose identity is
+ * already in the space is either the same source (already present) or a different one (conflict), and every other
+ * card is new. New cards become occupants as they are planned, so a package cannot add the same identity twice.
+ * Preview and import both use this; only import then writes the planned cards.
+ */
+export function planKnowledgeImport(
+  spaceId: string,
+  ingested: KnowledgeImportPathResult,
+  occupants: readonly KnowledgeSpaceOccupant[],
+): PlannedKnowledgeImportItem[] {
+  const known = [...occupants];
+  return ingested.items.map((item) => {
+    if (item.status !== 'draft' || !item.record) return { item };
+    const occupant = known.find((entry) => occupantMatches(item.record!, entry));
+    if (occupant && sameSource(occupant, sourceHashOf(item, ingested))) return { item: alreadyPresentItem(item, occupant) };
+    if (occupant) return { item: spaceConflictItem(item, occupant) };
+    const card: KnowledgeCardRecord = { ...item.record, spaceId, lifecycle: 'draft' };
+    known.push({
+      cardId: card.cardId,
+      spaceId,
+      relativePath: card.relativePath,
+      title: card.title,
+      ...(card.caseId ? { caseId: card.caseId } : {}),
+      ...(card.sourceHash ? { sourceHash: card.sourceHash } : {}),
+    });
+    const stagedImages = ingested.stagedImagesByCardId?.get(item.record.cardId);
+    return { item: { ...item, record: card }, write: { card, ...(stagedImages?.length ? { stagedImages } : {}) } };
+  });
+}
+
 export class KnowledgeImportService {
   constructor(private readonly overrides: Partial<KnowledgeImportDependencies> = {}) {}
 
@@ -161,17 +206,46 @@ export class KnowledgeImportService {
     };
   }
 
+  /** What importing this source into the space would do, item by item. Nothing is written. */
+  async previewImport(request: KnowledgeImportRequest): Promise<KnowledgeImportResult> {
+    const ingested = await this.ingest(request);
+    const planned = planKnowledgeImport(request.spaceId, ingested, await this.listOccupants(request.spaceId));
+    return publicResult(ingested, planned.map((entry) => entry.item));
+  }
+
   /**
    * Import writes draft cards into the chosen space. This method never creates a Candidate.
    */
   async importToSpace(request: KnowledgeImportRequest): Promise<KnowledgeImportResult> {
+    const ingested = await this.ingest(request);
+    const planned = planKnowledgeImport(request.spaceId, ingested, await this.listOccupants(request.spaceId));
+    const items: KnowledgeImportItem[] = [];
+    for (const entry of planned) {
+      if (!entry.write) {
+        items.push(entry.item);
+        continue;
+      }
+      const written = await this.deps.write.write({
+        spaceId: request.spaceId,
+        card: entry.write.card,
+        permissionMode: 'default',
+        confirmation: { explicitHumanConfirmation: true },
+        approvalAlreadyConsumed: true,
+        ...(entry.write.stagedImages ? { stagedImages: entry.write.stagedImages } : {}),
+      });
+      items.push({ ...entry.item, record: written });
+    }
+    return publicResult(ingested, items);
+  }
+
+  private async ingest(request: KnowledgeImportRequest): Promise<KnowledgeImportPathResult> {
     const space = this.deps.listSpaces().find((entry) => entry.spaceId === request.spaceId);
     if (!space) {
       const error = new Error(`Unknown knowledge space: ${request.spaceId}`);
       (error as Error & { code: string }).code = 'KNOWLEDGE_SPACE_UNKNOWN';
       throw error;
     }
-    const ingested = request.filePath
+    return request.filePath
       ? await ingestKnowledgeFromPath(request.filePath, {
         spaceId: request.spaceId,
         ...(request.availableAssetNames ? { availableAssetNames: request.availableAssetNames } : {}),
@@ -182,7 +256,6 @@ export class KnowledgeImportService {
         ...(request.availableAssetNames ? { availableAssetNames: request.availableAssetNames } : {}),
         ...(request.availableImagePaths ? { availableImagePaths: request.availableImagePaths } : {}),
       }) as KnowledgeImportPathResult, request.source ?? '');
-    return this.persistToSpace(request.spaceId, ingested);
   }
 
   async migrateSessionDrafts(sessionId: string): Promise<void> {
@@ -218,53 +291,6 @@ export class KnowledgeImportService {
     if (conflicts.length > 0) {
       throw new KnowledgeDraftMigrationConflictError(conflicts);
     }
-  }
-
-  private async persistToSpace(
-    spaceId: string,
-    ingested: KnowledgeImportPathResult,
-  ): Promise<KnowledgeImportResult> {
-    const occupants = await this.listOccupants(spaceId);
-    const items: KnowledgeImportItem[] = [];
-    for (const item of ingested.items) {
-      if (item.status !== 'draft' || !item.record) {
-        items.push(item);
-        continue;
-      }
-      const occupant = occupants.find((entry) => occupantMatches(item.record!, entry));
-      const hash = sourceHashOf(item, ingested);
-      if (occupant && sameSource(occupant, hash)) {
-        items.push(alreadyPresentItem(item, occupant));
-        continue;
-      }
-      if (occupant) {
-        items.push(spaceConflictItem(item, occupant));
-        continue;
-      }
-      const staged = ingested.stagedImagesByCardId?.get(item.record.cardId);
-      const written = await this.deps.write.write({
-        spaceId,
-        card: { ...item.record, spaceId, lifecycle: 'draft' },
-        permissionMode: 'default',
-        confirmation: { explicitHumanConfirmation: true },
-        approvalAlreadyConsumed: true,
-        ...(staged?.length ? { stagedImages: staged } : {}),
-      });
-      occupants.push({
-        cardId: written.cardId,
-        spaceId: written.spaceId,
-        relativePath: written.relativePath,
-        title: written.title,
-        ...(written.caseId ? { caseId: written.caseId } : {}),
-        ...(written.sourceHash ? { sourceHash: written.sourceHash } : {}),
-      });
-      items.push({
-        ...item,
-        record: written,
-      });
-    }
-    const { stagedImagesByCardId: _staged, ...publicResult } = ingested;
-    return { ...publicResult, items };
   }
 
   private async listOccupants(spaceId: string): Promise<KnowledgeSpaceOccupant[]> {

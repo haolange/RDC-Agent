@@ -297,6 +297,12 @@ export interface ElectronAPI {
       card: KnowledgeCardRecord;
       explicitUserIntent: true;
     }) => Promise<SessionKnowledgeCandidate>;
+    /** What importing this source would do, item by item; nothing is written and nothing asks for confirmation. */
+    previewImport: (request: {
+      spaceId: string;
+      source?: string;
+      filePath?: string;
+    }) => Promise<KnowledgeImportResult>;
     import: (request: {
       spaceId: string;
       sessionId?: string;
