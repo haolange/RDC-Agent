@@ -139,7 +139,12 @@ try {
     await page.getByTestId('knowledge-center-detail').waitFor({ timeout: 30_000 });
     await page.waitForTimeout(800);
     await shot('02d-knowledge-real-reader');
-    await page.getByTestId('knowledge-center-detail').evaluate((node) => { node.scrollTop = node.scrollHeight / 2; });
+    // The reader scrolls in an ancestor of the article; move the nearest one that can scroll.
+    await page.getByTestId('knowledge-center-detail').evaluate((node) => {
+      let scroller = node;
+      while (scroller && scroller.scrollHeight <= scroller.clientHeight) scroller = scroller.parentElement;
+      if (scroller) scroller.scrollTop = scroller.scrollHeight / 2;
+    });
     await shot('02e-knowledge-real-reader-middle');
     await closeOverlays(page);
   });
