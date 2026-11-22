@@ -79,6 +79,9 @@ function ImportItems({ items, written, candidates, onProposed }: {
               <span className="knowledge-import-item-title">{item.record?.title ?? t('knowledgeCenter.importUnreadable')}</span>
               {meta.length ? <span className="knowledge-import-item-meta">{meta.join(' · ')}</span> : null}
               <ItemNote item={item} />
+              {candidates?.candidateError && candidates.candidateError.cardId === item.record?.cardId ? (
+                <InlineError detail={candidates.candidateError.message}>{t('knowledgeCenter.candidateFailed')}</InlineError>
+              ) : null}
             </div>
             <div className="knowledge-import-item-side">
               <Badge tone={OUTCOME_TONE[outcome]} data-status={outcome}>{t((written ? WRITTEN_LABEL_KEYS : OUTCOME_LABEL_KEYS)[outcome])}</Badge>
@@ -176,8 +179,8 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
             value={importer.mode}
             onChange={(id) => importer.setMode(id as typeof importer.mode)}
             tabs={[
-              { id: 'file', label: t('knowledgeCenter.importModeFile') },
-              { id: 'paste', label: t('knowledgeCenter.importModePaste') },
+              { id: 'file', label: t('knowledgeCenter.importModeFile'), disabled: importer.busy },
+              { id: 'paste', label: t('knowledgeCenter.importModePaste'), disabled: importer.busy },
             ]}
           />
           {importer.mode === 'file' ? (
