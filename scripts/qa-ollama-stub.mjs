@@ -166,6 +166,9 @@ async function streamChat(response, chunks) {
 /** Runtime follow-up prompts are Markdown-headed; they continue the scripted turn rather than start a new one. */
 const isRuntimeFollowUp = (entry) => typeof entry.content === 'string' && entry.content.startsWith('# ');
 
+const lastPlanningPrompt = (messages) => messages.map((entry) => entry.role === 'user' && !isRuntimeFollowUp(entry)
+  && typeof entry.content === 'string' && (entry.content.includes('qa:plan') || entry.content.includes('qa:partial'))).lastIndexOf(true);
+
 /** The latest user message and the tool results that followed it decide where the scripted turn is. */
 function turnState(body) {
   const messages = body.messages ?? [];
@@ -179,7 +182,8 @@ function turnState(body) {
     step: after.filter((entry) => entry.role === 'assistant').length,
     toolResults: after.filter((entry) => entry.role === 'tool').map((entry) => String(entry.content ?? '')),
     after,
-    planRevisions: messages.filter((entry) => entry.role === 'assistant'
+    // Revisions count within the current planning flow, so a later plan in the same session starts at revision 1.
+    planRevisions: messages.slice(lastPlanningPrompt(messages) + 1).filter((entry) => entry.role === 'assistant'
       && (entry.tool_calls ?? []).some((call) => call.function?.name === 'plan_artifact')).length,
   };
 }

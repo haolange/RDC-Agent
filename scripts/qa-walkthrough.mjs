@@ -159,7 +159,11 @@ try {
     await page.getByTestId('settings-provider-connect-ollama').click();
     const dialog = page.getByTestId('settings-provider-connect-dialog');
     await dialog.getByRole('button', { name: /^(检查连接|Check connection)$/ }).click();
-    await page.waitForTimeout(3000);
+    // The service is not saved yet: its discovered models must still settle instead of reading as loading.
+    await page.waitForFunction(() => {
+      const rows = [...document.querySelectorAll('[data-testid^="settings-provider-model-row-"]')];
+      return rows.length > 0 && rows.every((row) => row.getAttribute('data-availability-badge') !== 'loading');
+    }, null, { timeout: 15_000 });
     await shot('03b-settings-provider-panel');
     await dialog.getByRole('button', { name: /^(保存|连接|Save|Connect)$/ }).click();
     await page.waitForTimeout(2500);
