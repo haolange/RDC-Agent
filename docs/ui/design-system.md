@@ -64,7 +64,7 @@ RDC-Agent 是 **现代精密工作台**：工作区高密度，其余处从容�
 | 图标 | 只有 `ui/Icon` 一套，线宽 1.6，行内 16px；文字当图标为 0 |
 | 胶囊 | 高 `--chip-height`（24px），网站图标 `--chip-icon-size`（14px），标题用正文角色，胶囊间距 8px（4px 网格） |
 | 圆角与间距 | 卡片 10，面板 14–18，胶囊全圆；间距走 4px 网格，行间距 8–10 |
-| 解释的去处 | 需要解释的放进 `data-tooltip` 或 `HelpTip`，或让控件自己说明（预览缩略图），不写进界面 |
+| 解释的去处 | 会影响决定的说明用次级正文写在标签下；只是补充的放进 `data-tooltip`；能让控件自己说明的（预览缩略图）就不另写 |
 
 **保留资产**：Working 工具卡片体系（卡壳、卡头「图标 · 标题 · 状态 · 耗时 · 箭头」、正文层、展开详情、原始回执层）、「已思考 · 时长」、Active 扫光、Composer 折射边缘、Max 粒子、子代理点阵和 Working 行的悬停定位。减法不碰它们，只清理其中露出的调试字段；`check:ui-contract` 为每项保留一条回归检查。
 
@@ -312,7 +312,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 反馈原语
 
-- **提示**：任何元素写 `data-tooltip` 即可获得悬停提示，`ui/TooltipHost`（挂在 `AppProviders`）统一呈现：悬停 450ms 后出现，刚关闭一个后下一个立即出现，键盘聚焦立即出现，Escape、按下指针与离开即消失，触屏不出现；提示文字与元素可访问名称不同时以 `aria-describedby` 关联。组件不写原生 `title`；截断文字用 `OverflowFade`，只在真正溢出时提供完整文字。`HelpTip` 用于需要点击展开的较长说明。
+- **提示**：任何元素写 `data-tooltip` 即可获得悬停提示，`ui/TooltipHost`（挂在 `AppProviders`）统一呈现：悬停 450ms 后出现，刚关闭一个后下一个立即出现，键盘聚焦立即出现，Escape、按下指针与离开即消失，触屏不出现；提示文字与元素可访问名称不同时以 `aria-describedby` 关联。组件不写原生 `title`；截断文字用 `OverflowFade`，只在真正溢出时提供完整文字；提示文字与可见文字完全相同且没有截断时，`TooltipHost` 不显示它。
 - **Toast**：`ui/Toast` + `NotificationToast` 是唯一的操作结果反馈：语气图标、一句标题、可选一句正文、关闭按钮；信息与成功 4s、警告 6s 自动消失，错误等待用户关闭，悬停或聚焦时暂停计时，最多同时 3 条。来源只有 `notificationStore`，技术细节不进 Toast。
 - **错误**：`ui/InlineError` 是唯一的错误呈现：错误图标 + 一句人话（正文字号）+ 可选「重试」+ 有技术原因时一个「复制详情」图标按钮（经 `lib/clipboard` 的 `ClipboardContext`，由 `AppProviders` 注入）。原始报错经 `lib/errorDetail` 只进复制内容，门禁拒绝在组件里渲染 `String(error)` 或裸 `<p role="alert">`。
 - **复制**：`ui/CopyButton` 是唯一的复制入口：复制图标，成功后 1.6s 内变成绿色对勾，提示同步切换为「已复制」。

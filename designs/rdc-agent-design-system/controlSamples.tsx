@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { Badge, Button, ColorField, Icon, IconButton, Input, ModeGlyph, Pill, Tabs,
   Toast, ToastStack, UnsavedChangesDialog } from '../../src/renderer/ui';
-import { HelpTip } from '../../src/renderer/ui/HelpTip';
 
 export function ColorSample() {
   const [color, setColor] = useState('#33d1ff');
   return <>
     <ColorField label="示例强调色" value={color} onChange={setColor} testId="catalog-color"
       areaLabel="饱和度与明度" hueLabel="色相" pickerTitle="示例颜色" currentLabel="当前颜色" />
-    <HelpTip label="颜色帮助">只改变此示例颜色，不写入产品配置。</HelpTip>
   </>;
 }
 
