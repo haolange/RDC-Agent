@@ -6,7 +6,7 @@ import { normalizeToolName, getToolDisplay, getToolFamily, formatMcpTarget } fro
 import { createUserInputRow, createPlanReviewShellRow, createPlanReviewRow } from './workProcessDecisionRows';
 import { parsePreview, createDetailLines, prettyPrint, toRecord, readNestedString, isJsonLike, readNestedValue, stringifyPreview, isRawPayloadPreview, isInternalAddress } from './workProcessContentText';
 import { unwrapToolContentLayer } from './workProcessToolContent';
-import { emptyUnwrappedContent, sanitizeContentText } from './workProcessToolContentShared';
+import { emptyUnwrappedContent } from './workProcessToolContentShared';
 import { extractWebToolPresentation } from './workProcessWebPresentation';
 import { formatDurationMs, normalizeWorkProcessText, compactText } from './workProcessFormat';
 import { getToolOutcome } from './workProcessOutcome';
@@ -65,16 +65,11 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
   const parsedResult = parsePreview(rawResult);
   const suppressApprovalPreview = Boolean(approval) && isApprovalRequiredPreview(parsedResult, rawResult);
   const status = deriveToolStatus(call, parsedResult);
-  const unwrapped = suppressApprovalPreview
+  // A failure's own text is the caption below the header and the raw receipt; it is not content to lay out again.
+  const unwrapped = suppressApprovalPreview || call.error
     ? emptyUnwrappedContent()
-    : unwrapToolContentLayer(call.toolName, parsedResult, call.error ? undefined : call.resultPreview, call.argsPreview, t);
-  const previewLines = call.error && !suppressApprovalPreview
-    ? (
-      unwrapped.previewLines.length > 0
-        ? unwrapped.previewLines
-        : createDetailLines(sanitizeContentText(call.error), 4)
-    )
-    : unwrapped.previewLines;
+    : unwrapToolContentLayer(call.toolName, parsedResult, call.resultPreview, call.argsPreview, t);
+  const previewLines = unwrapped.previewLines;
   const webPresentation = extractWebToolPresentation(call.toolName, parsedResult, call.argsPreview, status);
   // A failed read or search already says so in its title and on its pill; the HTTP reason stays in the raw receipt.
   const diagnosticCaption = status === 'error' && !webPresentation.webPages && !webPresentation.webQuery
@@ -95,7 +90,7 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
     groupKind: display.groupKind,
     family: getToolFamily(call.toolName),
     toolName: call.toolName,
-    target: normalizeToolName(call.toolName) === 'artifact_read' ? artifactObject(call.argsPreview, t) : getToolTarget(call.toolName, call.argsPreview),
+    target: (normalizeToolName(call.toolName) === 'artifact_read' ? artifactObject(call.argsPreview, t) : '') || getToolTarget(call.toolName, call.argsPreview),
     duration: formatDurationMs(call.executionStartedAt, call.completedAt),
     startedAt: call.executionStartedAt,
     completedAt: call.completedAt,
@@ -144,7 +139,21 @@ export const extractDiagnosticCaption = (
   const caption = candidates[0] ?? '';
   if (!caption) return '';
   const firstLine = caption.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? caption;
-  return compactText(firstLine, 160);
+  return compactText(withoutMachinePrefix(firstLine), 160);
+};
+
+/**
+ * Runtime failures are written for the model: an error code, the tool in brackets and a field path lead the reason.
+ * The surface keeps only the reason; the full text stays in the raw receipt.
+ */
+const MACHINE_PREFIX = /^(?:[A-Z][A-Z0-9_]{2,}:|\[[^\]\n]+\]|[A-Za-z_][\w-]*(?:\.[\w-]+|\[\d+\])+:)\s*/u;
+const withoutMachinePrefix = (line: string): string => {
+  let rest = line;
+  for (let previous = ''; previous !== rest;) {
+    previous = rest;
+    rest = rest.replace(MACHINE_PREFIX, '');
+  }
+  return rest.trim() || line;
 };
 
 const createToolApprovalPresentation = (
