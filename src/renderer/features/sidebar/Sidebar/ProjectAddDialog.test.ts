@@ -39,9 +39,10 @@ it('retains the draft and exposes failure, while cancellation does not add a pro
   act(() => root.render(createElement(ProjectAddDialog, { onAdd: add, onClose: close })));
   act(() => fill('D:/missing'));
   await act(async () => button('sidebar.addProject').click());
-  // The alert leads with a human sentence; the raw reason stays under diagnostics.
+  // The alert leads with a human sentence; the raw reason leaves only through the copy action.
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('app.error.actionFailed');
-  expect(document.querySelector('[role="alert"]')?.querySelector('.ui-inline-error-detail-text')?.textContent).toBe('directory unavailable');
+  expect(document.querySelector('[role="alert"]')?.textContent).not.toContain('directory unavailable');
+  expect(document.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
   expect(document.querySelector('input')?.value).toBe('D:/missing'); expect(close).not.toHaveBeenCalled();
   act(() => button('dialog.cancel').click()); expect(add).toHaveBeenCalledTimes(1); expect(close).toHaveBeenCalledTimes(1);
 });

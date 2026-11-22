@@ -218,7 +218,7 @@ const FIXTURES = {
   },
   runtime_context: {
     argsPreview: '{}',
-    resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc' }),
+    resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc', available: true }),
   },
   rdc_probe: {
     argsPreview: JSON.stringify({ action: 'doctor' }),
@@ -370,11 +370,16 @@ for (const toolName of allTools) {
   }
 
   if (toolName === 'plan_artifact') {
-    // The plan itself is delivered in the reply after Working; Working keeps one compact shell row.
-    assert(row.type === 'tool', 'plan_artifact should render as a compact tool shell row');
-    assert(row.target === 'Plan', 'plan shell row should name the plan title');
-    assert(row.planReview?.status === 'awaiting', 'plan shell row should keep the review status');
-    assert(row.icon === 'plan-artifact', 'plan shell row should use the plan icon');
+    // Working shows the current revision as the plan card; a revision it replaced folds into one compact shell row.
+    assert(row.type === 'planReview', 'the current plan revision should render as the plan card');
+    assert(row.plan.status === 'awaiting' && row.plan.title === 'Plan', 'the plan card should carry the reviewed plan');
+    const replaced = createToolRowForPresentation({
+      id: 'tool-plan_artifact-replaced', toolName, status: 'complete', argsPreview: fixture.argsPreview,
+      planReview: { ...fixture.planReview, status: 'superseded' }, startedAt: now, completedAt: now + 50,
+    }, t);
+    assert(replaced.type === 'tool', 'a replaced plan revision should render as a compact tool shell row');
+    assert(replaced.target === 'Plan', 'plan shell row should name the plan title');
+    assert(replaced.icon === 'plan-artifact', 'plan shell row should use the plan icon');
     continue;
   }
 
@@ -383,7 +388,7 @@ for (const toolName of allTools) {
   assert(row.icon && row.icon !== 'tool', `${toolName} should have a semantic icon, got "${row.icon}"`);
   assert(row.groupKind && row.groupKind !== 'diagnostic', `${toolName} should have a semantic group`);
   assert(row.category.length > 0, `${toolName} should have a category`);
-  assert(row.target.length > 0 || row.previewLines.length > 0, `${toolName} should expose target or preview`);
+  assert(row.target.length > 0 || row.previewLines.length > 0 || Boolean(row.bodyText), `${toolName} should expose a target, preview or body`);
   assert(
     ['file', 'search', 'shell', 'git', 'web', 'memory', 'skill', 'mcp', 'runtime', 'interpreter', 'generic'].includes(row.family),
     `${toolName} should expose a unified card family, got "${row.family}"`,
