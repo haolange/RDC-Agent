@@ -29,7 +29,7 @@
 }
 
 /* During a turn the pill names the route that turn runs on; it stays fully legible, it just cannot be changed. */
-.composer-model-effort-pill:disabled {
+.composer-model-effort-pill.ui-pill:is(:disabled, .is-disabled) {
   opacity: 1;
   cursor: default;
 }
