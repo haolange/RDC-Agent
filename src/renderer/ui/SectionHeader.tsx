@@ -1,11 +1,10 @@
 import { cn } from '../lib/cn';
-import { HelpTip } from './HelpTip';
 import type { HTMLAttributes, ReactNode } from 'react';
 import './SectionHeader.css';
 
 export interface SectionHeaderProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title: ReactNode;
-  /** Explanation of the section; it sits behind a help tip next to the title rather than under it. */
+  /** Explanation of the section, as secondary body text under the title. */
   description?: ReactNode;
   actions?: ReactNode;
 }
@@ -21,7 +20,7 @@ export function SectionHeader({
     <div className={cn('ui-section-header', className)} {...rest}>
       <div className="ui-section-header-copy">
         <h3 className="ui-section-header-title">{title}</h3>
-        {description ? <HelpTip label={typeof title === 'string' ? title : ''}>{description}</HelpTip> : null}
+        {description ? <p className="ui-section-header-description">{description}</p> : null}
       </div>
       {actions ? <div className="ui-section-header-actions">{actions}</div> : null}
     </div>

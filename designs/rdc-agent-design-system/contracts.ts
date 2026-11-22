@@ -120,11 +120,11 @@ export const contracts = {
     motion: '冻结现有从左到右 active-signal-shimmer；进行中标记只旋转一段弧线，系统减少动效时静止。',
     consumers: 'Transcript 工作过程、TaskSnapshotCard、RightRailTaskList。',
   },
-  'ColorField / HelpTip': {
-    avoid: '不恢复系统原生取色弹窗；HelpTip 不承载必须立即可见的错误和权限。',
-    states: 'grid/inline、合法/未提交 HEX 草稿、取色浮层、键盘色面与色相、帮助聚焦/悬停。',
-    layout: 'HEX 保持紧凑；取色器通过 Popover 避让视口；帮助内容合理换行。',
-    motion: '帮助退出延迟允许指针进入内容；颜色只改变当前样本，不改全局主题。',
+  ColorField: {
+    avoid: '不恢复系统原生取色弹窗。',
+    states: 'grid/inline、合法/未提交 HEX 草稿、取色浮层、键盘色面与色相。',
+    layout: 'HEX 保持紧凑；取色器通过 Popover 避让视口。',
+    motion: '颜色只改变当前样本，不改全局主题。',
     consumers: 'Appearance/Agents 颜色配置；Provider 能力说明。',
   },
   'Tabs / Pill / IconButton': {

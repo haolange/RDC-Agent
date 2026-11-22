@@ -1,6 +1,5 @@
 import React from 'react';
 import { Button } from '../../../../ui/Button';
-import { HelpTip } from '../../../../ui/HelpTip';
 import {
   projectEndpointTemplate,
   resolvePrimarySecretField,
@@ -89,11 +88,11 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
           </label>
         )}
         <div className="settings-field">
-          <div className="settings-field-label-row">
+          <div className="settings-field-copy">
             <span className="settings-field-label">{t('settings.apiKey')}</span>
-            <HelpTip label={t('settings.apiKey')}>
+            <p className="settings-field-description">
               {connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredHint') : t('settings.apiKeyConnectHint')}
-            </HelpTip>
+            </p>
           </div>
           <div className="settings-secret-field">
             <input

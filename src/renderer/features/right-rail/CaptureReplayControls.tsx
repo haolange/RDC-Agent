@@ -4,6 +4,7 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 import { Chevron } from '../../ui/Chevron';
+import { InlineError } from '../../ui/InlineError';
 import { errorDetail } from '../../lib/errorDetail';
 import { createReplayApplyQueue } from './replayApplyQueue';
 import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
@@ -35,10 +36,9 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
     if (disabled || !state || !events.some((event) => event.eventId === id)) return;
     setRequested(id); setError(null); queue.enqueue({ ...scope, bindingGeneration: state.generation, eventId: id, ...(target ? { target } : {}) }, flush);
   };
-  const feedback = requested !== null || state?.phase === 'applying' || (state?.requestedEventId != null && state.requestedEventId !== state.appliedEventId)
-    || (state?.image && state.imageEventId !== state.appliedEventId)
-    ? t('control.replay.requested', { requested: requested ?? state?.requestedEventId ?? '—', shown: state?.imageEventId ?? '—' })
-    : state?.appliedEventId !== null && state?.appliedEventId !== undefined ? t('control.replay.applied', { eid: state.appliedEventId }) : '';
+  // One event number lives in the workspace toolbar and one in the input; the line below only says it is switching.
+  const switching = requested !== null || state?.phase === 'applying' || (state?.requestedEventId != null && state.requestedEventId !== state.appliedEventId)
+    || Boolean(state?.image && state.imageEventId !== state.appliedEventId);
   return <div className="capture-replay-content" role="group" aria-label={t('control.replay.controls')} aria-disabled={disabled}>
     <div className="capture-image-toolbar">
       <span>{t(state?.isFinalOutput ? 'control.replay.final' : 'control.replay.event')}</span>
@@ -60,8 +60,8 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
       onChange={(event) => select(events[Number(event.target.value)].eventId)}
       onPointerUp={() => queue.flush()}
       onKeyUp={(event) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) queue.flush(); }} />
-    <div className="capture-replay-feedback" role="status">{error ?? feedback}</div>
-    {state?.contextId && state.devicePresentation.status === 'presented' && <small>{t('control.replay.synced')}</small>}
-    {state?.contextId && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small data-tooltip={state.devicePresentation.reason ?? undefined}>{t('control.replay.remoteUnavailable')}</small>}
+    {error ? <InlineError detail={error}>{t('control.replay.applyFailed')}</InlineError>
+      : <div className="capture-replay-feedback" role="status">{switching ? t('control.replay.switching') : ''}</div>}
+    {state?.contextId && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small>{t('control.replay.remoteUnavailable')}</small>}
   </div>;
 }

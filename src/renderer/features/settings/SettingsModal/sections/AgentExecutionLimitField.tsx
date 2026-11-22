@@ -9,7 +9,7 @@ export function AgentExecutionLimitField({ agent, onUpdateAgent, t }: {
   t: ReturnType<typeof useI18n>['t'];
 }) {
   return (
-    <SettingsField label={t('settings.agentMaxTurns')} help={t('settings.agentMaxTurnsHelp')}>
+    <SettingsField label={t('settings.agentMaxTurns')} description={t('settings.agentMaxTurnsHelp')}>
       <Input
         key={`${agent.id}:${agent.maxTurns ?? 'default'}`}
         type="number"

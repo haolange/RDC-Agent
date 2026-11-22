@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useI18n } from '../i18n';
 import { Button } from '../ui/Button';
-import { Details } from '../ui/Details';
+import { CopyDiagnosticsButton } from './CopyDiagnostics';
 import type { TranslationKey } from '../i18n';
 import type { ReplayDeviceIssue, SessionDevicePreparation } from '@shared/types/device';
 import './DevicePreparationStatus.css';
@@ -40,6 +40,8 @@ export function DevicePreparationStatus({ preparation, issue: actionIssue, trans
   const [cancelPending, setCancelPending] = useState(false);
   if (!preparation && !transportError && !actionIssue) return null;
   const issue = isDeviceInstallationUnconfirmed(preparation) ? preparation?.issue : actionIssue ?? preparation?.issue;
+  // A ready device with an open capture is already said by the panel's status; this block speaks only when it matters.
+  if (preparation?.phase === 'ready' && hasCapture && !issue && !transportError) return null;
   const busy = preparation ? isDevicePreparing(preparation.phase) : false;
   const installUnconfirmed = isDeviceInstallationUnconfirmed(preparation) || issue?.deviceAction?.outcome === 'unconfirmed';
   const diagnostic = issue?.diagnostic || transportError;
@@ -67,15 +69,13 @@ export function DevicePreparationStatus({ preparation, issue: actionIssue, trans
     {busy && preparation?.phase === 'starting' && <p className="device-preparation-hint">{t('device.prepare.phoneAuthorization')}</p>}
     {!installUnconfirmed && preparation?.phase === 'cancelled' && preparation.installation?.installedApk &&
       <p>{t('device.prepare.installedBeforeCancel')}</p>}
-    {(diagnostic || issue?.expectedVersion || issue?.actualVersion) && <Details summary={t('device.prepare.details')}>
-      {issue?.expectedVersion && <p>{t('device.prepare.expectedVersion', { version: issue.expectedVersion })}</p>}
-      {issue?.actualVersion && <p>{t('device.prepare.actualVersion', { version: issue.actualVersion })}</p>}
-      {diagnostic && <pre className="device-preparation-diagnostic">{diagnostic}</pre>}
-    </Details>}
+    {issue?.expectedVersion && <p>{t('device.prepare.expectedVersion', { version: issue.expectedVersion })}</p>}
+    {issue?.actualVersion && <p>{t('device.prepare.actualVersion', { version: issue.actualVersion })}</p>}
     <div className="device-preparation-actions">
       {actionLabel && <Button variant={disconnect ? 'ghost' : 'secondary'} size="sm" className={actionPending || disabled ? 'is-disabled' : undefined}
         aria-busy={actionPending} aria-disabled={actionPending || disabled} onClick={() => { void runAction(); }}>{t(actionLabel)}</Button>}
       {issue?.recovery === 'configure_tools' && <p>{t('device.prepare.configureTools')}</p>}
+      {diagnostic && <CopyDiagnosticsButton className="device-preparation-copy" facts={[{ label: t('device.prepare.title'), value: diagnostic }]} />}
     </div>
   </section>;
 }

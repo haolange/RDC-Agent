@@ -1,5 +1,5 @@
 import { Button } from '../../ui/Button';
-import { Details } from '../../ui/Details';
+import { CopyDiagnosticsButton } from '../../patterns/CopyDiagnostics';
 import type { CaptureReplayError, CaptureReplayPhase, CaptureReplayState } from '@shared/types/captureReplay';
 import type { TranslationKey } from '../../i18n';
 
@@ -104,13 +104,11 @@ export function CaptureReplayStatusChip({ label, tone }: { label: string; tone: 
 
 export function CaptureReplayCallouts({
   callouts,
-  detailLabel,
   disabled,
   retryLabels,
   onRetry,
 }: {
   callouts: CaptureCallout[];
-  detailLabel: string;
   disabled: boolean;
   retryLabels: Record<'open' | 'close' | 'image', string>;
   onRetry: (action: CaptureRetryAction) => void;
@@ -122,7 +120,7 @@ export function CaptureReplayCallouts({
         <div key={item.id} className={`capture-replay-callout is-${item.tone}`} role={item.tone === 'error' ? 'alert' : 'status'}>
           <div className="capture-replay-callout-copy">
             <strong>{item.title}</strong>
-            {item.detail ? <Details summary={detailLabel}><pre className="capture-replay-diagnostic">{item.detail}</pre></Details> : null}
+            {item.detail ? <CopyDiagnosticsButton className="capture-replay-callout-copy-details" facts={[{ label: item.title, value: item.detail }]} /> : null}
           </div>
           {item.retry ? (
             <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onRetry(item.retry!)}>

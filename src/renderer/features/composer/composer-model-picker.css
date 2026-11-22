@@ -28,7 +28,13 @@
   transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
-.composer-model-effort-pill:hover,
+/* During a turn the pill names the route that turn runs on; it stays fully legible, it just cannot be changed. */
+.composer-model-effort-pill.ui-pill:is(:disabled, .is-disabled) {
+  opacity: 1;
+  cursor: default;
+}
+
+.composer-model-effort-pill:hover:not(:disabled),
 .composer-model-effort-pill.is-open,
 .composer-model-effort-pill.is-override,
 .composer-model-effort-pill:focus-visible {

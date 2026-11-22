@@ -17,8 +17,8 @@ export const WorkProcessThinking: React.FC<{ row: ThinkingRow }> = ({ row }) => 
     .filter(Boolean).join(' ');
   const [open, toggle] = useScopedWorkDisclosure(`thinking-${row.id}`, row.openByDefault);
   const label = <><Icon name="spark" className="work-process-icon work-process-thinking-icon" />
-    <ActiveSignalText active={active} tone="info">{row.label}</ActiveSignalText></>;
-  if (row.expandable) return <details className={className} open={open}>
+    <span className="work-row-title" data-text={row.label}><ActiveSignalText active={active} tone="info">{row.label}</ActiveSignalText></span></>;
+  if (row.expandable) return <details className={className} open={open} data-locate>
     <summary className="work-process-thinking-summary" data-work-node-heading onClick={(event) => { event.preventDefault(); toggle(); }}>
       {label}<Chevron size={12} className="work-process-row-caret" />
     </summary>

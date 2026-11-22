@@ -1,7 +1,5 @@
 import { useI18n } from '../../../../i18n';
-import { useUiLabels } from '../../../../lib/useUiLabels';
 import { Button } from '../../../../ui/Button';
-import { Details } from '../../../../ui/Details';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 import type { KnowledgeIndexOverview } from '@shared/types/knowledge';
@@ -18,7 +16,6 @@ export function RebuildIndexDialog({ open, index, rebuilding, onRebuild, onClose
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const labels = useUiLabels();
   return (
     <TaskDialog
       open={open}
@@ -39,16 +36,13 @@ export function RebuildIndexDialog({ open, index, rebuilding, onRebuild, onClose
         </>
       )}
     >
-      <Details className="knowledge-center-index-diagnostics" summary={labels.diagnostics}>
-        <dl className="knowledge-center-index-facts">
-          <div><dt>{t('knowledgeCenter.indexCardCount')}</dt><dd>{index?.cardCount ?? 0}</dd></div>
-          <div>
-            <dt>{t('knowledgeCenter.indexBuiltAt')}</dt>
-            <dd>{index?.builtAt ? formatKnowledgeTime(Date.parse(index.builtAt)) : t('knowledgeCenter.indexNeverBuilt')}</dd>
-          </div>
-          <div><dt>{t('knowledgeCenter.indexRevision')}</dt><dd className="knowledge-center-index-revision">{index?.revision ?? '—'}</dd></div>
-        </dl>
-      </Details>
+      <dl className="knowledge-center-index-facts">
+        <div><dt>{t('knowledgeCenter.indexCardCount')}</dt><dd>{index?.cardCount ?? 0}</dd></div>
+        <div>
+          <dt>{t('knowledgeCenter.indexBuiltAt')}</dt>
+          <dd>{index?.builtAt ? formatKnowledgeTime(Date.parse(index.builtAt)) : t('knowledgeCenter.indexNeverBuilt')}</dd>
+        </div>
+      </dl>
     </TaskDialog>
   );
 }

@@ -124,6 +124,7 @@ export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeAp
     indexRebuild: () => transport.invoke(INVOKE.knowledge.indexRebuild),
     candidates: (sessionId) => transport.invoke(INVOKE.knowledge.candidates, sessionId),
     candidateCreate: (request) => transport.invoke(INVOKE.knowledge.candidateCreate, request),
+    previewImport: (request) => transport.invoke(INVOKE.knowledge.previewImport, request),
     import: (request) => transport.invoke(INVOKE.knowledge.import, request),
     image: (request) => transport.invoke(INVOKE.knowledge.image, request),
     issueApprovalToken: (request) => transport.invoke(INVOKE.knowledge.issueApprovalToken, request),

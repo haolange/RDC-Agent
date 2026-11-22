@@ -1,7 +1,6 @@
 /** Windowed messages with measured row heights, including expanded work cards. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDynStyle } from '../../lib/useDynStyle';
-import { findPlanLocation, TRANSCRIPT_LOCATE_PLAN_EVENT, type TranscriptPlanLocationRequest } from '../../lib/transcriptPlanLocation';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 const VIRTUALIZE_THRESHOLD = 48;
@@ -106,34 +105,6 @@ export const VirtualMessageList: React.FC<Props> = ({
     return () => { parent.removeEventListener('scroll', updateRange); observer?.disconnect(); };
   }, [updateRange]);
   useEffect(updateRange, [messages.length, heightRevision, updateRange]);
-
-  useEffect(() => {
-    let frame: number | undefined;
-    const locate = (event: Event) => {
-      const detail = (event as CustomEvent<TranscriptPlanLocationRequest>).detail;
-      const index = findPlanLocation(messages, detail);
-      if (index < 0) return;
-      const list = listRef.current;
-      const parent = list?.closest('.chat-messages') as HTMLElement | null;
-      if (!list || !parent) return;
-      if (frame !== undefined) cancelAnimationFrame(frame);
-      if (messages.length > VIRTUALIZE_THRESHOLD) {
-        const listTop = list.getBoundingClientRect().top - parent.getBoundingClientRect().top + parent.scrollTop;
-        parent.scrollTop = listTop + offsetsRef.current[index];
-        setRange({ start: Math.max(0, index - overscan), end: Math.min(messages.length, index + overscan + 1) });
-      }
-      frame = requestAnimationFrame(() => {
-        frame = undefined;
-        const message = Array.from(list.querySelectorAll<HTMLElement>('[data-message-id]')).find((item) => item.dataset.messageId === messages[index].id);
-        const selector = `[data-plan-target="${detail.target}"][data-plan-key="${detail.plan.planId}:${detail.plan.revision}"]`;
-        const target = message?.querySelector<HTMLElement>(selector) ?? message;
-        target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        target?.focus({ preventScroll: true });
-      });
-    };
-    document.addEventListener(TRANSCRIPT_LOCATE_PLAN_EVENT, locate);
-    return () => { document.removeEventListener(TRANSCRIPT_LOCATE_PLAN_EVENT, locate); if (frame !== undefined) cancelAnimationFrame(frame); };
-  }, [messages, overscan]);
 
   if (messages.length <= VIRTUALIZE_THRESHOLD) return <ol ref={listRef} className={className} data-testid={testId}
     data-message-count={messages.length} data-virtualized="false">{messages.map((message, index) =>

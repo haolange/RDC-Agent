@@ -74,16 +74,21 @@ export const KnowledgeCandidateCreateArgsSchema = z.tuple([
   }).strict(),
 ]);
 
+const knowledgeImportSource = {
+  spaceId: KnowledgeSpaceIdSchema,
+  source: ipcString(512 * 1024, 'source').optional(),
+  filePath: ipcNonEmptyString(4096, 'filePath').optional(),
+};
+const hasImportSource = (value: { source?: string; filePath?: string }) => Boolean(value.source?.trim() || value.filePath?.trim());
+
 export const KnowledgeImportArgsSchema = z.tuple([
-  z.object({
-    spaceId: KnowledgeSpaceIdSchema,
-    sessionId: ipcId(128, 'sessionId').optional(),
-    source: ipcString(512 * 1024, 'source').optional(),
-    filePath: ipcNonEmptyString(4096, 'filePath').optional(),
-  }).strict().refine(
-    (value) => Boolean(value.source?.trim() || value.filePath?.trim()),
-    { message: 'source or filePath is required' },
-  ),
+  z.object({ ...knowledgeImportSource, sessionId: ipcId(128, 'sessionId').optional() }).strict()
+    .refine(hasImportSource, { message: 'source or filePath is required' }),
+]);
+
+/** A preview reads the same source the import would, for the same target space, and writes nothing. */
+export const KnowledgeImportPreviewArgsSchema = z.tuple([
+  z.object(knowledgeImportSource).strict().refine(hasImportSource, { message: 'source or filePath is required' }),
 ]);
 
 export const KnowledgeImageArgsSchema = z.tuple([

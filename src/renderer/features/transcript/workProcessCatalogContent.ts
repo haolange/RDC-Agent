@@ -1,5 +1,5 @@
 import { type ToolContentInput, type UnwrappedToolContent, asFiniteNumber, sanitizeContentText, filterEnvelopeLines } from './workProcessToolContentShared';
-import { formatMcpTarget } from './workProcessToolCatalog';
+import { formatMcpTarget, toolDisplayName } from './workProcessToolCatalog';
 import { stringifyPreview, createDetailLines, readNestedValue, collectReadableText } from './workProcessContentText';
 import { compactText } from './workProcessFormat';
 
@@ -36,10 +36,11 @@ if (normalized === 'mcp' || normalized.startsWith('mcp__')) {
   }
 
 if (normalized === 'tool_search') {
-    const hits = collectReadableText(record?.matches ?? record?.tools ?? details?.matches, 8);
+    // Found tools read by what they do, never by their wire names.
+    const hits = collectReadableText(record?.matches ?? record?.tools ?? details?.matches, 8).map((name) => toolDisplayName(name, t));
     return {
       previewKind: 'generic',
-      bodyText: hits.length > 0 ? t(hits.length === 1 ? 'chat.previewToolsOne' : 'chat.previewToolsMany', { count: hits.length }) : contentText || undefined,
+      bodyText: hits.length > 0 ? t(hits.length === 1 ? 'chat.previewToolsOne' : 'chat.previewToolsMany', { count: hits.length }) : undefined,
       bodyLines: hits.slice(0, 3),
       previewLines: hits,
     };
@@ -58,14 +59,13 @@ if (normalized === 'output_register' || normalized === 'plan_artifact') {
   }
 
 if (normalized === 'runtime_context') {
-    const target = sanitizeContentText(stringifyPreview(
-      argsRecord?.target ?? argsRecord?.agent ?? details?.target,
-    ));
+    // The payload is identity for the model (session, scope, capture hashes); people see what it means for replay.
+    const state = details?.available === true ? 'replayReady' : details?.requiresRecovery === true ? 'replayRecovery'
+      : details?.available === false ? 'noCapture' : null;
     return {
       previewKind: 'generic',
-      chips: target ? [target] : undefined,
-      bodyText: contentText || target || undefined,
-      previewLines: filterEnvelopeLines(createDetailLines(contentText, 6)),
+      bodyText: state ? t(`chat.runtimeContext.${state}`) : undefined,
+      previewLines: [],
     };
   }
 

@@ -5,7 +5,7 @@ import { useUiLabels } from '../../../../lib/useUiLabels';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
-import { SettingsDiagnostics, type SettingsDiagnosticsRow } from '../parts';
+import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { McpResourceList } from './McpResourceList';
 import { McpTrustBadge, McpTrustPanel, mcpTrustState } from './McpTrustPanel';
 import { mcpTransportLabel } from './resourceLabels';
@@ -13,6 +13,7 @@ import { RuntimeScopePanel } from './RuntimeScopePanel';
 import { saveScopedResource } from './runtimeScopeMutations';
 import { formFromContent } from './scopedResourceForm';
 import { useMcpStatus } from './useMcpStatus';
+import type { DiagnosticFact } from '../../../../patterns/CopyDiagnostics';
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 
@@ -96,7 +97,7 @@ export const McpServicesPanel: React.FC<{
     const server = overviewFor(resource);
     const trust = server ? mcpTrustState(server) : null;
     const args = form.argsText.trim() && form.argsText.trim() !== '[]' ? form.argsText.replace(/\s+/g, ' ') : '';
-    const diagnostics: SettingsDiagnosticsRow[] = [
+    const diagnostics: DiagnosticFact[] = [
       { label: t('settings.resourceFieldId'), value: resource.id },
       { label: t('settings.resourceFieldTransport'), value: mcpTransportLabel(form.transport, t) },
       ...(form.url ? [{ label: t('settings.resourceFieldUrl'), value: form.url }] : []),
@@ -127,7 +128,7 @@ export const McpServicesPanel: React.FC<{
         ) : null}
         {live?.lastError ? <InlineError detail={live.lastError}>{t('settings.mcpConnectFailed')}</InlineError> : null}
         {server && overview ? <McpTrustPanel overview={overview} server={server} onChanged={onChanged} /> : null}
-        <SettingsDiagnostics testId="settings-mcp-diagnostics" rows={diagnostics} />
+        <CopyDiagnosticsButton testId="settings-mcp-diagnostics" facts={diagnostics} />
       </div>
     );
   };

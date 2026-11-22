@@ -85,45 +85,18 @@
   }
 }
 
-/* Default model: what every Agent without its own setting runs with. */
+/* Default model: an ordinary settings row above the scope switch, not a banner. */
 .settings-agent-defaults {
-  display: grid;
-  grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 2fr);
-  align-items: start;
-  gap: var(--space-2) var(--space-5);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-surface-sunken);
-  flex: 0 0 auto;
-}
-
-.settings-agent-defaults-copy {
   display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
 }
 
-.settings-agent-defaults-title {
-  margin: 0;
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
-  color: var(--token-text-primary);
-}
-
-.settings-agent-defaults > .ui-inline-error {
-  grid-column: 2;
-}
-
-@container settings-panel (max-width: 48rem) {
-  .settings-agent-defaults {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-agent-defaults > .ui-inline-error {
-    grid-column: 1;
-  }
+.settings-agent-defaults > .settings-field.is-row {
+  align-items: start;
 }
 
 /* Override-file migration: what moves to Settings and what is kept as a backup. */

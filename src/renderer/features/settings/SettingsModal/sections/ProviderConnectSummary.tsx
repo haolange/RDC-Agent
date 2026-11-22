@@ -1,36 +1,9 @@
 import React from 'react';
 import { Icon } from '../../../../ui/Icon';
-import { getProviderProtocolLabel } from '../utils';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-
-/** Read-only protocol summary: route protocol, endpoint class, operator and catalog ownership from the snapshot. */
-export const ProviderProtocolSummary: React.FC<{ provider: LlmProviderEntry; t: Translate }> = ({ provider, t }) => (
-  <dl className="settings-provider-summary-grid" data-testid="settings-provider-protocol-summary">
-    <div>
-      <dt>{t('settings.providers.summary.protocol')}</dt>
-      <dd>
-        {getProviderProtocolLabel(provider.protocol)}
-        {provider.routeCount && provider.routeCount > 1 ? ` · ${t('settings.providers.summary.routes', { count: provider.routeCount })}` : ''}
-      </dd>
-    </div>
-    <div>
-      <dt>{t('settings.providers.summary.endpointClass')}</dt>
-      <dd>{t(`settings.providers.endpointClass.${provider.endpointClass}` as const)}</dd>
-    </div>
-    <div>
-      <dt>{t('settings.providers.summary.operator')}</dt>
-      <dd>{provider.serviceOperator || '—'}</dd>
-    </div>
-    <div>
-      <dt>{t('settings.providers.summary.catalog')}</dt>
-      <dd>{t(`settings.providers.catalogOwnership.${provider.catalogOwnership}` as const)}</dd>
-    </div>
-  </dl>
-);
 
 export type ProviderConnectionPhase = 'untested' | 'testing' | 'testPassed' | 'connected' | 'failed' | 'saving';
 

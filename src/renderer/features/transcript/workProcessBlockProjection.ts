@@ -1,3 +1,4 @@
+import { supersededAnswerLoopIds } from '@shared/conversation/loopItems';
 import { aggregateSectionSteps } from './workProcessToolAggregate';
 import { projectLlmTurn } from './workProcessLlmProjection';
 import { pushStandaloneBlock } from './workProcessStandaloneProjection';
@@ -71,6 +72,8 @@ export function buildPresentationUnits(
     if (!owner || !blocks.some((candidate) => candidate.kind === 'llm_turn' && candidate.id === owner)) continue;
     snapshotsByLoop.set(owner, [...(snapshotsByLoop.get(owner) ?? []), block]);
   }
+  // Answers the runtime sent back read as commentary, also in sessions recorded before the runtime said so.
+  const superseded = supersededAnswerLoopIds(blocks);
   const groupedSnapshots = new Set([...snapshotsByLoop.values()].flat().map((block) => block.id));
   const groupedInteractions = new Set([...interactionsByLoop.values()].flat().map((block) => block.id));
 
@@ -78,7 +81,7 @@ export function buildPresentationUnits(
     const block = blocks[blockIndex];
 
     if (block.kind === 'llm_turn') {
-      const unit = projectLlmTurn(block, deps, ctx, snapshotsByLoop.get(block.id), interactionsByLoop.get(block.id));
+      const unit = projectLlmTurn(block, deps, ctx, snapshotsByLoop.get(block.id), interactionsByLoop.get(block.id), superseded.has(block.id));
       if (unit) units.push(unit);
       continue;
     }

@@ -1,8 +1,11 @@
 import { Button } from '../../../../ui/Button';
+import { Checkbox } from '../../../../ui/Checkbox';
 import { InlineError } from '../../../../ui/InlineError';
+import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
+import { knowledgeCardKey } from '../knowledgeImportExportModel';
 import type { KnowledgeExportFormat, KnowledgeExportScope } from '@shared/types/knowledgeExport';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeExport } from '../useKnowledgeExport';
@@ -16,7 +19,7 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
   const { t } = useI18n();
 
   const scopeOptions: Array<{ id: KnowledgeExportScope; label: string }> = [
-    { id: 'selected', label: t('knowledgeCenter.exportScopeSelected', { count: exporter.counts.selected }) },
+    { id: 'selected', label: t('knowledgeCenter.exportScopePicked', { count: exporter.counts.selected }) },
     { id: 'filtered', label: t('knowledgeCenter.exportScopeFiltered', { count: exporter.counts.filtered }) },
     { id: 'space', label: t('knowledgeCenter.exportScopeSpace') },
   ];
@@ -86,7 +89,7 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
               {t('knowledgeCenter.exportExcluded', { count: exporter.result.excludedCount })}
             </p>
           ) : null}
-          <code className="knowledge-export-path">{exporter.result.targetPath}</code>
+          <p className="knowledge-export-file">{exporter.result.targetPath.split(/[\\/]/).pop()}</p>
         </div>
       ) : (
         <>
@@ -97,6 +100,39 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
             exporter.setScope,
             t('knowledgeCenter.exportScope'),
           )}
+
+          {exporter.scope === 'selected' ? (
+            <div className="knowledge-export-picker" data-testid="knowledge-center-export-picker">
+              <div className="knowledge-export-picker-bar">
+                <Input
+                  value={exporter.pickerQuery}
+                  onChange={(event) => exporter.setPickerQuery(event.target.value)}
+                  placeholder={t('knowledgeCenter.exportPickerSearch')}
+                  aria-label={t('knowledgeCenter.exportPickerSearch')}
+                  disabled={exporter.busy}
+                />
+                <Button variant="ghost" size="sm" disabled={exporter.busy || exporter.pickable.length === 0} onClick={exporter.pickAll}>
+                  {t('knowledgeCenter.exportPickAll')}
+                </Button>
+                <Button variant="ghost" size="sm" disabled={exporter.busy || exporter.picked.size === 0} onClick={exporter.clearPicked}>
+                  {t('knowledgeCenter.exportPickNone')}
+                </Button>
+              </div>
+              <ul className="knowledge-export-picker-list">
+                {exporter.pickable.map((card) => (
+                  <li key={knowledgeCardKey(card)}>
+                    <Checkbox
+                      checked={exporter.picked.has(knowledgeCardKey(card))}
+                      disabled={exporter.busy}
+                      onCheckedChange={() => exporter.togglePicked(card)}
+                      label={card.title}
+                    />
+                  </li>
+                ))}
+                {exporter.pickable.length === 0 ? <li className="knowledge-export-picker-empty">{t('knowledgeCenter.exportPickerEmpty')}</li> : null}
+              </ul>
+            </div>
+          ) : null}
 
           {exporter.scope === 'space' ? (
             <label className="knowledge-center-field">

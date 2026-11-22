@@ -463,12 +463,36 @@ it('continues an incomplete runtime obligation through the request tail without 
   expect(JSON.stringify(context.messages)).not.toContain('Approved Task remains incomplete.');
 });
 
-it('feeds an unfinished approved Task back into the same loop and accepts its later completion', async () => {
+const cleanupTaskDir = async (taskDir: string, sessionId: string) => {
+  if (!existsSync(taskDir)) return;
+  const relativeTask = path.relative(realpathSync(path.dirname(taskDir)), realpathSync(taskDir));
+  if (relativeTask !== sessionId || lstatSync(taskDir).isSymbolicLink()) throw new Error('Unexpected task fixture path');
+  await rm(taskDir, { recursive: true, force: true });
+};
+
+/** turn_complete as the runtime assembles it: record the declaration, then return its review in the same result. */
+const declaringExecutor = (turn: TurnHandle, goal: ReturnType<typeof createApprovedGoalContinuation>,
+  declarations: Array<{ disposition: 'partial' | 'completed'; evidenceRefs: [] }>, onOther?: (name: string) => Promise<void>) => ({
+  execute: async (call: { id: string; name: string; arguments: Record<string, unknown> }) => {
+    if (call.name !== 'turn_complete') {
+      await onOther?.(call.name);
+      return toolExecutor.execute(call as never);
+    }
+    const declaration = declarations.shift()!;
+    turn.completionDeclaration = declaration;
+    const review = await goal.reviewDeclaration(declaration);
+    return { role: 'toolResult' as const, toolCallId: call.id, toolName: call.name, isError: false, timestamp: Date.now(),
+      content: [{ type: 'text' as const, text: `Turn completion recorded: ${declaration.disposition}.${review ? `\n\n${review}` : ''}` }] };
+  },
+});
+
+it('returns an unfinished approved Task with the partial declaration so the turn ends in one reply', async () => {
   const sessionId = `completion-partial-feedback-${randomUUID()}`;
   const taskDir = resolveSessionTasksDir(sessionId);
   let approved: ReturnType<typeof snapshotTaskRequirement>[] = [];
   const registry = new TaskRegistry(new FileTaskStore(taskDir, async () => approved));
   const turn = new TurnHandle({ sessionKey: sessionId, turnId: randomUUID(), generation: 1 });
+  turn.requiresApprovedGoalClosure = true;
   try {
     const task = await registry.createTask('Finish approved investigation');
     approved = [snapshotTaskRequirement(task)];
@@ -476,13 +500,13 @@ it('feeds an unfinished approved Task back into the same loop and accepts its la
     const first = await registry.startExecution(task.id, { mode: 'direct', budget: { toolCalls: 2, maxToolCalls: 10, deadlineAt } });
     await registry.settleExecution(first.id, { expectedGeneration: 1, status: 'blocked',
       result: { disposition: 'blocked', summary: 'One branch was not inspected.', outputs: {} } });
-    turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
     const requests: Context[] = [];
+    const steps = ['turn_complete', 'task_update', 'turn_complete'];
     const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
-      requests.push(request);
+      requests.push({ ...request, messages: [...request.messages] });
       const step = requests.length;
-      if (step === 2 || step === 3) return providerStream({ ...toolUseMessage(step), content: [{
-        type: 'toolCall', id: `step-${step}`, name: step === 2 ? 'task_update' : 'turn_complete', arguments: {},
+      if (step <= steps.length) return providerStream({ ...toolUseMessage(step), content: [{
+        type: 'toolCall', id: `step-${step}`, name: steps[step - 1]!, arguments: {},
       }] });
       return providerStream({ ...toolUseMessage(step), content: [{ type: 'text', text: 'Final response' }], stopReason: 'stop' });
     } };
@@ -490,70 +514,61 @@ it('feeds an unfinished approved Task back into the same loop and accepts its la
     context.runtime!.current.activeTools = ['task_update', 'turn_complete'].map(name => ({
       name, description: name, parameters: { type: 'object' },
     }));
-    const check = createApprovedGoalContinuation(turn, sessionId, registry);
+    const goal = createApprovedGoalContinuation(turn, sessionId, registry);
     const { stream } = agentLoop([], context, {
       model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
-      beforeTerminalResponse: () => check(),
-    }, provider, { execute: async call => {
-      if (call.name === 'task_update') {
-        const next = await registry.startExecution(task.id, { mode: 'direct' });
-        expect(next.budget).toMatchObject({ toolCalls: 2, maxToolCalls: 10, deadlineAt });
-        await registry.settleExecution(next.id, { expectedGeneration: 2, status: 'completed',
-          result: { disposition: 'completed', summary: 'Inspected the remaining branch.', outputs: {} } });
-      } else {
-        expect(call.name).toBe('turn_complete');
-        turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
-      }
-      return toolExecutor.execute(call);
-    } });
+      beforeTerminalResponse: () => goal.closingCheck(),
+    }, provider, declaringExecutor(turn, goal, [{ disposition: 'partial', evidenceRefs: [] }, { disposition: 'completed', evidenceRefs: [] }], async () => {
+      const next = await registry.startExecution(task.id, { mode: 'direct' });
+      expect(next.budget).toMatchObject({ toolCalls: 2, maxToolCalls: 10, deadlineAt });
+      await registry.settleExecution(next.id, { expectedGeneration: 2, status: 'completed',
+        result: { disposition: 'completed', summary: 'Inspected the remaining branch.', outputs: {} } });
+    }));
     await consume(stream);
     expect(requests).toHaveLength(4);
-    const tail = JSON.stringify(requests[1].messages.at(-1));
-    expect(tail).toContain('Approved Goal Reassessment');
-    expect(tail).toContain(task.id);
-    expect(requests[2].messages.some(message => JSON.stringify(message).includes('Approved Goal Reassessment'))).toBe(false);
+    const review = JSON.stringify(requests[1].messages.at(-1));
+    expect(review).toContain('Approved Goal Reassessment');
+    expect(review).toContain(task.id);
+    const texts = requests.at(-1)!.messages.filter(message => message.role === 'assistant'
+      && message.content.some(block => block.type === 'text'));
+    expect(texts).toHaveLength(0);
     expect(turn.completionDeclaration?.disposition).toBe('completed');
     expect((await registry.getTask(task.id))?.status).toBe('completed');
   } finally {
-    if (existsSync(taskDir)) {
-      const relativeTask = path.relative(realpathSync(path.dirname(taskDir)), realpathSync(taskDir));
-      if (relativeTask !== sessionId || lstatSync(taskDir).isSymbolicLink()) throw new Error('Unexpected task fixture path');
-      await rm(taskDir, { recursive: true, force: true });
-    }
+    await cleanupTaskDir(taskDir, sessionId);
   }
 });
 
-it('keeps an honest partial when reassessment ends without further tool work', async () => {
+it('keeps an honest partial when its review leaves no useful work', async () => {
   const sessionId = `completion-partial-unchanged-${randomUUID()}`;
   const taskDir = resolveSessionTasksDir(sessionId);
   let approved: ReturnType<typeof snapshotTaskRequirement>[] = [];
   const registry = new TaskRegistry(new FileTaskStore(taskDir, async () => approved));
   const turn = new TurnHandle({ sessionKey: sessionId, turnId: randomUUID(), generation: 1 });
+  turn.requiresApprovedGoalClosure = true;
   try {
     const task = await registry.createTask('Finish approved investigation');
     approved = [snapshotTaskRequirement(task)];
-    const declaration = { disposition: 'partial' as const, evidenceRefs: [] };
-    turn.completionDeclaration = declaration;
     const requests: Context[] = [];
     const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: (_model, request) => {
-      requests.push(request);
+      requests.push({ ...request, messages: [...request.messages] });
+      if (requests.length === 1) return providerStream({ ...toolUseMessage(1), content: [{ type: 'toolCall', id: 'declare', name: 'turn_complete', arguments: {} }] });
       return providerStream({ ...toolUseMessage(requests.length), content: [{ type: 'text', text: 'Remaining work is blocked.' }], stopReason: 'stop' });
     } };
-    const check = createApprovedGoalContinuation(turn, sessionId, registry);
-    const { stream } = agentLoop([], createContext(), {
+    const context = createContext();
+    context.runtime!.current.activeTools = [{ name: 'turn_complete', description: 'turn_complete', parameters: { type: 'object' } }];
+    const goal = createApprovedGoalContinuation(turn, sessionId, registry);
+    const declaration = { disposition: 'partial' as const, evidenceRefs: [] as [] };
+    const { stream } = agentLoop([], context, {
       model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
-      beforeTerminalResponse: () => check(),
-    }, provider, toolExecutor);
+      beforeTerminalResponse: () => goal.closingCheck(),
+    }, provider, declaringExecutor(turn, goal, [declaration]));
     await consume(stream);
     expect(requests).toHaveLength(2);
     expect(JSON.stringify(requests[1].messages.at(-1))).toContain('Approved Goal Reassessment');
     expect(turn.completionDeclaration).toBe(declaration);
   } finally {
-    if (existsSync(taskDir)) {
-      const relativeTask = path.relative(realpathSync(path.dirname(taskDir)), realpathSync(taskDir));
-      if (relativeTask !== sessionId || lstatSync(taskDir).isSymbolicLink()) throw new Error('Unexpected task fixture path');
-      await rm(taskDir, { recursive: true, force: true });
-    }
+    await cleanupTaskDir(taskDir, sessionId);
   }
 });
 
@@ -578,7 +593,7 @@ it('accepts a normal final answer when the declaration binds the exact report', 
     const approvedGoalContinuation = createApprovedGoalContinuation(turn, sessionId);
     const { stream } = agentLoop([], context, {
       model: TEST_MODEL, convertToLlm: messages => messages as Message[], streamOptions: { requestPlan: TEST_REQUEST_PLAN },
-      beforeTerminalResponse: message => approvedGoalContinuation(() => {
+      beforeTerminalResponse: message => approvedGoalContinuation.closingCheck(() => {
         assertMissionTurnCompletion({ profileId: 'general', completionContract: 'investigation-report',
           investigationMission: 'analyzer', sessionId: SESSION_ID, service,
           evidenceRefs: turn.completionDeclaration?.evidenceRefs,

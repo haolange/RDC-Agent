@@ -6,7 +6,7 @@
 
 支持组件搜索、主题、字号、窄容器及长内容；每项附用途、不适用场景、状态、接口、键盘、布局、动效与生产使用位置。多选可交互切换加载、失败、重试、空和禁用状态；草稿示例支持继续编辑与放弃。示例状态不构成产品运行验收，真实业务仍通过官方 Browser QA / Electron 验证。
 
-[完整生产消费者索引](consumers.md)由 TypeScript import 生成，覆盖 ui 公开入口与直接导入的 HelpTip/TaskStatusMarker。`check:appearance` 同时检查索引是否与源码一致。消费者变化后运行 `node scripts/check-component-catalog.mjs --write`，复核差异后再验收；不手写重复路径列表。表单协调、业务副作用和领域状态继续留在生产所有者内。
+[完整生产消费者索引](consumers.md)由 TypeScript import 生成，覆盖 ui 公开入口与直接导入的 TaskStatusMarker。`check:appearance` 同时检查索引是否与源码一致。消费者变化后运行 `node scripts/check-component-catalog.mjs --write`，复核差异后再验收；不手写重复路径列表。表单协调、业务副作用和领域状态继续留在生产所有者内。
 
 ## 生产消费者与所有权
 

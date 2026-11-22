@@ -23,7 +23,7 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
   const [envText, setEnvText] = useState(() => envToText(draft.env));
   const patch = (value: Partial<RdcCliInvokerSettings>) => { installation.invalidate(); change({ ...draft, ...value }); };
   return <section className="settings-local-tool-form settings-renderdoc-toolchain" data-testid="settings-rdc-toolchain">
-    <SettingsField label={t('settings.rdcFolder')} htmlFor="settings-rdc-installation-root" help={t('settings.rdcFolderHint')}>
+    <SettingsField label={t('settings.rdcFolder')} htmlFor="settings-rdc-installation-root" description={t('settings.rdcFolderHint')}>
       <Input id="settings-rdc-installation-root" readOnly value={installation.root || draft.command}
         data-tooltip={installation.root || draft.command} placeholder={t('settings.rdcNotSelected')} />
     </SettingsField>
@@ -69,7 +69,7 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
         <Input id="settings-rdc-timeout" type="number" min={1} max={600} step={1} disabled={installation.busy} value={draft.timeoutMs / 1000}
           onChange={(event) => patch({ timeoutMs: Math.round(Number(event.currentTarget.value) * 1000) })} />
       </SettingsField>
-      <SettingsField label={t('settings.rdcCliEnv')} htmlFor="settings-rdc-environment" help={t('settings.rdcCliEnvHint')}>
+      <SettingsField label={t('settings.rdcCliEnv')} htmlFor="settings-rdc-environment" description={t('settings.rdcCliEnvHint')}>
         <Textarea id="settings-rdc-environment" className="settings-rdc-cli-textarea" disabled={installation.busy}
           value={envText} placeholder="NAME=value" spellCheck={false}
           onChange={(event) => { setEnvText(event.currentTarget.value); patch({ env: textToEnv(event.currentTarget.value) }); }} />

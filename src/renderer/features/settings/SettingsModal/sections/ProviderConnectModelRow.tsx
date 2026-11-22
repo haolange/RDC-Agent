@@ -3,6 +3,7 @@ import { Switch } from '../../../../ui/Switch';
 import { resolveProviderModelAvailabilityBadge } from '../providerModelAvailabilityBadge';
 import { Chevron } from '../../../../ui/Chevron';
 import { formatContextCapability } from '../modelCapabilitySummaryUtils';
+import { ProviderModelCapabilityIcons } from './ProviderModelCapabilityIcons';
 import { ProviderModelCapabilitySummary } from './ProviderModelCapabilitySummary';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
@@ -75,21 +76,19 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
       aria-disabled={isUnavailable}
     >
       <div className="settings-model-row-main">
+        <span className={`settings-model-row-check is-${badge}`} data-tooltip={statusTitle}>{statusLabel}</span>
         <span className="settings-model-row-identity">
-          <span className="settings-model-row-label" data-tooltip={model.label}>{model.label}</span>
+          <span className="settings-model-row-label">{model.label}</span>
           {effectiveModel ? <span className="settings-model-row-context">{formatContextCapability(effectiveModel, t)}</span> : null}
         </span>
-        {/* Status speaks only when something is off; the reason is on hover. */}
-        {badge === 'available' ? null : (
-          <span className={`settings-model-row-status is-${badge}`} role="img" aria-label={statusLabel}
-            data-tooltip={[statusLabel, statusTitle].filter(Boolean).join(' · ')} />
-        )}
         <Switch
           checked={model.enabled}
           disabled={disabled || isUnavailable}
           onCheckedChange={(enabled) => onModelChange(model.id, { enabled })}
           aria-label={t('settings.providers.capability.modelEnabled', { model: model.label })}
         />
+        <span className="settings-model-row-capabilities">
+        <ProviderModelCapabilityIcons model={effectiveModel} t={t} />
         <button
           type="button"
           className="button button-ghost button-sm settings-model-capability-toggle"
@@ -102,6 +101,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
         >
           <Chevron direction="down" open={expanded} />
         </button>
+        </span>
       </div>
       {expanded ? (
         <ProviderModelCapabilitySummary

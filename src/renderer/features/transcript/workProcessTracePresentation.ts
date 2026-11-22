@@ -48,9 +48,12 @@ const resolveOutputPhase = (
   return 'final_answer';
 };
 
-/** "Thought for" only when this block's own reasoning start and settle times are known; never the step's time. */
+/**
+ * "Thought for" only when this block's own reasoning start and settle times are known and apart; never the step's
+ * time, and never an invented instant.
+ */
 const resolveSettledThinkingLabel = (item: ConversationThinkingItem, t: Translator): string =>
-  item.startedAt !== undefined && item.completedAt !== undefined
+  item.startedAt !== undefined && item.completedAt !== undefined && item.completedAt > item.startedAt
     ? t('chat.workProcessThoughtFor', { duration: formatDurationMs(item.startedAt, item.completedAt) })
     : t('chat.workProcessThinkingComplete');
 
@@ -144,7 +147,7 @@ const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, r
   if (row.type === 'section') return total + countToolSteps(row.steps);
   if (row.type === 'toolAggregate') return total + row.children.length;
   if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
-  if (row.type === 'userInput') return total + 1;
+  if (row.type === 'userInput' || row.type === 'planReview') return total + 1;
   return total;
 }, 0);
 

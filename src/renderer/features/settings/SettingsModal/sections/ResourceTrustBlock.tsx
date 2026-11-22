@@ -1,4 +1,3 @@
-import { HelpTip } from '../../../../ui/HelpTip';
 import { Icon } from '../../../../ui/Icon';
 import type { ReactNode } from 'react';
 
@@ -19,12 +18,10 @@ export function ResourceTrustBlock({ testId, state, title, hint, badge, changed,
   return (
     <section className="settings-trust-block" data-testid={testId} data-trust-state={state}>
       <header className="settings-trust-block-head">
-        <span className="settings-trust-block-title">
-          {title}
-          <HelpTip label={title}>{hint}</HelpTip>
-        </span>
+        <span className="settings-trust-block-title">{title}</span>
         {badge}
       </header>
+      <p className="settings-section-description">{hint}</p>
       {changed ? (
         <p className="settings-trust-change" data-testid={changed.testId}>
           <Icon name="warning" size={14} />

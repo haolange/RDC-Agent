@@ -25,7 +25,7 @@ export default function Preview() {
   const [dialog, setDialog] = useState(false);
   useEffect(() => applyChromeTheme({ ...createDefaultUiPreferences(), theme, fontScale: scale }, theme), [theme, scale]);
   const entries: { name: CatalogName; group: string; usage: string; api: string; keyboard: string; source: string; sample: ReactNode }[] = [
-    { name: 'ColorField / HelpTip', group: '输入', usage: '颜色输入与按需帮助，复用生产取色面。', api: 'value / onChange / layout / label；HelpTip label / children', keyboard: '色面方向键、色相方向键；Tab 聚焦帮助、Escape 关闭', source: 'ui/ColorField.tsx', sample: <ColorSample /> },
+    { name: 'ColorField', group: '输入', usage: '颜色输入，复用生产取色面。', api: 'value / onChange / layout / label', keyboard: '色面方向键、色相方向键', source: 'ui/ColorField.tsx', sample: <ColorSample /> },
     { name: 'Tabs / Pill / IconButton', group: '选择', usage: '内容页签、选择与独立运行标记，以及具名图标动作。', api: 'Tabs value / tabs / variant；Pill selected / running；IconButton label', keyboard: 'Tabs 方向键、Home/End；按钮 Enter/Space', source: 'ui/Tabs.tsx', sample: <NavigationSample /> },
     { name: 'UnsavedChangesDialog', group: '浮层', usage: '手动保存表单的草稿退出保护。', api: 'onKeepEditing / onDiscard / keepEditingLabel / discardLabel', keyboard: '初始焦点继续编辑，Escape 返回草稿', source: 'ui/UnsavedChangesDialog.tsx', sample: <UnsavedSample /> },
     { name: 'Composer Markdown', group: '领域组合', usage: '真实输入与预览组件。输入保持领域所有权；此处 Enter 仅反馈本地状态。', api: 'value / onChange / mode / onSend', keyboard: 'Enter 提交、Shift+Enter 换行、Tab 缩进', source: 'features/composer/ComposerMarkdownInput.tsx', sample: <ComposerSample /> },

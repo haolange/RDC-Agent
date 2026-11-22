@@ -87,7 +87,8 @@ describe('one event replay track', () => {
   it('keeps requested and shown events distinct while applying and does not relabel the old image', async () => {
     state = { ...state, requestedEventId: 21, phase: 'applying' }; await render();
     expect(input().value).toBe('21'); expect(host.querySelector('img')?.getAttribute('alt')).toBe('control.replay.eventNumber{"id":42}');
-    expect(host.textContent).toContain('"requested":21,"shown":42');
+    expect(host.textContent).toContain('control.replay.switching');
+    expect(host.textContent).not.toContain('"requested":21');
   });
   it('keeps controls in place but disables them and clears stale pixels after closing', async () => {
     await render(); state = { ...state, contextId: null, phase: 'closed', image: null, imageEventId: null, revision: 2 }; await render();

@@ -23,10 +23,6 @@
     pointer-events: none;
   }
 
-  .main-page-shell {
-    width: 100%;
-  }
-
   .app-titlebar {
     padding-left: var(--space-3);
   }

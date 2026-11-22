@@ -107,7 +107,8 @@ it('offers the exact Agent settings for trusted configuration failures', async (
   const root = createRoot(host);
   try {
     await act(async () => root.render(createElement(SubagentRow, { row, sessionId: 'config' })));
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Model unavailable');
+    expect(host.querySelector('[role="alert"]')?.textContent).not.toContain('Model unavailable');
+    expect(host.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
     const button = [...host.querySelectorAll('button')].find((element) => element.textContent === 'chat.subagentOpenAgentSettings');
     expect(button).toBeDefined();
     await act(async () => button!.click());
@@ -130,7 +131,8 @@ it('shows the parent receipt and task when admission fails before a child trace 
     const opened = new DOMParser().parseFromString(renderToStaticMarkup(createElement(SubagentRow, { row: failedRow, sessionId: 's1' })), 'text/html');
     const failure = opened.querySelector('.ui-inline-error[role="alert"]');
     expect(failure?.querySelector('.ui-inline-error-message')?.textContent).toBe('chat.subagentFailedSummary');
-    expect(failure?.querySelector('.ui-inline-error-detail-text')?.textContent).toContain('SUBAGENT_BUDGET');
+    expect(failure?.textContent).not.toContain('SUBAGENT_BUDGET');
+    expect(failure?.querySelector('button[aria-label="app.copyDetails"]')).not.toBeNull();
     expect(opened.querySelector('.work-process-subagent-task')?.textContent).toContain(task);
     expect(opened.querySelector('.work-process-subagent-task')?.textContent).not.toContain('chat.subagentContentUnavailable');
   } finally {

@@ -18,6 +18,7 @@ export function SettingsScopeBar({
   return (
     <Tabs
       className="settings-scope-bar"
+      variant="segmented"
       label={groupLabel}
       value={scope}
       onChange={(id) => onScopeChange(id as 'user' | 'project')}

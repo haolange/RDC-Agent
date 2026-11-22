@@ -6,6 +6,8 @@ import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { ScopedWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { WorkProcessContent } from './WorkProcessContent';
+import { planDeliverables } from './planDeliverables';
+import { WorkProcessFoldProvider } from './workProcessFold';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 
 interface WorkProcessProps {
@@ -16,13 +18,15 @@ interface WorkProcessProps {
 
 /**
  * Working stays open while the turn runs and when it ends in an error or a stop. Under "follow latest" it folds once
- * the turn completes normally; under "show all" it stays laid out in full. Opening or closing it by hand is remembered
- * for this message and always wins.
+ * the turn completes normally, or once it hands a plan to the user for review: the plan then reads below Working,
+ * and its card inside stays one click away. Under "show all" it stays laid out in full. Opening or closing it by
+ * hand is remembered for this message and always wins.
  */
 const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
   const { t } = useI18n();
   const presentation = useMemo(() => buildWorkProcessPresentation(trace, t), [trace, t]);
-  const running = trace.status === 'running';
+  const awaitingReview = trace.status === 'running' && planDeliverables(trace).some((plan) => plan.status === 'awaiting');
+  const running = trace.status === 'running' && !awaitingReview;
   const showAll = useAppSettingsStore((state) => state.settings.appearance.workProcessExpansion) === 'all';
   const [expanded, toggle] = useScopedWorkDisclosure('root', running || showAll || trace.status === 'error' || trace.status === 'stopped');
 
@@ -34,8 +38,9 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
   const actionMeta = presentation.actionCount > 0
     ? t(presentation.actionCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: presentation.actionCount })
     : '';
+  // While working the clock is the whole label; a settled turn says how long it took.
   const durationMeta = presentation.duration
-    ? t(running ? 'chat.workProcessDurationRunning' : 'chat.workProcessDuration', { duration: presentation.duration })
+    ? running ? presentation.duration : t('chat.workProcessDuration', { duration: presentation.duration })
     : '';
   const metaParts = [durationMeta, actionMeta].filter(Boolean);
   const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;
@@ -61,7 +66,11 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
         </button>
       </div>
 
-      {hasBody ? <WorkProcessContent presentation={presentation} sessionId={sessionId} active={running} /> : null}
+      {hasBody ? (
+        <WorkProcessFoldProvider value={!expanded}>
+          <WorkProcessContent presentation={presentation} sessionId={sessionId} active={running} />
+        </WorkProcessFoldProvider>
+      ) : null}
     </section>
   );
 };

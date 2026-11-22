@@ -137,11 +137,11 @@ interface AssistantMessageDiagnostic {
 
 Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；`AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；`PROVIDER_STREAM_*` → `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。未结算的本回合 direct Task 在 `turn_complete` 被拒绝；计划批准会结束规划回合，故 `plan_artifact` 在展示审阅前也先要求结算该回合 direct Task，不自动推断结果或预先声明批准。若模型直接终答，运行时在同一执行内反馈未结算任务，要求继续可执行工作或以真实原因结算受阻，不重置消费或期限。重复无进展、取消及明确限制仍可终止；回合异常结束时未结算执行记为 blocked，并报告对应的本地失败。只有真实网络、鉴权、配额或 wire 故障才产生 `CONVERSATION_LLM_REQUEST_FAILED`。
 
-获批调查的 partial／blocked 声明若因现场位置不符被要求恢复，主进程之后确认已回到签名入口时，会向同一执行反馈这一状态变化，要求重新判断未完成任务是否仍有可执行工作；其他真实阻塞仍可据实部分交付。反馈不自动启动任务、不改变权限，也不清零消费或延长原期限；未确认恢复和取消／硬限制继续按原合同处理。
+获批目标声明 partial／blocked 时，复评在 `turn_complete` 记录声明的同一个工具结果里返回，而不是在 Agent 写完回复之后再送回：声明先被记录，结果附上实际状态与记录原因，要求 Agent 对照计划与证据区分可执行工作和真实阻塞。复评同时列出最新有效 Checkpoint 的 unresolvedFrontier 与开放 Challenge 的 requiredFollowUp（Challenge 最多 12 项，余量提示用 `investigation_list`），要求逐项执行下一步检查或说明具体阻碍条件；存在合法且有价值的检查时应续用原 Task 实际执行，并在回复前再次 `turn_complete`，不能只列出后结束。没有可执行工作时直接写回复，原声明保留。复评只在存在未完成的获批 Task、未满足的获批执行合同，或 Task 均已结算但 partial 仍列出未决工作时出现；没有仍在后台运行的委派，且明确请求上限内仍有余量。这样一个回合只产生一份回复。
 
-获批目标声明 partial／blocked 时，若存在未完成的获批 Task 或未满足的获批执行合同、没有仍在后台运行的委派且明确请求上限内仍有可重新声明的工具请求，运行时在同一回合反馈实际状态和记录原因，要求 Agent 对照计划与证据区分可执行工作和真实阻塞；反馈同时列出最新有效 Checkpoint 的 unresolvedFrontier 与开放 Challenge 的 requiredFollowUp（Challenge 最多 12 项，余量提示用 `investigation_list`），要求逐项执行下一步检查或说明具体阻碍条件；存在合法且有价值的检查时应续用原 Task 并实际执行，不能只列出后结束。同一任务修订、执行代次和状态或同一合同错误只反馈一次。没有继续调用工具时保留原声明，避免把真实部分结果变成无进展错误；继续调用工具后必须重新声明，以免用旧结果覆盖新增工作。Agent 可以据实维持部分交付，也可以在原批准范围内继续；反馈不推断专业结论、不自动重复失败操作、不改变权限或预算。取消、交接及明确限额仍按各自合同处理。
+同一组未决工作只复评一次：键是未决项（gap、blocker、resumeWhen）加未完成获批 Task 的状态与原因，与证据 URI／hash 无关，Agent 改写调查记录不会再触发一轮。主进程确认现场已恢复到签名入口时（此前的 partial／blocked 声明曾因位置不符被要求恢复），记一次条件变化，同一组未决工作可以再复评一次，并说明恢复带来的可执行性。复评后又调用工具，旧声明随回合末检查作废，必须重新声明，以免用旧结果覆盖新增工作。回合末检查只处理协议违约（未声明、已失效的 completed、`budget_paused` 校验），不再因 partial 送回复评。反馈不推断专业结论、不自动重复失败操作、不改变权限或预算；取消、交接及明确限额仍按各自合同处理。
 
-已批准 Task 均已结算但 partial 声明仍列出未决工作时，也按同一组证据 URI／hash 反馈一次整体目标复评，避免将局部结算当作目标完成；证据版本变化后可重新判断。明确 blocked 仍按真实阻塞处理。
+被回合末检查送回的那次回复不是本回合的回复：下一轮 loop 开始时，主进程把它的阶段记为 commentary；渲染层用 `src/shared/conversation/loopItems.ts` 的同一条规则投影，旧会话不改写数据也按叙述显示。
 
 ## Tools 与 Permission（执行侧）
 

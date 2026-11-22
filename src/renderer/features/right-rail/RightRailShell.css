@@ -87,7 +87,7 @@
   list-style: none;
 }
 
-/* Tab bar over one section at a time; the selected tab already names the section. */
+/* Tab bar over one section at a time; the selected icon marks it and its name is in the tooltip. */
 .right-rail-tabs {
   flex: 1 1 auto;
   min-height: 0;

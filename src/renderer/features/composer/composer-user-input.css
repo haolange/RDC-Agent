@@ -60,7 +60,7 @@
   border-radius: var(--radius-sm);
   background: var(--token-bg-muted);
   color: var(--token-text-secondary);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
 }
@@ -139,7 +139,7 @@
 
 .composer-user-input-hint {
   color: var(--token-text-secondary);
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
 }
 

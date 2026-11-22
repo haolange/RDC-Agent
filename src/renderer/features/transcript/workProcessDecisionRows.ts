@@ -6,6 +6,15 @@ import { parsePreview } from './workProcessContentText';
 import { getMeaningfulBlockSummary } from './workProcessBlockText';
 import type { Translator } from '../../i18n/messages';
 
+/** The plan under review or approved, shown in Working as the card that follows each revision. */
+export const createPlanReviewRow = (call: ConversationToolCall): WorkProcessRow => ({
+  type: 'planReview',
+  id: call.id,
+  status: call.status,
+  plan: call.planReview!,
+  duration: formatDurationMs(call.startedAt, call.completedAt),
+});
+
 export const createPlanReviewShellRow = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
   const rejected = call.planReview?.status === 'rejected';
   const feedback = call.planReview?.decision?.kind === 'reject' ? call.planReview.decision.feedback : call.resultPreview;
@@ -15,9 +24,7 @@ export const createPlanReviewShellRow = (call: ConversationToolCall, t: Translat
     id: call.id,
     status: call.status,
     verb: call.planReview?.status === 'cancelled' ? t('chat.planShellCancelled')
-      : rejected ? t('chat.planShellFeedback')
-        : call.planReview?.status === 'awaiting' ? t('chat.planShellAwaiting')
-          : call.planReview?.status === 'approved' ? t('chat.planShellApproved') : t('chat.planUpdated'),
+      : rejected ? t('chat.planShellFeedback') : t('chat.planUpdated'),
     category: t('chat.toolDisplay.plan_artifact.category'),
     icon: 'plan-artifact',
     groupKind: 'runtime',

@@ -5,7 +5,6 @@ import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useI18n } from '../../i18n';
 import { InlineError } from '../../ui/InlineError';
-import { ProximityGlow } from '../../ui/ProximityHost';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 import { EFFORT_LABEL_KEYS, isReasoningLevelLabel } from '../../lib/reasoningLabels';
 import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
@@ -118,12 +117,11 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
   const progressDots = <SubagentProgressDots state={active ? 'active' : status === 'complete' ? 'complete' : 'stopped'} />;
   return <li ref={cardRef} className="work-process-step kind-subagent" data-work-process-block-id={row.id}>
     <WorkProcessRailIcon row={row} active={status === 'running'} />
-    <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent" data-proximity>
-    <ProximityGlow />
+    <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent" data-locate>
     <WorkCardHeader onClick={() => openCard(active)} expanded={expanded} controls={contentId}
       icon={<ModeGlyph mode={mode} icon={definition?.icon ?? undefined} className="work-process-tool-card-icon" />}
       title={<span className="work-process-subagent-identity">{agentLabel}{routeLabel ? <span className="work-process-subagent-route">{routeLabel}</span> : null}</span>}
-      tooltip={routeLabel ? `${agentLabel} · ${routeLabel}` : agentLabel} duration={headerLoading ? undefined : duration}
+      titleText={agentLabel} duration={headerLoading ? undefined : duration}
       status={<span className={`work-process-subagent-status is-${status}`}>
         {status === 'queued' ? t('chat.subagentQueued')
           : status === 'waiting' ? t('chat.subagentWaiting')

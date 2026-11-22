@@ -1,6 +1,12 @@
+/* The rail hangs outside the conversation's content edge: cards, headings and text keep the same left and right
+   edges as the user bubble and the Composer frame, and the rail sits in the column gutter. The marker keeps its
+   fixed 16px slot and the 4px gap to the content, so the rail centre is half a slot plus the gap. */
+.work-process {
+  --work-rail-hang: calc(var(--space-4) / 2 + var(--space-1));
+}
+
 .work-process-track {
   position: relative;
-  --work-track-gutter: calc(var(--space-3) + var(--space-4) + var(--space-1));
   --work-track-start: 0px;
   --work-track-length: 0px;
 }
@@ -10,21 +16,16 @@
   position: absolute;
   top: var(--work-track-start);
   height: var(--work-track-length);
-  left: calc(var(--space-3) + var(--space-2));
+  left: calc(var(--work-rail-hang) * -1);
   width: 1px;
   transform: translateX(-50%);
   background: var(--token-border-muted);
   pointer-events: none;
 }
 
-.work-process-track > .work-process-narrative-stream,
-.work-process-track-leading {
-  padding-left: var(--work-track-gutter);
-}
-
 .work-process-event-anchor {
   position: absolute;
-  left: calc((var(--space-4) + var(--space-1)) * -1);
+  left: calc(var(--work-rail-hang) * -1 - var(--space-4) / 2);
   width: var(--space-4);
   height: 0;
   pointer-events: none;
@@ -68,6 +69,7 @@
   animation: work-process-rail-pulse 1.5s ease-out infinite;
 }
 
+.work-process-track > .work-process-narrative-stream,
 .work-process-section-list,
 .work-process-tool-aggregate-body { padding-left: 0; }
 .work-process-track-leading { padding-bottom: var(--space-2); }
@@ -103,12 +105,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-/* Reply text leaves the process gutter and reads at the full assistant width, level with the Working
-   header and the Composer text; commentary stays on the process column. */
-.work-process-section-lead > .work-process-output:not(.kind-output-commentary) {
-  margin-inline-start: calc(var(--work-track-gutter) * -1);
 }
 
 .work-process-section-lead + .work-process-section-list {

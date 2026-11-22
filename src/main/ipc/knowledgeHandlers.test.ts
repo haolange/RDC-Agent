@@ -68,6 +68,7 @@ vi.mock('../knowledge/KnowledgeCandidateService', () => ({
 vi.mock('../knowledge/KnowledgeImportService', () => ({
   knowledgeImportService: {
     importToSpace: vi.fn(async () => ({ candidateCreated: false, verified: false, items: [] })),
+    previewImport: vi.fn(async () => ({ candidateCreated: false, verified: false, items: [] })),
     migrateSessionDrafts: vi.fn(async () => undefined),
   },
 }));
@@ -231,6 +232,16 @@ describe('knowledge mutation approval boundaries', () => {
     expect(knowledgeImportService.migrateSessionDrafts).not.toHaveBeenCalled();
     expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith(request);
     expect(writeMocks.write).not.toHaveBeenCalled();
+  });
+
+  it('previews an import without asking for confirmation or writing anything', async () => {
+    const request = { spaceId: 'user', source: 'case_id: same\ntitle: Same\nsymptoms: darker' };
+    const confirmations = vi.mocked(dialog.showMessageBox).mock.calls.length;
+    await handlers.get('knowledge:previewImport')!({}, request);
+    expect(knowledgeImportService.previewImport).toHaveBeenCalledWith(request);
+    expect(vi.mocked(dialog.showMessageBox).mock.calls.length).toBe(confirmations);
+    expect(knowledgeImportService.importToSpace).not.toHaveBeenCalled();
+    await expect(handlers.get('knowledge:previewImport')!({}, { spaceId: 'project:unknown', source: 'x' })).rejects.toThrow();
   });
 });
 

@@ -24,7 +24,7 @@
 .ui-section-header-description {
   margin: 0;
   color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
   line-height: var(--leading-normal);
 }
 

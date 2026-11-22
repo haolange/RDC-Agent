@@ -64,7 +64,8 @@ it.each(['unavailable', 'error'] as const)('retains the selected model and repor
   mock.capabilityState = status === 'error' ? { status, message: 'Discovery failed' }
     : { status, reason: 'missing-model', message: 'Selected model is not executable' };
   await render();
-  expect(host.textContent).toContain(mock.capabilityState.message);
+  expect(host.textContent).not.toContain(mock.capabilityState.message);
+  expect(host.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
   const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'composer.effort.capabilityRetry')!;
   await act(async () => retry.click());
@@ -149,7 +150,7 @@ it('always offers revisions, disallows empty feedback and preserves it on failed
   expect(textarea.value).toBe('  Clarify inputs  ');
   // The alert leads with a human sentence; the raw reason stays under diagnostics.
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('app.error.actionFailed');
-  expect(host.querySelector('[role="alert"]')?.querySelector('.ui-inline-error-detail-text')?.textContent).toBe('Retry available');
+  expect(host.querySelector('[role=\"alert\"] button[aria-label=\"app.copyDetails\"]')).not.toBeNull();
   await click('.composer-plan-review__revision button');
   expect(mock.submit).toHaveBeenCalledTimes(2);
 });
@@ -179,7 +180,7 @@ it('holds approval while a model saves, retains failures and still allows stop',
   await act(async () => mock.modelSave({ saving: false, error: 'Save failed' }));
   // The alert leads with a human sentence; the raw reason stays under diagnostics.
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('app.error.saveFailed');
-  expect(host.querySelector('[role="alert"]')?.querySelector('.ui-inline-error-detail-text')?.textContent).toBe('Save failed');
+  expect(host.querySelector('[role=\"alert\"] button[aria-label=\"app.copyDetails\"]')).not.toBeNull();
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
 });
 

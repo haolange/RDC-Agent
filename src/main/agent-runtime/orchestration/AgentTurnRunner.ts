@@ -202,6 +202,8 @@ export class AgentTurnRunner {
     let captureRestorationNeededForPartial = false;
     try {
     turnHandle.requiresApprovedGoalClosure = Boolean(preparedRuntime.approvedExecution);
+    const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
+    turnHandle.reviewCompletionDeclaration = (declaration) => approvedGoalContinuation.reviewDeclaration(declaration);
     turnHandle.requiresApprovedCaptureScope = Boolean(preparedRuntime.approvedExecution?.investigation
       && !preparedRuntime.approvedExecution.investigation.captureScope);
     const captureRestorationFeedback = async (declaration: import('./TurnCoordinator').TurnCompletionDeclaration | null): Promise<string | undefined> => {
@@ -240,9 +242,8 @@ export class AgentTurnRunner {
       }
       if (captureRestorationNeededForPartial && turnHandle.captureControl && !captureRestoreFailure) {
         captureRestorationNeededForPartial = false;
-        if (['partial', 'blocked'].includes(declaration.disposition)) {
-          throw new Error('# Approved Goal After Capture Restoration\nThe host now verifies the signed entry position. Reassess the unfinished approved Tasks: continue useful work that is now possible, using the existing Task and preserving its consumption and deadline. If another concrete condition still prevents progress, report it accurately in a new partial or blocked declaration.');
-        }
+        // The declaration is recorded; its review states what the restored position makes possible again.
+        approvedGoalContinuation.noteConditionsChanged('The host now verifies the signed entry position, so work that needed it may be possible again; continue it with the existing Task, preserving its consumption and deadline.');
       }
     };
     slotKey = agentSlotKey(executionScopeId, input.agentId);
@@ -415,7 +416,6 @@ export class AgentTurnRunner {
         }));
       }
     }
-    const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
     const missionPlanningFeedback = () => {
       const plan = turnHandle.runtimePlan ?? effectivePlan;
       if (!plan.investigationMission || !plan.profileHandoffs.some(handoff => handoff.surface === 'plan-gate')
@@ -464,14 +464,14 @@ export class AgentTurnRunner {
           const planningFeedback = missionPlanningFeedback();
           if (planningFeedback) return planningFeedback;
           if (!turnHandle.requiresApprovedGoalClosure) return undefined;
-          const incomplete = await approvedGoalContinuation();
+          const incomplete = await approvedGoalContinuation.closingCheck();
           if (incomplete) return incomplete;
           const restorationFeedback = await captureRestorationFeedback(turnHandle.completionDeclaration);
           if (restorationFeedback) {
             turnHandle.completionDeclaration = null;
             return `${restorationFeedback}\nThe previous completion declaration is no longer active; call turn_complete again.`;
           }
-          return approvedGoalContinuation(() => {
+          return approvedGoalContinuation.closingCheck(() => {
           if (preparedRuntime.approvedExecution) assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
           const mission = preparedRuntime.approvedExecution?.investigation?.mission;
           if (!mission || !['completed', 'budget_paused'].includes(turnHandle.completionDeclaration?.disposition ?? '')) return;

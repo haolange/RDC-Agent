@@ -19,7 +19,6 @@ for (const statement of parse('src/renderer/ui/index.ts').statements) {
     }
   }
 }
-publicNames.add('HelpTip');
 publicNames.add('TaskStatusMarker');
 const consumers = new Map([...publicNames].map(name => [name, []]));
 for (const file of files('src/renderer')) {

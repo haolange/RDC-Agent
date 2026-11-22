@@ -104,7 +104,7 @@
 }
 
 .conversation-system-command-label {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
   color: var(--token-text-secondary);
 }
@@ -153,35 +153,4 @@
   50%, 100% {
     opacity: 0;
   }
-}
-
-/* ---------- diagnostic ---------- */
-.conversation-message-diagnostic {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--transcript-card-padding);
-  border-radius: var(--transcript-card-radius);
-  background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--token-status-error) 24%, transparent);
-  color: var(--token-status-error);
-  font-size: var(--type-body-size);
-}
-
-.conversation-message-diagnostic-details {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-}
-
-.conversation-message-diagnostic-code {
-  display: block;
-  margin-top: var(--space-1);
-  font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
-  overflow-wrap: anywhere;
-}
-
-.conversation-message-diagnostic-text {
-  color: var(--token-text-primary);
-  line-height: 1.55;
 }

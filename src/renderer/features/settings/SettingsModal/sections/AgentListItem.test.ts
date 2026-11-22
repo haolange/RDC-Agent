@@ -42,22 +42,19 @@ describe('AgentListItem', () => {
     expect(row.classList.contains('is-selected')).toBe(true);
   });
 
-  it('keeps complete long text and an empty description slot on async updates', async () => {
+  it('keeps the complete name and description text and drops an empty description', async () => {
     const name = '很长的 Agent 名称 / Long Agent name '.repeat(8);
     const description = '完整的描述与 English description '.repeat(12);
     await render({ name, description });
     const title = container.querySelector<HTMLElement>('.settings-agent-list-item-name')!;
-    const detail = container.querySelector<HTMLElement>('.ui-overflow-fade')!;
-    expect(title.dataset.tooltip).toBe(name);
+    const detail = container.querySelector<HTMLElement>('.settings-agent-list-item-description')!;
+    // Visible text is not repeated as a tooltip; the description clamps to two lines in CSS.
+    expect(title.dataset.tooltip).toBeUndefined();
     expect(title.textContent).toBe(name);
-    // The description offers its full text as a tooltip only once it measurably overflows.
-    expect(detail.dataset.tooltip).toBeUndefined();
     expect(detail.textContent).toBe(description);
     expect(container.querySelector('strong')).toBeNull();
     await render({ description: '' });
-    expect(container.querySelector('.ui-overflow-fade')).toBe(detail);
-    expect(detail.textContent).toBe('');
-    expect(detail.dataset.tooltip).toBeUndefined();
+    expect(container.querySelector('.settings-agent-list-item-description')).toBeNull();
   });
 
   it('keeps glyphs decorative and small, and delegates disabled behavior to ListRow', async () => {

@@ -58,7 +58,7 @@ export const PolicySettings: React.FC<{
       >
         <SettingsField
           label={t('settings.compactionThreshold')}
-          help={t('settings.compactionThresholdScope')}
+          description={t('settings.compactionThresholdScope')}
           layout="row"
           className="settings-policy-threshold"
           search="compaction"

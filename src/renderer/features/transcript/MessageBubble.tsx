@@ -3,7 +3,7 @@ import { hasPlanReviewInteraction } from '@shared/conversation/planReviewPresent
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { MarkdownSourceProvider } from '../../patterns/Markdown/markdownSources';
 import { MarkdownSourcesRow } from '../../patterns/Markdown/MarkdownSourcesRow';
-import { Details } from '../../ui/Details';
+import { InlineError } from '../../ui/InlineError';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -11,7 +11,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useI18n } from '../../i18n';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { errorDetail } from '../../lib/errorDetail';
-import { useUiLabels } from '../../lib/useUiLabels';
 import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
 import { WorkProcess } from './WorkProcess';
 import { MessageActions } from './MessageActions';
@@ -19,7 +18,6 @@ import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
 import { PlanDeliverable } from './PlanDeliverable';
-import { PlanReferenceCard } from './PlanReferenceCard';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { answerSources } from './answerSources';
@@ -172,17 +170,14 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
             />
           ) : (
             <>
-              {message.planReference ? (
-                <PlanReferenceCard reference={message.planReference} prompt={message.content} />
-              ) : (
-                <div className="conversation-bubble conversation-bubble-user">
-                  {composerMarkdown ? (
-                    <MessageMarkdown content={message.content} />
-                  ) : (
-                    <span className="conversation-bubble-text">{message.content}</span>
-                  )}
-                </div>
-              )}
+              <div className="conversation-bubble conversation-bubble-user">
+                {composerMarkdown ? (
+                  <MessageMarkdown content={message.content} />
+                ) : (
+                  <span className="conversation-bubble-text">{message.content}</span>
+                )}
+              </div>
+              {/* A handoff that executes or revises a reviewed plan is bound to it; a rewrite could not carry that. */}
               <MessageMetaBar
                 message={message}
                 time={time}
@@ -198,7 +193,6 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
 
 const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const { t } = useI18n();
-  const labels = useUiLabels();
   const agentId = message.agentId;
   const time = formatClockTime(message.createdAt);
   const trace = message.workTrace ?? null;
@@ -246,17 +240,10 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
               <HandoffSuggestionRow suggestions={message.handoffSuggestions} />
             ) : null}
             {showDiagnosticBlock && message.diagnostic ? (
-              <div className="conversation-message-diagnostic" role="alert">
-                <span className="conversation-message-diagnostic-text">
-                  {message.diagnostic.userMessage}
-                </span>
-                <Details className="conversation-message-diagnostic-details" summary={labels.diagnostics}>
-                  <code className="conversation-message-diagnostic-code">{message.diagnostic.code}</code>
-                  {message.diagnostic.technicalMessage ? (
-                    <code className="conversation-message-diagnostic-code">{message.diagnostic.technicalMessage}</code>
-                  ) : null}
-                </Details>
-              </div>
+              <InlineError data-testid="conversation-message-diagnostic"
+                detail={[message.diagnostic.code, message.diagnostic.technicalMessage].filter(Boolean).join('\n')}>
+                {message.diagnostic.userMessage}
+              </InlineError>
             ) : null}
             {!isInProgress && hasContent ? <MarkdownSourcesRow content={message.content} /> : null}
             {!isInProgress ? (

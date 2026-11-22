@@ -7,7 +7,10 @@ import { RightRailContext } from './RightRailContext';
 import type { InvestigationArtifactRow, InvestigationListPage, TaskContextPanelViewModel } from '@shared/types/trace';
 const data = vi.hoisted(() => ({ sessionId: 'session', list: vi.fn(), read: vi.fn(), copy: vi.fn(), open: vi.fn() }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentSession: { sessionId: data.sessionId, projectId: 'project' } }) }));
-vi.mock('../../hooks/appShellBridge', () => ({ copyAppText: data.copy, openAppPath: data.open }));
+vi.mock('../../hooks/appShellBridge', () => ({ openAppPath: data.open }));
+vi.mock('../../lib/clipboard', () => ({ useCopyText: () => async (text: string) => {
+  try { await data.copy(text); return true; } catch { return false; }
+} }));
 vi.mock('./investigationPreviewActions', () => ({ listInvestigationArtifacts: data.list, readInvestigationArtifact: data.read }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: {count: number}) => values ? `${key}:${values.count}` : key }) }));
 const row = (index: number): InvestigationArtifactRow => ({ artifactId: `artifact-${index}`, kind: 'evidence', recordType: 'EvidenceRecord', status: 'ready', mission: 'debugger', title: `Evidence ${index}`, createdAt: '2026-01-01T00:00:00.000Z', contentHash: `sha256:${'a'.repeat(64)}`, contentHashShort: 'sha256:aaa', sourceRefCount: 1, degraded: false });
@@ -42,11 +45,11 @@ it('pages beyond fifty, opens nested preview, copies full ID and closes only the
   const preview = document.querySelector('[data-testid="investigation-preview"]')!;
   const integrity = preview.querySelector('[data-testid="investigation-preview-integrity"]')!;
   expect(integrity.textContent).toContain('control.rightRail.artifacts.preview.integrity.hashMismatch');
-  expect(integrity.textContent).toContain('Expected hash differs');
-  const copyId = preview.querySelector('button[aria-label="control.rightRail.artifacts.copyId"]');
-  await click(copyId);
-  expect(data.copy).toHaveBeenCalledWith('artifact-0');
-  expect(copyId?.getAttribute('data-copied')).toBe('true');
+  expect(preview.textContent).not.toContain('artifact-0');
+  const copyDiagnostics = preview.querySelector('button[aria-label="app.copyDiagnostics"]');
+  await click(copyDiagnostics);
+  expect(data.copy).toHaveBeenCalledWith(expect.stringContaining('ID: artifact-0'));
+  expect(copyDiagnostics?.getAttribute('data-copied')).toBe('true');
   await act(async () => document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})));
   expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
   expect(document.querySelector('[data-testid="investigation-list"]')).toBe(list);
@@ -91,13 +94,13 @@ it.each([0,5,6])('keeps context overflow discoverable at boundary %i', async tot
   expect(host.querySelectorAll('.right-rail-compact-row')).toHaveLength(Math.min(total,5));
   expect(Boolean(host.querySelector('.right-rail-browse-all'))).toBe(total>5);
 });
-it('reports ID clipboard failure inside preview without reporting success', async () => {
+it('reports a diagnostics clipboard failure inside preview without reporting success', async () => {
   data.copy.mockRejectedValueOnce(new Error('clipboard unavailable'));
   await act(async()=>root.render(createElement(RightRailArtifactList,{artifacts:{rows:[row(0)],totalCount:1,storeDegraded:false}})));
   await click(host.querySelector('.right-rail-compact-row'));
   const preview=document.querySelector('[data-testid="investigation-preview"]')!;
-  const copyId = preview.querySelector('button[aria-label="control.rightRail.artifacts.copyId"]');
-  await click(copyId);
-  expect(data.copy).toHaveBeenCalledWith('artifact-0');
-  expect(copyId?.getAttribute('data-copied')).toBe('false');
+  const copyDiagnostics = preview.querySelector('button[aria-label="app.copyDiagnostics"]');
+  await click(copyDiagnostics);
+  expect(data.copy).toHaveBeenCalledWith(expect.stringContaining('ID: artifact-0'));
+  expect(copyDiagnostics?.getAttribute('data-copied')).toBe('false');
 });

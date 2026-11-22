@@ -10,9 +10,9 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 vi.mock('./providerCatalogActions', () => ({ testModelCapability: vi.fn() }));
 
 it.each([
-  ['en', 'The provider reported default; actual Fast processing is unconfirmed.', 'Requested priority · Reported default'],
-  ['zh-CN', '服务端回报 default，实际 Fast 状态未确认。', '请求档位 priority · 服务端回报 default'],
-] as const)('formats the actual Fast tier receipt in %s', (language, detail, tiers) => {
+  ['en', 'The provider reported default; actual Fast processing is unconfirmed.'],
+  ['zh-CN', '服务端回报 default，实际 Fast 状态未确认。'],
+] as const)('says what a Fast probe found in %s, without the raw tier receipt', (language, detail) => {
   const text = providerProbeResultText({
     success: false,
     status: 'inconclusive',
@@ -27,7 +27,7 @@ it.each([
       usage: { inputTokens: 31, outputTokens: 5, totalTokens: 36 },
     },
   }, (key, params) => translate(language, key, params));
-  expect(text).toMatchObject({ detail, tiers });
+  expect(text).toEqual({ status: expect.any(String), detail });
 });
 
 const reasoning = {
@@ -76,7 +76,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
 }
 
 
-it('keeps warnings outside collapsed details and shows an inconclusive probe after collapsing', async () => {
+it('shows warnings, tiers and the probe in the expanded model, and the probe outcome in words', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -91,17 +91,17 @@ it('keeps warnings outside collapsed details and shows an inconclusive probe aft
   vi.mocked(testModelCapability).mockResolvedValue({ success: false, status: 'inconclusive', requestSent: true, detail: 'Need actual threshold evidence' });
   try {
     await act(async () => root.render(createElement(ProviderModelCapabilitySummary, props)));
-    const details = host.querySelector('details')!;
-    expect(details.open).toBe(false);
-    expect(host.querySelector('[data-testid="settings-provider-tool-calling-unverified"]')?.closest('details')).toBeNull();
+    // The expanded model is already the detail layer: nothing in it folds again.
+    expect(host.querySelector('details')).toBeNull();
+    expect(host.querySelector('[data-testid="settings-provider-tool-calling-unverified"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="settings-provider-model-tiers-model-a"]')).not.toBeNull();
     expect(host.textContent).toContain('Unavailable route');
-    await act(async () => host.querySelector('summary')!.click());
-    expect(details.open).toBe(true);
+    expect(host.textContent).not.toMatch(/settings\.providers\.capability\.(sources|protocolOwner|activation)/u);
     const probe = host.querySelector<HTMLButtonElement>('[data-testid="settings-provider-model-probe-model-a"] .settings-model-capability-probe-actions button')!;
     await act(async () => probe.click());
-    await act(async () => host.querySelector('summary')!.click());
-    expect(host.querySelector('[role="status"]')?.closest('details')).toBeNull();
     expect(host.querySelector('[role="status"]')?.textContent).toContain('inconclusive');
+    // The raw probe detail is not printed; only a known reason would be.
+    expect(host.textContent).not.toContain('Need actual threshold evidence');
     expect(testModelCapability).toHaveBeenCalledWith({providerId: 'provider-a', modelId: 'model-a', mode: 'default'});
     const select = host.querySelector<HTMLButtonElement>('[data-testid="settings-model-reasoning-model-a"]')!;
     await act(async () => select.click());

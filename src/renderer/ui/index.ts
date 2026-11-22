@@ -46,4 +46,3 @@ export { usePresence, type PresenceState } from './usePresence';
 export { Skeleton, type SkeletonProps, type SkeletonShape } from './Skeleton';
 export { CopyButton, type CopyButtonProps } from './CopyButton';
 export { ImageViewer, type ImageViewerItem, type ImageViewerProps } from './ImageViewer';
-export { ProximityGlow, ProximityHost } from './ProximityHost';

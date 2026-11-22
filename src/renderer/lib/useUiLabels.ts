@@ -5,7 +5,8 @@ export function useUiLabels() {
     selectPlaceholder: t('app.selectPlaceholder'),
     selectEmpty: t('app.selectEmpty'),
     retry: t('app.retry'),
-    diagnostics: t('app.diagnostics'),
+    copyDetails: t('app.copyDetails'),
+    copied: t('app.copied'),
     imageViewer: {
       close: t('app.imageViewer.close'),
       previous: t('app.imageViewer.previous'),

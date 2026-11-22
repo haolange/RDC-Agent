@@ -66,7 +66,7 @@ async function loadSession(sessionId: string, context: SlashCommandContext): Pro
   const electronAPI = window.electronAPI;
   const result = await electronAPI.session.select(sessionId);
   if (!result.success || !result.session) {
-    context.showNotice(result.error ?? currentText('composer.commandSessionMissing', { id: sessionId }));
+    context.showNotice(result.error ?? currentText('composer.commandSessionMissing'));
     return;
   }
 

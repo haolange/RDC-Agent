@@ -73,6 +73,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     indexRebuild: 'knowledge:index:rebuild',
     candidates: 'knowledge:candidates',
     candidateCreate: 'knowledge:candidateCreate',
+    previewImport: 'knowledge:previewImport',
     import: 'knowledge:import',
     image: 'knowledge:image',
     issueApprovalToken: 'knowledge:issueApprovalToken',

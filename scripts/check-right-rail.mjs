@@ -128,7 +128,7 @@ const artifactPreview = [
   read('src/renderer/features/right-rail/RightRailInvestigationPreview.tsx'),
   read('src/renderer/features/right-rail/investigationPreviewActions.ts'),
 ].join('\n');
-for (const required of ['investigation.read', 'expectedHash', 'TaskDialog', 'control.rightRail.artifacts.copyId', 'hash-mismatch']) {
+for (const required of ['investigation.read', 'expectedHash', 'TaskDialog', 'CopyDiagnosticsButton', 'hash-mismatch']) {
   requireText(artifactPreview, required, `RightRailInvestigationPreview must retain ${required}`);
 }
 for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'ArtifactViewer', 'title={hash}', 'title={row.contentHash}', 'investigation-preview-id', 'browse.copy.']) {
@@ -172,10 +172,12 @@ for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewSta
 const workspace = read('src/renderer/features/right-rail/CaptureWorkspace.tsx');
 if ((workspace.match(/className="capture-replay-image"/g) ?? []).length !== 1) fail('CaptureWorkspace must own exactly one image viewport');
 for (const retired of ['EID ', 'control.replay.more', '<h2 className="right-rail-section-heading">']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
-requireText(capturePanel, 'capture-replay-diagnostics', 'Capture keeps context and device ids under its diagnostics');
+requireText(capturePanel, 'CopyDiagnosticsButton', 'Capture hands context and device ids to the clipboard');
+forbidText(capturePanel, 'capture-replay-diagnostics', 'Capture must not restore a diagnostics disclosure');
 const reportView = read('src/renderer/features/right-rail/RightRailReportView.tsx');
 for (const retired of ['investigation-report-note', 'investigation-report-meta', 'claim.claimKind}', 'claim.epistemic}']) forbidText(reportView, retired, `Report view must retire ${retired}`);
-requireText(reportView, 'labels.diagnostics', 'Report view keeps record ids under one diagnostics disclosure');
+requireText(reportView, 'CopyDiagnosticsButton', 'Report view hands record ids to the clipboard');
+forbidText(reportView, 'labels.diagnostics', 'Report view must not restore a diagnostics disclosure');
 const taskList = read('src/renderer/features/right-rail/RightRailTaskList.tsx');
 for (const retired of ['right-rail-task-order', 'right-rail-task-facts', 'right-rail-task-progress-label']) forbidText(taskList, retired, `Tasks must retire ${retired}`);
 for (const retired of ['stopLabel', 'useSessionWorkStop', 'stopBackgroundWork']) forbidText(taskList + tracePanel, retired, `Tasks must retire ${retired}`);

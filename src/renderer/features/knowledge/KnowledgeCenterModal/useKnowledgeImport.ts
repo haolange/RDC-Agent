@@ -3,14 +3,11 @@ import { useI18n } from '../../../i18n';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { knowledgeErrorMessage } from './knowledgeCenterModel';
 import { beginSynchronousFlight } from './knowledgeImportExportModel';
-import type {
-  KnowledgeImportResult,
-  KnowledgeCandidatesResult,
-  KnowledgeCardRecord,
-  KnowledgeSpace,
-} from '@shared/types/knowledge';
+import type { KnowledgeImportResult, KnowledgeSpace } from '@shared/types/knowledge';
 
 export type KnowledgeImportMode = 'file' | 'paste';
+/** One dialog, three moments: choose a source, see what it would do, see what it did. */
+export type KnowledgeImportStep = 'input' | 'preview' | 'result';
 
 export function useKnowledgeImport(options: {
   open: boolean;
@@ -20,37 +17,16 @@ export function useKnowledgeImport(options: {
 }) {
   const { t } = useI18n();
   const request = useKnowledgeRequestScope(options.open, options.sessionId ?? '');
-  const inboxRequest = useKnowledgeRequestScope(options.open, options.sessionId ?? '');
   const inFlight = useRef(false);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<KnowledgeImportMode>('file');
   const [source, setSource] = useState('');
   const [filePath, setFilePath] = useState<string | null>(null);
   const [spaceId, setSpaceId] = useState(options.spaces[0]?.spaceId ?? 'user');
+  const [preview, setPreview] = useState<KnowledgeImportResult | null>(null);
   const [result, setResult] = useState<KnowledgeImportResult | null>(null);
-  const [inbox, setInbox] = useState<KnowledgeCandidatesResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [candidateError, setCandidateError] = useState<{ cardId: string; message: string } | null>(null);
-
-  const refreshInbox = useCallback(async () => {
-    if (!options.sessionId) {
-      setInbox(null);
-      return;
-    }
-    const seq = inboxRequest.next();
-    try {
-      const next = await window.electronAPI.knowledge.candidates(options.sessionId);
-      if (inboxRequest.isCurrent(seq)) setInbox(next);
-    } catch (err) {
-      if (inboxRequest.isCurrent(seq)) setError(knowledgeErrorMessage(err));
-    }
-  }, [inboxRequest, options.sessionId]);
-
-  useEffect(() => {
-    if (!options.open) return;
-    void refreshInbox();
-  }, [options.open, refreshInbox]);
 
   const close = useCallback(() => {
     request.next();
@@ -60,19 +36,17 @@ export function useKnowledgeImport(options: {
     setMode('file');
     setSource('');
     setFilePath(null);
+    setPreview(null);
     setResult(null);
     setError(null);
-    setCandidateError(null);
   }, [request]);
 
   useEffect(() => {
     close();
-    setInbox(null);
   }, [close, options.open, options.sessionId]);
 
   const openPanel = useCallback(() => {
     setSpaceId(options.spaces[0]?.spaceId ?? 'user');
-    setCandidateError(null);
     setOpen(true);
   }, [options.spaces]);
 
@@ -80,9 +54,42 @@ export function useKnowledgeImport(options: {
   const changeMode = useCallback((next: KnowledgeImportMode) => {
     setMode(next);
     setError(null);
+    setPreview(null);
     if (next === 'file') setSource('');
     else setFilePath(null);
   }, []);
+
+  const changeSource = useCallback((next: string) => {
+    setSource(next);
+    setPreview(null);
+  }, []);
+
+  const changeSpace = useCallback((next: string) => {
+    setSpaceId(next);
+    setPreview(null);
+  }, []);
+
+  /** Reads the source and reports, item by item, what importing it into the chosen space would do. Writes nothing. */
+  const previewSource = useCallback(async (input: { filePath: string } | { source: string }) => {
+    if (inFlight.current) return;
+    const seq = request.next();
+    setBusy(true);
+    setError(null);
+    try {
+      const planned = await window.electronAPI.knowledge.previewImport({ spaceId, ...input });
+      if (request.isCurrent(seq)) setPreview(planned);
+    } catch (err) {
+      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+    } finally {
+      if (request.isCurrent(seq)) setBusy(false);
+    }
+  }, [request, spaceId]);
+
+  const takeFile = useCallback(async (next: string) => {
+    setFilePath(next);
+    setSource('');
+    await previewSource({ filePath: next });
+  }, [previewSource]);
 
   const selectFile = useCallback(async () => {
     if (inFlight.current) return;
@@ -92,14 +99,28 @@ export function useKnowledgeImport(options: {
     try {
       const next = await window.electronAPI.selectKnowledgeImport();
       if (!request.isCurrent(seq)) return;
-      setFilePath(next);
-      if (next) setSource('');
+      setBusy(false);
+      if (next) await takeFile(next);
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
-    } finally {
-      if (request.isCurrent(seq)) setBusy(false);
+      if (request.isCurrent(seq)) {
+        setError(knowledgeErrorMessage(err));
+        setBusy(false);
+      }
     }
-  }, [request]);
+  }, [request, takeFile]);
+
+  /** A dropped file is read from its path on disk, as a chosen one is; a drop without a path cannot be imported. */
+  const dropFile = useCallback(async (file: File) => {
+    const dropped = window.rdcDesktop?.getPathForFile(file) ?? null;
+    if (!dropped) {
+      setError(t('knowledgeCenter.importDropUnavailable'));
+      return;
+    }
+    await takeFile(dropped);
+  }, [t, takeFile]);
+
+  const previewPasted = useCallback(() => previewSource({ source }), [previewSource, source]);
+  const back = useCallback(() => setPreview(null), []);
 
   const importSource = useCallback(async () => {
     if (!spaceId) {
@@ -117,9 +138,8 @@ export function useKnowledgeImport(options: {
         ...(filePath ? { filePath } : { source }),
       });
       if (!request.isCurrent(seq) || 'cancelled' in imported) return;
+      setPreview(null);
       setResult(imported);
-      await refreshInbox();
-      if (!request.isCurrent(seq)) return;
       await options.onImported(imported);
     } catch (err) {
       if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
@@ -127,64 +147,28 @@ export function useKnowledgeImport(options: {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [filePath, options, refreshInbox, request, source, spaceId, t]);
-
-  const createCandidate = useCallback(async (card: KnowledgeCardRecord) => {
-    if (!options.sessionId) {
-      const message = t('knowledgeCenter.sessionRequired');
-      setError(message);
-      setCandidateError({ cardId: card.cardId, message });
-      return;
-    }
-    if (!beginSynchronousFlight(inFlight)) return;
-    const seq = request.next();
-    setBusy(true);
-    setError(null);
-    setCandidateError(null);
-    try {
-      await window.electronAPI.knowledge.candidateCreate({
-        sessionId: options.sessionId,
-        card,
-        explicitUserIntent: true,
-      });
-      if (!request.isCurrent(seq)) return;
-      await refreshInbox();
-      if (request.isCurrent(seq)) close();
-    } catch (err) {
-      if (request.isCurrent(seq)) {
-        const raw = knowledgeErrorMessage(err);
-        const message = raw.includes('KNOWLEDGE_ASSETS_MISSING')
-          ? t('knowledgeCenter.candidateAssetsMissing')
-          : raw;
-        setError(message);
-        setCandidateError({ cardId: card.cardId, message });
-      }
-    } finally {
-      inFlight.current = false;
-      if (request.isCurrent(seq)) setBusy(false);
-    }
-  }, [close, options.sessionId, refreshInbox, request, t]);
+  }, [filePath, options, request, source, spaceId, t]);
 
   return {
-    hasSession: Boolean(options.sessionId),
     open,
     openPanel,
     close,
+    step: (result ? 'result' : preview ? 'preview' : 'input') as KnowledgeImportStep,
     mode,
     setMode: changeMode,
     source,
-    setSource,
+    setSource: changeSource,
     filePath,
     spaceId,
-    setSpaceId,
+    setSpaceId: changeSpace,
+    preview,
+    previewPasted,
+    back,
+    dropFile,
     result,
-    inbox,
-    refreshInbox,
     busy,
     error,
-    candidateError,
     selectFile,
     importSource,
-    createCandidate,
   };
 }

@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { Details } from '../../../../ui/Details';
+import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { Input } from '../../../../ui/Input';
@@ -75,10 +75,9 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
     return (
       <div className="settings-provider-oauth-panel">
         {(status?.accountLabel || status?.planLabel) ? (
-          <Details summary={status.accountLabel || status.planLabel!} data-testid="settings-provider-oauth-summary">
-            {status.planLabel ? <p>{status.planLabel}</p> : null}
-            <p>{t(status.oauthRefreshAvailable ? 'settings.oauthRefreshAvailable' : 'settings.oauthRefreshSession')}</p>
-          </Details>
+          <p className="settings-provider-oauth-account" data-testid="settings-provider-oauth-summary">
+            {[status.accountLabel, status.planLabel].filter(Boolean).join(' · ')}
+          </p>
         ) : null}
       </div>
     );
@@ -208,35 +207,21 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
         )}
       </ol>
 
-      {redirectUri || status?.requestedScopes || diagnostic?.requestedScopes ? (
-        <Details className="settings-provider-oauth-technical" data-testid="settings-provider-oauth-details" summary={t('settings.oauthTechnicalDetails')}>
-          <div className="settings-provider-oauth-detail-grid">
-            {redirectUri ? (
-              <>
-                <span>{t('settings.oauthRedirectUri')}</span>
-                <code className="settings-provider-oauth-value">{redirectUri}</code>
-              </>
-            ) : null}
-            {status?.requestedScopes || diagnostic?.requestedScopes ? (
-              <>
-                <span>{t('settings.oauthRequestedScopes')}</span>
-                <code className="settings-provider-oauth-value">{status?.requestedScopes ?? diagnostic?.requestedScopes}</code>
-              </>
-            ) : null}
-          </div>
-        </Details>
+      {diagnostic?.checklist && diagnostic.checklist.length > 0 ? (
+        <ul className="settings-provider-oauth-checklist">
+          {diagnostic.checklist.map((item) => <li key={item}>{item}</li>)}
+        </ul>
       ) : null}
 
-      {diagnostic ? (
-        <Details className="settings-provider-oauth-diagnostic" data-testid="settings-provider-oauth-diagnostic" summary={t('settings.oauthTechnicalDetails')}>
-          {diagnostic.providerError ? <span>{t('settings.oauthProviderError', { error: diagnostic.providerError })}</span> : null}
-          {diagnostic.detail ? <span>{diagnostic.detail}</span> : null}
-          {diagnostic.checklist && diagnostic.checklist.length > 0 ? (
-            <ul className="settings-provider-oauth-checklist">
-              {diagnostic.checklist.map((item) => <li key={item}>{item}</li>)}
-            </ul>
-          ) : null}
-        </Details>
+      {redirectUri || status?.requestedScopes || diagnostic ? (
+        <div className="settings-provider-oauth-diagnostics">
+          <CopyDiagnosticsButton testId="settings-provider-oauth-diagnostic" facts={[
+            { label: t('settings.oauthRedirectUri'), value: redirectUri },
+            { label: t('settings.oauthRequestedScopes'), value: status?.requestedScopes ?? diagnostic?.requestedScopes },
+            { label: t('settings.oauthProviderErrorLabel'), value: diagnostic?.providerError },
+            { label: t('settings.oauthDiagnosticDetail'), value: diagnostic?.detail },
+          ]} />
+        </div>
       ) : null}
     </div>
   );

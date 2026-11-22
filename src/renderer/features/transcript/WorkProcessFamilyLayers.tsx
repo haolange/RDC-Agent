@@ -149,7 +149,7 @@ const RuntimeBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className="work-process-tool-card-body family-runtime">
       <ChipRow chips={row.chips} />
       {row.bodyText ? (
-        <span className="work-process-tool-card-body-text is-summary" data-tooltip={row.bodyText}>{row.bodyText}</span>
+        <span className="work-process-tool-card-body-text is-summary">{row.bodyText}</span>
       ) : null}
     </div>
   );

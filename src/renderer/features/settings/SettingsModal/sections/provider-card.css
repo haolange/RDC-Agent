@@ -1,0 +1,113 @@
+/* One model service: identity and enabled-model count, its status in one word, then what you can do. */
+.settings-provider-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-card);
+  background: var(--token-bg-raised);
+  transition: border-color var(--transition-fast);
+}
+
+.settings-provider-card:hover,
+.settings-provider-card:focus-within {
+  border-color: var(--token-border-strong);
+}
+
+.settings-provider-card-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-provider-card-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  flex: none;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
+}
+
+.settings-provider-card-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-card-models {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.settings-provider-card-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-provider-card-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  flex: none;
+  border-radius: var(--radius-full);
+  /* Not connected yet is a neutral fact, not a warning. */
+  background: var(--token-text-disabled);
+}
+
+.settings-provider-card.is-tone-connected .settings-provider-card-dot {
+  background: var(--token-status-success);
+}
+
+.settings-provider-card.is-tone-error .settings-provider-card-dot {
+  background: var(--token-status-error);
+}
+
+.settings-provider-card-status-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-card.is-tone-connected .settings-provider-card-status-label {
+  color: var(--token-status-success);
+}
+
+.settings-provider-card.is-tone-error .settings-provider-card-status-label {
+  color: var(--token-status-error);
+}
+
+.settings-provider-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+}
+
+.settings-provider-card-primary {
+  margin-inline-start: auto;
+  min-width: 5rem;
+}

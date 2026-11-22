@@ -3,14 +3,19 @@
 // connect the built-in "Ollama" provider and walk the real Composer, transcript and Work Process without
 // credentials or a model. It is QA tooling only (never packaged) and serves just what the product's
 // Ollama adapter and discovery call:
-//   GET  /api/tags   one installed model
-//   POST /api/show   its capabilities (tools, thinking) and trained context length
+//   GET  /api/tags   three installed models, so model lists and pickers show real variety
+//   POST /api/show   each model's capabilities (tools, thinking, vision) and trained context length
 //   POST /api/chat   NDJSON stream. The capability probe's `capability_check` is answered with a structured
 //                    call. An agent turn follows a scenario chosen by a keyword in the latest user message:
 //     (default)  thinking → one `glob` call → streamed answer
 //     qa:loops   thinking → task_create → commentary + glob → start two Tasks → complete, cancel and block → answer
-//     qa:long    five model steps of six parallel `glob` calls each, then a long Markdown answer
-//     qa:plan    (Mission agents) thinking → plan_artifact; the plan gate then pauses the turn
+//     qa:long    fifty model steps of six parallel `glob` / `grep` / `read_file` calls (300 actions) with commentary
+//                and thinking every few steps, then a long Markdown answer — the scale of a real investigation
+//     qa:plan    (Mission agents) thinking → plan_artifact; the plan gate then pauses the turn. A rejection with
+//                feedback returns in the same turn, and the stub submits the next revision with one more step
+//     qa:partial  like qa:plan, but the approved execution reports an honest partial result: two checks, then
+//                turn_complete(partial); a reassessment (inside the tool result or as a runtime follow-up) gets one
+//                more check and the same declaration again, then a reply with a table
 //     qa:markdown an answer exercising the Markdown renderer: headings, callout, table, titled and long code, Mermaid,
 //                footnote and a project image (docs/frame.png, written by the walkthrough)
 //     qa:subagent thinking → tool_search loads `subagent` → one waited delegation to Verifier → answer; the child
@@ -25,7 +30,11 @@ import http from 'node:http';
 
 const port = Number(process.argv[2] ?? 11434);
 const MODEL = 'qa-stub:4b';
-const CONTEXT_LENGTH = 32768;
+const MODELS = [
+  { name: MODEL, capabilities: ['completion', 'tools', 'thinking'], contextLength: 32768 },
+  { name: 'qa-vision:12b', capabilities: ['completion', 'tools', 'vision'], contextLength: 131072 },
+  { name: 'qa-coder:32b', capabilities: ['completion', 'tools', 'thinking'], contextLength: 262144 },
+];
 const CHUNK_DELAY_MS = 120;
 
 const THINKING = ['先确认工作区里有哪些文件，', '再决定从哪里开始看。'];
@@ -53,11 +62,17 @@ const MARKDOWN_ANSWER = [
   '![修复前的这一帧](docs/frame.png)\n\n',
   '[^1]: 结论来自同一 capture 的两次回放。\n',
 ];
-const PLAN = {
-  title: '定位 vkcube 帧的唯一 draw 调用',
-  summary: ['列出事件树并确认唯一的 draw 调用', '读取该调用的管线状态', '用三句话总结这一帧画了什么'],
-  content: '## 目标\n\n确认这一帧只有一次 draw 调用，并说明它画了什么。\n\n## 步骤\n\n1. 列出事件树。\n2. 读取 draw 调用的管线状态。\n3. 汇总结论。\n',
-  requiredTaskIds: [],
+const PLAN_STEPS = ['列出事件树并确认唯一的 draw 调用', '读取该调用的管线状态', '用三句话总结这一帧画了什么',
+  '对照参考帧复核输出颜色', '记录无法确认的部分和恢复条件'];
+/** Revision N of the scripted plan: each revision adds one step, so the CoT card visibly changes. */
+const planRevision = (revision) => {
+  const steps = PLAN_STEPS.slice(0, Math.min(PLAN_STEPS.length, 2 + revision));
+  return {
+    title: '定位 vkcube 帧的唯一 draw 调用',
+    summary: steps,
+    content: `## 目标\n\n确认这一帧只有一次 draw 调用，并说明它画了什么。\n\n## 步骤\n\n${steps.map((item, index) => `${index + 1}. ${item}。`).join('\n')}\n\n## 完成标准\n\n每一步都有回放证据；无法确认的部分单独列出。\n`,
+    requiredTaskIds: [],
+  };
 };
 const DELEGATION = {
   profile: 'verifier', mode: 'wait',
@@ -78,6 +93,27 @@ const BLOCKED_COMPLETION = {
     recoveryState: [],
   },
 };
+
+const PARTIAL_COMPLETION = {
+  disposition: 'partial',
+  result: {
+    summary: '工作区里的文件已核对；没有 capture，draw 调用和管线状态无法确认。',
+    outputs: {},
+    counterevidence: [],
+    unresolved: [
+      { gap: '定位唯一的 draw 调用', attempted: '列出了工作区文件和 docs 目录，没有找到 .rdc。', blocker: 'external', resumeWhen: '导入 capture 后' },
+      { gap: '读取 draw 调用的管线状态', attempted: '依赖上一项，尚未开始。', blocker: 'external', resumeWhen: '定位到 draw 调用后' },
+    ],
+    scope: '只读核对工作区文件',
+    sideEffects: [],
+    recoveryState: [],
+  },
+};
+const PARTIAL_ANSWER = [
+  '## 结论\n\n工作区里没有 capture，这一帧的 draw 调用还无法定位。[Unresolved]\n\n',
+  '| 检查 | 结果 |\n| --- | --- |\n| 工作区文件 | 只有 docs/frame.png |\n| capture | 未找到 |\n| 管线状态 | 未开始 |\n\n',
+  '## 恢复条件\n\n导入 capture 后，从事件树开始继续。\n',
+];
 
 const CHILD_COMPLETION = {
   disposition: 'completed',
@@ -130,6 +166,9 @@ async function streamChat(response, chunks) {
 /** Runtime follow-up prompts are Markdown-headed; they continue the scripted turn rather than start a new one. */
 const isRuntimeFollowUp = (entry) => typeof entry.content === 'string' && entry.content.startsWith('# ');
 
+const lastPlanningPrompt = (messages) => messages.map((entry) => entry.role === 'user' && !isRuntimeFollowUp(entry)
+  && typeof entry.content === 'string' && (entry.content.includes('qa:plan') || entry.content.includes('qa:partial'))).lastIndexOf(true);
+
 /** The latest user message and the tool results that followed it decide where the scripted turn is. */
 function turnState(body) {
   const messages = body.messages ?? [];
@@ -138,10 +177,25 @@ function turnState(body) {
   const prompt = typeof messages[lastUser]?.content === 'string' ? messages[lastUser].content : '';
   return {
     scenario: prompt.includes(DELEGATION.task) ? 'qa:subagent-child'
-      : ['qa:loops', 'qa:long', 'qa:plan', 'qa:subagent', 'qa:markdown'].find((keyword) => prompt.includes(keyword)) ?? 'default',
+      : ['qa:loops', 'qa:long', 'qa:plan', 'qa:partial', 'qa:subagent', 'qa:markdown'].find((keyword) => prompt.includes(keyword))
+        ?? sessionScenario(messages.slice(0, lastUser)) ?? 'default',
     step: after.filter((entry) => entry.role === 'assistant').length,
     toolResults: after.filter((entry) => entry.role === 'tool').map((entry) => String(entry.content ?? '')),
+    after,
+    // Revisions count within the current planning flow, so a later plan in the same session starts at revision 1.
+    planRevisions: messages.slice(lastPlanningPrompt(messages) + 1).filter((entry) => entry.role === 'assistant'
+      && (entry.tool_calls ?? []).some((call) => call.function?.name === 'plan_artifact')).length,
   };
+}
+
+/**
+ * A plan revision and an approved execution arrive as their own user messages without a keyword; the planning
+ * message earlier in the session decides which scripted flow they continue.
+ */
+function sessionScenario(history) {
+  const prompts = history.filter((entry) => entry.role === 'user' && !isRuntimeFollowUp(entry)).map((entry) => String(entry.content ?? ''));
+  const planning = prompts.findLast((prompt) => prompt.includes('qa:plan') || prompt.includes('qa:partial'));
+  return planning?.includes('qa:partial') ? 'qa:partial-flow' : planning ? 'qa:plan-flow' : undefined;
 }
 
 function loopsScenario(state, tools) {
@@ -170,12 +224,50 @@ function loopsScenario(state, tools) {
   return [...thinking(['信息已经够了，', '可以给出结论。']), ...text(ANSWER)];
 }
 
+const LONG_STEPS = 50;
+/** One step of six parallel reads that mixes the three primitive families a real investigation uses. */
+function longStepCalls(step, tools) {
+  return Array.from({ length: 6 }, (_, index) => {
+    const slot = (step + index) % 3;
+    if (slot === 1 && tools.has('grep')) return ['grep', { pattern: index % 2 ? 'draw' : 'pipeline', path: '.' }];
+    if (slot === 2 && tools.has('read_file')) return ['read_file', { path: 'docs/notes.md' }];
+    return ['glob', { pattern: index % 2 ? '**/*.rdc' : 'docs/*' }];
+  });
+}
+
 function longScenario(state, tools) {
-  if (state.step < 5 && tools.has('glob')) {
-    const calls = Array.from({ length: 6 }, (_, index) => ['glob', { pattern: index % 2 ? '*.rdc' : '*' }]);
-    return [...(state.step === 0 ? thinking(['需要多轮核对列举结果，', '每轮并行执行。']) : []), toolCalls(calls)];
+  if (state.step < LONG_STEPS && tools.has('glob')) {
+    const lead = state.step === 0 ? thinking(['需要多轮核对列举结果，', '每轮并行执行。'])
+      : state.step % 10 === 0 ? text([`第 ${state.step / 10} 组核对完成，结果与上一组一致，继续下一组。`])
+        : state.step % 7 === 0 ? thinking(['这一轮的结果和上一轮相同，', '继续扩大范围。']) : [];
+    return [...lead, toolCalls(longStepCalls(state.step, tools))];
   }
   return text(LONG_ANSWER);
+}
+
+/** Runtime reassessments arrive either inside a tool result or as a Markdown-headed runtime follow-up. */
+const isReassessment = (entry) => typeof entry.content === 'string' && entry.content.includes('Reassessment');
+const isDeclaration = (entry) => entry.role === 'tool' && String(entry.content ?? '').includes('Turn completion recorded');
+
+/**
+ * The approved execution of qa:partial: two checks, an honest partial declaration, one more check after each
+ * reassessment the runtime asks for, then a reply. The stub never invents progress it did not make.
+ */
+function partialExecution(state, tools) {
+  const { after } = state;
+  const declarations = after.filter(isDeclaration).length;
+  const lastReassessment = after.findLastIndex(isReassessment);
+  // A reassessment is answered once the stub has declared again after it; three declarations end the script.
+  const pending = lastReassessment >= 0 && declarations < 3 && !after.slice(lastReassessment + 1).some(isDeclaration);
+  if (state.toolResults.length === 0) return [...thinking(['先核对工作区里有没有 capture，', '再决定能做到哪一步。']), toolCalls([['glob', { pattern: '*' }]])];
+  if (state.toolResults.length === 1) return [...text(['工作区根目录没有 capture，再看看 docs 目录。']), toolCalls([['glob', { pattern: 'docs/*' }], ['glob', { pattern: '**/*.rdc' }]])];
+  if (declarations === 0) return [toolCalls([['turn_complete', PARTIAL_COMPLETION]])];
+  if (pending) {
+    const checkedSince = after.slice(lastReassessment + 1).filter((entry) => entry.role === 'tool' && !isDeclaration(entry)).length;
+    if (checkedSince === 0) return [...thinking(['复评要求再确认一次，', '换个范围找 capture。']), toolCalls([['glob', { pattern: '**/*.rdc' }]])];
+    return [toolCalls([['turn_complete', PARTIAL_COMPLETION]])];
+  }
+  return text(PARTIAL_ANSWER);
 }
 
 function chatChunks(body) {
@@ -199,9 +291,15 @@ function chatChunks(body) {
     if (!declared && tools.has('turn_complete')) return [...thinking(['工作区里没有 .rdc 文件，', '结论可以交回。']), toolCalls([['turn_complete', CHILD_COMPLETION]])];
     return text(['工作区里没有 .rdc capture，需要先导入。']);
   }
-  if (state.scenario === 'qa:plan' && tools.has('plan_artifact') && state.step === 0) {
-    return [...thinking(['先把调查计划写出来，', '交给用户审阅。']), toolCalls([['plan_artifact', PLAN]])];
+  const planning = ['qa:plan', 'qa:partial', 'qa:plan-flow', 'qa:partial-flow'].includes(state.scenario);
+  // A rejected revision comes back as the plan_artifact result in the same turn; the stub submits the next one.
+  const rejected = state.toolResults.at(-1)?.startsWith('rejected\nfeedback:');
+  if (planning && tools.has('plan_artifact') && (state.step === 0 || rejected)) {
+    const revision = state.planRevisions + 1;
+    return [...thinking(revision === 1 ? ['先把调查计划写出来，', '交给用户审阅。'] : ['按反馈修改计划，', '补上复核和未知项的步骤。']),
+      toolCalls([['plan_artifact', planRevision(revision)]])];
   }
+  if (state.scenario === 'qa:partial-flow' && tools.has('turn_complete')) return partialExecution(state, tools);
   const declared = state.toolResults.some((result) => result.includes('Turn completion recorded'));
   if (tools.has('turn_complete') && state.toolResults.length > 0 && !declared) return [toolCalls([['turn_complete', BLOCKED_COMPLETION]])];
   if (state.toolResults.length > 0 || !tools.has('glob')) return text(ANSWER);
@@ -213,14 +311,16 @@ const server = http.createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
     console.log(`[qa-ollama-stub] ${request.method} ${url.pathname}`);
     if (request.method === 'GET' && url.pathname === '/api/tags') {
-      return json(response, 200, { models: [{ name: MODEL, model: MODEL, details: { family: 'qa-stub' } }] });
+      return json(response, 200, { models: MODELS.map(({ name }) => ({ name, model: name, details: { family: name.split(':')[0] } })) });
     }
     if (request.method === 'POST' && url.pathname === '/api/show') {
       const body = await readBody(request);
-      if (body.model !== MODEL) return json(response, 404, { error: `model "${body.model}" not found` });
+      const model = MODELS.find(({ name }) => name === body.model);
+      if (!model) return json(response, 404, { error: `model "${body.model}" not found` });
+      const family = model.name.split(':')[0];
       return json(response, 200, {
-        capabilities: ['completion', 'tools', 'thinking'],
-        model_info: { 'general.architecture': 'qa-stub', 'qa-stub.context_length': CONTEXT_LENGTH },
+        capabilities: model.capabilities,
+        model_info: { 'general.architecture': family, [`${family}.context_length`]: model.contextLength },
       });
     }
     if (request.method === 'POST' && url.pathname === '/api/chat') {

@@ -1,4 +1,4 @@
-import { loopTextItems, loopThinkingItems } from '@shared/conversation/loopItems';
+import { loopTextItems, loopThinkingItems, presentedTextPhase } from '@shared/conversation/loopItems';
 import { formatDurationMs } from './workProcessFormat';
 import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
 import type { LoopPresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
@@ -19,8 +19,9 @@ export function projectLlmTurn(
   ctx: BlockProjectionContext,
   snapshots: ConversationWorkBlock[] = [],
   interactions: ConversationWorkBlock[] = [],
+  superseded = false,
 ): LoopPresentationUnit | StandalonePresentationUnit | null {
-  const outputPhase = deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
+  const outputPhase = superseded ? 'commentary' : deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
   const reasoningState = deps.resolveReasoningState(block);
   const stopReason = block.result?.stopReason;
   // Successful TaskRegistry mutations already have authoritative snapshots;
@@ -51,7 +52,7 @@ export function projectLlmTurn(
     ...loopTextItems(block).map((item) => ({
       order: item.displayOrder, time: block.startedAt,
       row: { type: 'output', id: `${block.id}:output:${item.providerOutputRef.contentIndex}`,
-        status: item.status === 'streaming' ? 'running' : 'complete', text: item.text, phase: item.phase, duration: '' } as WorkProcessRow,
+        status: item.status === 'streaming' ? 'running' : 'complete', text: item.text, phase: presentedTextPhase(item.phase, superseded), duration: '' } as WorkProcessRow,
     })),
   ];
   // Each visible thinking block is its own row at the position it first streamed in.

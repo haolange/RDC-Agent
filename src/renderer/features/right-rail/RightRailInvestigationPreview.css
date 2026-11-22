@@ -1,48 +1,9 @@
-.investigation-preview-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin: 0;
-}
 
-.investigation-preview-meta div {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.investigation-preview-meta dt {
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-}
-
-.investigation-preview-meta dd {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  overflow-wrap: anywhere;
-}
 
 .investigation-preview-message {
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-}
-
-.investigation-preview-body {
-  margin: 0;
-  padding: var(--space-3);
-  overflow: auto;
-  border: 1px solid var(--token-border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--token-surface-sunken);
-  color: var(--token-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--type-body-size);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 .investigation-report {
@@ -75,7 +36,6 @@
 
 .investigation-report p:last-child { margin-bottom: 0; }
 
-
 .investigation-report-claims {
   margin: 0;
   padding-left: var(--space-4);
@@ -92,21 +52,6 @@
   gap: var(--space-1);
   margin-bottom: var(--space-2);
 }
-
-.investigation-report-index {
-  display: grid;
-  gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-}
-
-.investigation-report-index div {
-  display: grid;
-  grid-template-columns: minmax(6rem, 1fr) minmax(0, 3fr);
-  gap: var(--space-2);
-}
-
-.investigation-report-index dt { color: var(--token-text-secondary); }
-.investigation-report-index dd { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
 
 .investigation-report-tuple {
   display: grid;
@@ -139,13 +84,3 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
-.investigation-preview-meta dd {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.investigation-preview-meta dd code { min-width: 0; overflow-wrap: anywhere; }
-
-.investigation-preview-diagnostics .investigation-preview-body { margin-top: var(--space-3); }

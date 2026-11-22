@@ -103,4 +103,32 @@ describe('structural sharing', () => {
       vi.useRealTimers();
     }
   });
+
+  it('times a summary that arrives whole from its loop start instead of reading as an instant', () => {
+    vi.useFakeTimers();
+    try {
+      const ref = { protocol: 'fixture', providerBlockKey: 'output:reasoning:0', contentIndex: 0 };
+      const thinking = (text: string) => ({ text, kind: 'summary' as const, source: 'openai-responses-summary' as const, visibility: 'summary' as const });
+      vi.setSystemTime(1_000);
+      let trace = upsertLoopResult(undefined, 'loop', { status: 'streaming' });
+      vi.setSystemTime(4_200);
+      trace = upsertLoopThinkingItem(trace, 'loop', ref, thinking('**Planning the read**'), 'complete');
+      expect(trace.blocks[0]!.items?.[0]).toMatchObject({ startedAt: 1_000, completedAt: 4_200 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('records an answer the runtime sent back as commentary once the next loop starts', () => {
+    const ref = { protocol: 'fixture', providerBlockKey: 'output:text:0', contentIndex: 0 };
+    let trace = upsertLoopTextItem(undefined, 'loop-1', ref, 'Interim report', 'final_answer', 'complete');
+    trace = upsertLoopResult(trace, 'loop-1', { status: 'complete', stopReason: 'end_turn', outputPhase: 'final_answer' });
+    trace = upsertLoopTextItem(trace, 'loop-2', ref, 'Final report', 'final_answer', 'complete');
+    trace = upsertLoopResult(trace, 'loop-2', { status: 'complete', stopReason: 'end_turn', outputPhase: 'final_answer' });
+    const [first, second] = trace.blocks;
+    expect(first!.result?.outputPhase).toBe('commentary');
+    expect(first!.items?.[0]).toMatchObject({ kind: 'text', phase: 'commentary' });
+    expect(second!.result?.outputPhase).toBe('final_answer');
+    expect(second!.items?.[0]).toMatchObject({ kind: 'text', phase: 'final_answer' });
+  });
 });

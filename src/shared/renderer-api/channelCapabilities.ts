@@ -70,6 +70,8 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'knowledge:index:rebuild': 'mutation',
   'knowledge:candidates': 'read',
   'knowledge:candidateCreate': 'high-impact',
+  // A preview reads a file the renderer names; from a browser that is as sensitive as importing it.
+  'knowledge:previewImport': 'high-impact',
   'knowledge:import': 'high-impact',
   'knowledge:image': 'read',
   'knowledge:issueApprovalToken': 'high-impact',

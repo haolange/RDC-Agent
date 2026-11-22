@@ -5,128 +5,26 @@
 }
 
 .appearance-mode-tabs {
-  --ui-tabs-min-width: 6rem;
+  align-self: center;
+  --ui-tabs-min-width: 7rem;
 }
 
-.appearance-chrome-card {
-  min-width: 0;
-  max-width: 44rem;
-  padding: var(--space-4);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-card);
-  background: var(--token-bg-raised);
-  animation: appearance-editor-enter var(--duration-base) var(--ease-decelerate) both;
+/* Both themes side by side, each a live preview over its own editor; one column when the panel narrows. */
+.appearance-theme-editors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
   --color-field-columns: minmax(5rem, 0.24fr) minmax(0, 0.76fr);
   --color-field-justify: stretch;
 }
 
-@keyframes appearance-editor-enter {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: none; }
+.appearance-chrome-card {
+  min-width: 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .appearance-chrome-card { animation: none; }
-}
-
-/* One row per mode: its name, every preset as a tiny window, then 自定义. */
-.appearance-preset-rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.appearance-preset-row {
-  display: grid;
-  grid-template-columns: minmax(5rem, auto) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.appearance-preset-row-label {
-  color: var(--token-text-primary);
-}
-
-.appearance-preset-row-tiles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.appearance-preset-tile {
-  position: relative;
-  width: var(--space-12);
-  height: var(--space-8);
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--preset-surface);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.appearance-preset-tile:hover,
-.appearance-preset-tile:focus-visible {
-  border-color: var(--token-border-strong);
-}
-
-.appearance-preset-tile.is-selected {
-  border-color: var(--preset-accent);
-  box-shadow: 0 0 0 1px var(--preset-accent);
-}
-
-.appearance-preset-tile-side {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 30%;
-  background: color-mix(in srgb, var(--preset-ink) 8%, var(--preset-surface));
-}
-
-.appearance-preset-tile-line {
-  position: absolute;
-  top: 28%;
-  left: 38%;
-  width: 46%;
-  height: 3px;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--preset-ink) 45%, transparent);
-}
-
-.appearance-preset-tile-accent {
-  position: absolute;
-  bottom: 22%;
-  left: 38%;
-  width: 28%;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: var(--preset-accent);
-}
-
-.appearance-preset-customize {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--token-text-secondary);
-  transition: color var(--transition-fast), background var(--transition-fast);
-}
-
-.appearance-preset-customize:hover,
-.appearance-preset-customize:focus-visible {
-  background: var(--token-interactive-hover);
-  color: var(--token-text-primary);
-}
-
-
-.appearance-preferences.settings-block {
-  border: 0;
-  border-top: 1px solid var(--token-border-muted);
-  border-radius: 0;
-  background: transparent;
-  padding: var(--space-4) 0 0;
+.appearance-chrome-card + .appearance-chrome-card {
+  border-left: 1px solid var(--token-border-muted);
+  padding-left: var(--space-6);
 }
 
 .appearance-chrome-header {
@@ -136,6 +34,14 @@
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
+}
+
+.appearance-chrome-title {
+  margin: 0;
+  color: var(--token-text-primary);
+  font-size: var(--type-reading-size);
+  font-weight: var(--font-semibold);
+  line-height: var(--type-reading-line);
 }
 
 .appearance-chrome-actions {
@@ -148,14 +54,44 @@
 .appearance-chrome-fields {
   display: grid;
   gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 
+.appearance-preset-picker,
 .appearance-text-field,
 .appearance-contrast-field {
   display: grid;
-  grid-template-columns: minmax(120px, 160px) 1fr;
+  grid-template-columns: minmax(5rem, 0.24fr) minmax(0, 0.76fr);
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
+}
+
+.appearance-preset-dropdown {
+  min-width: 0;
+}
+
+.appearance-preset-trigger {
+  min-height: var(--control-height-md);
+  min-width: 148px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-full);
+  background: var(--token-bg-panel);
+  box-shadow: none;
+  gap: var(--space-2);
+}
+
+.appearance-preset-trigger:hover:not(:disabled),
+.appearance-preset-trigger[aria-expanded='true'],
+.appearance-preset-trigger:focus-visible {
+  border-color: var(--token-border-strong);
+  background: var(--token-bg-raised);
+  box-shadow: none;
+}
+
+.appearance-preset-menu .dropdown-select-menu-caret::before {
+  background: var(--token-bg-overlay);
 }
 
 .appearance-text-field .input {
@@ -174,6 +110,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.appearance-preferences.settings-block {
+  border: 0;
+  border-top: 1px solid var(--token-border-muted);
+  border-radius: 0;
+  background: transparent;
+  padding: var(--space-4) 0 0;
+}
+
 .appearance-preferences .settings-preference-list {
   display: grid;
   gap: 0;
@@ -187,22 +131,26 @@
   border-top: 1px solid var(--token-border-muted);
 }
 
-@container settings-panel (max-width: 48rem) {
-  .appearance-chrome-card {
+@container settings-panel (max-width: 60rem) {
+  .appearance-theme-editors {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .appearance-chrome-card + .appearance-chrome-card {
+    border-left: 0;
+    border-top: 1px solid var(--token-border-muted);
+    padding: var(--space-5) 0 0;
+  }
+}
+
+@container settings-panel (max-width: 36rem) {
+  .appearance-theme-editors {
     --color-field-columns: 1fr;
   }
 
-  .appearance-chrome-card .appearance-text-field,
-  .appearance-chrome-card .appearance-contrast-field {
+  .appearance-preset-picker,
+  .appearance-text-field,
+  .appearance-contrast-field {
     grid-template-columns: 1fr;
-  }
-
-  .appearance-preset-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .appearance-preset-row-tiles {
-    grid-column: 1 / -1;
-    grid-row: 2;
   }
 }

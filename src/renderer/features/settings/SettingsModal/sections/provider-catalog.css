@@ -4,3 +4,87 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+
+.settings-provider-search.ui-search-field {
+  width: 100%;
+  max-width: 28rem;
+}
+
+/* Services in groups: a title, one sentence on what the group is, then a grid of cards. */
+.settings-provider-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-provider-group + .settings-provider-group {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-provider-group-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.settings-provider-group-title {
+  margin: 0;
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--font-semibold);
+}
+
+.settings-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.settings-provider-upcoming {
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--token-surface-sunken);
+}
+
+.settings-provider-upcoming-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  cursor: pointer;
+}
+
+.settings-provider-upcoming-summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.settings-provider-upcoming-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.settings-provider-upcoming .settings-provider-card {
+  opacity: 0.7;
+}
+
+/* Connection status, then the one quiet copy action for the service's technical identity. */
+.settings-provider-connection-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@container settings-panel (max-width: 36rem) {
+  .settings-provider-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

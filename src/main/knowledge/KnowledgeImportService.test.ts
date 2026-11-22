@@ -101,6 +101,20 @@ describe('KnowledgeImportService', () => {
     expect(readFileSync(path.join(spaceRoot, 'cases', 'dup-case.md'), 'utf8')).toBe(before);
   });
 
+  it('previews the same judgments the import makes without writing anything', async () => {
+    const spaceRoot = tempRoot('rdc-know-import-preview-');
+    const importer = createDisposableImportService({ spaceRoot });
+    await importer.importToSpace({ spaceId: 'user', source: caseYaml('kept-case', 'Kept', 'first symptoms') });
+    const before = readdirSync(path.join(spaceRoot, 'cases')).sort();
+    const changed = await importer.previewImport({ spaceId: 'user', source: caseYaml('kept-case', 'Kept, edited', 'second symptoms') });
+    expect(changed.items.map((item) => [item.status, item.reason])).toEqual([['conflict', 'duplicate-case-id']]);
+    const fresh = await importer.previewImport({ spaceId: 'user', source: caseYaml('new-case', 'New card') });
+    expect(fresh.items.map((item) => [item.status, item.reason, item.record?.title])).toEqual([['draft', undefined, 'New card']]);
+    expect(readdirSync(path.join(spaceRoot, 'cases')).sort()).toEqual(before);
+    const imported = await importer.importToSpace({ spaceId: 'user', source: caseYaml('new-case', 'New card') });
+    expect(imported.items.map((item) => [item.status, item.reason])).toEqual(fresh.items.map((item) => [item.status, item.reason]));
+  });
+
   it('quarantines secrets and absolute paths without writing the space', async () => {
     const spaceRoot = tempRoot('rdc-know-import-q-');
     const importer = createDisposableImportService({ spaceRoot });

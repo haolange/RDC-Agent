@@ -1,7 +1,6 @@
 /* Work Process transcript presentation - canonical runtime view */
 .work-process {
-  /* Working fills the assistant stack, which the conversation inset already narrows on both sides, so its
-     cards end level with the Composer's inner content. */
+  /* Working fills the assistant stack edge to edge, level with the Composer frame; only its rail hangs outside. */
   position: relative;
   width: 100%;
   max-width: 100%;
@@ -259,6 +258,9 @@
 
 .work-process-viewport.is-following > .work-process-viewport-scroller {
   max-height: min(40vh, 360px);
+  /* A scroller clips horizontally too; it reaches into the gutter so the hanging rail stays visible. */
+  margin-inline-start: calc(var(--work-rail-hang) * -1 - var(--space-4) / 2);
+  padding-inline-start: calc(var(--work-rail-hang) + var(--space-4) / 2);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;

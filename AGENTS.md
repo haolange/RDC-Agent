@@ -174,7 +174,7 @@
 
 - **Appearance**：规则见 `docs/ui/design-system.md` 的「双体系」，验收见 `docs/ui/appearance-checklist.md`；禁止恢复 translucent / semi-transparent sidebar。
 - **Token**：引用语义 token（`--token-*`），不直接用 primitive token，不写字面颜色；字号只用四个排版角色 `var(--type-title|reading|body|meta-size)`，间距、圆角、控件高度分别用 `var(--space-*)`、`var(--radius-*)`、`var(--control-height-*)`。门禁：`pnpm run check:design-tokens`。
-- **信息克制**：默认画面只放动词加对象的标题、状态、耗时与主要动作；ID、哈希、`session://`、协议、状态码、字节数与原始枚举只进每个对象唯一的「诊断」。不写说明小字，需要解释的用 `data-tooltip`（`ui/TooltipHost`）或 `HelpTip`；不用原生 `title`。审美契约与三层归属见 `docs/ui/design-system.md`。
+- **信息克制**：默认画面只放动词加对象的标题、状态、耗时与主要动作；ID、哈希、`session://`、协议、状态码、字节数与原始枚举不上任何界面，只经「⋯ › 复制诊断信息」或错误旁的「复制详情」进剪贴板（`patterns/CopyDiagnostics`），不做「诊断」折叠块。需要解释的用次级正文写在标签下，悬停提示（`data-tooltip`，`ui/TooltipHost`）只补充信息或显示被截断的全文；不用原生 `title`。视觉原则见 `DESIGN.md`，审美契约见 `docs/ui/design-system.md`。
 - **图标与动效**：图标只来自 `ui/Icon`（展开箭头用 `ui/Chevron`），不内联 SVG、不用文字当图标；一条 transition 只写一条缓动，进场必有退场。门禁：`pnpm run check:ui-contract`。
 - **按钮**：动作按钮用 `<Button>`（`.button` + variant）。
 - **状态类**：一律 `is-*` 并配对应 `aria-*`。

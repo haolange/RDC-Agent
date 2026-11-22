@@ -54,7 +54,6 @@ export function KnowledgeCardImage({
         ) : (
           <div className="knowledge-card-image-missing" role="img" aria-label={t('knowledgeCenter.imageMissing')}>
             <span>{t('knowledgeCenter.imageMissing')}</span>
-            <code>{path}</code>
           </div>
         )}
       </div>

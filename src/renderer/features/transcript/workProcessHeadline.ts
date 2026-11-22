@@ -41,7 +41,8 @@ export function toolHeadline(row: ToolRowModel, t: Translator): string {
   if (row.planReview || row.approval?.status === 'pending' || row.imageCalls) return row.verb;
   const target = row.target.trim();
   if (!target) return row.verb;
-  if (row.family === 'file' && name !== 'artifact_read') return `${row.verb} ${shorten(fileName(target))}`;
+  if (name === 'artifact_read') return t('chat.toolHeadlineObject', { verb: row.verb, object: target });
+  if (row.family === 'file') return `${row.verb} ${shorten(fileName(target))}`;
   if (row.family === 'search') return t('chat.toolHeadlineQuoted', { verb: row.verb, object: shorten(target) });
   return row.verb;
 }

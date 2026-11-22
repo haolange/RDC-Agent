@@ -39,9 +39,10 @@ it('disables empty and pending submission, rejects duplicate Enter, and retains 
   act(() => document.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(reference).toHaveBeenCalledExactlyOnceWith('project', 'D:/original/capture.rdc');
   await act(async () => finish({ success: false, error: 'SOURCE_CHANGED' }));
-  // The alert leads with a human sentence; the raw reason stays under diagnostics.
+  // The alert leads with a human sentence; the raw reason leaves only through its copy action.
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('app.error.actionFailed');
-  expect(document.querySelector('[role="alert"]')?.querySelector('.ui-inline-error-detail-text')?.textContent).toBe('SOURCE_CHANGED');
+  expect(document.querySelector('[role="alert"]')?.textContent).not.toContain('SOURCE_CHANGED');
+  expect(document.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
   expect(document.querySelector('input')!.value).toBe('D:/original/capture.rdc');
   expect(button().disabled).toBe(false); expect(close).not.toHaveBeenCalled(); expect(registered).not.toHaveBeenCalled();
   reference.mockResolvedValue({ success: true, inputs: [] });

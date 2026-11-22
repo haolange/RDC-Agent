@@ -1,18 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
-import { copyAppText } from '../../hooks/appShellBridge';
-import { useUiLabels } from '../../lib/useUiLabels';
 import { formatBytes } from '../../lib/formatBytes';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 import { DevicePreparationStatus, isDevicePreparing, isDeviceInstallationUnconfirmed } from '../../patterns/DevicePreparationStatus';
+import { CopyDiagnosticsButton } from '../../patterns/CopyDiagnostics';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { Icon } from '../../ui/Icon';
-import { CopyButton } from '../../ui/CopyButton';
-import { Details } from '../../ui/Details';
 import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
 import { errorDetail } from '../../lib/errorDetail';
@@ -33,18 +30,9 @@ import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@share
 import './CaptureReplay.css';
 
 type Action = 'open' | 'close' | 'refresh' | 'image';
-const copied = (value: string) => async () => {
-  try {
-    await copyAppText(value);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdcContextPanelViewModel }) {
   const { t, language } = useI18n();
-  const labels = useUiLabels();
   const { state, selection, error: connectionError, actionFailure, reload, receive } = useCaptureReplay(scope);
   const recovery = useCaptureRecovery(scope, state?.revision);
   const devices = useDeviceStore((value) => value.devices);
@@ -136,7 +124,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     {recovery.status && <div className="capture-replay-callout is-warning" aria-live="polite">
       <div className="capture-replay-callout-copy"><strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
         <small>{recovery.status.original
-          ? [recovery.status.original.fileName, deviceLabel(recovery.status.original.deviceId), t('control.replay.eventNumber', { id: recovery.status.original.eventId })].join(' · ')
+          ? [recovery.status.original.fileName, deviceLabel(recovery.status.original.deviceId)].join(' · ')
           : t('control.replay.recoveryNoCapture')}</small></div>
       <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} data-tooltip={t('control.replay.recoveryDescription')} onClick={() => {
         if (!state) return;
@@ -150,21 +138,17 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />
     <CaptureReplayCallouts
       callouts={callouts}
-      detailLabel={t('device.prepare.details')}
       disabled={disabled}
       retryLabels={{ open: t('control.replay.retryOpen'), close: t('control.replay.retryClose'), image: t('control.replay.retryImage') }}
       onRetry={(operation) => void run(operation)}
     />
     <CaptureWorkspace scope={scope} state={state}
       disabled={disabled || !open || pending || state?.error?.retry === 'close'} receive={receive} />
-    <Details className="capture-replay-diagnostics" summary={labels.diagnostics}>
-      <dl className="capture-replay-diagnostics-list">
-        <div><dt>{t('control.replay.contextId')}</dt><dd>{state?.contextId ? <><code>{state.contextId}</code>
-          <CopyButton onCopy={copied(state.contextId)} label={t('control.replay.copyContext')} copiedLabel={t('control.rightRail.artifacts.copied')} /></> : '—'}</dd></div>
-        <div><dt>{t('control.replay.deviceId')}</dt><dd><code>{actualDeviceId}</code></dd></div>
-        {selectedInput ? <div><dt>{t('control.replay.inputPath')}</dt><dd><code>{selectedInput.filePath}</code></dd></div> : null}
-      </dl>
-    </Details>
+    <CopyDiagnosticsButton className="capture-replay-copy-diagnostics" testId="capture-replay-copy-diagnostics" facts={[
+      { label: t('control.replay.contextId'), value: state?.contextId },
+      { label: t('control.replay.deviceId'), value: actualDeviceId },
+      { label: t('control.replay.inputPath'), value: selectedInput?.filePath },
+    ]} />
   </div>;
 }
 

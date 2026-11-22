@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { MeasuredWorkRows } from './MeasuredWorkRows';
 import { ToolRow } from './WorkProcessRowParts';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
+import { WorkProcessFoldProvider } from './workProcessFold';
 import type { WorkProcessRow } from './workProcessTypes';
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 it('crosses the 24/25 row boundary without duplicate events or losing user disclosure', async () => {
@@ -71,4 +72,26 @@ it('follows the scroller when the Working window switches between following and 
     await render(true);
     expect([...listening]).toEqual([inner]);
   } finally { await act(async () => root.unmount()); transcript.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); }
+});
+
+it('renders every row of a folded Working, so the reply at its end is never windowed away', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'); host.className = 'chat-messages'; document.body.append(host);
+  const root = createRoot(host);
+  const rows: WorkProcessRow[] = Array.from({ length: 60 }, (_, i) => ({ type: 'tool', id: `folded-${i}`,
+    status: 'complete', verb: 'Read', category: 'task', icon: 'file-read', groupKind: 'task', family: 'file',
+    toolName: 'read_file', target: 'file.txt', duration: '', argsLines: ['file.txt'], previewLines: ['original'], rawLines: ['receipt'] }));
+  const render = (folded: boolean) => act(async () => root.render(createElement(ScopedWorkDisclosure, {
+    scope: 'folded-window', children: createElement(WorkProcessFoldProvider, { value: folded,
+      children: createElement(MeasuredWorkRows, { rows, className: 'work-process-steps',
+        renderRow: row => row.type === 'tool' ? createElement(ToolRow, { key: row.id, row }) : null }) }),
+  })));
+  try {
+    await render(false);
+    expect(host.querySelector('[data-virtualized="true"]')).not.toBeNull();
+    await render(true);
+    expect(host.querySelector('[data-virtualized="true"]')).toBeNull();
+    expect(host.querySelector('.work-process-row-spacer')).toBeNull();
+    expect(host.querySelectorAll('.work-card-trigger')).toHaveLength(60);
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

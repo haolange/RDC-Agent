@@ -3,7 +3,6 @@ import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
-import { ProximityGlow } from '../../ui/ProximityHost';
 import { WorkCardHeader } from './WorkCardHeader';
 import { getRowStatusLabel } from './workProcessStatus';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
@@ -57,7 +56,6 @@ export const ToolRow: React.FC<{
   // users expand individual cards when they want detail / Raw.
   const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`tool-${row.id}`, false);
   const verbLabel = toolHeadline(row, t);
-  const durationTitleFull = row.duration ? `${verbLabel} · ${row.duration}` : verbLabel;
   const approvalAttention = row.approval && row.approval.status !== 'approved'
     ? [row.approval.verb !== verbLabel ? row.approval.verb : '', row.approval.message].filter(Boolean).join(' · ')
     : '';
@@ -85,11 +83,10 @@ export const ToolRow: React.FC<{
           className={`work-process-tool-card status-${row.status}${expanded ? ' is-expanded' : ''}${canExpand ? ' is-expandable' : ''}${compact ? ' is-compact' : ''}${isBackgroundWait ? ' is-background-wait' : ''}${hasPayloadSurface ? ' has-payload' : ''}`}
           data-testid="work-process-tool-card"
           data-family={row.family}
-          data-proximity
+          data-locate
         >
-          <ProximityGlow />
           <WorkCardHeader onClick={toggleExpanded} expanded={canExpand ? expanded : undefined}
-            disabled={!canExpand} tooltip={durationTitleFull} duration={row.duration}
+            disabled={!canExpand} duration={row.duration} titleText={verbLabel}
             icon={<Icon name={row.icon} className="work-process-icon work-process-tool-card-icon" />}
             title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{verbLabel}</ActiveSignalText>}
             status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
