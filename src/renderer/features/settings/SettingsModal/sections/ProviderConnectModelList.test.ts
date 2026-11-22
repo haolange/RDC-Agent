@@ -6,7 +6,7 @@ import { translate } from '../../../../i18n/messages';
 import { reconcileCatalogProviders, resetCatalogProjection } from '../../../../stores/effectiveCatalogStore';
 import { ProviderConnectModelList } from './ProviderConnectModelList';
 import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
-import type { LlmProviderModel } from '@shared/types/settings';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
 const { read } = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../../../../platform/getElectronApi', () => ({ getElectronApi: () => undefined }));
@@ -16,8 +16,10 @@ vi.mock('../../../../services/effectiveCatalogService', () => ({
 
 afterEach(() => { resetCatalogProjection(); read.mockReset(); vi.unstubAllGlobals(); });
 
-const provider = { id: 'draft-service', catalogOwnership: 'discovered' as const, activeAccountId: undefined, protocol: 'OpenAIChatCompletions' as const,
-  isConfigured: false, serviceOperator: undefined, authMode: 'api_key' as const };
+const provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'> = {
+  id: 'draft-service', catalogOwnership: 'provider-managed', activeAccountId: undefined, protocol: 'OpenAICompatibleChatCompletions',
+  isConfigured: false, serviceOperator: 'Draft', authMode: 'api-key',
+};
 const model: LlmProviderModel = { id: 'model-a', label: 'Model A', enabled: true, availability: 'available' };
 const snapshot: EffectiveCatalogSnapshot = {
   scopeGeneration: 'scope', projectionVersion: 1, providerId: provider.id, accountId: `anonymous:${provider.id}`,
