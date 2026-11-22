@@ -10,7 +10,7 @@ import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
 import { usePresence } from '../../../ui/usePresence';
 import { useSettingsNavigationStore } from '../../../stores/settingsNavigationStore';
 import { useSettingsModal } from './useSettingsModal';
-import { ProviderDetail } from './sections/ProviderDetail';
+import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsCenterNav } from './SettingsCenterNav';
 import { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
 import { useSettingsNavigation } from './useSettingsNavigation';
@@ -57,7 +57,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleTestProviderDraft,
     handleSaveProviderConnection,
     handleStartAccountLogin,
-    handleDisconnectProvider,
   } = modal;
 
   const { pendingLeave, keepEditing, discardAndLeave, guardLeave, requestClose, setResourceDraftDirty } =
@@ -79,9 +78,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     layerId,
   });
 
-  // The selected provider's detail sits beside the provider list on the model services page.
-  const providerDetail = connectionDraft && connectionProvider ? (
-    <ProviderDetail
+  // A service's panel opens over the card grid; closing it returns to the grid.
+  const providerDialog = connectionDraft && connectionProvider ? (
+    <ProviderConnectDialog
       connectionDraft={connectionDraft}
       connectionProvider={connectionProvider}
       getResolvedProviderLabel={getResolvedProviderLabel}
@@ -96,7 +95,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
       onTest={handleTestProviderDraft}
       onSave={handleSaveProviderConnection}
       onStartAccountLogin={handleStartAccountLogin}
-      onDisconnect={handleDisconnectProvider}
       t={t}
     />
   ) : null;
@@ -179,8 +177,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
               <SettingsPageContent modal={modal} settings={settings} runtime={runtime}
                 resourceScope={resourceScope} setResourceScope={setResourceScope}
-                setResourceDraftDirty={setResourceDraftDirty}
-                selectedProviderId={connectionProvider?.id ?? null} providerDetail={providerDetail} />
+                setResourceDraftDirty={setResourceDraftDirty} />
             </div>
           </div>
         </div>
@@ -197,6 +194,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         />
       ) : null}
 
+      {providerDialog}
     </>,
     document.body,
   );

@@ -1,4 +1,3 @@
-import { HelpTip } from '../../../ui/HelpTip';
 import { GeneralSettings } from './sections/GeneralSettings';
 import { AppearanceSettings } from './sections/AppearanceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
@@ -8,7 +7,6 @@ import { McpServicesPanel } from './sections/McpServicesPanel';
 import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
 import { HooksSettings } from './sections/HooksSettings';
 import { PolicySettings } from './sections/PolicySettings';
-import type React from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import type { useSettingsModal } from './useSettingsModal';
 import type { useRdcRuntimeOverview } from './useRdcRuntimeOverview';
@@ -18,7 +16,7 @@ type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'handleAccountSave' | 'setLanguage' | 'globalInstructionsDraft' | 'setGlobalInstructionsDraft' | 'handleSavePersonalization' |
   'setTheme' | 'setFontScale' | 'setComposerMarkdown' |
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
-  'openProviderConnection' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
+  'openProviderConnection' | 'handleDisconnectProvider' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
   'handleAgentModelsChange' | 'previewAgentModelMigration' | 'handleCommitAgentOverrideFile' | 'loadAgentBuiltinComparison' |
   'previewProjectAgentTrust' | 'handleTrustProjectAgent' |
@@ -31,12 +29,9 @@ interface SettingsPageContentProps {
   resourceScope: 'user' | 'project';
   setResourceScope: (scope: 'user' | 'project') => void;
   setResourceDraftDirty: (dirty: boolean) => void;
-  /** The provider whose detail is open on the model services page, and that detail. */
-  selectedProviderId: string | null;
-  providerDetail: React.ReactNode;
 }
 export function SettingsPageContent({ modal, settings, runtime, resourceScope, setResourceScope,
-  setResourceDraftDirty, selectedProviderId, providerDetail }: SettingsPageContentProps) {
+  setResourceDraftDirty }: SettingsPageContentProps) {
   const {
     activeSection,
     t,
@@ -58,6 +53,7 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     providerCatalogCategories,
     getResolvedProviderLabel,
     openProviderConnection,
+    handleDisconnectProvider,
     agentManifestDrafts,
     agentManifestContextReady,
     setAgentManifestDrafts,
@@ -114,9 +110,8 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         providerCatalog={providerCatalog}
         providerCatalogCategories={providerCatalogCategories}
         getResolvedProviderLabel={getResolvedProviderLabel}
+        onDisconnectProvider={handleDisconnectProvider}
         onOpenProviderConnection={openProviderConnection}
-        selectedProviderId={selectedProviderId}
-        detail={providerDetail}
         t={t}
       />
     )}
@@ -154,10 +149,8 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     {activeSection === 'tools' && (
       <section className="settings-page settings-page-tools" data-settings-search="tools">
       <header className="settings-section-header">
-        <div className="settings-section-title-row">
-          <div className="settings-section-title">{t('settings.mcpServicesTitle')}</div>
-          <HelpTip label={t('settings.mcpServicesTitle')}>{t('settings.mcpServicesHint')}</HelpTip>
-        </div>
+        <div className="settings-section-title">{t('settings.mcpServicesTitle')}</div>
+        <p className="settings-section-description">{t('settings.mcpServicesHint')}</p>
       </header>
       <McpServicesPanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
       <ToolsSettings

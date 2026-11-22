@@ -1,5 +1,4 @@
 import { Button } from '../../../../ui/Button';
-import { HelpTip } from '../../../../ui/HelpTip';
 import type { LlmModelCapabilityProbeMode } from '@shared/types/settings';
 import type { ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 
@@ -13,10 +12,8 @@ export function ProviderModelProbe({ model, provider, t, probeMode, probeModes, 
   return (
     <div className="settings-model-capability-probe" data-testid={`settings-provider-model-probe-${model.id}`}>
       <div className="settings-model-preferences-heading">
-        <span className="settings-model-capability-section-label">
-          {t('settings.providers.capability.probe')}
-          <HelpTip label={t('settings.providers.capability.probe')}>{t('settings.providers.capability.probeHint')}</HelpTip>
-        </span>
+        <span className="settings-model-capability-section-label">{t('settings.providers.capability.probe')}</span>
+        <p className="settings-section-description">{t('settings.providers.capability.probeHint')}</p>
       </div>
       <div className="settings-model-capability-probe-actions">
         {probeModes.map((mode) => (

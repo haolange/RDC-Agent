@@ -11,7 +11,7 @@ import { getRdcOverview, revokeHook, testHook, trustHook } from './hooksSettings
 import { ResourceTrustBlock } from './ResourceTrustBlock';
 import { commandLine, hookEventLabel, timeoutSeconds } from './resourceLabels';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
-import { formFromContent } from './scopedResourceForm';
+import { formFromContent, resourceDisplayName } from './scopedResourceForm';
 import type { DiagnosticFact } from '../../../../patterns/CopyDiagnostics';
 import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 
@@ -104,7 +104,7 @@ export const HooksSettings: React.FC<{
       <div className="settings-runtime-detail" data-testid="settings-hook-detail">
         <header className="settings-runtime-detail-head">
           <div className="settings-runtime-detail-title">
-            <strong>{resource.id}</strong>
+            <strong>{resourceDisplayName('hook', resource.id, resource.content)}</strong>
             <span className="settings-runtime-detail-badges">
               {!form.enabled ? <Badge tone="warning">{t('settings.disabled')}</Badge> : null}
             </span>

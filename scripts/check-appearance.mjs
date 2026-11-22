@@ -230,9 +230,11 @@ const appearanceSource = scriptRead('src/renderer/features/settings/SettingsModa
 const appearanceChromeParts = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx');
 assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
 assert(!appearanceChromeParts.includes('appearance-preset-swatch'), 'Chrome parts must not keep a side-mounted preset Aa sibling');
-const appearancePresetRow = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx');
-assert(appearancePresetRow.includes('THEME_PRESET_CATALOG.map') && appearancePresetRow.includes('aria-pressed'), 'Each mode shows every preset as a pressable tile');
-assert(!appearanceChromeParts.includes('appearance-preset-picker'), 'The theme editor no longer repeats the preset picker the row already offers');
+// Both themes stay open side by side: a live preview over the full editor, with the preset picker in it.
+assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx')), 'The preset-tile row that folded the editors away is retired');
+assert(appearanceSource.includes('appearance-theme-editors') && !appearanceSource.includes('useState'), 'Appearance shows both theme editors at once, with no 自定义 toggle');
+assert(appearanceChromeParts.includes('AppearanceChromePreview') && appearanceChromeParts.includes('appearance-chrome-title'), 'Each theme card keeps its title and live preview');
+assert(appearanceChromeParts.includes('appearance-preset-picker') && appearanceChromeParts.includes('swatchColor'), 'Each theme card picks its preset with the Aa swatch dropdown');
 assert(!appearanceSource.includes('appearance-variant-tabs'), 'Appearance has one theme switch; the second Light / Dark tab row is gone');
 assert(!appearanceSource.includes('usePointerCursors'), 'The pointer cursor preference is retired');
 assert(appearanceChromeParts.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
@@ -301,7 +303,7 @@ for (const file of [
 }
 // Ids, paths, protocols and hashes never sit on a settings surface; they leave through one copy action.
 for (const file of [
-  'src/renderer/features/settings/SettingsModal/sections/ProviderDetail.tsx',
+  'src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx',
   'src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx',
   'src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx',
 ]) {

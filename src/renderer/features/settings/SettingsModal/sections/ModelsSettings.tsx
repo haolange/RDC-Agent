@@ -11,9 +11,8 @@ interface ModelsSettingsProps {
   providerCatalog: LlmProviderEntry[];
   providerCatalogCategories: ProviderCatalogCategory[];
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
+  onDisconnectProvider: (provider: LlmProviderEntry) => void | Promise<void>;
   onOpenProviderConnection: (provider: LlmProviderEntry) => void;
-  selectedProviderId: string | null;
-  detail: React.ReactNode;
   t: Translate;
 }
 

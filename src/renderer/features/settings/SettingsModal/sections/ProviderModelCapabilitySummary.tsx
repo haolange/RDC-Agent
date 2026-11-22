@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
-import { Details } from '../../../../ui/Details';
 import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
 import { errorDetail } from '../../../../lib/errorDetail';
 import { Skeleton } from '../../../../ui/Skeleton';
@@ -43,7 +42,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
 }) => {
   const [probeMode, setProbeMode] = useState<LlmModelCapabilityProbeMode | null>(null);
   const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
-  const chips = buildCapabilityChips(effectiveModel, t).filter((chip) => chip.label !== t('settings.providers.capability.route'));
+  const chips = buildCapabilityChips(effectiveModel, t);
   const contextChoices = effectiveModel ? resolveContextTierChoices(effectiveModel) : null;
   const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
     'default',
@@ -107,10 +106,8 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
           ) : null}
 
           <ProviderModelPreferences {...{ model, effectiveModel, snapshot, loading, onModelChange, t }} />
-          <Details className="settings-model-details" summary={t('settings.providers.capability.details')}>
-            <ProviderModelDetails {...{ model, effectiveModel, provider, t }} />
-            <ProviderModelProbe {...{ model, provider, t, probeMode, probeModes, runProbe }} />
-          </Details>
+          <ProviderModelDetails {...{ model, effectiveModel, t }} />
+          <ProviderModelProbe {...{ model, provider, t, probeMode, probeModes, runProbe }} />
           {probeResult && probeText ? (
             <div
               className={`settings-model-capability-probe-result settings-model-capability-probe-result--${probeResult.status}`}
@@ -118,7 +115,6 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
             >
               <strong>{probeText.status}</strong>
               {probeText.detail ? <span>{probeText.detail}</span> : null}
-              {probeText.tiers ? <span>{probeText.tiers}</span> : null}
             </div>
           ) : null}
           {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}

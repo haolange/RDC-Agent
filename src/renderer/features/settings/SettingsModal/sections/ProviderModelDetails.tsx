@@ -1,8 +1,8 @@
-import { buildContextTierRows, buildPricingRows, buildCapabilityEvidenceSummary } from '../modelCapabilitySummaryUtils';
-import { buildRouteOptionMeta } from '../utils';
+import { buildContextTierRows, buildPricingRows } from '../modelCapabilitySummaryUtils';
 import type { ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 
-export function ProviderModelDetails({ model, effectiveModel, provider, t }: Pick<ProviderModelCapabilitySummaryProps, 'model' | 'effectiveModel' | 'provider' | 't'>) {
+/** Context sizes with what the account is entitled to and what they cost, then the price list. */
+export function ProviderModelDetails({ model, effectiveModel, t }: Pick<ProviderModelCapabilitySummaryProps, 'model' | 'effectiveModel' | 't'>) {
   if (!effectiveModel) return null;
   const tiers = buildContextTierRows(effectiveModel, t);
   const pricing = buildPricingRows(effectiveModel, t);
@@ -15,9 +15,7 @@ export function ProviderModelDetails({ model, effectiveModel, provider, t }: Pic
             <strong>{tier.label}</strong>
             <span>{tier.limit}</span>
           </span>
-          <span className="settings-model-capability-tier-meta">
-            {[tier.entitlement, tier.activation, tier.cost].filter(Boolean).join(' · ')}
-          </span>
+          <span className="settings-model-capability-tier-meta">{[tier.entitlement, tier.cost].filter(Boolean).join(' · ')}</span>
         </div>
       ))}
     </div>
@@ -33,11 +31,5 @@ export function ProviderModelDetails({ model, effectiveModel, provider, t }: Pic
         ))}
       </div>
     ) : null}
-
-
-    {(effectiveModel.routeOptions ?? []).map((option) => <div className="settings-model-capability-note" key={option.id}>
-      {option.label} · {buildRouteOptionMeta(option, provider.serviceOperator, (owner) => t('settings.providers.capability.protocolOwner', { owner }))}
-    </div>)}
-    <div className="settings-model-capability-source">{buildCapabilityEvidenceSummary(effectiveModel, t)}</div>
   </div>;
 }

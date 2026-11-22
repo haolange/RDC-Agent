@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCapabilityChips,
-  buildCapabilityEvidenceSummary,
   buildContextTierRows,
   formatContextCapability,
   formatFastControl,
@@ -26,11 +25,7 @@ const t = (key: string, params?: Record<string, string | number>): string => {
     'settings.providers.capability.visionInput': 'Vision',
     'settings.providers.capability.structuredOutput': 'Structured',
     'settings.providers.capability.supported': 'Supported',
-    'settings.providers.capability.activationImplicit': 'Implicit',
-    'settings.providers.capability.activationHeader': 'Header',
-    'settings.providers.capability.activationRequest': 'Request parameter',
-    'settings.providers.capability.sourceCatalog': 'catalog',
-    'settings.providers.capability.sourceObserved': 'observed',
+    'settings.providers.capability.alwaysOn': 'Always on',
     'composer.effort.providerManaged': 'Provider-managed',
     'composer.effort.levelOff': 'Off',
     'composer.effort.levelOn': 'On',
@@ -42,12 +37,9 @@ const t = (key: string, params?: Record<string, string | number>): string => {
   };
   if (key === 'settings.providers.capability.providerDefault') return `Provider default (${params?.value})`;
   if (key === 'settings.providers.capability.lockedValue') return `${params?.value} (Locked)`;
-  if (key === 'settings.providers.capability.activationModel') return `Model ${params?.model}`;
-  if (key === 'settings.providers.capability.activationWithEntitlement') return `${params?.activation} · ${params?.entitlement}`;
   if (key === 'settings.providers.capability.contextRange') return `${params?.base} -> ${params?.maximum}`;
   if (key === 'settings.providers.capability.contextRangeUnverified') return `${params?.base} -> ${params?.maximum} (Unverified)`;
   if (key === 'settings.providers.capability.maxTierLabel') return `${params?.label} · Max mode`;
-  if (key === 'settings.providers.capability.sources') return `${params?.sources} @ ${params?.date}`;
   return labels[key] ?? key;
 };
 
@@ -97,18 +89,21 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
 }
 
 describe('modelCapabilitySummaryUtils', () => {
-  it('formats the revisioned EffectiveModel projection', () => {
+  it('says what a model can do without how the catalog learned it or how a control is wired', () => {
     const chips = buildCapabilityChips(model(), t);
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, On' }));
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'Model model-a-fast' }));
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'Supported' }));
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
+    // The model row already carries the context size; the route is not a capability.
+    expect(chips.map((chip) => chip.label)).not.toContain('Context');
+    expect(chips.map((chip) => chip.label)).not.toContain('Route');
+    expect(chips.map((chip) => chip.value).join(' ')).not.toMatch(/model-a-fast|Header|Request/u);
   });
 
   it('formats locked, provider-managed and unknown control semantics distinctly', () => {
     expect(formatFastControl(model({
       controls: { ...model().controls, fast: { state: 'fixed', fixedValue: true, entitlement: 'granted' } },
-    }), t)).toBe('Fast (Locked)');
+    }), t)).toBe('Always on');
     expect(formatFastControl(model({
       controls: { ...model().controls, fast: { state: 'provider-managed', fixedValue: true } },
     }), t)).toBe('Provider-managed');
@@ -154,8 +149,9 @@ describe('modelCapabilitySummaryUtils', () => {
     });
     expect(formatContextCapability(effective, t)).toBe('272k -> 1.1M (Unverified)');
     expect(buildContextTierRows(effective, t)).toContainEqual(expect.objectContaining({
-      id: 'long', label: 'Long · Max mode', entitlement: 'Unverified', activation: 'Header', tone: 'warning',
+      id: 'long', label: 'Long · Max mode', entitlement: 'Unverified', tone: 'warning',
     }));
+    expect(buildContextTierRows(effective, t).find((row) => row.id === 'long')).not.toHaveProperty('activation');
   });
 
   it('does not invent values without an EffectiveModel', () => {
@@ -178,13 +174,5 @@ describe('modelCapabilitySummaryUtils', () => {
       { id: 'provider-a', activeAccountId: 'account-b', protocol: 'AnthropicMessages' },
       'account-a',
     )).toBe(true);
-  });
-
-  it('summarizes the winning field-level provenance', () => {
-    expect(buildCapabilityEvidenceSummary(model({ provenance: [
-      { field: 'availability', source: 'catalog', observedAt: '2026-07-01T00:00:00.000Z' },
-      { field: 'availability', source: 'observed', observedAt: '2026-07-13T00:00:00.000Z' },
-      { field: 'controls.fast.state', source: 'catalog', observedAt: '2026-07-01T00:00:00.000Z' },
-    ] }), t)).toBe('observed, catalog @ 2026-07-13');
   });
 });

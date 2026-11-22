@@ -154,13 +154,18 @@ try {
 
   await step('connect-ollama', async () => {
     await openSettings(page, 'models');
-    await page.getByTestId('settings-provider-row-ollama').click();
-    const detail = page.getByTestId('settings-provider-detail');
-    await detail.getByRole('button', { name: /^(检查连接|Check connection)$/ }).click();
-    await page.waitForTimeout(3000);
-    await detail.getByRole('button', { name: /^(保存|连接|Save|Connect)$/ }).click();
-    await page.waitForTimeout(2500);
     await shot('03-settings-models');
+    // A service card opens its panel; checking the connection also discovers the models.
+    await page.getByTestId('settings-provider-connect-ollama').click();
+    const dialog = page.getByTestId('settings-provider-connect-dialog');
+    await dialog.getByRole('button', { name: /^(检查连接|Check connection)$/ }).click();
+    await page.waitForTimeout(3000);
+    await shot('03b-settings-provider-panel');
+    await dialog.getByRole('button', { name: /^(保存|连接|Save|Connect)$/ }).click();
+    await page.waitForTimeout(2500);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => undefined);
+    await shot('03c-settings-models-connected');
   });
   await step('settings-agents', async () => {
     await openSettings(page, 'agents');

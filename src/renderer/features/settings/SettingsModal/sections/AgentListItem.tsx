@@ -1,7 +1,6 @@
 import React from 'react';
 import { ListRow } from '../../../../ui/ListRow';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
-import { OverflowFade } from '../../../../ui/OverflowFade';
 import type { AgentMode, ModeIconKey } from '@shared/types/layout';
 import './AgentListItem.css';
 
@@ -31,8 +30,8 @@ export const AgentListItem: React.FC<AgentListItemProps> = ({
     )}
   >
     <span className="settings-agent-list-item-copy">
-      <span className="settings-agent-list-item-name" data-tooltip={name}>{name}</span>
-      <OverflowFade className="settings-agent-list-item-description" text={description} />
+      <span className="settings-agent-list-item-name">{name}</span>
+      {description ? <span className="settings-agent-list-item-description">{description}</span> : null}
     </span>
   </ListRow>
 );

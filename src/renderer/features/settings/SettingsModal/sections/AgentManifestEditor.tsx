@@ -10,6 +10,7 @@ import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
 import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { SettingsSection } from '../parts';
+import { Badge } from '../../../../ui/Badge';
 import { InlineError } from '../../../../ui/InlineError';
 import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
@@ -155,7 +156,14 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon ?? 'message-orbit'} size={20} strokeWidth={1.9} />
           </span>
           <div className="settings-agent-editor-copy">
-            <div className="settings-agent-editor-name">{selectedAgent.name}</div>
+            <div className="settings-agent-editor-name-row">
+              <span className="settings-agent-editor-name">{selectedAgent.name}</span>
+              {provenanceScope ? (
+                <Badge tone={provenanceScope === 'builtin' ? 'accent' : 'neutral'} variant="outline" data-testid="settings-agent-provenance">
+                  {provenanceLabel(provenanceScope, t)}
+                </Badge>
+              ) : null}
+            </div>
             {description ? <p className="settings-agent-editor-description">{description}</p> : null}
             {builtinUpdate ? (
               <div className="settings-agent-editor-override" data-testid="settings-agent-override"
@@ -218,9 +226,11 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 </span>
               </label>
               <label className="settings-agent-flag">
-                <span className="settings-field-label">{t('settings.disableModelInvocation')}</span>
+                <span className="settings-field-label">{t('settings.modelInvocable')}</span>
                 <span className="settings-switch-row">
-                  <Switch checked={selectedAgent.disableModelInvocation} onCheckedChange={(disableModelInvocation) => onUpdateAgent({ disableModelInvocation })} aria-label={t('settings.disableModelInvocation')} />
+                  {/* Asked positively; the manifest keeps its own field, so the switch inverts it. */}
+                  <Switch checked={!selectedAgent.disableModelInvocation}
+                    onCheckedChange={(callable) => onUpdateAgent({ disableModelInvocation: !callable })} aria-label={t('settings.modelInvocable')} />
                 </span>
               </label>
             </div>

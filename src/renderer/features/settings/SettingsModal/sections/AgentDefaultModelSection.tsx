@@ -1,12 +1,12 @@
-import { HelpTip } from '../../../../ui/HelpTip';
 import { InlineError } from '../../../../ui/InlineError';
+import { SettingsField } from '../parts';
 import { AgentModelBindingFields } from './AgentModelBindingFields';
 import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
-/** The model and reasoning level every Agent without its own setting runs with. */
+/** The model and reasoning level every Agent without its own setting runs with: an ordinary settings row. */
 export function AgentDefaultModelSection({ settings, error, onChange, t }: {
   settings: AppSettings;
   error: string | null;
@@ -14,19 +14,17 @@ export function AgentDefaultModelSection({ settings, error, onChange, t }: {
   t: Translate;
 }) {
   return (
-    <section className="settings-agent-defaults" data-testid="settings-agent-default-model" aria-labelledby="settings-agent-defaults-title">
-      <div className="settings-agent-defaults-copy">
-        <h3 id="settings-agent-defaults-title" className="settings-agent-defaults-title">{t('settings.agentDefaultModelTitle')}</h3>
-        <HelpTip label={t('settings.agentDefaultModelTitle')}>{t('settings.agentDefaultModelHint')}</HelpTip>
-      </div>
-      <AgentModelBindingFields
-        binding={settings.agentModels.default}
-        options={settings.agents.modelOptions}
-        onChange={onChange}
-        testIdPrefix="settings-agent-default"
-        t={t}
-      />
+    <div className="settings-agent-defaults" data-testid="settings-agent-default-model">
+      <SettingsField layout="row" label={t('settings.agentDefaultModelTitle')} description={t('settings.agentDefaultModelHint')}>
+        <AgentModelBindingFields
+          binding={settings.agentModels.default}
+          options={settings.agents.modelOptions}
+          onChange={onChange}
+          testIdPrefix="settings-agent-default"
+          t={t}
+        />
+      </SettingsField>
       {error ? <InlineError>{error}</InlineError> : null}
-    </section>
+    </div>
   );
 }

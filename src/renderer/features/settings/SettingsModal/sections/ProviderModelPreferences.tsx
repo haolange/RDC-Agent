@@ -1,7 +1,6 @@
 import { getReasoningSelectionOrder, type ReasoningSelection } from '@shared/types/modelCapability';
 import { Select } from '../../../../ui/Select';
 import { Input } from '../../../../ui/Input';
-import { HelpTip } from '../../../../ui/HelpTip';
 import { SettingsField } from '../parts';
 import { formatReasoningDefault, getReasoningLabelKey } from '../modelCapabilitySummaryUtils';
 import { getProviderProtocolLabel } from '../utils';
@@ -31,18 +30,20 @@ export function ProviderModelPreferences({ model, effectiveModel, snapshot, load
   return <section className="settings-model-preferences" data-testid={`settings-provider-model-preferences-${model.id}`}>
     <div className="settings-model-preferences-heading">
       <span className="settings-model-capability-section-label">{t('settings.providers.capability.preferences')}</span>
-      <HelpTip label={t('settings.providers.capability.preferences')}>{t('settings.providers.capability.preferencesHint')}</HelpTip>
+      <p className="settings-section-description">{t('settings.providers.capability.preferencesHint')}</p>
     </div>
     <div className="settings-model-preferences-grid">
-      <SettingsField label={t('settings.providers.capability.route')} help={t(routeOptions.length > 1 ? 'settings.providers.capability.routeHint' : 'settings.providers.capability.routeReadonlyHint')}>
-        {routeOptions.length > 1 ? <Select
-          dataTestId={`settings-model-route-${model.id}`} ariaLabel={t('settings.providers.capability.route')}
-          value={selectedRouteOptionId} disabled={loading || snapshot?.refreshing}
-          onChange={(value) => onModelChange({ preferredRouteOptionId: value || undefined })}
-          options={routeOptions.map((option) => ({ value: option.id,
-            label: option.label ?? getProviderProtocolLabel(option.route.protocol), disabled: option.availability !== 'available' }))}
-        /> : <span className="settings-model-route-readonly">{routeOptions[0]?.label ?? getProviderProtocolLabel(effectiveModel.route.protocol)}</span>}
-      </SettingsField>
+      {routeOptions.length > 1 ? (
+        <SettingsField label={t('settings.providers.capability.route')} description={t('settings.providers.capability.routeHint')}>
+          <Select
+            dataTestId={`settings-model-route-${model.id}`} ariaLabel={t('settings.providers.capability.route')}
+            value={selectedRouteOptionId} disabled={loading || snapshot?.refreshing}
+            onChange={(value) => onModelChange({ preferredRouteOptionId: value || undefined })}
+            options={routeOptions.map((option) => ({ value: option.id,
+              label: option.label ?? getProviderProtocolLabel(option.route.protocol), disabled: option.availability !== 'available' }))}
+          />
+        </SettingsField>
+      ) : null}
       <SettingsField label={t('settings.providers.capability.defaultReasoning')}>
         <Select dataTestId={`settings-model-reasoning-${model.id}`} ariaLabel={t('settings.providers.capability.defaultReasoning')}
           value={reasoningDefaultUnverified ? '' : model.defaultReasoningSelection ?? ''} disabled={reasoningOptions.length <= 1}
@@ -50,7 +51,7 @@ export function ProviderModelPreferences({ model, effectiveModel, snapshot, load
           options={[{ value: '', label: formatReasoningDefault(reasoning ?? null, t) },
             ...reasoningOptions.map((selection) => ({ value: selection, label: t(getReasoningLabelKey(selection)) }))]} />
       </SettingsField>
-      <SettingsField label={t('settings.providers.capability.clientBudget')} help={t('settings.providers.capability.clientBudgetHint', { value: effectiveModel.defaultBudgetTokens })}>
+      <SettingsField label={t('settings.providers.capability.clientBudget')} description={t('settings.providers.capability.clientBudgetHint', { value: effectiveModel.defaultBudgetTokens })}>
         <Input type="number" min={1} step={1000} aria-label={t('settings.providers.capability.clientBudget')}
           value={model.defaultBudgetTokens ?? ''} placeholder={String(effectiveModel.defaultBudgetTokens)}
           onChange={(event) => updateBudget(event.target.value)} />

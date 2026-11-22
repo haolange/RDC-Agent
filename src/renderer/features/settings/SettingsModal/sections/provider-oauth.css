@@ -5,70 +5,22 @@
   gap: var(--space-3);
 }
 
-
-
-.settings-provider-oauth-technical {
-  overflow: hidden;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-surface-sunken);
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-}
-
-.settings-provider-oauth-technical > summary {
-  padding: var(--space-2) var(--space-3);
-  color: var(--token-text-secondary);
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.settings-provider-oauth-technical > summary:hover,
-.settings-provider-oauth-technical > summary:focus-visible {
-  color: var(--token-text-secondary);
-  background: color-mix(in srgb, var(--token-border-focus) 6%, var(--token-surface-sunken));
-}
-
-.settings-provider-oauth-technical > summary:active {
-  background: color-mix(in srgb, var(--token-border-focus) 10%, var(--token-surface-sunken));
-}
-
-.settings-provider-oauth-technical > summary:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset-inset);
-}
-
-.settings-provider-oauth-technical[open] > summary {
-  border-bottom: 1px solid var(--token-border-muted);
-  color: var(--token-text-secondary);
-}
-
-.settings-provider-oauth-detail-grid {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--space-2) var(--space-3);
-  align-items: center;
-  padding: var(--space-3);
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-}
-
-.settings-provider-oauth-detail-grid strong,
-.settings-provider-oauth-value {
-  min-width: 0;
-  color: var(--token-text-primary);
-}
-
-.settings-provider-oauth-value {
-  overflow-wrap: anywhere;
-  font-family: var(--font-mono);
-  font-size: var(--type-meta-size);
-}
-
 .settings-provider-oauth-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
+}
+
+/* Signed in: who, and on which plan, in one line. */
+.settings-provider-oauth-account {
+  margin: 0;
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+.settings-provider-oauth-diagnostics {
+  display: flex;
+  justify-content: flex-end;
 }

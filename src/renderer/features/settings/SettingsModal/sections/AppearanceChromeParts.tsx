@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { THEME_PRESET_CATALOG, getPresetChrome } from '@shared/theme/presets';
 import { serializeRdcThemeV1 } from '@shared/theme/rdcThemeV1';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Button } from '../../../../ui/Button';
 import { ColorField } from '../../../../ui/ColorField';
+import { Select } from '../../../../ui/Select';
 import { AppearanceFontField } from './AppearanceFontField';
 import { ThemeImportDialog } from './ThemeImportDialog';
-import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
+import type { ThemeChromeConfig, ThemePresetId, ThemeVariant } from '@shared/types/settings';
 import type { AppearanceTranslate } from './appearanceChromeModel';
 
 export type { AppearanceTranslate };
@@ -54,6 +56,21 @@ export function ChromeThemeCard(props: {
   const [importOpen, setImportOpen] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
+  const presetOptions = useMemo(
+    () => THEME_PRESET_CATALOG.map((preset) => ({
+      value: preset.id,
+      label: preset.label,
+      // The selected preset previews the live accent; the others show their own.
+      swatchColor: preset.id === props.chrome.presetId ? props.chrome.accent : preset[props.variant].accent,
+      testId: `appearance-preset-option-${props.variant}-${preset.id}`,
+    })),
+    [props.chrome.accent, props.chrome.presetId, props.variant],
+  );
+
+  const handlePreset = (presetId: ThemePresetId) => {
+    props.onChange({ ...getPresetChrome(presetId, props.variant), fonts: props.chrome.fonts });
+  };
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(serializeRdcThemeV1(props.chrome, props.variant));
@@ -72,6 +89,7 @@ export function ChromeThemeCard(props: {
   return (
     <div className="appearance-chrome-card" data-testid={`appearance-chrome-${props.variant}`}>
       <div className="appearance-chrome-header">
+        <h3 className="appearance-chrome-title">{title}</h3>
         <div className="appearance-chrome-actions">
           <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
             {props.t('settings.appearanceImport')}
@@ -89,6 +107,22 @@ export function ChromeThemeCard(props: {
       <AppearanceChromePreview chrome={props.chrome} variant={props.variant} label={title} />
 
       <div className="appearance-chrome-fields">
+        <div className="appearance-preset-picker">
+          <span className="settings-field-label">{props.t('settings.appearancePreset')}</span>
+          <Select
+            value={props.chrome.presetId}
+            options={presetOptions}
+            onChange={(value) => handlePreset(value as ThemePresetId)}
+            dataTestId={`appearance-preset-${props.variant}`}
+            ariaLabel={props.t('settings.appearancePreset')}
+            variant="inline"
+            menuAlign="end"
+            minMenuWidth={280}
+            className="appearance-preset-dropdown"
+            triggerClassName="appearance-preset-trigger"
+            menuClassName="settings-select-menu appearance-preset-menu"
+          />
+        </div>
         <ColorField
           label={props.t('settings.appearanceAccent')}
           areaLabel={props.t('settings.colorPickerArea')}

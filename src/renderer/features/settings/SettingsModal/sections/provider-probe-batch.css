@@ -33,9 +33,10 @@
 }
 
 .settings-provider-probe-title {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .settings-provider-probe-status,

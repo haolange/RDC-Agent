@@ -6,17 +6,14 @@ import {
 import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { formatPricePerMillion } from '@shared/utils/cost';
-import { getProviderProtocolLabel } from './utils';
 import type { useI18n } from '../../../i18n';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type {
-  CapabilityEvidenceSource,
   CapabilityState,
   ContextTier,
   EffectiveCatalogSnapshot,
   EffectiveModel,
   EntitlementState,
-  TierActivation,
 } from '@shared/types/providerCapability';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -26,16 +23,6 @@ const REASONING_LABEL_KEYS = {
   low: 'composer.effort.levelLow', medium: 'composer.effort.levelMedium', high: 'composer.effort.levelHigh',
   xhigh: 'composer.effort.levelExtra', max: 'composer.effort.levelMax',
 } as const satisfies Record<ReasoningSelection, Parameters<Translate>[0]>;
-
-const EVIDENCE_LABEL_KEYS = {
-  catalog: 'settings.providers.capability.sourceCatalog',
-  discovery: 'settings.providers.capability.sourceDiscovery',
-  overlay: 'settings.providers.capability.sourceOverlay',
-  entitlement: 'settings.providers.capability.sourceEntitlement',
-  observed: 'settings.providers.capability.sourceObserved',
-  'maintained-surface': 'settings.providers.capability.sourceMaintainedSurface',
-  user: 'settings.providers.capability.sourceUser',
-} as const satisfies Record<CapabilityEvidenceSource, Parameters<Translate>[0]>;
 
 export interface CapabilityChip {
   label: string;
@@ -48,7 +35,6 @@ export interface ContextTierRow {
   label: string;
   limit: string;
   entitlement: string;
-  activation: string;
   cost: string | null;
   tone: CapabilityChip['tone'];
 }
@@ -111,15 +97,6 @@ function formatEntitlement(entitlement: EntitlementState, t: Translate): string 
   return t('settings.providers.capability.unverified');
 }
 
-function formatActivation(activation: TierActivation, t: Translate): string {
-  switch (activation.kind) {
-    case 'header': return t('settings.providers.capability.activationHeader');
-    case 'body': return t('settings.providers.capability.activationBody');
-    case 'implicit':
-    default: return t('settings.providers.capability.activationImplicit');
-  }
-}
-
 export function formatContextCapability(model: EffectiveModel | null, t: Translate): string {
   if (!model) return t('settings.providers.capability.unknown');
   const choices = resolveContextTierChoices(model);
@@ -146,7 +123,6 @@ export function buildContextTierRows(model: EffectiveModel | null, t: Translate)
       : tier.label,
     limit: formatTierLimit(tier, t),
     entitlement: formatEntitlement(tier.entitlement, t),
-    activation: formatActivation(tier.activation, t),
     cost: typeof tier.costMultiplier === 'number'
       ? t('settings.providers.capability.costMultiplier', { multiplier: tier.costMultiplier })
       : null,
@@ -179,38 +155,16 @@ export function formatReasoningCapability(model: EffectiveModel | null, t: Trans
   return formatReasoningCapabilityValue(model?.controls.reasoning ?? null, t);
 }
 
+/** Whether fast mode is there for this model, in one word; how it is switched on is not the person's concern. */
 export function formatFastControl(model: EffectiveModel | null, t: Translate): string {
   if (!model || model.controls.fast.state === 'unknown') return t('settings.providers.capability.unknown');
   if (model.controls.fast.state === 'unsupported') return t('settings.providers.capability.unsupported');
   if (model.controls.fast.state === 'provider-managed') return t('composer.effort.providerManaged');
-  if (model.controls.fast.state === 'fixed') {
-    const activation = t('settings.providers.capability.lockedValue', {
-      value: t('settings.providers.capability.fastMode'),
-    });
-    return !model.controls.fast.entitlement || model.controls.fast.entitlement === 'granted'
-      ? activation
-      : t('settings.providers.capability.activationWithEntitlement', {
-          activation,
-          entitlement: formatEntitlement(model.controls.fast.entitlement, t),
-        });
-  }
-  const bindingId = model.resolvedControls?.fast.bindingId;
-  const binding = model.executionBindings?.find((candidate) => candidate.id === bindingId)
-    ?? model.executionBindings?.find((candidate) => candidate.when.fast === true);
-  const action = binding?.actions.find((candidate) => candidate.kind !== 'fixed');
-  const activation = model.controls.fast.label ?? (action?.kind === 'model-switch'
-    ? t('settings.providers.capability.activationModel', { model: action.targetModelId })
-    : action?.kind === 'client-tier'
-      ? t('settings.providers.capability.activationClientTier', { tier: action.tierId })
-      : action?.kind === 'unsupported'
-        ? t('settings.providers.capability.unsupported')
-        : t('settings.providers.capability.activationRequest'));
-  return model.controls.fast.entitlement === 'granted'
-    ? activation
-    : t('settings.providers.capability.activationWithEntitlement', {
-        activation,
-        entitlement: formatEntitlement(model.controls.fast.entitlement, t),
-      });
+  if (model.controls.fast.state === 'fixed') return t('settings.providers.capability.alwaysOn');
+  const entitlement = model.controls.fast.entitlement;
+  return !entitlement || entitlement === 'granted'
+    ? t('settings.providers.capability.supported')
+    : formatEntitlement(entitlement, t);
 }
 
 export function formatCapabilityState(state: CapabilityState | undefined, t: Translate): string {
@@ -236,7 +190,6 @@ function toolCallingTone(state: CapabilityState | undefined): CapabilityChip['to
 }
 
 export function buildCapabilityChips(model: EffectiveModel | null, t: Translate): CapabilityChip[] {
-  const context = formatContextCapability(model, t);
   const fast = formatFastControl(model, t);
   const fastState = model?.resolvedControls?.fast.state ?? model?.controls.fast.state;
   const fastTone = !model || fastState === 'unknown' || fastState === 'provider-managed'
@@ -249,14 +202,6 @@ export function buildCapabilityChips(model: EffectiveModel | null, t: Translate)
             ? 'warning'
             : 'positive';
   return [
-    {
-      label: t('settings.providers.capability.route'),
-      value: model ? (model.route.source === 'model'
-        ? t('settings.providers.capability.modelRoute', { protocol: getProviderProtocolLabel(model.route.protocol) })
-        : getProviderProtocolLabel(model.route.protocol)) : t('settings.providers.capability.unknown'),
-      tone: model?.route.source === 'model' ? 'positive' : 'default',
-    },
-    { label: t('settings.providers.capability.context'), value: context, tone: context === t('settings.providers.capability.unknown') ? 'warning' : 'positive' },
     {
       label: t('settings.providers.capability.reasoning'),
       value: formatReasoningCapability(model, t),
@@ -271,15 +216,4 @@ export function buildCapabilityChips(model: EffectiveModel | null, t: Translate)
     { label: t('settings.providers.capability.visionInput'), value: formatCapabilityState(model?.visionInput, t), tone: stateTone(model?.visionInput) },
     { label: t('settings.providers.capability.structuredOutput'), value: formatCapabilityState(model?.structuredOutput, t), tone: stateTone(model?.structuredOutput) },
   ];
-}
-
-export function buildCapabilityEvidenceSummary(model: EffectiveModel | null, t: Translate): string {
-  if (!model?.provenance.length) return t('settings.providers.capability.conservativeDefault');
-  const winners = new Map(model.provenance.map((evidence) => [evidence.field, evidence]));
-  const evidence = [...winners.values()];
-  const sources = [...new Set(evidence.map((entry) => entry.source))]
-    .map((source) => t(EVIDENCE_LABEL_KEYS[source]))
-    .join(', ');
-  const latest = evidence.map((entry) => entry.observedAt).sort().at(-1)?.slice(0, 10) ?? '';
-  return t('settings.providers.capability.sources', { sources, date: latest });
 }

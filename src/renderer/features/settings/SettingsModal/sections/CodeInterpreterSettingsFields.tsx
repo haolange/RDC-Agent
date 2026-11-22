@@ -60,7 +60,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterArgs')} help={t('settings.rdcCliArgsPrefixHint')}>
+        <SettingsField label={t('settings.codeInterpreterArgs')} description={t('settings.rdcCliArgsPrefixHint')}>
           <Input
             type="text"
             value={argsText}
@@ -71,7 +71,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterEnv')} help={t('settings.envLineHint')}>
+        <SettingsField label={t('settings.codeInterpreterEnv')} description={t('settings.envLineHint')}>
           <Textarea
             aria-label={t('settings.codeInterpreterEnv')}
             data-testid="settings-code-interpreter-env"
@@ -87,7 +87,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField className="settings-interpreter-artifacts" layout="row" label={t('settings.codeInterpreterArtifacts')} help={t('settings.codeInterpreterArtifactsHint')}>
+        <SettingsField className="settings-interpreter-artifacts" layout="row" label={t('settings.codeInterpreterArtifacts')} description={t('settings.codeInterpreterArtifactsHint')}>
           <Checkbox
             checked={draft.artifactsEnabled}
             onCheckedChange={(checked) => onChange({ ...draft, artifactsEnabled: checked })}

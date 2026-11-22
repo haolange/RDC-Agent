@@ -42,7 +42,6 @@ export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => (
   capabilities: provider.capabilities ? [...provider.capabilities] : undefined,
 });
 
-
 export const getEnabledModels = (provider?: Pick<LlmProviderEntry, 'models'> | null) =>
   provider?.models.filter((model) => model.enabled) ?? [];
 
@@ -115,22 +114,3 @@ export const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-export interface RouteOptionMeta {
-  endpointOwner?: string;
-  protocolOwner?: string;
-  authMode?: string;
-  baseUrl?: string;
-}
-
-export const buildRouteOptionMeta = (
-  option: RouteOptionMeta,
-  fallbackOperator: string,
-  protocolOwnerLabel: (owner: string) => string,
-): string => {
-  let endpoint = option.endpointOwner ?? fallbackOperator;
-  if (!option.endpointOwner && option.baseUrl) {
-    try { endpoint = new URL(option.baseUrl).host; } catch { /* retain fallback */ }
-  }
-  const wireOwner = option.protocolOwner ? protocolOwnerLabel(option.protocolOwner) : '';
-  return [wireOwner, endpoint, option.authMode].filter(Boolean).join(' · ');
-};

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { catalogScopeKey, useEffectiveCatalogStore } from '../../../../stores/effectiveCatalogStore';
 import { projectProviderModels } from '../providerModelProjection';
+import { InlineError } from '../../../../ui/InlineError';
 import { SearchField } from '../../../../ui/SearchField';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
 import type { useI18n } from '../../../../i18n';
@@ -66,14 +67,17 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   return (
     <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
       <div className="settings-model-section-header">
-        <span data-tooltip={t('settings.providerManagedModelCount', { available: availableModelCount, total: resolvedModels.length })}>
+        <span className="settings-model-section-title">
           {provider.catalogOwnership !== 'user-managed'
             ? t('settings.providers.capability.appManagedModels')
             : t('settings.providers.capability.userManagedModels')}
         </span>
+        <span className="settings-model-section-count">
+          {t('settings.providerManagedModelCount', { available: availableModelCount, total: resolvedModels.length })}
+        </span>
       </div>
       {snapshot?.lastRefreshError ? (
-        <div className="settings-provider-notice" role="status">{snapshot.lastRefreshError}</div>
+        <InlineError detail={snapshot.lastRefreshError}>{t('settings.providers.capability.refreshFailed')}</InlineError>
       ) : null}
       {allUnavailable ? (
         <div className="settings-provider-notice" data-testid="settings-provider-connect-unavailable-hint">
@@ -91,6 +95,14 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
             aria-label={t('settings.searchModelPlaceholder')}
             data-testid="settings-provider-model-search"
           />
+        </div>
+      ) : null}
+      {resolvedModels.length > 0 ? (
+        <div className="settings-model-columns" aria-hidden="true">
+          <span>{t('settings.providers.columns.availability')}</span>
+          <span>{t('settings.providers.columns.model')}</span>
+          <span>{t('settings.providers.columns.enabled')}</span>
+          <span>{t('settings.providers.columns.capability')}</span>
         </div>
       ) : null}
       <div className="settings-model-list scrollbar-thin" data-empty-label={t('settings.testBeforeSaveHint')} data-testid="settings-provider-model-list">

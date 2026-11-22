@@ -65,6 +65,22 @@
   line-height: var(--leading-tight);
 }
 
+/* What a field or section changes: one readable sentence, body size, secondary ink. */
+.settings-field-description,
+.settings-section-description {
+  margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+.settings-field-warning {
+  margin: 0;
+  color: var(--token-status-warning);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
 .settings-field-control {
   min-width: 0;
 }

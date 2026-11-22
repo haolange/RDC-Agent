@@ -1,15 +1,11 @@
 import { cn } from '../../../../lib/cn';
-import { HelpTip } from '../../../../ui/HelpTip';
 import type { ReactNode } from 'react';
 
 export interface SettingsFieldProps {
   label: ReactNode;
-  /** What the field means; shown behind the help tip beside the label, never as a line under it. */
-  help?: ReactNode;
-  /**
-   * A risk the user must see before changing the field (full access, deleting data…). The only explanation that stays
-   * on the page; settings keep at most a handful of these.
-   */
+  /** One sentence on what the field changes, in secondary body text under the label. */
+  description?: ReactNode;
+  /** A risk the user must see before changing the field (full access, deleting data…). */
   warning?: ReactNode;
   htmlFor?: string;
   search?: string;
@@ -21,7 +17,7 @@ export interface SettingsFieldProps {
 
 export function SettingsField({
   label,
-  help,
+  description,
   warning,
   htmlFor,
   search,
@@ -37,13 +33,12 @@ export function SettingsField({
       data-testid={testId}
     >
       <div className="settings-field-copy">
-        <div className="settings-field-label-row">{htmlFor ? (
+        {htmlFor ? (
           <label className="settings-field-label" htmlFor={htmlFor}>{label}</label>
         ) : (
           <div className="settings-field-label">{label}</div>
         )}
-        {help ? <HelpTip label={typeof label === 'string' ? label : ''}>{help}</HelpTip> : null}
-        </div>
+        {description ? <p className="settings-field-description">{description}</p> : null}
         {warning ? <p className="settings-field-warning">{warning}</p> : null}
       </div>
       <div className="settings-field-control">{children}</div>
