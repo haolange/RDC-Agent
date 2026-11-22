@@ -40,7 +40,10 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   const snapshot = projection?.snapshot ?? null;
   const loading = !projection || projection.loading;
   const loadFailed = Boolean(projection?.error);
-  useEffect(() => { void useEffectiveCatalogStore.getState().load(scope, false, true); }, [scope]);
+  // Settings reconciliation drops catalog entries of scopes that are not saved providers, which includes the draft this
+  // panel discovers against. The panel owns its scope, so it asks again whenever its entry is dropped.
+  const dropped = projection === undefined;
+  useEffect(() => { void useEffectiveCatalogStore.getState().load(scope, false, true); }, [scope, dropped]);
 
   const resolvedModels = useMemo(
     () => projectProviderModels(provider.catalogOwnership, models, snapshot),
