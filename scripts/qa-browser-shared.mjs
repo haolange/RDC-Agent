@@ -108,20 +108,23 @@ export function inspectPage() {
 }
 
 /**
- * Runs in the page: facts that may only live in 诊断 but show on the surface — internal addresses, long hashes and
- * HTTP status codes. User and model content, expanded technical layers and the run log are not the surface.
+ * Runs in the page: technical traces that must never reach a product surface — internal addresses, hashes, HTTP
+ * status codes, raw identifiers and enums, byte counts, receipt sentences and diagnostics disclosures. Content the
+ * person or the model wrote, code, the raw receipt layer of a work card and the run log are not the surface.
  */
 export function scanSurfaceForbidden() {
   const EXCLUDED = [
-    '.markdown-body', '.message-bubble-user', 'textarea', 'input',
-    '.knowledge-center-markdown', '.knowledge-center-meta-details', '.knowledge-center-index-diagnostics',
-    '.settings-diagnostics', '.ui-inline-error-detail', '.runtime-terminal-drawer',
-    '.work-process-tool-card-raw', '.work-process-subagent-raw', '.work-process-tool-card-expand',
+    '.markdown-body', '.message-bubble-user', 'textarea', 'input', 'code', 'pre', '.knowledge-center-markdown',
+    '.runtime-terminal-drawer', '.work-process-tool-card-raw', '.work-process-subagent-raw', '.work-process-tool-card-expand',
   ].join(', ');
   const PATTERNS = [
     ['internal-address', /session:\/\//u],
-    ['hash', /\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\b/iu],
+    ['hash', /\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{8,}\b/iu],
     ['http-status', /\bHTTP\s?[1-5]\d\d\b/u],
+    ['raw-identifier', /\b[a-z]{2,}(?:_[a-z0-9]{2,})+\b/u],
+    ['byte-count', /\b\d+(?:\.\d+)?\s?(?:B|KB|MB|GB|KiB|MiB|bytes)\b/u],
+    ['diagnostics-disclosure', /^(诊断|诊断详情|技术详情|Diagnostics|Technical details)$/u],
+    ['receipt-sentence', /已应用事件|Applied event|设备画面已同步|Device display synchronized|生效证据|Winning evidence/u],
   ];
   const hits = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);

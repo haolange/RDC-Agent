@@ -7,8 +7,10 @@
 // Usage (each instance's bootstrap token is single-use):
 //   node scripts/qa-ollama-stub.mjs &
 //   RDC_AGENT_BROWSER_QA_FULL_ACCESS=1 TMPDIR=/dev/shm pnpm run start:agent-browser > <log> 2>&1 &
-//   node scripts/qa-walkthrough.mjs <log> <shot-dir> [--capture <file.rdc>]
-// Screenshots go to <shot-dir>, which should live outside the repository.
+//   node scripts/qa-walkthrough.mjs <log> <shot-dir> [--capture <file.rdc>] [--knowledge <a.zip,b.zip>]
+// Screenshots go to <shot-dir>, which should live outside the repository. --knowledge imports real knowledge
+// packages (rdc.knowledge-package/1 zips kept outside the repository) through the product's import channel, so
+// the list, the reader and conflicts are judged on real case cards rather than the two pasted samples.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +21,7 @@ const args = process.argv.slice(2);
 const [logPath, shotDir] = args;
 if (!logPath || !shotDir) throw new Error('usage: qa-walkthrough.mjs <qa-log> <shot-dir> [--capture <file.rdc>]');
 const capture = args.includes('--capture') ? args[args.indexOf('--capture') + 1] : null;
+const knowledgePackages = args.includes('--knowledge') ? args[args.indexOf('--knowledge') + 1].split(',').filter(Boolean) : [];
 fs.mkdirSync(shotDir, { recursive: true });
 
 const { browser, page } = await openApp(logPath);
@@ -97,6 +100,7 @@ const knowledgeCase = (caseId, title, symptom) => [
 const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-qa-project-'));
 fs.mkdirSync(path.join(projectRoot, 'docs'));
 fs.writeFileSync(path.join(projectRoot, 'docs', 'frame.png'), gradientPng(480, 270));
+fs.writeFileSync(path.join(projectRoot, 'docs', 'notes.md'), '# 调查笔记\n\n- 这一帧只有一次 draw 调用。\n- 管线状态待回放后读取。\n');
 if (capture) fs.copyFileSync(capture, path.join(projectRoot, path.basename(capture)));
 
 try {
@@ -116,6 +120,24 @@ try {
     await page.locator('.knowledge-center-card-button').first().click();
     await page.getByTestId('knowledge-center-detail').waitFor({ timeout: 30_000 });
     await shot('02b-knowledge-cards');
+    await closeOverlays(page);
+  });
+  await step('knowledge-packages', async () => {
+    if (!knowledgePackages.length) return;
+    // The import channel is high-impact: the QA instance runs with full access and confirms in the main process.
+    for (const filePath of knowledgePackages) {
+      const result = await page.evaluate((file) => window.electronAPI.knowledge.import({ spaceId: 'user', filePath: file }), filePath);
+      console.log(`[walkthrough] knowledge package ${path.basename(filePath)}: ${JSON.stringify(result?.items?.map((item) => item.status) ?? result)}`);
+    }
+    await page.getByTestId('sidebar-knowledge-center-trigger').click();
+    await page.waitForTimeout(1200);
+    await shot('02c-knowledge-real-list');
+    await page.locator('.knowledge-center-card-button').filter({ hasText: /发白|发黑/ }).first().click();
+    await page.getByTestId('knowledge-center-detail').waitFor({ timeout: 30_000 });
+    await page.waitForTimeout(800);
+    await shot('02d-knowledge-real-reader');
+    await page.getByTestId('knowledge-center-detail').evaluate((node) => { node.scrollTop = node.scrollHeight / 2; });
+    await shot('02e-knowledge-real-reader-middle');
     await closeOverlays(page);
   });
 
@@ -247,10 +269,33 @@ try {
     await page.getByTestId('plan-card').last().click();
     await shot('13-plan-reader');
     await closeOverlays(page);
+    // A revision request produces the next revision in the same session; the CoT card follows it.
+    await page.locator('.composer-plan-review__feedback').fill('补上对照参考帧复核和未知项记录这两步。');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('plan-review-request-panel').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => undefined);
+    await page.getByTestId('plan-review-request-panel').waitFor({ timeout: 90_000 });
+    await page.waitForTimeout(800);
+    await shot('13b-plan-revised');
     await page.getByTestId('plan-review-request-panel').getByTestId('handoff-action-row').getByRole('button').first().click();
     await waitForText('它验证流式推理');
     await page.waitForTimeout(1200);
     await shot('14-plan-handoff');
+  });
+
+  await step('partial', async () => {
+    // An approved execution that can only finish part of its goal: one honest reply, no reports stacked inside Working.
+    await page.getByTestId('composer-mode-pill').click();
+    await page.getByRole('menuitemradio', { name: /Debugger/ }).or(page.getByRole('option', { name: /Debugger/ })).first().click();
+    await send('qa:partial 定位这一帧唯一的 draw 调用，并读取它的管线状态。');
+    await page.getByTestId('plan-review-request-panel').waitFor({ timeout: 90_000 });
+    await page.getByTestId('plan-review-request-panel').getByTestId('handoff-action-row').getByRole('button').first().click();
+    await waitForText('导入 capture 后，从事件树开始继续');
+    await page.waitForTimeout(1500);
+    await shot('14d-partial-settled');
+    await page.locator('.work-process-header').last().click();
+    await page.waitForTimeout(500);
+    await page.locator('.work-process-header').last().scrollIntoViewIfNeeded();
+    await shot('14e-partial-working');
   });
 
   await step('light', async () => {
