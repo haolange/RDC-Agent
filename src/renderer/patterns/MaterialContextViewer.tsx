@@ -1,8 +1,8 @@
 import React from 'react';
-import { CopyDiagnosticsButton } from './CopyDiagnostics';
 import { Button } from '../ui';
 import { TaskDialog } from '../ui/TaskDialog';
 import { useI18n } from '../i18n';
+import { CopyDiagnosticsButton } from './CopyDiagnostics';
 import type { MaterialContext } from '@shared/types/materialContext';
 import './MaterialContextEditor.css';
 
