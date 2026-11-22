@@ -5557,3 +5557,10 @@ S225（2026-10-23）阻塞审计：前轮S224有实际修复进展，本轮刷�
 - 结果：界面减法规格第 11 版的 U0–U15 全部落地；全量单测 645 个文件、4764 条通过（5 个文件、6 条按条件跳过），check:gates、check:contracts（250 条）、覆盖率 ratchet（行 80.84%、分支 70.32%）、生产构建与对 main 分叉点的 git diff 检查通过；Browser QA 完整走查通过，每张默认画面的表面扫描没有发现内部地址、长哈希或 HTTP 状态码，伪本地化与命令面板画面已截图。CI 与 Windows 实机走查不在本条范围内。
 - 证据：本地：`TMPDIR=/dev/shm npx vitest run`、`npm run check:gates`、`npm run check:contracts`、`npm run test:coverage && npm run check:coverage-ratchet`、`npm run build`、`RDC_DIFF_BASE=$(git merge-base HEAD origin/main) npm run check:git-diff`、`node scripts/qa-walkthrough.mjs <应用日志> <截图目录>`。
 - 人工介入：无；改前改后对照与动效录屏整理在私有页面中供验收。
+
+## 2026-11-22：UI Resync 2 本地验收（以 11-07 为视觉基准，云端 Linux）
+
+- 提交：`2e38d64d`
+- 结果：以 `c1c179d8` 为视觉基准恢复用户定下的设计（Working 内 CoT 计划卡、交接为普通用户消息、「计划已批准」面板、外观主题卡、模型服务卡片网格与面板、智能体分段控件、设置页副标题、知识导入导出）；撤掉「诊断」折叠块、回执句与等宽数据行，技术事实只经复制动作；复评挪进 `turn_complete`，已批准执行一个回合只出一份回复。全量单测 646 个文件、4775 条通过（5 个文件、6 条按条件跳过），check:contracts 250 条、覆盖率 ratchet（行 80.85%、分支 70.35%）、check:gates、生产构建与 git diff 检查通过；Browser QA 完整走查 43 屏通过（导入 4 个真实知识包），每屏表面扫描零命中，滚轮上滚断言通过。CI 与 Windows 实机走查不在本条范围内。
+- 证据：本地：`TMPDIR=/dev/shm pnpm test`、`pnpm run check:contracts`、`pnpm run test:coverage && pnpm run check:coverage-ratchet`、`RDC_SYSTEM_DEBT_BASE_REF=961dc7d3 RDC_DIFF_BASE=961dc7d3 pnpm run check:gates`、`pnpm run build`、`RDC_DIFF_BASE=961dc7d3 pnpm run check:git-diff`、`node scripts/qa-walkthrough.mjs <应用日志> <截图目录> --knowledge <四个知识包>`。
+- 人工介入：无。
