@@ -87,7 +87,16 @@
   font-size: var(--type-body-size);
 }
 
-/* The transition line names what is happening now with a live indicator, and fades in rather than popping. */
+.composer-transition-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Model availability has actionable consequences at the plan gate. */
 .composer-transition-status {
   display: flex;
   align-items: center;

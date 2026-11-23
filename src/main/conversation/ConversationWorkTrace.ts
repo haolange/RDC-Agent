@@ -1,5 +1,5 @@
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
-import { loopTextItems, loopThinkingItems, presentedTextPhase, sameProviderBlock, settleTextPhase, supersededAnswerLoopIds } from '@shared/conversation/loopItems';
+import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { normalizeWorkBlockKind, providerOutputRefKey } from './StoredWorkTrace';
@@ -127,18 +127,8 @@ function ensureLoopBlock(trace: ConversationWorkTrace, loopId: string): Conversa
     block = createWorkBlock(loopId, 'LLM turn', 'model', 'llm_turn');
     block.status = 'running';
     trace.blocks.push(block);
-    demoteSupersededAnswers(trace);
   }
   return block;
-}
-
-/** A new loop means the previous answer did not end the turn; its text is recorded as commentary. */
-function demoteSupersededAnswers(trace: ConversationWorkTrace): void {
-  for (const loopId of supersededAnswerLoopIds(trace.blocks)) {
-    const loop = writableBlock(trace, (entry) => entry.id === loopId)!;
-    loop.result = { ...loop.result!, outputPhase: 'commentary' };
-    for (const item of loop.items ?? []) if (item.kind === 'text') item.phase = presentedTextPhase(item.phase, true);
-  }
 }
 
 /** Text of one provider block. It keeps the position it first appeared at, whatever arrives later. */

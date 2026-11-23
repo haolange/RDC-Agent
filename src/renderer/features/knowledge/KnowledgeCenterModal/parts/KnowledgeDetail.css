@@ -60,7 +60,12 @@
 .knowledge-center-outline-link:focus-visible { color: var(--token-text-primary); }
 .knowledge-center-outline-link:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); border-radius: var(--radius-sm); }
 
-.knowledge-case-sections { display: flex; flex-direction: column; gap: var(--space-8); }
+.knowledge-case-tabs .ui-tabs-list {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.knowledge-case-tabs .ui-tabs-tab { flex: 0 0 auto; }
 .knowledge-case-section { scroll-margin-top: var(--space-5); color: var(--token-text-primary); font-size: var(--type-reading-size); line-height: var(--type-reading-line); }
 .knowledge-case-section > h2 { margin: 0 0 var(--space-3); color: var(--token-text-primary); font-size: var(--type-reading-size); font-weight: var(--font-semibold); line-height: var(--leading-tight); }
 .knowledge-case-section .knowledge-center-markdown-body,

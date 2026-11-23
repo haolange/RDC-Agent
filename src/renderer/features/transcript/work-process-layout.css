@@ -1,8 +1,9 @@
 /* Work Process transcript presentation - canonical runtime view */
 .work-process {
-  /* Working fills the assistant stack edge to edge, level with the Composer frame; only its rail hangs outside. */
+  --work-process-inset: var(--space-3);
   position: relative;
-  width: 100%;
+  width: calc(100% - 2 * var(--work-process-inset));
+  margin-inline: var(--work-process-inset);
   max-width: 100%;
   box-sizing: border-box;
   overflow: visible;
@@ -264,6 +265,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  scrollbar-gutter: stable both-edges;
 }
 
 .work-process-viewport.has-hidden-above > .work-process-viewport-scroller {

@@ -285,6 +285,7 @@ export const zhChat = {
   'chat.markdownMermaidLoading': '正在渲染图表…',
   'chat.markdownMermaidFailed': '图表渲染失败',
   'chat.planReviewCardKind': '计划',
+  'chat.planReviewProcessKind': '过程计划',
   'chat.planReviewStatusAwaiting': '待审阅',
   'chat.planReviewStatusApproved': '已批准',
   'chat.planReviewStatusRejected': '已拒绝',

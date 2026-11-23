@@ -57,7 +57,7 @@
 
 .settings-page-agents .settings-manifest-layout {
   align-items: stretch;
-  grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
+  grid-template-columns: clamp(14rem, 25%, 21rem) minmax(0, 1fr);
   flex: 1 1 auto;
   height: auto;
   min-height: 0;

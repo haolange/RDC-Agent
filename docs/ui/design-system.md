@@ -394,7 +394,7 @@ pnpm run typecheck
 
 浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 [`appearance-checklist.md`](appearance-checklist.md)）。验收前须重启最新 `start:agent-browser`，并删除该 QA project 下全部 session 后新建隔离 session。
 
-Knowledge Case 详情是一篇写好的文档：对照图为主视觉，章节按「现象 → 证据 → 根因 → 修复 → 验证」排列并各有形态，目录是一行安静的文字链接；空章节不出现，也不提示缺了哪些章。卡片信息使用带 aria-expanded 的统一 Button 展开。JSON 章节只在阅读层转为人话事实与列表（键与枚举转成词，工程标识按行内代码，内部引用不显示），普通 Markdown 和无法解析的内容保持原文，禁止回写或改变知识事实。细则见 `docs/ui/knowledge-center.md`。
+Knowledge Case 详情是一篇写好的文档：对照图为主视觉，章节按「现象 → 证据 → 根因 → 修复 → 验证」排列并各有形态，多章案例使用可横向滚动的下划线 Tabs，每次只展示选中章节。单章直接展示，空章省略。卡片信息使用带 aria-expanded 的统一 Button 展开。JSON 章节只在阅读层转为人话事实与列表（键与枚举转成词，工程标识按行内代码，内部引用不显示），普通 Markdown 和无法解析的内容保持原文，禁止回写或改变知识事实。细则见 `docs/ui/knowledge-center.md`。
 
 Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属性使用紧凑网格与行内列表；禁止递归缩进线和宽标签列。证据摘要常驻，来源及参数由统一按钮按需展开，不将编号、参数置于摘要之前占据正文。窄屏对照改为纵向排列。
 
@@ -422,7 +422,7 @@ Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28
 
 Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩。model-effort 菜单独随生效模型名 + 思考等级 hug，用 `max-width` 封顶（默认 12rem），`min-width: 0` 可压；胶囊 `width: auto`，不预留固定槽、不贯通 `width: 100%`。窄容器（`@container composer`，宽度 ≤560px / ≤420px）只收紧 `max-width`（8rem / 6rem），不用 `flex-basis` 预留槽。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；模型名只对实际溢出文本渐隐，完整名留在 `title`。
 
-计划卡使用 transcript-card padding/border/radius 与实色 token-bg-raised；标题左对齐，正文为连续、有界 Markdown 预览，短内容自然收缩、长内容裁切，无分节折叠、内部 URI 或卡内滚动。整卡为唯一阅读入口，提供键盘操作与焦点环，不另设阅读按钮。Composer 计划门使用紧凑决策列表与常驻修改意见输入，不重复标题/摘要，不以关闭或跳过隐式批准。
+计划卡共用 transcript-card padding/border/radius。正式交付卡保留完整标题层级和六行摘要。Working 中的同修订剪影使用次级表面、正文字号标题及四行摘要，并显示实际决策状态。标题左对齐，正文为连续、有界 Markdown 预览，短内容自然收缩、长内容裁切，无分节折叠、内部 URI 或卡内滚动。整卡为唯一阅读入口，提供键盘操作与焦点环，不另设阅读按钮。Composer 计划门使用紧凑决策列表与常驻修改意见输入，不重复标题/摘要，不以关闭或跳过隐式批准。
 
 计划阅读器左右严格对齐当前可见Composer的border-box，主内容顶部至少留space-4，像Context Window一样锚定Composer上方并留`--space-2`间距；实色卡片自然收缩，长正文按可用高度滚动，不铺满工作区，不模糊背景。几何由工作区上下文测量，经 `useDynStyle` 随布局、字体及视口变化更新，不使用固定 rem 宽高上限。全窗口透明点击层负责外部关闭，面板采用实色 `--token-bg-overlay`。标题、版本和操作栏固定，正文独立滚动，窄屏将标题与操作分行；保留 overlay stack、键盘焦点循环和关闭回焦。卡片尺寸、文字淡出与背景呈现须观察实际界面，computed style不能替代视觉验收。
 

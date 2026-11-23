@@ -33,6 +33,7 @@ type ComposerFooterProps = Pick<ComposerController,
   | 'handlePromptSend'> & Pick<React.ComponentProps<typeof ComposerAgentMenu>,
   'selectedAgentDefinition' | 'selectedAgentCapability' | 'activeAgentId' | 'setCurrentMode'> & {
   currentSession: React.ComponentProps<typeof ComposerModelEffortControl>['currentSession'];
+  transitionLabel: string;
 };
 
 function RegisteredContextUsageIndicator(
@@ -47,7 +48,7 @@ export function ComposerFooter({
   setSelectedAgentId, lastKnownUsage, usageEstimated, usageStale, preparedTurnContext,
   conversationPreparationPhase, selectedContextProfile, isComposerBusy, attachButtonLabel,
   primaryButtonDisabled, primaryButtonDescription, handlePrimaryStop, handleAttachmentSelect,
-  handlePromptSend,
+  handlePromptSend, transitionLabel,
   selectedAgentDefinition, selectedAgentCapability, activeAgentId, setCurrentMode, currentSession,
 }: ComposerFooterProps) {
   const handingOff = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
@@ -99,6 +100,7 @@ export function ComposerFooter({
             detailsExpanded={detailsExpanded}
             onDetailsExpandedChange={(expanded) => { void setDetailsExpanded(expanded); }}
           />
+          <span role="status" className="composer-transition-announcement">{transitionLabel}</span>
           <Button
             variant={isComposerBusy ? 'danger' : 'primary'}
             size="sm"
@@ -107,7 +109,7 @@ export function ComposerFooter({
             onClick={() => void (isComposerBusy ? handlePrimaryStop() : handlePromptSend())}
             disabled={primaryButtonDisabled}
             aria-label={primaryButtonDescription}
-            data-tooltip={primaryButtonDescription}
+            data-tooltip={[transitionLabel, primaryButtonDescription].filter(Boolean).join(' · ')}
           >
             {isComposerBusy ? (
               <Icon name="stop" filled />

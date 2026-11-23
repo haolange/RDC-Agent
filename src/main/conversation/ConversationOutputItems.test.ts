@@ -10,21 +10,29 @@ function fixture() {
   const state = {
     assistantMessage: { id: 'a', turnId: 'turn', role: 'assistant', content: '', createdAt: 1, updatedAt: 1 },
     currentLoopText: '', currentLoopProviderOutputRefs: [], loopHasTools: false,
-    canonicalOutput: { finalAnswerText: '' }, visibleResponse: '',
+    loopSeq: 1, pendingNewLoop: false,
   } as unknown as TurnStreamState;
   const commit = (_type: string, patch: Partial<ConversationMessage>) => { state.assistantMessage = { ...state.assistantMessage, ...patch }; };
   const deps = {
     host: { emitConversationEvent: vi.fn() }, sessionId: 'session',
     input: { context: { projectId: 'project', currentRun: null }, preparedTurn: { runtime: { routeCapability: { reasoningDelivery: 'stream-full' } } } },
     turnStreamState: state, commitAssistantMessage: commit,
-    commitVisibleAssistantText: () => {}, commitThinkingTrace: (workTrace: ConversationWorkTrace) => { state.assistantMessage.workTrace = workTrace; },
-    beginAssistantContentLoop: () => {}, currentLoopId: () => 'loop',
+    commitThinkingTrace: (workTrace: ConversationWorkTrace) => { state.assistantMessage.workTrace = workTrace; },
+    beginAssistantContentLoop: () => {
+      if (!state.pendingNewLoop) return;
+      state.loopSeq += 1;
+      state.pendingNewLoop = false;
+      state.currentLoopOutputPhase = undefined;
+      state.currentLoopText = '';
+      state.currentLoopProviderOutputRefs = [];
+      state.loopHasTools = false;
+    },
+    currentLoopId: () => state.loopSeq === 1 ? 'loop' : `loop-${state.loopSeq}`,
     markLoopCommentary: () => { state.currentLoopOutputPhase = 'commentary'; },
     resolveStreamingOutputPhase: () => state.currentLoopOutputPhase,
     recordProviderOutputRefs: (refs: ProviderOutputRef[] = []) => { state.currentLoopProviderOutputRefs.push(...refs); },
-    currentLoopOptions: () => ({ loopId: 'loop', loopProviderOutputRefs: state.currentLoopProviderOutputRefs }),
+    currentLoopOptions: () => ({ loopId: deps.currentLoopId(), loopProviderOutputRefs: state.currentLoopProviderOutputRefs }),
     pendingContinuation: { approval: false, userInput: false, planReview: false, handoff: false },
-    hasPendingContinuation: () => false,
   } as unknown as AgentEventHandlerDeps;
   const handler = createAgentEventHandler(deps);
   const send = (type: AgentEvent['type'], payload: Record<string, unknown>) => handler({
@@ -38,6 +46,18 @@ const thinkingRef = (index: number): ProviderOutputRef => ({ protocol: 'OpenAIRe
 const loopBlock = (state: TurnStreamState) => state.assistantMessage.workTrace!.blocks.find((block) => block.id === 'loop')!;
 const textItems = (state: TurnStreamState) => loopBlock(state).items!.filter((item) => item.kind === 'text');
 
+it('keeps a provider answer followed by host continuation out of the published reply', () => {
+  const { state, send } = fixture();
+  const attempted = { providerOutputRef: ref(0), text: 'Execution was interrupted.', phase: 'final_answer' };
+  send('assistant.completed', { text: attempted.text, stopReason: 'end_turn', textItems: [attempted] });
+  send('assistant.delta', { providerOutputRef: ref(0), text: 'Checking the replay.', phase: 'commentary' });
+  send('tool.requested', { toolCall: { id: 'probe', name: 'rdc_probe', arguments: {} } });
+  const loops = state.assistantMessage.workTrace!.blocks.filter((block) => block.kind === 'llm_turn');
+  expect(loops.map((block) => block.toolCalls.length)).toEqual([0, 1]);
+  expect(loops[1].items?.[0]).toMatchObject({ text: 'Checking the replay.', phase: 'commentary' });
+  expect(state.assistantMessage.content).toBe('');
+});
+
 it('streams distinct text items after thinking and confirms only final items', () => {
   const { state, send } = fixture();
   const thinking = { kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', text: 'Thinking' };
@@ -48,13 +68,14 @@ it('streams distinct text items after thinking and confirms only final items', (
   const items = () => textItems(state);
   expect(items().map((item) => item.text)).toEqual(['Checking', 'First answer']);
   expect(items()[1].phase).toBeUndefined();
-  expect(state.canonicalOutput.finalAnswerText).toBe('');
+  expect(state.assistantMessage.content).toBe('');
   send('assistant.completed', { stopReason: 'end_turn', text: 'CheckingFirst answer', textItems: [
     { providerOutputRef: ref(0), text: 'Checking' },
     { providerOutputRef: ref(1), text: 'First answer' },
   ] });
   expect(items().map((item) => item.phase)).toEqual(['commentary', 'final_answer']);
-  expect(state.canonicalOutput.finalAnswerText).toBe('First answer');
+  expect(state.assistantMessage.content).toBe('');
+  expect(state.pendingNewLoop).toBe(true);
 });
 
 it('resolves unknown text as commentary on a tool event without changing its position', () => {
@@ -64,7 +85,7 @@ it('resolves unknown text as commentary on a tool event without changing its pos
   send('tool.requested', { toolCall: { id: 'tool', name: 'read_file', arguments: {} }, providerOutputRef: ref(1) });
   const after = textItems(state)[0];
   expect(after).toMatchObject({ text: 'Checking', phase: 'commentary', displayOrder: before.displayOrder });
-  expect(state.canonicalOutput.finalAnswerText).toBe('');
+  expect(state.assistantMessage.content).toBe('');
 });
 
 it('records visible thinking after an earlier text item without changing its order', () => {
@@ -100,7 +121,7 @@ it.each(['max_tokens', 'refusal', 'error', 'aborted'] as const)(
     const loop = state.assistantMessage.workTrace!.blocks.find((block) => block.id === 'loop')!;
     expect(loop.result?.stopReason).toBe(stopReason);
     expect(loop.items?.[0]).toMatchObject({ kind: 'text', text: 'Partial output', status: 'complete' });
-    expect(state.canonicalOutput.finalAnswerText).toBe('');
+    expect(state.assistantMessage.content).toBe('');
   },
 );
 
@@ -115,5 +136,5 @@ it('drops a failed attempt\'s partial text and undeclared tools when the provide
   send('assistant.completed', { stopReason: 'end_turn', text: 'A whole answer',
     textItems: [{ providerOutputRef: { ...ref(0), responseId: 'retry' }, text: 'A whole answer' }] });
   expect(textItems(state).map((item) => item.text)).toEqual(['A whole answer']);
-  expect(state.canonicalOutput.finalAnswerText).toBe('A whole answer');
+  expect(state.assistantMessage.content).toBe('');
 });

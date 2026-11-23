@@ -199,11 +199,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const status: ConversationMessageStatus = message.status ?? 'complete';
   const isInProgress = status === 'streaming' || status === 'draft';
   const hasContent = Boolean(message.content && message.content.length > 0);
-  const traceIsRunning = Boolean(trace && trace.status === 'running');
-  const hasProjectedOutput = Boolean(trace?.blocks.some((block) => block.items?.some((item) => item.kind === 'text')));
-  // Work Process remains first, while the assistant answer streams underneath it.
-  const showContentBubble = !hasProjectedOutput && (hasContent || isInProgress || traceIsRunning)
-    || (status === 'error' && hasContent);
+  const showContentBubble = hasContent || (!trace && isInProgress);
   // 诊断文案已由气泡正文承载时不再重复渲染独立诊断块，避免同一信息三重显示。
   const showDiagnosticBlock = Boolean(
     message.diagnostic
@@ -222,7 +218,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
         <div className="conversation-message-row">
           <div className="conversation-message-stack">
             {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
-                <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} />
+                <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} answer={message.content} />
             ) : null}
             <PlanDeliverable trace={trace} />
             {message.workTraceDiscarded ? (

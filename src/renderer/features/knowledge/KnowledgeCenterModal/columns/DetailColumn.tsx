@@ -7,6 +7,7 @@ import { InlineError } from '../../../../ui/InlineError';
 import { Chevron } from '../../../../ui/Chevron';
 import { Menu } from '../../../../ui/Menu';
 import { Panel } from '../../../../ui/Panel';
+import { Tabs } from '../../../../ui/Tabs';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { detailToRecord, type KnowledgeWriteAction } from '../knowledgeCenterModel';
@@ -63,6 +64,28 @@ function headlineFacts(card: KnowledgeCardDetail, typeLabel: string | null): str
   return [...(typeLabel ? [typeLabel] : []), ...axes];
 }
 
+function CaseChapters({ card, chapters }: { card: KnowledgeCardDetail; chapters: KnowledgeCaseChapter[] }) {
+  const { t } = useI18n();
+  const [selected, setSelected] = useState<string>(chapters[0] ?? '');
+  const chapter = chapters.find((entry) => entry === selected) ?? chapters[0];
+  if (!chapter) return null;
+
+  const section = (
+    <section className="knowledge-case-section" key={chapter} data-chapter={chapter}>
+      {chapters.length === 1 ? <h2>{t(CHAPTER_LABEL_KEYS[chapter])}</h2> : null}
+      <CaseChapterContent spaceId={card.spaceId} chapter={chapter} content={card.chapters![chapter]!} />
+    </section>
+  );
+
+  return chapters.length === 1 ? section : (
+    <Tabs className="knowledge-case-tabs" label={t('knowledgeCenter.outline')}
+      tabs={chapters.map((entry) => ({ id: entry, label: t(CHAPTER_LABEL_KEYS[entry]) }))}
+      value={chapter} onChange={setSelected}>
+      {section}
+    </Tabs>
+  );
+}
+
 export function DetailColumn({ state, write, onCreateCandidate, candidateHasSession, candidateBusy, candidateError }: DetailColumnProps) {
   const { t } = useI18n();
   const card = state.selectedCard;
@@ -79,17 +102,14 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
   const claim = card?.chapters?.claim?.trim();
   const lead = card && claim && !sameText(claim, card.title) ? claim : null;
   const facts = card ? headlineFacts(card, card.type ? t(TYPE_LABEL_KEYS[card.type]) : null) : [];
-  const body = card && !chapters ? bodyWithoutTitle(card.body, card.title) : '';
-  const outline = chapters
-    ? chapters.map((chapter) => t(CHAPTER_LABEL_KEYS[chapter]))
-    : markdownOutline(body).filter((heading) => heading.level <= 3).map((heading) => heading.title);
+  const body = card && !chapters?.length ? bodyWithoutTitle(card.body, card.title) : '';
+  const outline = markdownOutline(body).filter((heading) => heading.level <= 3).map((heading) => heading.title);
   const actions = card ? knowledgeCardActions(card.lifecycle, reviewing) : null;
   const candidateBlocked = !candidateHasSession ? t('knowledgeCenter.sessionRequired')
     : card?.missingAssets?.length ? t('knowledgeCenter.candidateAssetsMissing') : undefined;
 
   const jumpTo = (index: number) => {
-    // Chapters and Markdown headings of levels 1–3 are drawn in outline order, so the nth entry is the nth heading.
-    textRef.current?.querySelectorAll(chapters ? '.knowledge-case-section > h2' : 'h1, h2, h3')[index]
+    textRef.current?.querySelectorAll('h1, h2, h3')[index]
       ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
   const run = (action: KnowledgeCardAction) => {
@@ -190,16 +210,13 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                   ))}
                 </nav>
               ) : null}
-              <div ref={textRef} className={chapters ? 'knowledge-case-sections' : 'knowledge-center-markdown'}>
-                {chapters
-                  ? chapters.map((chapter) => (
-                    <section className="knowledge-case-section" key={chapter} data-chapter={chapter}>
-                      <h2>{t(CHAPTER_LABEL_KEYS[chapter])}</h2>
-                      <CaseChapterContent spaceId={card.spaceId} chapter={chapter} content={card.chapters?.[chapter] ?? ''} />
-                    </section>
-                  ))
-                  : <KnowledgeMarkdown content={body} spaceId={card.spaceId} />}
-              </div>
+              {chapters?.length ? (
+                <CaseChapters key={JSON.stringify([card.spaceId, card.cardId])} card={card} chapters={chapters} />
+              ) : (
+                <div ref={textRef} className="knowledge-center-markdown">
+                  <KnowledgeMarkdown content={body} spaceId={card.spaceId} />
+                </div>
+              )}
             </div>
           </article>
         )}

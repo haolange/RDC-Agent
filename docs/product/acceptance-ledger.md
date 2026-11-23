@@ -1,5 +1,59 @@
 # Acceptance Ledger
 
+## 2026-11-24：BlackHair 真机调查完成并就地交付
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）
+- 证据：本地：`node node_modules/.cache/rdc-live-acceptance/deliver.mjs`（会话 sess_20675be0cbc7）。GPT-6.0-Luna Medium 实际完成计划、批准、Android E2653 最终图取证与独立 Verifier 核验。报告 invart-2144b9cdba27-1795449571843 为 ready，宿主接受 completed，只显示一份终答。
+- General 报告头发大面积近黑、发束层次较弱，较暗的围领候选区域仍有纹理。范围为当前最终输出的观察。原生入口回到 E2653，已持久化签名 resolved 回执并释放回放。
+- 人工介入：选择设备、打开回放、批准计划。执行回合内无追加提示词或手工修正报告。
+
+## 2026-11-23：BlackHair Android 应用内自动恢复与同回合续跑
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）
+- 证据：本地：`node node_modules/.cache/rdc-live-acceptance/run.mjs`（会话 sess_b4bbe4888399）。Luna Medium 冻结 BlackHair.rdc 和当前 Android，批准后以 General 读取原生现场。
+- 停止该回放独占的 Android RenderDoc helper 后，原生返回 replay_fatal_error。General 在同一个 turn 调用 capture_recover，签名回执记录旧 daemon 退出以及同一 capture、设备下的新 context。随后真实查询新 context 并重新取图。
+- 人工介入：批准计划、触发故障，后续按应用询问澄清一次围脖毛区域。已有 ADB 服务继续运行，恢复和续跑无需补发提示词。测试驱动异常退出，正式报告另行复验。
+
+## 2026-11-23：BlackHair 真机调查复现普通查询故障未登记
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）
+- 证据：本地：`node node_modules/.cache/rdc-live-acceptance/run.mjs`（会话 sess_76611041836f）。GPT-6.0-Luna Medium 提交并获批冻结 BlackHair 与同一 Android 的只读计划，General 完成原生事件查询。在自有 ADB 中断后，资源列表查询报告 replay_fatal_error，capture_recover 随后拒绝了缺失故障记录的 lease。
+- 人工介入：打开回放、批准计划、触发中断。General 以一次未解决终答结束，随后释放回放。
+
+## 2026-11-23：Windows Electron 调查回合与交互（Browser QA）
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser`。本机 Provider 实际请求使用 GPT-6.0-Luna Medium。General 的真实工具调用及终答保持一次交付，Working 排在回复上方。在 708×640、1400×900、2560×1440 下，两侧实测内缩均为 22 CSS px。
+- 本机知识案例通过键盘切换到证据章节，详情只显示选中章节；设置窗口在 708×640、1400×900、1920×1080 无横向溢出。
+- Debugger 正式计划触发待审时，Working 默认收起，展开时剪影与正式卡可区分。人工批准后交接显示为普通用户消息。首次 General 执行在验收时间内未交付，日志显示缺少 Checkpoint 和 ready Report，已修正 Skill 的交付指引。
+- 人工介入：录入 QA 提示词、按计划门批准、切换界面；普通 General 回合提交后自动完成。
+
+## 2026-11-23：批准后的离线调查交付复验
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser`。GPT-6.0-Luna Medium 提交计划，批准后 General 从本机知识卡提取观察并交付一份终答。
+- 真正声明为 partial。宿主要求带 Claim 和 WorldState 的 MissionCheckpoint，Agent 如实交代材料缺口。执行 Skill 已补明会话内的记录依赖；completed 路径本次未通过真实模型验收。
+- 人工介入：录入 QA 提示词并批准计划。执行期间无补充提示词。
+
+## 2026-11-23：Android Capture 界面实测与计划范围门
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser`。Capture 在 Windows Electron 中打开 BlackHair.rdc，显示 Android 真机回放画面，随后释放回放。
+- 第一条现场调查计划缺少结构化 captureScope，执行门拒绝原生读取。General 交付一次阻塞说明。此轮控制传输已中断，但未进入受控恢复链。
+- 人工介入：选择设备、批准计划、触发本轮自有 ADB 中断和关闭回放。
+
+## 2026-11-23：Android 受控续跑复验未进入执行
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser`。Browser QA 的 ADB 发现已看到设备；选择 Android 后，RDC-Tool 对该设备的 get-state 返回 adb_device_invalid_response，Capture 准备失败。
+- 人工介入：选择同一台设备。该次未执行中断，也未提交模型请求；仍需设备能通过 get-state，再验收冻结范围、原生恢复和同一调查续跑。
+
+## 2026-11-23：RDC-Tool Android 断开后重建回放
+
+- 提交：`b43018451001f7c8f34bae056f684b7488232576`（Agent 基线）；RDC-Tool 基线 3764eae7a34d，测试使用本地工作树。
+- 证据：本地：`rd.pipeline.get_state` 在独立 ADB 传输断开前成功，断开后返回 replay_fatal_error。旧 context clear 与 daemon stop 均成功；同一设备重新打开 BlackHair.rdc，在新 context 完成相同查询，并释放新的 context 与 daemon。
+- 人工介入：仅针对本轮独立 ADB 服务触发断开和恢复，然后直接驱动 RDC-Tool 原生验证。
+
 ## 2026-11-20：第二轮收敛（视觉语言、对话与 Working、Tasks、计划交付、设置、知识中心；云端 Linux）
 
 - 提交：`5b4ad8e5`

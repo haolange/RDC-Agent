@@ -1,6 +1,4 @@
-/* The rail hangs outside the conversation's content edge: cards, headings and text keep the same left and right
-   edges as the user bubble and the Composer frame, and the rail sits in the column gutter. The marker keeps its
-   fixed 16px slot and the 4px gap to the content, so the rail centre is half a slot plus the gap. */
+/* The timeline sits outside the inset Working column. */
 .work-process {
   --work-rail-hang: calc(var(--space-4) / 2 + var(--space-1));
 }
@@ -74,39 +72,11 @@
 .work-process-tool-aggregate-body { padding-left: 0; }
 .work-process-track-leading { padding-bottom: var(--space-2); }
 .work-process-track .work-process-step.is-appear { animation: none; }
-
-.work-process.is-collapsed .work-process-summary,
-.work-process.is-collapsed .work-process-track::before,
-.work-process.is-collapsed .work-process-section > .work-process-event-anchor,
-/* Folding hides the process, never the reply: a step keeps only its text list, where commentary folds
-   away and text whose phase the provider never declared stays visible, like the final answer. */
-.work-process.is-collapsed .work-process-section > .work-process-step-content > :not(.work-process-section-lead),
-.work-process.is-collapsed .work-process-step:not(.work-process-section):not(.work-process-output),
-.work-process.is-collapsed .work-process-output.kind-output-commentary {
-  display: none;
-}
-
-.work-process.is-collapsed .work-process-section,
-.work-process.is-collapsed .work-process-section-lead {
-  padding-top: 0;
-  margin-top: 0;
-}
-
-.work-process.is-collapsed .work-process-section:not(:has(.work-process-output:not(.kind-output-commentary))) {
+.work-process-output[hidden],
+.work-process.is-collapsed > .work-process-body {
   display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .work-process-rail-marker.is-running::after { animation: none; }
-}
-
-/* A step leads with its thinking and commentary; its actions fold behind one quiet line beneath them. */
-.work-process-steps.work-process-section-lead {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.work-process-section-lead + .work-process-section-list {
-  margin-top: var(--space-2);
 }

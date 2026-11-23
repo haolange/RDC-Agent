@@ -202,6 +202,7 @@ export class AgentTurnRunner {
     let captureRestorationNeededForPartial = false;
     try {
     turnHandle.requiresApprovedGoalClosure = Boolean(preparedRuntime.approvedExecution);
+    const toolCallsAtEntry = turnHandle.policyBudget.toolCalls;
     const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
     turnHandle.reviewCompletionDeclaration = (declaration) => approvedGoalContinuation.reviewDeclaration(declaration);
     turnHandle.requiresApprovedCaptureScope = Boolean(preparedRuntime.approvedExecution?.investigation
@@ -464,6 +465,8 @@ export class AgentTurnRunner {
           const planningFeedback = missionPlanningFeedback();
           if (planningFeedback) return planningFeedback;
           if (!turnHandle.requiresApprovedGoalClosure) return undefined;
+          if (input.options?.allowInformationalReply && !turnHandle.completionDeclaration
+            && turnHandle.policyBudget.toolCalls === toolCallsAtEntry) return undefined;
           const incomplete = await approvedGoalContinuation.closingCheck();
           if (incomplete) return incomplete;
           const restorationFeedback = await captureRestorationFeedback(turnHandle.completionDeclaration);

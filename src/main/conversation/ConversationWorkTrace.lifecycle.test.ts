@@ -119,15 +119,15 @@ describe('structural sharing', () => {
     }
   });
 
-  it('records an answer the runtime sent back as commentary once the next loop starts', () => {
+  it('preserves the original provider phase when the host starts the next response', () => {
     const ref = { protocol: 'fixture', providerBlockKey: 'output:text:0', contentIndex: 0 };
     let trace = upsertLoopTextItem(undefined, 'loop-1', ref, 'Interim report', 'final_answer', 'complete');
     trace = upsertLoopResult(trace, 'loop-1', { status: 'complete', stopReason: 'end_turn', outputPhase: 'final_answer' });
     trace = upsertLoopTextItem(trace, 'loop-2', ref, 'Final report', 'final_answer', 'complete');
     trace = upsertLoopResult(trace, 'loop-2', { status: 'complete', stopReason: 'end_turn', outputPhase: 'final_answer' });
     const [first, second] = trace.blocks;
-    expect(first!.result?.outputPhase).toBe('commentary');
-    expect(first!.items?.[0]).toMatchObject({ kind: 'text', phase: 'commentary' });
+    expect(first!.result?.outputPhase).toBe('final_answer');
+    expect(first!.items?.[0]).toMatchObject({ kind: 'text', phase: 'final_answer' });
     expect(second!.result?.outputPhase).toBe('final_answer');
     expect(second!.items?.[0]).toMatchObject({ kind: 'text', phase: 'final_answer' });
   });

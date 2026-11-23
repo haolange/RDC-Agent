@@ -25,8 +25,8 @@
   container-name: settings-shell;
   position: relative;
   z-index: var(--z-modal);
-  width: min(76rem, calc(100vw - 2 * var(--modal-workbench-inset)));
-  height: min(56rem, calc(100dvh - 2 * var(--modal-workbench-inset)));
+  width: min(max(88rem, 61vw), calc(100vw - max(8vw, 2 * var(--modal-workbench-inset))));
+  height: min(max(58rem, 74dvh), calc(100dvh - max(10dvh, 2 * var(--modal-workbench-inset))));
   min-width: min(45rem, calc(100vw - 2 * var(--modal-workbench-inset)));
   min-height: min(30rem, calc(100vh - 2 * var(--modal-workbench-inset)));
   display: grid;
@@ -98,6 +98,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+.settings-page-general,
+.settings-page-appearance {
+  max-width: 54rem;
+  margin-inline: auto;
 }
 
 @media (max-width: 1280px) {

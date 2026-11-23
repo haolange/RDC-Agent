@@ -121,9 +121,17 @@ function blocksToDetailRows(blocks: ConversationWorkBlock[], t: Translator): Wor
 export const buildWorkProcessPresentation = (
   trace: ConversationWorkTrace,
   t: Translator,
+  owner?: { reply: string },
 ): WorkProcessPresentation => {
   const blocks = Array.isArray(trace.blocks) ? trace.blocks : [];
-  const rows = markReadSearchResults(mergeWebReadsAcrossSteps(blocksToDetailRows(blocks, t)));
+  const reply = owner?.reply.trim();
+  const processBlocks = owner ? blocks.map((block) => block.items?.length ? {
+    ...block,
+    items: block.items.filter((item) => item.kind !== 'text' || (
+      item.phase !== 'final_answer' && (!reply || item.text.trim() !== reply)
+    )),
+  } : block) : blocks;
+  const rows = markReadSearchResults(mergeWebReadsAcrossSteps(blocksToDetailRows(processBlocks, t)));
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);

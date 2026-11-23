@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { agentDescription } from '../../lib/agentDescription';
 import { InlineError } from '../../ui/InlineError';
-import { Spinner } from '../../ui/Spinner';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -126,6 +125,11 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [composerMarkdown, isComposerBusy]);
 
   const pendingRequest = useComposerPendingRequest();
+  const handoffPhase = composer.handoff?.phase;
+  const transitionLabel = conversationPreparationPhase === 'preparing' || handoffPhase === 'preparing'
+    ? t('composer.handoff.preparing')
+    : handoffPhase === 'confirming' ? t('composer.handoff.confirming')
+      : handoffPhase ? t('composer.handoff.switching') : '';
   return (
     <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
     <ComposerMenuRegistryProvider key={pendingRequest?.kind === 'plan-review'
@@ -173,12 +177,6 @@ export const Composer: React.FC<ComposerProps> = ({
           {t(composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? 'app.handoffUnconfirmed' : 'app.handoffFailed')}
         </InlineError>
       ) : null}
-      {composer.handoff?.phase || (isComposerBusy && conversationPreparationPhase === 'preparing') ? (
-        <p className="composer-transition-status" role="status">
-          <Spinner size="sm" />
-          {t(conversationPreparationPhase === 'preparing' || composer.handoff?.phase === 'preparing' ? 'composer.handoff.preparing' : composer.handoff?.phase === 'confirming' ? 'composer.handoff.confirming' : 'composer.handoff.switching')}
-        </p>
-      ) : null}
       <ComposerEditor
         promptValue={promptValue}
         setPromptValue={setPromptValue}
@@ -210,6 +208,7 @@ export const Composer: React.FC<ComposerProps> = ({
         attachButtonLabel={attachButtonLabel}
         primaryButtonDisabled={primaryButtonDisabled}
         primaryButtonDescription={primaryButtonDescription}
+        transitionLabel={transitionLabel}
         handlePrimaryStop={handlePrimaryStop}
         handleAttachmentSelect={handleAttachmentSelect}
         handlePromptSend={handlePromptSend}

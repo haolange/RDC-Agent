@@ -36,16 +36,23 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
     if (disabled || !state || !events.some((event) => event.eventId === id)) return;
     setRequested(id); setError(null); queue.enqueue({ ...scope, bindingGeneration: state.generation, eventId: id, ...(target ? { target } : {}) }, flush);
   };
-  // One event number lives in the workspace toolbar and one in the input; the line below only says it is switching.
-  const switching = requested !== null || state?.phase === 'applying' || (state?.requestedEventId != null && state.requestedEventId !== state.appliedEventId)
-    || Boolean(state?.image && state.imageEventId !== state.appliedEventId);
+  const applying = requested !== null || state?.phase === 'applying'
+    || (state?.requestedEventId != null && state.requestedEventId !== state.appliedEventId);
+  const imagePending = Boolean(state?.image && state.imageEventId !== state.appliedEventId);
+  const targets = state?.targets ?? [];
+  const targetLabel = (target: (typeof targets)[number]) => target.outputSlot === null
+    ? t('control.replay.final') : t('control.replay.colorTarget', { slot: target.outputSlot });
+
   return <div className="capture-replay-content" role="group" aria-label={t('control.replay.controls')} aria-disabled={disabled}>
     <div className="capture-image-toolbar">
-      <span>{t(state?.isFinalOutput ? 'control.replay.final' : 'control.replay.event')}</span>
-      {(state?.targets.length ?? 0) > 0 && <Select dataTestId="capture-color-target" ariaLabel={t('control.replay.color')}
-        value={state?.target?.textureId ?? ''} disabled={disabled || state?.appliedEventId == null}
-        options={(state?.targets ?? []).map((target) => ({ value: target.textureId, label: target.outputSlot === null ? t('control.replay.final') : t('control.replay.colorTarget', { slot: target.outputSlot }) }))}
-        onChange={(textureId) => state?.appliedEventId != null && select(state.appliedEventId, true, { textureId })} />}
+      {targets.length > 1 ? <Select dataTestId="capture-color-target" ariaLabel={t('control.replay.color')}
+        value={state?.target?.textureId ?? ''} disabled={disabled || state?.appliedEventId == null || applying}
+        options={targets.map((target) => ({ value: target.textureId, label: targetLabel(target) }))}
+        onChange={(textureId) => state?.appliedEventId != null && select(state.appliedEventId, true, { textureId })} />
+        : <span>{targets[0] ? targetLabel(targets[0]) : t(state?.isFinalOutput ? 'control.replay.final' : 'control.replay.event')}</span>}
+      {(applying || imagePending) && state?.appliedEventId != null && (
+        <span>{t('control.replay.appliedEvent', { id: state.appliedEventId })}</span>
+      )}
     </div>
     <div className="capture-event-controls">
       <Button variant="ghost" size="sm" aria-label={t('control.replay.previous')} disabled={disabled || position === 0} onClick={() => select(events[position - 1].eventId, true)}><Chevron direction="left" /></Button>
@@ -61,7 +68,8 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
       onPointerUp={() => queue.flush()}
       onKeyUp={(event) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) queue.flush(); }} />
     {error ? <InlineError detail={error}>{t('control.replay.applyFailed')}</InlineError>
-      : <div className="capture-replay-feedback" role="status">{switching ? t('control.replay.switching') : ''}</div>}
-    {state?.contextId && ['unsupported', 'unavailable'].includes(state.devicePresentation.status) && <small>{t('control.replay.remoteUnavailable')}</small>}
+      : applying ? <div className="capture-replay-feedback" role="status">{t('control.replay.switching')}</div> : null}
+    {state?.contextId && state.devicePresentation.status === 'unsupported' ? <small>{t('control.replay.remoteUnsupported')}</small>
+      : state?.contextId && state.devicePresentation.status === 'unavailable' ? <small>{t('control.replay.remoteUnavailable')}</small> : null}
   </div>;
 }

@@ -55,6 +55,7 @@
   min-height: 0;
   width: 100%;
   overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;

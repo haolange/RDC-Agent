@@ -46,6 +46,8 @@ export interface AgentTurnContext {
 }
 
 export interface AgentTurnOptions {
+  /** A new user message may ask about an earlier run without carrying out approved work. */
+  allowInformationalReply?: boolean;
   /** Internal callback before model/tool effects; facts come from the prepared runtime. */
   onTaskPreparation?: (preparation: import('@shared/types/taskExecution').TaskExecutionPreparation) => Promise<void>;
   signal?: AbortSignal;

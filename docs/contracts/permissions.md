@@ -168,7 +168,7 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 
 ## 原生 RDC 执行证据
 
-shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍进入 shell 的同一审批入口；low 分类须来自已验证的具体语义，不能仅凭工具名称或模型声称只读。原生 RDC 执行要求 owning root turn 的 `full` 天花板 profile（内置为 General），Full access 权限模式不能抬高天花板，天花板不足即拒绝；仅 `capture_select` / `capture_restore` / `capture_recover` 另要求 agentId 为 general；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。Skill 仅提供知识，不能扩权。
+shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍进入 shell 的同一审批入口；low 分类须来自已验证的具体语义，不能仅凭工具名称或模型声称只读。原生 RDC 执行要求 owning root turn 的 `full` 天花板 profile（内置为 General），Full access 权限模式不能抬高天花板，天花板不足即拒绝；仅 `capture_select` / `capture_restore` / `capture_recover` 另要求 agentId 为 general；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。回放生命周期自动审查接收主进程定义的操作目标和效果；当前权限模式、审批下限及执行时的归属检查仍然适用。Skill 仅提供知识，不能扩权。
 
 执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdc-runtime.md。
 

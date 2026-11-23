@@ -8,7 +8,7 @@ import {
   resolveConversationReasoningState,
   type ConversationLoopContinuationState,
 } from '@shared/conversation/loopOutputPhase';
-import { lastLoopThinking, loopFinalAnswerText, sameProviderBlock } from '@shared/conversation/loopItems';
+import { lastLoopThinking, sameProviderBlock } from '@shared/conversation/loopItems';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { redactCredentialLikeText, redactedArgumentsPreview } from '../runtime/secretRedaction';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
@@ -30,7 +30,6 @@ import {
   applyPlanReviewRequested,
   isPlanReviewApprovalPayload,
 } from './ConversationPlanReviewEvents';
-import { reduceCanonicalAssistantOutput } from './CanonicalAssistantOutput';
 import { delegationTraceStore } from './DelegationTraceStore';
 import {
   isActiveRun,
@@ -39,7 +38,6 @@ import {
 } from './ConversationRoutePreflight';
 import { normalizeTaskSnapshotItems } from './ConversationTaskSnapshot';
 import { mergeThinkingPayload } from './ConversationThinkingArtifacts';
-import type { CanonicalAssistantOutputState } from './CanonicalAssistantOutput';
 import type { ToolCallResult } from '@shared/types/tool';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import type {
@@ -59,13 +57,10 @@ export interface TurnStreamState {
   currentLoopText: string;
   currentLoopProviderOutputRefs: ProviderOutputRef[];
   loopHasTools: boolean;
-  visibleResponse: string;
-  canonicalOutput: CanonicalAssistantOutputState;
   runWasCancelled: boolean;
   loopSeq: number;
   pendingNewLoop: boolean;
   currentLoopOutputPhase: ConversationLoopOutputPhase | undefined;
-  turnHadAskPause: boolean;
   assistantMessage: ConversationMessage;
   errorViewModel: { code: string; message: string; technicalMessage?: string } | null;
   llmDiagnostic: ConversationMessageDiagnostic | undefined;
@@ -82,7 +77,6 @@ export interface AgentEventHandlerDeps {
     patch: Partial<ConversationMessage>,
     options?: Partial<import('./ConversationStreamPatchScheduler').ConversationStreamPatchCommitOptions>,
   ) => void;
-  commitVisibleAssistantText: () => void;
   commitThinkingTrace: (workTrace: ConversationWorkTrace) => void;
   beginAssistantContentLoop: () => void;
   markLoopCommentary: () => void;
@@ -97,17 +91,16 @@ export interface AgentEventHandlerDeps {
     loopProviderOutputRefs: ProviderOutputRef[];
   };
   pendingContinuation: ConversationLoopContinuationState;
-  hasPendingContinuation: () => boolean;
 }
 
 export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
   const {
     host, sessionId, input, agentLabel, turnStreamState,
-    commitAssistantMessage, commitVisibleAssistantText, commitThinkingTrace,
+    commitAssistantMessage, commitThinkingTrace,
     beginAssistantContentLoop, markLoopCommentary,
     currentLoopId, resolveStreamingOutputPhase,
     seenCompactionSummaries, recordProviderOutputRefs,
-    currentLoopOptions, pendingContinuation, hasPendingContinuation,
+    currentLoopOptions, pendingContinuation,
   } = deps;
   const currentLoopItem = (kind: 'text' | 'thinking', ref: ProviderOutputRef) => turnStreamState.assistantMessage.workTrace
     ?.blocks.find((block) => block.id === currentLoopId())
@@ -119,10 +112,6 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
     turnStreamState.currentLoopProviderOutputRefs = [];
     turnStreamState.currentLoopOutputPhase = undefined;
     turnStreamState.loopHasTools = false;
-    if (turnStreamState.visibleResponse) {
-      turnStreamState.visibleResponse = '';
-      commitVisibleAssistantText();
-    }
   };
   return (event: AgentEvent) => {
             host.emitConversationEvent({
@@ -202,8 +191,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               const payload = event.payload as { text?: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef };
               const chunk = typeof payload.text === 'string' ? payload.text : '';
               if (chunk) {
-                recordProviderOutputRefs(payload.providerOutputRef ? [payload.providerOutputRef] : undefined);
                 beginAssistantContentLoop();
+                recordProviderOutputRefs([payload.providerOutputRef]);
                 turnStreamState.currentLoopText += chunk;
                 const previous = currentLoopItem('text', payload.providerOutputRef);
                 const trace = upsertLoopResult(turnStreamState.assistantMessage.workTrace, currentLoopId(), { status: 'streaming', outputPhase: resolveStreamingOutputPhase(), providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs });
@@ -213,6 +202,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             }
             if (event.type === 'assistant.text_end') {
               const payload = event.payload as { text: string; phase?: ConversationLoopOutputPhase; providerOutputRef: ProviderOutputRef };
+              beginAssistantContentLoop();
+              recordProviderOutputRefs([payload.providerOutputRef]);
               const trace = turnStreamState.assistantMessage.workTrace;
               if (trace) commitThinkingTrace(upsertLoopTextItem(trace, currentLoopId(), payload.providerOutputRef,
                 payload.text, payload.phase, 'complete'));
@@ -433,13 +424,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               const toolName = String(payload.toolName ?? 'approval');
               if (isPlanReviewApprovalPayload({ kind: payload.kind, toolName })) {
                 pendingContinuation.planReview = true;
-                turnStreamState.turnHadAskPause = true;
                 turnStreamState.pendingNewLoop = true;
                 markLoopCommentary();
-                if (turnStreamState.visibleResponse) {
-                  turnStreamState.visibleResponse = '';
-                  commitVisibleAssistantText();
-                }
                 if (!payload.planReview) return;
                 commitAssistantMessage('message_patched', {
                   workTrace: applyPlanReviewRequested({
@@ -452,17 +438,9 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               }
               if (payload.kind === 'ask_user' || normalizeToolName(toolName) === 'ask_user') {
                 pendingContinuation.userInput = true;
-                turnStreamState.turnHadAskPause = true;
-                // Insurance: assistant.completed(tool_use) arrives before ask_user approval.
-                // Force the next assistant content onto a fresh loop even if that earlier
-                // completed handler missed the pause (ask_user is not a loop-scoped tool).
+                // The user interaction stays with the response that requested it.
                 turnStreamState.pendingNewLoop = true;
                 markLoopCommentary();
-                // Retract any mis-classified final_answer bubble text from the ask pause.
-                if (turnStreamState.visibleResponse) {
-                  turnStreamState.visibleResponse = '';
-                  commitVisibleAssistantText();
-                }
                 const questions = normalizeAskUserQuestions({ questions: payload.questions });
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertLoopResult(upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
@@ -634,9 +612,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               });
               const outputPhase = turnStreamState.currentLoopOutputPhase ?? resolvedOutputPhase;
               turnStreamState.currentLoopOutputPhase = outputPhase;
-              let completedTrace = turnStreamState.assistantMessage.workTrace;
-              const loopBlock = () => completedTrace?.blocks.find((block) => block.id === currentLoopId());
-              if (loopResult || loopBlock()?.items?.length || payload.thinking?.length || stopReason || outputPhase) {
+              const completedTrace = turnStreamState.assistantMessage.workTrace;
+              if (loopResult || completedTrace?.blocks.some((block) => block.id === currentLoopId()) || payload.thinking?.length || stopReason) {
                 let trace = settleLoopItems(
                   upsertLoopResult(completedTrace, currentLoopId(), { status: 'complete', stopReason, outputPhase, providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs }),
                   currentLoopId(), { stopReason, outputPhase }, { textItems: payload.textItems, thinking: payload.thinking },
@@ -646,41 +623,13 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                   input.preparedTurn.runtime.routeCapability.reasoningDelivery,
                 );
                 trace = upsertLoopResult(trace, currentLoopId(), { status: 'complete', reasoningState });
-                completedTrace = trace;
                 commitAssistantMessage('message_patched', {
                   workTrace: trace,
                 });
               }
-              if (outputPhase === 'final_answer') {
-                const finalText = loopFinalAnswerText(loopBlock()) || loopResult;
-                turnStreamState.canonicalOutput = reduceCanonicalAssistantOutput(turnStreamState.canonicalOutput, finalText, outputPhase);
-                turnStreamState.visibleResponse = turnStreamState.canonicalOutput.finalAnswerText;
-              } else {
-                // Commentary stays in Work Process; never leave process text in the bubble.
-                turnStreamState.visibleResponse = '';
-              }
-              commitVisibleAssistantText();
-              // Any commentary / pending continuation ends this loop so the next assistant
-              // content (including post-ask final answers) cannot reuse a stale commentary phase.
-              if (
-                outputPhase === 'commentary'
-                || hasPendingContinuation()
-                || turnStreamState.loopHasTools
-                || turnStreamState.turnHadAskPause
-                || stopReason === 'tool_use'
-              ) {
-                turnStreamState.pendingNewLoop = true;
-              }
-              commitAssistantMessage('message_patched', {
-                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, 'assistant-output', {
-                  kind: 'output',
-                  title: 'Assistant output ready',
-                  stage: 'respond',
-                  status: 'complete',
-                  summary: 'Final answer generated.',
-                  completedAt: nowMs(),
-                }),
-              });
+              // Provider completion closes this response, even when the host requests another one.
+              // The owning turn's validated completion receipt is the only publisher of an answer.
+              turnStreamState.pendingNewLoop = true;
             }
             if (event.type === 'run.completed') {
               commitAssistantMessage('message_patched', {

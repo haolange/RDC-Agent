@@ -301,6 +301,7 @@ export const enChat = {
   'chat.markdownMermaidLoading': 'Rendering diagram…',
   'chat.markdownMermaidFailed': 'Diagram failed',
   'chat.planReviewCardKind': 'Plan',
+  'chat.planReviewProcessKind': 'Plan in process',
   'chat.planReviewStatusAwaiting': 'Awaiting review',
   'chat.planReviewStatusApproved': 'Approved',
   'chat.planReviewStatusRejected': 'Rejected',

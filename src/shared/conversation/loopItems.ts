@@ -54,24 +54,6 @@ export function presentedTextPhase(phase: ConversationLoopOutputPhase | undefine
   return superseded ? 'commentary' : phase;
 }
 
-/**
- * What a stopped turn keeps as its reply: the text the last answering loop had streamed, minus anything
- * already marked as commentary. The person saw it, so it stays the message body.
- */
-export function stoppedReplyText(blocks: ReadonlyArray<Pick<ConversationWorkBlock, 'kind' | 'items'>>): string {
-  for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    const block = blocks[index]!;
-    if (block.kind !== 'llm_turn') continue;
-    const text = loopTextItems(block)
-      .filter((item) => item.phase !== 'commentary')
-      .map((item) => item.text)
-      .join('')
-      .trim();
-    if (text) return text;
-  }
-  return '';
-}
-
 /** A settled loop's answer text: its final-phase text blocks, in order. Empty for any other loop. */
 export function loopFinalAnswerText(block: Pick<ConversationWorkBlock, 'items' | 'result'> | undefined): string {
   if (block?.result?.outputPhase !== 'final_answer') return '';

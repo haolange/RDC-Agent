@@ -1,9 +1,10 @@
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { RDC_PROBE_ACTIONS, RDC_PROBE_READONLY_CLI_ACTIONS, RdcProbeInputSchema, compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
-import { parseRdcNativeResult } from '../../rdc/RdcNativeProtocol';
+import { parseRdcNativeResult, RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
 import { assertRdcContextLeaseOwnership, getRdcContextLease, type RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { executePreservedPipelineProbe } from '../../rdc/RdcProbePipeline';
+import { quarantineFatalReplayFailure } from '../../rdc/RdcReplayFailure';
 import type { CLIResult } from '@shared/types/tool';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { JsonSchema } from '../core/types';
@@ -173,12 +174,22 @@ export function createRdcProbeTool(
         }
         const args = [...compiled.args];
         if (lease && compiled.needsContext) args.push('--daemon-context', lease.contextId);
-        const cli = input.action === 'probe' && input.args?.action === 'pipeline_show' && lease
-          ? await executePreservedPipelineProbe({ lease, settings, args, signal, execute: executeCli })
-          : await executeCli(compiled.command, args, { abortSignal: signal, settings, contextId: lease?.contextId });
-        signal?.throwIfAborted();
-        const expectedContext = compiled.command === 'context' ? lease?.contextId : undefined;
-        const payload = parseRdcNativeResult(cli, expectedContext, compiled.operation);
+        const pipelineLease = input.action === 'probe' && input.args?.action === 'pipeline_show' ? lease : null;
+        let cli: CLIResult;
+        let payload: ReturnType<typeof parseRdcNativeResult>;
+        try {
+          cli = pipelineLease
+            ? await executePreservedPipelineProbe({ lease: pipelineLease, settings, args, signal, execute: executeCli })
+            : await executeCli(compiled.command, args, { abortSignal: signal, settings, contextId: lease?.contextId });
+          signal?.throwIfAborted();
+          const expectedContext = compiled.command === 'context' ? lease?.contextId : undefined;
+          payload = parseRdcNativeResult(cli, expectedContext, compiled.operation);
+        } catch (error) {
+          if (!pipelineLease && lease && compiled.needsContext && error instanceof RdcNativeFailure) {
+            quarantineFatalReplayFailure(lease, error, compiled.operation ?? error.resultKind ?? compiled.command, compiled.args);
+          }
+          throw error;
+        }
         if (compiled.operation && payload.data.session_id !== undefined && payload.data.session_id !== lease?.runtimeContext.replaySessionId) {
           throw new Error('RDC_CLI_PROTOCOL: replay session mismatch in native result.');
         }

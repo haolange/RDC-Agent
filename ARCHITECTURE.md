@@ -279,7 +279,7 @@ Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件
 
 ### L. Mission Completion Contract
 
-普通对话不因自然终答自动完成 Investigation 或 Task。获批 Mission 计划由 General 继承对应领域完成合同；`completed` 经 turn / Mission 收口门禁检查必要 Task、当前版本核验、相关 open Challenge、活动子执行、可解引用的 `MissionCheckpoint`、ready report、canonical `final_answer` 与原现场恢复。`turn_complete.evidenceRefs` 精确引用当前 ready report 的 URI 和内容哈希；声明前检查该报告的完整领域合同，包括报告状态、所需实验与相关未解 Challenge，缺口作为工具错误返回；终答提交时重新核验相同引用与合同，用户正文不必重复内部标识。提前终答的缺口返回同一执行；真实停止或阻塞保留对应 disposition。`partial` / `inconclusive` / `blocked` / `cancelled` / `budget_paused` 不伪装 completed，不能只靠 Hook、模型文本或 `output_register`。合同闭合后 General 就地交付报告；需战略改变时保存缺口并由用户切回 Mission。未继承调查合同的普通 General 不受垂直门禁约束。
+会话从 owning turn 的完成回执发布唯一正文。模型响应的终止事件关闭该响应对应的工作段，模型阶段标记仅描述该响应。用户发起的新消息可以直接说明上一轮结果。批准执行交接、当前回合实际调用工具或已提交完成声明时，按当前执行合同收口。普通对话不因自然终答自动完成 Investigation 或 Task。获批 Mission 计划由 General 继承对应领域完成合同；`completed` 经 turn / Mission 收口门禁检查必要 Task、当前版本核验、相关 open Challenge、活动子执行、可解引用的 `MissionCheckpoint`、ready report、canonical `final_answer` 与原现场恢复。`turn_complete.evidenceRefs` 精确引用当前 ready report 的 URI 和内容哈希；声明前检查该报告的完整领域合同，包括报告状态、所需实验与相关未解 Challenge，缺口作为工具错误返回；终答提交时重新核验相同引用与合同，用户正文不必重复内部标识。提前终答的缺口返回同一执行；真实停止或阻塞保留对应 disposition。`partial` / `inconclusive` / `blocked` / `cancelled` / `budget_paused` 不伪装 completed，不能只靠 Hook、模型文本或 `output_register`。合同闭合后 General 就地交付报告；需战略改变时保存缺口并由用户切回 Mission。未继承调查合同的普通 General 不受垂直门禁约束。
 
 ## Right Rail Authority
 

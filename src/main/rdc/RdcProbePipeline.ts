@@ -3,6 +3,7 @@ import { rdcDigest } from './RdcExecutionReceipts';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { runRdcOperation } from './RdcOperationCoordinator';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
+import { quarantineFatalReplayFailure } from './RdcReplayFailure';
 import { assertRdcContextLeaseOwnership, quarantineRdcContext, type RdcContextLease } from './RdcRuntimeContextRegistry';
 import { validateRdcSwitchSnapshot, type RdcSwitchSnapshot } from './RdcSwitchSnapshot';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
@@ -33,13 +34,7 @@ export async function executePreservedPipelineProbe(input: {
   };
   const sameReplay = (a: RdcSwitchSnapshot, b: RdcSwitchSnapshot) =>
     isDeepStrictEqual({ ...a, eventId: 0 }, { ...b, eventId: 0 });
-  const quarantineFatal = (error: unknown): boolean => {
-    if (!(error instanceof RdcNativeFailure)
-      || !['replay_fatal_error', 'replay_health_unavailable'].includes(error.nativeError.code)) return false;
-    quarantineRdcContext(lease.ownerSessionId, lease.version, 'Pipeline probe reported an unhealthy native replay.',
-      { operation: 'rd.pipeline.get_state', argsFingerprint: rdcDigest(input.args), code: error.nativeError.code });
-    return true;
-  };
+  const quarantineFatal = (error: unknown) => quarantineFatalReplayFailure(lease, error, 'rd.pipeline.get_state', input.args);
 
   return runRdcOperation(lease.contextId, async () => {
     let before: RdcSwitchSnapshot;

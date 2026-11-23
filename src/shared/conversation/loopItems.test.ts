@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loopFinalAnswerText, settleTextPhase, stoppedReplyText } from './loopItems';
+import { loopFinalAnswerText, settleTextPhase } from './loopItems';
 import type { ConversationWorkBlock } from '../types/conversation';
 
 const text = (value: string, phase?: 'commentary' | 'final_answer', index = 0) => ({
@@ -23,10 +23,5 @@ describe('loop items', () => {
     const mixed = [text('Checking. ', 'commentary', 0), text('The answer.', 'final_answer', 1)];
     expect(loopFinalAnswerText(loop(mixed, 'final_answer'))).toBe('The answer.');
     expect(loopFinalAnswerText(loop(mixed, 'commentary'))).toBe('');
-  });
-
-  it('keeps what a stopped turn had streamed, without commentary', () => {
-    expect(stoppedReplyText([loop([text('Let me look. ', 'commentary', 0), text('Partial answ', undefined, 1)])])).toBe('Partial answ');
-    expect(stoppedReplyText([loop([text('Only narration', 'commentary', 0)])])).toBe('');
   });
 });

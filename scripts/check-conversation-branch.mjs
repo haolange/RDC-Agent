@@ -266,10 +266,10 @@ assert(
   'rewrite must re-read history after stopped turns settle, and the terminal runner must settle only after cleanup',
 );
 assert(
-  conversationTurnRunner.includes('turnHadAskPause')
+  conversationTurnRunner.includes('beginAssistantContentLoopIfPending')
     && conversationTurnRunner.includes('resolveStreamingOutputPhase')
     && fs.readFileSync(path.join(process.cwd(), 'src/main/conversation/ConversationTurnAgentEventHandler.ts'), 'utf8').includes('upsertLoopTextItem'),
-  'terminal runner must retain pause boundaries and item-scoped streaming output',
+  'terminal runner must retain response boundaries and item-scoped streaming output',
 );
 const conversationStore = fs.readFileSync(
   path.join(process.cwd(), 'src/renderer/stores/conversationStore.ts'),

@@ -90,6 +90,12 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
   const callouts = collectCaptureCallouts({
     failureTitle: t('control.replay.actionFailed'),
+    actionFailureTitles: {
+      open: t('control.replay.openFailed'),
+      close: t('control.replay.closeFailed'),
+      refresh: t('control.replay.refreshFailed'),
+      image: t('control.replay.exportFailed'),
+    },
     warning: state?.warning ?? null,
     finalPresentTitle: t('control.replay.finalPresentUnavailable'),
     actionError: state?.preparation.issue ? null : error,
@@ -103,10 +109,19 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   });
   const deviceLabel = (deviceId: string) => (deviceId === 'local' ? t('device.local')
     : devices.find((device) => device.id === deviceId)?.label ?? t('control.replay.unknownDevice'));
+  const originalRecovery = recovery.status?.original;
+  const showRecoveryTarget = originalRecovery &&
+    (originalRecovery.inputId !== selectedInput?.inputId || originalRecovery.deviceId !== targetDeviceId);
+
   // The rail tab already names this panel; the status chip leads instead of a second title.
   return <div className="capture-replay-panel" aria-label={t('control.rightRail.capture.controls')}>
     <div className="capture-replay-status-row">
       <CaptureReplayStatusChip label={t(captureStatusLabelKey({ pending, partial, phase: state?.phase }))} tone={statusTone} />
+      <CopyDiagnosticsButton className="capture-replay-copy-diagnostics" testId="capture-replay-copy-diagnostics" facts={[
+        { label: t('control.replay.contextId'), value: state?.contextId },
+        { label: t('control.replay.deviceId'), value: actualDeviceId },
+        { label: t('control.replay.inputPath'), value: selectedInput?.filePath },
+      ]} />
     </div>
     <div className="capture-replay-file-row" data-tooltip={selectedInput ? `${selectedInput.fileName} · ${formatBytes(selectedInput.sizeBytes, language)}` : undefined}>
       <Select dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
@@ -123,9 +138,8 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {deviceLabel(actualDeviceId)}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
     {recovery.status && <div className="capture-replay-callout is-warning" aria-live="polite">
       <div className="capture-replay-callout-copy"><strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
-        <small>{recovery.status.original
-          ? [recovery.status.original.fileName, deviceLabel(recovery.status.original.deviceId)].join(' · ')
-          : t('control.replay.recoveryNoCapture')}</small></div>
+        {showRecoveryTarget ? <small>{originalRecovery.fileName} · {deviceLabel(originalRecovery.deviceId)}</small>
+          : !originalRecovery ? <small>{t('control.replay.recoveryNoCapture')}</small> : null}</div>
       <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} data-tooltip={t('control.replay.recoveryDescription')} onClick={() => {
         if (!state) return;
         setRestoring(true);
@@ -139,16 +153,13 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     <CaptureReplayCallouts
       callouts={callouts}
       disabled={disabled}
-      retryLabels={{ open: t('control.replay.retryOpen'), close: t('control.replay.retryClose'), image: t('control.replay.retryImage') }}
-      onRetry={(operation) => void run(operation)}
+      refreshDisabled={state ? disabled : action !== null}
+      retryLabels={{ open: t('control.replay.retryOpen'), close: t('control.replay.retryClose'),
+        image: t('control.replay.retryImage'), refresh: t('control.replay.refresh') }}
+      onRetry={(operation) => void (operation === 'refresh' && !state ? reload() : run(operation))}
     />
     <CaptureWorkspace scope={scope} state={state}
       disabled={disabled || !open || pending || state?.error?.retry === 'close'} receive={receive} />
-    <CopyDiagnosticsButton className="capture-replay-copy-diagnostics" testId="capture-replay-copy-diagnostics" facts={[
-      { label: t('control.replay.contextId'), value: state?.contextId },
-      { label: t('control.replay.deviceId'), value: actualDeviceId },
-      { label: t('control.replay.inputPath'), value: selectedInput?.filePath },
-    ]} />
   </div>;
 }
 

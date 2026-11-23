@@ -42,15 +42,11 @@ export function findCanonicalFinalAnswer(
   runId: string,
 ): string | null {
   let finalAnswer: string | null = null;
-  const visit = (blocks: ConversationWorkBlock[] | undefined) => {
-    for (const block of blocks ?? []) {
-      const answer = loopFinalAnswerText(block);
-      if (answer) finalAnswer = answer;
-    }
-  };
   for (const message of conversations) {
-    if (message.runId !== runId || message.role !== 'assistant') continue;
-    visit(message.workTrace?.blocks);
+    if (message.runId !== runId || message.role !== 'assistant' || message.diagnostic
+      || (message.status ?? message.workTrace?.status) !== 'complete') continue;
+    const reply = message.content.trim();
+    if (reply && message.workTrace?.blocks.some((block) => loopFinalAnswerText(block) === reply)) finalAnswer = reply;
   }
   return finalAnswer;
 }

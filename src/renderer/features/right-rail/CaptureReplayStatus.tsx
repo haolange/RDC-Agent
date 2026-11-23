@@ -1,5 +1,4 @@
-import { Button } from '../../ui/Button';
-import { CopyDiagnosticsButton } from '../../patterns/CopyDiagnostics';
+import { InlineError } from '../../ui/InlineError';
 import type { CaptureReplayError, CaptureReplayPhase, CaptureReplayState } from '@shared/types/captureReplay';
 import type { TranslationKey } from '../../i18n';
 
@@ -47,6 +46,7 @@ export function resolveCaptureStatusTone(args: {
 
 export function collectCaptureCallouts(args: {
   failureTitle: string;
+  actionFailureTitles?: Partial<Record<CaptureRetryAction, string>>;
   warning: { code: string; message: string } | null;
   finalPresentTitle: string;
   actionError: { message: string; action: CaptureRetryAction } | null;
@@ -64,11 +64,11 @@ export function collectCaptureCallouts(args: {
     });
   }
   if (args.actionError) {
-    items.push({ id: 'action', tone: 'error', title: args.failureTitle, detail: args.actionError.message, retry: args.actionError.action });
+    items.push({ id: 'action', tone: 'error', title: args.actionFailureTitles?.[args.actionError.action] ?? args.failureTitle, detail: args.actionError.message, retry: args.actionError.action });
     return items;
   }
   if (args.connectionError) {
-    items.push({ id: 'connection', tone: 'error', title: args.failureTitle, detail: args.connectionError, retry: 'refresh' });
+    items.push({ id: 'connection', tone: 'error', title: args.actionFailureTitles?.refresh ?? args.failureTitle, detail: args.connectionError, retry: 'refresh' });
     return items;
   }
   const error = args.stateError;
@@ -105,28 +105,27 @@ export function CaptureReplayStatusChip({ label, tone }: { label: string; tone: 
 export function CaptureReplayCallouts({
   callouts,
   disabled,
+  refreshDisabled,
   retryLabels,
   onRetry,
 }: {
   callouts: CaptureCallout[];
   disabled: boolean;
-  retryLabels: Record<'open' | 'close' | 'image', string>;
+  refreshDisabled: boolean;
+  retryLabels: Record<CaptureRetryAction, string>;
   onRetry: (action: CaptureRetryAction) => void;
 }) {
   if (!callouts.length) return null;
   return (
     <div className="capture-replay-callouts">
-      {callouts.map((item) => (
-        <div key={item.id} className={`capture-replay-callout is-${item.tone}`} role={item.tone === 'error' ? 'alert' : 'status'}>
-          <div className="capture-replay-callout-copy">
-            <strong>{item.title}</strong>
-            {item.detail ? <CopyDiagnosticsButton className="capture-replay-callout-copy-details" facts={[{ label: item.title, value: item.detail }]} /> : null}
-          </div>
-          {item.retry ? (
-            <Button variant="ghost" size="sm" disabled={disabled} onClick={() => onRetry(item.retry!)}>
-              {item.retry === 'close' ? retryLabels.close : item.retry === 'open' ? retryLabels.open : retryLabels.image}
-            </Button>
-          ) : null}
+      {callouts.map(({ id, tone, title, detail, retry }) => tone === 'error' ? (
+        <InlineError key={id} detail={detail} retryDisabled={retry === 'refresh' ? refreshDisabled : disabled}
+          onRetry={retry ? () => onRetry(retry) : undefined} retryLabel={retry ? retryLabels[retry] : undefined}>
+          {title}
+        </InlineError>
+      ) : (
+        <div key={id} className={`capture-replay-callout is-${tone}`} role="status">
+          <span>{title}</span>
         </div>
       ))}
     </div>

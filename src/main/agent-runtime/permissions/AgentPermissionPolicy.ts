@@ -35,6 +35,12 @@ import type { ShellKind } from '../../runtime/ShellResolver';
  */
 export type AgentPermissionDecisionAction = 'allow' | 'ask_user' | 'auto_review' | 'deny';
 
+const REPLAY_LIFECYCLE_CONTRACT = {
+  capture_select: 'Select the registered input named by inputId on the device frozen in the approved plan.',
+  capture_restore: 'Verify the signed entry position and, if needed, restore only its owning replay, event and output target. Reopening can use only the recorded entry input and device. An empty entry position means closing the owning replay.',
+  capture_recover: 'Release the faulted lease only after checking its owner and process identity, then reopen the same approved capture and device under a new replay context. The call supplies no replacement target.',
+} as const;
+
 export interface AgentPermissionDecision {
   action: AgentPermissionDecisionAction;
   reason?: string;
@@ -356,14 +362,19 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
-    if (toolName === 'rdc_probe' && ['capture_select', 'capture_restore', 'capture_recover']
-      .includes(String(input.toolCall.arguments.action))) {
+    const probeAction = input.toolCall.arguments.action;
+    if (toolName === 'rdc_probe' && typeof probeAction === 'string' && Object.hasOwn(REPLAY_LIFECYCLE_CONTRACT, probeAction)) {
+      const replayAction = probeAction as keyof typeof REPLAY_LIFECYCLE_CONTRACT;
       if (ceiling !== 'full') return denied('RDC_EXECUTION_DENIED: replay lifecycle requires a full access ceiling.');
       const baseline = mode === 'full-access'
         ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
         : request(mode, 'Changing the owning replay requires authorization under the current permission mode.', 'medium');
       const floor = input.compiledPolicy ? resolvePolicyApprovalFloor(input.compiledPolicy, toolName, 'mutation') : 'none';
-      return maxDecision(baseline, floorAction(floor, input.toolCall.name));
+      return maxDecision({ ...baseline, operationFacts: {
+        operation: replayAction,
+        scope: 'owning approved replay',
+        operationContract: { description: REPLAY_LIFECYCLE_CONTRACT[replayAction] },
+      } }, floorAction(floor, input.toolCall.name));
     }
 
     if (toolName === 'shell' && input.toolCall.arguments.rdc !== undefined) {

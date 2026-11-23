@@ -14,21 +14,22 @@ interface WorkProcessProps {
   trace: ConversationWorkTrace;
   sessionId?: string | null;
   messageId: string;
+  answer?: string;
 }
 
 /**
  * Working stays open while the turn runs and when it ends in an error or a stop. Under "follow latest" it folds once
- * the turn completes normally, or once it hands a plan to the user for review: the plan then reads below Working,
- * and its card inside stays one click away. Under "show all" it stays laid out in full. Opening or closing it by
- * hand is remembered for this message and always wins.
+ * the turn completes normally. A plan awaiting review starts with Working folded, so the plan reads below it.
+ * Opening or closing Working by hand is remembered for this message and always wins.
  */
-const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId }) => {
+const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer }) => {
   const { t } = useI18n();
-  const presentation = useMemo(() => buildWorkProcessPresentation(trace, t), [trace, t]);
+  const presentation = useMemo(() => buildWorkProcessPresentation(trace, t, { reply: answer ?? '' }), [trace, t, answer]);
   const awaitingReview = trace.status === 'running' && planDeliverables(trace).some((plan) => plan.status === 'awaiting');
   const running = trace.status === 'running' && !awaitingReview;
   const showAll = useAppSettingsStore((state) => state.settings.appearance.workProcessExpansion) === 'all';
-  const [expanded, toggle] = useScopedWorkDisclosure('root', running || showAll || trace.status === 'error' || trace.status === 'stopped');
+  const [expanded, toggle] = useScopedWorkDisclosure('root',
+    !awaitingReview && (running || showAll || trace.status === 'error' || trace.status === 'stopped'));
 
   const headlineCopy = trace.status === 'stopped'
     ? t('chat.workProcessHeadlineStopped')

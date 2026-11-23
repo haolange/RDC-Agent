@@ -78,7 +78,7 @@ describe('populated session rail', () => {
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
       openRailTab(host, 4);
-      expect(host.textContent).toContain('Scene.rdc · device.local');
+      expect(host.textContent).not.toContain('Scene.rdc · device.local');
       expect(host.textContent).not.toContain('Scene.rdc · device.local · control.replay.eventNumber');
       expect(host.textContent).not.toContain('EID');
       expect(button()?.disabled).toBe(true); expect(state.restoreRecovery).not.toHaveBeenCalled();
@@ -194,7 +194,7 @@ describe('populated session rail', () => {
       state.replay = { ...replay(), phase: 'error', revision: 3, error: { code: 'READ_FAILED', message: 'Readback failed', retry: 'image' } }; render();
       expect(host.querySelector('.capture-replay-image')?.getAttribute('aria-busy')).toBe('false');
       expect(host.querySelector('[role="alert"]')?.textContent).not.toContain('Readback failed');
-      expect(host.querySelector('[role="alert"] button[aria-label="app.copyDiagnostics"]')).not.toBeNull();
+      expect(host.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
       expect(button('control.replay.retryImage')?.disabled).toBe(false);
       expect(host.querySelector('.capture-replay-status')?.classList.contains('is-error')).toBe(true);
       expect([...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid'))).toEqual(['right-rail-capture']);

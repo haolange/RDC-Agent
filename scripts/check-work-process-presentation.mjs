@@ -1018,15 +1018,15 @@ const i18nSource = [
     .map((entry) => fs.readFileSync(path.join(CONTRACT_ROOT, 'src/renderer/i18n/locales', entry), 'utf8')),
 ].join('\n');
 const sectionModelSource = scriptRead('src/renderer/features/transcript/workProcessSectionModel.ts', 'utf8');
-// Steps are not numbered: a step leads with its thinking or commentary, or reads as its actions line.
+// Steps have no visible numbering.
 for (const [label, source] of [['components', componentSource], ['section model', sectionModelSource], ['i18n', i18nSource]]) {
   assert(!/workProcessSectionTitle|\bordinal\b|numberSections|markLastSectionOpen/.test(source), `${label} must not number Working steps`);
 }
-assert(/'thinking' \| 'thinking\+commentary' \| 'commentary' \| 'actions'/.test(sectionModelSource),
-  'section model must name the four step leads');
 assert(componentSource.includes("useScopedWorkDisclosure('root'"), 'Working root must use the scoped disclosure so a manual toggle wins');
 // Steps never fold: no per-step disclosure, no "N actions · time" toggle; the preference picks follow-latest or show-all.
 const sectionRowSource = scriptRead('src/renderer/features/transcript/WorkProcessSectionRow.tsx', 'utf8');
+assert(sectionRowSource.includes('rows={row.visibleSteps}') && !/leadRows|actionRows/.test(sectionRowSource),
+  'Working must render a single ordered list of model response events');
 assert(!/Disclosure|useScopedWorkDisclosure|actionsLabel/.test(sectionRowSource + sectionModelSource), 'Working steps must be laid out flat without a step toggle');
 assert(!/workProcessSectionRunning|workProcessSectionDone/.test(i18nSource), 'the step toggle copy must stay deleted');
 const viewportSource = scriptRead('src/renderer/features/transcript/WorkProcessViewport.tsx', 'utf8');
@@ -1057,15 +1057,12 @@ assert(
   'settled commentary must follow the loop outputPhase, not void it',
 );
 assert(
-  conversationEventHandlerSource.includes('turnHadAskPause')
-    && conversationEventHandlerSource.includes('resolveStreamingOutputPhase')
+  conversationEventHandlerSource.includes('resolveStreamingOutputPhase')
     && conversationEventHandlerSource.includes('upsertLoopTextItem')
     && conversationEventHandlerSource.includes('upsertLoopThinkingItem')
     && !conversationEventHandlerSource.includes('upsertLoopOutputItem')
-    && conversationEventHandlerSource.includes("outputPhase === 'commentary'")
-    && conversationEventHandlerSource.includes("stopReason === 'tool_use'")
-    && /pendingNewLoop\s*=\s*true/.test(conversationEventHandlerSource),
-  'ask/commentary pauses must set pendingNewLoop and preserve item-scoped streaming output',
+    && /event\.type === 'assistant\.completed'[\s\S]*?pendingNewLoop\s*=\s*true/.test(conversationEventHandlerSource),
+  'provider completion must close the response and preserve item-scoped output',
 );
 assert(
   /\.work-process-user-input-transcript\s*\{[^}]*gap:\s*var\(--space-4\)/.test(cssSource),

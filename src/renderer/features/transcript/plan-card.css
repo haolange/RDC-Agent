@@ -13,6 +13,19 @@
   cursor: var(--cursor-pointer, pointer);
 }
 
+.plan-card.is-process {
+  background: var(--token-bg-raised);
+  gap: var(--space-2);
+}
+
+.plan-card.is-process .plan-card__title {
+  font-size: var(--type-body-size);
+}
+
+.plan-card.is-process .plan-card__preview {
+  max-height: min(4lh, 24dvh);
+}
+
 .plan-card:hover { border-color: var(--token-border-focus); }
 .plan-card:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); }
 

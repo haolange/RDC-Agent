@@ -406,7 +406,7 @@ export class RdcSessionService {
               }));
             });
           } catch (error) {
-            const fatal = quarantineFatalReplayFailure(scope, lease, error, operation, operationArgs);
+            const fatal = quarantineFatalReplayFailure(lease, error, operation, operationArgs);
             if (fatal) { this.publish(binding, { phase: 'error', error: fatal }); throw error; }
             this.publish(binding, { error: { code: 'RDC_IMAGE_FAILED', message: String(error), retry: 'image' } });
           }
@@ -603,7 +603,7 @@ export class RdcSessionService {
           ...(!human ? { requestedEventId: observed.appliedEventId ?? null } : {}), phase: 'ready' });
       }
       catch (error) {
-        const fatal = quarantineFatalReplayFailure(scope, lease, error, 'rd.session.observe', args);
+        const fatal = quarantineFatalReplayFailure(lease, error, 'rd.session.observe', args);
         if (generation === binding.state.generation) this.publish(binding, { operationId, ...(!human ? { requestedEventId: null } : {}), image: null, observation: null, imageEventId: null, appliedEventId: null, target: null, targets: [], isFinalOutput: false,
           phase: fatal ? 'error' : 'ready', error: fatal ?? { code: 'RDC_OBSERVE_FAILED', message: String(error), retry: 'image' } });
       }

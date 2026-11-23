@@ -34,7 +34,7 @@ RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。
 
 Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽屉或自动收起后该接缝不再提供拖拽。
 
-对话是一列：page shell、transcript 与 Composer 共用 `.app-main` 上定义的 `--conversation-column-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）。这一列只有一对内容边界：Composer 外框、用户气泡右缘、Working 的标题、卡片与叙述、计划卡和正文都落在这两条竖线上；`--conversation-inset` 只是 Composer 的内边距。Working 的时间线竖线与事件点悬挂在左边界外侧的栏间距里（`--work-rail-hang`），与卡片、标题的相对位置不变；为了让它不被裁掉，page shell 是这一列加两侧栏间距（`--conversation-column-gutter`），`.chat-messages` 再用同样的内边距把内容放回列边，任何宽度下 transcript 与 Composer 都是同一对边界。不再有 Working 专用的收口变量、负外边距或更窄的 content-rail。运行记录是主栏底部的抽屉，占用高度而不覆盖消息。
+对话是一列：page shell、transcript 与 Composer 共用 `.app-main` 上定义的 `--conversation-column-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）。Composer 外框、用户气泡右缘、正式计划卡和回复正文使用外列边界。Working 标题、卡片和叙述共用对称内缩边界，`--conversation-inset` 只是 Composer 的内边距。Working 的时间线竖线与事件点悬挂在左边界外侧的栏间距里（`--work-rail-hang`），与卡片、标题的相对位置不变；为了让它不被裁掉，page shell 是这一列加两侧栏间距（`--conversation-column-gutter`），`.chat-messages` 再用同样的内边距把内容放回列边，任何宽度下 transcript 与 Composer 都是同一对边界。不再有 Working 专用的收口变量、负外边距或更窄的 content-rail。运行记录是主栏底部的抽屉，占用高度而不覆盖消息。
 
 - 用户 prompt：右对齐 raised bubble（`fit-content`、`--token-surface-raised`）。
 - Assistant final answer、Work Process（含 tool 卡片）、loop commentary：full-bleed 透明散文；`.conversation-thread` 共用 `padding-inline: var(--space-3)`。
@@ -158,11 +158,11 @@ Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent 
 
 RDC 非空时保留固定卡片：文件与大小、实际设备与打开/关闭、紧凑控制权状态、唯一等比完整画面、颜色输出与 EID 控件、唯一原生事件滑条和简短反馈。人工与 Agent 共享同一套实际 EID 回放，不设双 Tab、Agent 足迹折叠区、历史播放或返回当前入口。EID 输入和滑条操作实际回放，不浏览历史快照。
 
-Agent preparing/running、委派和原生退出未确认均以主进程 interactionLock 为权威，禁用文件/设备/打开/关闭/刷新与事件操作；同一控件原位显示并跟随实际 EID，锁释放后原位恢复，不自动 apply。控制权用一行状态呈现，详细锁定原因放 title，不重复展示大幅说明。requested/applied/image EID 在途状态分别表达，旧图不得改标为新事件；图片读取失败可独立重试，不触发 replay。后台证据保存与既有记录保留，不构成第二套 UI。
+Agent preparing/running、委派和原生退出未确认均以主进程 interactionLock 为权威，禁用文件/设备/打开/关闭/刷新与事件操作；同一控件原位显示并跟随实际 EID，锁释放后原位恢复，不自动 apply。控制权用一行状态呈现，详细锁定原因用提示显示。事件输入显示请求的位置，在途时单列已应用事件，图像标注其来源事件。单一输出只显示一次。旧图保留原事件标注；图片读取失败可独立重试，不触发 replay。后台证据保存与既有记录保留，不构成第二套 UI。
 
 项目 RDC 为零时保持改造前原空态，不显示选择器、画面或历史。右栏宽度、drawer、五个标签的顺序不变；不恢复独立 preview 窗口，不加最小窗口宽度。Tasks 只展示任务与定位入口，不提供额外的「停止此会话全部工作」按钮；停止执行沿用 Composer 的会话级 Stop 生命周期。
 
-计划卡是文档预览入口，整卡是一个按钮：类型和真实状态、左对齐标题、摘要与章节的有界 Markdown 摘录。摘录只取正文章节；正文之后的执行引用（规划者写的 `## Execution references` 与主进程生成的合同）不进入卡片，在阅读器里收进默认折叠的「执行引用」披露。短内容自然收缩，长内容裁切且不产生卡内滚动；预览不含链接、代码复制等次级交互，点击或键盘（Tab/Enter/Space）打开阅读器，选择文字不触发打开。不展示内部 URI，不在卡片内批准或折叠分节。
+正式计划卡是规划回合的回复。Working 内以紧凑剪影呈现同一修订及真实决定状态。两处整卡均打开同一阅读器，提供左对齐标题和有界 Markdown 摘录。摘录只取正文章节；正文之后的执行引用（规划者写的 `## Execution references` 与主进程生成的合同）不进入卡片，在阅读器里收进默认折叠的「执行引用」披露。短内容自然收缩，长内容裁切且不产生卡内滚动；预览不含链接、代码复制等次级交互，点击或键盘（Tab/Enter/Space）打开阅读器，选择文字不触发打开。不展示内部 URI，不在卡片内批准或折叠分节。
 
 Composer 计划门只显示“实施此计划？”、当前计划声明的全部执行目标及常驻的修改意见 Textarea。`HandoffActionRow` 的 decisions 展示逐项列出目标；普通续跑建议保留 buttons 展示。空意见不可提交，提交期间禁止重复操作，失败保留意见。会话、turn/tool call 和计划 revision/hash 共同隔离本地状态；切换会话、Stop、替换或撤销请求后丢弃迟到续跑，批准事件先于 IPC 返回也不误丢合法续跑。
 

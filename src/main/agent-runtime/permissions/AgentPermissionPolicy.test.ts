@@ -118,6 +118,10 @@ it('classifies replay lifecycle separately from read-only probe queries', () => 
   expect(decision('probe', 'auto-review', 'read-only').action).toBe('allow');
   expect(decision('capture_select', 'full-access', 'read-only').action).toBe('deny');
   expect(decision('capture_select', 'auto-review', 'full').action).toBe('auto_review');
+  expect(decision('capture_restore', 'auto-review', 'full')).toMatchObject({ action: 'auto_review', operationFacts: {
+    operation: 'capture_restore', scope: 'owning approved replay',
+    operationContract: { description: expect.stringContaining('signed entry position') },
+  } });
   expect(decision('capture_select', 'full-access', 'full').action).toBe('allow');
   expect(decision('capture_select', 'full-access', 'full', { approval: 'mutation' }).action).toBe('ask_user');
 });

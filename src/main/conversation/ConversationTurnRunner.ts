@@ -1,6 +1,5 @@
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { nowMs } from '@shared/utils/id';
-import { stoppedReplyText } from '@shared/conversation/loopItems';
 import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
@@ -223,7 +222,7 @@ export async function completeProfileTurn(
     );
     commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
-      content: assistantMessage.content || stoppedReplyText(stoppedTrace?.blocks ?? []),
+      content: assistantMessage.content,
       workTrace: finalizeTrace(stoppedTrace, 'stopped'),
     });
   };
@@ -280,8 +279,6 @@ export async function completeProfileTurn(
   let loopHasTools = false;
   let pendingNewLoop = false;
   let currentLoopOutputPhase: ConversationLoopOutputPhase | undefined;
-  /** After ask_user pause, subsequent assistant content must not reuse the ask commentary loop. */
-  let turnHadAskPause = false;
   const pendingContinuation: ConversationLoopContinuationState = {
     approval: false,
     userInput: false,
@@ -293,12 +290,6 @@ export async function completeProfileTurn(
     // assigned only by assistant.completed after the stop reason is known.
     currentLoopOutputPhase = 'commentary';
   };
-  const hasPendingContinuation = () => (
-    pendingContinuation.approval
-    || pendingContinuation.userInput
-    || pendingContinuation.planReview
-    || pendingContinuation.handoff
-  );
   const resolveStreamingOutputPhase = (): ConversationLoopOutputPhase | undefined => {
     return currentLoopOutputPhase;
   };
@@ -309,13 +300,10 @@ export async function completeProfileTurn(
   Object.defineProperty(turnStreamState, 'currentLoopText', { get: () => currentLoopText, set: (value) => { currentLoopText = value; } });
   Object.defineProperty(turnStreamState, 'currentLoopProviderOutputRefs', { get: () => currentLoopProviderOutputRefs, set: (value) => { currentLoopProviderOutputRefs = value; } });
   Object.defineProperty(turnStreamState, 'loopHasTools', { get: () => loopHasTools, set: (value) => { loopHasTools = value; } });
-  Object.defineProperty(turnStreamState, 'visibleResponse', { get: () => visibleResponse, set: (value) => { visibleResponse = value; } });
-  Object.defineProperty(turnStreamState, 'canonicalOutput', { get: () => canonicalOutput, set: (value) => { canonicalOutput = value; } });
   Object.defineProperty(turnStreamState, 'runWasCancelled', { get: () => runWasCancelled, set: (value) => { runWasCancelled = value; } });
   Object.defineProperty(turnStreamState, 'loopSeq', { get: () => loopSeq, set: (value) => { loopSeq = value; } });
   Object.defineProperty(turnStreamState, 'pendingNewLoop', { get: () => pendingNewLoop, set: (value) => { pendingNewLoop = value; } });
   Object.defineProperty(turnStreamState, 'currentLoopOutputPhase', { get: () => currentLoopOutputPhase, set: (value) => { currentLoopOutputPhase = value; } });
-  Object.defineProperty(turnStreamState, 'turnHadAskPause', { get: () => turnHadAskPause, set: (value) => { turnHadAskPause = value; } });
   Object.defineProperty(turnStreamState, 'assistantMessage', { get: () => assistantMessage, set: (value) => { assistantMessage = value; } });
   Object.defineProperty(turnStreamState, 'errorViewModel', { get: () => errorViewModel, set: (value) => { errorViewModel = value; } });
   Object.defineProperty(turnStreamState, 'llmDiagnostic', { get: () => llmDiagnostic, set: (value) => { llmDiagnostic = value; } });
@@ -399,6 +387,7 @@ export async function completeProfileTurn(
           turnControls,
           requestPlan: planning.plan,
           preparedTurn: input.preparedTurn,
+          allowInformationalReply: input.userMessage.planReference?.intent !== 'execute',
           userContent: userInput.content,
           visibleTurnIds: prepared.visibleTurnIds,
           activeBranchId: assistantMessage.branchId ?? input.userMessage.branchId ?? ROOT_BRANCH_ID,
@@ -418,12 +407,11 @@ export async function completeProfileTurn(
           },
           onEvent: createAgentEventHandler({
             host, sessionId, input, agentLabel, turnStreamState,
-            commitAssistantMessage, commitVisibleAssistantText, commitThinkingTrace,
+            commitAssistantMessage, commitThinkingTrace,
             beginAssistantContentLoop, markLoopCommentary,
             currentLoopId, resolveStreamingOutputPhase,
             seenCompactionSummaries, showWorkTrace, withWorkTrace, recordProviderOutputRefs,
             currentLoopOptions, pendingContinuation,
-            hasPendingContinuation: () => Boolean(hasPendingContinuation()),
           }),
         },
       );

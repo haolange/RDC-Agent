@@ -13,11 +13,10 @@ export function replayObservationLease(scope: SessionScope, owner: RdcRuntimeCon
 }
 
 /** A fatal controller cannot safely be treated as a retryable image-export failure. */
-export function quarantineFatalReplayFailure(scope: SessionScope, lease: RdcContextLease | null, error: unknown,
-  operation: 'rd.session.get_replay_events' | 'rd.session.observe', args: Record<string, unknown>) {
+export function quarantineFatalReplayFailure(lease: RdcContextLease | null, error: unknown, operation: string, args: unknown) {
   if (!(error instanceof RdcNativeFailure)
     || !['replay_fatal_error', 'replay_health_unavailable'].includes(error.nativeError.code)) return null;
-  if (lease) quarantineRdcContext(scope.sessionId, lease.version,
+  if (lease) quarantineRdcContext(lease.ownerSessionId, lease.version,
     'Native replay health is uncertain; close or recover this capture before further execution.',
     { operation, argsFingerprint: rdcDigest(args), code: error.nativeError.code });
   return { code: error.nativeError.code, message: String(error), retry: 'close' as const };

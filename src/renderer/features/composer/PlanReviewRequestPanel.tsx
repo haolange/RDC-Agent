@@ -4,7 +4,6 @@ import { Textarea } from '../../ui/Textarea';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { InlineError } from '../../ui/InlineError';
-import { Spinner } from '../../ui/Spinner';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { cancelPlanReview } from '../../services/planReviewService';
@@ -88,7 +87,7 @@ export const PlanReviewRequestPanel: React.FC<{
   };
 
   return (
-    <section className="composer-plan-review" data-testid="plan-review-request-panel" aria-busy={isSubmitting}>
+    <section className="composer-plan-review" data-testid="plan-review-request-panel" aria-busy={isSubmitting || !!transition}>
       <div className="composer-plan-review__header">
         <h2 className="composer-plan-review__title">{t('chat.planReviewImplement')}</h2>
         <IconButton className="composer-plan-review__stop" size="sm" label={t('chat.planReviewStop')}
@@ -132,7 +131,9 @@ export const PlanReviewRequestPanel: React.FC<{
         </IconButton>
       </div>
       {modelSave.error ? <InlineError detail={modelSave.error} onRetry={modelSave.retry ?? undefined} retryLabel={t('composer.model.retrySave')}>{t('app.error.saveFailed')}</InlineError> : null}
-      {isSubmitting || transition ? <p className="composer-transition-status" role="status"><Spinner size="sm" />{t(transition?.phase === 'handoff' ? 'composer.handoff.switching' : 'composer.handoff.confirming')}</p> : null}
+      <span className="composer-transition-announcement" role="status">
+        {isSubmitting || transition ? t(transition?.phase === 'handoff' ? 'composer.handoff.switching' : 'composer.handoff.confirming') : ''}
+      </span>
       {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
       {modelStatus.labelKey && (capabilityState.status === 'error' || capabilityState.status === 'unavailable') ? (
         <InlineError detail={capabilityState.message} onRetry={retryCapability} retryLabel={t('composer.effort.capabilityRetry')}>

@@ -100,6 +100,22 @@ describe('native RDC probe', () => {
     expect(executeCli).not.toHaveBeenCalled();
   });
 
+  it('records an ordinary probe replay fault on its owning lease so the turn can recover', async () => {
+    const current = context();
+    const executeCli = vi.fn<NonNullable<RdcProbeToolDeps['executeCli']>>(async () => result(1, {
+      schema_version: '3.0.0', ok: false, result_kind: 'rd.resource.list',
+      error: { code: 'replay_fatal_error', category: 'runtime', message: 'Connection lost to remote server' },
+    }));
+    const tool = createRdcProbeTool('s', 'p', { executeCli });
+    const query = { action: 'probe', args: { action: 'resource_list' } } as const;
+    expect((await tool.execute('resources', query, undefined, undefined, current)).isError).toBe(true);
+    expect(getRdcContextLease('s')?.quarantineCause).toMatchObject({
+      operation: 'rd.resource.list', code: 'replay_fatal_error', argsFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect((await tool.execute('repeat', query, undefined, undefined, current)).isError).toBe(true);
+    expect(executeCli).toHaveBeenCalledOnce();
+  });
+
   it('restores the entry event after a pipeline query and quarantines an unconfirmed restoration', async () => {
     const current = context();
     const processIdentity = { status: 'available', daemon: { pid: 10, start_generation: 'windows-filetime:1' },

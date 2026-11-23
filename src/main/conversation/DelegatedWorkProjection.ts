@@ -61,6 +61,7 @@ export function projectDelegatedEvent(state: DelegatedProjectionState, event: Ag
     }
   } else if (event.type === 'assistant.text_end') {
     const item = event.payload as AgentAssistantDeltaPayload;
+    beginContent();
     trace = upsertLoopTextItem(trace, loopId(), item.providerOutputRef, safeText(item.text), item.phase, 'complete');
   } else if (event.type === 'assistant.thinking_delta' || event.type === 'assistant.thinking_end') {
     const incoming = payload.thinking as ThinkingArtifact | undefined;

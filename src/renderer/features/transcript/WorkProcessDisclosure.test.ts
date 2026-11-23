@@ -86,6 +86,15 @@ it('keeps streamed text in the same DOM node when its phase is confirmed', async
     expect([...host.querySelectorAll('[data-testid="work-process-output"], [data-testid="work-process-tool-call"]')]
       .map((entry) => entry.getAttribute('data-testid'))).toEqual(['work-process-output', 'work-process-tool-call']);
     expect(host.querySelector('[data-testid="work-process-tool-call"] [data-active-signal="info"]')).not.toBeNull();
+    const afterTool = { ...output, providerOutputRef: { ...output.providerOutputRef, providerBlockKey: 'text:2', contentIndex: 2 },
+      text: 'Replay is ready', phase: 'commentary' as const, displayOrder: 4 };
+    const unaccepted = { ...afterTool, providerOutputRef: { ...output.providerOutputRef, providerBlockKey: 'text:3', contentIndex: 3 },
+      text: 'Unaccepted answer', phase: 'final_answer' as const, displayOrder: 5 };
+    trace.blocks[0].items.push(afterTool, unaccepted);
+    await render();
+    expect([...host.querySelectorAll('[data-testid="work-process-output"], [data-testid="work-process-tool-call"]')]
+      .map((entry) => entry.getAttribute('data-testid'))).toEqual(['work-process-output', 'work-process-tool-call', 'work-process-output']);
+    expect(host.textContent).not.toContain('Unaccepted answer');
     trace.blocks[0].toolCalls[0].approval = { approvalId: 'approval', status: 'pending' };
     await render();
     expect(host.querySelector('[data-testid="work-process-tool-call"] [data-active-signal="info"]')).toBeNull();

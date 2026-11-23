@@ -976,7 +976,7 @@ Mission 读取 Checkpoint，重新检索 Knowledge
 
 `partial`、`blocked`、`budget_paused` 必须逐项列出未决工作：缺口是什么、试过什么、被什么阻止、什么条件下可以恢复。
 
-`completed` 的条件：必需覆盖完成；结论达到所声明的验证等级；没有开放的 Challenge（Challenge 只记录阻止结论按现措辞成立的缺口，不影响结论成立的审查备注进入交付的未知项）；交付写清结论、证据、验证覆盖与未决项；正式报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer；已写 Mission Checkpoint；回放现场已恢复到进入时的位置。
+`completed` 的条件：必需覆盖完成；结论达到所声明的验证等级；没有开放的 Challenge（Challenge 只记录阻止结论按现措辞成立的缺口，不影响结论成立的审查备注进入交付的未知项）；交付写清结论、证据、验证覆盖与未决项；General 已写 Mission Checkpoint 与 ready Report，并将当前报告的 URI 和内容哈希附在完成声明中；回放现场已恢复到进入时的位置。
 
 四种"完成"不等价：
 
@@ -3743,7 +3743,7 @@ Optimizer investigates efficiency
 
 最终 Claim、Evidence、Experiment 和 Artifact 先确定，再生成报告。
 
-General 就地交付写清结论、证据、验证覆盖与未决项；正式报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer。报告不是 General 完成的前置条件。
+General 在声明完成前保存当前的 ready Report，按需委派 Report Writer 组织材料。General 的终答就地交付结论、证据、验证覆盖与未决项。用户切回 Mission 时可以基于已有报告和 Checkpoint 重新评估。
 
 Visual Design Skill 只能改变：
 
@@ -4188,7 +4188,7 @@ RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 - 一套 Context Engineering；
 - 一套 Evidence / Experiment；
 - 一个 Knowledge Engine；
-- 统一的报告与评价：报告由 Mission 在用户切回评估时产出，或按需委托 Report Writer（5.7、14.1）；评价见第 15 章。
+- 统一的报告与评价：General 在执行回合交付当前报告，可按需委托 Report Writer（5.7、14.1）；用户切回 Mission 时可启动下一轮评估，见第 15 章。
 
 ---
 

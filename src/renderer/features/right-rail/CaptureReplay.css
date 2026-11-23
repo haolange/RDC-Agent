@@ -56,11 +56,6 @@
   background: color-mix(in srgb, var(--token-status-warning) 8%, transparent);
   color: var(--token-status-warning);
 }
-.capture-replay-callout.is-error {
-  border-color: color-mix(in srgb, var(--token-status-error) 26%, transparent);
-  background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
-  color: var(--token-status-error);
-}
 .capture-replay-callout.is-info {
   border-color: color-mix(in srgb, var(--token-status-info) 22%, transparent);
   background: color-mix(in srgb, var(--token-status-info) 8%, transparent);
@@ -81,7 +76,8 @@
 .capture-replay-image > span { max-width: 100%; padding: var(--space-3); color: var(--token-text-secondary); font-size: var(--type-body-size); text-align: center; overflow-wrap: anywhere; }
 .capture-replay-image .capture-image-state { position: absolute; inset: auto 0 0; padding: var(--space-2); border-top: 1px solid var(--token-border-subtle); background: var(--token-bg-panel); }
 .capture-image-toolbar { color: var(--token-text-secondary); font-size: var(--type-meta-size); }
-.capture-image-toolbar > div { max-width: 55%; }
+.capture-image-toolbar { flex-wrap: wrap; }
+.capture-image-toolbar > div { min-width: 0; max-width: 100%; }
 .capture-event-controls { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
 .capture-event-input { display: flex; align-items: center; justify-content: center; gap: var(--space-2); min-width: 0; color: var(--token-text-secondary); font-size: var(--type-meta-size); }
 .capture-event-input .input { max-width: 8ch; min-width: 0; text-align: center; font-variant-numeric: tabular-nums; }

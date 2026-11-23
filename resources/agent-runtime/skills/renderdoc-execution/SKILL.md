@@ -59,4 +59,4 @@ General 的终答就是交付，按这个顺序写：
 3. **未知项与未覆盖的范围**：单独成段，放在结论之后。
 4. **现场与后续**：现场是否已恢复，是否需要用户决定。
 
-正式报告由 Mission 在用户切回时产出，需要时可委派 report-writer。获批目标、必要核验、相关 Challenge 与现场恢复都闭合后声明 completed，否则如实声明 partial 或 blocked。
+在会话内写 WorldState、Claim、Checkpoint 和 ready Report。核验、Challenge 与现场恢复闭合后，用报告 URI/hash 声明 completed；受阻如实声明 partial 或 blocked。
