@@ -752,15 +752,13 @@ export class ConversationHistoryStore {
       }
       const classification = classifications?.[index];
       const stats = fs.statSync(sourcePath);
-      const sourceName = classification?.fileName || path.basename(sourcePath);
-      const extension = path.extname(sourceName);
-      const baseName = path.basename(sourceName, extension);
-      let fileName = path.basename(sourceName);
+      const fileName = path.basename(classification?.fileName || sourcePath);
+      const extension = path.extname(fileName);
+      const baseName = path.basename(fileName, extension);
       let targetPath = path.join(logicalAttachmentsDir, fileName);
       let counter = 2;
       while (fs.existsSync(targetPath) || reserved.has(targetPath.toLowerCase())) {
-        fileName = `${baseName}-${counter}${extension}`;
-        targetPath = path.join(logicalAttachmentsDir, fileName);
+        targetPath = path.join(logicalAttachmentsDir, `${baseName}-${counter}${extension}`);
         counter += 1;
       }
       reserved.add(targetPath.toLowerCase());
@@ -792,7 +790,7 @@ export class ConversationHistoryStore {
   ): SessionAttachmentRecord[] {
     const planned = this.planAttachmentsForTurn(session, sourcePaths, logicalAttachmentsDir);
     for (let index = 0; index < planned.length; index += 1) {
-      const targetPath = path.join(physicalAttachmentsDir, planned[index]!.fileName);
+      const targetPath = path.join(physicalAttachmentsDir, path.basename(planned[index]!.filePath));
       fs.copyFileSync(path.resolve(sourcePaths[index]!), targetPath);
     }
     return planned;

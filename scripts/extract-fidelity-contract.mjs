@@ -22,11 +22,13 @@ const testIdPatterns = [
   /data-testid\s*=\s*'([^']+)'/g,
   /data-testid\s*=\s*\{`([^`]+)`\}/g,
   /data-testid\s*=\s*\{\s*['"]([^'"]+)['"]\s*\}/g,
+  /\b(?:data-testid|dataTestId)\s*=\s*\{[^{}?]+\?\s*['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]\s*\}/g,
   /dataTestId\s*=\s*"([^"]+)"/g,
   /dataTestId\s*=\s*'([^']+)'/g,
   // Shared parts take the id as a prop (SettingsField, SettingsDiagnostics, ResourceTrustBlock).
   /\btestId\s*=\s*"([^"]+)"/g,
   /\btestId:\s*'([^']+)'/g,
+  /\btestId:\s*`([^`]+)`/g,
 ];
 
 const testIds = new Set();
@@ -34,8 +36,10 @@ for (const filePath of walkTsx(rendererRoot)) {
   const content = fs.readFileSync(filePath, 'utf8');
   for (const pattern of testIdPatterns) {
     for (const match of content.matchAll(pattern)) {
-      const value = match[1]?.trim();
-      if (value) testIds.add(value);
+      for (const capture of match.slice(1)) {
+        const value = capture?.trim();
+        if (value) testIds.add(value);
+      }
     }
   }
 }

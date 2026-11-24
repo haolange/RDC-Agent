@@ -28,7 +28,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   const { status, flush } = useSettingsAutosave(`${accountDraft.nickname}\u0000${accountDraft.avatarPath ?? ''}`, pending, onSave);
 
   return (
-    <SettingsSection title={t('settings.profile')} className="settings-profile-section" data-settings-search="profile">
+    <SettingsSection variant="rows" title={t('settings.profile')} className="settings-profile-section" data-settings-search="profile">
       <div className="settings-profile-row">
         <button type="button" className="settings-profile-avatar-button" aria-label={t('settings.changeAvatar')}
           data-tooltip={t('settings.changeAvatar')} onClick={() => void onAvatarSelect()}>
@@ -48,7 +48,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
           onBlur={flush}
         />
         <SettingsSaveMark status={status} savingLabel={t('settings.saving')} savedLabel={t('settings.profileSaved')}
-          errorLabel={t('settings.profileSaveFailed')} />
+          errorLabel={t('settings.profileSaveFailed')} onRetry={flush} retryLabel={t('settings.retry')} />
       </div>
     </SettingsSection>
   );

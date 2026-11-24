@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { createHash, randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import { sanitizeUiPreferences } from '@shared/theme/uiPreferences';
 import {
   DEFAULT_APPEARANCE,
@@ -130,21 +130,6 @@ export function assertPersistedSettingsSchemaVersion(raw: unknown, filePath: str
   if (llm && typeof llm === 'object' && !Array.isArray(llm) && 'agentRoutes' in llm) {
     throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} contains retired persisted agent routes`);
   }
-}
-
-/** Async counterpart of `readJsonFile` for event-loop-friendly reads. */
-export async function readJsonFileAsync<T>(filePath: string): Promise<T | null> {
-  let parsed: T;
-  try {
-    const raw = await fs.promises.readFile(filePath, 'utf8');
-    parsed = JSON.parse(raw) as T;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException | undefined)?.code;
-    if (code === 'ENOENT') return null;
-    throw new StorageSchemaError(`STORAGE_CORRUPT: ${filePath} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  assertPersistedSettingsSchemaVersion(parsed, filePath);
-  return parsed;
 }
 
 export function createDefaultRuntimeSettings(): AppSettings {
@@ -331,18 +316,6 @@ export function writeSettings(settings: PersistedSettingsPayload): void {
     fs.renameSync(temporaryPath, filePath);
   } finally {
     if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
-  }
-}
-
-export async function writeSettingsAsync(settings: PersistedSettingsPayload): Promise<void> {
-  const filePath = appPathService.getRuntimePaths().settingsPath;
-  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-  try {
-    await fs.promises.writeFile(temporaryPath, JSON.stringify(settings, null, 2), 'utf8');
-    await fs.promises.rename(temporaryPath, filePath);
-  } finally {
-    await fs.promises.rm(temporaryPath, { force: true });
   }
 }
 

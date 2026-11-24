@@ -1,16 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { Details } from '../../../../ui/Details';
-import { EmptyState } from '../../../../ui/EmptyState';
-import { SearchField } from '../../../../ui/SearchField';
-import { getProviderCategoryTranslation } from '../utils';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '../../../../ui/Button';
+import { Icon } from '../../../../ui/Icon';
 import { ProviderCard } from './ProviderCard';
+import { ProviderDirectory } from './ProviderDirectory';
 import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
-import { isProviderActionBlocked } from './providerCardModel';
 import type { ProviderCatalogCategory } from '../types';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProvidersSettingsProps {
   accountProviders: LlmProviderEntry[];
@@ -19,96 +15,57 @@ interface ProvidersSettingsProps {
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
   onDisconnectProvider: (provider: LlmProviderEntry) => void | Promise<void>;
   onOpenProviderConnection: (provider: LlmProviderEntry) => void;
-  t: Translate;
+  t: ReturnType<typeof useI18n>['t'];
 }
 
-/**
- * Model services as cards, grouped the way people connect them, each group with one sentence on what it is.
- * Opening a card brings up that service's panel; services that are not available yet fold away at the end.
- */
-export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
-  accountProviders,
-  providerCatalog,
-  providerCatalogCategories,
-  getResolvedProviderLabel,
-  onDisconnectProvider,
-  onOpenProviderConnection,
-  t,
-}) => {
-  const [query, setQuery] = useState('');
-  const matchesQuery = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase();
-    return (provider: LlmProviderEntry) => !needle || [
-      provider.label,
-      ...provider.models.map((model) => model.label ?? model.id),
-    ].join(' ').toLocaleLowerCase().includes(needle);
-  }, [query]);
-
-  const visibleAccounts = accountProviders.filter((provider) => !isProviderActionBlocked(provider) && matchesQuery(provider));
-  const visibleCatalog = providerCatalog.filter((provider) => !isProviderActionBlocked(provider) && matchesQuery(provider));
-  const upcoming = [...accountProviders, ...providerCatalog].filter((provider) => isProviderActionBlocked(provider) && matchesQuery(provider));
-
-  const categoryIds = new Set(providerCatalogCategories.map((category) => category.id));
-  const extraGroups = Array.from(new Set(visibleCatalog.map((provider) => provider.category).filter((group) => !categoryIds.has(group))));
-  const catalogSections = [
-    ...providerCatalogCategories,
-    ...extraGroups.map((group) => ({ id: group, label: group, description: '' })),
-  ]
-    .filter((category) => category.id !== 'login-authorization')
-    .map((category) => ({ category, providers: visibleCatalog.filter((provider) => provider.category === category.id) }))
-    .filter(({ providers }) => providers.length > 0);
-
-  const renderCard = (provider: LlmProviderEntry) => (
-    <ProviderCard key={provider.id} provider={provider} label={getResolvedProviderLabel(provider)}
-      onDisconnect={onDisconnectProvider} onOpenConnection={onOpenProviderConnection} t={t} />
-  );
-  const renderGroup = (title: string, description: string, providers: LlmProviderEntry[], testId: string) => (
-    <section className="settings-provider-group" data-testid={testId} key={testId}>
-      <header className="settings-provider-group-head">
-        <h3 className="settings-provider-group-title">{title}</h3>
-        {description ? <p className="settings-section-description">{description}</p> : null}
-      </header>
-      <div className="settings-provider-grid">{providers.map(renderCard)}</div>
-    </section>
-  );
-  const nothingVisible = visibleAccounts.length + visibleCatalog.length + upcoming.length === 0;
-
-  return (
-    <>
-      <ProviderProbeBatchPanel t={t} />
-      <SearchField
-        className="settings-provider-search"
-        value={query}
-        aria-label={t('settings.searchProviders')}
-        placeholder={t('settings.searchProviders')}
-        onChange={(event) => setQuery(event.target.value)}
-        onClear={() => setQuery('')}
-        clearLabel={t('app.clearSearch')}
-        data-testid="settings-provider-search"
-      />
-      {nothingVisible ? <EmptyState title={t('settings.providerSearchEmpty')} /> : null}
-      {visibleAccounts.length > 0
-        ? renderGroup(t('settings.oauthAccounts'), t(getProviderCategoryTranslation('login-authorization').description),
-          visibleAccounts, 'settings-oauth-accounts')
-        : null}
-      {catalogSections.map(({ category, providers }) => renderGroup(
-        t(getProviderCategoryTranslation(category.id).label),
-        t(getProviderCategoryTranslation(category.id).description),
-        providers,
-        `settings-provider-group-${category.id}`,
-      ))}
-      {upcoming.length > 0 ? (
-        <Details className="settings-provider-upcoming" data-testid="settings-provider-upcoming"
-          summaryClassName="settings-provider-upcoming-summary" summary={<>
-            <span>{t('settings.providers.upcoming')}</span>
-            <span>{t('settings.providerCount', { count: upcoming.length })}</span>
-          </>}>
-          <div className="settings-provider-upcoming-body">
-            <p className="settings-section-description">{t('settings.providers.upcomingHint')}</p>
-            <div className="settings-provider-grid">{upcoming.map(renderCard)}</div>
-          </div>
-        </Details>
-      ) : null}
-    </>
-  );
-};
+export function ProvidersSettings({ accountProviders, providerCatalog, providerCatalogCategories,
+  getResolvedProviderLabel, onDisconnectProvider, onOpenProviderConnection, t }: ProvidersSettingsProps) {
+  const [adding, setAdding] = useState(false);
+  const cards = useRef<HTMLDivElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const pendingDisconnect = useRef<{ id: string; index: number } | null>(null);
+  const entries = useMemo(() => [...new Map([...providerCatalog, ...accountProviders]
+    .map(entry => [entry.id, entry])).values()], [providerCatalog, accountProviders]);
+  const configured = entries.filter(entry => entry.isConfigured);
+  const browse = adding || !configured.length;
+  useLayoutEffect(() => {
+    const pending = pendingDisconnect.current;
+    if (!pending) return;
+    const remaining = configured.find(provider => provider.id === pending.id);
+    if (remaining) {
+      if (remaining.status === 'failed') pendingDisconnect.current = null;
+      return;
+    }
+    pendingDisconnect.current = null;
+    // A slow disconnect can finish after the user has already moved elsewhere.
+    if (document.activeElement !== document.body) return;
+    const buttons = cards.current?.querySelectorAll<HTMLButtonElement>('.settings-provider-card-actions button');
+    const next = buttons?.[Math.min(pending.index, buttons.length - 1)];
+    (next ?? search.current)?.focus();
+  }, [configured]);
+  return <>
+    <div className="settings-provider-toolbar">
+      <h3 className="settings-provider-group-title">{t(browse ? 'settings.directory.add' : 'settings.configuredServices')}</h3>
+      <div className="settings-provider-actions">
+        {configured.length > 0 ? (
+          <Button variant={browse ? 'secondary' : 'primary'} size="sm" aria-expanded={browse}
+            data-testid="settings-provider-directory-toggle" onClick={() => setAdding(!adding)}>
+            {browse ? null : <Icon name="plus" size={14} />}
+            {t(browse ? 'settings.configuredServices' : 'settings.directory.add')}
+          </Button>
+        ) : null}
+        <ProviderProbeBatchPanel t={t} />
+      </div>
+    </div>
+    {browse ? <ProviderDirectory searchRef={search} entries={entries.filter(entry => !entry.isConfigured)} categories={providerCatalogCategories}
+      onChoose={onOpenProviderConnection} t={t} /> : (
+      <div ref={cards} className="settings-provider-grid" data-testid="settings-configured-services">
+        {configured.map((provider, index) => <ProviderCard key={provider.id} provider={provider} label={getResolvedProviderLabel(provider)}
+          onOpenConnection={onOpenProviderConnection} onDisconnect={entry => {
+            pendingDisconnect.current = { id: entry.id, index };
+            return onDisconnectProvider(entry);
+          }} t={t} />)}
+      </div>
+    )}
+  </>;
+}

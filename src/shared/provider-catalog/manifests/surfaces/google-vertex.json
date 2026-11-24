@@ -31,6 +31,15 @@
       "refreshedAt": "2026-07-15",
       "identityId": "google-vertex",
       "surface": "google-vertex"
+    },
+    {
+      "id": "provider-docs:google-vertex:gemini4-2026-11-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions ; https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start/get-started-with-gemini-4 ; https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking ; https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/tools/function-calling ; https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-neon ; https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-hydrogen",
+      "observedAt": "2026-11-24",
+      "refreshedAt": "2026-11-24",
+      "surface": "google-vertex",
+      "accountScope": "public-api"
     }
   ],
   "defaultFactSourceId": "models.dev:google-vertex:0",
@@ -122,8 +131,227 @@
       "parserId": "google-vertex-models"
     }
   },
-  "models": [],
+  "models": [
+    {
+      "modelId": "gemini-4-carbon",
+      "label": "Gemini 4 Carbon",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "discovered",
+      "route": {
+        "protocol": "GoogleVertexGemini",
+        "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/google",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:google-vertex:gemini4-2026-11-24"
+    },
+    {
+      "modelId": "gemini-4-neon",
+      "label": "Gemini 4 Neon",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "discovered",
+      "route": {
+        "protocol": "GoogleVertexGemini",
+        "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/google",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:google-vertex:gemini4-2026-11-24"
+    },
+    {
+      "modelId": "gemini-4-hydrogen",
+      "label": "Gemini 4 Hydrogen",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "discovered",
+      "route": {
+        "protocol": "GoogleVertexGemini",
+        "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/google",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:google-vertex:gemini4-2026-11-24"
+    }
+  ],
   "protocolOverrides": [],
-  "recommendedModels": [],
+  "recommendedModels": [
+    "gemini-4-carbon",
+    "gemini-4-neon",
+    "gemini-4-hydrogen"
+  ],
   "docsUrl": "https://cloud.google.com/vertex-ai/generative-ai/docs/models"
 }

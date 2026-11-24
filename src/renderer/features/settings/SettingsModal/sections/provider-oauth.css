@@ -19,8 +19,3 @@
   font-size: var(--type-body-size);
   line-height: var(--type-body-line);
 }
-
-.settings-provider-oauth-diagnostics {
-  display: flex;
-  justify-content: flex-end;
-}

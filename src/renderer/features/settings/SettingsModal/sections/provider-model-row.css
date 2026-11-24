@@ -1,137 +1,105 @@
 .settings-model-row {
-  width: 100%;
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-3);
-  border: 1px solid var(--token-border-card);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--token-bg-raised) 38%, transparent);
+  background: var(--settings-subtle-bg);
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  text-align: left;
 }
 
-.settings-model-row-label {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-model-row--disabled {
-  border-color: var(--token-border-muted);
+.settings-model-row.is-expanded {
   background: var(--token-surface-sunken);
-  color: var(--token-text-secondary);
 }
 
-.settings-model-row--disabled .settings-model-row-label {
-  color: var(--token-text-secondary);
-}
-
-.settings-model-row--expanded {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-/* Availability · model · on · capabilities, the same four columns as the header above the list. */
 .settings-model-columns,
 .settings-model-row-main {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) 3.5rem 8.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(6rem, .38fr) minmax(7.75rem, .4fr) 4rem var(--control-height-md);
   align-items: center;
-  gap: var(--space-2);
-  width: 100%;
+  gap: var(--space-3);
   min-width: 0;
-}
-
-.settings-model-row-main > .ui-switch {
-  justify-self: end;
-}
-
-.settings-model-row-identity {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-/* The one number a model row carries: how much context it takes. */
-.settings-model-row-context {
-  flex: 0 0 auto;
-  color: var(--token-text-secondary);
-  font-variant-numeric: tabular-nums;
 }
 
 .settings-model-columns {
-  padding: 0 var(--space-3);
+  padding-inline: var(--space-3);
   color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
+  font-size: var(--type-meta-size);
 }
 
-.settings-model-columns span:nth-child(3),
-.settings-model-columns span:nth-child(4) {
-  text-align: end;
+.settings-model-columns span:nth-child(4),
+.settings-model-row-main > .ui-switch {
+  justify-self: center;
 }
 
-/* Availability in one word; the reason, when there is one, is on hover. */
+.settings-model-row-identity {
+  display: grid;
+  gap: var(--space-0-5);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-model-row-label {
+  font-weight: var(--font-semibold);
+}
+
+.settings-model-row.is-disabled .settings-model-row-label,
+.settings-model-row-check,
+.settings-model-row-context,
+.settings-model-capability-icons {
+  color: var(--token-text-secondary);
+}
+
+.settings-model-row-context {
+  font-size: var(--type-meta-size);
+  font-variant-numeric: tabular-nums;
+}
+
 .settings-model-row-check {
-  overflow: hidden;
-  color: var(--token-status-success);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-.settings-model-row-check.is-unverified,
-.settings-model-row-check.is-loading { color: var(--token-status-warning); }
+.settings-model-row-check.is-unverified { color: var(--token-status-warning); }
 .settings-model-row-check.is-unavailable,
 .settings-model-row-check.is-refresh-failed { color: var(--token-status-error); }
-.settings-model-row-check.is-disabled { color: var(--token-text-secondary); }
 
-.settings-model-row-capabilities {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.settings-model-capability-icons {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--token-text-secondary);
-}
-
+.settings-model-row-capabilities,
+.settings-model-capability-icons,
 .settings-model-capability-icon {
   display: inline-flex;
   align-items: center;
+}
+
+.settings-model-capability-icons {
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.settings-model-capability-icon {
   justify-content: center;
   inline-size: var(--space-5);
   block-size: var(--space-5);
 }
 
-@container settings-panel (max-width: 36rem) {
-  .settings-model-columns {
-    display: none;
-  }
-  .settings-model-row-main {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-  .settings-model-row-identity {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    flex-wrap: wrap;
-  }
-  .settings-model-row-label {
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
+.settings-model-capability-toggle.button {
+  inline-size: var(--control-height-md);
+  block-size: var(--control-height-md);
+  padding: 0;
 }
 
-.settings-model-row {
-  border: 1px solid var(--token-border-muted);
-  background: var(--settings-subtle-bg);
+@container provider-model-list (max-width: 38rem) {
+  .settings-model-columns { display: none; }
+
+  .settings-model-row-main {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "model enabled expand" "status capabilities capabilities";
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .settings-model-row-identity { grid-area: model; }
+  .settings-model-row-check { grid-area: status; font-size: var(--type-meta-size); }
+  .settings-model-row-capabilities { grid-area: capabilities; justify-self: end; }
+  .settings-model-row-main > .ui-switch { grid-area: enabled; }
+  .settings-model-capability-toggle { grid-area: expand; }
 }

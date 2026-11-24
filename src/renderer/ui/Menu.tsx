@@ -7,6 +7,7 @@ import './Menu.css';
 export interface MenuItem {
   id: string;
   label: string;
+  testId?: string;
   disabled?: boolean;
   type?: 'item' | 'radio' | 'separator';
   checked?: boolean;
@@ -70,6 +71,7 @@ export function Menu({
       side={side}
       className={cn('ui-menu', className)}
       role="presentation"
+      dismissOnTab
     >
       <div
         role="menu"
@@ -104,9 +106,10 @@ export function Menu({
               }}
               type="button"
               role={role}
+              data-testid={item.testId}
               aria-checked={item.type === 'radio' ? Boolean(item.checked) : undefined}
               disabled={item.disabled}
-              tabIndex={index === activeIndex ? 0 : -1}
+              tabIndex={open && index === activeIndex ? 0 : -1}
               className={cn(
                 'ui-menu-item',
                 index === activeIndex && 'is-active',

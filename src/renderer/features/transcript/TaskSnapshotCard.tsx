@@ -3,7 +3,9 @@ import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 import { useI18n } from '../../i18n';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import { Icon } from '../../ui/Icon';
+import { Chevron } from '../../ui/Chevron';
 import { WorkCardHeader } from './WorkCardHeader';
+import { WorkRowTitle } from './WorkRowTitle';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import type { WorkProcessRow } from './workProcessTypes';
@@ -25,7 +27,7 @@ export const TaskSnapshotCard: React.FC<{
       data-testid="work-process-task-snapshot" data-work-process-block-id={row.id}>
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
-        <div className={`work-process-task-snapshot${expanded ? ' is-expanded' : ''}`}>
+        <div className={`work-process-task-snapshot${expanded ? ' is-expanded' : ''}`} data-locate>
           <WorkCardHeader onClick={toggle} expanded={expanded} controls={listId}
             icon={<Icon name="task-list" className="work-process-icon work-process-tool-card-icon" />}
             title={title}
@@ -43,8 +45,11 @@ export const TaskSnapshotCard: React.FC<{
                   <TaskStatusMarker status={item.displayState ?? item.status}
                     label={item.status === 'pending' && item.waitingOn?.length
                       ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${item.displayState ?? item.status}`)} />
-                  {item.statusReason || item.waitingOn?.length ? <details className="work-process-task-snapshot-copy">
-                    <summary className="work-process-task-snapshot-title">{item.title}</summary>
+                  {item.statusReason || item.waitingOn?.length ? <details className="work-process-task-snapshot-copy" data-locate>
+                    <summary className="work-process-task-snapshot-title">
+                      <WorkRowTitle text={item.title} wrap />
+                      <Chevron size={12} className="work-process-row-caret" />
+                    </summary>
                     {item.statusReason ? <p className="work-process-task-snapshot-reason">{reasonText(item.statusReason)}</p> : null}
                     {item.waitingOn?.map(wait => <p className="work-process-task-snapshot-reason" key={wait.taskId}>
                       {t(`chat.taskDependency.${wait.reason}`, { title: wait.title ?? t('chat.taskUntitled') })}

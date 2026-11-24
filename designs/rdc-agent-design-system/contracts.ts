@@ -69,14 +69,14 @@ export const contracts = {
     states: '空/已填/聚焦/只读/禁用/aria-invalid；Textarea auto/fill 与长内容。',
     layout: 'Input 与标签对齐；Textarea auto 在 minRows/maxRows 内增长，fill 占父容器剩余空间。',
     motion: '只使用焦点反馈，不对输入内容施加位移动画。',
-    consumers: 'SettingsField 及各资源编辑器、MaterialContextEditor、Knowledge 写入弹层。',
+    consumers: 'SettingsField 及各资源编辑器、Knowledge 写入弹层。',
   },
   Select: {
     avoid: '不用于多选或动作菜单；无选择/不可用值不能静默映射为首项。',
     states: '关闭/展开/选中/禁用选项/全局禁用/空目录/长标签。',
     layout: '锚点及实测内容决定翻转、限宽限高；内部滚动；字体加载与尺寸变化重新定位。',
     motion: '保留既有浮层反馈；不施加弹簧或持续动画。',
-    consumers: 'Appearance、Providers、Agents、Tools、MaterialContextEditor。',
+    consumers: 'Appearance、Providers、Agents、Tools。',
   },
   'Switch / Checkbox': {
     avoid: 'Switch 不表示执行中，Checkbox 不作为保存按钮；不能同时叠加重复的启用/停用说明。',

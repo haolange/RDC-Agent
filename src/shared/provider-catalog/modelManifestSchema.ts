@@ -61,7 +61,7 @@ export const ProviderProtocolSchema = z.enum([
 
 const OpenAiEffortSchema = z.enum(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 const AnthropicEffortSchema = z.enum(['low', 'medium', 'high', 'xhigh', 'max']);
-const GeminiThinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high']);
+const GeminiThinkingLevelSchema = z.enum(['minimal', 'low', 'medium', 'high', 'xhigh']);
 
 export const ReasoningWireProfileSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),

@@ -1,5 +1,4 @@
 import { cn } from '../../../../lib/cn';
-import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { EmptyState } from '../../../../ui/EmptyState';
@@ -73,16 +72,14 @@ function HitButton({ hit: card, active, onSelect }: { hit: KnowledgeLaneHit; act
   );
 }
 
-/** Candidate title and actionable pending-review status. */
+/** The queue header owns the review status shared by every candidate. */
 function RecordRow({
   record,
   active,
-  pendingLabel,
   onSelect,
 }: {
   record: KnowledgeCardRecord;
   active: boolean;
-  pendingLabel: string;
   onSelect: () => void;
 }) {
   return (
@@ -91,7 +88,6 @@ function RecordRow({
       selected={active}
       onClick={onSelect}
       data-testid={`knowledge-candidate-${record.cardId}`}
-      trailing={<Badge tone="warning">{pendingLabel}</Badge>}
     >
       <span className="knowledge-center-card-title"><TypeIcon type={record.type} />{record.title}</span>
       {record.preview && record.preview.trim() !== record.title.trim() ? <span className="knowledge-center-card-preview">{record.preview}</span> : null}
@@ -144,7 +140,7 @@ export function ListColumn({ state, inbox, inboxError, onImport }: ListColumnPro
           </span>
         </div>
       )}
-      <div className="knowledge-center-tree" data-testid="knowledge-center-tree">
+      <div className="knowledge-center-tree" data-testid="knowledge-center-tree" ref={state.listFocusRef} tabIndex={state.narrow ? -1 : undefined}>
         {loading && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="row" count={5} /></div>}
         {!loading && state.viewMode === 'candidates' && inboxError ? (
           <InlineError detail={inboxError}>{t('app.error.loadFailed')}</InlineError>
@@ -174,27 +170,17 @@ export function ListColumn({ state, inbox, inboxError, onImport }: ListColumnPro
             {state.loadingMore ? t('knowledgeCenter.loading') : t('knowledgeCenter.loadMore')}
           </Button>
         ) : null}
-        {!loading && state.viewMode === 'candidates' && inbox && !reason && (
-          <>
-            {inbox.candidates.length > 0 ? (
-              <div className="knowledge-center-section-title">{t('knowledgeCenter.candidatesSection')}</div>
-            ) : null}
-            {inbox.candidates.map((entry) => (
-              <RecordRow
-                key={entry.candidateId}
-                record={entry.card}
-                active={state.selectedCardId === entry.card.cardId && state.selectedCard?.lifecycle === entry.card.lifecycle}
-                pendingLabel={t('knowledgeCenter.pendingReview')}
-                onSelect={() => state.selectRecord(entry.card)}
-              />
-            ))}
-          </>
-        )}
+        {!loading && state.viewMode === 'candidates' && !reason && inbox?.candidates.map((entry) => (
+          <RecordRow
+            key={entry.candidateId}
+            record={entry.card}
+            active={state.selectedCardId === entry.card.cardId && state.selectedCard?.lifecycle === entry.card.lifecycle}
+            onSelect={() => state.selectRecord(entry.card)}
+          />
+        ))}
         {!loading && state.viewMode === 'conflicts' && state.pack && !reason && state.pack.conflicts.map((conflict) => (
           <ConflictRow
             key={`${conflict.leftCardId}:${conflict.rightCardId}`}
-            leftCardId={conflict.leftCardId}
-            rightCardId={conflict.rightCardId}
             left={hitById.get(conflict.leftCardId)}
             right={hitById.get(conflict.rightCardId)}
             selected={state.selectedConflict?.leftCardId === conflict.leftCardId && state.selectedConflict?.rightCardId === conflict.rightCardId}

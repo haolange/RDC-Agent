@@ -84,5 +84,39 @@ describe('ProviderDefinitionMutationCoordinator', () => {
 
     await expect(coordinator.flush('provider-under-test')).rejects.toThrow('disk full');
     await expect(pending).resolves.toMatchObject({ status: 'failed', lastSuccessful });
+    await expect(coordinator.flush('provider-under-test')).resolves.toEqual(lastSuccessful);
+  });
+
+  it('reports a transport failure only to the current revision and retains the committed baseline', async () => {
+    const commit = vi.fn(async (request: ProviderDefinitionSaveRequest) => committed(request));
+    const coordinator = new ProviderDefinitionMutationCoordinator(commit, 60_000);
+    const baseline = coordinator.enqueue({ provider: provider('baseline'), clientRevision: 1 });
+    await coordinator.flush('provider-under-test');
+    const { lastSuccessful } = await baseline;
+
+    commit.mockRejectedValueOnce(new Error('Connection lost'));
+    const old = coordinator.enqueue({ provider: provider('old-choice'), clientRevision: 2 });
+    const latest = coordinator.enqueue({ provider: provider('latest-choice'), clientRevision: 3 });
+
+    await expect(coordinator.flush('provider-under-test')).rejects.toThrow('Connection lost');
+    await expect(old).resolves.toMatchObject({ status: 'superseded', clientRevision: 2, lastSuccessful });
+    await expect(latest).resolves.toMatchObject({ status: 'failed', clientRevision: 3, lastSuccessful });
+  });
+
+  it('does not roll back to another account when a newly connected account cannot save', async () => {
+    const commit = vi.fn(async (request: ProviderDefinitionSaveRequest) => committed(request));
+    const coordinator = new ProviderDefinitionMutationCoordinator(commit, 60_000);
+    const previous = coordinator.enqueue({
+      provider: { ...provider('previous'), activeAccountId: 'previous-account' }, clientRevision: 1,
+    });
+    await coordinator.flush('provider-under-test');
+    await previous;
+
+    commit.mockRejectedValueOnce(new Error('Connection lost'));
+    const next = coordinator.enqueue({
+      provider: { ...provider('next'), activeAccountId: 'next-account' }, clientRevision: 2,
+    });
+    await expect(coordinator.flush('provider-under-test')).rejects.toThrow('Connection lost');
+    await expect(next).resolves.toMatchObject({ status: 'failed', provider: null, lastSuccessful: null });
   });
 });

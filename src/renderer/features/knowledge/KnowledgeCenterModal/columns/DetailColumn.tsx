@@ -5,12 +5,15 @@ import { Icon } from '../../../../ui/Icon';
 import { IconButton } from '../../../../ui/IconButton';
 import { InlineError } from '../../../../ui/InlineError';
 import { Chevron } from '../../../../ui/Chevron';
+import { useCopyFeedback } from '../../../../ui/CopyButton';
 import { Menu } from '../../../../ui/Menu';
 import { Panel } from '../../../../ui/Panel';
 import { Tabs } from '../../../../ui/Tabs';
+import { useCopyDiagnostics } from '../../../../patterns/CopyDiagnostics';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { detailToRecord, type KnowledgeWriteAction } from '../knowledgeCenterModel';
+import { hasReadableCaseChapter } from '../knowledgeCaseValues';
 import { knowledgeCardActions, type KnowledgeCardAction } from '../knowledgeCardActions';
 import { bodyWithoutTitle, markdownOutline } from '../knowledgeOutline';
 import { CaseChapterContent } from '../parts/CaseChapterContent';
@@ -97,7 +100,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
   const space = card ? state.spaces.find((entry) => entry.spaceId === card.spaceId) : undefined;
   const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : (space?.label ?? '');
   const chapters = card?.type === 'case' && card.chapters
-    ? CASE_READING_ORDER.filter((chapter) => card.chapters?.[chapter]?.trim())
+    ? CASE_READING_ORDER.filter((chapter) => hasReadableCaseChapter(card.chapters?.[chapter]))
     : null;
   const claim = card?.chapters?.claim?.trim();
   const lead = card && claim && !sameText(claim, card.title) ? claim : null;
@@ -105,12 +108,22 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
   const body = card && !chapters?.length ? bodyWithoutTitle(card.body, card.title) : '';
   const outline = markdownOutline(body).filter((heading) => heading.level <= 3).map((heading) => heading.title);
   const actions = card ? knowledgeCardActions(card.lifecycle, reviewing) : null;
+  const { copied, copy } = useCopyFeedback(useCopyDiagnostics(card ? [
+    { label: 'cardId', value: card.cardId },
+    { label: 'caseId', value: card.caseId },
+    { label: 'relations', value: card.relations.map((relation) => relation.targetCardId).join(', ') },
+    { label: 'sourceStatus', value: card.sourceStatus },
+    { label: t('knowledgeCenter.metaSourceHash'), value: card.sourceHash },
+    { label: t('knowledgeCenter.metaSourceMtime'), value: card.sourceMtimeMs != null ? new Date(card.sourceMtimeMs).toISOString() : null },
+    { label: t('knowledgeCenter.metaSourceSize'), value: card.sourceSize },
+  ] : []));
   const candidateBlocked = !candidateHasSession ? t('knowledgeCenter.sessionRequired')
     : card?.missingAssets?.length ? t('knowledgeCenter.candidateAssetsMissing') : undefined;
+  const cardActionsLabel = card ? t('knowledgeCenter.cardActions', { title: card.title }) : '';
 
   const jumpTo = (index: number) => {
     textRef.current?.querySelectorAll('h1, h2, h3')[index]
-      ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      ?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
   };
   const run = (action: KnowledgeCardAction) => {
     if (!card) return;
@@ -128,7 +141,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
         <div className="knowledge-center-header">
           <div className="knowledge-center-header-copy">
             {state.narrow && (
-              <Button variant="ghost" size="sm" onClick={() => state.setNarrowPane('list')}>
+              <Button ref={state.backButtonRef} variant="ghost" size="sm" onClick={() => state.navigateToPane('list')}>
                 {t('knowledgeCenter.back')}
               </Button>
             )}
@@ -149,7 +162,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 size="sm"
                 className="knowledge-detail-info-toggle"
                 aria-expanded={infoOpen}
-                aria-controls="knowledge-card-information"
+                aria-controls={infoOpen ? "knowledge-card-information" : undefined}
                 onClick={() => setInfoOpen(!infoOpen)}
                 data-testid="knowledge-center-metadata-toggle"
               >
@@ -162,10 +175,9 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
       ) : null}
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">
-        {state.loadingDetail && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={8} /></div>}
+        {state.loadingDetail && !conflict && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={8} /></div>}
         {conflict ? (
           <ConflictCompare
-            conflict={conflict}
             left={state.conflictCards.left}
             right={state.conflictCards.right}
             loading={state.loadingDetail}
@@ -188,19 +200,16 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 <CardMetaGrid
                   card={card}
                   spaceLabel={spaceLabel}
-                  resolveTitle={(targetCardId) => (state.hits.find((entry) => entry.cardId === targetCardId)
-                    ?? state.pack?.hits.find((entry) => entry.cardId === targetCardId))?.title}
-                  onOpenRelation={(targetCardId) => {
-                    const hit = state.hits.find((entry) => entry.cardId === targetCardId)
-                      ?? state.pack?.hits.find((entry) => entry.cardId === targetCardId);
-                    if (hit) state.openRelatedCard(hit);
-                  }}
+                  resolveRelation={(targetCardId) => state.hits.find((entry) => entry.cardId === targetCardId)
+                    ?? state.pack?.hits.find((entry) => entry.cardId === targetCardId)}
+                  onOpenRelation={state.openRelatedCard}
                 />
               </div>
             ) : null}
             <div className="knowledge-center-document">
               {lead ? <p className="knowledge-case-claim">{lead}</p> : null}
-              {card.images?.length ? <KnowledgeCardImages spaceId={card.spaceId} images={card.images} /> : null}
+              {card.images?.length ? <KnowledgeCardImages key={JSON.stringify(['images', card.spaceId, card.cardId])}
+                spaceId={card.spaceId} images={card.images} /> : null}
               {outline.length >= OUTLINE_MIN_ENTRIES ? (
                 <nav className="knowledge-center-chapters" aria-label={t('knowledgeCenter.outline')} data-testid="knowledge-center-chapters">
                   {outline.map((label, index) => (
@@ -225,21 +234,23 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
       {card && actions ? (
         <div className="knowledge-center-actions" data-testid="knowledge-center-actions">
           {candidateError ? <InlineError detail={candidateError}>{t('knowledgeCenter.candidateFailed')}</InlineError> : null}
-          {actions.more.length > 0 ? (
-            <Menu
-              open={moreOpen}
-              onOpenChange={setMoreOpen}
-              align="end"
-              side="top"
-              label={t('knowledgeCenter.moreActions')}
-              items={actions.more.map((action) => ({ id: action, label: t(ACTION_LABEL_KEYS[action]), onSelect: () => run(action) }))}
-              trigger={(
-                <IconButton label={t('knowledgeCenter.moreActions')} size="sm" data-testid="knowledge-center-more-actions">
-                  <Icon name="more" size={16} />
-                </IconButton>
-              )}
-            />
-          ) : null}
+          <Menu
+            open={moreOpen}
+            onOpenChange={setMoreOpen}
+            align="end"
+            side="top"
+            label={cardActionsLabel}
+            items={[
+              ...actions.more.map((action) => ({ id: action, label: t(ACTION_LABEL_KEYS[action]), onSelect: () => run(action) })),
+              { id: 'diagnostics', testId: 'knowledge-center-provenance', label: t('app.copyDiagnostics'), onSelect: () => void copy() },
+            ]}
+            trigger={(
+              <IconButton label={cardActionsLabel} size="sm" aria-haspopup="menu" data-testid="knowledge-center-more-actions"
+                data-tooltip={t(copied ? 'app.copied' : 'knowledgeCenter.moreActions')}>
+                <Icon name={copied ? 'check' : 'more'} size={16} />
+              </IconButton>
+            )}
+          />
           {actions.primary ? (
             <Button
               variant="primary"

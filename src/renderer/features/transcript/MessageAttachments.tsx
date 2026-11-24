@@ -1,68 +1,40 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { formatBytes } from '../../lib/formatBytes';
-import { useI18n } from '../../i18n';
-import { openAppPath } from '../../hooks/appShellBridge';
-import { MaterialContextViewer } from '../../patterns/MaterialContextViewer';
+import { useMemo } from 'react';
+import { AttachmentShelf } from '../../patterns/attachments/AttachmentShelf';
+import { attachmentMode, type AttachmentItem, type AttachmentNotes } from '../../patterns/attachments/attachmentItem';
 import { useConversationStore } from '../../stores/conversationStore';
-import { getAttachmentPreview } from '../../hooks/conversationPreview';
-import { Icon } from '../../ui/Icon';
+import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionAttachmentRecord } from '@shared/types/session';
 
-const isImageAttachment = (attachment: SessionAttachmentRecord): boolean =>
-  attachment.kind === 'image' || /^image\/(png|jpeg|gif|webp)$/i.test(attachment.mimeType ?? '');
+const NO_RELATED_MESSAGES: readonly ConversationMessage[] = [];
 
-const MessageAttachmentPill: React.FC<{
-  attachment: SessionAttachmentRecord;
-  previewUrl?: string;
-  onInspect: (attachment: SessionAttachmentRecord) => void;
-}> = ({ attachment, previewUrl, onInspect }) => {
-  const { language } = useI18n();
-  const image = isImageAttachment(attachment);
-
-  const openAttachment = () => {
-    onInspect(attachment);
-  };
-
-  return (
-    <button
-      type="button"
-      className={`message-attachment-pill ${image ? 'image' : ''}`.trim()}
-      onClick={openAttachment}
-    >
-      <span className="message-attachment-pill-icon" aria-hidden="true">
-        {previewUrl ? (
-          <img src={previewUrl} alt="" className="message-attachment-pill-thumb" />
-        ) : <Icon name={image ? 'image' : 'file'} />}
-      </span>
-      <span className="message-attachment-pill-copy">
-        <span className="message-attachment-pill-name">{attachment.fileName}</span>
-        {attachment.size > 0 ? <span className="message-attachment-pill-meta">{formatBytes(attachment.size, language)}</span> : null}
-      </span>
-    </button>
-  );
-};
-
-export const MessageAttachments: React.FC<{ attachments: SessionAttachmentRecord[] }> = ({ attachments }) => {
-  const [selected, setSelected] = useState<SessionAttachmentRecord | null>(null);
-  const [previews, setPreviews] = useState<Record<string, string>>({});
-  const messages = useConversationStore(state => state.conversationMessages);
-  const available = useMemo(() => [...new Map([...messages.flatMap(message => message.attachments ?? []), ...attachments]
-    .filter(item => item.sessionId === attachments[0]?.sessionId).map(item => [item.attachmentId, item])).values()], [messages, attachments]);
-  const group = selected?.material?.comparison?.group;
-  const items = selected ? available.filter(item => item.attachmentId === selected.attachmentId || (group && item.material?.comparison?.group === group)) : [];
-  useEffect(() => {
-    let cancelled = false;
-    for (const attachment of (selected ? available : attachments)) {
-      if (!isImageAttachment(attachment) || !attachment.sessionId) continue;
-      void getAttachmentPreview({ previewId: attachment.attachmentId, sessionId: attachment.sessionId })?.then(result => {
-        if (!cancelled && result?.dataUrl) setPreviews(current => ({ ...current, [attachment.attachmentId]: result.dataUrl! }));
-      });
+function notesFor(attachment: SessionAttachmentRecord, messages: readonly ConversationMessage[]): AttachmentNotes | undefined {
+  const { material, sourceHash, sessionId } = attachment;
+  if (!material || !Object.values(material).some(Boolean)) return undefined;
+  const group = material.comparison?.group;
+  const related = new Map<string, string>();
+  if (group) {
+    for (const message of messages) {
+      for (const candidate of message.attachments ?? []) {
+        if (candidate.sessionId === sessionId && candidate.attachmentId !== attachment.attachmentId
+          && candidate.material?.comparison?.group === group) {
+          related.set(candidate.attachmentId, candidate.fileName);
+        }
+      }
     }
-    return () => { cancelled = true; };
-  }, [attachments, available, selected]);
-  return <div className="message-attachments" data-testid="message-attachments">
-    {attachments.map(attachment => <MessageAttachmentPill key={attachment.attachmentId} attachment={attachment} previewUrl={previews[attachment.attachmentId]} onInspect={setSelected} />)}
-    {selected && <MaterialContextViewer items={items.map(item => ({ id: item.attachmentId, name: item.fileName, previewUrl: previews[item.attachmentId], material: item.material, hash: item.sourceHash }))}
-      onClose={() => setSelected(null)} onOpenOriginal={id => { const file = available.find(item => item.attachmentId === id)?.filePath; if (file) void openAppPath(file); }} />}
-  </div>;
-};
+  }
+  return { material, sourceHash, relatedNames: [...related.values()] };
+}
+
+export function MessageAttachments({ attachments }: { attachments: readonly SessionAttachmentRecord[] }) {
+  const hasComparison = attachments.some((item) => item.material?.comparison);
+  const messages = useConversationStore((state) => hasComparison ? state.conversationMessages : NO_RELATED_MESSAGES);
+  const items = useMemo(() => attachments.map((attachment): AttachmentItem => ({
+    id: attachment.attachmentId,
+    owner: attachment.sessionId && !attachment.attachmentId.startsWith('optimistic-')
+      ? { scope: 'session', attachmentId: attachment.attachmentId, sessionId: attachment.sessionId } : null,
+    fileName: attachment.fileName,
+    mode: attachmentMode(attachment.fileName, attachment.layer, attachment.mimeType),
+    notes: notesFor(attachment, messages),
+  })), [attachments, messages]);
+  return <AttachmentShelf key={attachments[0]?.sessionId} items={items} className="message-attachments" testId="message-attachments" />;
+}

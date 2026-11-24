@@ -6,19 +6,20 @@ interface LocalToolDisclosureProps {
   icon: IconName;
   title: string;
   description: string;
+  status: string;
   testId: string;
   children: ReactNode;
   defaultOpen?: boolean;
 }
 
 /**
- * Compact summary row for a machine-local tool: its icon and name, with what it does on hover. Collapsed by default so
- * the Tools page reads as a short list instead of three stacked forms.
+ * Machine-local tool with its draft state visible while options are collapsed.
  */
 export function LocalToolDisclosure({
   icon,
   title,
   description,
+  status,
   testId,
   children,
   defaultOpen = false,
@@ -26,9 +27,12 @@ export function LocalToolDisclosure({
   return (
     <Details className="settings-local-tool" data-testid={testId} open={defaultOpen} summaryClassName="settings-local-tool-summary" summary={<>
         <Icon name={icon} size={16} className="settings-local-tool-icon" />
-        <span className="settings-local-tool-title" data-tooltip={description}>{title}</span>
-
-       </>}>
+        <span className="settings-local-tool-title">
+          {title}
+          <span className="settings-section-description">{description}</span>
+        </span>
+        <span className="settings-local-tool-status">{status}</span>
+      </>}>
       <div className="settings-local-tool-body">{children}</div>
     </Details>
   );

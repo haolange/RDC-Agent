@@ -33,6 +33,8 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.body.textContent).toContain('chat.workProcessTaskSnapshotCreated');
   expect(document.body.textContent).toContain('1 / 5 completed');
   expect(document.body.textContent).not.toContain('0ms');
+  expect(document.querySelector('.work-process-task-snapshot[data-locate] .work-card-trigger .work-row-title')
+    ?.getAttribute('data-text')).toBe('chat.workProcessTaskSnapshotCreated');
   expect(document.querySelectorAll('.task-status-marker svg')).toHaveLength(5);
   expect(document.querySelector('.task-pending .task-status-marker circle')).not.toBeNull();
   expect(document.querySelector('.task-pending .task-status-marker')?.getAttribute('aria-label')).toBe('chat.taskWaitingDependencies');
@@ -40,6 +42,8 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.querySelectorAll('.task-blocked')).toHaveLength(1);
   expect(document.querySelector('.task-blocked details')?.hasAttribute('open')).toBe(false);
   expect(document.querySelector('.task-blocked summary')?.textContent).toBe('Blocked');
+  expect(document.querySelector('.task-blocked details[data-locate] > summary .work-row-title')?.textContent).toBe('Blocked');
+  expect(document.querySelector('.task-completed [data-locate]')).toBeNull();
   expect(document.querySelector('.task-blocked .work-process-task-snapshot-reason')?.textContent).toBe('Waiting for input');
   expect(document.querySelector('[data-work-process-task-id="current"]')?.getAttribute('tabindex')).toBe('-1');
   const older = renderToStaticMarkup(createElement(TaskSnapshotCard, { row: snapshot('old') }));

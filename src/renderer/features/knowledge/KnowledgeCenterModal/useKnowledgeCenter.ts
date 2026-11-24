@@ -20,7 +20,8 @@ export function useKnowledgeCenter(open: boolean) {
   const overviewSeq = useRef(createRequestSeq());
   const rebuildSeq = useRef(createRequestSeq());
   const [viewMode, setViewMode] = useState<KnowledgeViewMode>('cards');
-  const { narrow, narrowPane, setNarrowPane } = useKnowledgeViewport();
+  const viewport = useKnowledgeViewport();
+  const { narrow, setNarrowPane, navigateToPane } = viewport;
   const [spaces, setSpaces] = useState<KnowledgeSpace[]>([]);
   const [index, setIndex] = useState<KnowledgeIndexOverview | null>(null);
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
@@ -71,7 +72,7 @@ export function useKnowledgeCenter(open: boolean) {
     querySeq, queryRequest, page, setHits, setPage, setError,
   });
 
-  const showDetail = useCallback(() => { if (narrow) setNarrowPane('detail'); }, [narrow, setNarrowPane]);
+  const showDetail = useCallback(() => navigateToPane('detail'), [navigateToPane]);
   const { selectedCardId, selectedCard, loadingDetail, clearCardSelection,
     selectedConflict, conflictCards, selectConflict, clearConflict, selectCard, selectRecord } =
     useKnowledgeSelection({ open, queryKey: knowledgeQueryKey(queryRequest), hits, pack,
@@ -153,7 +154,7 @@ export function useKnowledgeCenter(open: boolean) {
   }, [clearConflict, narrow, queryRequest, refreshOverview, runQuery, selectCard, setNarrowPane]);
 
   return {
-    sessionId, viewMode, setViewMode: changeViewMode, narrow, narrowPane, setNarrowPane, spaces, index,
+    sessionId, viewMode, setViewMode: changeViewMode, ...viewport, spaces, index,
     selectedSpaceIds, types, lifecycles,
     searchQuery, setSearchQuery, hits, page, loadingMore, loadMore, pack, packQueryKey, selectedCardId, selectedCard, loadingOverview,
     loadingQuery, loadingDetail, rebuilding, error, setError, toggleSpace, toggleType,

@@ -1,31 +1,5 @@
-.settings-agent-flags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-2);
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.settings-agent-identity-grid {
-  grid-template-columns: 1fr;
-}
-
 .settings-agent-description-field {
   min-height: var(--input-height-lg);
-}
-
-.settings-page-agents .settings-agent-flags {
-  display: grid;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-4);
-  min-height: 0;
-  width: 100%;
 }
 
 .settings-agent-editor-title {
@@ -113,10 +87,11 @@
   border-top: 1px solid var(--token-border-muted);
 }
 
-.settings-agent-flag {
+.ui-switch.settings-agent-flag {
   display: flex;
   min-width: 0;
-  flex-direction: column;
+  flex-direction: row-reverse;
+  justify-content: space-between;
   gap: var(--space-2);
 }
 
@@ -153,9 +128,7 @@
 }
 
 @container settings-panel (max-width: 48rem) {
-  .settings-agent-flags,
-  .settings-page-agents .settings-agent-flags {
-    width: 100%;
+  .settings-agent-flags {
     grid-template-columns: minmax(0, 1fr);
   }
 

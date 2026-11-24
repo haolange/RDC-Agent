@@ -45,8 +45,8 @@
 .knowledge-export-group legend {
   padding: 0 0 var(--space-1);
   color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-normal);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
 }
 
 .knowledge-export-option {
@@ -89,13 +89,13 @@
 
 .knowledge-write-fact dt {
   color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
 }
 
 .knowledge-write-fact dd {
   margin: 0;
   color: var(--token-text-primary);
-  font-size: var(--type-meta-size);
+  font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 
@@ -110,7 +110,16 @@
   margin: 0;
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  font-weight: var(--font-normal);
+  font-weight: var(--font-semibold);
+}
+
+.knowledge-write-conflict {
+  margin: 0;
+}
+
+.knowledge-write-conflict .knowledge-center-card-title {
+  display: block;
+  overflow: visible;
 }
 
 .knowledge-import-lead {
@@ -231,6 +240,7 @@
 }
 
 .knowledge-import-item-side {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -245,6 +255,7 @@
 
 .knowledge-export-picker-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
@@ -272,10 +283,4 @@
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-}
-
-.knowledge-write-rollback {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }

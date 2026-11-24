@@ -82,19 +82,18 @@
   color: var(--token-text-secondary);
 }
 
-/* Hover locate (design-system.md「悬停定位」): while browsing Working, the row under the pointer is found by its
-   title alone — secondary and regular at rest, primary and semibold when hovered, focused or open. A hidden
-   semibold copy of the title holds the width, so the row never shifts. Icons, durations and bodies stay put. */
+/* The hidden semibold title reserves its size. Only hover and keyboard focus emphasize the visible title. */
 .work-row-title {
   display: inline-grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
-  color: var(--token-text-secondary);
+  color: var(--work-row-title-tone, var(--token-text-secondary));
   font-weight: var(--font-normal);
   transition: color var(--transition-fast);
 }
 
-.work-row-title > *,
-.work-row-title[data-text]::after {
+.work-row-title > span,
+.work-row-title::after {
   grid-area: 1 / 1;
   min-width: 0;
   overflow: hidden;
@@ -102,28 +101,33 @@
   text-overflow: ellipsis;
 }
 
-.work-row-title[data-text]::after {
+.work-row-title::after {
   content: attr(data-text);
   font-weight: var(--font-semibold);
   visibility: hidden;
   pointer-events: none;
 }
 
+.work-row-title.is-wrapping > span,
+.work-row-title.is-wrapping::after {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 @media (hover: hover) {
-  [data-locate]:hover:not(:has([data-locate]:hover)) > :is(.work-card-trigger, summary) .work-row-title {
-    color: var(--token-text-primary);
+  [data-locate]:hover:not(:has([data-locate]:hover)) > :is(button[aria-expanded]:enabled, summary) .work-row-title {
+    color: var(--work-row-title-tone, var(--token-text-primary));
     font-weight: var(--font-semibold);
   }
 }
 
-[data-locate]:has(> :is(.work-card-trigger, summary):focus-visible) > :is(.work-card-trigger, summary) .work-row-title,
-[data-locate]:is(.is-expanded, [open]) > :is(.work-card-trigger, summary) .work-row-title {
-  color: var(--token-text-primary);
+[data-locate] > :is(button[aria-expanded]:enabled, summary):focus-visible .work-row-title {
+  color: var(--work-row-title-tone, var(--token-text-primary));
   font-weight: var(--font-semibold);
 }
 
-.work-process-tool-card.status-error .work-row-title {
-  color: var(--token-status-error);
+.work-process-tool-card.status-error > .work-card-trigger {
+  --work-row-title-tone: var(--token-status-error);
 }
 
 @media (prefers-reduced-motion: reduce) {

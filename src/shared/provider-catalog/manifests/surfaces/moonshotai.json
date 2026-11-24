@@ -25,6 +25,15 @@
   "catalogOwnership": "user-managed",
   "factSources": [
     {
+      "id": "provider-docs:moonshotai:2026-11-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.kimi.ai/docs/models ; https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart",
+      "observedAt": "2026-11-24",
+      "refreshedAt": "2026-11-24",
+      "surface": "moonshotai",
+      "accountScope": "public-api"
+    },
+    {
       "id": "models.dev:moonshotai:0",
       "sourceKind": "models.dev",
       "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
@@ -82,5 +91,22 @@
   "models": [],
   "protocolOverrides": [],
   "recommendedModels": [],
-  "docsUrl": "https://platform.moonshot.ai/docs/api/chat"
+  "docsUrl": "https://platform.moonshot.ai/docs/api/chat",
+  "retiredModelIds": [
+    "kimi-k2.5",
+    "moonshot-v1-8k",
+    "moonshot-v1-32k",
+    "moonshot-v1-128k",
+    "moonshot-v1-auto",
+    "moonshot-v1-8k-vision-preview",
+    "moonshot-v1-32k-vision-preview",
+    "moonshot-v1-128k-vision-preview",
+    "kimi-k2-0905-preview",
+    "kimi-k2-0711-preview",
+    "kimi-k2-turbo-preview",
+    "kimi-k2-thinking",
+    "kimi-k2-thinking-turbo",
+    "kimi-latest",
+    "kimi-thinking-preview"
+  ]
 }

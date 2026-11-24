@@ -25,7 +25,8 @@ export function KnowledgeStatusTag({ lifecycle, sourceStatus, reviewing = false,
   const label = reviewing ? t('knowledgeCenter.pendingReview')
     : fixedUnverified ? t('knowledgeCenter.statusFixedUnverified')
       : t(LIFECYCLE_LABEL_KEYS[lifecycle!]);
-  const hint = fixedUnverified ? t('knowledgeCenter.statusFixedUnverifiedHint')
+  const hint = reviewing ? t(LIFECYCLE_HINT_KEYS.candidate)
+    : fixedUnverified ? t('knowledgeCenter.statusFixedUnverifiedHint')
     : lifecycle ? t(LIFECYCLE_HINT_KEYS[lifecycle]) : undefined;
   const tone = reviewing || fixedUnverified ? 'warning' : LIFECYCLE_TONE[lifecycle!];
   return (

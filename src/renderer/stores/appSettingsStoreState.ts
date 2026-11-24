@@ -21,6 +21,8 @@ import type {
 
 export interface AppSettingsState {
   settings: AppSettings;
+  /** The Composer's current preference, including an intent that could not be saved. */
+  contextBreakdownPreference: { expanded: boolean; error?: string } | null;
   hydrated: boolean;
   systemTheme: ResolvedTheme;
   hydrate: (settings: AppSettings, systemTheme: ResolvedTheme) => void;

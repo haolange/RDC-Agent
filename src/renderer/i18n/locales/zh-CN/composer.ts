@@ -125,6 +125,4 @@ export const zhComposer = {
   'composer.commandCategory.debug': "排查",
   'composer.commandCategory.edit': "编辑",
   'composer.commandCategory.session': "会话",
-  'composer.attachment.details': '说明',
-  'composer.attachment.describe': '说明 {fileName}',
 } as const;

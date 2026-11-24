@@ -1,4 +1,5 @@
 import React from 'react';
+import { authModeLabelKey } from './providerCardModel';
 import type { LlmProviderAuthMode, LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 
@@ -11,21 +12,6 @@ interface ProviderAuthModeFieldProps {
   onChange: (mode: LlmProviderAuthMode) => void;
   t: Translate;
 }
-
-const authModeLabel = (
-  mode: LlmProviderAuthMode,
-  provider: LlmProviderEntry,
-  t: Translate,
-): string => {
-  if (mode === 'api-key') {
-    const usesTypedCredentials = (provider.connectionSchema?.fields ?? [])
-      .some((field) => field.id !== 'apiKey');
-    return t(usesTypedCredentials ? 'settings.providerAuthCredentials' : 'settings.providerAuthApiKey');
-  }
-  if (mode === 'account') return t('settings.providerAuthAccount');
-  if (mode === 'environment') return t('settings.providerAuthEnvironment');
-  return t('settings.providerAuthLocal');
-};
 
 export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
   provider,
@@ -62,7 +48,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
               disabled={disabled || unavailable}
               onClick={() => onChange(mode)}
             >
-              {authModeLabel(mode, provider, t)}
+              {t(authModeLabelKey(mode, provider))}
             </button>
           );
         })}

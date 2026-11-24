@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
 import { Chevron } from '../../ui/Chevron';
+import { assignDynStyles, clearDynStyles } from '../../lib/useDynStyle';
 
 /** A gap this small at the bottom still counts as "at the latest". */
 const BOTTOM_SLACK = 24;
@@ -53,14 +54,29 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
       setHiddenAbove(false);
       return undefined;
     }
-    scrollToLatest(false);
+    const scroller = scrollerRef.current;
     const content = contentRef.current;
-    if (!content || typeof ResizeObserver === 'undefined') return undefined;
+    if (!scroller || !content) return undefined;
+    let gutter = -1;
+    const measureGutter = () => {
+      const next = scroller.offsetWidth - scroller.clientWidth;
+      if (next === gutter) return;
+      gutter = next;
+      assignDynStyles([[scroller, { '--work-scrollbar-gutter': `${gutter}px` }]]);
+    };
+    measureGutter();
+    scrollToLatest(false);
+    if (typeof ResizeObserver === 'undefined') return () => clearDynStyles([scroller]);
     const observer = new ResizeObserver(() => {
+      measureGutter();
       if (stick.current) scrollToLatest(true);
     });
     observer.observe(content);
-    return () => observer.disconnect();
+    observer.observe(scroller);
+    return () => {
+      observer.disconnect();
+      clearDynStyles([scroller]);
+    };
   }, [following, scrollToLatest]);
 
   React.useEffect(() => () => window.cancelAnimationFrame(animating.current), []);

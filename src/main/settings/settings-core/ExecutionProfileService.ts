@@ -1,3 +1,4 @@
+import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import { agentRuntimeConfigService } from '../agent-manifests/AgentRuntimeConfigService';
 import { resolveEffectiveModel } from '../provider-catalog/EffectiveModelResolver';
 import type { AgentRole } from '@shared/types/agent';
@@ -42,7 +43,7 @@ export class ExecutionProfileService {
   }
 
   getDiagnostics(settings: AppSettings): SettingsDiagnostic[] {
-    return settings.llm.providers.some((provider) => provider.isConfigured)
+    return settings.llm.providers.some(isProviderExecutable)
       ? []
       : [{
           code: 'missing_configured_provider',

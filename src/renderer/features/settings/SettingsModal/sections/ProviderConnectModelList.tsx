@@ -59,7 +59,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   const allUnavailable = resolvedModels.length > 0 && resolvedModels.every(({ model, effectiveModel }) => (
     effectiveModel?.availability ?? model.availability
   ) === 'unavailable');
-  const rowLoading = loading || snapshot?.refreshing === true;
+  const rowLoading = loading && !snapshot;
   const needle = query.trim().toLowerCase();
   const visibleModels = needle
     ? resolvedModels.filter(({ model, effectiveModel }) => [model.id, model.label, effectiveModel?.label]
@@ -102,10 +102,10 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
       ) : null}
       {resolvedModels.length > 0 ? (
         <div className="settings-model-columns" aria-hidden="true">
-          <span>{t('settings.providers.columns.availability')}</span>
           <span>{t('settings.providers.columns.model')}</span>
-          <span>{t('settings.providers.columns.enabled')}</span>
+          <span>{t('settings.providers.columns.availability')}</span>
           <span>{t('settings.providers.columns.capability')}</span>
+          <span>{t('settings.providers.columns.enabled')}</span>
         </div>
       ) : null}
       <div className="settings-model-list scrollbar-thin" data-empty-label={t('settings.testBeforeSaveHint')} data-testid="settings-provider-model-list">

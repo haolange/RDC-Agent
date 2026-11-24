@@ -1,4 +1,4 @@
-/* The timeline sits outside the inset Working column. */
+/* The timeline sits in the left gutter of the inset process body. */
 .work-process {
   --work-rail-hang: calc(var(--space-4) / 2 + var(--space-1));
 }
@@ -69,7 +69,6 @@
 
 .work-process-track > .work-process-narrative-stream,
 .work-process-section-list,
-.work-process-tool-aggregate-body { padding-left: 0; }
 .work-process-track-leading { padding-bottom: var(--space-2); }
 .work-process-track .work-process-step.is-appear { animation: none; }
 .work-process-output[hidden],

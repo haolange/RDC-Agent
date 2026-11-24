@@ -5,9 +5,9 @@ import { useUiLabels } from '../../../../lib/useUiLabels';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
-import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
+import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { McpResourceList } from './McpResourceList';
-import { McpTrustBadge, McpTrustPanel, mcpTrustState } from './McpTrustPanel';
+import { McpTrustPanel } from './McpTrustPanel';
 import { mcpTransportLabel } from './resourceLabels';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 import { saveScopedResource } from './runtimeScopeMutations';
@@ -17,27 +17,19 @@ import type { DiagnosticFact } from '../../../../patterns/CopyDiagnostics';
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/rdcRuntime';
 
-type ConnectionKind = 'connected' | 'error' | 'loading' | 'disconnected';
-
-const CONNECTION_KIND: Record<MCPConnectionStatus, ConnectionKind> = {
-  connected: 'connected',
-  error: 'error',
-  connecting: 'loading',
-  disconnected: 'disconnected',
-  unknown: 'disconnected',
-};
-
-const CONNECTION_LABEL_KEY: Record<ConnectionKind, TranslationKey> = {
+const CONNECTION_LABEL_KEY: Record<MCPConnectionStatus, TranslationKey> = {
   connected: 'settings.mcpStatusConnected',
   error: 'settings.mcpStatusError',
-  loading: 'settings.mcpStatusLoading',
+  connecting: 'settings.mcpStatusConnecting',
   disconnected: 'settings.mcpStatusDisconnected',
+  unknown: 'settings.mcpStatusUnknown',
 };
 
 /** A status dot and one word; the reason for an error is in the server's detail. */
 function ConnectionStatus({ server }: { server: MCPServerStatusSummary | undefined }) {
   const { t } = useI18n();
-  const kind = server ? CONNECTION_KIND[server.connectionStatus] ?? 'disconnected' : 'disconnected';
+  const kind = server?.connectionStatus;
+  if (!kind) return null;
   return (
     <span className="settings-mcp-status" data-testid="settings-mcp-connection-badge" data-status={kind}>
       {t(CONNECTION_LABEL_KEY[kind])}
@@ -95,7 +87,6 @@ export const McpServicesPanel: React.FC<{
     const form = formFromContent('mcp', resource.id, resource.content);
     const live = statusFor(resource);
     const server = overviewFor(resource);
-    const trust = server ? mcpTrustState(server) : null;
     const args = form.argsText.trim() && form.argsText.trim() !== '[]' ? form.argsText.replace(/\s+/g, ' ') : '';
     const diagnostics: DiagnosticFact[] = [
       { label: t('settings.resourceFieldId'), value: resource.id },
@@ -112,13 +103,13 @@ export const McpServicesPanel: React.FC<{
         <header className="settings-runtime-detail-head">
           <div className="settings-runtime-detail-title">
             <strong>{form.name || resource.id}</strong>
-            {trust ? <span className="settings-runtime-detail-badges"><McpTrustBadge state={trust} /></span> : null}
           </div>
           <div className="settings-runtime-actions">
             <Button variant="secondary" size="sm" onClick={edit} data-testid="settings-mcp-detail-edit">
               <Icon name="edit" size={14} />
               {t('settings.edit')}
             </Button>
+            <CopyDiagnosticsMenu testId="settings-mcp-diagnostics" facts={diagnostics} />
           </div>
         </header>
         {live?.connectionStatus === 'connected' ? (
@@ -128,7 +119,6 @@ export const McpServicesPanel: React.FC<{
         ) : null}
         {live?.lastError ? <InlineError detail={live.lastError}>{t('settings.mcpConnectFailed')}</InlineError> : null}
         {server && overview ? <McpTrustPanel overview={overview} server={server} onChanged={onChanged} /> : null}
-        <CopyDiagnosticsButton testId="settings-mcp-diagnostics" facts={diagnostics} />
       </div>
     );
   };

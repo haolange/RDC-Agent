@@ -25,7 +25,7 @@ export function createDefaultUiPreferences(): UiPreferences {
     language: 'zh-CN',
     fontScale: 'medium',
     composerMarkdown: false,
-    contextBreakdownExpanded: true,
+    contextBreakdownExpanded: false,
     workProcessExpansion: 'latest',
     chromeThemes: createDefaultChromeThemes(),
   };

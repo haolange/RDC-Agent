@@ -65,6 +65,24 @@ export const ConversationGetAttachmentPreviewArgsSchema = z.tuple([
   }).strict(),
 ]);
 
+export const ConversationAccessAttachmentArgsSchema = z.tuple([
+  z.object({
+    owner: z.discriminatedUnion('scope', [
+      z.object({
+        scope: z.literal('staging'),
+        stagingId: z.string().regex(/^[a-f0-9]{32}$/),
+        composerScopeKey: ipcNonEmptyString(256, 'composerScopeKey'),
+      }).strict(),
+      z.object({
+        scope: z.literal('session'),
+        attachmentId: ipcNonEmptyString(64, 'attachmentId'),
+        sessionId: ipcId(128, 'sessionId'),
+      }).strict(),
+    ]),
+    action: z.enum(['preview', 'open', 'reveal']),
+  }).strict(),
+]);
+
 const ConfigurationCommitSchema = z.object({
   agentId: ipcNonEmptyString(200, 'agentId'),
   agentCommitHash: ipcString(128, 'agentCommitHash').optional(),

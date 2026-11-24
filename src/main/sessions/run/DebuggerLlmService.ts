@@ -87,9 +87,6 @@ function buildScaledBreakdown(
   return scaled;
 }
 
-function positiveTokenOrOmit(value: number | undefined): number | undefined {
-  return typeof value === 'number' && value > 0 ? value : undefined;
-}
 function hasMaterialProviderUsageTelemetry(usage: {
   inputTokens: number;
   outputTokens: number;
@@ -291,12 +288,8 @@ export class DebuggerLlmService {
       occupiedTokens,
       breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, promptBudgetTokens || null),
       snapshotAt: summary.lastSnapshotAt ?? null,
-      ...(positiveTokenOrOmit(summary.totalCacheReadTokens) !== undefined
-        ? { cacheReadTokens: positiveTokenOrOmit(summary.totalCacheReadTokens) }
-        : {}),
-      ...(positiveTokenOrOmit(summary.totalCacheWriteTokens) !== undefined
-        ? { cacheWriteTokens: positiveTokenOrOmit(summary.totalCacheWriteTokens) }
-        : {}),
+      ...(summary.totalCacheReadTokens !== undefined ? { cacheReadTokens: summary.totalCacheReadTokens } : {}),
+      ...(summary.totalCacheWriteTokens !== undefined ? { cacheWriteTokens: summary.totalCacheWriteTokens } : {}),
       ...(cacheHitTokens !== undefined ? { cacheHitTokens } : {}),
       ...(cacheMissTokens !== undefined ? { cacheMissTokens } : {}),
       ...(lastTurnHit !== undefined ? { lastTurnCacheHitTokens: lastTurnHit } : {}),
@@ -304,13 +297,9 @@ export class DebuggerLlmService {
       ...(cacheHitTokens !== undefined ? { cacheSavedTokens: cacheHitTokens } : {}),
       ...(lastTurnRate !== undefined ? { lastTurnCacheHitRate: lastTurnRate } : {}),
       ...(cumulativeRate !== undefined ? { cumulativeCacheHitRate: cumulativeRate } : {}),
-      ...(positiveTokenOrOmit(summary.totalReasoningTokens) !== undefined
-        ? { reasoningTokens: positiveTokenOrOmit(summary.totalReasoningTokens) }
-        : {}),
+      ...(summary.totalReasoningTokens !== undefined ? { reasoningTokens: summary.totalReasoningTokens } : {}),
       ...(summary.lastTurnCost ? { cost: summary.lastTurnCost } : {}),
-      ...(typeof summary.totalCost === 'number' && summary.totalCost > 0
-        ? { cumulativeCost: summary.totalCost }
-        : {}),
+      ...(summary.totalCost !== undefined ? { cumulativeCost: summary.totalCost } : {}),
     };
   }
 

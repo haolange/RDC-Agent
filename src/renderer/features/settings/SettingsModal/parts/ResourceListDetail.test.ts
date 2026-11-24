@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ResourceListDetail } from './ResourceListDetail';
 
 describe('resource frame layouts', () => {
-  it.each(['panel', 'page'] as const)('renders a single %s empty state and action group', (emptyVariant) => {
+  it.each(['panel', 'inline'] as const)('renders a single %s empty state and action group', (emptyVariant) => {
     const html = renderToStaticMarkup(React.createElement(ResourceListDetail, {
       toolbar: 'Scope', isEmpty: true, emptyTitle: 'No resources', emptyVariant,
       emptyActions: React.createElement('button', null, 'Add resource'), list: 'hidden list', detail: 'hidden editor',
@@ -24,9 +24,9 @@ describe('resource frame layouts', () => {
     expect(html).not.toContain('Add resource');
   });
 
-  it('renders populated Hook list and detail instead of the fill empty state', () => {
+  it('renders populated Hook list and detail instead of the empty prompt', () => {
     const html = renderToStaticMarkup(React.createElement(ResourceListDetail, {
-      toolbar: 'Scope', isEmpty: false, emptyTitle: 'No Hooks', emptyVariant: 'page',
+      toolbar: 'Scope', isEmpty: false, emptyTitle: 'No Hooks', emptyVariant: 'panel',
       list: 'Hook resources', detail: 'Hook trust and test results',
     }));
     expect(html).toContain('settings-resource-list-column');

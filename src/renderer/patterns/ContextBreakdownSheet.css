@@ -1,21 +1,20 @@
 /* Context usage content inside the shared ReadingSheet; the sheet owns position, size and the one scroller. */
 .context-breakdown-content {
-  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
 }
 
-/* Hero: the big percentage, one sentence and the full-width bar. */
 .context-breakdown-hero {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .context-breakdown-hero-usage {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
   min-width: 0;
@@ -38,9 +37,19 @@
 
 .context-breakdown-hero-tokens {
   margin: 0;
+  margin-inline-start: auto;
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-variant-numeric: tabular-nums;
+}
+
+.context-breakdown-details {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.context-breakdown.is-height-animated .context-breakdown-details {
+  animation: none;
 }
 
 .context-breakdown-window-note {
@@ -50,11 +59,58 @@
   line-height: var(--type-meta-line);
 }
 
-/* Stacked bar — thicker Cursor-style track */
+.context-breakdown-scale {
+  display: flex;
+  flex-direction: column;
+}
+
+.context-breakdown-scale-label {
+  position: relative;
+  align-self: flex-start;
+  inset-inline-start: var(--context-threshold-left);
+  transform: translateX(calc(-1 * var(--context-threshold-left)));
+  max-width: 100%;
+  padding-top: var(--space-2);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--type-meta-line);
+}
+
+.context-breakdown-scale-label::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: var(--context-threshold-left);
+  height: var(--space-1);
+  border-inline-start: 1px solid var(--token-text-secondary);
+}
+
+.context-breakdown-budget {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.context-breakdown-budget > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--type-body-size);
+}
+
+.context-breakdown-budget dt { color: var(--token-text-secondary); }
+
+.context-breakdown-budget dd {
+  margin: 0;
+  color: var(--token-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
 .context-breakdown-bar {
   position: relative;
   display: flex;
-  gap: var(--space-0-5);
   width: 100%;
   height: 10px;
   border-radius: var(--radius-full);
@@ -68,7 +124,7 @@
   bottom: 0;
   left: var(--context-threshold-left, 80%);
   width: 2px;
-  margin-left: -var(--space-0-5);
+  transform: translateX(-50%);
   background: var(--token-text-secondary);
   pointer-events: none;
   z-index: var(--z-local-1);
@@ -81,6 +137,10 @@
   border-radius: var(--radius-sm);
   transition: width var(--transition-fast);
   background: var(--token-context-deferred);
+}
+
+.context-breakdown-bar-segment:not([data-segment]) {
+  background: var(--token-text-secondary);
 }
 
 .context-breakdown-bar-segment[data-segment='system_prompt'],

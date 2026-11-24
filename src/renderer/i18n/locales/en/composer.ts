@@ -125,6 +125,4 @@ export const enComposer = {
   'composer.commandCategory.debug': "Troubleshooting",
   'composer.commandCategory.edit': "Editing",
   'composer.commandCategory.session': "Session",
-  'composer.attachment.details': 'Details',
-  'composer.attachment.describe': 'Describe {fileName}',
 } as const;

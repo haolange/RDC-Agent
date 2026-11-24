@@ -24,7 +24,7 @@ export const CONTEXT_BREAKDOWN_GROUPS: {
   {
     id: 'tools',
     labelKey: 'contextBreakdown.groupTools',
-    ids: ['system_tools', 'mcp_tools', 'mcp_tools_deferred', 'builtin_tools_deferred', 'subagent_definitions'],
+    ids: ['system_tools', 'mcp_tools', 'subagent_definitions'],
   },
   {
     id: 'conversation',
@@ -32,6 +32,7 @@ export const CONTEXT_BREAKDOWN_GROUPS: {
     ids: ['summarized_conversation', 'conversation'],
   },
   { id: 'space', labelKey: 'contextBreakdown.groupSpace', ids: ['free'] },
+  { id: 'deferred', labelKey: 'contextBreakdown.groupDeferred', ids: ['mcp_tools_deferred', 'builtin_tools_deferred'] },
 ];
 
 export const SEGMENT_LABEL_KEYS: Record<ContextUsageBreakdownId, TranslationKey> = {

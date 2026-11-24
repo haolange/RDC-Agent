@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../../../../i18n';
 import { ImageViewer } from '../../../../ui/ImageViewer';
+import { Skeleton } from '../../../../ui/Skeleton';
 import { knowledgeImageRoleLabelKey, normalizeKnowledgePreviewPath } from '../knowledgeCardImages';
 import { useKnowledgeCardImage } from '../useKnowledgeCardImage';
 import type { KnowledgeImageRole } from '@shared/types/knowledge';
@@ -30,6 +31,7 @@ export function KnowledgeCardImage({
   const path = normalizeKnowledgePreviewPath(relativePath);
   const roleLabel = role ? t(knowledgeImageRoleLabelKey(role)) : undefined;
   const heading = caption ?? roleLabel;
+  const imageLabel = alt || heading || t('knowledgeCenter.imageRole.illustration');
   const ready = preview.status === 'ready';
   const url = ready ? preview.dataUrl : undefined;
   const [viewing, setViewing] = useState(false);
@@ -39,7 +41,7 @@ export function KnowledgeCardImage({
 
   return (
     <figure
-      className={`knowledge-card-image${ready ? '' : ' is-missing'}${preview.status === 'loading' ? ' is-loading' : ''}`}
+      className="knowledge-card-image"
       data-testid="knowledge-card-image"
       data-role={role}
       data-path={path}
@@ -47,10 +49,14 @@ export function KnowledgeCardImage({
       {heading ? <figcaption className="knowledge-card-image-label">{heading}</figcaption> : null}
       <div className="knowledge-card-image-frame">
         {ready ? (
-          <button type="button" className="knowledge-card-image-open" aria-label={t('knowledgeCenter.imageOpen', { name: heading ?? alt ?? path })}
+          <button type="button" className="knowledge-card-image-open" aria-label={t('knowledgeCenter.imageOpen', { name: heading || imageLabel })}
             onClick={() => (onOpen ? onOpen(relativePath) : setViewing(true))}>
-            <img src={preview.dataUrl} alt={alt ?? heading ?? path} />
+            <img src={preview.dataUrl} alt={imageLabel} />
           </button>
+        ) : preview.status === 'loading' || preview.status === 'idle' ? (
+          <div className="knowledge-card-image-missing" role="status" aria-label={t('knowledgeCenter.loading')}>
+            <Skeleton shape="line" count={2} />
+          </div>
         ) : (
           <div className="knowledge-card-image-missing" role="img" aria-label={t('knowledgeCenter.imageMissing')}>
             <span>{t('knowledgeCenter.imageMissing')}</span>
@@ -58,7 +64,7 @@ export function KnowledgeCardImage({
         )}
       </div>
       {!onOpen && url ? (
-        <ImageViewer open={viewing} items={[{ src: url, title: heading ?? alt ?? path }]} index={0}
+        <ImageViewer open={viewing} items={[{ src: url, title: imageLabel }]} index={0}
           onIndexChange={() => undefined} onClose={() => setViewing(false)} />
       ) : null}
     </figure>

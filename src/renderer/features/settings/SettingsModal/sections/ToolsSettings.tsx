@@ -1,10 +1,12 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '../../../../ui/Button';
+import { InlineError } from '../../../../ui/InlineError';
 import { errorDetail } from '../../../../lib/errorDetail';
 import { RdcCliInvokerSettingsFields } from './RdcCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
 import { LocalToolDisclosure } from './LocalToolDisclosure';
+import { useRdcInstallation } from './useRdcInstallation';
 import type { useI18n } from '../../../../i18n';
 import type { AgentShellSettings, CodeInterpreterSettings, RdcCliInvokerSettings } from '@shared/types/settings';
 
@@ -38,9 +40,10 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState('');
   const saving = status === 'saving';
+  const installation = useRdcInstallation(rdcCliDraft, onRdcCliDraftChange);
 
   const save = async () => {
-    if (saving) return;
+    if (saving || installation.busy || !dirty) return;
     setStatus('saving');
     setError('');
     try {
@@ -55,7 +58,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   const statusText = status === 'saving'
     ? t('settings.saving')
     : status === 'error'
-      ? error
+      ? ''
       : dirty
         ? t('settings.unsaved')
         : status === 'saved'
@@ -66,7 +69,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
     <form
       className="settings-tools-card-stack"
       data-testid="settings-local-tools"
-      onChange={() => { if (status !== 'saving') setStatus('idle'); }}
+      onChange={() => { if (!saving) { setStatus('idle'); setError(''); } }}
       onSubmit={(event) => { event.preventDefault(); void save(); }}
     >
       <header className="settings-section-header">
@@ -74,38 +77,40 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
         <p className="settings-section-description">{t('settings.localToolsHint')}</p>
       </header>
 
-      <LocalToolDisclosure
-        icon="cube"
-        title={t('settings.rdcToolchainTitle')}
-        description={t('settings.rdcToolchainHint')}
-        testId="settings-rdc-block"
-      >
-        <RdcCliInvokerSettingsFields rdcCliDraft={rdcCliDraft} onRdcCliDraftChange={onRdcCliDraftChange} t={t} />
-      </LocalToolDisclosure>
+      <fieldset disabled={saving} className="settings-local-tool-fields" aria-label={t('settings.localToolsTitle')}>
+        <LocalToolDisclosure
+          icon="cube"
+          title={t('settings.rdcToolchainTitle')}
+          description={t('settings.rdcToolchainHint')}
+          status={t(rdcCliDraft.enabled ? 'settings.localToolEnabled' : 'settings.disabled')}
+          testId="settings-rdc-block"
+        >
+          <RdcCliInvokerSettingsFields rdcCliDraft={rdcCliDraft} onRdcCliDraftChange={onRdcCliDraftChange} installation={installation} t={t} />
+        </LocalToolDisclosure>
 
-      <LocalToolDisclosure
-        icon="terminal"
-        title={t('settings.shellTitle')}
-        description={t('settings.shellSummary')}
-        testId="settings-shell-block"
-      >
-        <ShellSettingsFields draft={shellDraft} onChange={onShellDraftChange} t={t} />
-      </LocalToolDisclosure>
+        <LocalToolDisclosure
+          icon="terminal"
+          title={t('settings.shellTitle')}
+          description={t('settings.shellSummary')}
+          status={t(shellDraft.executable.trim() ? 'settings.localToolCustom' : 'settings.localToolAutomatic')}
+          testId="settings-shell-block"
+        >
+          <ShellSettingsFields draft={shellDraft} onChange={onShellDraftChange} t={t} />
+        </LocalToolDisclosure>
 
-      <LocalToolDisclosure
-        icon="code"
-        title={t('settings.codeInterpreterTitle')}
-        description={t('settings.codeInterpreterHint')}
-        testId="settings-code-interpreter-block"
-      >
-        <CodeInterpreterSettingsFields
-          draft={codeInterpreterDraft}
-          onChange={onCodeInterpreterDraftChange}
-          t={t}
-        />
-      </LocalToolDisclosure>
+        <LocalToolDisclosure
+          icon="code"
+          title={t('settings.codeInterpreterTitle')}
+          description={t('settings.codeInterpreterHint')}
+          status={t(codeInterpreterDraft.enabled ? 'settings.localToolEnabled' : 'settings.disabled')}
+          testId="settings-code-interpreter-block"
+        >
+          <CodeInterpreterSettingsFields draft={codeInterpreterDraft} onChange={onCodeInterpreterDraftChange} t={t} />
+        </LocalToolDisclosure>
+      </fieldset>
 
-      <div className="settings-actions settings-actions-split settings-tools-save-bar">
+      {error ? <InlineError detail={error}>{t('settings.localToolsSaveFailed')}</InlineError> : null}
+      {statusText || error ? <div className="settings-actions settings-actions-split settings-tools-save-bar">
         <span
           className="settings-save-status"
           role="status"
@@ -114,10 +119,10 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
         >
           {statusText}
         </span>
-        <Button type="submit" variant="primary" disabled={saving || !dirty} data-testid="settings-tools-save">
+        {dirty || saving ? <Button type="submit" variant="primary" disabled={saving || installation.busy} data-testid="settings-tools-save">
           {t('settings.save')}
-        </Button>
-      </div>
+        </Button> : null}
+      </div> : null}
     </form>
   );
 };

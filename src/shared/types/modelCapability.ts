@@ -19,7 +19,7 @@ export type ReasoningControlKind = 'unknown' | 'none' | 'toggle' | 'levels' | 'a
 
 export type OpenAiWireEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type AnthropicWireEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-export type GeminiWireThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
+export type GeminiWireThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export type ReasoningWireProfile =
   | { kind: 'none' }

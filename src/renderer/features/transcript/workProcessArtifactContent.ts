@@ -1,8 +1,5 @@
-import { type ToolContentInput, type UnwrappedToolContent, sanitizeContentText, filterEnvelopeLines } from './workProcessToolContentShared';
+import { type ToolContentInput, type UnwrappedToolContent, sanitizeContentText } from './workProcessToolContentShared';
 import { stringifyPreview, createDetailLines, toRecord } from './workProcessContentText';
-
-/** Offload receipt lines (the session address, its hash, read hints) belong to the raw receipt, never the card. */
-const isReceiptLine = (line: string): boolean => /^(?:ref|hash|sha256|Evidence ref|Decoded tool text|Image evidence)\b|session:\/\/|^\{"uri":/i.test(line.trim());
 
 /**
  * A result moved into a session file still reads as what the tool did: the offload kept a display gist (the page, the
@@ -16,8 +13,8 @@ export function unwrapArtifactContent(input: ToolContentInput): UnwrappedToolCon
     || (typeof details?.uri === 'string' && details.uri.startsWith('session://'));
   if (!artifactized) return null;
 
-  const summary = sanitizeContentText(stringifyPreview(details?.summary)) || contentText;
-  const previewLines = summary ? filterEnvelopeLines(createDetailLines(summary, 4)).filter((line) => !isReceiptLine(line)) : [];
+  const summary = contentText || sanitizeContentText(stringifyPreview(details?.summary));
+  const previewLines = createDetailLines(summary, 4);
   const display = toRecord(details?.display);
   if (display?.kind === 'command' && typeof display.command === 'string') {
     return { previewKind: 'shell', commandText: display.command, bodyText: display.command, previewLines };

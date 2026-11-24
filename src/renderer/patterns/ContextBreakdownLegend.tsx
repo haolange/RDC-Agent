@@ -11,13 +11,14 @@ import type { ContextUsageBreakdownEntry } from '@shared/types/session';
 export const ContextBreakdownLegend: React.FC<{
   entries: ContextUsageBreakdownEntry[];
   unavailable?: boolean;
-}> = ({ entries, unavailable = false }) => {
+  estimatedFreeSpace?: boolean;
+}> = ({ entries, unavailable = false, estimatedFreeSpace = false }) => {
   const { t } = useI18n();
 
   const renderRow = (entry: ContextUsageBreakdownEntry, knownEmpty: boolean) => {
     const suffixKey = COUNT_SUFFIX_KEYS[entry.id];
     const suffix = suffixKey ? t(suffixKey) : '';
-    const countLabel = !suffix
+    const countLabel = !suffixKey
       ? null
       : unavailable
         ? '—'
@@ -33,7 +34,6 @@ export const ContextBreakdownLegend: React.FC<{
     return (
       <li
         key={entry.id}
-        data-pointer-interactive
         className={`context-breakdown-row${isFree ? ' is-free' : ''}${isDeferred ? ' is-deferred' : ''}${isZero ? ' is-zero' : ''}`}
       >
         <span
@@ -43,7 +43,9 @@ export const ContextBreakdownLegend: React.FC<{
         />
         <span className="context-breakdown-label">{t(SEGMENT_LABEL_KEYS[entry.id])}</span>
         {countLabel ? <span className="context-breakdown-count">{countLabel}</span> : null}
-        <span className="context-breakdown-tokens">{unavailable ? '—' : formatTokenCount(entry.tokens)}</span>
+        <span className="context-breakdown-tokens">
+          {unavailable ? '—' : `${isFree && estimatedFreeSpace ? '~' : ''}${formatTokenCount(entry.tokens)}`}
+        </span>
       </li>
     );
   };

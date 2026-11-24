@@ -97,12 +97,17 @@ it('shows warnings, tiers and the probe in the expanded model, and the probe out
     expect(host.querySelector('[data-testid="settings-provider-model-tiers-model-a"]')).not.toBeNull();
     expect(host.textContent).toContain('Unavailable route');
     expect(host.textContent).not.toMatch(/settings\.providers\.capability\.(sources|protocolOwner|activation)/u);
-    const probe = host.querySelector<HTMLButtonElement>('[data-testid="settings-provider-model-probe-model-a"] .settings-model-capability-probe-actions button')!;
+    const probeRow = host.querySelector('[data-testid="settings-provider-model-probe-model-a"]')!;
+    const probe = probeRow.querySelector('button')!;
     await act(async () => probe.click());
     expect(host.querySelector('[role="status"]')?.textContent).toContain('inconclusive');
     // The raw probe detail is not printed; only a known reason would be.
     expect(host.textContent).not.toContain('Need actual threshold evidence');
     expect(testModelCapability).toHaveBeenCalledWith({providerId: 'provider-a', modelId: 'model-a', mode: 'default'});
+    await act(async () => probeRow.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!.click());
+    expect(testModelCapability).toHaveBeenCalledTimes(1);
+    await act(async () => document.querySelector<HTMLElement>('[role="menuitem"]')!.click());
+    expect(testModelCapability).toHaveBeenLastCalledWith({providerId: 'provider-a', modelId: 'model-a', mode: 'fast'});
     const select = host.querySelector<HTMLButtonElement>('[data-testid="settings-model-reasoning-model-a"]')!;
     await act(async () => select.click());
     const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((el) => el.textContent?.includes('levelOn'))!;

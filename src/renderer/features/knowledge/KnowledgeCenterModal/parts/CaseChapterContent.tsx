@@ -24,6 +24,9 @@ type Translate = (key: TranslationKey, values?: Record<string, string | number>)
 const FIELD_LABELS: Record<string, TranslationKey> = {
   expected: 'knowledgeCenter.field.expected',
   observed: 'knowledgeCenter.field.observed',
+  visual: 'knowledgeCenter.field.visual',
+  first_bad_event: 'knowledgeCenter.field.first_bad_event',
+  responsible_layer: 'knowledgeCenter.field.responsible_layer',
   phenomenon: 'knowledgeCenter.field.phenomenon',
   spatial_pattern: 'knowledgeCenter.field.spatial_pattern',
   temporal_pattern: 'knowledgeCenter.field.temporal_pattern',

@@ -50,6 +50,18 @@ describe('resolveConversationMedia', () => {
     }
   });
 
+  it('resolves same-named attachments independently by their registered storage names and paths', () => {
+    const { scope } = fixture();
+    const second = path.join(scope.attachmentsRoot, 'shot-2.png');
+    const secondBytes = Buffer.concat([PNG, Buffer.from([1])]);
+    fs.writeFileSync(second, secondBytes);
+    const withDuplicateName = { ...scope, attachments: [...scope.attachments, { fileName: 'shot.png', filePath: second }] };
+    expect(resolveConversationMedia('a1-shot.png', withDuplicateName)).toEqual({ kind: 'image', dataUrl: `data:image/png;base64,${PNG.toString('base64')}` });
+    expect(resolveConversationMedia('shot-2.png', withDuplicateName)).toEqual({ kind: 'image', dataUrl: `data:image/png;base64,${secondBytes.toString('base64')}` });
+    expect(resolveConversationMedia(second, withDuplicateName)).toEqual(resolveConversationMedia('shot-2.png', withDuplicateName));
+    expect(resolveConversationMedia('shot.png', withDuplicateName)).toEqual({ dataUrl: null, error: 'MEDIA_NOT_FOUND' });
+  });
+
   it('refuses anything outside the three roots, other schemes, and bytes that do not match an allowed type', () => {
     const { scope, project, outside } = fixture();
     fs.symlinkSync(outside, path.join(project, 'link.png'));

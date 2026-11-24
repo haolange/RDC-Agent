@@ -1,3 +1,4 @@
+import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import type {
   ProviderDefinitionCommitSnapshot,
   ProviderDefinitionSaveRequest,
@@ -11,7 +12,6 @@ type CommitProviderDefinition = (
 interface Waiter {
   request: ProviderDefinitionSaveRequest;
   resolve: (result: ProviderDefinitionSaveResult) => void;
-  reject: (error: unknown) => void;
 }
 
 interface Lane {
@@ -22,7 +22,6 @@ interface Lane {
   latestRevision: number;
   lastSuccessful: ProviderDefinitionCommitSnapshot | null;
   lastResult: ProviderDefinitionSaveResult | null;
-  lastError: unknown | null;
 }
 
 const superseded = (
@@ -58,21 +57,23 @@ export class ProviderDefinitionMutationCoordinator {
       lane.timer = null;
       void this.runLane(request.provider.id);
     }, this.debounceMs);
-    return new Promise((resolve, reject) => lane.waiters.push({ request, resolve, reject }));
+    return new Promise((resolve) => lane.waiters.push({ request, resolve }));
   }
 
   async flush(providerId: string): Promise<ProviderDefinitionCommitSnapshot | null> {
     const lane = this.lanes.get(providerId);
     if (!lane) return null;
+    const waitingForSave = Boolean(lane.pending || lane.running);
     if (lane.timer) {
       clearTimeout(lane.timer);
       lane.timer = null;
     }
     while (lane.pending || lane.running) await this.runLane(providerId);
-    if (lane.lastResult?.status === 'failed') {
+    // The caller must see a failure from a save it waited for. Once settled,
+    // later callers can read the current committed definition and catalog.
+    if (waitingForSave && lane.lastResult?.status === 'failed') {
       throw new Error(lane.lastResult.error ?? 'Provider settings save failed.');
     }
-    if (lane.lastError) throw lane.lastError;
     return lane.lastSuccessful;
   }
 
@@ -87,7 +88,6 @@ export class ProviderDefinitionMutationCoordinator {
       latestRevision: 0,
       lastSuccessful: null,
       lastResult: null,
-      lastError: null,
     };
     this.lanes.set(providerId, lane);
     return lane;
@@ -100,8 +100,18 @@ export class ProviderDefinitionMutationCoordinator {
     if (!request) return;
     lane.pending = null;
     lane.running = this.commit(request)
+      .catch((error: unknown): ProviderDefinitionSaveResult => {
+        const previous = lane.lastSuccessful;
+        const lastSuccessful = previous?.provider
+          && providerConnectionIdentity(previous.provider) === providerConnectionIdentity(request.provider)
+          ? previous : null;
+        return {
+          ...superseded(request, lastSuccessful),
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+        };
+      })
       .then((result) => {
-        lane.lastError = null;
         lane.lastResult = result;
         if (result.lastSuccessful) lane.lastSuccessful = result.lastSuccessful;
         if (lane.pending) return;
@@ -111,11 +121,6 @@ export class ProviderDefinitionMutationCoordinator {
             ? result
             : superseded(waiter.request, result.lastSuccessful));
         }
-      })
-      .catch((error) => {
-        if (lane.pending) return;
-        lane.lastError = error;
-        for (const waiter of lane.waiters.splice(0)) waiter.reject(error);
       })
       .finally(() => { lane.running = null; });
     await lane.running;

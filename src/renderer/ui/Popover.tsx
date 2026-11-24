@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { cn } from '../lib/cn';
 import { placeAnchoredSurface } from '../lib/anchoredSurface';
 import { useDynStyle } from '../lib/useDynStyle';
@@ -31,6 +31,7 @@ export interface PopoverProps {
   side?: 'top' | 'bottom';
   className?: string;
   role?: 'dialog' | 'presentation';
+  dismissOnTab?: boolean;
 }
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
@@ -51,12 +52,13 @@ export function Popover({
   side = 'bottom',
   className,
   role = 'dialog',
+  dismissOnTab = false,
 }: PopoverProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   // An open popover is the topmost dismissible layer, so Escape closes only it
   // and leaves the modal it was launched from open.
-  const { layerId } = useOverlayLayer(open);
+  const { layerId } = useOverlayLayer(open, 'layout');
   const presence = usePresence(open, contentRef);
   const [coords, setCoords] = useState({ left: VIEWPORT_MARGIN, top: VIEWPORT_MARGIN, ready: false });
   const positionStyle = useDynStyle({
@@ -77,6 +79,7 @@ export function Popover({
 
   // A closing popover keeps its place while the exit plays; it is measured afresh after it unmounts.
   useLayoutEffect(() => {
+    if (!open && contentRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
     if (!presence.mounted) {
       setCoords((current) => (current.ready ? { ...current, ready: false } : current));
       return;
@@ -93,8 +96,8 @@ export function Popover({
       onOpenChange(false);
     };
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
       if (!isTopOverlayLayer(layerId)) return;
+      if (event.key !== 'Escape') return;
       event.preventDefault();
       event.stopPropagation();
       onOpenChange(false);
@@ -151,6 +154,16 @@ export function Popover({
             ref={contentRef}
             className={cn('ui-popover', className)}
             role={role}
+            onKeyDownCapture={(event) => {
+              if (!open || !isTopOverlayLayer(layerId) || !event.currentTarget.contains(event.target as Node)) return;
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+              } else if (event.key !== 'Tab' || !dismissOnTab) return;
+              // Release this surface before its dialog handles the key. Tab continues natively from the trigger.
+              flushSync(() => onOpenChange(false));
+              triggerRef.current?.focus();
+            }}
             data-side={side}
             data-state={presence.state}
             data-ready={coords.ready ? 'true' : 'false'}

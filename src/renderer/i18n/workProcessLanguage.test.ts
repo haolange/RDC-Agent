@@ -3,8 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { BUILTIN_AGENT_TOOL_IDS } from '@shared/constants/agentToolTokens';
+import { toolDisplayName } from '../features/transcript/workProcessToolCatalog';
 import { createToolRowForPresentation, getToolVerb } from '../features/transcript/workProcessToolRows';
-import { buildToolAggregateSummary } from '../features/transcript/workProcessToolAggregate';
 import { buildWorkProcessPresentation } from '../features/transcript/workProcessTracePresentation';
 import { WorkProcess } from '../features/transcript/WorkProcess';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
@@ -32,6 +32,7 @@ it('covers every builtin and terminal state in both languages without translatin
         expect(row.verb).toBeTruthy();
         expect(row.verb).not.toContain('chat.');
         if (language === 'en') expect(row.verb).not.toMatch(/\p{Script=Han}/u);
+        else if (status === 'error' && row.type === 'tool') expect(row.verb).toBe(toolDisplayName(name, t));
         else expect(row.verb).toMatch(/\p{Script=Han}/u);
         if (row.type === 'tool') {
           expect(row.toolName).toBe(name);
@@ -41,8 +42,8 @@ it('covers every builtin and terminal state in both languages without translatin
       }
     }
   }
-  expect(getToolVerb('artifact_read', 'complete', undefined, undefined, translator('en'))).toBe('Read artifact');
-  expect(getToolVerb('artifact_read', 'complete', undefined, undefined, translator('zh-CN'))).toBe('已读取产物');
+  expect(getToolVerb('artifact_read', 'complete', undefined, translator('en'))).toBe('Read artifact');
+  expect(getToolVerb('artifact_read', 'complete', undefined, translator('zh-CN'))).toBe('已读取产物');
 });
 
 it('translates approvals, unknown risks and fallback messages while retaining host reasons', () => {
@@ -68,11 +69,7 @@ it('translates approvals, unknown risks and fallback messages while retaining ho
   }
 });
 
-it('formats mixed aggregate counts and compaction details directly for the selected language', () => {
-  const tools = ['read_file', 'read_file', 'write_file', 'shell'].map(name => createToolRowForPresentation(call(name), translator('en')))
-    .filter((row): row is Extract<typeof row, { type: 'tool' }> => row.type === 'tool');
-  expect(buildToolAggregateSummary(tools, translator('en'))).toBe('Created 1 file, Read 2 files, Ran 1 command');
-  expect(buildToolAggregateSummary(tools, translator('zh-CN'))).toBe('创建了 1 个文件，读取了 2 个文件，运行了 1 条命令');
+it('formats compaction details directly for the selected language', () => {
   const trace: ConversationWorkTrace = { status: 'complete', updatedAt: 2, blocks: [{
     id: 'compact', kind: 'compaction', startedAt: 1, title: '原始标题', summary: '原始压缩内容', status: 'complete', toolCalls: [],
     compactionStats: { provenance: 'auto', messagesBefore: 8, messagesAfter: 2, tokensBefore: 100, tokensAfter: 20 },

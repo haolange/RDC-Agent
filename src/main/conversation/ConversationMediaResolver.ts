@@ -35,6 +35,15 @@ const realpathWithin = (candidate: string, root: string): string => {
   return real;
 };
 
+function findAttachment(src: string, attachments: ConversationMediaScope['attachments']) {
+  if (path.isAbsolute(src)) return attachments.find((attachment) => path.resolve(attachment.filePath) === path.resolve(src));
+  if (/[\\/]/.test(src)) return undefined;
+  const stored = attachments.find((attachment) => path.basename(attachment.filePath) === src);
+  if (stored) return stored;
+  const named = attachments.filter((attachment) => attachment.fileName === src);
+  return named.length === 1 ? named[0] : undefined;
+}
+
 /**
  * Which file an answer's media reference names: a session artifact, an attachment of this session (by file name), or
  * a file inside the session's project. Nothing outside those three roots resolves, symlinks included.
@@ -48,10 +57,10 @@ function locate(src: string, scope: ConversationMediaScope): string {
     }
   }
   if (/^[a-z][a-z0-9+.-]*:/i.test(src) && !/^[a-z]:[\\/]/i.test(src)) throw new MediaError('MEDIA_SCOPE_DENIED');
-  const attachment = !/[\\/]/.test(src) ? scope.attachments.find((item) => item.fileName === src) : undefined;
+  const decoded = decodeURI(src);
+  const attachment = findAttachment(decoded, scope.attachments);
   if (attachment) return realpathWithin(attachment.filePath, scope.attachmentsRoot);
   if (!scope.projectRoot) throw new MediaError('MEDIA_SCOPE_DENIED');
-  const decoded = decodeURI(src);
   return realpathWithin(path.resolve(scope.projectRoot, decoded), scope.projectRoot);
 }
 

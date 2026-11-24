@@ -160,8 +160,13 @@ try {
   await step('connect-ollama', async () => {
     await openSettings(page, 'models');
     await shot('03-settings-models');
-    // A service card opens its panel; checking the connection also discovers the models.
-    await page.getByTestId('settings-provider-connect-ollama').click();
+    const ollama = page.getByTestId('settings-provider-connect-ollama');
+    if (!(await ollama.isVisible())) {
+      const search = page.getByTestId('settings-provider-search');
+      if (!(await search.isVisible())) await page.getByTestId('settings-provider-directory-toggle').click();
+      await search.fill('Ollama');
+    }
+    await ollama.click();
     const dialog = page.getByTestId('settings-provider-connect-dialog');
     await dialog.getByRole('button', { name: /^(检查连接|Check connection)$/ }).click();
     // The service is not saved yet: its discovered models must still settle instead of reading as loading.

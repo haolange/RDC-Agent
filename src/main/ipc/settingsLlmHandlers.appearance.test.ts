@@ -15,6 +15,7 @@ const fixture = vi.hoisted(() => ({
   modelOption: { canonicalId: 'deepseek:deepseek-v4-flash', status: 'ready' },
   load: vi.fn(async () => undefined),
   applyIcon: vi.fn(),
+  applyBackgrounds: vi.fn(),
   refreshMenu: vi.fn(),
   log: vi.fn(),
 }));
@@ -47,6 +48,7 @@ vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: fixtu
 vi.mock('../runtime/ShellResolver', () => ({ shellResolver: {}, formatShellInterpreterLabel: vi.fn() }));
 vi.mock('../window/applicationMenu', () => ({ refreshApplicationMenu: fixture.refreshMenu }));
 vi.mock('../window/productIcon', () => ({ applyProductIcon: fixture.applyIcon }));
+vi.mock('../window/appearanceChrome', () => ({ applyWindowBackgrounds: fixture.applyBackgrounds }));
 
 describe('appearance settings response', () => {
   it('keeps executable Agent choices after saving appearance without changing providers', async () => {
@@ -78,6 +80,18 @@ it('refreshes native menus only after a committed language change', async () => 
   expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
   await handle({}, { appearance: { language: 'zh-CN' } });
   expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
+});
+
+it('saves the context details preference without refreshing native chrome', async () => {
+  fixture.applyIcon.mockClear();
+  fixture.applyBackgrounds.mockClear();
+  registerSettingsLlmHandlers({ broadcastToRenderer: vi.fn(), applyCurrentLlmConfig: vi.fn() } as unknown as WorkbenchIpcContext);
+  const result = await fixture.handlers.get('settings:set')!({}, {
+    appearance: { contextBreakdownExpanded: true },
+  }) as AppSettings;
+  expect(result.appearance.contextBreakdownExpanded).toBe(true);
+  expect(fixture.applyIcon).not.toHaveBeenCalled();
+  expect(fixture.applyBackgrounds).not.toHaveBeenCalled();
 });
 
 it('returns committed settings when a native notification fails', async () => {

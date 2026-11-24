@@ -29,11 +29,6 @@
   font-weight: var(--font-normal);
 }
 
-.appearance-font-popover-head .appearance-font-popover-note {
-  margin: 0;
-  padding: 0;
-}
-
 .appearance-font-options {
   display: flex;
   flex-direction: column;

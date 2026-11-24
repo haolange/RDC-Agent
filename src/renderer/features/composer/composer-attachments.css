@@ -25,62 +25,26 @@
 }
 
 .composer-attachment-tray {
-  --composer-attachment-card-size: 72px;
-  --composer-attachment-card-size-narrow: 56px;
-  --composer-attachment-remove-size: 24px;
-  --composer-attachment-tray-max: 168px;
-  --composer-attachment-tray-max-narrow: 128px;
-  --composer-attachment-card-max: 280px;
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--space-2);
-  max-height: var(--composer-attachment-tray-max);
-  padding: var(--space-3);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-shell);
+  max-height: calc(var(--space-16) * 2 + var(--space-12));
+  padding: var(--space-1);
   overflow-y: auto;
 }
 
-.composer-attachment-card,
 .composer-skill-chip {
-  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--composer-attachment-card-size);
-  max-width: min(var(--composer-attachment-card-max), 100%);
-  padding: var(--space-2);
+  min-height: var(--control-height-md);
+  min-width: 0;
+  max-width: 100%;
+  padding-inline-start: var(--space-2);
   border-radius: var(--control-radius);
   border: 1px solid var(--token-border-default);
   background: var(--token-bg-raised);
-}
-
-.composer-attachment-card.is-error {
-  border-color: var(--token-status-error);
-}
-
-.composer-attachment-card.is-warning {
-  border-color: var(--token-status-warning);
-}
-
-.composer-attachment-card-preview {
-  width: var(--composer-attachment-card-size);
-  height: var(--composer-attachment-card-size);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: var(--control-radius);
-  background: var(--token-bg-muted);
-  color: var(--token-text-secondary);
-  flex-shrink: 0;
-}
-
-/* A skill armed for the next send: a compact chip, icon and name. */
-.composer-skill-chip {
-  min-height: var(--control-height-md);
-  padding: var(--space-1) var(--space-6) var(--space-1) var(--space-2);
 }
 
 .composer-skill-chip-glyph {
@@ -88,21 +52,6 @@
   color: var(--token-text-link);
 }
 
-.composer-attachment-card-thumb,
-.message-attachment-pill-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.composer-attachment-card-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  padding-right: var(--space-4);
-}
-
-.composer-attachment-card-name,
 .composer-skill-chip-name {
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
@@ -111,54 +60,20 @@
   white-space: nowrap;
 }
 
-.composer-attachment-card-meta {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-}
-
-.composer-attachment-card-remove,
 .composer-skill-chip-remove {
-  position: absolute;
-  top: var(--space-1);
-  right: var(--space-1);
-  width: var(--composer-attachment-remove-size);
-  height: var(--composer-attachment-remove-size);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--token-border-default);
-  background: var(--token-bg-overlay);
-  color: var(--token-text-primary);
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-fast);
+  flex-shrink: 0;
 }
 
-.composer-attachment-card:hover .composer-attachment-card-remove,
-.composer-attachment-card:focus-within .composer-attachment-card-remove,
-.composer-skill-chip:hover .composer-skill-chip-remove,
-.composer-skill-chip:focus-within .composer-skill-chip-remove,
-.composer-attachment-card:focus-visible .composer-attachment-card-remove,
-.composer-skill-chip:focus-visible .composer-skill-chip-remove {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-@media (max-width: 480px) {
-  .composer-attachment-tray {
-    max-height: var(--composer-attachment-tray-max-narrow);
+@media (hover: hover) and (pointer: fine) {
+  .composer-skill-chip-remove {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-fast);
   }
 
-  .composer-attachment-card,
-  .composer-skill-chip {
-    min-height: var(--composer-attachment-card-size-narrow);
-    max-width: 100%;
-  }
-
-  .composer-attachment-card-preview {
-    width: var(--composer-attachment-card-size-narrow);
-    height: var(--composer-attachment-card-size-narrow);
+  .composer-skill-chip:hover .composer-skill-chip-remove,
+  .composer-skill-chip:focus-within .composer-skill-chip-remove {
+    opacity: 1;
+    pointer-events: auto;
   }
 }

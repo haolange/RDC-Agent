@@ -6,6 +6,7 @@ export const enApp = {
   'app.retry': 'Retry',
   'app.copyDetails': 'Copy details',
   'app.copyDiagnostics': 'Copy diagnostics',
+  'app.moreActions': 'More actions',
   'app.copied': 'Copied',
   'app.imageViewer.close': 'Close image',
   'app.imageViewer.previous': 'Previous',

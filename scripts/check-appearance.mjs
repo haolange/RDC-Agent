@@ -230,12 +230,23 @@ const appearanceSource = scriptRead('src/renderer/features/settings/SettingsModa
 const appearanceChromeParts = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx');
 assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
 assert(!appearanceChromeParts.includes('appearance-preset-swatch'), 'Chrome parts must not keep a side-mounted preset Aa sibling');
-// Both themes stay open side by side: a live preview over the full editor, with the preset picker in it.
+// Both theme previews select one editor independently of the application display mode.
 assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx')), 'The preset-tile row that folded the editors away is retired');
-assert(appearanceSource.includes('appearance-theme-editors') && !appearanceSource.includes('useState'), 'Appearance shows both theme editors at once, with no 自定义 toggle');
-assert(appearanceChromeParts.includes('AppearanceChromePreview') && appearanceChromeParts.includes('appearance-chrome-title'), 'Each theme card keeps its title and live preview');
+assert(appearanceSource.includes('appearance-theme-previews') && appearanceSource.includes('aria-pressed={editing === variant}'),
+  'Appearance selects an edit target through the two previews');
+assert((appearanceSource.match(/<ChromeThemeCard\b/g) ?? []).length === 1 && appearanceSource.includes('variant={editing}'),
+  'Appearance mounts one editor for the selected variant');
+const chromePreview = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromePreview.tsx');
+const importDialog = scriptRead('src/renderer/features/settings/SettingsModal/sections/ThemeImportDialog.tsx');
+assert(appearanceSource.includes('<AppearanceChromePreview') && importDialog.includes('<AppearanceChromePreview'),
+  'Appearance and valid theme imports preview the same interface');
+assert(chromePreview.includes('compileThemeChrome(chrome, variant)') &&
+  chromePreview.includes("palette['--font-sans']") && chromePreview.includes("palette['--font-mono']"),
+  'The selected chrome compiles its own contrast and both fonts for the preview');
+const generalSettings = scriptRead('src/renderer/features/settings/SettingsModal/sections/GeneralSettings.tsx');
+assert(generalSettings.includes('icon: <WorkProcessPreview latest />') && generalSettings.includes('icon: <WorkProcessPreview />'),
+  'Both expansion choices show the same timeline using their own presentation mode');
 assert(appearanceChromeParts.includes('appearance-preset-picker') && appearanceChromeParts.includes('swatchColor'), 'Each theme card picks its preset with the Aa swatch dropdown');
-assert(!appearanceSource.includes('appearance-variant-tabs'), 'Appearance has one theme switch; the second Light / Dark tab row is gone');
 assert(!appearanceSource.includes('usePointerCursors'), 'The pointer cursor preference is retired');
 assert(appearanceChromeParts.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
 assert(!appearanceChromeParts.includes('function ColorField'), 'Appearance must not inline a private ColorField');
@@ -295,7 +306,6 @@ assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the
 for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx',
   'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
-  'src/renderer/patterns/MaterialContextEditor.tsx',
 ]) {
   const source = scriptRead(file);
   assert(source.includes('<Details'), `${file} must use shared Details`);
@@ -308,8 +318,8 @@ for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx',
 ]) {
   const source = scriptRead(file);
-  assert(source.includes('<CopyDiagnosticsButton') && !/SettingsDiagnostics|summary=\{labels\.diagnostics\}/.test(source),
-    `${file} must hand its technical facts to CopyDiagnosticsButton instead of a 诊断 disclosure`);
+  assert(/<CopyDiagnosticsMenu\b|\buseCopyDiagnostics\(/.test(source) && !/SettingsDiagnostics|summary=\{labels\.diagnostics\}/.test(source),
+    `${file} must expose object diagnostics from its actions menu`);
   assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
 }
 for (const file of ['Popover.tsx', 'Select/index.tsx', 'ContextMenu/index.tsx']) {

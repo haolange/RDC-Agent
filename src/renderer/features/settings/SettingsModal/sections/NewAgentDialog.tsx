@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
 import { TaskDialog } from '../../../../ui/TaskDialog';
@@ -18,6 +18,11 @@ export const NewAgentDialog: React.FC<{
   t: Translate;
 }> = ({ scopeLabel, existingIds, onCreate, onClose, t }) => {
   const [name, setName] = useState('');
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => nameRef.current?.focus());
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
   const trimmed = name.trim();
   const id = uniqueResourceId(toSlug(trimmed || t('settings.agentDefaultName')), existingIds);
   const create = () => { if (trimmed) onCreate({ name: trimmed, id }); };
@@ -29,7 +34,7 @@ export const NewAgentDialog: React.FC<{
         <Button variant="primary" disabled={!trimmed} onClick={create}>{t('settings.newAgentCreate')}</Button>
       </>}>
       <SettingsField label={t('settings.agentName')}>
-        <Input autoFocus aria-label={t('settings.agentName')} value={name} placeholder={t('settings.agentDefaultName')}
+        <Input ref={nameRef} aria-label={t('settings.agentName')} value={name} placeholder={t('settings.agentDefaultName')}
           onChange={(event) => setName(event.currentTarget.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); create(); } }} />
       </SettingsField>

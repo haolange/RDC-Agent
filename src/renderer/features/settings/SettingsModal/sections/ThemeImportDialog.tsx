@@ -3,8 +3,8 @@ import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
 import { Textarea } from '../../../../ui/Textarea';
 import { TaskDialog } from '../../../../ui/TaskDialog';
-import { useDynStyle } from '../../../../lib/useDynStyle';
 import { SettingsField } from '../parts';
+import { AppearanceChromePreview } from './AppearanceChromePreview';
 import { previewThemeImport, themeImportErrorMessage, type AppearanceTranslate } from './appearanceChromeModel';
 import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 
@@ -14,24 +14,6 @@ interface ThemeImportDialogProps {
   onApply: (chrome: ThemeChromeConfig) => void;
   onClose: () => void;
   t: AppearanceTranslate;
-}
-
-function ThemeImportSwatches({ chrome }: { chrome: ThemeChromeConfig }) {
-  const style = useDynStyle({
-    '--ap-surface': chrome.surface,
-    '--ap-ink': chrome.ink,
-    '--ap-accent': chrome.accent,
-  });
-  return (
-    <div className="appearance-import-preview" {...style} data-testid="appearance-import-preview">
-      <span className="appearance-import-swatch appearance-import-swatch--accent" />
-      <span className="appearance-import-swatch appearance-import-swatch--surface" />
-      <span className="appearance-import-swatch appearance-import-swatch--ink" />
-      <code className="appearance-import-preview-code">
-        {chrome.accent} · {chrome.surface} · {chrome.ink}
-      </code>
-    </div>
-  );
 }
 
 export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeImportDialogProps) {
@@ -87,7 +69,10 @@ export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeI
       {preview.state === 'valid' ? (
         <>
           <p className="appearance-import-status" role="status">{t('settings.appearanceImportValid')}</p>
-          <ThemeImportSwatches chrome={preview.chrome} />
+          <AppearanceChromePreview chrome={preview.chrome} variant={variant} t={t} data-testid="appearance-import-preview"
+            description={t('settings.appearanceImportPalette', {
+              accent: preview.chrome.accent, surface: preview.chrome.surface, ink: preview.chrome.ink, contrast: preview.chrome.contrast,
+            })} />
         </>
       ) : null}
     </TaskDialog>

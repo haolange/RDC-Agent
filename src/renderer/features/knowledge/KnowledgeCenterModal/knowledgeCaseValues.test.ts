@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasReadableCaseChapter,
   humanizeKey,
   humanizeTerm,
   isTermLike,
@@ -10,6 +11,13 @@ import {
 } from './knowledgeCaseValues';
 
 describe('case chapter values', () => {
+  it('offers a chapter only when the reader has something to display', () => {
+    expect(hasReadableCaseChapter(' {} ')).toBe(false);
+    expect(hasReadableCaseChapter('{"refs":["asset-1f2e3d4c"]}')).toBe(false);
+    expect(hasReadableCaseChapter('{"draws":0}')).toBe(true);
+    expect(hasReadableCaseChapter('Plain Markdown')).toBe(true);
+  });
+
   it('reads keys and enum-like values as words without knowing the case', () => {
     expect(humanizeKey('spatial_pattern')).toBe('Spatial pattern');
     expect(humanizeKey('featureConfiguration')).toBe('Feature configuration');

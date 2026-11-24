@@ -96,7 +96,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     [modalState.providerDrafts],
   );
   const configuredProvidersWithoutEnabledModels = useMemo(
-    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length === 0)),
+    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.isConfigured && getEnabledModels(provider).length === 0)),
     [modalState.providerDrafts],
   );
   const getResolvedProviderLabel = (provider: Pick<LlmProviderEntry, 'label'>) =>

@@ -18,32 +18,10 @@ const upsert = (providers: LlmProviderEntry[], provider: LlmProviderEntry): LlmP
     : [...providers, provider]
 );
 
-const project = (
-  settings: AppSettings,
-  providerId: string,
-  provider: LlmProviderEntry | null,
-): AppSettings => ({
-  ...settings,
-  llm: {
-    ...settings.llm,
-    providers: provider
-      ? upsert(settings.llm.providers, provider)
-      : settings.llm.providers.filter((entry) => entry.id !== providerId),
-  },
-});
-
-export function beginProviderDefinitionSave(settings: AppSettings, provider: LlmProviderEntry): {
-  clientRevision: number;
-  previous: LlmProviderEntry | null;
-  settings: AppSettings;
-} {
+export function beginProviderDefinitionSave(providerId: string): number {
   lastRevision = Math.max(Date.now() * 1_000, lastRevision + 1);
-  revisions.set(provider.id, lastRevision);
-  return {
-    clientRevision: lastRevision,
-    previous: settings.llm.providers.find((entry) => entry.id === provider.id) ?? null,
-    settings: project(settings, provider.id, provider),
-  };
+  revisions.set(providerId, lastRevision);
+  return lastRevision;
 }
 
 export const isLatestProviderDefinitionRevision = (providerId: string, revision: number): boolean => (
@@ -58,14 +36,10 @@ export const enqueueProviderDefinitionSave = (
 export const settleProviderDefinitionSave = (
   settings: AppSettings,
   provider: LlmProviderEntry,
-): AppSettings => project(settings, provider.id, provider);
-
-export const rollbackProviderDefinitionSave = (
-  settings: AppSettings,
-  providerId: string,
-  snapshot: ProviderDefinitionCommitSnapshot | null,
-  previous: LlmProviderEntry | null,
-): AppSettings => project(settings, providerId, snapshot?.provider ?? previous);
+): AppSettings => ({
+  ...settings,
+  llm: { ...settings.llm, providers: upsert(settings.llm.providers, provider) },
+});
 
 export async function flushProviderDefinitionSaves(
   providerId: string,

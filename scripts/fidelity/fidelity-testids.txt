@@ -15,7 +15,7 @@ appearance-chrome-${props.variant}
 appearance-contrast-${props.variant}
 appearance-import-${variant}
 appearance-import-preview
-appearance-preview-${props.variant}
+appearance-preview-${variant}
 capture-color-target
 chat-messages
 composer-attach-button
@@ -116,7 +116,6 @@ left-navigation-drawer
 markdown-code-block
 markdown-mermaid
 markdown-mermaid-fallback
-material-comparison-role
 message-actions
 message-attachments
 message-bubble-assistant
@@ -233,6 +232,7 @@ settings-provider-connection-fields
 settings-provider-connection-status
 settings-provider-credential-options
 settings-provider-diagnostics
+settings-provider-directory-toggle
 settings-provider-disconnect-${provider.id}
 settings-provider-discovery
 settings-provider-discovery-empty
@@ -249,7 +249,6 @@ settings-provider-model-tiers-${model.id}
 settings-provider-oauth-browser-opened
 settings-provider-oauth-code
 settings-provider-oauth-device-code
-settings-provider-oauth-diagnostic
 settings-provider-oauth-open-page
 settings-provider-oauth-start
 settings-provider-oauth-steps
@@ -260,7 +259,6 @@ settings-provider-search
 settings-provider-tool-calling-unsupported
 settings-provider-tool-calling-unverified
 settings-provider-unavailable-summary
-settings-provider-upcoming
 settings-rdc-enabled
 settings-rdc-toolchain
 settings-resource-dialog
@@ -297,7 +295,6 @@ work-process-subagent
 work-process-subagent-details
 work-process-task-snapshot
 work-process-thinking
-work-process-tool-aggregate
 work-process-tool-approval
 work-process-tool-call
 work-process-tool-card

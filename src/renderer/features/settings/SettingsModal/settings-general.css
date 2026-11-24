@@ -4,8 +4,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  min-height: 100%;
-  align-content: start;
 }
 
 .settings-page-general .settings-profile-section,
@@ -22,7 +20,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-top: var(--space-2);
+  flex-wrap: wrap;
 }
 
 /* The avatar is the change-avatar button; hover lifts its ring. */
@@ -42,8 +40,8 @@
 
 .settings-account-avatar,
 .settings-account-avatar-fallback {
-  width: var(--space-12);
-  height: var(--space-12);
+  width: var(--control-height-lg);
+  height: var(--control-height-lg);
   border-radius: var(--radius-full);
   object-fit: cover;
 }
@@ -103,76 +101,6 @@
   opacity: 1;
 }
 
-/* Work process preference: two preview cards. */
-.work-process-expansion-picker {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 12rem));
-  gap: var(--space-3);
-}
-
-.work-process-expansion-card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-card);
-  background: var(--token-bg-raised);
-  color: var(--token-text-primary);
-  text-align: left;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.work-process-expansion-card:hover,
-.work-process-expansion-card:focus-visible {
-  border-color: var(--token-border-strong);
-}
-
-.work-process-expansion-card.is-selected {
-  border-color: var(--token-accent-primary);
-  box-shadow: 0 0 0 1px var(--token-accent-primary);
-}
-
-.work-process-expansion-thumb {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: var(--space-1);
-  height: var(--space-16);
-  padding: var(--space-2);
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: var(--token-surface-sunken);
-}
-
-.work-process-expansion-thumb.is-latest {
-  mask-image: linear-gradient(to bottom, transparent 0%, rgb(0 0 0 / 0.25) 18%, rgb(0 0 0) 45%);
-}
-
-.work-process-expansion-thumb.is-all {
-  justify-content: flex-start;
-}
-
-.work-process-expansion-thumb-step {
-  flex: 0 0 auto;
-  height: var(--space-1);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--token-text-secondary) 45%, transparent);
-}
-
-.work-process-expansion-thumb-step:nth-child(odd) {
-  width: 80%;
-}
-
-.work-process-expansion-thumb-step:nth-child(even) {
-  width: 56%;
-}
-
-.work-process-expansion-label {
-  padding: 0 var(--space-1);
-}
-
 .settings-personalization-textarea {
   line-height: 1.7;
 }
@@ -185,14 +113,45 @@
   color: var(--token-status-error);
 }
 
-@container settings-panel (max-width: 48rem) {
-  .settings-profile-actions {
-    justify-content: flex-start;
-  }
+.work-process-choice {
+  --ui-tabs-accent: var(--token-border-focus);
 }
 
-.settings-page-general .settings-language-section .settings-block-body {
-  display: flex;
+.work-process-choice .ui-tabs-tab {
   flex-direction: column;
-  gap: var(--space-4);
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  white-space: normal;
+  text-align: start;
 }
+
+.work-process-choice-preview {
+  display: grid;
+  align-content: center;
+  inline-size: clamp(4rem, 9cqi, 8rem);
+  block-size: var(--control-height-md);
+  padding-inline: var(--space-2);
+  gap: var(--space-1);
+  color: var(--token-text-secondary);
+}
+
+.work-process-choice-preview > span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.work-process-choice-preview > span::before,
+.work-process-choice-preview > span::after {
+  content: '';
+  block-size: var(--space-1);
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.work-process-choice-preview > span::before { inline-size: var(--space-1); }
+.work-process-choice-preview > span::after { inline-size: 68%; }
+.work-process-choice-preview > span:nth-child(even)::after { inline-size: 48%; }
+.work-process-choice-preview > span:last-child { color: var(--token-accent-primary); }
+.work-process-choice-preview.is-following { mask-image: linear-gradient(to bottom, transparent 20%, black 75%); }

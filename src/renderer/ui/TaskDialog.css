@@ -88,6 +88,7 @@
 .task-dialog-footer {
   flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
@@ -118,11 +119,9 @@
     max-height: calc(100dvh - var(--space-3) * 2);
   }
 
-  .task-dialog-footer {
-    flex-wrap: wrap;
-  }
-
-  .task-dialog-footer .button {
-    flex: 1;
-  }
+}
+.task-dialog-title-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }

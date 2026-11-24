@@ -10,18 +10,17 @@ import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
 type McpServerOverview = RdcRuntimeOverview['mcpServers'][number];
 
-export type McpTrustState = 'trusted' | 'needs-retrust' | 'untrusted' | 'override-rejected' | 'user';
+type McpTrustState = 'trusted' | 'needs-retrust' | 'untrusted' | 'override-rejected' | 'user';
 
-export function mcpTrustState(server: McpServerOverview): McpTrustState {
+function mcpTrustState(server: McpServerOverview): McpTrustState {
   if (server.executableOverrideRejected) return 'override-rejected';
   if (server.scope !== 'project') return 'user';
   if (server.trusted && server.needsRetrust) return 'needs-retrust';
   return server.trusted ? 'trusted' : 'untrusted';
 }
 
-export function McpTrustBadge({ state }: { state: McpTrustState }) {
+function McpTrustBadge({ state }: { state: Exclude<McpTrustState, 'user'> }) {
   const { t } = useI18n();
-  if (state === 'user') return null;
   const tone = state === 'trusted' ? 'success' : state === 'override-rejected' ? 'error' : 'warning';
   const label = state === 'trusted'
     ? t('settings.mcpTrusted')

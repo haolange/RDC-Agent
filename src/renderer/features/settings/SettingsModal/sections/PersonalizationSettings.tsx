@@ -1,6 +1,6 @@
 import React from 'react';
 import { Textarea } from '../../../../ui/Textarea';
-import { SettingsField, SettingsSaveMark, SettingsSection, useSettingsAutosave } from '../parts';
+import { SettingsSaveMark, SettingsSection, useSettingsAutosave } from '../parts';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -13,7 +13,6 @@ interface PersonalizationSettingsProps {
   t: Translate;
 }
 
-/** What the instructions are for lives in the placeholder; saving shows only a brief check. */
 export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = ({
   globalInstructionsDraft,
   savedGlobalInstructions,
@@ -26,11 +25,11 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
   const textareaId = 'settings-global-instructions';
 
   return (
-    <SettingsSection className="settings-personalization-block" title={t('settings.personalizationTitle')}
+    <SettingsSection variant="rows" title={t('settings.globalInstructions')}
+      description={t('settings.globalInstructionsHelp')}
       data-settings-search="personalization"
       actions={<SettingsSaveMark status={status} savingLabel={t('settings.saving')} savedLabel={t('settings.personalizationSaved')}
-        errorLabel={t('settings.personalizationSaveFailed')} />}>
-      <SettingsField label={t('settings.globalInstructions')} htmlFor={textareaId}>
+        errorLabel={t('settings.personalizationSaveFailed')} onRetry={flush} retryLabel={t('settings.retry')} />}>
         <Textarea
           id={textareaId}
           className="settings-agent-instructions settings-personalization-textarea"
@@ -38,9 +37,8 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
           minRows={4}
           onChange={(event) => onGlobalInstructionsDraftChange(event.currentTarget.value)}
           onBlur={flush}
-          placeholder={t('settings.globalInstructionsPlaceholder')}
+          aria-label={t('settings.globalInstructions')}
         />
-      </SettingsField>
     </SettingsSection>
   );
 };

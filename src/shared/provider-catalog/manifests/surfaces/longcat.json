@@ -25,6 +25,15 @@
   "catalogOwnership": "app-managed",
   "factSources": [
     {
+      "id": "provider-docs:longcat:2026-11-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://longcat.chat/platform/docs/zh/ChangeLog.html ; https://longcat.chat/platform/docs/api/model-params ; https://longcat.chat/platform/docs/api/chat ; https://longcat.chat/platform/docs/api/messages ; https://longcat.chat/platform/docs/api/models ; https://longcat.chat/platform/docs/pricing/longcat-2.5",
+      "observedAt": "2026-11-24",
+      "refreshedAt": "2026-11-24",
+      "surface": "longcat",
+      "accountScope": "public-api"
+    },
+    {
       "id": "rdc-agent:longcat:0",
       "sourceKind": "rdc-agent",
       "sourceRevision": "provider-registry-v4",
@@ -108,6 +117,100 @@
   },
   "models": [
     {
+      "modelId": "LongCat-2.5",
+      "label": "LongCat 2.5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 262144,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.longcat.chat/openai/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "label": "OpenAI Chat Completions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.longcat.chat/openai/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "meituan",
+          "protocolOwner": "openai"
+        },
+        {
+          "id": "AnthropicMessages",
+          "label": "Anthropic Messages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.longcat.chat/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "meituan",
+          "protocolOwner": "anthropic"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "thinking-enabled",
+            "offMode": "thinking-disabled"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:longcat:2026-11-24",
+      "cost": {
+        "input": 0.3,
+        "output": 1.2,
+        "cacheRead": 0.006
+      }
+    },
+    {
       "modelId": "LongCat-2.5-Preview",
       "label": "LongCat-2.5-Preview",
       "aliases": [],
@@ -138,7 +241,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAICompatibleChatCompletions",
         "baseUrl": "https://api.longcat.chat/openai/v1",
@@ -226,7 +329,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "OpenAICompatibleChatCompletions",
         "baseUrl": "https://api.longcat.chat/openai/v1",
@@ -287,6 +390,27 @@
   ],
   "protocolOverrides": [
     {
+      "modelId": "LongCat-2.5",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "high",
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:longcat:2026-11-24"
+    },
+    {
       "modelId": "LongCat-2.0",
       "protocol": "AnthropicMessages",
       "patch": {
@@ -309,8 +433,15 @@
     }
   ],
   "recommendedModels": [
-    "LongCat-2.5-Preview",
-    "LongCat-2.0"
+    "LongCat-2.5"
   ],
-  "docsUrl": "https://longcat.chat/platform/docs/api/models"
+  "docsUrl": "https://longcat.chat/platform/docs/api/models",
+  "retiredModelIds": [
+    "longcat-flash-chat",
+    "longcat-flash-thinking",
+    "longcat-flash-thinking-2601",
+    "longcat-flash-lite",
+    "longcat-flash-omni-2603",
+    "longcat-flash-chat-2602-exp"
+  ]
 }

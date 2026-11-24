@@ -27,7 +27,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--type-body-size);
-  font-weight: var(--font-normal);
+  font-weight: var(--font-semibold);
 }
 
 /* What the Agent is for, in up to two readable lines. */
@@ -41,6 +41,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .settings-agent-list-item:disabled .settings-agent-list-item-description {

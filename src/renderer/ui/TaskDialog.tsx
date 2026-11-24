@@ -1,4 +1,4 @@
-import { useId, useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../lib/cn';
 import { useOverlayLayer } from '../lib/overlayStack';
@@ -13,10 +13,13 @@ export type TaskDialogSize = 'sm' | 'md' | 'lg';
 export interface TaskDialogProps {
   open: boolean;
   title: string;
+  titleIcon?: ReactNode;
+  headerActions?: ReactNode;
   description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
+  fallbackFocusRef?: RefObject<HTMLElement>;
   closeLabel: string;
   size?: TaskDialogSize;
   busy?: boolean;
@@ -36,10 +39,13 @@ export interface TaskDialogProps {
 export function TaskDialog({
   open,
   title,
+  titleIcon,
+  headerActions,
   description,
   children,
   footer,
   onClose,
+  fallbackFocusRef,
   closeLabel,
   size = 'md',
   busy = false,
@@ -55,7 +61,7 @@ export function TaskDialog({
   const { layerId } = useOverlayLayer(open);
   const presence = usePresence(open, overlayRef);
 
-  useModalFocus({ open, containerRef: dialogRef, onClose, busy, layerId });
+  useModalFocus({ open, containerRef: dialogRef, onClose, busy, layerId, fallbackFocusRef });
 
   if (!presence.mounted || typeof document === 'undefined') return null;
 
@@ -82,11 +88,14 @@ export function TaskDialog({
       >
         <header className="task-dialog-header">
           <div className="task-dialog-heading">
-            <h2 id={titleId} className="task-dialog-title" data-tooltip={title}>{title}</h2>
+            <h2 id={titleId} className="task-dialog-title">
+              {titleIcon ? <span className="task-dialog-title-with-icon">{titleIcon}{title}</span> : title}
+            </h2>
             {description ? (
               <p id={descriptionId} className="task-dialog-description">{description}</p>
             ) : null}
           </div>
+          {headerActions}
           {variant === 'task' ? (
             <IconButton label={closeLabel} size="sm" disabled={busy} onClick={onClose}>
               <Icon name="close" size={16} />

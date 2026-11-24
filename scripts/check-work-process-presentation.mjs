@@ -40,7 +40,6 @@ const activeSignalHelper = readSource('src/renderer/features/transcript/workProc
 const activeSignalRenderSource = [
   'src/renderer/features/transcript/WorkProcessSectionRow.tsx',
   'src/renderer/features/transcript/WorkProcessThinking.tsx',
-  'src/renderer/features/transcript/ToolAggregateRow.tsx',
   'src/renderer/features/transcript/WorkProcessRows.tsx',
   'src/renderer/features/transcript/SubagentRow.tsx',
   'src/renderer/features/composer/UserInputRequestPanel.tsx',
@@ -76,17 +75,12 @@ assert(!activeSignalRenderSource.includes("row.status === 'complete' &&"), 'comp
 
 const flattenRows = (rows) => rows.flatMap((row) => {
   if (row.type === 'section') return [row, ...flattenRows(row.steps)];
-  if (row.type === 'toolAggregate') return [row, ...row.children];
   if (row.type === 'toolGroup') return [row, ...flattenRows(row.rows)];
   return [row];
 });
 
 const collectVisible = (rows) => rows.flatMap((row) => {
   if (row.type === 'section') return collectVisible(row.steps);
-  if (row.type === 'toolAggregate') return [
-    row.summary,
-    ...collectVisible(row.children),
-  ].filter(Boolean);
   if (row.type === 'toolGroup') return [
     row.title,
     row.countLabel,
@@ -309,7 +303,7 @@ const activeRawThinkingPresentation = buildWorkProcessPresentation({
 const activeRawThinkingSection = activeRawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(activeRawThinkingSection?.type === 'section', 'active raw thinking loop should render a section');
 const activeRawThinkingRow = sectionThinking(activeRawThinkingSection);
-assert(activeRawThinkingRow?.label === '正在思考', 'active raw thinking should use streaming label');
+assert(activeRawThinkingRow?.label === '正在思考…', 'active raw thinking should use streaming label');
 assert(activeRawThinkingRow.openByDefault === true, 'active process-loop raw thinking should expand by policy');
 
 const activeSummaryThinkingPresentation = buildWorkProcessPresentation({
@@ -546,7 +540,7 @@ const activeFinalAnswerThinkingSection = activeFinalAnswerThinkingPresentation.r
 assert(activeFinalAnswerThinkingSection?.type === 'section', 'active final-answer thinking should render a section');
 const activeFinalAnswerThinkingRow = sectionThinking(activeFinalAnswerThinkingSection);
 assert(activeFinalAnswerThinkingRow?.openByDefault === true, 'active final-answer thinking should expand by policy');
-assert(activeFinalAnswerThinkingRow.label === '正在思考', 'active final-answer thinking should use streaming label');
+assert(activeFinalAnswerThinkingRow.label === '正在思考…', 'active final-answer thinking should use streaming label');
 
 const opaquePresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -973,7 +967,6 @@ const componentSource = [
   scriptRead('src/renderer/features/transcript/WorkProcessContent.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessSectionRow.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessThinking.tsx', 'utf8'),
-  scriptRead('src/renderer/features/transcript/ToolAggregateRow.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessRowRenderer.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessRows.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessRowParts.tsx', 'utf8'),
@@ -1008,7 +1001,6 @@ const presentationSource = [
   scriptRead('src/renderer/features/transcript/workProcessBlockProjection.ts', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessLlmProjection.ts', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessStandaloneProjection.ts', 'utf8'),
-  scriptRead('src/renderer/features/transcript/workProcessToolAggregate.ts', 'utf8'),
   scriptRead('src/renderer/features/transcript/workProcessToolCatalog.ts', 'utf8'),
 ].join('\n');
 const i18nSource = [
@@ -1066,7 +1058,7 @@ assert(
 );
 assert(
   /\.work-process-user-input-transcript\s*\{[^}]*gap:\s*var\(--space-4\)/.test(cssSource),
-  'Asked transcript items should use space-3 gap between numbered Q/A pairs',
+  'Asked transcript items should use space-4 gap between numbered Q/A pairs',
 );
 assert(
   componentSource.includes('work-process-user-input-transcript-index')
@@ -1079,9 +1071,6 @@ assert(
   /\.work-process-user-input\s*\{[^}]*border:\s*1px\s+solid\s+var\(--token-border-muted\)/.test(cssSource),
   'Asked rows should use the same card border chrome as tool cards',
 );
-assert(presentationSource.includes('aggregateSectionSteps'), 'presentation should aggregate consecutive tools');
-assert(presentationSource.includes("type: 'toolAggregate'"), 'presentation should expose toolAggregate rows');
-assert(presentationSource.includes('buildToolAggregateSummary'), 'tool aggregate summaries should be built centrally');
 assert(!presentationSource.includes('buildSemanticStepGroups'), 'semantic step grouping must be removed');
 assert(presentationSource.includes("block.kind === 'llm_turn'"), 'Work Process sections should be sourced from LLM loop blocks');
 assert(presentationSource.includes('WORK_PROCESS_TOOL_DISPLAY_CATALOG'), 'tool display catalog should be canonical');
@@ -1128,7 +1117,6 @@ for (const forbidden of ['Called tool']) {
 }
 
 assert(!componentSource.includes('ToolGroupRow'), 'component must not render toolGroup shells');
-assert(componentSource.includes('ToolAggregateRow'), 'component should render tool aggregate rows');
 assert(componentSource.includes('work-process-narrative-stream'), 'component should use narrative stream list class');
 assert(!componentSource.includes('ResponseRow'), 'component must not render a Reply response boundary row');
 assert(!scriptExists('src/renderer/features/transcript/WorkProcessResponseRow.tsx'), 'WorkProcessResponseRow must be deleted');
@@ -1151,8 +1139,6 @@ for (const removedPath of [
 ]) {
   assert(!scriptExists(removedPath), `legacy path must be deleted: ${removedPath}`);
 }
-assert(scriptExists('src/renderer/features/transcript/workProcessToolAggregate.ts'), 'tool aggregate helper must exist');
-assert(scriptExists('src/renderer/features/transcript/ToolAggregateRow.tsx'), 'ToolAggregateRow must exist');
 assert(scriptExists('src/renderer/features/transcript/workProcessUnits.ts'), 'presentation units helper must exist');
 assert(componentSource.includes('work-process-tool-diagnostic'), 'failed tools should expose a diagnostic caption exit');
 assert(componentSource.includes('diagnosticCaption'), 'tool rows should carry diagnosticCaption from projection');
@@ -1304,23 +1290,17 @@ assert(
   'Work Process labels must not set color while Active Signal is live',
 );
 assert(
-  /order:\s*1/.test(cssSource.match(/\.work-process-status-dot\s*\{[^}]+\}/)?.[0] ?? ''),
-  'Work Process status dot should lead the header so its left edge can align with prose',
-);
-assert(
-  !cssSource.includes('left: calc(-1 * (8px + var(--space-2)))'),
-  'Work Process status dot must not hang left of the prose edge',
-);
-assert(
-  /\.work-process-steps\s*\{[^}]*padding:\s*0\s+0\s+0\s+var\(--space-3\)/.test(cssSource)
-    || /\.work-process-steps\s*\{[^}]*padding-left:\s*var\(--space-3\)/.test(cssSource),
-  'loop turns should nest under the header status dot with space-3 indent',
+  /\.work-process\s*>\s*\.work-process-body\s*\{[^}]*margin-inline:\s*calc\(var\(--space-3\) \+ var\(--space-5\)\)/.test(cssSource)
+    && /\.work-process-header\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/.test(cssSource)
+    && !/\.work-process-status-dot\s*\{[^}]*position:\s*absolute/.test(cssSource)
+    && !/\.conversation-message-stack\s*>\s*\.conversation-bubble-assistant\s*\{[^}]*padding-inline/.test(cssSource),
+  'Working insets only its body; the status dot leads the header at the reply edge',
 );
 assert(
   !/\.conversation-message-assistant \.conversation-message-stack,[^{]*\{[^}]*padding-inline/.test(cssSource)
     && /\.work-process-track::before\s*\{[^}]*left:\s*calc\(var\(--work-rail-hang\)\s*\*\s*-1\)/.test(cssSource)
     && !/--work-track-gutter/.test(cssSource),
-  'the conversation has one content edge: assistant content is not inset, and only the Working rail hangs outside it',
+  'the assistant stack uses the outer column and Working hangs its rail outside its own content edge',
 );
 assert(!/--work-process-inline-end-inset|--chat-transcript-width|--workbench-outer-rail-width/.test(cssSource),
   'the conversation column has one width and one inset; no Working-only end inset or second rail');
@@ -1340,7 +1320,6 @@ assert(
 );
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
-assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
 assert(!cssSource.includes('.work-process-step-rail'), 'segmented guides and nested rail suppression must be removed');
 assert(cssSource.includes('.work-process-rail-marker.is-running'), 'actual activity owns blue markers');
 assert(cssSource.includes('var(--space-1) + var(--space-0-5)'), 'markers retain the 6px geometry');
@@ -1356,8 +1335,8 @@ assert(
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
 assert(
-  componentSource.includes('<MessageMarkdown content={row.preview} deferHeavyPlugins={active} />'),
-  'thinking preview must render through MessageMarkdown',
+  /className="work-process-thinking-preview">\s*<MessageMarkdown\b[^>]*\bdeferHeavyPlugins=\{active\}/.test(componentSource),
+  'expandable thinking content must render through MessageMarkdown and defer heavy plugins while streaming',
 );
 assert(
   cssSource.includes('.work-process-thinking-preview .markdown-body'),
@@ -1417,7 +1396,8 @@ assert(!componentSource.includes('work-process-console-head'), 'Console chrome h
 assert(cssSource.includes('.work-process-shell-command'), 'shell command styling should exist');
 assert(cssSource.includes('.work-process-tool-card-detail'), 'family detail styling should exist');
 assert(cssSource.includes('.work-process-tool-diagnostic'), 'failed-tool diagnostic caption styling should exist');
-assert(cssSource.includes('.work-process-tool-card.status-error .work-row-title'), 'failed tool titles should use error color only on the title');
+assert(/\.work-process-tool-card\.status-error > \.work-card-trigger\s*\{[^}]*--work-row-title-tone:\s*var\(--token-status-error\)/.test(cssSource),
+  'failed tool titles should keep their error color in all interaction states');
 assert(i18nSource.includes("'chat.workProcessShowDiagnostic': 'Show details'"), 'diagnostic detail affordance English copy should exist');
 assert(i18nSource.includes("'chat.workProcessShowDiagnostic': '查看详情'"), 'diagnostic detail affordance Chinese copy should exist');
 assert(!i18nSource.includes('workProcessShowLoopDetail'), 'grouped/detail view i18n keys must be removed');

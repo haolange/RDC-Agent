@@ -2,7 +2,7 @@ import { type ConversationToolCall, type ConversationToolApproval, type Conversa
 import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 import { formatToolApprovalReason } from '../../lib/toolApprovalText';
 import { type WorkProcessRow, type WorkProcessToolApproval, type WorkProcessRowStatus } from './workProcessTypes';
-import { normalizeToolName, getToolDisplay, getToolFamily, formatMcpTarget } from './workProcessToolCatalog';
+import { normalizeToolName, getToolDisplay, getToolFamily, toolDisplayName, formatMcpTarget } from './workProcessToolCatalog';
 import { createUserInputRow, createPlanReviewShellRow, createPlanReviewRow } from './workProcessDecisionRows';
 import { parsePreview, createDetailLines, prettyPrint, toRecord, readNestedString, isJsonLike, readNestedValue, stringifyPreview, isRawPayloadPreview, isInternalAddress } from './workProcessContentText';
 import { unwrapToolContentLayer } from './workProcessToolContent';
@@ -84,7 +84,7 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
     type: 'tool',
     id: call.id,
     status,
-    verb: getToolVerb(call.toolName, status, call.error || call.resultPreview, call.approval, t),
+    verb: getToolVerb(call.toolName, status, call.approval, t),
     category: t(display.category),
     icon: display.icon,
     groupKind: display.groupKind,
@@ -235,7 +235,6 @@ const deriveToolStatus = (call: ConversationToolCall, parsedResult: unknown): Wo
 export const getToolVerb = (
   toolName: string,
   status: WorkProcessRowStatus,
-  resultPreview: string | undefined,
   approval: ConversationToolApproval | undefined,
   t: Translator,
 ): string => {
@@ -245,8 +244,7 @@ export const getToolVerb = (
   if (status === 'running') return t(display.runningVerb);
   if (status === 'skipped') return t('chat.workProcessStatusSkipped');
   if (status === 'cancelled') return t('chat.workProcessApprovalCancelled');
-  if (status !== 'error') return t(display.completeVerb);
-  return isToolApprovalRejected(approval) || /approval required|no changes were made/i.test(resultPreview ?? '') ? t('chat.workProcessToolBlocked') : t('chat.workProcessToolFailed');
+  return status === 'error' ? toolDisplayName(toolName, t) : t(display.completeVerb);
 };
 
 const resultIndicatesFailure = (parsedResult: unknown, raw?: string): boolean => {

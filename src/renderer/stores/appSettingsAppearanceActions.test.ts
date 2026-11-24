@@ -14,7 +14,7 @@ describe('Appearance persistence ordering', () => {
       settings = { ...settings, appearance: { ...settings.appearance, ...patch.appearance } };
       return settings;
     });
-    const actions = createAppSettingsAppearanceActions(() => ({ settings, patchSettings }));
+    const actions = createAppSettingsAppearanceActions(() => ({ settings, patchSettings }), vi.fn(), vi.fn());
     const accent = actions.setChromeTheme('light', { accent: '#bf4c22' });
     const surface = actions.setChromeTheme('light', { surface: '#f8eee8' });
     const dark = actions.setChromeTheme('dark', { accent: '#33d1ff' });
@@ -28,9 +28,31 @@ describe('Appearance persistence ordering', () => {
 
   it('reports a failed save and continues with subsequent edits', async () => {
     const patchSettings = vi.fn().mockRejectedValueOnce(new Error('write failed')).mockResolvedValue(DEFAULT_SETTINGS);
-    const actions = createAppSettingsAppearanceActions(() => ({ settings: DEFAULT_SETTINGS, patchSettings }));
+    const actions = createAppSettingsAppearanceActions(() => ({ settings: DEFAULT_SETTINGS, patchSettings }), vi.fn(), vi.fn());
     await expect(actions.setTheme('light')).rejects.toThrow('write failed');
     await actions.setTheme('dark');
     expect(patchSettings).toHaveBeenLastCalledWith({ appearance: { theme: 'dark' } });
+  });
+
+  it('keeps disclosure intent immediate when a stale save fails and reports only the latest failure', async () => {
+    let rejectFirst!: (error: Error) => void;
+    const first = new Promise<void>((_resolve, reject) => { rejectFirst = reject; });
+    const display = vi.fn();
+    const persist = vi.fn().mockReturnValueOnce(first).mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('disk full'));
+    const actions = createAppSettingsAppearanceActions(
+      () => ({ settings: DEFAULT_SETTINGS, patchSettings: vi.fn() }), display, persist,
+    );
+    const expanding = actions.setContextBreakdownExpanded(true);
+    const collapsing = actions.setContextBreakdownExpanded(false);
+    expect(display.mock.calls).toEqual([[{ expanded: true }], [{ expanded: false }]]);
+    await Promise.resolve();
+    expect(persist.mock.calls).toEqual([[true]]);
+    rejectFirst(new Error('stale write failed'));
+    await Promise.all([expanding, collapsing]);
+    expect(persist.mock.calls).toEqual([[true], [false]]);
+    expect(display).toHaveBeenCalledTimes(2);
+    await actions.setContextBreakdownExpanded(true);
+    expect(display).toHaveBeenLastCalledWith({ expanded: true, error: 'disk full' });
   });
 });

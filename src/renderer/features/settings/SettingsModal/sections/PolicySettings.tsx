@@ -51,7 +51,7 @@ export const PolicySettings: React.FC<{
         editorPresentation="dialog"
         emptyDescriptionExtra={t('settings.policyEmptyBaseline')}
       />
-      <SettingsSection
+      <SettingsSection variant="rows"
         title={t('settings.globalRuntimeSettings')}
         description={t('settings.compactionThresholdHint')}
         data-testid="settings-agent-runtime-block"

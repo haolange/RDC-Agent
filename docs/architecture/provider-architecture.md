@@ -301,7 +301,7 @@ Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/a
 
 ## 显式能力探测与批量生命周期
 
-Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。批次只在主进程内存中存在，准备阶段刷新已保存账号目录并列出请求数量；用户明确开始后串行发送短提示，只附一个无副作用工具 `capability_check`（真实回合总是带工具，探测按回合的样子检查路线）、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。回复里对该工具的结构化调用是工具调用能力的回执，记为 `toolCalling: supported`；只回文字不改变工具调用状态；HTTP 400 且消息明确说模型不支持工具（如 Ollama 的 `does not support tools`）记为 `unsupported`，不算账号资格拒绝。不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
+Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。批次只在主进程内存中存在，准备阶段读取本地 manifest 和已保存的有效目录，列出请求数量。请求发送仅始于用户确认，目录发现仍由连接管理负责；用户明确开始后串行发送短提示，只附一个无副作用工具 `capability_check`（真实回合总是带工具，探测按回合的样子检查路线）、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。回复里对该工具的结构化调用是工具调用能力的回执，记为 `toolCalling: supported`；只回文字不改变工具调用状态；HTTP 400 且消息明确说模型不支持工具（如 Ollama 的 `does not support tools`）记为 `unsupported`，不算账号资格拒绝。不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
 
 成功必须有正常终止和文本。Fast 根据实际 binding 分别检查原生 usage.speed、响应 service tier 或响应 model id；请求参数和客户端构造的消息 model 不能冒充服务端回执。Max 的 implicit/client-tier 扩窗必须有明确当前账号目录资格，短请求成功不能独自授予更大窗口；明确 header/body 激活仍沿所属执行契约。组合 binding 独立验证，组合拒绝不撤销两个单项的资格。
 

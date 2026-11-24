@@ -158,7 +158,6 @@ export const Composer: React.FC<ComposerProps> = ({
         />
       ) : null}
       <ComposerAttachmentTray
-        onMaterialChange={(id, material) => composer.setPendingAttachments(current => current.map(item => item.id === id ? { ...item, material } : item))}
         pendingSkills={pendingSkills}
         pendingAttachments={pendingAttachments}
         composerScopeKey={composerScopeKey}
@@ -167,8 +166,6 @@ export const Composer: React.FC<ComposerProps> = ({
         handlePendingAttachmentRemove={handlePendingAttachmentRemove}
         armedSkillMeta={t('app.armedSkillMeta')}
         removeArmedSkillLabel={(skill) => t('app.removeArmedSkill', { skill })}
-        removeAttachmentLabel={(fileName) => t('app.removeAttachment', { fileName })}
-        visionUnsupportedLabel={t('app.attachVisionUnsupported')}
       />
       {composer.handoff?.error ? (
         <InlineError detail={composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? undefined : composer.handoff.error}

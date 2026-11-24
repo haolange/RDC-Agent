@@ -162,7 +162,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
                   { id: 'rebuild', label: t('knowledgeCenter.indexRebuild'), onSelect: () => setRebuildOpen(true) },
                 ]}
                 trigger={(
-                  <IconButton label={t('knowledgeCenter.moreActions')} size="sm" data-testid="knowledge-center-more">
+                  <IconButton label={t('knowledgeCenter.moreActions')} size="sm" aria-haspopup="menu" data-testid="knowledge-center-more">
                     <Icon name="more" size={16} />
                   </IconButton>
                 )}
@@ -220,7 +220,7 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
 
       <ImportKnowledgeDialog importer={importer} candidates={candidates} spaces={state.spaces} />
       <ExportKnowledgeDialog exporter={exporter} spaces={state.spaces} />
-      <WriteConfirmDialog write={write} />
+      <WriteConfirmDialog write={write} spaces={state.spaces} />
       <KnowledgeTopicsDialog topics={topics} />
       <RebuildIndexDialog open={rebuildOpen} index={state.index} rebuilding={state.rebuilding}
         onRebuild={state.rebuildIndex} onClose={() => setRebuildOpen(false)} />

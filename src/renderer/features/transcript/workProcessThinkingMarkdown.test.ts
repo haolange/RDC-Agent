@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkProcess } from './WorkProcess';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
+import type { ConversationThinkingItem, ConversationWorkTrace } from '@shared/types/conversation';
 
 vi.mock('../../i18n', () => ({
   useI18n: () => ({
@@ -70,12 +70,46 @@ const gptSummaryTrace: ConversationWorkTrace = {
   }],
 };
 
+function renderThinking(text: string, visibility: ConversationThinkingItem['thinking']['visibility'] = 'summary'): string {
+  const [block] = gptSummaryTrace.blocks;
+  const items = block.items?.map((item) => item.kind === 'thinking'
+    ? { ...item, thinking: { ...item.thinking, text, visibility } }
+    : item);
+  const trace = { ...gptSummaryTrace, blocks: [{ ...block, items }] };
+  return renderToStaticMarkup(createElement(WorkProcess, { trace, messageId: 'thinking-markdown' }));
+}
+
 describe('Work Process thinking markdown', () => {
-  it('renders GPT summary titles through MessageMarkdown instead of literal **', () => {
-    const html = renderToStaticMarkup(createElement(WorkProcess, { trace: gptSummaryTrace, messageId: 'thinking-markdown' }));
-    expect(html).toContain('work-process-thinking-preview');
-    expect(html).toContain('markdown-body');
+  it('renders a GPT summary title inside its disclosure before commentary and its tool', () => {
+    const html = renderThinking('**Planning project purpose inspection**');
+    const caption = html.indexOf('work-process-thinking-summary');
+    const commentary = html.indexOf('我先查看项目文件');
+    expect(caption).toBeGreaterThan(-1);
+    expect(commentary).toBeGreaterThan(caption);
+    expect(html.indexOf('data-testid="work-process-tool-call"')).toBeGreaterThan(commentary);
     expect(html).toContain('<strong>Planning project purpose inspection</strong>');
+    expect(html).toContain('work-process-thinking-preview');
     expect(html).not.toContain('**Planning project purpose inspection**');
+  });
+
+  it('preserves indented code and hard breaks through the live projection path', () => {
+    const html = renderThinking('    if (ready) {\n      inspect();\n    }\n\nFirst line.  \r\nSecond line.');
+    expect(html).toMatch(/<code\b[^>]*>if \(ready\) \{\n  inspect\(\);\n\}\n<\/code>/u);
+    expect(html).toContain('First line.<br/>\nSecond line.');
+  });
+
+  it('keeps a title followed by reference definitions inside the disclosure', () => {
+    const html = renderThinking('# Inspect\n\n[ref]: https://example.com');
+    expect(html).toContain('work-process-thinking-summary');
+    expect(html).toContain('<h1>Inspect</h1>');
+    expect(html).toContain('work-process-thinking-preview');
+  });
+
+  it.each(['   \n', '[ref]: https://example.com', '## ###'])('omits an empty thinking row for %j', (value) => {
+    expect(renderThinking(value)).not.toContain('data-testid="work-process-thinking"');
+  });
+
+  it('omits hidden thinking before Markdown rendering', () => {
+    expect(renderThinking('# Hidden reasoning', 'hidden')).not.toContain('Hidden reasoning');
   });
 });

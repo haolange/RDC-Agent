@@ -109,8 +109,10 @@
 
   /* Typography */
   /* Inter and JetBrains Mono ship with the app (@fontsource-variable); CJK falls through to the system face. */
-  --font-sans: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
-  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --font-sans-default: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --font-mono-default: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --font-sans: var(--font-sans-default);
+  --font-mono: var(--font-mono-default);
 
   /* Four typography roles (DESIGN.md): title, reading, body and meta. Components reference a role, never a
      raw size; meta (12px) is only for timestamps and durations. The font-scale presets remap all four together. */

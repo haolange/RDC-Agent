@@ -6,6 +6,7 @@ export const zhApp = {
   'app.retry': '重试',
   'app.copyDetails': '复制详情',
   'app.copyDiagnostics': '复制诊断信息',
+  'app.moreActions': '更多操作',
   'app.copied': '已复制',
   'app.imageViewer.close': '关闭图片',
   'app.imageViewer.previous': '上一张',

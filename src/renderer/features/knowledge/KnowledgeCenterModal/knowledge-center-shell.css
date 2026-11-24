@@ -53,6 +53,8 @@
 }
 
 .knowledge-center-content.ui-panel {
+  --knowledge-reader-inset: var(--space-5);
+  container: knowledge-detail / inline-size;
   background: var(--token-bg-shell);
 }
 
@@ -138,6 +140,10 @@
 }
 
 @media (max-width: 960px) {
+  .knowledge-center-content.ui-panel {
+    --knowledge-reader-inset: var(--space-4);
+  }
+
   .knowledge-center-grid {
     grid-template-columns: minmax(0, 1fr);
   }

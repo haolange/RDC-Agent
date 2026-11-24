@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import { getElectronApi } from '../platform/getElectronApi';
 import { observeEffectiveCatalog, readEffectiveCatalog, refreshEffectiveCatalog } from '../services/effectiveCatalogService';
 import { latestCatalogProjection } from '../lib/catalogProjection';
@@ -20,7 +21,7 @@ export const catalogScopeKey = (scope: CatalogScope): string =>
   JSON.stringify([scope.id, scope.activeAccountId || `anonymous:${scope.id}`, scope.protocol]);
 const requests = new Map<string, Promise<EffectiveCatalogSnapshot | null>>();
 let generation = 0;
-const configurations = new Map<string, string>();
+const configurations = new Map<string, { connection: string; models: string }>();
 const pendingEvents = new Map<string, Map<string, EffectiveCatalogSnapshot>>();
 
 interface CatalogState {
@@ -108,23 +109,40 @@ export function startCatalogProjection(): () => void {
 }
 
 /** Settings already owns credential/configuration revision; no secret enters this projection. */
-export function reconcileCatalogProviders(providers: readonly LlmProviderEntry[]): void {
+export function reconcileCatalogProviders(
+  providers: readonly LlmProviderEntry[],
+  activeProviderIds: ReadonlySet<string> = new Set(providers.map((provider) => provider.id)),
+): void {
   const keys = new Set(providers.map(catalogScopeKey));
+  for (const key of configurations.keys()) {
+    if (!keys.has(key)) configurations.delete(key);
+  }
   for (const key of Object.keys(useEffectiveCatalogStore.getState().entries)) {
     if (!keys.has(key)) {
       requests.delete(key);
       pendingEvents.delete(key);
-      configurations.delete(key);
       useEffectiveCatalogStore.setState((state) => { const entries = { ...state.entries }; delete entries[key]; return { entries }; });
     }
   }
   for (const provider of providers) {
     const key = catalogScopeKey(provider);
-    const signature = JSON.stringify([provider.enabled, provider.isConfigured, provider.authMode,
-      provider.baseUrl, provider.connectionValues, provider.models]);
-    if (configurations.has(key) && configurations.get(key) !== signature) useEffectiveCatalogStore.getState().invalidate(provider);
-    configurations.set(key, signature);
-    void useEffectiveCatalogStore.getState().load(provider);
+    const connection = providerConnectionIdentity(provider);
+    const models = JSON.stringify(provider.models);
+    const previous = configurations.get(key);
+    const store = useEffectiveCatalogStore.getState();
+    const tracked = key in store.entries;
+    configurations.set(key, { connection, models });
+    if (previous && previous.connection !== connection) {
+      store.invalidate(provider);
+    } else if (previous && previous.models !== models && tracked) {
+      // The active catalog belongs to the same connection. Supersede an older
+      // read while retaining the rows and accept the newly committed generation.
+      requests.delete(key);
+      pendingEvents.delete(key);
+      void store.load(provider, false, true);
+      continue;
+    }
+    if (tracked || activeProviderIds.has(provider.id)) void store.load(provider);
   }
 }
 

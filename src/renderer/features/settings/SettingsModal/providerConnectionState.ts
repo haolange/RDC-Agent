@@ -68,9 +68,12 @@ export function projectEndpointTemplate(
   template: string | undefined,
   values: Readonly<Record<string, string>>,
 ): string {
-  return (template ?? '').replace(/\$\{([^}]+)\}/gu, (placeholder, fieldId: string) => (
-    values[fieldId]?.trim() || placeholder
-  ));
+  const source = template ?? '';
+  return source.replace(/\$\{([^}]+)\}/gu, (placeholder, fieldId: string, offset: number) => {
+    const value = values[fieldId]?.trim().replace(/\/+$/u, '');
+    if (!value) return placeholder;
+    return /https?:\/\/$/iu.test(source.slice(0, offset)) ? value.replace(/^https?:\/\//iu, '') : value;
+  });
 }
 
 export function shouldUseProviderDocsLink(provider: LlmProviderEntry): boolean {

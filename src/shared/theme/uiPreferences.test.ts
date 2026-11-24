@@ -35,3 +35,11 @@ describe('Working expansion preference', () => {
     expect(sanitizeUiPreferences({ workProcessExpansion: 'every' }).workProcessExpansion).toBe('latest');
   });
 });
+
+describe('Context breakdown expansion preference', () => {
+  it('starts collapsed and retains a saved expanded preference', () => {
+    expect(createDefaultUiPreferences().contextBreakdownExpanded).toBe(false);
+    expect(sanitizeUiPreferences({}).contextBreakdownExpanded).toBe(false);
+    expect(sanitizeUiPreferences({ contextBreakdownExpanded: true }).contextBreakdownExpanded).toBe(true);
+  });
+});

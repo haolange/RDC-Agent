@@ -1,5 +1,6 @@
 import { useRef, type Dispatch, type SetStateAction } from 'react';
 import { updateProviderModelPreference } from './providerModelProjection';
+import { hasProviderConnectionDefinitionChanged } from './providerConnectionRequest';
 import { useProviderConnectionActions } from './useProviderConnectionActions';
 import { useProviderConnectionDraft } from './useProviderConnectionDraft';
 import type { ProviderConnectionDraft } from './types';
@@ -30,9 +31,7 @@ interface UseProviderConnectionOptions {
 export const useProviderConnection = (options: UseProviderConnectionOptions) => {
   const draft = useProviderConnectionDraft(options);
   const connectionDraftRef = useRef(options.connectionDraft);
-  const providerDraftsRef = useRef(options.providerDrafts);
   connectionDraftRef.current = options.connectionDraft;
-  providerDraftsRef.current = options.providerDrafts;
 
   const actions = useProviderConnectionActions(
     options.connectionDraft,
@@ -43,39 +42,9 @@ export const useProviderConnection = (options: UseProviderConnectionOptions) => 
     options.t,
   );
 
-  const rollbackFailedPreference = async (providerId: string, error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    try {
-      const settings = await draft.refreshLocalSettings(providerId);
-      const provider = settings.llm.providers.find((entry) => entry.id === providerId);
-      if (!provider) throw new Error(`Provider ${providerId} disappeared during rollback.`);
-      providerDraftsRef.current = settings.llm.providers;
-      options.setConnectionDraft((current) => {
-        if (!current || current.providerId !== providerId) return current;
-        const next = {
-          ...current,
-          protocol: provider.protocol,
-          baseUrl: provider.baseUrl ?? '',
-          models: provider.models.map((model) => ({ ...model })),
-          error: message,
-        };
-        connectionDraftRef.current = next;
-        return next;
-      });
-    } catch {
-      options.setConnectionDraft((current) => current?.providerId === providerId
-        ? { ...current, error: message }
-        : current);
-    }
-  };
-
-  const persistPreference = (provider: LlmProviderEntry) => {
-    void options.saveProvider(provider).catch((error) => rollbackFailedPreference(provider.id, error));
-  };
-
   const updateConnectionModelPreference = (modelId: string, patch: Partial<LlmProviderModel>) => {
     const currentDraft = connectionDraftRef.current;
-    const provider = providerDraftsRef.current.find((entry) => entry.id === currentDraft?.providerId);
+    const provider = options.providerDrafts.find((entry) => entry.id === currentDraft?.providerId);
     if (!currentDraft || !provider) return;
     const models = updateProviderModelPreference(
       provider.catalogOwnership,
@@ -83,15 +52,32 @@ export const useProviderConnection = (options: UseProviderConnectionOptions) => 
       modelId,
       patch,
     );
-    const nextDraft = { ...currentDraft, models, error: '' };
-    const nextProvider = { ...provider, models: models.map((model) => ({ ...model })) };
+    const nextDraft = { ...currentDraft, models, modelSaveError: undefined };
     connectionDraftRef.current = nextDraft;
-    providerDraftsRef.current = providerDraftsRef.current.map((entry) => (
-      entry.id === provider.id ? nextProvider : entry
-    ));
     options.setConnectionDraft(nextDraft);
-    options.setProviderDrafts(providerDraftsRef.current);
-    persistPreference(nextProvider);
+    const connectionOwner = { ...provider, configuredAuthMode: provider.configuredAuthMode ?? provider.authMode };
+    if (hasProviderConnectionDefinitionChanged(connectionOwner, currentDraft)) return;
+
+    void options.saveProvider({ ...provider, models }).then((result) => {
+      if (result.status === 'superseded') return;
+      const confirmed = result.lastSuccessful?.provider;
+      if (confirmed) options.setProviderDrafts((providers) => providers.map(
+        (entry) => entry.id === provider.id ? confirmed : entry,
+      ));
+      options.setConnectionDraft((current) => {
+        if (current?.providerId !== provider.id || hasProviderConnectionDefinitionChanged(connectionOwner, current)) return current;
+        // The dialog can be reopened before the write returns. Only reconcile
+        // a fresh draft still showing the original saved model selection.
+        const submittedHere = current.models === models;
+        if (!submittedHere && JSON.stringify(current.models) !== JSON.stringify(provider.models)) return current;
+        if (result.status === 'committed') return submittedHere || !confirmed ? current : { ...current, models: confirmed.models };
+        return {
+          ...current,
+          models: (confirmed ?? provider).models,
+          modelSaveError: result.error ?? options.t('settings.providerSaveFailed'),
+        };
+      });
+    });
   };
 
   return {

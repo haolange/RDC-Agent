@@ -129,6 +129,20 @@ describe('reviewed provider catalog request paths', () => {
     expect(wire(fast.plan).service_tier).toBe('priority');
   });
 
+  it.each(['openai', 'openai-us', 'openai-eu'])('uses GPT-6.2 Responses with Fast on %s', (surfaceId) => {
+    const model = effective(surfaceId, 'gpt-6.2-astra');
+    expect(model.route.protocol).toBe('OpenAIResponses');
+    expect(model.contextTiers[0]).toMatchObject({
+      maxPromptTokens: 922_000, maxOutputTokens: 128_000, maxTotalTokens: 1_050_000,
+    });
+    const result = planModelRequest({ model, controls: { reasoningLevel: 'xhigh', fastModel: true } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(wire(result.plan)).toMatchObject({ model: 'gpt-6.2-astra', reasoning: { effort: 'xhigh' }, service_tier: 'fast' });
+    expect(wire(result.plan)).not.toHaveProperty('temperature');
+    expect(wire(result.plan)).not.toHaveProperty('top_p');
+  });
+
   it('binds Claude Opus 5.5 Fast to Anthropic API only', () => {
     const api = planModelRequest({ model: effective('anthropic', 'claude-opus-5-5'), controls: { fastModel: true } });
     expect(api.ok).toBe(true);
@@ -147,6 +161,18 @@ describe('reviewed provider catalog request paths', () => {
     expect(wire(account.plan)).not.toHaveProperty('speed');
     expect(account.plan.headers['anthropic-beta']).not.toContain('fast-mode-2026-02-01');
     expect(account.plan.headers['anthropic-beta']).toContain('oauth-2025-04-20');
+  });
+
+  it('uses Claude Fable 5.2 adaptive thinking and GA Fast without the legacy beta header', () => {
+    const result = planModelRequest({ model: effective('anthropic', 'claude-fable-5-2'), controls: { fastModel: true } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(wire(result.plan)).toMatchObject({
+      model: 'claude-fable-5-2', thinking: { type: 'adaptive' }, output_config: { effort: 'high' }, speed: 'fast',
+    });
+    expect(wire(result.plan)).not.toHaveProperty('temperature');
+    expect(wire(result.plan)).not.toHaveProperty('top_p');
+    expect(result.plan.headers['anthropic-beta'] ?? '').not.toContain('fast-mode-2026-02-01');
   });
 
   for (const surfaceId of ['glm-global-coding-plan']) {

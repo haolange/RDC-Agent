@@ -91,14 +91,14 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
         <div className="settings-model-capability-note settings-model-capability-note--error">{t('settings.providers.capability.loadFailed')}</div>
       ) : effectiveModel ? (
         <>
-          <div className="settings-model-capability-grid">
+          <dl className="settings-model-capability-grid">
             {chips.map((chip) => (
-              <div key={chip.label} className="settings-model-capability-chip" data-tone={chip.tone ?? 'default'}>
-                <span className="settings-model-capability-chip-label">{chip.label}</span>
-                <span className="settings-model-capability-chip-value">{chip.value}</span>
+              <div key={chip.label} data-tone={chip.tone ?? 'default'}>
+                <dt>{chip.label}</dt>
+                <dd>{chip.value}</dd>
               </div>
             ))}
-          </div>
+          </dl>
           {effectiveModel.toolCalling.state === 'unknown' ? (
             <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unverified">{t('settings.providers.capability.toolCallingUnverifiedHint')}</div>
           ) : effectiveModel.toolCalling.state === 'unsupported' ? (
@@ -119,9 +119,6 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
           ) : null}
           {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}
           {snapshot?.stale ? <div className="settings-model-capability-note">{t('settings.providers.capability.stale')}</div> : null}
-          {snapshot?.lastRefreshError ? (
-            <div className="settings-model-capability-note settings-model-capability-note--warning" data-tooltip={snapshot.lastRefreshError}>{t('settings.providers.capability.refreshFailed')}</div>
-          ) : null}
           {effectiveModel.quota ? (
             <div className="settings-model-capability-note settings-model-capability-note--warning">
               {t('settings.providers.capability.quota', {

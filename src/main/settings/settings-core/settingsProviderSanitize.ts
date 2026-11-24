@@ -313,22 +313,17 @@ function sanitizeRoute(entry: unknown): LlmAgentRoute | null {
 }
 
 function pickProviderStatus(
-  provider: Partial<LlmProviderEntry>,
-  fallback: LlmProviderEntry,
-  canUseProvider: boolean,
-  models: LlmProviderModel[],
+  previousStatus: LlmProviderConnectionStatus | undefined,
+  authUnavailable: boolean,
+  verifiedConnection: boolean,
 ): LlmProviderConnectionStatus {
-  const hasEnabledModels = models.some((model) => model.enabled !== false);
-  if (fallback.status === 'unavailable') {
+  if (authUnavailable) {
     return 'unavailable';
   }
-  if (provider.status === 'failed') {
+  if (previousStatus === 'failed') {
     return 'failed';
   }
-  if ((provider.status === 'verified' || provider.isConfigured === true) && canUseProvider && hasEnabledModels) {
-    return 'verified';
-  }
-  return 'unconfigured';
+  return verifiedConnection ? 'verified' : 'unconfigured';
 }
 
 export function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
@@ -525,22 +520,15 @@ export function sanitizeUserProvider(
       })
     : persistedModels;
   const selectedAvailability = resolveSelectedAuthAvailability(rawId, authMode, builtinFallback);
-  const canUseProvider = selectedAvailability.state !== 'unavailable' && hasStoredSecret;
   const configuredAuthMode = (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).includes(provider.configuredAuthMode as LlmProviderAuthMode)
     ? provider.configuredAuthMode
     : provider.status === 'verified' || provider.isConfigured === true
       ? authMode
       : undefined;
   const status = pickProviderStatus(
-    configuredAuthMode && configuredAuthMode !== authMode
-      ? { ...provider, status: 'unconfigured', isConfigured: false }
-      : provider,
-    {
-      ...builtinFallback,
-      status: selectedAvailability.state === 'unavailable' ? 'unavailable' : 'unconfigured',
-    },
-    canUseProvider,
-    models,
+    configuredAuthMode && configuredAuthMode !== authMode ? 'unconfigured' : provider.status,
+    selectedAvailability.state === 'unavailable',
+    configuredAuthMode === authMode && hasStoredSecret,
   );
   const hasEnabledModels = models.some((model) => model.enabled !== false);
   const enabled = status === 'verified' && hasEnabledModels;
@@ -599,7 +587,7 @@ export function sanitizeUserProvider(
     oauthExpiresAt: typeof provider.oauthExpiresAt === 'string' ? provider.oauthExpiresAt : undefined,
     oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === 'boolean' ? provider.oauthRefreshAvailable : undefined,
     unavailableReason: selectedAvailability.state === 'unavailable' ? selectedAvailability.reason : undefined,
-    isConfigured: status === 'verified' && hasEnabledModels && enabled,
+    isConfigured: status === 'verified',
     capabilities: definition?.capabilities ? [...definition.capabilities] : undefined,
   };
 }
@@ -679,12 +667,11 @@ export function hydrateProviderSecrets(
       : provider.status === 'verified'
         && provider.configuredAuthMode === provider.authMode
         && canUseProvider
-        && hasEnabledModels
         ? 'verified'
         : provider.status === 'failed'
           ? 'failed'
           : 'unconfigured';
-    const isConfigured = status === 'verified' && hasEnabledModels;
+    const isConfigured = status === 'verified';
 
     return {
       ...provider,
@@ -694,7 +681,7 @@ export function hydrateProviderSecrets(
       hasStoredSecret,
       hasStoredSecretByAuthMode,
       hasStoredConnectionSecrets,
-      enabled: isConfigured,
+      enabled: isConfigured && hasEnabledModels,
       status,
       isConfigured,
     };

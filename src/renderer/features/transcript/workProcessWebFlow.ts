@@ -51,7 +51,6 @@ function* toolRows(rows: readonly WorkProcessRow[]): Generator<ToolRow> {
     if (row.type === 'tool') yield row;
     else if (row.type === 'section') yield* toolRows(row.visibleSteps);
     else if (row.type === 'webGroup') yield* row.members;
-    else if (row.type === 'toolAggregate') yield* row.children;
   }
 }
 

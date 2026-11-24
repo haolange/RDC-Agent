@@ -75,6 +75,7 @@ export function createConversationApi(transport: RendererApiTransport): Conversa
     stageAttachments: (request) => transport.invoke(INVOKE.conversation.stageAttachments, request),
     releaseAttachments: (request) => transport.invoke(INVOKE.conversation.releaseAttachments, request),
     getAttachmentPreview: (request) => transport.invoke(INVOKE.conversation.getAttachmentPreview, request),
+    accessAttachment: (request) => transport.invoke(INVOKE.conversation.accessAttachment, request),
     resolveMedia: (request) => transport.invoke(INVOKE.conversation.resolveMedia, request),
     onEvent: (callback): void => {
       transport.addListener(EVENT.conversation.event, callback as unknown as RendererEventCallback);

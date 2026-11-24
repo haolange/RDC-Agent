@@ -10,7 +10,6 @@ import {
   UserInputRow,
 } from './WorkProcessRows';
 import { WorkProcessSectionRow } from './WorkProcessSectionRow';
-import { ToolAggregateRow } from './ToolAggregateRow';
 import { WorkProcessImageRow } from './WorkProcessImageRow';
 import { WorkProcessOutputRow } from './WorkProcessOutputRow';
 import { WorkProcessThinkingRow } from './WorkProcessThinking';
@@ -33,7 +32,6 @@ export function createWorkProcessRowRenderer(
         <ToolRow key={member.id} row={member} extraDetail={renderToolDetail?.(member)} density="compact" grouped />
       )} />;
     }
-    if (row.type === 'toolAggregate') return <ToolAggregateRow key={row.id} row={row} renderToolDetail={renderToolDetail} density={density} />;
     if (row.type === 'userInput') return <UserInputRow key={row.id} row={row} />;
     if (row.type === 'planReview') return <PlanReviewRow key={row.id} row={row} />;
     if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;

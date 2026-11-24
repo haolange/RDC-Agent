@@ -1,14 +1,14 @@
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Chevron } from '../../../../ui/Chevron';
+import { Icon } from '../../../../ui/Icon';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 import { Skeleton } from '../../../../ui/Skeleton';
 import { KnowledgeStatusTag } from './KnowledgeStatusTag';
-import type { KnowledgeCardDetail, KnowledgePackConflict } from '@shared/types/knowledge';
+import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 
 interface ConflictCompareProps {
-  conflict: KnowledgePackConflict;
   left: KnowledgeCardDetail | null;
   right: KnowledgeCardDetail | null;
   loading: boolean;
@@ -17,13 +17,11 @@ interface ConflictCompareProps {
 
 function ConflictCardPane({
   label,
-  cardId,
   card,
   loading,
   onOpen,
 }: {
   label: string;
-  cardId: string;
   card: KnowledgeCardDetail | null;
   loading: boolean;
   onOpen: () => void;
@@ -63,39 +61,37 @@ function ConflictCardPane({
           ) : null}
         </dl>
       ) : (
-        <p className="knowledge-center-status" data-tooltip={cardId}>{t('knowledgeCenter.conflictCardMissing')}</p>
+        <p className="knowledge-center-status">{t('knowledgeCenter.conflictCardMissing')}</p>
       )}
     </section>
   );
 }
 
 /** Side-by-side comparison of a contradicts pair; review is manual, there is no automatic resolution. */
-export function ConflictCompare({ conflict, left, right, loading, onOpenCard }: ConflictCompareProps) {
+export function ConflictCompare({ left, right, loading, onOpenCard }: ConflictCompareProps) {
   const { t } = useI18n();
-  const leftTitle = left?.title || conflict.leftCardId;
-  const rightTitle = right?.title || conflict.rightCardId;
+  const leftTitle = left?.title ?? t('knowledgeCenter.conflictCardA');
+  const rightTitle = right?.title ?? t('knowledgeCenter.conflictCardB');
   return (
     <article className="knowledge-conflict-compare" data-testid="knowledge-conflict-compare">
       <header className="knowledge-conflict-compare-head">
         <h1 className="knowledge-center-header-title">
           {leftTitle}
-          <span className="knowledge-center-conflict-swap" aria-hidden="true">↔</span>
+          <Icon name="conflict" className="knowledge-center-conflict-swap" size={16} />
           {rightTitle}
         </h1>
         <Badge tone="warning">{t('knowledgeCenter.conflictPending')}</Badge>
       </header>
-      <p className="knowledge-center-meta-line">{t('knowledgeCenter.conflictCompareHint', { a: leftTitle, b: rightTitle })}</p>
+      <p className="knowledge-center-meta-line">{t('knowledgeCenter.conflictCompareHint')}</p>
       <div className="knowledge-conflict-panes">
         <ConflictCardPane
           label={t('knowledgeCenter.conflictCardA')}
-          cardId={conflict.leftCardId}
           card={left}
           loading={loading}
           onOpen={() => left && onOpenCard(left)}
         />
         <ConflictCardPane
           label={t('knowledgeCenter.conflictCardB')}
-          cardId={conflict.rightCardId}
           card={right}
           loading={loading}
           onOpen={() => right && onOpenCard(right)}

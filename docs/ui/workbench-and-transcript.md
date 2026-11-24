@@ -14,7 +14,7 @@
 - 打开一个会话、读取它的历史时，对话区显示骨架占位，不闪出空首页。
 - 运行记录抽屉的每行是严重度色点（悬停给出级别）、时间、标题与摘要；来源与会话、运行、项目标识一起在展开内容里。
 - 原生应用菜单在语言设置成功保存后刷新；新打开的原生对话框读取当前语言，审批身份、按钮序号与取消行为保持。系统自带按钮、菜单 role 和文件浏览器内容遵循操作系统语言。语言选项始终使用自称 `简体中文` / `English`。
-- 验收覆盖双向切换、历史重载、运行与终态、审批、聚合摘要、窄屏、字号和键盘；Browser 与原生 Electron 分开记录，隔离 UI fixture 不作为模型或 RDC 执行证据。
+- 验收覆盖双向切换、历史重载、运行与终态、审批、连续工具调用、窄屏、字号和键盘；Browser 与原生 Electron 分开记录，隔离 UI fixture 不作为模型或 RDC 执行证据。
 
 ## 准备清单
 
@@ -34,7 +34,7 @@ RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。
 
 Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽屉或自动收起后该接缝不再提供拖拽。
 
-对话是一列：page shell、transcript 与 Composer 共用 `.app-main` 上定义的 `--conversation-column-width`（源自 `WORKBENCH_CHAT_RAIL_MAX_WIDTH`）。Composer 外框、用户气泡右缘、正式计划卡和回复正文使用外列边界。Working 标题、卡片和叙述共用对称内缩边界，`--conversation-inset` 只是 Composer 的内边距。Working 的时间线竖线与事件点悬挂在左边界外侧的栏间距里（`--work-rail-hang`），与卡片、标题的相对位置不变；为了让它不被裁掉，page shell 是这一列加两侧栏间距（`--conversation-column-gutter`），`.chat-messages` 再用同样的内边距把内容放回列边，任何宽度下 transcript 与 Composer 都是同一对边界。不再有 Working 专用的收口变量、负外边距或更窄的 content-rail。运行记录是主栏底部的抽屉，占用高度而不覆盖消息。
+对话主栏由 page shell、transcript 和 Composer 共用的对话列宽决定。Composer 外框、用户气泡右缘和正式计划卡沿外列排版。最终回复正文占外列全宽，Working 状态点左缘沿同一外列左缘。标题、元信息和箭头依次排列在状态点右侧。过程叙述和同层卡片左右等量内缩，事件轨道位于过程左侧留白。外层滚动条占用 page shell 的栏间距，跟随视窗滚动条占用 Working 的右侧留白。运行记录是主栏底部的抽屉，占用高度。
 
 - 用户 prompt：右对齐 raised bubble（`fit-content`、`--token-surface-raised`）。
 - Assistant final answer、Work Process（含 tool 卡片）、loop commentary：full-bleed 透明散文；`.conversation-thread` 共用 `padding-inline: var(--space-3)`。
@@ -51,11 +51,11 @@ Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽�
 - 结束后：`工作过程` / `Work process` + duration/action meta；
 - 禁止用 `执行完成` 做主标题。
 
-展开模型：工作过程没有段落开关，思考、叙述与工具卡按发生顺序连续平铺；每个模型段不编号，段首按内容决定（只有思考时是可展开的思考标签；思考加叙述时上下排列；只有叙述时只显示叙述；纯工具段直接是工具卡）。设置 › 常规 › 工作过程 决定两种呈现，取值仍为 `latest` / `all`：「跟随最新」（`latest`，默认）运行中是限高视窗 `min(40vh, 360px)`，顶部渐隐（0% 全透明、18% 处 25%、45% 处不透明），新内容到来时 200ms 缓动滚到最新，用户在视窗里上滚即暂停跟随并出现「回到最新」，回合正常完成后、或回合把计划交给用户审阅时整体收起成标题行（审阅中的计划这时只在 Working 下方显示一次）；「显示全部」（`all`）运行中不限高、完整铺开，由对话区自身滚动跟随，回合结束后不收起。两档下出错或被停止时都保持展开，用户手动开合按会话与消息记住并始终优先（流式更新、窗口化重挂载后保持）；再次展开已完成的工作过程时完整平铺、不加内部滚动。工具卡的正文与展开详情按卡片自己的默认开合，不被偏好一并撑开。子代理内部的工作过程跟随同一偏好，活动状态取子代理自己的运行状态。
+展开模型：工作过程没有段落开关，思考、叙述与工具卡按发生顺序连续平铺；每个模型段不编号，段首按内容决定（只有可读思考时显示带状态的思考披露行；思考加叙述时上下排列；只有叙述时只显示叙述；纯工具段直接是工具卡）。设置 › 常规 › 工作过程 决定两种呈现，取值仍为 `latest` / `all`：「跟随最新」（`latest`，默认）运行中是限高视窗 `min(40vh, 360px)`，顶部渐隐（0% 全透明、18% 处 25%、45% 处不透明），新内容到来时 200ms 缓动滚到最新，用户在视窗里上滚即暂停跟随并出现「回到最新」，回合正常完成后、或回合把计划交给用户审阅时整体收起成标题行（审阅中的计划这时只在 Working 下方显示一次）；「显示全部」（`all`）运行中不限高、完整铺开，由对话区自身滚动跟随，回合结束后不收起。两档下出错或被停止时都保持展开，用户手动开合按会话与消息记住并始终优先（流式更新、窗口化重挂载后保持）；再次展开已完成的工作过程时完整平铺、不加内部滚动。工具卡的正文与展开详情按卡片自己的默认开合，不被偏好一并撑开。子代理内部的工作过程跟随同一偏好，活动状态取子代理自己的运行状态。
 
-Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展开）→ `已思考 · {duration}` / `Thought for`（完成后默认折叠；时长取该思考块首个可见文字到结束的时间，主进程记录在思考项上，缺任一时刻只显示 `已思考`，不借用步骤耗时）；思考类型（摘要 / 原始）不贴标签；手动开合 sticky 覆盖。禁止 `深度思考` / settled `思考了`。Readable `raw`/`summary`/`unknown` 共用标签；opaque/hidden 永不渲染 CoT 占位句。
+Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展开）→ `已思考 · {duration}` / `Thought for`（完成后默认折叠；时长取该思考块首个可见文字到结束的时间，主进程记录在思考项上，缺任一时刻只显示 `已思考`，不借用步骤耗时）；思考类型（摘要 / 原始）不贴标签；手动开合 sticky 覆盖。状态栏只显示本地化状态与可核实的时长。包括单标题在内的完整模型原文位于展开区，Markdown 的段落、链接、列表、硬换行、代码缩进保留。禁止 `深度思考` / settled `思考了`。Readable `raw`/`summary`/`unknown` 共用标签；opaque/hidden 永不渲染 CoT 占位句。
 
-Commentary：markdown 散文，不进 thinking 槽。文本项与工具、Tasks 快照按首次可见顺序排列；无明确 phase 的文本立即中性显示，确认 commentary 或 final 时保留节点与位置。用户折叠工作过程时只收起过程与 commentary 文本；final 与阶段未声明的文本继续可读，且答复在阶段确认前后保持同一位置与同一 DOM 节点：同一段的思考与所有文本项共处一个按显示顺序排列的列表，动作行在其后。段落节点挂在段首（思考标签、叙述首行或动作行），纯工具分组不再把节点挂在第一张卡上。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（卡头图标 + 动词加对象的标题，如「读取 ContextBreakdownSheet.tsx」「编辑 useTabsLayout.ts」，标题过长尾部渐隐；卡头悬停提示是人话标题加耗时，不显示原始工具 id；**结果优先** body；路径、状态码、字节数、行数与复制按钮在展开详情；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。转存为会话文件的结果按 `details.display`（网页的地址与标题、命令、文件路径）照常按语义呈现，`session://` 地址与哈希只在原始回执里；没有 display 的旧记录只显示工具动词与耗时。相邻可见 tool、Tasks 快照与无叙述 section 的边框间距统一 `--space-2`，只由事件列表边界提供；有可见 thinking/commentary 的段落入口及其首 tool 保留 `--space-3`。隐藏或空模型段不补空位，窗口化占位不重复添加间距。≥8 连续 tools 仅在整组终止后聚合成摘要行，摘要耗时是整组总耗时；运行期间维持原卡片顺序，聚合保留子项身份及用户展开选择；网页读取组与搜索卡不被聚合吞并。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 label 角色字号。
+Commentary：markdown 散文，不进 thinking 槽。文本项与工具、Tasks 快照按首次可见顺序排列；无明确 phase 的文本立即中性显示，确认 commentary 或 final 时保留节点与位置。用户折叠工作过程时只收起过程与 commentary 文本；final 与阶段未声明的文本继续可读，且答复在阶段确认前后保持同一位置与同一 DOM 节点：同一段的思考与所有文本项共处一个按显示顺序排列的列表，动作行在其后。段落节点挂在段首（思考标签、叙述首行或动作行），纯工具段的节点按段首动作定位。Tool / Asked / Sub Agent / Tasks 快照 / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（卡头图标 + 动词加对象的标题，如「读取 ContextBreakdownSheet.tsx」「编辑 useTabsLayout.ts」，标题过长尾部渐隐；卡头悬停提示是人话标题加耗时，不显示原始工具 id；**结果优先** body；路径、状态码、字节数、行数与复制按钮在展开详情；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。转存为会话文件的结果按 `details.display`（网页的地址与标题、命令、文件路径）照常按语义呈现，`session://` 地址与哈希只在原始回执里；没有 display 的旧记录只显示工具动词与耗时。相邻可见 tool、Tasks 快照与无叙述 section 的边框间距统一 `--space-2`，只由事件列表边界提供；有可见 thinking/commentary 的段落入口及其首 tool 保留 `--space-3`。隐藏或空模型段不补空位，窗口化占位不重复添加间距。每次普通工具调用各有一张卡，结算时保持调用顺序、详情展开与焦点。失败卡以实际操作为标题，失败状态和可读原因各出现一次。Compact 是正式卡片，标题走 i18n。Tasks 快照卡与 tool 卡共用 `--transcript-card-icon-size` 与 label 角色字号。
 
 Tasks 在主回合内每次真实创建或更新各留下独立历史卡，按事件 ID 保序去重，卡内列表冻结为变更提交当刻的逐项状态；一批创建只产生一张「添加任务」，更新显示「已更新任务」。旧记录没有事件种类时用「任务列表」，不得把旧卡改写为最新状态。卡头右端为完成数和固定箭头，不使用 `0ms`；列表用状态图形呈现待开始、进行中、完成、受阻和取消，原因仅在所属项详情展开时显示，默认无副标题或底部 tips，行内不叠加卡壳。每张卡初次出现默认展开，后续活动不自动收起旧卡；用户手动开合优先并跨分页／窗口化保持。右栏 Tasks 是最新列表：顶部是完成进度条，完成数 / 总数只在它的悬停提示与读屏名称里，不在旁边再写一遍（标签徽标保留总数）；每行一个状态图形（待开始灰色空心、进行中强调色旋转、已完成绿色实心对勾且标题保持可读、受阻琥珀色暂停、执行失败红色、已取消灰色斜线加删除线）加最多两行标题，没有序号列，进行中的一项加粗；委派或后台执行的事实（「后台」、实际执行的 Agent 与模型）只在悬停提示与点开后的详情里出现，行内不加徽标；超过 6 项且已完成至少 2 项时，已完成项收进一行「显示已完成的 N 项」。原因不进紧凑列表，悬停提示给出状态。其任务定位优先找到最后一张包含该任务的历史卡。右栏标签栏是图标加短名，计数用徽标；栏宽放不下时其余标签只留图标与悬停提示，选中标签保留名字，永不重叠。父回复结束后的后台变更只更新子代理卡和右栏，不在旧回复中倒插历史卡。
 
@@ -78,9 +78,9 @@ Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s li
 
 ## Human-in-the-loop
 
-`ask_user`：batch `questions[]`；`ConversationToolCall.userInputQuestions` 为唯一跨层 payload；`argsPreview` 仅展示。Composer 区 wizard 答题；Work Process 记录紧凑 Q/A transcript。
+`ask_user` 使用批量 `questions[]`，`ConversationToolCall.userInputQuestions` 为唯一跨层 payload，`argsPreview` 仅展示。Composer 逐题作答并统一提交。Working 展开时，Ask 用静态卡头和有序列表显示整批问题及配对回答。进行中显示等待与答题数，终态的缺答标记为未记录回答，缺失问题数据时显示现有错误提示。
 
-`plan_artifact` 与 `ask_user` 同构停顿。四个表面：Working 里的计划卡（`planReview` 行 → `PlanCard`：当前修订——待审或已批准——显示成一张卡，约 6 行高，越到底部越透明，随每次修订更新；被取代、打回或取消的修订收成一行紧凑工具壳「已更新 / 已提出修改 / 审阅已取消」，计划行会切断连续工具的聚合）、Working 之后的最终计划（`PlanDeliverable` → 同一个 `PlanCard`，同一 planId 只显示最新一版且仅在待审或已批准时出现，不带跳转、修订号或交接说明）、只读阅读面板（`PlanReviewPanel`，在共享 `ReadingSheet` 中）、Composer 待审门（`PlanReviewRequestPanel` + `HandoffActionRow`）。批准后交接 prompt 作为一条普通用户消息出现：消息上持久化核验过的 `planReference`，但转录不把它包成卡片，也不加双向跳转；只隐藏「编辑重发」，因为改写不能携带引用。交接未能发出时，Composer 上方显示用户定的「计划已批准」面板（一句话 + 交接按钮）。Composer 优先级 `pendingToolApproval > pendingPlanReview > pendingUserInput`。通过 = 点当前 Agent 声明的 continue 按钮（文案 = `label`）；拒绝意见必填。计划门那一击可以同时批准并 enqueue 续跑。带反馈的 rejected 显示“已提出修改”，cancelled 显示“审阅已取消”，真实错误仍可见。计划不进 Right Rail。不得把计划写进 `final_answer` 冒充审阅门。只要本条 assistant 消息包含计划审阅交互，result 底部不显示“继续”及 handoff 按钮，主进程和 renderer 共用同一可见性规则；已有建议快照也按此规则呈现。计划执行入口仅在 Composer 待审区，批准后由既有队列发送一次。普通非计划回复仍保留符合现有资格的声明建议，General 无声明即无建议行。建议行与计划门共用 `HandoffActionRow`；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`，`send: true` 才自动发。手动改 Agent pill 不写 offer。
+`plan_artifact` 与 `ask_user` 同构停顿。四个表面：Working 里的计划卡（`planReview` 行 → `PlanCard`：当前修订——待审或已批准——显示成一张卡，约 6 行高，越到底部越透明，随每次修订更新；被取代、打回或取消的修订收成一行紧凑工具壳「已更新 / 已提出修改 / 审阅已取消」）、Working 之后的最终计划（`PlanDeliverable` → 同一个 `PlanCard`，同一 planId 只显示最新一版且仅在待审或已批准时出现，不带跳转、修订号或交接说明）、只读阅读面板（`PlanReviewPanel`，在共享 `ReadingSheet` 中）、Composer 待审门（`PlanReviewRequestPanel` + `HandoffActionRow`）。批准后交接 prompt 作为一条普通用户消息出现：消息上持久化核验过的 `planReference`，但转录不把它包成卡片，也不加双向跳转；只隐藏「编辑重发」，因为改写不能携带引用。交接未能发出时，Composer 上方显示用户定的「计划已批准」面板（一句话 + 交接按钮）。Composer 优先级 `pendingToolApproval > pendingPlanReview > pendingUserInput`。通过 = 点当前 Agent 声明的 continue 按钮（文案 = `label`）；拒绝意见必填。计划门那一击可以同时批准并 enqueue 续跑。带反馈的 rejected 显示“已提出修改”，cancelled 显示“审阅已取消”，真实错误仍可见。计划不进 Right Rail。不得把计划写进 `final_answer` 冒充审阅门。只要本条 assistant 消息包含计划审阅交互，result 底部不显示“继续”及 handoff 按钮，主进程和 renderer 共用同一可见性规则；已有建议快照也按此规则呈现。计划执行入口仅在 Composer 待审区，批准后由既有队列发送一次。普通非计划回复仍保留符合现有资格的声明建议，General 无声明即无建议行。建议行与计划门共用 `HandoffActionRow`；人点后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`，`send: true` 才自动发。手动改 Agent pill 不写 offer。
 
 ## Composer 控件
 
@@ -98,7 +98,7 @@ Transcript 内容解析与轨迹呈现分离，滚动跟随使用统一生产条
 
 普通输入与 Markdown 共用外壳书写区：空内容最小高度 72px，随内容增高，上限 180px，超出后在书写区内滚动。高度只由 `COMPOSER_PROMPT_MIN_HEIGHT` / `COMPOSER_PROMPT_MAX_HEIGHT` 定义，通过动态样式表共享给 CSS；Markdown 使用实测 padding，随布局、字号和内容变化重新测量，卸载释放观察器和动态样式。普通输入不使用表单 Textarea 的灰底、边框和圆角，背景透出 `composer-shell`。底栏工具条与书写区同一面板，不另做底色。
 
-左：attach / agent / permission；右：model-effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。`+` 只附加图片与文件（选择器 / 拖放 / 粘贴截图）。`.rdc` 不走 Composer，只从 Project 右栏 Import。待发附件渲染为输入框上方托盘：图片 72px 缩略图卡，其他文件是类型图标卡；卡上只有文件名和按界面语言格式化的大小，不写扩展名缩写；hover / `:focus-within` 右上角叉移除（淡入）。拖放只有一种反馈：盖在 Composer 上的半透明层（上传图标 + 一句提示），进出都淡入淡出，外壳不再另画虚线框。武装的技能显示为紧凑芯片（技能图标 + 技能名），「发送时预载」在悬停提示里，不显示文字缩写或技能 ID。斜杠菜单与模型选择器同一套弹层与行：按分类分组，每行 `/命令` 加一行说明，方向键移动、Enter 选择、Escape 关闭，不再写键位提示脚注。权限弹层每档只写名称，说明在悬停提示里；失败时用统一错误提示加「刷新权限状态」。模型列表每行是名称加上下文大小，图像输入、推理、Fast 用图标表示并在悬停时说出名字；服务商刷新失败只写一句人话，技术原因在悬停里。非法/超限卡片用错误描边；当前模型无 `visionInput` 时图片卡警告。已发送附件在用户气泡下显示可点击 pill（`app:openPath`）。模型与思考共用一颗胶囊：收起态在 Fast/Max 开启时前置对应图标，后面固定是生效模型名 + 思考等级；覆盖态加 `.is-override`。胶囊 hug 文案，不预留固定槽；不同服务商提供同名模型时，胶囊在模型名前加服务商名；只有模型名溢出才渐隐，完整名留在 `title`。点开后是同一弹层：左上 Fast（实心闪电）、右上 Max（层叠卡片；只在模型支持时出现，固定支持显示锁定开启，selectable 才可切；hover / `:focus-visible` 出对准图标的实色圆胶囊 tip，完全浮在弹层上方；有约束状态只显示状态，可用时只显示模式名，不占面板内行）、中间思考等级 + 模型名、底部思考滑杆；只能开启或关闭思考的模型不显示两档滑杆，改为一个「思考」开关。点模型名切到现有模型列表（搜索、搜索栏下常驻「按 Agent 配置」、按 provider 分组）；列表 picker 高到 `32rem`，宽仍 `320`（`space-10 * 8`）；选完回到思考面板，不关弹层。列表里 Escape 先回思考面板，面板上 Escape 或点空白关闭。无 session 时可先选模型（只记草稿，不建 session）；有 session 则写入 `modelOverride`。选「按 Agent 配置」或 `/model default` 清除覆盖（session 写 `null` / 无 session 清草稿）。Agent 未配置或配置的模型当前不可执行时该行禁用。裸 `default` 先于模型 id；真名叫 `default` 的模型用 canonical `provider:model`。不写回 `.agent.md`，切 Agent 不清模型。能力未就绪时滑杆与 Fast/Max 灰掉不可调，不把整页换成状态大卡。
+左：attach / agent / permission；右：model-effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。`+` 只附加图片与文件（选择器 / 拖放 / 粘贴截图）。`.rdc` 不走 Composer，只从 Project 右栏 Import。待发附件直接排在输入框上方。图片使用缩略图，普通文件显示类型与名称，打开与移除见 [Composer 附件](design-system.md#composer-附件卡)。拖放只有一种反馈：盖在 Composer 上的半透明层（上传图标 + 一句提示），进出都淡入淡出，外壳不再另画虚线框。武装的技能显示为紧凑芯片（技能图标 + 技能名），「发送时预载」在悬停提示里，不显示文字缩写或技能 ID。斜杠菜单与模型选择器同一套弹层与行：按分类分组，每行 `/命令` 加一行说明，方向键移动、Enter 选择、Escape 关闭，不再写键位提示脚注。权限弹层每档只写名称，说明在悬停提示里；失败时用统一错误提示加「刷新权限状态」。模型列表每行是名称加上下文大小，图像输入、推理、Fast 用图标表示并在悬停时说出名字；服务商刷新失败只写一句人话，技术原因在悬停里。非法/超限卡片用错误描边；当前模型无 `visionInput` 时图片卡警告。已发送附件在用户气泡下沿用相同的图片和文件打开规则。模型与思考共用一颗胶囊：收起态在 Fast/Max 开启时前置对应图标，后面固定是生效模型名 + 思考等级；覆盖态加 `.is-override`。胶囊 hug 文案，不预留固定槽；不同服务商提供同名模型时，胶囊在模型名前加服务商名；只有模型名溢出才渐隐，完整名留在 `title`。点开后是同一弹层：左上 Fast（实心闪电）、右上 Max（层叠卡片；只在模型支持时出现，固定支持显示锁定开启，selectable 才可切；hover / `:focus-visible` 出对准图标的实色圆胶囊 tip，完全浮在弹层上方；有约束状态只显示状态，可用时只显示模式名，不占面板内行）、中间思考等级 + 模型名、底部思考滑杆；只能开启或关闭思考的模型不显示两档滑杆，改为一个「思考」开关。点模型名切到现有模型列表（搜索、搜索栏下常驻「按 Agent 配置」、按 provider 分组）；列表 picker 高到 `32rem`，宽仍 `320`（`space-10 * 8`）；选完回到思考面板，不关弹层。列表里 Escape 先回思考面板，面板上 Escape 或点空白关闭。无 session 时可先选模型（只记草稿，不建 session）；有 session 则写入 `modelOverride`。选「按 Agent 配置」或 `/model default` 清除覆盖（session 写 `null` / 无 session 清草稿）。Agent 未配置或配置的模型当前不可执行时该行禁用。裸 `default` 先于模型 id；真名叫 `default` 的模型用 canonical `provider:model`。不写回 `.agent.md`，切 Agent 不清模型。能力未就绪时滑杆与 Fast/Max 灰掉不可调，不把整页换成状态大卡。
 
 底栏弹窗（Agent / Permission / model-effort / Usage）走单一互斥注册表：任意时刻只开一个；Escape 关闭并把焦点还给 trigger；点空白关闭。Composer 外环在壳内 `:focus-within` **或** 底栏弹层 `aria-expanded="true"` 时保持，不按点击几何脉冲检测。
 
@@ -106,9 +106,11 @@ Edit-and-resend 使用 Composer 当前 agent + 当前对话模型，编辑框上
 
 Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`，嵌在合并胶囊的弹层里。关档文案统一 `Disabled` / `禁用`。`unknown` / `none` → 同关态外观并灰掉不可调；`always-on` / fixed → 锁定开；wire `xhigh` 显示 `Extra`；产品最高档 `Max`。Max/Fast entitlement 未知时关态灰掉且状态文案亦为 `Disabled`。滑杆 inset 几何，松手 snap。Compose 色跟 agent `accent`（`--composer-effort-*`），禁止只用全局 `--token-border-focus`。
 
-Context 环：外框固定使用原有 sm 高度 token（28px），禁止通过增大外框解决文字与圆弧重叠。SVG 同尺寸填满，圆心等宽文字采用 xs 字号的 0.75 倍，四字符百分比采用 2/3 倍，长估值采用 7/12 倍；圆弧与文字共同在原外框内校准，保持清晰内边距。0% 无亮点、100% 无端点凸起。面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。占用率分母是可执行 prompt 上限 `promptBudgetTokens`（不再扣模型输出上限，例如 DeepSeek 1M 环分母为 1M）。圆环悬停只显示「已用 N%」，不标压缩位置。面板先给大百分比、一条带自动压缩刻度的分段进度条和一句「大约还能写 N」；自动压缩位置、条件完整窗口（仅 window > budget）、缓存与成本以及下面的三栏明细收进面板内默认收起的「详细用量」，术语写人话（「自动压缩位置」「命中 / 未命中」「上一轮实际」）。Actual 三栏 Tokens | Cache | Reasoning 在弹层宽度大于 `38rem` 时等宽三张独立圆角卡片同行排列，缺遥测显示 `—`，禁止假 0；仅真实窄屏才纵向单列堆叠。
+Context 环：外框固定使用原有 sm 高度 token（28px），禁止通过增大外框解决文字与圆弧重叠。SVG 同尺寸填满，圆心等宽文字采用 xs 字号的 0.75 倍，四字符百分比采用 2/3 倍，长估值采用 7/12 倍；圆弧与文字共同在原外框内校准，保持清晰内边距。0% 无亮点、100% 无端点凸起。面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。占用率分母是可执行 prompt 上限 `promptBudgetTokens`（不再扣模型输出上限，例如 DeepSeek 1M 环分母为 1M）。圆环悬停只显示「已用 N%」，不标压缩位置。面板首行将占用率、用量来源与已占用／可执行 prompt 上限放在同一阅读层，紧接分段条、自动压缩阈值和本轮可生成量。明细默认收起，沿用已保存的选择。面板内操作由阅读面板接收，退出时焦点回到底部指示器。
 
-`Current request` 固定渲染 `Tokens | Cache | Reasoning` 三栏：Tokens 的 Input 与 Total 都是 `~preparedInputTokens`，Output、Cache 和 Reasoning 都是 `—`；不得混入上一轮的 Actual / Last actual 数值。每栏依次为标题、同一基线上的主数值与短说明、同一刻度起始的次级信息，不使用固定空高：Tokens 主数值为总量，Cache 为已节省量，Reasoning 为推理量；仅在真实推理量与输出量均已知且推理量不大于输出量时显示占输出比例。未知是 `—`，真实零值是 `0`，估值保留 `~`，包括投影中的已知明细。第一个同一 turn 的真实 provider usage 到达后原位切换为 Actual。终止后保留 Last actual，关闭再打开 session 仍可见；只有应用重启或从 `usage.json` 回读时标记 stale，新 session 从未拿到快照才显示「暂无用量」。产品弹窗不展示 continuation、derived context 或 prompt-cache policy 等内部诊断。
+展开用量明细先读 Tokens、Cache、Reasoning 三卡，依次给出总量与输入／输出、缓存节省与最近／累计命中率及累计命中／未命中量、推理量与输出占比。有费用记录时在三卡后列费用，随后展示上下文构成和延迟加载工具。
+
+准备期间沿用已有实测记录，当前请求预算就绪后在输入行显示估算。切换模型时三卡注明上次运行累计，上下文构成注明估算，重新计算的剩余空间带 `~`。未知用 `—`，真实零值用 `0`。推理占比只在推理量与输出量均已知且比例有效时显示。实际用量到达后原位更新。
 
 Send 不因打字/改模型触发 Context preview IPC。在途 turn 冻结创建时 `RequestPlan`。
 
@@ -199,7 +201,7 @@ Tasks 保持创建序，状态图标占独立列；标题最多两行（共享 `
 
 修改意见使用共享Textarea/Icon/IconButton，标准字号单行32px、图标16px；外框拥有内边距，Textarea原生padding归零，大字号与一至五行自然增高。批准、反馈、模型保存与停止语义不变。
 
-同段连续成功的read_image在renderer组成图片展示组，其他调用/状态打断，不跨Turn或子过程。数量取成功图片实例而非缩略图加载数，原始调用顺序和回执不变；该组先于通用聚合。默认最多四张80px缩略图，窄容器64px、8px间距、object-fit:contain；+N展开其余图片，详情按调用展示完整路径/复制/原始回执，每批20项显式加载。只有原结构化预览引用可读，历史缺引用明确不可用，不猜路径。结果转存保留imagePreviews。
+同段连续成功的read_image在renderer组成图片展示组，其他调用/状态打断，不跨Turn或子过程。数量取成功图片实例而非缩略图加载数，原始调用顺序和回执不变。默认最多四张80px缩略图，窄容器64px、8px间距、object-fit:contain；+N展开其余图片，详情按调用展示完整路径/复制/原始回执，每批20项显式加载。只有原结构化预览引用可读，历史缺引用明确不可用，不猜路径。结果转存保留imagePreviews。
 
 缩略图独立呈现，全局最多四项并发；失败可单项重试，会话切换隔离迟到结果。预览复用TaskDialog/overlay/focus，展示既有受控分辨率；无独立全局Escape和固定z-index遮罩，不宣称原图。
 
@@ -228,7 +230,7 @@ Tasks 标题采用 text-sm / normal / leading-normal，固定单行，剩余宽�
 
 每个有可见过程内容的模型段落只使用一个 6px 节点，对齐首个可见标题或文字首行，不取卡片或展开正文的中点。节点用短横线指向内容，横线止于 16px 槽位，保留 4px 内容间隔。轨道与横线共用 1px `--token-border-muted`；活动为蓝色、结束为灰色，pending 和等待审批不使节点点亮。普通工具通过标题扫光表达执行，完成后停止，不额外打点。
 
-父、子过程各有轨道作用域，共享事件组件。分页加载入口不新增节点；窗口化占位保留逻辑高度，首事件卸载后保留已测得的起点。主过程披露作用域由会话+消息构成，子过程使用会话+委派调用，用户开合选择在聚合、窗口化和整段折叠后恢复。
+父、子过程各有轨道作用域，共享事件组件。分页加载入口不新增节点；窗口化占位保留逻辑高度，首事件卸载后保留已测得的起点。主过程披露作用域由会话+消息构成，子过程使用会话+委派调用，用户开合选择在窗口化和整段折叠后恢复。
 
 
 ### 自动审查与计划交接

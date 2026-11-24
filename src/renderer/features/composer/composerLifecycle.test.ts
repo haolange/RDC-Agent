@@ -31,7 +31,7 @@ afterEach(() => {
   host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 
-function Menu({ id }: { id: 'agent' | 'usage' }) {
+function Menu({ id }: { id: 'agent' | 'permission' }) {
   const menu = useComposerMenu(id);
   return createElement('div', { ref: menu.setRoot },
     createElement('button', { ref: menu.setTrigger, onClick: menu.toggle, 'data-menu': id, 'aria-expanded': menu.open }, id),
@@ -39,7 +39,10 @@ function Menu({ id }: { id: 'agent' | 'usage' }) {
 }
 function Menus({ scope }: { scope: string }) {
   return createElement(StrictMode, null, createElement(ComposerMenuRegistryProvider, { key: scope,
-    children: [createElement(Menu, { key: 'agent', id: 'agent' }), createElement(Menu, { key: 'usage', id: 'usage' })],
+    children: [
+      createElement(Menu, { key: 'agent', id: 'agent' }),
+      createElement(Menu, { key: 'permission', id: 'permission' }),
+    ],
   }));
 }
 
@@ -47,9 +50,9 @@ describe('Composer lifecycle', () => {
   it('keeps menus exclusive, dismisses outside, and cancels queued focus on session change', () => {
     act(() => root.render(createElement(Menus, { scope: 'session-a' })));
     const click = (id: string) => act(() => host.querySelector<HTMLButtonElement>(`[data-menu="${id}"]`)!.click());
-    click('agent'); click('usage');
+    click('agent'); click('permission');
     expect(host.querySelector('[data-panel="agent"]')).toBeNull();
-    expect(host.querySelector('[data-panel="usage"]')).not.toBeNull();
+    expect(host.querySelector('[data-panel="permission"]')).not.toBeNull();
     act(() => window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
     expect(host.querySelector('[data-panel]')).toBeNull();
     expect(frames.size).toBe(1);

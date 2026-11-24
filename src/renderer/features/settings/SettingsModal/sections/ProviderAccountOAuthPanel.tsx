@@ -1,5 +1,4 @@
 import React, { type ReactNode } from 'react';
-import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { Input } from '../../../../ui/Input';
@@ -68,7 +67,6 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   const busy = connectionDraft.busy !== 'idle';
   const isAuthorizationPending = connectionDevicePending || busy;
   const isBrowserCodePending = selectedMode === 'browser' && status?.requiresCodeInput === true;
-  const redirectUri = status?.redirectUri ?? '';
   const started = Boolean(status?.verificationUri || status?.authUrl || connectionDevicePending || isBrowserCodePending);
 
   if (connectionAccountConnected) {
@@ -213,16 +211,6 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
         </ul>
       ) : null}
 
-      {redirectUri || status?.requestedScopes || diagnostic ? (
-        <div className="settings-provider-oauth-diagnostics">
-          <CopyDiagnosticsButton testId="settings-provider-oauth-diagnostic" facts={[
-            { label: t('settings.oauthRedirectUri'), value: redirectUri },
-            { label: t('settings.oauthRequestedScopes'), value: status?.requestedScopes ?? diagnostic?.requestedScopes },
-            { label: t('settings.oauthProviderErrorLabel'), value: diagnostic?.providerError },
-            { label: t('settings.oauthDiagnosticDetail'), value: diagnostic?.detail },
-          ]} />
-        </div>
-      ) : null}
     </div>
   );
 };

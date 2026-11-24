@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { useI18n } from '../../../../i18n';
+import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Badge } from '../../../../ui/Badge';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { errorDetail } from '../../../../lib/errorDetail';
-import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
+import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
 import { getRdcOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
 import { ResourceTrustBlock } from './ResourceTrustBlock';
@@ -17,6 +17,14 @@ import type { RdcRuntimeOverview, ScopedResourceDocument } from '@shared/types/r
 
 type HookOverview = RdcRuntimeOverview['hooks'][number];
 type HookTrustState = 'trusted' | 'needs-retrust' | 'untrusted' | 'builtin';
+type HookTest = Awaited<ReturnType<typeof testHook>>;
+const testStatusLabel: Record<HookTest['status'], TranslationKey> = {
+  completed: 'settings.hookTestPassed',
+  failed: 'settings.hookTestFailed',
+  'timed-out': 'settings.hookTestTimedOut',
+  untrusted: 'settings.hookTestBlocked',
+  skipped: 'settings.hookTestSkipped',
+};
 
 function hookTrustState(hook: HookOverview | undefined): HookTrustState {
   if (!hook || hook.scope === 'builtin') return 'builtin';
@@ -50,7 +58,7 @@ export const HooksSettings: React.FC<{
   const { t } = useI18n();
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
-  const [testResult, setTestResult] = useState<{ id: string; scope: HookOverview['scope']; fingerprint: string; text: string } | null>(null);
+  const [testResult, setTestResult] = useState<(HookTest & { id: string; scope: HookOverview['scope']; fingerprint: string }) | null>(null);
 
   const hookFor = (resource: ScopedResourceDocument): HookOverview | undefined =>
     overview?.hooks.find((hook) => hook.id === resource.id && hook.scope === resource.scope);
@@ -65,8 +73,9 @@ export const HooksSettings: React.FC<{
     try {
       const trustProjectRoot = resolveHookTrustProjectRoot({ scope: hook.scope, projectRoot: overview?.projectRoot });
       if (action === 'test') {
+        setTestResult(null);
         const result = await testHook(hook.event, overview?.projectRoot, hook.id);
-        setTestResult({ id: hook.id, scope: hook.scope, fingerprint: hook.trustFingerprint, text: JSON.stringify(result, null, 2) });
+        setTestResult({ ...result, id: hook.id, scope: hook.scope, fingerprint: hook.trustFingerprint });
         return;
       }
       const next = action === 'trust'
@@ -92,7 +101,10 @@ export const HooksSettings: React.FC<{
     const busy = busyId === resource.id;
     const canTest = Boolean(hook) && (trust === 'builtin' || trust === 'trusted');
     const seconds = timeoutSeconds(form.timeoutMs);
+    const result = testResult?.id === resource.id && testResult.scope === resource.scope &&
+      testResult.fingerprint === hook?.trustFingerprint && canTest ? testResult : null;
     const diagnostics: DiagnosticFact[] = [
+      ...(result ? [{ label: t('settings.hookTestResult'), value: result.details }] : []),
       { label: t('settings.resourceScope'), value: resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') },
       { label: t('settings.scopeResourceLocation'), value: resource.sourcePath },
       ...(hook ? [
@@ -105,9 +117,7 @@ export const HooksSettings: React.FC<{
         <header className="settings-runtime-detail-head">
           <div className="settings-runtime-detail-title">
             <strong>{resourceDisplayName('hook', resource.id, resource.content)}</strong>
-            <span className="settings-runtime-detail-badges">
-              {!form.enabled ? <Badge tone="warning">{t('settings.disabled')}</Badge> : null}
-            </span>
+            {!form.enabled ? <Badge tone="warning">{t('settings.disabled')}</Badge> : null}
           </div>
           <div className="settings-runtime-actions">
             <Button variant="secondary" size="sm" onClick={edit} data-testid="settings-hook-detail-edit">
@@ -125,6 +135,7 @@ export const HooksSettings: React.FC<{
               <Icon name="play" size={14} />
               {t('settings.hookTest')}
             </Button>
+            <CopyDiagnosticsMenu testId="settings-hook-diagnostics" facts={diagnostics} />
           </div>
         </header>
 
@@ -161,11 +172,12 @@ export const HooksSettings: React.FC<{
         ) : null}
 
         {message && busyId === '' ? <InlineError detail={message}>{t('app.error.actionFailed')}</InlineError> : null}
-        {testResult?.id === resource.id && testResult.scope === resource.scope
-          && testResult.fingerprint === hook?.trustFingerprint && canTest ? (
-          <pre className="settings-runtime-result" data-testid="settings-hook-test-result">{testResult.text}</pre>
-        ) : null}
-        <CopyDiagnosticsButton testId="settings-hook-diagnostics" facts={diagnostics} />
+        {result && (result.status === 'completed' || result.status === 'skipped'
+          ? <p className="settings-runtime-editor-status" role="status" data-testid="settings-hook-test-result">
+            {result.status === 'completed' && <Icon name="check" size={14} />}
+            {t(testStatusLabel[result.status])}
+          </p>
+          : <InlineError detail={result.details} data-testid="settings-hook-test-result">{t(testStatusLabel[result.status])}</InlineError>)}
       </div>
     );
   };

@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { settingsService } from '../settings-core/SettingsService';
-import { providerConnectionService } from '../provider-auth/ProviderConnectionService';
 import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { isProbeAvailabilityDenied } from './ProviderProbeEvidence';
 import { resolveEffectiveCatalog } from './EffectiveModelResolver';
@@ -11,17 +10,20 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 
 export interface ProbeBatchDependencies {
   providers(): LlmProviderEntry[];
-  refresh(providerId: string): Promise<string | undefined>;
+  loadSavedCatalog(providerId: string): Promise<string | undefined>;
   models(providerId: string): EffectiveModel[];
   test(item: ProviderProbeBatchItem, signal: AbortSignal): Promise<LlmModelCapabilityProbeResult>;
 }
 
 const production: ProbeBatchDependencies = {
   providers: () => settingsService.getAll().llm.providers,
-  refresh: async id => {
-    await loadProviderSurface(id);
-    const result = await providerConnectionService.refreshProviderModels(id);
-    return result.success ? undefined : result.error;
+  loadSavedCatalog: async id => {
+    try {
+      await loadProviderSurface(id);
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+    return undefined;
   },
   models: id => resolveEffectiveCatalog(id, settingsService.getAll())?.models ?? [],
   test: (item, signal) => providerCapabilityProbeService.test(item, signal),
@@ -84,7 +86,7 @@ export class ProviderProbeBatchService {
       };
       this.identities.clear();
       for (const provider of providers) {
-        const detail = await this.dependencies.refresh(provider.id);
+        const detail = await this.dependencies.loadSavedCatalog(provider.id);
         if (detail) batch.discoveryErrors.push({ providerId: provider.id, detail });
         const current = this.dependencies.providers().find(p => p.id === provider.id);
         if (!current?.enabled || !current.isConfigured || current.activeAccountId !== provider.activeAccountId) continue;

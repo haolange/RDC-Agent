@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
+import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
@@ -7,9 +7,11 @@ import { TaskDialog } from '../../../../ui/TaskDialog';
 import { SettingsField } from '../parts';
 import { shouldUseProviderDocsLink } from '../providerConnectionState';
 import { hasProviderConnectionDefinitionChanged } from '../providerConnectionRequest';
-import { getProviderCategoryTranslation, getProviderProtocolLabel } from '../utils';
+import { getProviderProtocolLabel } from '../utils';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderAuthModeField } from './ProviderAuthModeField';
+import { ProviderMark } from './ProviderMark';
+import { providerIdentityDetail } from './providerCardModel';
 import { ProviderConnectActions } from './ProviderConnectActions';
 import { ProviderConnectionFields } from './ProviderConnectionFields';
 import { ProviderConnectionStatusLine, ProviderDiscoveryEmpty, connectionPhase } from './ProviderConnectSummary';
@@ -41,7 +43,7 @@ interface ProviderConnectDialogProps {
 
 /**
  * One service's panel, opened from its card: how it connects and whether it is connected, then its models as
- * a table, then a capability check. Its technical identity leaves only through the copy action by its status.
+ * a table, then a capability check. The footer tracks the connection result while the user edits.
  */
 export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   connectionDraft,
@@ -69,37 +71,57 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   const phase = connectionPhase(connectionDraft, connectionHasFreshTest, savedConnected);
   const unavailableCount = connectionDraft.models.filter((model) => model.availability === 'unavailable').length;
   const showDiscoveryEmpty = (authMode === 'environment' || authMode === 'local') && connectionDraft.models.length === 0;
-  // Who the connection is (account · plan); otherwise what kind of service it is.
-  const subtitle = [provider.accountLabel, provider.planLabel].filter(Boolean).join(' · ')
-    || t(getProviderCategoryTranslation(provider.category).label);
+  const title = getResolvedProviderLabel(provider);
   const protocolLabel = getProviderProtocolLabel(provider.protocol);
   const routeCount = provider.routeCount ?? 1;
+  const account = authMode === 'account' ? connectionDraft.accountStatus : undefined;
 
   return (
     <TaskDialog
       open
       size="lg"
       className="settings-provider-connect-dialog"
-      title={getResolvedProviderLabel(provider)}
-      description={subtitle}
+      title={title}
+      titleIcon={<ProviderMark id={provider.id} category={provider.category} />}
+      headerActions={<>
+        {provider.isConfigured ? <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy} t={t} /> : null}
+        <CopyDiagnosticsMenu testId="settings-provider-diagnostics" label={t('settings.directory.more', { name: title })} facts={[
+          { label: t('settings.providers.serviceId'), value: provider.id },
+          { label: t('settings.providerProtocol'), value: routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel },
+          { label: t('settings.providerBaseUrl'), value: connectionDraft.baseUrl || provider.baseUrl },
+          { label: t('settings.oauthRedirectUri'), value: account?.redirectUri },
+          { label: t('settings.oauthRequestedScopes'), value: account?.requestedScopes ?? account?.diagnostic?.requestedScopes },
+          { label: t('settings.oauthProviderErrorLabel'), value: account?.diagnostic?.providerError },
+          { label: t('settings.oauthDiagnosticDetail'), value: account?.diagnostic?.detail },
+        ]} />
+      </>}
+      description={provider.accountLabel || provider.planLabel || provider.category === 'coding-token-plan'
+        ? providerIdentityDetail(provider, title, t) : undefined}
       onClose={onClose}
       closeLabel={t('settings.cancel')}
       busy={busy}
       dataTestId="settings-provider-connect-dialog"
       footer={(
-        <ProviderConnectActions
-          draft={connectionDraft}
-          provider={provider}
-          accountConnected={connectionAccountConnected}
-          devicePending={connectionDevicePending}
-          needsCredentials={connectionNeedsCredentials}
-          needsBaseUrl={connectionNeedsBaseUrl}
-          hasFreshTest={connectionHasFreshTest}
-          onClose={onClose}
-          onTest={onTest}
-          onSave={onSave}
-          t={t}
-        />
+        <>
+          {connectionDraft.modelSaveError ? (
+            <InlineError className="settings-provider-connection-status" detail={connectionDraft.modelSaveError}>
+              {t('settings.providerSaveFailed')}
+            </InlineError>
+          ) : <ProviderConnectionStatusLine phase={phase} t={t} />}
+          <ProviderConnectActions
+            draft={connectionDraft}
+            provider={provider}
+            accountConnected={connectionAccountConnected}
+            devicePending={connectionDevicePending}
+            needsCredentials={connectionNeedsCredentials}
+            needsBaseUrl={connectionNeedsBaseUrl}
+            hasFreshTest={connectionHasFreshTest}
+            onClose={onClose}
+            onTest={onTest}
+            onSave={onSave}
+            t={t}
+          />
+        </>
       )}
     >
       <div className="settings-provider-connect-body" data-model-count={modelCount} data-testid="settings-provider-connect-body">
@@ -161,19 +183,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           </SettingsField>
         )}
 
-        <SettingsField label={t('settings.providers.connectionStatus')}>
-          <div className="settings-provider-connection-row">
-            <ProviderConnectionStatusLine phase={phase} t={t} />
-            {/* The service's technical identity leaves through one copy action beside its status. */}
-            <CopyDiagnosticsButton testId="settings-provider-diagnostics" facts={[
-              { label: t('settings.providers.serviceId'), value: provider.id },
-              { label: t('settings.providerProtocol'),
-                value: routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel },
-              { label: t('settings.providerBaseUrl'), value: connectionDraft.baseUrl || provider.baseUrl },
-            ]} />
-          </div>
-        </SettingsField>
-
         {authMode === 'account' && (
           <ProviderAccountOAuthPanel
             connectionDraft={connectionDraft}
@@ -195,7 +204,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         {connectionDraft.error && (
           <InlineError data-testid="settings-provider-connect-error" detail={connectionDraft.error}>{t('settings.providerTestFailed')}</InlineError>
         )}
-
         {!connectionDraft.error && connectionDraft.discoveryDiagnostic && (
           <p className="settings-provider-notice" data-testid="settings-provider-connect-discovery-diagnostic">
             {t(
@@ -238,7 +246,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           />
         )}
 
-        <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy || !provider.isConfigured} t={t} />
       </div>
     </TaskDialog>
   );

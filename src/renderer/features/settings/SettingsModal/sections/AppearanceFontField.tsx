@@ -25,7 +25,7 @@ interface AppearanceFontFieldProps {
 }
 
 interface FontOptionProps {
-  family: string | null;
+  family: string;
   selected: boolean;
   sample: string;
   label: string;
@@ -34,7 +34,7 @@ interface FontOptionProps {
 
 /** One candidate row: the sample sentence rendered in that family, the family name underneath. */
 function FontOption({ family, selected, sample, label, onSelect }: FontOptionProps) {
-  const style = useDynStyle({ '--ap-font-sample': family ?? 'inherit' });
+  const style = useDynStyle({ '--ap-font-sample': family });
   return (
     <Button
       variant="ghost"
@@ -52,8 +52,8 @@ function FontOption({ family, selected, sample, label, onSelect }: FontOptionPro
   );
 }
 
-function FontPreview({ family, sample, title }: { family: string | null; sample: string; title: string }) {
-  const style = useDynStyle({ '--ap-font-sample': family ?? 'inherit' });
+function FontPreview({ family, sample, title }: { family: string; sample: string; title: string }) {
+  const style = useDynStyle({ '--ap-font-sample': family });
   return (
     <div className="appearance-font-preview">
       <div className="appearance-font-preview-title">{title}</div>
@@ -64,9 +64,11 @@ function FontPreview({ family, sample, title }: { family: string | null; sample:
 
 export function AppearanceFontField({ kind, variant, value, onChange, t }: AppearanceFontFieldProps) {
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string | null>(null);
   const label = kind === 'ui' ? t('settings.appearanceUiFont') : t('settings.appearanceCodeFont');
   const suggestions = kind === 'ui' ? UI_FONT_SUGGESTIONS : CODE_FONT_SUGGESTIONS;
-  const sample = t('settings.appearanceFontSample');
+  const sample = kind === 'ui' ? `${t('knowledgeCenter.title')} · Aa 0123` : 'float4 color = pixels[0];';
+  const defaultFamily = kind === 'ui' ? 'var(--font-sans-default)' : 'var(--font-mono-default)';
   const systemDefault = t('settings.appearanceFontSystemDefault');
 
   const apply = (next: string | null) => {
@@ -79,15 +81,17 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
       <span className="settings-field-label" id={`appearance-font-${kind}-${variant}`}>{label}</span>
       <div className="appearance-font-control">
         <Input
-          value={value ?? ''}
+          value={draft ?? value ?? ''}
           aria-labelledby={`appearance-font-${kind}-${variant}`}
           placeholder={systemDefault}
           spellCheck={false}
           data-testid={`appearance-${kind}-font-${variant}`}
           onChange={(event) => {
+            setDraft(event.target.value);
             const next = event.target.value.trim();
-            onChange(next || null);
+            if (next !== (draft ?? value ?? '').trim()) onChange(next || null);
           }}
+          onBlur={() => setDraft(null)}
         />
         <Popover
           open={open}
@@ -106,11 +110,10 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
         >
           <div className="appearance-font-popover-head">
             <div className="appearance-font-popover-title">{t('settings.appearanceFontSuggestions')}</div>
-            <p className="appearance-font-popover-note">{t('settings.appearanceFontSuggestionsHint')}</p>
           </div>
           <div className="appearance-font-options" role="radiogroup" aria-label={label}>
             <FontOption
-              family={null}
+              family={defaultFamily}
               selected={value === null}
               sample={sample}
               label={systemDefault}
@@ -127,7 +130,7 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
               />
             ))}
           </div>
-          <FontPreview family={value} sample={sample} title={t('settings.appearanceFontPreview')} />
+          <FontPreview family={value ?? defaultFamily} sample={sample} title={t('settings.appearanceFontPreview')} />
           <p className="appearance-font-popover-note">{t('settings.appearanceFontFreeTextHint')}</p>
         </Popover>
       </div>

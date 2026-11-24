@@ -1,5 +1,7 @@
 import { loopTextItems, loopThinkingItems, presentedTextPhase } from '@shared/conversation/loopItems';
 import { formatDurationMs } from './workProcessFormat';
+import { groupImageRows } from './groupImageRows';
+import { groupWebRows } from './groupWebRows';
 import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
 import type { LoopPresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 import type { WorkProcessRow } from './workProcessTypes';
@@ -28,10 +30,9 @@ export function projectLlmTurn(
   // pending approval and failed mutations still need their own interaction/error.
   const orderedSteps = [
     ...block.toolCalls
-      .filter((call) => isVisibleToolCall(call) && (!isTaskLifecycleTool(call.toolName)
-        || call.status === 'error' || Boolean(call.approval && call.approval.status !== 'approved')))
       .map((call) => ({ order: call.displayOrder, time: call.executionStartedAt ?? call.approval?.requestedAt ?? call.startedAt,
-        row: call.delegation ? {
+        row: !isVisibleToolCall(call) || (isTaskLifecycleTool(call.toolName) && call.status !== 'error'
+          && (!call.approval || call.approval.status === 'approved')) ? null : call.delegation ? {
         type: 'subagent', id: call.id, status: call.status,
         profile: call.delegation.profile, task: call.delegation.task, mode: call.delegation.mode,
         argsPreview: call.argsPreview ?? '', resultPreview: call.resultPreview ?? '',
@@ -65,7 +66,7 @@ export function projectLlmTurn(
       row: { type: 'thinking', id: `${block.id}:thinking:${item.providerOutputRef.providerBlockKey}:${item.providerOutputRef.contentIndex}`,
         duration: '', status: presented.status === 'streaming' ? 'running' : 'complete',
         preview: presented.preview, label: presented.label, kind: presented.kind,
-        visibility: presented.visibility, thinkingStatus: presented.status, expandable: true,
+        visibility: presented.visibility, thinkingStatus: presented.status,
         openByDefault: presented.openByDefault } as WorkProcessRow,
       presented,
     }];
@@ -81,7 +82,7 @@ export function projectLlmTurn(
   // Order is the shared display sequence only; every entry carries one.
   const ordered = [...orderedSteps, ...thinkingRows.map(({ order, time, row }) => ({ order, time, row }))]
     .sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER));
-  const steps = ctx.groupProcessRows(ordered.map((entry) => entry.row));
+  const steps = ctx.groupProcessRows(ordered.flatMap(({ row }) => row ? [row] : []));
   const shouldRenderSection = steps.length > 0;
 
   if (!shouldRenderSection) {
@@ -99,7 +100,7 @@ export function projectLlmTurn(
       stepCount: deps.countToolSteps(steps),
       duration: formatDurationMs(block.startedAt, block.completedAt),
       steps,
-      visibleSteps: steps,
+      visibleSteps: groupSectionSteps(ordered.map(({ row }) => row)),
       outputPhase,
       stopReason,
     });
@@ -127,4 +128,18 @@ function isDuplicateThinking(
   if (ctx.visibleThinkingKeys.has(key)) return true;
   ctx.visibleThinkingKeys.add(key);
   return false;
+}
+
+/** A suppressed call interrupts a contiguous run of image or web requests. */
+function groupSectionSteps(steps: (WorkProcessRow | null)[]): WorkProcessRow[] {
+  const output: WorkProcessRow[] = [];
+  let run: WorkProcessRow[] = [];
+  for (const row of steps) {
+    if (row) run.push(row);
+    else {
+      output.push(...groupImageRows(groupWebRows(run)));
+      run = [];
+    }
+  }
+  return output.concat(groupImageRows(groupWebRows(run)));
 }

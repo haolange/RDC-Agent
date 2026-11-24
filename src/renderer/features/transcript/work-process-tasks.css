@@ -88,17 +88,6 @@
   cursor: pointer;
 }
 .work-process-task-snapshot-copy summary::-webkit-details-marker { display: none; }
-.work-process-task-snapshot-copy summary::after {
-  content: '';
-  flex: 0 0 var(--space-1);
-  width: var(--space-1);
-  height: var(--space-1);
-  border-right: 1px solid var(--token-text-secondary);
-  border-bottom: 1px solid var(--token-text-secondary);
-  transform: rotate(-45deg);
-}
-.work-process-task-snapshot-copy[open] summary::after { transform: rotate(45deg); }
-.work-process-task-snapshot-copy summary:hover,
-.work-process-task-snapshot-copy summary:focus-visible { color: var(--token-text-primary); }
+.work-process-task-snapshot-copy[open] > summary .work-process-row-caret { transform: rotate(90deg); }
 .work-process-task-snapshot-copy summary:focus-visible { outline: 2px solid var(--token-border-focus); }
 .work-process-task-snapshot-reason { margin: var(--space-1) 0 0; }

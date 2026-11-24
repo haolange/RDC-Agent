@@ -34,7 +34,7 @@ export function WorkProcessImageRow({ row, renderToolDetail }: {
   return <li className="work-process-step kind-tool family-image" data-testid="work-process-image-group">
     <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
-      <div className={`work-process-tool-card${expanded ? ' is-expanded' : ''}`}>
+      <div className={`work-process-tool-card${expanded ? ' is-expanded' : ''}`} data-locate>
         <WorkCardHeader icon={<Icon name="image-read" className="work-process-icon work-process-tool-card-icon" />}
           title={t('chat.imagesViewed', { count })} duration={row.duration} expanded={expanded} controls={detailsId} onClick={toggle} />
         <div className="work-process-image-summary">

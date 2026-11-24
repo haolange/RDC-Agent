@@ -45,6 +45,17 @@
   gap: var(--space-1);
 }
 
+.settings-center-nav-group {
+  padding: var(--space-2) var(--space-3) 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+.settings-center-nav-group:not(:first-child) {
+  margin-block-start: var(--space-2);
+}
+
 .settings-center-nav-item {
   display: flex;
   align-items: center;
@@ -111,6 +122,8 @@
     flex-wrap: nowrap;
     overflow-x: auto;
   }
+
+  .settings-center-nav-group { display: none; }
 
   .settings-center-nav-item {
     width: auto;

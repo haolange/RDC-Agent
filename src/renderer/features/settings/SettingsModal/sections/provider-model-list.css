@@ -7,7 +7,6 @@
   flex-direction: column;
   gap: var(--space-2);
   overflow: visible;
-  padding-right: var(--space-1);
 }
 
 .settings-model-list-no-match {
@@ -56,6 +55,7 @@
 }
 
 .settings-provider-connect-models {
+  container: provider-model-list / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);

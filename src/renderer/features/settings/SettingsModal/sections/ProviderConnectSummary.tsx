@@ -1,5 +1,6 @@
 import React from 'react';
 import { Icon } from '../../../../ui/Icon';
+import { Spinner } from '../../../../ui/Spinner';
 import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
 
@@ -26,8 +27,10 @@ export function connectionPhase(
 
 /** One status line for the current connection draft across provider types. */
 export const ProviderConnectionStatusLine: React.FC<{ phase: ProviderConnectionPhase; t: Translate }> = ({ phase, t }) => (
-  <div className="settings-provider-connection-status" data-testid="settings-provider-connection-status" data-phase={phase}>
-    <span className="settings-provider-connection-status-dot" aria-hidden="true" />
+  <div className="settings-provider-connection-status" role="status" aria-label={t('settings.providers.connectionStatus')}
+    data-testid="settings-provider-connection-status" data-phase={phase}>
+    {phase === 'testing' || phase === 'saving' ? <Spinner size="sm" /> : null}
+    {phase === 'connected' || phase === 'testPassed' ? <Icon name="check" size={14} /> : null}
     <span>{t(`settings.providers.connectionPhase.${phase}` as const)}</span>
   </div>
 );

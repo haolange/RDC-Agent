@@ -1,5 +1,6 @@
 import React from 'react';
 import { Chevron } from '../../ui/Chevron';
+import { WorkRowTitle } from './WorkRowTitle';
 
 export const FadingPreview: React.FC<{ text: string }> = ({ text }) => {
   const ref = React.useRef<HTMLSpanElement>(null);
@@ -22,10 +23,10 @@ export const WorkDisclosure: React.FC<{
   bodyClassName?: string;
 }> = ({ title, preview = '', open, onToggle, children, meta, disabled, variant = 'section', bodyClassName }) => {
   const contentId = React.useId();
-  const heading = <><span className="work-disclosure-label">{title}</span>
+  const heading = <>{disabled ? <span className="work-disclosure-label">{title}</span> : <WorkRowTitle text={title} wrap />}
     {!open || disabled ? <FadingPreview text={preview} /> : <span className="work-disclosure-meta">{meta}</span>}
     {!disabled ? <Chevron open={open} size={12} className="work-process-row-caret" /> : null}</>;
-  return <section className={`work-disclosure variant-${variant}${open ? ' is-open' : ''}`}>
+  return <section className={`work-disclosure variant-${variant}${open ? ' is-open' : ''}`} data-locate={!disabled || undefined}>
     {disabled ? <div className="work-disclosure-header is-disabled">{heading}</div>
       : <button type="button" className="work-disclosure-header" aria-expanded={open}
         aria-controls={contentId} onClick={onToggle}>{heading}</button>}

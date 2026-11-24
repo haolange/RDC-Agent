@@ -102,7 +102,9 @@ export interface SessionAttachmentRecord {
   projectId: string;
   kind: SessionAttachmentKind;
   layer?: SessionAttachmentLayer;
+  /** Name shown in the conversation. Multiple attachments can share it. */
   fileName: string;
+  /** Frozen path for this attachment, including its disambiguated storage name. */
   filePath: string;
   mimeType: string;
   size: number;

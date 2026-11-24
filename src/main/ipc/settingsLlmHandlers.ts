@@ -414,7 +414,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const patch = settings as AppSettingsPatch;
     const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
-    if (patch.appearance) {
+    if (patch.appearance?.theme !== undefined || patch.appearance?.chromeThemes !== undefined) {
       await notifyCommitted(applyProductIcon);
       await notifyCommitted(applyWindowBackgrounds);
     }

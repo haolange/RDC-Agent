@@ -1,0 +1,144 @@
+.attachment-tile {
+  --attachment-thumb-size: var(--space-16);
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: min(100%, calc(var(--space-16) * 5));
+}
+
+.attachment-tile-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-raised);
+}
+
+.attachment-tile.is-error .attachment-tile-line {
+  border-color: var(--token-status-error);
+}
+
+.attachment-tile.is-image .attachment-tile-line {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+}
+
+.attachment-tile .attachment-tile-target:is(.button, span) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-lg);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--token-text-secondary);
+}
+
+.attachment-tile button.attachment-tile-target:hover:not(:disabled),
+.attachment-tile button.attachment-tile-target:focus-visible:not(:disabled) {
+  background: var(--token-interactive-hover);
+}
+
+.attachment-tile.is-image .attachment-tile-target {
+  justify-content: center;
+  width: var(--attachment-thumb-size);
+  height: var(--attachment-thumb-size);
+  padding: 0;
+  overflow: hidden;
+  background: var(--token-bg-muted);
+}
+
+.attachment-tile.is-warning .attachment-tile-target {
+  box-shadow: inset 0 0 0 1px var(--token-status-warning);
+}
+
+.attachment-tile-thumbnail {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-tile-name {
+  min-width: 0;
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+}
+
+.attachment-tile .attachment-tile-action {
+  flex-shrink: 0;
+  width: var(--control-height-sm);
+  padding: 0;
+}
+
+.attachment-tile.is-image .attachment-tile-action {
+  position: absolute;
+  z-index: var(--z-local-1);
+  top: var(--space-1);
+  right: var(--space-1);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-full);
+  background: var(--token-bg-overlay);
+  color: var(--token-text-primary);
+}
+
+.attachment-tile.is-image .attachment-tile-action:hover,
+.attachment-tile.is-image .attachment-tile-action:focus-visible {
+  background: var(--token-interactive-hover);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attachment-tile-remove,
+  .attachment-tile.is-image .attachment-tile-notes {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-fast);
+  }
+
+  .attachment-tile:hover .attachment-tile-remove,
+  .attachment-tile:focus-within .attachment-tile-remove,
+  .attachment-tile.is-image:hover .attachment-tile-notes,
+  .attachment-tile.is-image:focus-within .attachment-tile-notes {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.attachment-tile-status {
+  max-width: calc(var(--space-16) * 3);
+  margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+
+.attachment-tile.is-error .attachment-tile-status {
+  color: var(--token-status-error);
+}
+
+.attachment-tile.is-warning .attachment-tile-status {
+  color: var(--token-status-warning);
+}
+
+.attachment-notes-body p {
+  margin-block: 0 var(--space-2);
+}
+
+.attachment-notes-body dt {
+  font-weight: var(--font-semibold);
+}
+
+.attachment-notes-body dd {
+  margin: 0 0 var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .attachment-tile {
+    --attachment-thumb-size: var(--space-12);
+  }
+}

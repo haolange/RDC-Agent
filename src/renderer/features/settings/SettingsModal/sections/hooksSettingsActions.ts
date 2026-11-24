@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { getElectronApi } from '../../../../platform/getElectronApi';
 import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
@@ -20,5 +21,10 @@ export async function testHook(
   projectRoot: string | undefined,
   hookId: string,
 ) {
-  return runtime()?.testHook(event, projectRoot, hookId);
+  const receipt = await runtime()?.testHook(event, projectRoot, hookId);
+  const { status } = z.object({
+    hookId: z.literal(hookId),
+    status: z.enum(['completed', 'failed', 'timed-out', 'untrusted', 'skipped']),
+  }).parse(receipt);
+  return { status, details: JSON.stringify(receipt, null, 2) };
 }

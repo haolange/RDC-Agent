@@ -42,10 +42,12 @@ export const useProviderConnectionActions = (
     if (!connectionDraft) return;
     const provider = providerDrafts.find((entry) => entry.id === connectionDraft.providerId);
     if (!provider) throw new Error(`Provider ${connectionDraft.providerId} is unavailable.`);
-    await saveProvider({
+    const result = await saveProvider({
       ...provider,
       models: connectionDraft.models.map((model) => ({ ...model })),
     });
+    if (result.status === 'failed') throw new Error(result.error ?? t('settings.providerSaveFailed'));
+    if (result.status === 'superseded') return;
     await reopenSaved(connectionDraft.providerId);
   };
 

@@ -14,6 +14,12 @@ export function parseChapterValue(content: string): CaseValue | undefined {
   try { return JSON.parse(text) as CaseValue; } catch { return undefined; }
 }
 
+export function hasReadableCaseChapter(content: string | undefined): boolean {
+  if (!content?.trim()) return false;
+  const parsed = parseChapterValue(content);
+  return parsed === undefined || withoutInternalReferences(parsed) !== undefined;
+}
+
 export const isCaseRecord = (value: CaseValue | undefined): value is CaseRecord => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );

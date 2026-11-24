@@ -46,7 +46,7 @@
 }
 
 .work-process-user-input-transcript-error {
-  grid-column: 1 / -1;
+  padding: var(--space-3);
   color: var(--token-status-error);
 }
 

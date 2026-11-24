@@ -1,44 +1,35 @@
-import { Badge } from '../../../../ui/Badge';
 import { ListRow } from '../../../../ui/ListRow';
+import { Icon } from '../../../../ui/Icon';
 import { useI18n } from '../../../../i18n';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
 import type { KnowledgeLaneHit } from '@shared/types/knowledge';
 
 interface ConflictRowProps {
-  leftCardId: string;
-  rightCardId: string;
-  /** Resolved titles / timestamps from the compiled pack; ids fall back when a card is not in the current pack. */
   left?: Pick<KnowledgeLaneHit, 'title' | 'updatedAt'> | null;
   right?: Pick<KnowledgeLaneHit, 'title' | 'updatedAt'> | null;
   selected?: boolean;
   onSelect?: () => void;
 }
 
-/** One contradicts pair: left ↔ right titles, pending-review status, latest update. Card ids live in card details. */
-export function ConflictRow({ leftCardId, rightCardId, left, right, selected = false, onSelect }: ConflictRowProps) {
+/** Titles identify a pair in the review queue. The more recent timestamp distinguishes updates. */
+export function ConflictRow({ left, right, selected = false, onSelect }: ConflictRowProps) {
   const { t } = useI18n();
-  const leftTitle = left?.title || leftCardId;
-  const rightTitle = right?.title || rightCardId;
+  const title = <span className="knowledge-center-card-title">
+    {left?.title ?? t('knowledgeCenter.conflictCardA')}
+    <Icon name="conflict" className="knowledge-center-conflict-swap" size={14} />
+    {right?.title ?? t('knowledgeCenter.conflictCardB')}
+  </span>;
   const updated = formatKnowledgeTime(Math.max(left?.updatedAt ?? 0, right?.updatedAt ?? 0) || undefined);
+  if (!onSelect) return <p className="knowledge-write-conflict">{title}</p>;
   return (
     <ListRow
       className="knowledge-center-conflict-row"
       data-testid="knowledge-center-conflict-row"
       selected={selected}
       onClick={onSelect}
-      disabled={!onSelect}
-      trailing={(
-        <span className="knowledge-center-conflict-trailing">
-          <Badge tone="warning">{t('knowledgeCenter.conflictPending')}</Badge>
-          {updated ? <small>{updated}</small> : null}
-        </span>
-      )}
+      trailing={updated ? <span className="knowledge-center-conflict-time">{updated}</span> : undefined}
     >
-      <span className="knowledge-center-card-title">
-        {leftTitle}
-        <span className="knowledge-center-conflict-swap" aria-hidden="true">↔</span>
-        {rightTitle}
-      </span>
+      {title}
     </ListRow>
   );
 }

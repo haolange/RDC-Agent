@@ -30,6 +30,12 @@ export function shouldCaptureEscapedFocus(trap: boolean): boolean {
   return trap;
 }
 
+function restoreDialogFocus(previous: HTMLElement | null, fallback?: RefObject<HTMLElement>) {
+  // An editor can replace its empty-state action with a toolbar action in the closing render.
+  const target = previous?.isConnected ? previous : fallback?.current;
+  target?.focus();
+}
+
 export function useModalFocus(options: {
   open: boolean;
   containerRef: RefObject<HTMLElement>;
@@ -37,13 +43,15 @@ export function useModalFocus(options: {
   busy?: boolean;
   trap?: boolean;
   trapRootRef?: RefObject<HTMLElement>;
+  /** Focus target after an edit removes the action that opened the dialog. */
+  fallbackFocusRef?: RefObject<HTMLElement>;
   /**
    * Layer id from `useOverlayLayer`. When provided, Escape and Tab are only
    * handled while this layer is the topmost overlay.
    */
   layerId?: number | null;
 }): void {
-  const { open, containerRef, onClose, busy = false, trap = true, trapRootRef, layerId = null } = options;
+  const { open, containerRef, onClose, busy = false, trap = true, trapRootRef, fallbackFocusRef, layerId = null } = options;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -61,9 +69,9 @@ export function useModalFocus(options: {
     });
     return () => {
       window.cancelAnimationFrame(frameId);
-      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+      restoreDialogFocus(previouslyFocused, fallbackFocusRef);
     };
-  }, [containerRef, open]);
+  }, [containerRef, fallbackFocusRef, open]);
 
   useEffect(() => {
     if (!open) return undefined;

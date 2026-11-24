@@ -70,6 +70,15 @@
       "refreshedAt": "2026-10-25",
       "surface": "anthropic",
       "accountScope": "public-api"
+    },
+    {
+      "id": "provider-docs:anthropic:fable52-2026-11-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://platform.claude.com/docs/en/models/fable-5-2/overview ; https://platform.claude.com/docs/en/build-with-claude/fast-mode ; https://platform.claude.com/docs/en/build-with-claude/effort",
+      "observedAt": "2026-11-24",
+      "refreshedAt": "2026-11-24",
+      "surface": "anthropic",
+      "accountScope": "public-api"
     }
   ],
   "defaultFactSourceId": "rdc-agent:anthropic:0",
@@ -146,6 +155,123 @@
     }
   },
   "models": [
+    {
+      "modelId": "claude-fable-5-2",
+      "label": "Claude Fable 5.2",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted"
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "onMode": "adaptive"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:anthropic:fable52-2026-11-24",
+      "cost": {
+        "input": 8,
+        "output": 40,
+        "cacheRead": 0.2,
+        "cacheWrite": 10
+      },
+      "executionBindings": [
+        {
+          "id": "route:omit-unsupported-sampling",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "top_k": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
+          "id": "fast:anthropic-speed",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "top_k": null,
+                "speed": "fast"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ]
+    },
     {
       "modelId": "claude-haiku-5-5",
       "label": "claude-haiku-5-5",
@@ -945,8 +1071,8 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "claude-fable-5-2",
     "claude-opus-5-5",
-    "claude-fable-5-1",
     "claude-sonnet-5-5",
     "claude-haiku-5-5"
   ],

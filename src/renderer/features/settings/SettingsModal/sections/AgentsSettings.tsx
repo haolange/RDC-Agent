@@ -1,4 +1,4 @@
-import React, { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
+import React, { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { agentDescription } from '../../../../lib/agentDescription';
 import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
@@ -16,9 +16,7 @@ import { AgentManifestEditor } from './AgentManifestEditor';
 import { AgentListItem } from './AgentListItem';
 import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
 import { AgentDefaultModelSection } from './AgentDefaultModelSection';
-import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
-import { AgentModelMigrationDialog } from './AgentModelMigrationDialog';
-import { ProjectAgentTrustDialog } from './ProjectAgentTrustDialog';
+import { AgentReviewDialogs } from './AgentReviewDialogs';
 import { NewAgentDialog } from './NewAgentDialog';
 import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
 import type { AgentProvenanceScope } from './agentConfigStatus';
@@ -71,6 +69,21 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   const [selectedAgentId, setSelectedAgentId] = useState(scopedDrafts[0]?.id ?? '');
   const [pendingDelete, setPendingDelete] = useState<AgentManifestDraft | null>(null);
   const [naming, setNaming] = useState(false);
+  const [detailRequested, setDetailRequested] = useState(false);
+  const backToListRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const openDetail = () => {
+    setDetailRequested(true);
+    requestAnimationFrame(() => {
+      const back = backToListRef.current;
+      if (back?.getClientRects().length) back.focus();
+    });
+  };
+  const returnToList = () => {
+    setDetailRequested(false);
+    requestAnimationFrame(() => listRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
+  };
   const selectedAgent = missingAgentId ? null : scopedDrafts.find((agent) => agent.id === selectedAgentId) ?? scopedDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
   // A shipped description is shown in the interface language until the user edits it.
@@ -86,6 +99,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
     if (target) {
       setScope(draftScope(target));
       setSelectedAgentId(target.id);
+      setDetailRequested(true);
       setMissingAgentId(null);
     } else {
       setMissingAgentId(agentRequest.agentId);
@@ -111,6 +125,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
     setNaming(false);
     onAgentManifestDraftsChange((current) => [...current, createNewAgent(identity, t, scope, currentProjectId)]);
     setSelectedAgentId(identity.id);
+    openDetail();
   };
 
   const duplicateAgent = () => {
@@ -145,7 +160,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   };
 
   return (
-    <div className="settings-manifest-page">
+    <div className={`settings-manifest-page${detailRequested && selectedAgent ? ' is-detail-open' : ''}`}>
       <AgentDefaultModelSection
         settings={settings}
         error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
@@ -155,7 +170,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       <div className="settings-manifest-toolbar settings-manifest-page-toolbar" data-testid="settings-agents-toolbar">
         <SettingsScopeBar
           scope={scope}
-          onScopeChange={(next) => { clearAgentRequest(); setMissingAgentId(null); setScope(next); }}
+          onScopeChange={(next) => { clearAgentRequest(); setMissingAgentId(null); setScope(next); setDetailRequested(false); }}
           canProject={canProject}
           userLabel={t('settings.scopeUser')}
           projectLabel={t('settings.scopeProject')}
@@ -190,7 +205,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               items={[{ id: 'import', label: t('settings.importAgentManifest'), onSelect: () => void onImportAgentManifest() }]} />
           </div>
 
-          <div className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
+          <div ref={listRef} className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
             {scopedDrafts.length === 0 ? (
               <EmptyState
                 className="settings-manifest-list-empty"
@@ -204,7 +219,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                 description={displayDescription(agent)}
                 icon={agent.icon}
                 selected={agent.id === selectedId}
-                onSelect={() => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agent.id); }}
+                onSelect={() => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agent.id); openDetail(); }}
               />
             ))}
           </div>
@@ -227,53 +242,36 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         </div>
 
         {selectedAgent ? (
-          <AgentManifestEditor
-            skills={skills}
-            settings={settings}
-            selectedAgent={selectedAgent}
-            provenance={selectedDefinition?.provenance ?? null}
-            builtinUpdate={builtinUpdate}
-            description={displayDescription(selectedAgent)}
-            onUpdateAgent={updateAgent}
-            onModelBindingChange={(binding) => models.setAgentBinding(selectedAgent.id, binding)}
-            modelError={models.modelError?.target === selectedAgent.id ? models.modelError.message : null}
-            onDuplicateAgent={duplicateAgent}
-            onDeleteAgent={deleteAgent}
-            onShowBuiltinDiff={() => models.showBuiltinDiff(selectedAgent, builtinUpdate?.status === 'updated')}
-            agentManifestSaveBlocked={agentManifestSaveBlocked}
-            t={t}
-          />
+          <div className="settings-manifest-detail">
+            <Button className="settings-agent-back" ref={backToListRef} variant="ghost" size="sm" onClick={returnToList}>
+              <Chevron direction="left" />
+              {t('settings.agentBackToList')}
+            </Button>
+            <AgentManifestEditor
+              key={selectedAgent.id}
+              skills={skills}
+              settings={settings}
+              selectedAgent={selectedAgent}
+              provenance={selectedDefinition?.provenance ?? null}
+              builtinUpdate={builtinUpdate}
+              description={displayDescription(selectedAgent)}
+              onUpdateAgent={updateAgent}
+              onModelBindingChange={(binding) => models.setAgentBinding(selectedAgent.id, binding)}
+              modelError={models.modelError?.target === selectedAgent.id ? models.modelError.message : null}
+              onDuplicateAgent={duplicateAgent}
+              onDeleteAgent={deleteAgent}
+              onShowBuiltinDiff={() => models.showBuiltinDiff(selectedAgent, builtinUpdate?.status === 'updated')}
+              agentManifestSaveBlocked={agentManifestSaveBlocked}
+              t={t}
+            />
+          </div>
         ) : (
           <div className="settings-runtime-editor-placeholder">
             <EmptyState variant="page" title={t('settings.agentSelectOrCreate')} />
           </div>
         )}
       </div>
-      {models.builtinDiff ? (
-        <AgentBuiltinDiffDialog
-          state={models.builtinDiff}
-          onClose={models.closeBuiltinDiff}
-          onRestore={() => { models.closeBuiltinDiff(); deleteAgent(); }}
-          t={t}
-        />
-      ) : null}
-      {models.overrideAction ? (
-        <AgentModelMigrationDialog
-          target={models.overrideAction}
-          options={settings.agents.modelOptions}
-          onConfirm={models.confirmOverrideAction}
-          onClose={models.closeOverrideAction}
-          t={t}
-        />
-      ) : null}
-      {models.trustReview ? (
-        <ProjectAgentTrustDialog
-          review={models.trustReview}
-          onConfirm={models.confirmTrust}
-          onClose={models.closeTrustReview}
-          t={t}
-        />
-      ) : null}
+      <AgentReviewDialogs models={models} options={settings.agents.modelOptions} onRestore={deleteAgent} t={t} />
       {naming ? (
         <NewAgentDialog scopeLabel={scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser')}
           existingIds={agentManifestDrafts.map((agent) => agent.id)} onCreate={addAgent} onClose={() => setNaming(false)} t={t} />

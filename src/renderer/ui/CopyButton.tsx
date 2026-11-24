@@ -15,8 +15,7 @@ export interface CopyButtonProps {
   'data-testid'?: string;
 }
 
-/** The single copy affordance: a copy glyph that turns into a check mark once the clipboard accepts the text. */
-export function CopyButton({ onCopy, label, copiedLabel, className, 'data-testid': testId }: CopyButtonProps) {
+export function useCopyFeedback(onCopy: () => Promise<boolean>) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -26,6 +25,12 @@ export function CopyButton({ onCopy, label, copiedLabel, className, 'data-testid
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setCopied(false), CONFIRM_MS);
   };
+  return { copied, copy };
+}
+
+/** Confirmation appears once the clipboard accepts the text. */
+export function CopyButton({ onCopy, label, copiedLabel, className, 'data-testid': testId }: CopyButtonProps) {
+  const { copied, copy } = useCopyFeedback(onCopy);
   const current = copied ? copiedLabel : label;
   return (
     <button

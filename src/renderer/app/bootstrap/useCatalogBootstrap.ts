@@ -38,9 +38,11 @@ export function useCatalogBootstrap(): void {
 
   useEffect(() => {
     if (useAppSettingsStore.getState().hydrated) {
-      const active = settings.llm.providers.filter((provider) => provider.enabled !== false
-        || settings.llm.agentRoutes.some((route) => route.providerId === provider.id));
-      reconcileCatalogProviders(active);
+      const active = new Set(settings.llm.agentRoutes.map((route) => route.providerId));
+      for (const provider of settings.llm.providers) {
+        if (provider.enabled !== false) active.add(provider.id);
+      }
+      reconcileCatalogProviders(settings.llm.providers, active);
     }
   }, [settings.llm.providers, settings.llm.agentRoutes]);
 }

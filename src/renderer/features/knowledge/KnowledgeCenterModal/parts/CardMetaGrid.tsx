@@ -1,6 +1,5 @@
-import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail } from '@shared/types/knowledge';
+import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail, type KnowledgeLaneHit } from '@shared/types/knowledge';
 import { useI18n } from '../../../../i18n';
-import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
 import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, RELATION_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { Button } from '../../../../ui/Button';
 
@@ -8,23 +7,15 @@ interface CardMetaGridProps {
   card: KnowledgeCardDetail;
   /** Human label of the card's space (User / project label). */
   spaceLabel: string;
-  /** The title of a related card when it is loaded; otherwise its file name stands in. */
-  resolveTitle?: (targetCardId: string) => string | undefined;
-  /** Present when a relation target can be opened from here. */
-  onOpenRelation?: (targetCardId: string) => void;
+  resolveRelation: (targetCardId: string) => KnowledgeLaneHit | undefined;
+  onOpenRelation: (hit: KnowledgeLaneHit) => void;
 }
-
-/** A related card named by its title, or by its file name when the card is not loaded. */
-const relationTargetName = (targetCardId: string, title: string | undefined): string => (
-  title || (targetCardId.split('/').pop() ?? targetCardId).replace(/\.md$/u, '')
-);
 
 /**
  * What a reader may want to know about the selected card: its type, topics, lifecycle, when it changed and where it
- * lives, the scope it applies to and how it relates to other cards. Identifiers and source facts (case id, file,
- * import hash, size) are not shown; they leave through the copy action.
+ * lives, the scope it applies to and how it relates to other cards.
  */
-export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }: CardMetaGridProps) {
+export function CardMetaGrid({ card, spaceLabel, resolveRelation, onOpenRelation }: CardMetaGridProps) {
   const { t } = useI18n();
   const exclusions = card.scope.exclusions ?? {};
   const axes = KNOWLEDGE_SCOPE_AXES.filter((axis) => card.scope[axis] || exclusions[axis]?.length);
@@ -78,30 +69,23 @@ export function CardMetaGrid({ card, spaceLabel, resolveTitle, onOpenRelation }:
             <h4>{t('knowledgeCenter.metaRelations')}</h4>
             {card.relations.length === 0 ? <p className="knowledge-center-meta-empty">—</p> : (
               <ul className="knowledge-center-relation-list">
-                {card.relations.map((relation) => (
-                  <li key={`${relation.kind}:${relation.targetCardId}`}>
+                {card.relations.map((relation) => {
+                  const hit = resolveRelation(relation.targetCardId);
+                  return <li key={`${relation.kind}:${relation.targetCardId}`}>
                     <span className="knowledge-center-relation-kind">{t(RELATION_LABEL_KEYS[relation.kind])}</span>
-                    {onOpenRelation ? (
-                      <Button variant="ghost" size="sm" className="knowledge-center-relation-target" data-tooltip={relation.targetCardId}
-                        onClick={() => onOpenRelation(relation.targetCardId)}>
-                        {relationTargetName(relation.targetCardId, resolveTitle?.(relation.targetCardId))}
+                    {hit ? (
+                      <Button variant="ghost" size="sm" className="knowledge-center-relation-target"
+                        onClick={() => onOpenRelation(hit)}>
+                        {hit.title}
                       </Button>
-                    ) : <span data-tooltip={relation.targetCardId}>{relationTargetName(relation.targetCardId, resolveTitle?.(relation.targetCardId))}</span>}
-                  </li>
-                ))}
+                    ) : <span>{t('knowledgeCenter.relationUnavailable')}</span>}
+                  </li>;
+                })}
               </ul>
             )}
           </section>
         </div>
       </div>
-      <CopyDiagnosticsButton className="knowledge-center-copy-diagnostics" testId="knowledge-center-provenance" facts={[
-        { label: 'cardId', value: card.cardId },
-        { label: 'caseId', value: card.caseId },
-        { label: 'sourceStatus', value: card.sourceStatus },
-        { label: t('knowledgeCenter.metaSourceHash'), value: card.sourceHash },
-        { label: t('knowledgeCenter.metaSourceMtime'), value: card.sourceMtimeMs ? new Date(card.sourceMtimeMs).toISOString() : null },
-        { label: t('knowledgeCenter.metaSourceSize'), value: card.sourceSize },
-      ]} />
     </div>
   );
 }

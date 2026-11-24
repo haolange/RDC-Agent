@@ -23,6 +23,19 @@
   animation: surface-rise-in var(--motion-overlay);
 }
 
+.ui-reading-sheet.is-height-animated {
+  height: var(--reading-sheet-target-height, auto);
+  transition: height var(--motion-disclosure);
+}
+
+.ui-reading-sheet.is-height-animated > .ui-reading-sheet-body {
+  scrollbar-gutter: stable;
+}
+
+.ui-reading-sheet-content {
+  display: flow-root;
+}
+
 [data-state='closing'] > .ui-reading-sheet {
   animation: surface-rise-out var(--motion-overlay) forwards;
 }

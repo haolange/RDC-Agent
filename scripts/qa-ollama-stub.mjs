@@ -9,6 +9,7 @@
 //                    call. An agent turn follows a scenario chosen by a keyword in the latest user message:
 //     (default)  thinking → one `glob` call → streamed answer
 //     qa:loops   thinking → task_create → commentary + glob → start two Tasks → complete, cancel and block → answer
+//     qa:ask     a two-question ask_user batch → answers submitted through Composer → final reply
 //     qa:long    fifty model steps of six parallel `glob` / `grep` / `read_file` calls (300 actions) with commentary
 //                and thinking every few steps, then a long Markdown answer — the scale of a real investigation
 //     qa:plan    (Mission agents) thinking → plan_artifact; the plan gate then pauses the turn. A rejection with
@@ -177,7 +178,7 @@ function turnState(body) {
   const prompt = typeof messages[lastUser]?.content === 'string' ? messages[lastUser].content : '';
   return {
     scenario: prompt.includes(DELEGATION.task) ? 'qa:subagent-child'
-      : ['qa:loops', 'qa:long', 'qa:plan', 'qa:partial', 'qa:subagent', 'qa:markdown'].find((keyword) => prompt.includes(keyword))
+      : ['qa:loops', 'qa:ask', 'qa:long', 'qa:plan', 'qa:partial', 'qa:subagent', 'qa:markdown'].find((keyword) => prompt.includes(keyword))
         ?? sessionScenario(messages.slice(0, lastUser)) ?? 'default',
     step: after.filter((entry) => entry.role === 'assistant').length,
     toolResults: after.filter((entry) => entry.role === 'tool').map((entry) => String(entry.content ?? '')),
@@ -275,6 +276,22 @@ function chatChunks(body) {
   if (tools.has('capability_check')) return [toolCalls([['capability_check', { ok: true }]])];
   const state = turnState(body);
   if (state.scenario === 'qa:loops') return loopsScenario(state, tools);
+  if (state.scenario === 'qa:ask') {
+    if (state.toolResults.some((result) => result.startsWith('Q1: Which capture'))) {
+      return text(['Both answers were received.']);
+    }
+    if (!tools.has('ask_user') && tools.has('tool_search') && state.step === 0) {
+      return [toolCalls([['tool_search', { query: 'ask_user' }]])];
+    }
+    if (!tools.has('ask_user')) return text(['The question tool is unavailable.']);
+    return [toolCalls([['ask_user', { questions: [
+      { questionId: 'capture', prompt: 'Which capture should I inspect?', allowFreeform: false, options: [
+        { optionId: 'android', label: 'Android capture' },
+        { optionId: 'local', label: 'Local capture' },
+      ] },
+      { questionId: 'event', prompt: 'Which event should I use as the starting point?', allowFreeform: true },
+    ] }]])];
+  }
   if (state.scenario === 'qa:long') return longScenario(state, tools);
   if (state.scenario === 'qa:markdown') return text(MARKDOWN_ANSWER);
   if (state.scenario === 'qa:subagent') {

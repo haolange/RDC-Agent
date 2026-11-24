@@ -42,7 +42,7 @@ it('retains task approval and pre-execution errors while suppressing successful 
   expect(row.visibleSteps.some(isTrackActivity)).toBe(false);
   expect(row.visibleSteps[0].duration).toBe('');
 });
-it('does not aggregate eight completed calls while a hidden ninth declaration still awaits execution', () => {
+it('retains each completed call while the next declaration starts and settles', () => {
   const calls: ConversationToolCall[] = Array.from({ length: 9 }, (_, index) => ({
     id: `boundary-${index}`, toolName: 'read_file', status: index === 8 ? 'pending' : 'complete',
     startedAt: 1, ...(index < 8 ? { executionStartedAt: 2, completedAt: 3 } : {}),
@@ -50,12 +50,11 @@ it('does not aggregate eight completed calls while a hidden ninth declaration st
   const project = () => buildWorkProcessPresentation({ status: 'running', updatedAt: 4, blocks: [{
     id: 'boundary-loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1, toolCalls: calls,
   }] }, t).rows[0] as Extract<WorkProcessRow, { type: 'section' }>;
-  expect(project().visibleSteps.map((row) => row.id)).toEqual(calls.slice(0, 8).map((call) => call.id));
+  expect(project().visibleSteps.map((row) => row.id)).toEqual(calls.slice(0, 8).map(({ id }) => id));
   calls[8] = { ...calls[8], status: 'running', executionStartedAt: 4 };
-  expect(project().visibleSteps).toHaveLength(9);
+  expect(project().visibleSteps.map((row) => row.id)).toEqual(calls.map(({ id }) => id));
   calls[8] = { ...calls[8], status: 'complete', completedAt: 5 };
-  expect(project().visibleSteps).toHaveLength(1);
-  expect(project().visibleSteps[0].type).toBe('toolAggregate');
+  expect(project().visibleSteps.map((row) => row.id)).toEqual(calls.map(({ id }) => id));
 });
 it('finds the first visible event through silent model turns without changing order', () => {
   const rows = [section('a', []), section('b', [tool('first'), tool('second')]), section('c', [tool('third')])];
@@ -63,6 +62,18 @@ it('finds the first visible event through silent model turns without changing or
   expect(rows[1].visibleSteps.map(row => row.id)).toEqual(['first', 'second']);
   expect(firstTrackEvent([section('acted', [tool('first')])])).toBe('acted');
   expect(firstTrackEvent([])).toBeUndefined();
+});
+
+it.each(['skipped', 'cancelled', 'pending'] as const)('does not group across a hidden %s declaration', (status) => {
+  const presentation = buildWorkProcessPresentation({ status: 'running', updatedAt: 4, blocks: [{
+    id: 'boundary-loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
+    toolCalls: [
+      { id: 'before', toolName: 'read_file', status: 'complete', startedAt: 1, displayOrder: 1 },
+      { id: 'hidden', toolName: 'read_file', status, startedAt: 1, displayOrder: 2 },
+      { id: 'after', toolName: 'read_file', status: 'complete', startedAt: 1, displayOrder: 3 },
+    ],
+  }] }, t);
+  expect(presentation.rows[0]).toMatchObject({ type: 'section', visibleSteps: [{ id: 'before' }, { id: 'after' }] });
 });
 
 it('keeps started details stable during streaming and excludes future calls while retaining pre-start errors', () => {

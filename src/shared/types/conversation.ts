@@ -395,6 +395,21 @@ export interface ConversationGetAttachmentPreviewResult {
   error?: string;
 }
 
+export type AttachmentOwner =
+  | { scope: 'staging'; stagingId: string; composerScopeKey: string }
+  | { scope: 'session'; attachmentId: string; sessionId: string };
+
+export interface ConversationAccessAttachmentRequest {
+  owner: AttachmentOwner;
+  action: 'preview' | 'open' | 'reveal';
+}
+
+export type ConversationAccessAttachmentResult =
+  | { kind: 'image'; dataUrl: string }
+  | { kind: 'markdown'; source: string }
+  | { kind: 'opened' | 'revealed' }
+  | { kind: 'error'; code: 'unavailable' | 'denied' | 'tooLarge' | 'unsupported' | 'openFailed' | 'revealFailed' };
+
 export interface ConversationAttachmentInput {
   material?: import('@shared/types/materialContext').MaterialContext;
   sourcePath: string;

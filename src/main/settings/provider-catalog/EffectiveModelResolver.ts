@@ -15,7 +15,7 @@ import {
   receiptExceedsSmallerTiers,
 } from './ProviderProbeEvidence';
 import { effectiveCatalogService } from './EffectiveCatalogService';
-import { revisionFor } from './effectiveCatalogMerge';
+import { providerConnectionRevision } from './effectiveCatalogMerge';
 import { planModelRequest } from './RequestPlanner';
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
@@ -510,9 +510,7 @@ export function buildEffectiveCatalogRequest(
   );
   return {
     providerId: provider.id,
-    configurationRevision: revisionFor({ authMode: provider.authMode, enabled: provider.enabled,
-      isConfigured: provider.isConfigured, baseUrl: provider.baseUrl, connectionValues: provider.connectionValues,
-      activeAccountId: provider.activeAccountId, protocol: provider.protocol }),
+    configurationRevision: providerConnectionRevision(provider),
     accountId: provider.activeAccountId ?? `anonymous:${provider.id}`,
     protocol: provider.protocol,
     catalogOwnership: provider.catalogOwnership,

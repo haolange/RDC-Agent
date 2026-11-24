@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { DEFAULT_AGENT_RUNTIME, createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import { useRuntimePermissionStore } from './runtimePermissionStore';
 import {
   beginAgentDefinitionSave,
@@ -13,7 +14,6 @@ import {
   enqueueProviderDefinitionSave,
   flushProviderDefinitionSaves,
   isLatestProviderDefinitionRevision,
-  rollbackProviderDefinitionSave,
   settleProviderDefinitionSave,
 } from './providerDefinitionSettings';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
@@ -32,6 +32,7 @@ const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: createDefaultAppSettings(),
+  contextBreakdownPreference: null,
   hydrated: false,
   systemTheme: 'dark',
   hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true }),
@@ -79,26 +80,34 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     set({ settings: nextSettings, hydrated: true });
     return nextSettings;
   },
-  ...createAppSettingsAppearanceActions(get),
+  ...createAppSettingsAppearanceActions(
+    get,
+    (contextBreakdownPreference) => set({ contextBreakdownPreference }),
+    async (expanded) => {
+      const saved = await window.electronAPI.settings.set({ appearance: { contextBreakdownExpanded: expanded } });
+      // Merge only the persisted preference. Unrelated saves can advance while this IPC returns.
+      set(({ settings }) => ({
+        settings: { ...settings, appearance: {
+          ...settings.appearance, contextBreakdownExpanded: saved.appearance.contextBreakdownExpanded,
+        } },
+      }));
+    },
+  ),
   updateProfile: async (profile) => {
     await get().patchSettings({ profile });
   },
   saveProvider: async (provider) => {
-    const optimistic = beginProviderDefinitionSave(get().settings, provider);
-    set({ settings: optimistic.settings });
-    const result = await enqueueProviderDefinitionSave(provider, optimistic.clientRevision);
-    if (!isLatestProviderDefinitionRevision(provider.id, optimistic.clientRevision)) return result;
-    if (result.status === 'failed') {
-      set((state) => ({
-        settings: rollbackProviderDefinitionSave(
-          state.settings, provider.id, result.lastSuccessful, optimistic.previous,
-        ),
-      }));
-      throw new Error(result.error ?? 'Provider settings save failed.');
+    const clientRevision = beginProviderDefinitionSave(provider.id);
+    const result = await enqueueProviderDefinitionSave(provider, clientRevision);
+    const current = get().settings.llm.providers.find((entry) => entry.id === provider.id);
+    if (!isLatestProviderDefinitionRevision(provider.id, clientRevision)
+      || !current || providerConnectionIdentity(current) !== providerConnectionIdentity(provider)) {
+      return { ...result, status: 'superseded' };
     }
-    if (result.status === 'committed' && result.provider) {
+    const confirmed = result.status === 'committed' ? result.provider : result.lastSuccessful?.provider;
+    if (confirmed) {
       set((state) => ({
-        settings: settleProviderDefinitionSave(state.settings, result.provider!),
+        settings: settleProviderDefinitionSave(state.settings, confirmed),
         hydrated: true,
       }));
     }

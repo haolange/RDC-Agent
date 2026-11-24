@@ -54,6 +54,15 @@
       "refreshedAt": "2026-10-25",
       "surface": "google-ai-studio",
       "accountScope": "public-api"
+    },
+    {
+      "id": "provider-docs:google-ai-studio:gemini4-2026-11-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://aistudio.google.com/docs/models/gemini-4-carbon ; https://aistudio.google.com/docs/models/gemini-4-neon ; https://aistudio.google.com/docs/models/gemini-4-hydrogen ; https://aistudio.google.com/docs/interactions-overview ; https://aistudio.google.com/docs/thinking ; https://aistudio.google.com/docs/pricing ; https://aistudio.google.com/docs/deprecations",
+      "observedAt": "2026-11-24",
+      "refreshedAt": "2026-11-24",
+      "surface": "google-ai-studio",
+      "accountScope": "public-api"
     }
   ],
   "defaultFactSourceId": "rdc-agent:google-ai-studio:0",
@@ -115,6 +124,235 @@
     }
   },
   "models": [
+    {
+      "modelId": "gemini-4-carbon",
+      "label": "Gemini 4 Carbon",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:google-ai-studio:gemini4-2026-11-24",
+      "cost": {
+        "input": 2,
+        "output": 10,
+        "cacheRead": 0.1
+      }
+    },
+    {
+      "modelId": "gemini-4-neon",
+      "label": "Gemini 4 Neon",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:google-ai-studio:gemini4-2026-11-24",
+      "cost": {
+        "input": 3,
+        "output": 15,
+        "cacheRead": 0.15
+      }
+    },
+    {
+      "modelId": "gemini-4-hydrogen",
+      "label": "Gemini 4 Hydrogen",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1048576
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:google-ai-studio:gemini4-2026-11-24",
+      "cost": {
+        "input": 1.5,
+        "output": 7.5,
+        "cacheRead": 0.075
+      }
+    },
     {
       "modelId": "gemini-4-argon",
       "label": "Gemini 4 Argon",
@@ -255,78 +493,6 @@
       "factSourceId": "provider-docs:google-ai-studio:models-2026-09-22"
     },
     {
-      "modelId": "gemini-3.7-flash",
-      "label": "gemini-3.7-flash",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 1048576,
-          "maxOutputTokens": 65536,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "supported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "GoogleInteractions",
-        "baseUrl": "https://generativelanguage.googleapis.com/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "fixed",
-          "fixedValue": true,
-          "tierId": "default",
-          "entitlement": "granted"
-        },
-        "reasoning": {
-          "kind": "levels",
-          "supportsOff": false,
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ],
-          "defaultSelection": "medium",
-          "wireProfile": {
-            "kind": "gemini-thinking-level",
-            "on": "medium",
-            "levels": {
-              "low": "low",
-              "medium": "medium",
-              "high": "high"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:google-ai-studio:0",
-      "fieldFactSourceIds": {
-        "controls.reasoning": "provider-docs:google-ai-studio:models-2026-09-22"
-      }
-    },
-    {
       "modelId": "gemini-3.6-flash",
       "label": "gemini-3.6-flash",
       "aliases": [],
@@ -396,80 +562,6 @@
         }
       },
       "factSourceId": "rdc-agent:google-ai-studio:0"
-    },
-    {
-      "modelId": "gemini-3.5-flash",
-      "label": "gemini-3.5-flash",
-      "aliases": [],
-      "availability": "available",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 1048576,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted",
-          "maxOutputTokens": 65536
-        }
-      ],
-      "defaultBudgetTokens": 256000,
-      "toolCalling": {
-        "state": "supported"
-      },
-      "visionInput": {
-        "state": "supported"
-      },
-      "structuredOutput": {
-        "state": "supported"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "maintained",
-      "route": {
-        "protocol": "GoogleInteractions",
-        "baseUrl": "https://generativelanguage.googleapis.com/v1",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "fixed",
-          "fixedValue": true,
-          "tierId": "default",
-          "entitlement": "granted"
-        },
-        "reasoning": {
-          "kind": "levels",
-          "supportsOff": false,
-          "levels": [
-            "minimal",
-            "low",
-            "medium",
-            "high"
-          ],
-          "defaultSelection": "medium",
-          "wireProfile": {
-            "kind": "gemini-thinking-level",
-            "on": "medium",
-            "levels": {
-              "minimal": "minimal",
-              "low": "low",
-              "medium": "medium",
-              "high": "high"
-            }
-          }
-        }
-      },
-      "factSourceId": "rdc-agent:google-ai-studio:0",
-      "fieldFactSourceIds": {
-        "contextTiers": "provider-docs:google-ai-studio:models-2026-09-22"
-      }
     },
     {
       "modelId": "gemini-3.1-pro-preview",
@@ -548,7 +640,7 @@
       "modelId": "gemini-2.5-pro",
       "label": "gemini-2.5-pro",
       "aliases": [],
-      "availability": "available",
+      "availability": "unknown",
       "contextTiers": [
         {
           "id": "default",
@@ -574,7 +666,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "GoogleInteractions",
         "baseUrl": "https://generativelanguage.googleapis.com/v1",
@@ -620,7 +712,7 @@
       "modelId": "gemini-2.5-flash",
       "label": "gemini-2.5-flash",
       "aliases": [],
-      "availability": "available",
+      "availability": "unknown",
       "contextTiers": [
         {
           "id": "default",
@@ -646,7 +738,7 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "discovered",
       "route": {
         "protocol": "GoogleInteractions",
         "baseUrl": "https://generativelanguage.googleapis.com/v1",
@@ -691,11 +783,16 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "gemini-4-carbon",
+    "gemini-4-neon",
+    "gemini-4-hydrogen",
     "gemini-4-argon",
     "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash"
+    "gemini-3.6-flash"
   ],
-  "docsUrl": "https://aistudio.google.com/app/apikey"
+  "docsUrl": "https://aistudio.google.com/app/apikey",
+  "retiredModelIds": [
+    "gemini-3.7-flash",
+    "gemini-3.5-flash"
+  ]
 }

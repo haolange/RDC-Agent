@@ -29,64 +29,15 @@
   background: var(--token-surface-sunken);
 }
 
-.work-process-user-input-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-bottom: 1px solid var(--token-border-muted);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: default;
-}
-
-.work-process-user-input-header:hover {
-  background: var(--token-interactive-hover);
-}
-
-.work-process-user-input-header:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset-inset);
-}
-
-.work-process-user-input:not(.is-expanded) .work-process-user-input-header {
-  border-bottom: 0;
-}
-
 .work-process-user-input-progress {
-  margin-left: auto;
+  flex-shrink: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
 }
 
-.work-process-user-input-collapsed-summary {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0 var(--space-3) var(--space-2);
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-}
-
-.work-process-user-input-collapsed-question {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.work-process-user-input-collapsed-count {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
 .work-process-user-input-verb {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   color: var(--token-text-primary);

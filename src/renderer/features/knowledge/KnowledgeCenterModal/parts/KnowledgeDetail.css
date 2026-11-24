@@ -16,8 +16,13 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 48rem;
-  margin-inline: auto;
+  min-width: 0;
+}
+
+.knowledge-center-document :is(p, blockquote, .knowledge-case-list),
+.knowledge-center-markdown > .knowledge-center-markdown-body > ul,
+.knowledge-center-markdown > .knowledge-center-markdown-body > ol {
+  max-inline-size: 72ch;
 }
 
 .knowledge-case-claim {
@@ -116,8 +121,13 @@
 }
 
 /* Before and after are the hero of a case: large, side by side, captioned underneath. */
-.knowledge-card-images { display: grid; gap: var(--space-4); margin-bottom: var(--space-6); }
-.knowledge-card-images-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.knowledge-card-images { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); }
+.knowledge-card-images-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); }
+.knowledge-card-images-pair > figure {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+}
 .knowledge-card-image { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; min-width: 0; }
 .knowledge-card-image-label { order: 2; margin: 0; color: var(--token-text-secondary); font-size: var(--type-body-size); line-height: var(--type-body-line); }
 .knowledge-card-image-frame {
@@ -140,12 +150,17 @@
   outline: 2px solid var(--token-border-focus);
   outline-offset: var(--focus-ring-offset-inset);
 }
+.knowledge-card-image-open:is(:hover, :focus-visible) img {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
+}
 .knowledge-card-image-frame img {
   display: block;
   width: 100%;
-  max-height: 52vh;
+  max-height: 58dvh;
   object-fit: contain;
 }
+
 .knowledge-card-image-missing {
   display: grid;
   place-items: center;
@@ -157,10 +172,9 @@
   font-size: var(--type-body-size);
   text-align: center;
 }
-@media (max-width: 640px) {
-  .knowledge-center-content .knowledge-center-body { padding: var(--space-4); }
+@container knowledge-detail (max-width: 28rem) {
   .knowledge-case-facts, .knowledge-symptom-comparison, .knowledge-card-images-pair { grid-template-columns: 1fr; }
-  .knowledge-detail-info .knowledge-center-meta { grid-template-columns: 1fr; }
+  .knowledge-card-images-pair { row-gap: var(--space-3); }
 }
 
 /* Headings the outline jumps to land below the sticky header edge, not under it. */

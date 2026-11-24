@@ -1,90 +1,99 @@
-.settings-models-page {
+.settings-models-page,
+.settings-provider-directory {
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
+.settings-provider-toolbar,
+.settings-provider-actions,
+.settings-directory-filters,
+.settings-directory-other {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.settings-provider-toolbar {
+  column-gap: var(--space-4);
+}
+
+.settings-provider-actions {
+  min-width: 0;
+}
+
 .settings-provider-search.ui-search-field {
-  width: 100%;
-  max-width: 28rem;
-}
-
-/* Services in groups: a title, one sentence on what the group is, then a grid of cards. */
-.settings-provider-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.settings-provider-group + .settings-provider-group {
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--token-border-muted);
-}
-
-.settings-provider-group-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
+  flex: 1 1 16rem;
+  min-width: 0;
 }
 
 .settings-provider-group-title {
   margin: 0;
-  color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  line-height: var(--type-body-line);
   font-weight: var(--font-semibold);
 }
 
 .settings-provider-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
   gap: var(--space-3);
-  align-items: stretch;
 }
 
-.settings-provider-upcoming {
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-lg);
-  background: var(--token-surface-sunken);
+.settings-directory-list,
+.settings-directory-members {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.settings-provider-upcoming-summary {
+.settings-directory-list > * + *,
+.settings-directory-other {
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-directory-item.button {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  min-width: 0;
+  height: auto;
+  min-height: var(--control-height-lg);
+  padding: var(--space-2) var(--space-3);
+  justify-content: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  color: var(--token-text-primary);
+  text-align: start;
+}
+
+.settings-directory-name {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.settings-directory-hint {
+  font-weight: var(--font-normal);
   color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  cursor: pointer;
 }
 
-.settings-provider-upcoming-summary:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset);
-}
-
-.settings-provider-upcoming-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: 0 var(--space-4) var(--space-4);
-}
-
-.settings-provider-upcoming .settings-provider-card {
-  opacity: 0.7;
-}
-
-/* Connection status, then the one quiet copy action for the service's technical identity. */
-.settings-provider-connection-row {
+.settings-directory-family > summary {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  min-height: var(--control-height-lg);
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-3);
 }
 
-@container settings-panel (max-width: 36rem) {
-  .settings-provider-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.settings-directory-family > summary > .ui-details-chevron {
+  order: 1;
+  margin-inline-start: auto;
+}
+
+.settings-directory-members {
+  margin-inline-start: var(--space-4);
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid var(--token-border-muted);
+}
+
+.settings-directory-other {
+  align-items: baseline;
+  padding-top: var(--space-3);
 }

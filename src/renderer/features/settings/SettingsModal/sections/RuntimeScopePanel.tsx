@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '../../../../lib/cn';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
@@ -75,6 +75,8 @@ export const RuntimeScopePanel: React.FC<{
     return () => onDirtyChange?.(false);
   }, [onDirtyChange, panel.dirty]);
   const dialogMode = editorPresentation === 'dialog';
+  const showEmptyScope = panel.resources.length === 0 && (dialogMode || !panel.editing);
+  const createActionRef = useRef<HTMLButtonElement>(null);
   // In dialog mode the selection also drives the read-only detail; the dialog only opens on explicit edit.
   const dialogOpen = dialogMode && (panel.creating || panel.dialogEditing);
 
@@ -101,11 +103,11 @@ export const RuntimeScopePanel: React.FC<{
 
   const actions = (
     <div className="settings-resource-toolbar-actions">
-      {panel.resources.length > 0 || panel.editing ? <>
+      {!showEmptyScope ? <>
       <Button variant="secondary" disabled={addDisabled || panel.busy} onClick={() => void panel.importResource()}>
         {t('settings.scopeImport')}
       </Button>
-      <Button variant="primary" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
+      <Button ref={createActionRef} variant="primary" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
         {t('settings.scopeAdd', { kind: kindLabel })}
       </Button>
       </> : null}
@@ -135,8 +137,8 @@ export const RuntimeScopePanel: React.FC<{
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
       <ResourceListDetail
           testId="settings-resource-frame"
-          emptyVariant={kind === 'skill' || kind === 'hook' ? 'page' : 'panel'}
-          isEmpty={panel.resources.length === 0 && !panel.editing}
+          emptyVariant={kind === 'skill' || kind === 'hook' ? 'panel' : 'inline'}
+          isEmpty={showEmptyScope}
           emptyTitle={t('settings.scopeEmpty', { kind: kindLabel })}
           emptyDescription={emptyDescriptionExtra ? (
             <>
@@ -147,7 +149,7 @@ export const RuntimeScopePanel: React.FC<{
           ) : t('settings.scopeEmptyHint')}
           emptyActions={(
             <>
-              <Button variant="primary" size="sm" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
+              <Button ref={createActionRef} variant="primary" size="sm" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
                 {t('settings.scopeAdd', { kind: kindLabel })}
               </Button>
               <Button variant="secondary" size="sm" disabled={addDisabled || panel.busy} onClick={() => void panel.importResource()}>
@@ -194,12 +196,13 @@ export const RuntimeScopePanel: React.FC<{
       {dialogMode ? (
         <TaskDialog
           open={dialogOpen}
-          size="md"
+          size={kind === 'policy' || kind === 'skill' ? 'lg' : 'md'}
           className={`settings-resource-dialog${kind === 'mcp' ? ' settings-mcp-dialog' : ''}${kind === 'policy' || kind === 'skill' || kind === 'agent' ? ' settings-document-dialog' : ''}`}
           title={panel.creating
             ? t('settings.scopeAdd', { kind: kindLabel })
             : t('settings.scopeEditTitle', { kind: kindLabel })}
           onClose={panel.closeDialogEditor}
+          fallbackFocusRef={createActionRef}
           closeLabel={t('settings.scopeCancel')}
           busy={panel.busy}
           dataTestId="settings-resource-dialog"

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { CANONICAL_HOOK_EVENTS, type ScopedResourceKind } from '@shared/types/rdcRuntime';
 import { MCP_TRANSPORTS } from '@shared/types/mcp';
 import { useI18n, type TranslationKey } from '../../../../i18n';
@@ -56,6 +56,7 @@ export const ScopedResourceEditor: React.FC<{
   onCancel,
 }) => {
   const { t } = useI18n();
+  const fieldId = useId();
   const kindLabel = t(kindLabelKey(kind));
   const isError = Boolean(message) && message !== t('settings.scopeSaved') && message !== t('settings.scopeImported');
   return (
@@ -91,9 +92,9 @@ export const ScopedResourceEditor: React.FC<{
           </SettingsField>
         ) : null}
 
-        <SettingsField label={t('settings.resourceFieldId')}>
+        <SettingsField label={t('settings.resourceFieldId')} htmlFor={`${fieldId}-id`}>
           <div className="settings-runtime-id-control">
-            <Input value={form.id} disabled={idLocked || busy} placeholder={templateResourceId(kind)}
+            <Input id={`${fieldId}-id`} value={form.id} disabled={idLocked || busy} placeholder={templateResourceId(kind)}
               onChange={(event) => onChange({ id: event.target.value })} />
             {idLocked ? (
               <span className="settings-runtime-readonly-tag" data-testid="settings-resource-id-locked">
@@ -121,8 +122,8 @@ export const ScopedResourceEditor: React.FC<{
 
         {kind === 'mcp' && (
           <>
-            <SettingsField label={t('settings.resourceFieldName')}>
-              <Input value={form.name} disabled={busy} onChange={(event) => onChange({ name: event.target.value })} />
+            <SettingsField label={t('settings.resourceFieldName')} htmlFor={`${fieldId}-name`}>
+              <Input id={`${fieldId}-name`} value={form.name} disabled={busy} onChange={(event) => onChange({ name: event.target.value })} />
             </SettingsField>
             <SettingsField label={t('settings.resourceFieldTransport')}>
               <Select
@@ -135,12 +136,12 @@ export const ScopedResourceEditor: React.FC<{
               />
             </SettingsField>
             {form.transport === 'streamable-http' ? (
-              <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldUrl')}>
-                <Input value={form.url} disabled={busy} placeholder="http://localhost:8123/mcp" onChange={(event) => onChange({ url: event.target.value })} />
+              <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldUrl')} htmlFor={`${fieldId}-url`}>
+                <Input id={`${fieldId}-url`} value={form.url} disabled={busy} placeholder="http://localhost:8123/mcp" onChange={(event) => onChange({ url: event.target.value })} />
               </SettingsField>
             ) : null}
-            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldCommand')}>
-              <Input value={form.command} disabled={busy} onChange={(event) => onChange({ command: event.target.value })} />
+            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldCommand')} htmlFor={`${fieldId}-command`}>
+              <Input id={`${fieldId}-command`} value={form.command} disabled={busy} onChange={(event) => onChange({ command: event.target.value })} />
             </SettingsField>
             <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')}>
               <Textarea aria-label={t('settings.resourceFieldArgsJson')} value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
@@ -167,15 +168,15 @@ export const ScopedResourceEditor: React.FC<{
                 options={enumOptions(CANONICAL_HOOK_EVENTS, form.event, (value) => hookEventLabel(value, t), t('settings.resourceEnumUnsupported'))}
               />
             </SettingsField>
-            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldCommand')}>
-              <Input value={form.command} disabled={busy} onChange={(event) => onChange({ command: event.target.value })} />
+            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldCommand')} htmlFor={`${fieldId}-command`}>
+              <Input id={`${fieldId}-command`} value={form.command} disabled={busy} onChange={(event) => onChange({ command: event.target.value })} />
             </SettingsField>
-            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')}>
-              <Input value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
+            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')} htmlFor={`${fieldId}-args`}>
+              <Input id={`${fieldId}-args`} value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
             </SettingsField>
-            <SettingsField label={t('settings.resourceFieldTimeout')}>
+            <SettingsField label={t('settings.resourceFieldTimeout')} htmlFor={`${fieldId}-timeout`}>
               {/* Stored in milliseconds, edited in seconds. */}
-              <Input type="number" min={1} max={600} step={1} value={timeoutSeconds(form.timeoutMs)} disabled={busy}
+              <Input id={`${fieldId}-timeout`} type="number" min={1} max={600} step={1} value={timeoutSeconds(form.timeoutMs)} disabled={busy}
                 onChange={(event) => onChange({ timeoutMs: event.target.value ? String(Math.round(Number(event.target.value) * 1000)) : '' })} />
             </SettingsField>
             <SettingsField label={t('settings.resourceFieldFailurePolicy')}>

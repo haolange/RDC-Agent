@@ -37,10 +37,19 @@ type ComposerFooterProps = Pick<ComposerController,
 };
 
 function RegisteredContextUsageIndicator(
-  props: Omit<React.ComponentProps<typeof ContextUsageIndicator>, 'menu'>,
+  props: Omit<React.ComponentProps<typeof ContextUsageIndicator>, 'menu' | 'detailsExpanded' |
+    'detailsSaveError' | 'onDetailsExpandedChange'>,
 ): React.ReactElement {
   const menu = useComposerMenu('usage');
-  return <ContextUsageIndicator {...props} menu={menu} />;
+  const detailsExpanded = useAppSettingsStore((state) => (
+    state.contextBreakdownPreference?.expanded ?? state.settings.appearance.contextBreakdownExpanded
+  ));
+  const detailsSaveError = useAppSettingsStore((state) => state.contextBreakdownPreference?.error);
+  const setDetailsExpanded = useAppSettingsStore((state) => state.setContextBreakdownExpanded);
+  return (
+    <ContextUsageIndicator {...props} menu={menu} detailsExpanded={detailsExpanded} detailsSaveError={detailsSaveError}
+      onDetailsExpandedChange={(expanded) => { void setDetailsExpanded(expanded); }} />
+  );
 }
 
 export function ComposerFooter({
@@ -52,8 +61,6 @@ export function ComposerFooter({
   selectedAgentDefinition, selectedAgentCapability, activeAgentId, setCurrentMode, currentSession,
 }: ComposerFooterProps) {
   const handingOff = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
-  const detailsExpanded = useAppSettingsStore((state) => state.settings.appearance.contextBreakdownExpanded);
-  const setDetailsExpanded = useAppSettingsStore((state) => state.setContextBreakdownExpanded);
   return (
       <div className="composer-footer-bar" data-testid="composer-footer-bar">
         <div className="composer-toolbar-group composer-toolbar-group-left">
@@ -97,8 +104,6 @@ export function ComposerFooter({
             selectedProfile={selectedContextProfile}
             stale={usageStale}
             estimated={usageEstimated}
-            detailsExpanded={detailsExpanded}
-            onDetailsExpandedChange={(expanded) => { void setDetailsExpanded(expanded); }}
           />
           <span role="status" className="composer-transition-announcement">{transitionLabel}</span>
           <Button

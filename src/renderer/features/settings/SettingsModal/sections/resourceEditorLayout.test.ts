@@ -41,8 +41,8 @@ describe('resource editor layout contracts (not Browser geometry)', () => {
     expect(css).not.toMatch(/height:\s*100%/);
   });
 
-  it('uses bounded Policy and MCP empty states while Skills and Hooks fill their document area', () => {
-    expect(source('sections/RuntimeScopePanel.tsx')).toContain("emptyVariant={kind === 'skill' || kind === 'hook' ? 'page' : 'panel'}");
+  it('keeps creation prompts compact in every empty scope', () => {
+    expect(source('sections/RuntimeScopePanel.tsx')).toContain("emptyVariant={kind === 'skill' || kind === 'hook' ? 'panel' : 'inline'}");
     expect(source('sections/settings-page-layout.css')).toMatch(/\.settings-page-policy > \.settings-block\s*\{\s*flex: 0 0 auto;/);
   });
 
@@ -51,8 +51,8 @@ describe('resource editor layout contracts (not Browser geometry)', () => {
     expect(css).toContain('.settings-center-panel:has(> .settings-page-hooks)');
     expect(css).toMatch(/\.settings-page-hooks\s*\{\s*flex: 1 1 0;\s*min-height: 0;/);
     expect(css).toMatch(/\.settings-page-hooks > \.settings-runtime-scope\s*\{\s*flex: 1;\s*min-height: 0;/);
-    expect(css).toMatch(/\.settings-page-hooks \.settings-resource-list-column\s*\{\s*max-height: calc\(var\(--control-height-md\) \* 2\)/);
     const kit = source('parts/settings-kit.css');
+    expect(kit).toMatch(/@container settings-panel \(max-width: 60rem\)[\s\S]+\.settings-resource-list-column\s*\{[^}]*max-height: 14rem;/);
     for (const column of ['list', 'detail']) {
       expect(kit).toMatch(new RegExp(`\\.settings-resource-${column}-column\\s*\\{[^}]*min-height: 0;[^}]*overflow-y: auto;`));
     }

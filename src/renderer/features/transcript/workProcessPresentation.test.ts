@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import { translate } from '../../i18n/messages';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { createToolRowForPresentation } from './workProcessToolRows';
@@ -82,7 +83,6 @@ type WorkRow = ReturnType<typeof buildWorkProcessPresentation>['rows'][number];
 function flattenWorkRows(rows: WorkRow[]): WorkRow[] {
   return rows.flatMap((row) => {
     if (row.type === 'section') return [row, ...flattenWorkRows(row.steps)];
-    if (row.type === 'toolAggregate') return [row, ...row.children];
     return [row];
   });
 }
@@ -434,7 +434,6 @@ describe('buildWorkProcessPresentation', () => {
     expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
       label: '已思考 · 1.5s',
       preview: 'raw chain-of-thought that must not be result text',
-      expandable: true,
       openByDefault: false,
     })]);
     expect(rowsOfType(presentation.rows, 'output').map((row) => row.text)).toEqual(['Read files before answering.']);
@@ -495,9 +494,8 @@ describe('buildWorkProcessPresentation', () => {
     }, t);
 
     expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
-      label: '正在思考',
+      label: '正在思考…',
       thinkingStatus: 'streaming',
-      expandable: true,
       openByDefault: true,
     })]);
   });
@@ -526,7 +524,7 @@ describe('buildWorkProcessPresentation', () => {
     }, t);
     expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
       openByDefault: true,
-      label: '正在思考',
+      label: '正在思考…',
     })]);
   });
 
@@ -578,7 +576,7 @@ describe('buildWorkProcessPresentation', () => {
     }, t);
     expect(rowsOfType(active.rows, 'thinking')).toEqual([expect.objectContaining({
       openByDefault: true,
-      label: '正在思考',
+      label: '正在思考…',
     })]);
 
     const settled = buildWorkProcessPresentation({
@@ -637,8 +635,8 @@ describe('buildWorkProcessPresentation', () => {
     expect(rowsOfType(presentation.rows, 'thinking').map((row) => row.label)).toEqual(['已思考']);
   });
 
-  it('aggregates eight consecutive tools into one toolAggregate row', () => {
-    const toolCallIds = Array.from({ length: 8 }, (_, index) => `tool-read-${index}`);
+  it('keeps adjacent tool calls in individual cards with their own identities', () => {
+    const toolCallIds = ['lookup', 'first-result', 'second-result'];
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now,
@@ -651,12 +649,13 @@ describe('buildWorkProcessPresentation', () => {
           result: { status: 'complete', toolCallIds },
           toolCalls: toolCallIds.map((id, index) => ({
             id,
-            toolName: 'read_file',
+            toolName: index === 0 ? 'tool_search' : 'artifact_read',
             status: 'complete',
-            argsPreview: JSON.stringify({ path: `docs/${index}.md` }),
+            argsPreview: JSON.stringify(index === 0 ? { query: 'files' } : { uri: `session://tool-outputs/${id}` }),
             resultPreview: JSON.stringify({ content: `document ${index}` }),
             startedAt: now + index * 10,
-            completedAt: now + index * 10 + 5,
+            executionStartedAt: now + index * 10,
+            completedAt: now + index * 10 + index + 1,
           })),
           startedAt: now,
           completedAt: now + 30,
@@ -666,14 +665,15 @@ describe('buildWorkProcessPresentation', () => {
 
     const section = presentation.rows.find((row) => row.type === 'section');
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
-    expect(visibleSteps).toHaveLength(1);
-    expect(visibleSteps[0]?.type).toBe('toolAggregate');
-    expect(visibleSteps[0]?.type === 'toolAggregate' ? visibleSteps[0].children : []).toHaveLength(8);
-    expect(section?.type === 'section' ? section.steps : []).toHaveLength(8);
+    expect(visibleSteps.map((row) => row.id)).toEqual(toolCallIds);
+    expect(visibleSteps).toMatchObject(toolCallIds.map((id, index) => ({
+      type: 'tool', id, duration: `${index + 1}ms`, rawLines: expect.arrayContaining([expect.stringContaining(`document ${index}`)]),
+    })));
+    expect(section?.type === 'section' ? section.steps : []).toHaveLength(3);
   });
 
-  it('keeps seven consecutive tools flat without aggregation', () => {
-    const toolCallIds = Array.from({ length: 7 }, (_, index) => `tool-flat-${index}`);
+  it('keeps a single tool flat without aggregation', () => {
+    const toolCallIds = ['tool-flat'];
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now,
@@ -701,7 +701,7 @@ describe('buildWorkProcessPresentation', () => {
 
     const section = presentation.rows.find((row) => row.type === 'section');
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
-    expect(visibleSteps.map((row) => row.type)).toEqual(Array(7).fill('tool'));
+    expect(visibleSteps.map((row) => row.type)).toEqual(['tool']);
   });
 
   it('retains skipped audit counts without projecting calls that never executed', () => {
@@ -730,6 +730,52 @@ describe('buildWorkProcessPresentation', () => {
       expect.objectContaining({ type: 'tool', id: 'failed', status: 'error' }),
     ]));
     expect(flattenWorkRows(presentation.rows).some((row) => row.id === 'skipped')).toBe(false);
+  });
+
+  it('keeps generated evidence references in raw receipts while showing only inline result content', () => {
+    const ref = 'session://tool-outputs/inline.json';
+    const hash = 'ab'.repeat(32);
+    const image = `session://tool-outputs/image-${hash}.png`;
+    const receipt = `Evidence ref: ${ref}\nhash: ${hash}\nImage evidence (grant each exact URI explicitly to a reviewer; the result wrapper does not grant pixels):\n${image}\nsha256:${hash}`;
+    const resultPreview = buildToolResultPreview({
+      content: [{ type: 'text', text: 'Files inspected' }, { type: 'text', text: receipt },
+        { type: 'text', text: 'Output after receipt' }],
+      details: { evidenceArtifact: { ref, hash }, matched: 12 },
+    });
+    const row = createToolRowForPresentation({ id: 'inline-evidence', toolName: 'shell', status: 'complete',
+      startedAt: now, resultPreview }, t);
+    expect(row).toMatchObject({ type: 'tool', previewLines: ['Files inspected', 'Output after receipt'] });
+    if (row.type !== 'tool') throw new Error('expected tool row');
+    expect(row.rawLines.join('\n')).toContain(ref);
+    expect(row.rawLines.join('\n')).toContain(hash);
+    expect(JSON.parse(resultPreview).data.details).toEqual({ evidenceArtifact: { ref, hash }, matched: 12 });
+  });
+
+  it('preserves receipt-like lines printed by a tool and the complete failure reason', () => {
+    const printed = `Evidence ref: session://tool-outputs/printed.json\nhash: ${'cd'.repeat(32)}\nUnable to read the capture`;
+    const resultPreview = buildToolResultPreview({ content: [{ type: 'text', text: printed }] });
+    const row = createToolRowForPresentation({ id: 'printed', toolName: 'shell', status: 'complete', startedAt: now, resultPreview }, t);
+    expect(row).toMatchObject({ type: 'tool', previewLines: printed.split('\n') });
+    const error = createToolRowForPresentation({ id: 'error', toolName: 'shell', status: 'error', startedAt: now,
+      resultPreview: buildToolResultPreview({ ok: false, error: { message: printed } }) }, t);
+    expect(error).toMatchObject({ type: 'tool', diagnosticCaption: expect.stringContaining('Unable to read the capture') });
+  });
+
+  it('keeps offloaded output around the generated read hint and stores the full hint in Raw', () => {
+    const ref = 'session://tool-outputs/read.json';
+    const hash = 'ef'.repeat(32);
+    const summary = 'hash check returned a mismatch';
+    const hint = 'Decoded tool text: call artifact_read with one of the following exact selections, then follow its next cursor. '
+      + 'These select returned text blocks, not omitted source-file ranges or domain validation.';
+    const pointer = JSON.stringify({ uri: ref, expectedHash: hash, textPointer: '/content/0/text' });
+    const resultPreview = buildToolResultPreview({ content: [{ type: 'text',
+      text: `${summary}\nref: ${ref}\nhash: ${hash}\n${hint}\n${pointer}\nCheck the original file` }],
+      details: { artifactized: true, ref, hash, summary },
+    });
+    const row = createToolRowForPresentation({ id: 'offload', toolName: 'shell', status: 'complete', startedAt: now, resultPreview }, t);
+    expect(row).toMatchObject({ type: 'tool', previewLines: [summary, 'Check the original file'] });
+    if (row.type !== 'tool') throw new Error('expected tool row');
+    expect(row.rawLines.join('\n')).toContain('textPointer');
   });
 
   it('preserves info, warning, and error diagnostic severity in Work Process rows', () => {
@@ -816,7 +862,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(tool).toMatchObject({
       type: 'tool',
       status: 'error',
-      verb: '执行失败',
+      verb: '命令',
       diagnosticCaption: 'fatal: not a git repository (or any of the parent directories): .git',
     });
     expect(tool?.type === 'tool' ? tool.diagnosticCaption : '').not.toMatch(/^\s*\{/);
@@ -837,6 +883,7 @@ describe('buildWorkProcessPresentation', () => {
 
     const tool = flattenWorkRows(presentation.rows).find((row) => row.type === 'tool');
     if (tool?.type !== 'tool') throw new Error('expected a tool row');
+    expect(tool.verb).toBe('提交计划');
     expect(tool.diagnosticCaption).toBe('数组元素数不得大于 4（实际: 5）');
     expect(tool.previewLines).toEqual([]);
     expect(tool.rawLines.join('\n')).toContain('TOOL_SCHEMA_VIOLATION');
@@ -887,7 +934,7 @@ describe('buildWorkProcessPresentation', () => {
       type: 'section',
       loopId: 'runtime-loop-answer',
       stepCount: 0,
-      steps: [expect.objectContaining({ type: 'thinking', preview: 'Closing thoughts before the reply.', expandable: true })],
+      steps: [expect.objectContaining({ type: 'thinking', preview: 'Closing thoughts before the reply.' })],
     });
 
     const withoutThinking = buildWorkProcessPresentation({

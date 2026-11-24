@@ -101,6 +101,32 @@ describe('effective catalog projection', () => {
     await store().load(scope);
     expect(read).toHaveBeenCalledTimes(2);
   });
+  it('keeps discovery during the last model toggle and discards it for an endpoint change', async () => {
+    const initial = snapshot();
+    read.mockResolvedValueOnce(initial);
+    const provider = { ...scope, enabled: true, isConfigured: true, baseUrl: 'https://example.test', models: [
+      { id: 'model-a', enabled: true },
+    ] } as LlmProviderEntry;
+    const key = catalogScopeKey(provider);
+    reconcileCatalogProviders([provider]);
+    await store().load(scope);
+
+    let finish!: (value: EffectiveCatalogSnapshot) => void;
+    read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const disabled = { ...provider, enabled: false, models: [{ ...provider.models[0], enabled: false }] };
+    reconcileCatalogProviders([disabled], new Set());
+    expect(store().entries[key].snapshot).toBe(initial);
+    const updated = { ...initial, scopeGeneration: 'updated', catalogRevision: 'disabled' };
+    finish(updated);
+    await store().load(scope);
+    expect(store().entries[key].snapshot).toBe(updated);
+
+    read.mockResolvedValueOnce({ ...initial, scopeGeneration: 'new-endpoint' });
+    reconcileCatalogProviders([{ ...disabled, baseUrl: 'https://second.test' }], new Set());
+    expect(store().entries[key].snapshot).toBeNull();
+    await store().load(scope);
+    expect(store().entries[key].snapshot?.scopeGeneration).toBe('new-endpoint');
+  });
   it('exposes a main-process refresh failure while retaining its cached catalog', async () => {
     read.mockResolvedValue({ ...snapshot(), projectionVersion: 0, lastRefreshError: 'HTTP 401' });
     await store().load(scope);

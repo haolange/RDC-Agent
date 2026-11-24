@@ -83,12 +83,12 @@ export const ToolRow: React.FC<{
           className={`work-process-tool-card status-${row.status}${expanded ? ' is-expanded' : ''}${canExpand ? ' is-expandable' : ''}${compact ? ' is-compact' : ''}${isBackgroundWait ? ' is-background-wait' : ''}${hasPayloadSurface ? ' has-payload' : ''}`}
           data-testid="work-process-tool-card"
           data-family={row.family}
-          data-locate
+          data-locate={canExpand || undefined}
         >
           <WorkCardHeader onClick={toggleExpanded} expanded={canExpand ? expanded : undefined}
-            disabled={!canExpand} duration={row.duration} titleText={verbLabel}
+            disabled={!canExpand} duration={row.duration} title={verbLabel}
             icon={<Icon name={row.icon} className="work-process-icon work-process-tool-card-icon" />}
-            title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{verbLabel}</ActiveSignalText>}
+            titleContent={<ActiveSignalText active={isTrackActivity(row)} tone="info">{verbLabel}</ActiveSignalText>}
             status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
 
           {(!isBackgroundWait || expanded) && !grouped ? <CardBody row={row} /> : null}

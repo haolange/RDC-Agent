@@ -1,9 +1,3 @@
-/* MCP row: name, then a status dot with its word, then the switch. */
-.settings-mcp-row-trailing {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-}
 .settings-mcp-status {
   display: inline-flex;
   align-items: center;
@@ -21,7 +15,7 @@
 }
 .settings-mcp-status[data-status='connected']::before { background: var(--token-status-success); }
 .settings-mcp-status[data-status='error']::before { background: var(--token-status-error); }
-.settings-mcp-status[data-status='loading']::before { background: var(--token-status-warning); }
+.settings-mcp-status[data-status='connecting']::before { background: var(--token-status-warning); }
 .settings-runtime-detail {
   display: flex;
   flex-direction: column;
@@ -30,6 +24,7 @@
 }
 .settings-runtime-detail-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
@@ -48,11 +43,6 @@
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
   font-weight: var(--font-regular);
-}
-.settings-runtime-detail-badges {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 .settings-runtime-detail-grid {
   display: grid;
@@ -86,22 +76,23 @@
 }
 .settings-trust-block {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-raised);
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-3);
+  border-block-start: 1px solid var(--token-border-muted);
 }
-.settings-trust-block[data-trust-state='untrusted'],
-.settings-trust-block[data-trust-state='needs-retrust'] {
-  border-color: color-mix(in srgb, var(--token-status-warning) 42%, transparent);
+.settings-trust-copy {
+  flex: 1 1 18rem;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
 }
 .settings-trust-block-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 .settings-trust-block-title {
   display: inline-flex;
@@ -125,5 +116,5 @@
   color: var(--token-status-warning);
 }
 .settings-trust-block-actions {
-  justify-content: flex-end;
+  margin-inline-start: auto;
 }

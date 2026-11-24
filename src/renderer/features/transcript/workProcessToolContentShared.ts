@@ -1,6 +1,6 @@
 import { normalizeToolName } from './workProcessToolCatalog';
 import { toRecord, stringifyPreview, createDetailLines, readNestedValue, collectReadableText, extractContentTextFromJsonishString, isJsonLike, isEnvelopeText, ENVELOPE_KEY_PATTERN } from './workProcessContentText';
-import type { getDetailsRecord } from './workProcessWebPresentation';
+import { getDetailsRecord } from './workProcessWebPresentation';
 import type { Translator } from '../../i18n/messages';
 
 export interface ToolContentInput {
@@ -44,10 +44,43 @@ export const asFiniteNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
+// Receipts carry the same identity in their model-facing text and structured details.
+const imageEvidenceHeading = 'Image evidence (grant each exact URI explicitly to a reviewer; the result wrapper does not grant pixels):';
+const decodedTextHeading = 'Decoded tool text: call artifact_read with one of the following exact selections, then follow its next cursor. '
+  + 'These select returned text blocks, not omitted source-file ranges or domain validation.';
+
+function withoutEvidenceReceipt(lines: string[], parsed: unknown): string[] {
+  const record = toRecord(parsed);
+  const details = getDetailsRecord(record);
+  const offloaded = details?.artifactized === true;
+  const receipt = offloaded ? details : toRecord(details?.evidenceArtifact);
+  if (!receipt || typeof receipt.ref !== 'string' || !receipt.ref.startsWith('session://tool-outputs/')
+    || typeof receipt.hash !== 'string' || !/^[a-f0-9]{64}$/u.test(receipt.hash)
+    || record?.error || record?.message) return lines;
+  const start = lines.lastIndexOf(`${offloaded ? 'ref' : 'Evidence ref'}: ${receipt.ref}`);
+  if (start < 0 || lines[start + 1] !== `hash: ${receipt.hash}`) return lines;
+  let end = start + 2;
+  if (offloaded && lines[end] === decodedTextHeading) {
+    let selection = end + 1;
+    while (lines[selection]?.startsWith('{"uri":')) {
+      const index = /"textPointer":"\/content\/(\d+)\/text"\}$/u.exec(lines[selection])?.[1];
+      if (!index || lines[selection] !== JSON.stringify({ uri: receipt.ref, expectedHash: receipt.hash, textPointer: `/content/${index}/text` })) break;
+      selection++;
+    }
+    if (selection > end + 1) end = selection;
+  }
+  if (lines[end] === imageEvidenceHeading) {
+    let image = end + 1;
+    while (lines[image]?.startsWith('session://tool-outputs/') && /^sha256:[a-f0-9]{64}$/u.test(lines[image + 1] ?? '')) image += 2;
+    if (image > end + 1) end = image;
+  }
+  return [...lines.slice(0, start), ...lines.slice(end)];
+}
+
 export const extractContentLayerText = (parsed: unknown, raw?: string): string => {
   const collected = collectReadableText(parsed, 40);
   if (collected.length > 0) {
-    return collected.join('\n');
+    return withoutEvidenceReceipt(collected, parsed).join('\n');
   }
   if (typeof parsed === 'string') {
     const extracted = extractContentTextFromJsonishString(parsed);
@@ -104,8 +137,8 @@ export const filterEnvelopeLines = (lines: string[]): string[] => (
 );
 
 export const extractReadableResultLines = (parsed: unknown, raw?: string, maxLines = 3): string[] => {
-  const collected = collectReadableText(parsed, maxLines);
-  if (collected.length > 0) return collected.slice(0, maxLines);
+  const collected = collectReadableText(parsed, 40);
+  if (collected.length > 0) return createDetailLines(withoutEvidenceReceipt(collected, parsed).join('\n'), maxLines);
   // Never dump the transport envelope into preview; raw tier owns the full payload.
   if (raw && !isEnvelopeText(raw) && !isJsonLike(raw)) {
     return createDetailLines(raw, maxLines);

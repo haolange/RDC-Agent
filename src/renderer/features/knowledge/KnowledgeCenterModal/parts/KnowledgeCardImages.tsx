@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useI18n } from '../../../../i18n';
 import { ImageViewer } from '../../../../ui/ImageViewer';
 import { groupKnowledgeImages, knowledgeImageRoleLabelKey } from '../knowledgeCardImages';
@@ -19,13 +19,16 @@ export function KnowledgeCardImages({ spaceId, images }: KnowledgeCardImagesProp
     setLoaded((current) => (current[relativePath] === url ? current : { ...current, [relativePath]: url }));
   }, []);
   // The viewer walks the loaded images in reading order: each before / after pair, then the singles.
-  const items = useMemo(() => [
-    ...pairs.flatMap((pair) => [
-      { path: pair.observed.relativePath, title: pair.observed.alt ?? t('knowledgeCenter.imageBefore') },
-      { path: pair.reference.relativePath, title: pair.reference.alt ?? t('knowledgeCenter.imageAfter') },
-    ]),
-    ...singles.map((image) => ({ path: image.relativePath, title: image.alt ?? t(knowledgeImageRoleLabelKey(image.role)) })),
-  ].flatMap((item) => (loaded[item.path] ? [{ ...item, src: loaded[item.path] }] : [])), [pairs, singles, loaded, t]);
+  const items = [
+    ...pairs.flatMap((pair) => [pair.observed, pair.reference]),
+    ...singles,
+  ].flatMap((image) => {
+    const src = loaded[image.relativePath];
+    if (!src) return [];
+    const role = t(knowledgeImageRoleLabelKey(image.role));
+    const title = image.alt && image.alt !== role ? `${role} · ${image.alt}` : role;
+    return [{ path: image.relativePath, title, src }];
+  });
   const index = items.findIndex((item) => item.path === opened);
   if (images.length === 0) return null;
 

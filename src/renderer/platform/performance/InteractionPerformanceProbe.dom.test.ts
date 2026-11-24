@@ -28,7 +28,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/app');
   document.body.innerHTML = `<div data-testid="conversation-thread">
     <div data-testid="work-process-tool-card"><button><span>Tool</span></button></div>
-    <details data-testid="work-process-tool-aggregate"><summary>Tools</summary></details>
+    <li data-testid="work-process-thinking"><details><summary>Thought</summary></details></li>
   </div><div data-testid="composer-effort-fast-row"><button role="switch">Fast</button></div>`;
 });
 afterEach(() => {

@@ -1,10 +1,7 @@
 import { expect, it } from 'vitest';
-import { translate } from '../../i18n/messages';
 import { groupImageRows } from './groupImageRows';
-import { aggregateSectionSteps } from './workProcessToolAggregate';
 import type { WorkProcessRow } from './workProcessTypes';
 
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
 const image = (id: string, status = 'complete', toolName = 'read_image') => ({
   type: 'tool', id, status, toolName, target: id, duration: '1ms',
 } as Extract<WorkProcessRow, { type: 'tool' }>);
@@ -18,9 +15,9 @@ it('groups successful adjacent reads without losing or deduplicating receipts', 
 it.each(['running', 'error', 'cancelled', 'pending'])('never groups across %s', status => {
   expect(groupImageRows([image('a'), image('b', status), image('c')])).toHaveLength(3);
 });
-it('keeps image groups ahead of the generic eight-tool aggregate', () => {
+it('keeps adjacent images together and splits groups at file reads', () => {
   const images = Array.from({ length: 25 }, (_, i) => image(String(i)));
-  const grouped = aggregateSectionSteps(images, t);
+  const grouped = groupImageRows(images);
   expect(grouped).toHaveLength(1);
   expect(grouped[0].type).toBe('tool');
   expect((grouped[0] as typeof images[0]).imageCalls).toHaveLength(25);

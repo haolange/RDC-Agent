@@ -165,7 +165,7 @@ export function applyGeminiReasoning(
     }
     const thinkingLevel = reasoning.control.wireProfile.levels[wireLevel];
     if (thinkingLevel) {
-      generationConfig.thinkingConfig = withThoughts({ thinkingLevel });
+      generationConfig.thinkingConfig = withThoughts({ thinkingLevel: thinkingLevel.toUpperCase() });
     }
     return;
   }

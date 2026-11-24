@@ -428,6 +428,104 @@ describe('SettingsService provider persistence', () => {
       .toBe('AnthropicMessages');
   });
 
+  it('keeps a verified account and its discovery identity after the last model is disabled', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const { buildEffectiveCatalogRequest } = await import('../provider-catalog/EffectiveModelResolver');
+    const service = new SettingsService();
+    service.initialize();
+    service.saveProviderAccountConnection(
+      'openrouter',
+      JSON.stringify({ providerId: 'openrouter', accountId: 'account-under-test', apiKey: 'sk-or-oauth' }),
+      [{ id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', enabled: true }],
+    );
+    const openRouter = () => service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')!;
+    const connected = openRouter();
+    const model = connected.models.find((entry) => entry.enabled)!;
+    const result = await service.saveProviderDefinition({
+      provider: { ...connected, models: connected.models.map((entry) => ({ ...entry, enabled: false })) },
+      clientRevision: 1,
+    });
+    expect(result.status).toBe('committed');
+    expect(openRouter()).toMatchObject({ enabled: false, isConfigured: true, status: 'verified', activeAccountId: 'account-under-test' });
+    expect(buildEffectiveCatalogRequest(openRouter()).configurationRevision)
+      .toBe(buildEffectiveCatalogRequest(connected).configurationRevision);
+
+    await service.saveProviderDefinition({
+      provider: { ...openRouter(), models: openRouter().models.map((entry) => ({ ...entry, enabled: entry.id === model.id })) },
+      clientRevision: 2,
+    });
+    expect(openRouter()).toMatchObject({ enabled: true, isConfigured: true, status: 'verified', activeAccountId: 'account-under-test' });
+  });
+
+  it('commits concurrent model choices and an independent settings write without replacing either provider', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const settings = service.initialize();
+    const change = (id: string) => {
+      const provider = settings.llm.providers.find((entry) => entry.id === id)!;
+      return service.saveProviderDefinition({
+        provider: { ...provider, models: provider.models.map((model) => ({ ...model, enabled: false })) },
+        clientRevision: 1,
+      });
+    };
+    const first = change('deepseek');
+    const second = change('longcat');
+    const window = { width: 1600, height: 1000, x: 10, y: 20, isMaximized: true };
+    service.persistWindowLayout(window);
+    service.setAll({ appearance: { contextBreakdownExpanded: true } });
+
+    expect((await Promise.all([first, second])).map((item) => item.status)).toEqual(['committed', 'committed']);
+    const persisted = service.getAll();
+    expect(persisted.layout.window).toEqual(window);
+    expect(persisted.appearance.contextBreakdownExpanded).toBe(true);
+    for (const providerId of ['deepseek', 'longcat']) {
+      const models = persisted.llm.providers.find((entry) => entry.id === providerId)!.models;
+      expect(models.length).toBeGreaterThan(0);
+      expect(models.every((model) => !model.enabled)).toBe(true);
+    }
+  });
+
+  it('rejects a queued model edit from a connection that was disconnected before commit', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+    service.saveProviderAccountConnection(
+      'openrouter',
+      JSON.stringify({ providerId: 'openrouter', accountId: 'account-under-test', apiKey: 'sk-or-oauth' }),
+      [{ id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', enabled: true }],
+    );
+    const connected = service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')!;
+    const pending = service.saveProviderDefinition({
+      provider: { ...connected, models: connected.models.map((model) => ({ ...model, enabled: false })) },
+      clientRevision: 1,
+    });
+    const disconnected = service.disconnectProvider('openrouter', 'account').llm.providers.find((entry) => entry.id === 'openrouter');
+
+    await expect(pending).resolves.toMatchObject({ status: 'superseded' });
+    expect(service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')).toEqual(disconnected);
+  });
+
+  it('returns the prior model choices and keeps config bytes after a provider commit fails', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const settings = service.initialize();
+    const provider = settings.llm.providers.find((entry) => entry.id === 'deepseek')!;
+    const filePath = path.join(settings.paths.userRdcRoot, 'config.json');
+    const before = fs.readFileSync(filePath, 'utf8');
+    const rename = vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => { throw new Error('model preference commit failed'); });
+    try {
+      const result = await service.saveProviderDefinition({
+        provider: { ...provider, models: provider.models.map((model) => ({ ...model, enabled: false })) },
+        clientRevision: 1,
+      });
+      expect(result).toMatchObject({ status: 'failed', error: 'model preference commit failed', lastSuccessful: { provider } });
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(before);
+      expect(fs.existsSync(`${filePath}.${process.pid}.tmp`)).toBe(false);
+    } finally {
+      rename.mockRestore();
+    }
+  });
+
   it('preserves an invalid Volc route id so Settings can require an explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
@@ -626,40 +724,6 @@ describe('SettingsService provider persistence', () => {
       x: 120,
       y: 80,
       isMaximized: false,
-    });
-  });
-
-  it('persistWindowLayoutAsync patches only layout.window without touching llm providers', async () => {
-    const { settingsPath } = await createVerifiedPersistedSettings();
-    const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    service.initialize();
-
-    const before = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: { providers: unknown[] };
-    };
-    const providersBefore = JSON.stringify(before.llm.providers);
-
-    await service.persistWindowLayoutAsync({
-      width: 1600,
-      height: 1000,
-      x: 10,
-      y: 20,
-      isMaximized: true,
-    });
-
-    const after = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: { providers: unknown[] };
-      layout: { window: { width: number; height: number; x: number; y: number; isMaximized: boolean } };
-    };
-
-    expect(JSON.stringify(after.llm.providers)).toBe(providersBefore);
-    expect(after.layout.window).toEqual({
-      width: 1600,
-      height: 1000,
-      x: 10,
-      y: 20,
-      isMaximized: true,
     });
   });
 

@@ -75,7 +75,6 @@ export type WorkProcessRow =
     kind?: ThinkingArtifact['kind'];
     visibility?: ThinkingArtifact['visibility'];
     thinkingStatus?: ConversationThinkingStatus;
-    expandable: boolean;
     openByDefault: boolean;
   }
   | {
@@ -162,14 +161,6 @@ export type WorkProcessRow =
     total: number;
     items: import('@shared/types/conversation').ConversationTaskSnapshotItem[];
     duration: string;
-  }
-  | {
-    type: 'toolAggregate';
-    id: string;
-    status: WorkProcessRowStatus;
-    summary: string;
-    duration: string;
-    children: Extract<WorkProcessRow, { type: 'tool' }>[];
   }
   | {
     type: 'userInput';

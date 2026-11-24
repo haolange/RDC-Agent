@@ -1,5 +1,147 @@
 # Acceptance Ledger
 
+## 2026-11-24：本地及 Android 回放恢复
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（改前工作区生产构建）
+- 结果：本机导入 `vkcube.rdc`，取得 6 个事件，定位 14 → 5 → 14，读取预览并释放回放。
+- 结果：Android RMX3551 使用当前 RDC-Tool 工作区准备连接。桌面 capture 因显存类型不兼容被拒。Android 同源 capture 成功读到 592 个事件。一次 ADB 返回空状态，刷新设备后重新准备成功，定位 2653 → 2651 → 2653，读取预览并释放回放。
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser`。隔离工作区、真实 capture 与 USB 连接。
+- 人工介入：无。已安装的旧 RDC-Tool 捆绑件缺少自动准备能力，本轮使用当前工作区的捆绑程序。物理拔线由外部条件限制。
+
+## 2026-11-24：模型开关、用量展开与知识中心稳定性
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区生产构建）
+- 结果：模型切换的展开行高保持 664.5 CSS px，前后邻行与滚动位移为 0，焦点未丢失。快速切换、写入失败、搜索结果、最后一个模型停用及重开通过。失败提示留在页脚，未重载即用已有模型发送成功。批量检查向隔离服务发出请求，之后取消成功。
+- 结果：用量明细在 330 ms 写回延迟下 13 ms 展开，经 12 个实测高度。底边及宽度位移为 0。减少动效直接切换。写入失败后明细仍可读，Electron 桌面在正常尺寸和 708×640、125% 缩放下通过 Space 展开与 Escape 归焦。
+- 结果：设置八页与知识中心 11 组场景通过，覆盖 708×640、1400×900、1920×1080、中英文、浅深色、大字号、125% 等效视口与减少动效。快速关闭图片回原缩略图，关闭窄窗知识详情回原列表行。
+- 结果：项目切换隔离会话，流式期间切换会话无串入。Markdown 编辑重发保留原名和内容，重载可读。Tasks、子代理、停止、工具拒绝及计划交接均实操。失败请求进入终态，后续流式恢复，打开的用量面板收到实测值。计划阅读面板首帧按 Escape 返回原入口。
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser`。原生 Electron 窗口使用该生产构建。
+- 人工介入：无。Provider 与失败注入均使用隔离本地服务。
+
+## 2026-11-24：模型服务工具栏、附件打开与模型目录
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：隔离 Browser QA 连接三个本地服务，复验添加目录、管理、批量请求清单。预览时样本服务未收到推理请求。确认后的批次完成，收起摘要紧邻按钮。
+- 结果：708×640、1400×900、1920×1080 覆盖中英文、浅深色、大字号与 125% 缩放。三图混合 7 份附件，实开 1400×630 原图、逐张切换、关闭归焦和移除。长 Markdown 可读到末尾，表格与代码正常。本地样本发送及编辑重发保留 7 份附件。
+- 结果：重开隔离历史标注样本，查看关注区域、对比条件和同组文件。Electron 桌面点击 PDF/DOCX 后，Windows 的系统打开调用接受两份独立副本。源代码附件提供定位。
+- 结果：182 个 Provider 入口入账，15 个更新。模型目录按官方来源与协议样本核对。全量复跑通过 4828 项，最终批次、附件与 Markdown 增量定向 30 项通过。
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser`。截图 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-visual-review/model-service-toolbar-tight-zh.png`，同目录保留 `composer-attachment-shelf-narrow-en.png` 和 `attachment-original-viewer.png`。
+- 人工介入：无。联机账号、企业部署权益和计费未实测，模型推理仅用本地协议样本。
+
+## 2026-11-24：设置焦点、知识候选与冲突对照
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：三种窗口尺寸遍历设置。键盘新建 Agent 时焦点进入名称输入，Esc 回到原按钮。MCP、Hook、Policy 空列表同样归焦。真实保存首条 Policy 和删除最后一条后，焦点均落在可用的新建按钮。
+- 结果：检查知识卡七章与元信息、导入／导出弹窗、主题与重建确认。从双栏冲突对照打开关联卡，在 708×640 英文浅色大字号下，Space 放大图片，Esc 返回原缩略图。125% 缩放下 Hook 弹窗可完整操作。
+- 结果：从空候选进入隔离工程和会话，提交卡片为候选，经预览和写入确认，填写理由并确认冲突后保存成功。
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser-dev`。使用独立资源根、临时工程与知识卡副本。
+- 人工介入：无。在线服务和外接设备未参与。
+
+## 2026-11-24：逐条工具、思考栏与上下文三卡
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：回放真实 GPT 会话，收起的思考只显示状态和时长，键盘展开后依次显示两段原文。中文进度保持可读。23 次工具调用逐项显示，实点的三项耗时 158、144、154 ms；失败的知识读取只显示一次失败状态及具体原因。
+- 结果：从 Composer 打开用量面板，鼠标、Space、Enter 切换明细，滚动后 Escape 返回原按钮。三卡分别显示 195.5k、120.2k 和 335。最近与累计命中率分别是 98% 与 62%，费用未上报时直接进入上下文构成。
+- 结果：在 708×640、1400×900、1920×1080 分配中英文和浅深色，窄窗复验大字号、125% 缩放；另在 620×640 实测窄面板三卡同序纵排，卡内无横向溢出。
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser-dev`。截图 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-visual-review/context-usage-three-cards-zh.png`、同目录 `context-usage-stacked-en.png`、`working-thinking-zh.png` 与 `working-tools-individual-en.png`。
+- 人工介入：无。回放使用只读来源的隔离副本，未发起模型请求。
+
+## 2026-11-24：跨模型工作过程、上下文用量与面板交互
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：隔离回放 GPT 历史，中文进度保留原位，短推理标题直接可读。「查找了工具，读取工具结果 2 次」展开为 158、144、154 ms 三项。Grok 旧格式存档在隔离会话中显示历史格式提示；Kimi、DeepSeek、Claude、Gemini 缺可回放存档。16 种已登记适配器的协议样本通过。
+- 结果：从 Composer 打开用量面板，鼠标、Space、Enter 切换明细，Escape 返回触发按钮。中英文、浅深色、三种窗口尺寸复验，708×640 大字号检查 125% 缩放。占用量和容量同排，压缩阈值贴近刻度，输出额度单列对齐。
+- 结果：运行八个设置页、知识三视图，核对模型行、Agent 折叠、资源弹窗及知识章节。键盘从图片查看器回到原图按钮；在知识副本添加一条测试关系，重建后从冲突对照页打开关联卡片。
+- 证据：本地：`node scripts/launch-rdc-agent.mjs --mode browser-dev`。截图 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-visual-review/context-scale-zh.png` 与同目录 `context-scale-en.png`。
+- 人工介入：无。全程使用隔离数据，模型请求额度消耗为零。
+
+## 2026-11-24：项目 Hook 与 MCP 信任区
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：在隔离工程分别打开项目 Hook 和 MCP 的详情，1400×900、708×640 下信任状态、说明与操作可见，动作与正文的边界无重叠，内容无横向溢出。
+- 证据：本地：`node node_modules/.cache/capability-review/run.cjs --trust`。
+- 人工介入：无。仅查看两项资源。
+
+## 2026-11-24：本地模型默认端口对照
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：隔离 Ollama 端点使用默认端口 11434。通过界面检查并保存连接、预览清单并确认。端点收到 3 次模型检查，应用逐项判定已验证。
+- 证据：本地：`node node_modules/.cache/capability-review/run.cjs --default-port`。
+- 人工介入：无。
+
+## 2026-11-24：能力检查入口、确认与自定义端口
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：在 1400×900 配置本地服务，708×640 英文深色下打开服务标题栏的检查入口，展开请求清单、按 Escape 返回原按钮；1920×1080 中文浅色下从单服务和全局入口复查。标题栏、底部操作均在可见范围内。
+- 结果：自定义端口 32683 上的隔离 Ollama 端点完成 3 个模型发现。预览时没有模型推理请求，确认后该端点收到 3 次聊天请求，应用全部判定已验证。
+- 证据：本地：`node node_modules/.cache/capability-review/run.cjs`。截图 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-visual-review/capability-review.png` 及同目录的 `capability-service.png`。
+- 人工介入：无。使用隔离配置和仓库的本地协议测试端点。
+
+## 2026-11-24：连接状态与对象操作
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：在英文深色 708×640 的模型面板核对底部尚未测试状态与模型控件。1400×900 下用隔离的 Ollama 测试端点走过连接失败、测试通过、保存并重开已连接。1920×1080 中文浅色下核对 Agent 和知识卡菜单；Escape 关闭当前菜单并归还焦点。
+- 证据：本地：`node node_modules/.cache/panel-study/run.cjs status`。截图 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-visual-review/status-connection-narrow.png`。
+- 人工介入：无。使用隔离的配置、知识副本与本地测试端点。
+
+## 2026-11-24：Settings 预览、服务目录与知识案例
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（工作区构建）
+- 结果：Windows Electron Browser QA 在 1400×900 英文深色、1920×1080 中文浅色及 708×640 窄窗走查八个设置页。实际切换模型开关、展开详情，核验窄窗控件边界；通过搜索找到长尾服务与区域入口，使用本地 Ollama 测试端点连接并回到已配置服务页。
+- 结果：核对用户知识案例的等高前后图、章节、信息、导入、导出、筛选、主题和重建弹窗。临时会话中创建候选、填写理由并确认保存成功；窄窗经键盘放大图片及返回。
+- 结果：服务菜单的 Tab 与 Shift+Tab 均沿触发按钮的原生顺序移动，断开最后一个隔离连接后搜索框获得焦点。固定连接地址省去预览，Azure 资源与部署填写后生成地址。本机 RDC-Tool 在设置里检测、验证并应用成功。
+- 证据：本地：`node node_modules/.cache/panel-study/run.cjs after`、`node node_modules/.cache/panel-study/run.cjs finish`、`node node_modules/.cache/panel-study/run.cjs keyboard --focus-only`。截图 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-visual-review/after-models.png` 与同目录的 `finish-knowledge-narrow.png`。
+- 人工介入：无。设置、会话及知识写入使用隔离副本，本地端点仅验证配置与目录交互。
+
+## 2026-11-24：Settings 与知识中心排版及交互（Windows Browser QA）
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（本轮修改在工作区）
+- 结果：Electron 生产构建，708×640、1400×900、1920×1080，DPR 1.25。八个设置页走查，验证偏好保存、主题编辑目标、Agent 窄窗回退、资源子弹窗。知识对照图单组两张且等高，切章节、打开图片、提交候选、键盘确认并保存成功。
+- 证据：本地：`node node_modules/.cache/settings-convergence/verify.cjs`，知识审核专项 `node node_modules/.cache/settings-convergence/verify.cjs --knowledge-only`。保留截图 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-convergence/agents-1920.png` 与 `C:/Users/vulcangu/.codex/visualizations/2026/11/23/01a207f4-cd7f-74e3-a80f-5de70c6c70b4/settings-convergence/knowledge-1400.png`。
+- 人工介入：无。使用独立 Browser QA 配置及测试知识卡，通过产品界面操作。
+
+## 2026-11-24：Working 标题高亮与双题 Ask（Windows Browser QA）
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（本轮交互改动在工作区）
+- 结果：Electron 生产构建搭配本地 Ollama 测试服务。深色中文 1400×900 验证 Tasks 卡头和嵌套原因的悬停、离开、键盘焦点、高亮前后等尺寸及减少动效。浅色英文 708×640 同时见两道待答问题，经 Composer 选择并填写后，1920×1080 同卡显示两对问答，原有外列对齐复测通过。
+- 证据：本地：`node node_modules/.cache/rdc-work-interactions-qa/verify.mjs`（Tasks），`node node_modules/.cache/rdc-work-interactions-qa/verify.mjs --ask-only`（Ask 专项）。
+- 人工介入：无。使用真实 Composer 驱动交互，复用本轮隔离配置，提交后检查同一卡片。
+
+## 2026-11-24：Working 状态点与正文、Composer 共线（Windows Browser QA）
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（本轮排版在工作区）
+- 结果：Electron 生产构建搭配本地 Ollama 测试服务。浅色 1400×900 和深色 708×640 的开合状态均实测状态点、最终回复与 Composer 左缘偏差为 0。最终回复保持全宽，工具卡每侧内缩 32 CSS px。
+- 证据：本地：`node node_modules/.cache/rdc-working-dot-qa/verify.mjs`。
+- 人工介入：无。经 Composer 发送固定测试回合，用键盘展开、折叠。
+
+## 2026-11-24：全宽最终回复与 Working 标题共线（Windows Browser QA）
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（本轮排版在工作区）
+- 结果：Electron 生产构建搭配本地 Ollama 测试服务。英文浅色 1400×900 和中文深色 708×640 的展开、折叠状态均实测最终回复与 Composer 外框等宽，Working 标题与回复左缘偏差为 0，状态点可见。工具卡每侧内缩 32 CSS px。
+- 证据：本地：`node node_modules/.cache/rdc-plain-answer-qa/verify.mjs`。
+- 人工介入：无。经 Composer 发送固定测试回合，再用键盘开合 Working。
+
+## 2026-11-24：Working 整体内缩与最终回复对齐（Windows Browser QA）
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（本轮排版在工作区）
+- 结果：Electron 生产构建搭配本地 Ollama 测试服务。英文浅色 1400×900 和中文深色 708×640 均验证 Working 无外框、整体每侧内缩 12 CSS px。展开和折叠时标题文字与最终回复正文左缘误差为 0。窄窗跟随和停止时工具卡边界一致，无横向溢出。
+- 证据：本地：`node node_modules/.cache/rdc-working-inset-qa/verify.mjs`。
+- 人工介入：无。经 Composer 发送测试请求并用键盘展开、折叠。
+
+## 2026-11-24：Working 父子层级复验（Windows Browser QA）
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（层级修正在工作区）
+- 结果：Electron 生产构建搭配本地 Ollama 测试服务。浅色英文 1400×900 和深色中文 708×640 展开可见同一轮廓包住标题与过程，工具卡左右内缩各 22 CSS px。运行与停止边界一致，折叠后标题和箭头保持横向位置，无横向溢出。
+- 证据：本地：`node node_modules/.cache/rdc-working-frame-qa/measure.mjs`。
+- 人工介入：无，经 Composer 触发测试回合并用键盘展开、折叠。
+
+## 2026-11-24：对话主栏对齐复验（Windows Browser QA）
+
+- 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（本轮几何改动在工作区）
+- 结果：Electron 生产构建搭配本地 Ollama 测试服务，在 708×640、1400×900、1920×1080（模拟 DPR 1.5）交叉验证中英文、深浅主题、右栏停靠与左栏抽屉。实测状态点与事件点圆心、外列与 Composer 边缘误差为 0。运行、上滚与停止时，卡片两侧内缩均为 22 CSS px。窄窗长中文换行无横向溢出。
+- 证据：本地：`node node_modules/.cache/rdc-alignment-qa/measure.mjs before`、`node node_modules/.cache/rdc-alignment-qa/measure.mjs after`、`node node_modules/.cache/rdc-alignment-qa/measure.mjs wrap`。
+- 人工介入：无。经真实 Composer 发送测试请求，自动走查展开、折叠、手动上滚、停止、子代理和计划交付。
+
 ## 2026-11-24：BlackHair 真机调查完成并就地交付
 
 - 提交：`b43018451001f7c8f34bae056f684b7488232576`（本地工作树）

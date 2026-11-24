@@ -1,76 +1,69 @@
-/* One model service: identity and enabled-model count, its status in one word, then what you can do. */
 .settings-provider-card {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: var(--space-3);
+  align-content: space-between;
+  gap: var(--space-4);
   min-width: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-card);
   background: var(--token-bg-raised);
-  transition: border-color var(--transition-fast);
-}
-
-.settings-provider-card:hover,
-.settings-provider-card:focus-within {
-  border-color: var(--token-border-strong);
 }
 
 .settings-provider-card-identity {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
 }
 
-.settings-provider-card-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-8);
-  height: var(--space-8);
-  flex: none;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-panel);
+.settings-provider-emblem {
+  display: grid;
+  place-items: center;
+  width: var(--space-10);
+  height: var(--space-10);
   color: var(--token-text-primary);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
+  background: var(--token-bg-panel);
+  border-radius: var(--radius-md);
+}
+
+.settings-brand-mark.ui-icon {
+  fill: currentColor;
+  fill-rule: evenodd;
+  stroke: none;
+}
+
+.settings-provider-card-copy {
+  display: grid;
+  min-width: 0;
+  color: var(--token-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .settings-provider-card-name {
-  min-width: 0;
-  overflow: hidden;
   color: var(--token-text-primary);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-line);
   font-weight: var(--font-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.settings-provider-card-models {
-  flex: none;
-  margin-inline-start: auto;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
+.settings-provider-card-actions,
 .settings-provider-card-status {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 0;
+}
+
+.settings-provider-card-actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.settings-provider-card-status {
+  color: var(--token-text-secondary);
 }
 
 .settings-provider-card-dot {
   width: var(--space-2);
   height: var(--space-2);
-  flex: none;
   border-radius: var(--radius-full);
-  /* Not connected yet is a neutral fact, not a warning. */
   background: var(--token-text-disabled);
 }
 
@@ -82,32 +75,12 @@
   background: var(--token-status-error);
 }
 
-.settings-provider-card-status-label {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-line);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-provider-card.is-tone-connected .settings-provider-card-status-label {
-  color: var(--token-status-success);
-}
-
-.settings-provider-card.is-tone-error .settings-provider-card-status-label {
-  color: var(--token-status-error);
-}
-
-.settings-provider-card-actions {
-  display: flex;
+.settings-service-title {
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--control-height-sm);
 }
 
-.settings-provider-card-primary {
-  margin-inline-start: auto;
-  min-width: 5rem;
+.settings-model-group-title .settings-service-title {
+  color: var(--token-text-primary);
 }

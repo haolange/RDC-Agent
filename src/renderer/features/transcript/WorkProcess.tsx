@@ -52,10 +52,9 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer 
       data-testid="work-process"
       aria-label={headlineCopy}
     >
-      <div className="work-process-header-row">
-        <button type="button" className="work-process-header" onClick={toggle} aria-expanded={expanded}>
-          <Chevron open={expanded} size={12} className="work-process-caret" />
-          <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
+      <button type="button" className="work-process-header" onClick={toggle} aria-expanded={expanded}>
+        <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
+        <span className="work-process-heading-copy">
           {running ? (
             <ActiveSignalText active tone="info" className={`work-process-label status-${trace.status}`}>
               {headlineCopy}
@@ -64,8 +63,9 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer 
             <span className={`work-process-label status-${trace.status}`}>{headlineCopy}</span>
           )}
           {metaParts.length > 0 ? <span className="work-process-meta">{metaParts.join(' · ')}</span> : null}
-        </button>
-      </div>
+        </span>
+        <Chevron open={expanded} size={12} className="work-process-caret" />
+      </button>
 
       {hasBody ? (
         <WorkProcessFoldProvider value={!expanded}>

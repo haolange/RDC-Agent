@@ -57,11 +57,20 @@
 
 .settings-page-agents .settings-manifest-layout {
   align-items: stretch;
-  grid-template-columns: clamp(14rem, 25%, 21rem) minmax(0, 1fr);
+  grid-template-columns: minmax(16rem, 0.33fr) minmax(0, 0.67fr);
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.settings-manifest-detail {
+  min-width: 0;
+  min-height: 0;
+}
+
+.settings-agent-back.button {
+  display: none;
 }
 
 .settings-manifest-page-toolbar {
@@ -84,6 +93,18 @@
   .settings-page-agents .settings-manifest-page {
     display: block;
     flex: 0 0 auto;
+  }
+
+  .settings-manifest-page:not(.is-detail-open) .settings-manifest-detail,
+  .settings-manifest-page.is-detail-open :is(
+    .settings-manifest-list-column, .settings-agent-defaults, .settings-manifest-page-toolbar
+  ) {
+    display: none;
+  }
+
+  .settings-agent-back.button {
+    display: inline-flex;
+    margin-block-end: var(--space-2);
   }
 
   .settings-page-agents .settings-manifest-layout {

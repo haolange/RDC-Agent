@@ -44,7 +44,7 @@
 }
 
 .settings-page-agents .settings-manifest-editor {
-  background: color-mix(in srgb, var(--token-bg-panel) 82%, var(--token-bg-shell));
+  background: transparent;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -65,14 +65,14 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-2) 0 var(--space-4);
   border-bottom: 1px solid var(--token-border-muted);
 }
 
 .settings-page-agents .settings-manifest-editor-actions {
   flex: 0 0 auto;
-  flex-wrap: nowrap;
   justify-content: flex-end;
+  max-inline-size: 42%;
 }
 
 .settings-manifest-editor-body {
@@ -82,7 +82,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-5);
+  padding: var(--space-4) var(--space-2) var(--space-3) 0;
 }
 
 .settings-runtime-editor.settings-manifest-editor {
@@ -107,7 +107,7 @@
   }
 
   .settings-page-agents .settings-manifest-editor-actions {
-    width: 100%;
+    max-inline-size: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
   }

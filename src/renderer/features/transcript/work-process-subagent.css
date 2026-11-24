@@ -100,11 +100,7 @@
   font-size: var(--type-body-size);
   cursor: pointer;
 }
-.work-disclosure-header:hover,
-.work-disclosure-header:focus-visible { color: var(--token-text-primary); }
 .work-disclosure-header > .work-process-row-caret { margin-inline-start: auto; }
-.work-disclosure-header:hover > .work-process-row-caret,
-.work-disclosure-header:focus-visible > .work-process-row-caret { opacity: 1; }
 .work-disclosure-header:focus-visible,
 .work-process-subagent-more:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
 .work-disclosure-header.is-disabled { cursor: default; background: transparent; }
@@ -123,8 +119,6 @@
   background: transparent;
   color: var(--token-text-secondary);
 }
-.work-disclosure.variant-inline > .work-disclosure-header:hover,
-.work-disclosure.variant-inline > .work-disclosure-header:focus-visible { background: transparent; color: var(--token-text-primary); }
 .work-disclosure.variant-inline > .work-disclosure-header .work-disclosure-label { color: inherit; font-weight: var(--font-normal); }
 .work-disclosure.variant-inline > .work-disclosure-body { padding: var(--space-2) 0 var(--space-3); border: 0; }
 .work-delegation-document,
@@ -139,11 +133,6 @@
   min-height: var(--space-8);
   padding: var(--space-2) var(--space-3);
   gap: var(--space-2);
-  color: var(--token-text-secondary);
-}
-.work-disclosure.variant-secondary-card > .work-disclosure-header:hover,
-.work-disclosure.variant-secondary-card > .work-disclosure-header:focus-visible {
-  background: color-mix(in srgb, var(--token-interactive-hover) 30%, var(--transcript-card-surface));
   color: var(--token-text-secondary);
 }
 .work-disclosure.variant-secondary-card > .work-disclosure-header.is-disabled { background: transparent; }
@@ -187,15 +176,9 @@
 .work-process-subagent-more:hover,
 .work-process-subagent-more:focus-visible { background: color-mix(in srgb, var(--token-interactive-hover) 30%, var(--transcript-card-surface)); }
 
-/* Header identity: the agent's name, then its model and effort one text level down. */
-.work-process-subagent-identity {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .work-process-subagent-route {
+  align-self: baseline;
+  min-width: 0;
   overflow: hidden;
   color: var(--token-text-secondary);
   font-weight: var(--font-normal);

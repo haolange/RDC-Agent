@@ -118,8 +118,8 @@ describe('ContextBreakdownContent phase authority', () => {
     expect(html).toContain('contextBreakdown.windowPending');
     expect(html).toContain('contextBreakdown.windowPendingNote');
     expect(html).toContain('data-phase="unavailable"');
-    expect(html).not.toContain('>100%</span>');
-    expect(html).not.toContain('contextBreakdown.budgetNote.generatable');
+    expect(html).not.toContain('contextBreakdown.used');
+    expect(html).not.toContain('contextBreakdown.turnOutput');
   });
 
   it('Preparing keeps the last actual structure instead of replacing it with a status card', () => {
@@ -159,6 +159,7 @@ describe('ContextBreakdownContent phase authority', () => {
     expect(html).toContain('context-breakdown-run-meter');
     expect(html).toContain('data-phase="unavailable"');
     expect(html).toContain('contextBreakdown.noUsageYet');
+    expect(html).not.toContain('data-testid="context-breakdown-cost"');
     expect(html).toContain('context-breakdown-details');
     expect(html).toContain('>—</span>');
     expect(html).not.toContain('context-breakdown-empty-state');
@@ -185,7 +186,7 @@ describe('ContextBreakdownContent phase authority', () => {
         stale: false,
       }),
     );
-    expect(html).toContain('>0%</span>');
+    expect(html).toContain('contextBreakdown.used:{&quot;percent&quot;:&quot;0%&quot;}');
     expect(html).toContain('>0contextBreakdown.countSuffix.system_tools</span>');
     expect(html).not.toContain('data-phase="unavailable"');
   });
@@ -206,19 +207,28 @@ describe('ContextBreakdownContent phase authority', () => {
     expect(html).toContain('context-breakdown-hero');
     expect(html).toContain('data-testid="context-breakdown-run-meter"');
     expect(html).toContain('data-phase="current"');
+    expect(html).toContain('contextBreakdown.requestUsage');
+    expect(html).toContain('<dt>contextBreakdown.inputLabel</dt><dd>~24k</dd>');
     expect(html.match(/>—</g)?.length).toBeGreaterThanOrEqual(5);
     expect(html).not.toContain('context-breakdown-meter-eyebrow');
     expect(html).not.toContain('contextBreakdown.lastActual');
   });
 
-  it('idle Last actual owns three independent metric cards without phase eyebrow', () => {
+  it('shows the latest context breakdown and cumulative run totals as separate sections', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownContent, {
         detailsExpanded: true,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'idle',
-        usage,
+        usage: {
+          ...usage,
+          lastTurnCacheHitTokens: 0,
+          lastTurnCacheMissTokens: 20_000,
+          reasoningTokens: 320,
+          cost: { total: 0, input: 0, output: 0 },
+          cumulativeCost: 0.2,
+        },
         selectedProfile: profile(),
         stale: false,
       }),
@@ -227,19 +237,37 @@ describe('ContextBreakdownContent phase authority', () => {
     expect(html).toContain('data-testid="context-breakdown-run-meter"');
     expect(html.match(/data-testid="context-breakdown-run-meter"/g)?.length).toBe(1);
     expect(html).not.toContain('context-breakdown-meter-eyebrow');
-    expect(html).toContain('contextBreakdown.tokensColumn');
-    expect(html).toContain('contextBreakdown.cacheColumn');
+    expect(html).toContain('contextBreakdown.latestBreakdown');
+    expect(html).toContain('contextBreakdown.runTotals');
+    expect(html).toContain('contextBreakdown.totalLabel');
+    expect(html).toContain('contextBreakdown.groupDeferred');
     expect(html).toContain('contextBreakdown.reasoningLabel');
-    expect(html).toContain('data-columns="3"');
-    expect(html).toContain('data-col="tokens"');
-    expect(html).toContain('data-col="cache"');
-    expect(html).toContain('data-col="reasoning"');
-    expect(html).toContain('context-breakdown-run-col');
+    expect(html).toContain('context-breakdown-meter-row');
+    const sections = ['data-col="tokens"', 'data-col="cache"', 'data-col="reasoning"',
+      'data-testid="context-breakdown-cost"', 'contextBreakdown.latestBreakdown', 'contextBreakdown.groupDeferred'];
+    const positions = sections.map((section) => html.indexOf(section));
+    expect(positions.every((index) => index >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(html).not.toContain('>0 / 20k<');
+    expect(html).toContain('>8k / 12k<');
+    expect(html).toContain('>32%<');
+    expect(html).toContain('contextBreakdown.costThisTurn');
+    expect(html).toContain('contextBreakdown.costThisRun');
+    expect(html).not.toContain('contextBreakdown.costCacheRead');
     expect(html).not.toContain('context-breakdown-runtime');
     expect(html).not.toContain('semantic-replay');
     expect(html).not.toContain('stableTokenEstimate');
   });
 
+  it('keeps a reported cumulative zero cost without inventing a request cost', () => {
+    const html = renderToStaticMarkup(React.createElement(ContextBreakdownContent, {
+      detailsExpanded: true, onDetailsExpandedChange: () => undefined,
+      prepared: null, phase: 'idle', usage: { ...usage, cumulativeCost: 0 }, selectedProfile: profile(), stale: true,
+    }));
+    expect(html).toContain('contextBreakdown.lastRunTotals');
+    expect(html).toContain('<dt>contextBreakdown.costThisRun</dt><dd>$0.00</dd>');
+    expect(html).not.toContain('contextBreakdown.costThisTurn');
+  });
   it('shows projected occupancy against the selected model window', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownContent, {
@@ -270,8 +298,12 @@ describe('ContextBreakdownContent phase authority', () => {
       }),
     );
     expect(html).toContain('contextBreakdown.projected');
-    expect(html).toContain('>~12%</span>');
+    expect(html).toContain('contextBreakdown.used:{&quot;percent&quot;:&quot;~12%&quot;}');
     expect(html).toContain('data-tooltip="contextBreakdown.projectedNote"');
+    expect(html).toContain('contextBreakdown.lastRunTotals');
+    expect(html).toContain('>21k</strong>');
+    expect(html).toContain('contextBreakdown.estimatedBreakdown');
+    expect(html).toContain('>~884.8k</span>');
     expect(html).not.toContain('contextBreakdown.lastActual');
     expect(html).not.toContain('contextBreakdown.staleNote');
   });
@@ -306,7 +338,7 @@ describe('ContextBreakdownContent phase authority', () => {
       }),
     );
     expect(html).toContain('contextBreakdown.projected');
-    expect(html).toContain('>~12%</span>');
+    expect(html).toContain('contextBreakdown.used:{&quot;percent&quot;:&quot;~12%&quot;}');
     expect(html).toContain('contextBreakdown.projectedNote');
     expect(html).not.toContain('contextBreakdown.lastActual');
   });
@@ -314,7 +346,7 @@ describe('ContextBreakdownContent phase authority', () => {
   it('explains the compaction line and remaining generation budget', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownContent, {
-        detailsExpanded: true,
+        detailsExpanded: false,
         onDetailsExpandedChange: () => undefined,
         prepared: null,
         phase: 'idle',
@@ -337,9 +369,10 @@ describe('ContextBreakdownContent phase authority', () => {
     expect(html).toContain('data-testid="context-breakdown-window-note"');
     expect(html).toContain('data-testid="context-breakdown-bar-threshold"');
     expect(html).toContain('contextBreakdown.budgetNote.threshold:{&quot;threshold&quot;:&quot;800k&quot;}');
-    expect(html).toContain('contextBreakdown.budgetNote.generatable:{&quot;tokens&quot;:&quot;384k&quot;}');
-    expect(html).not.toContain('contextBreakdown.budgetNote.window');
+    expect(html).toContain('<dt>contextBreakdown.turnOutput</dt><dd>~384k</dd>');
+    expect(html).not.toContain('contextBreakdown.fullWindow');
     expect(html).toContain('20k / 1M');
+    expect(html).not.toContain('context-breakdown-run-meter');
   });
 
   it('adds the full window only when it is larger than the prompt budget', () => {
@@ -365,7 +398,7 @@ describe('ContextBreakdownContent phase authority', () => {
         stale: false,
       }),
     );
-    expect(html).toContain('contextBreakdown.budgetNote.window:{&quot;window&quot;:&quot;264k&quot;}');
+    expect(html).toContain('<dt>contextBreakdown.fullWindow</dt><dd>264k</dd>');
     expect(html).toContain('20k / 200k');
   });
 });

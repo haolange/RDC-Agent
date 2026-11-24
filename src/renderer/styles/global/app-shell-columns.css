@@ -85,8 +85,7 @@
 }
 
 .app-main {
-  /* One conversation column for the page shell, transcript and Composer. The Composer's outer edge is the
-     column edge; its inner padding is the shared inset that assistant text and Working start from. */
+  /* The page shell, transcript and Composer share a conversation column. */
   --conversation-column-gutter: 18px;
   --conversation-column-width: min(
     var(--workbench-rail-max-width, 100%),
@@ -124,9 +123,7 @@
   gap: var(--space-1);
 }
 
-/* The page shell bounds the transcript: it owns the remaining main-column height so `.chat-messages`
-   is the one scroller. It is the conversation column plus its gutter on both sides: the Working rail hangs
-   in that gutter, and `.chat-messages` pads it back so content keeps the Composer's two edges. */
+/* The page shell adds outside gutters for the timeline and transcript scrollbar. */
 .main-page-shell {
   flex: 1;
   width: min(100%, calc(var(--conversation-column-width) + 2 * var(--conversation-column-gutter)));

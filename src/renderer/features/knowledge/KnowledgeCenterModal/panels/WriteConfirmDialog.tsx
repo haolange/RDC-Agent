@@ -4,14 +4,18 @@ import { Checkbox } from '../../../../ui/Checkbox';
 import { InlineError } from '../../../../ui/InlineError';
 import { Textarea } from '../../../../ui/Textarea';
 import { TaskDialog } from '../../../../ui/TaskDialog';
-import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
+import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { useI18n } from '../../../../i18n';
 import { ConflictRow } from '../parts/ConflictRow';
+import { KnowledgeStatusTag } from '../parts/KnowledgeStatusTag';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
+import type { ReactNode } from 'react';
+import type { KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
 
 interface WriteConfirmDialogProps {
   write: ReturnType<typeof useKnowledgeWriteConfirm>;
+  spaces: readonly KnowledgeSpace[];
 }
 
 /**
@@ -19,11 +23,15 @@ interface WriteConfirmDialogProps {
  * by main. Submission stays blocked until the reason is filled, the version is
  * still current, and the user has explicitly ticked the confirmation.
  */
-export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
+export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
   const { t } = useI18n();
   if (!write.open || !write.after) return null;
 
+  const space = spaces.find(({ spaceId }) => spaceId === write.after?.spaceId);
+  const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : space?.label;
   const hasContradicts = write.contradicts.length > 0;
+  const conflictHit = (id: string) => write.after?.cardId === id
+    ? write.after : write.conflictHits.find((hit) => hit.cardId === id);
   const blocked = Boolean(write.block)
     || write.versionStale
     || !write.packReady
@@ -31,7 +39,7 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
     || !write.confirmed
     || (hasContradicts && !write.acknowledgedConflicts);
 
-  const fact = (label: string, value: string) => (
+  const fact = (label: string, value: ReactNode) => (
     <div className="knowledge-write-fact">
       <dt>{label}</dt>
       <dd>{value}</dd>
@@ -48,6 +56,13 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
       closeLabel={t('knowledgeCenter.confirmCancel')}
       busy={write.busy}
       dataTestId="knowledge-center-confirm"
+      headerActions={write.basis ? (
+        <CopyDiagnosticsMenu facts={[
+          { label: t('knowledgeCenter.confirmTarget'), value: `${write.after.spaceId} / ${write.after.relativePath}` },
+          { label: t('knowledgeCenter.confirmRollbackBasis'), value: write.basis.hash },
+          { label: 'bytes', value: write.basis.bytes },
+        ]} />
+      ) : undefined}
       footer={(
         <>
           <Button variant="ghost" disabled={write.busy} onClick={write.close}>
@@ -65,10 +80,10 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
       )}
     >
       <dl className="knowledge-write-facts">
-        {fact(t('knowledgeCenter.confirmTarget'), `${write.after.spaceId} / ${write.after.relativePath}`)}
+        {fact(t('knowledgeCenter.confirmTarget'), [write.after.title, spaceLabel].filter(Boolean).join(' · '))}
         {fact(
-          t('knowledgeCenter.confirmProvenance'),
-          `${write.after.sourceStatus ?? '—'} · ${write.after.caseId ?? '—'}`,
+          t('knowledgeCenter.confirmCurrentStatus'),
+          <KnowledgeStatusTag lifecycle={write.before?.lifecycle} sourceStatus={write.before?.sourceStatus} />,
         )}
         {fact(
           t('knowledgeCenter.confirmVersion'),
@@ -91,8 +106,8 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
           {write.contradicts.map((conflict) => (
             <ConflictRow
               key={`${conflict.leftCardId}:${conflict.rightCardId}`}
-              leftCardId={conflict.leftCardId}
-              rightCardId={conflict.rightCardId}
+              left={conflictHit(conflict.leftCardId)}
+              right={conflictHit(conflict.rightCardId)}
             />
           ))}
         </section>
@@ -111,15 +126,7 @@ export function WriteConfirmDialog({ write }: WriteConfirmDialogProps) {
         <span className="knowledge-write-hint">{t('knowledgeCenter.confirmChangeReasonRequired')}</span>
       </label>
 
-      <p className="knowledge-write-hint knowledge-write-rollback">
-        {t('knowledgeCenter.confirmNoAutoRollback')}
-        {write.basis ? (
-          <CopyDiagnosticsButton facts={[
-            { label: t('knowledgeCenter.confirmRollbackBasis'), value: write.basis.hash },
-            { label: 'bytes', value: write.basis.bytes },
-          ]} />
-        ) : null}
-      </p>
+      <p className="knowledge-write-hint">{t('knowledgeCenter.confirmNoAutoRollback')}</p>
 
       {write.block === 'draft-to-verified' && <InlineError>{t('knowledgeCenter.confirmBlockedLifecycle')}</InlineError>}
       {write.block?.startsWith('missing-chapters') && <InlineError>{t('knowledgeCenter.confirmMissingChapters')}</InlineError>}

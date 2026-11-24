@@ -44,6 +44,15 @@
       "refreshedAt": "2026-10-25",
       "surface": "openai-eu",
       "accountScope": "public-api"
+    },
+    {
+      "id": "provider-docs:openai-eu:gpt62-2026-11-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://developers.openai.com/api/docs/models/gpt-6.2-astra ; https://developers.openai.com/api/docs/models/gpt-6.2-sol ; https://developers.openai.com/api/docs/models/gpt-6.1-terra ; https://developers.openai.com/api/docs/models ; https://developers.openai.com/api/docs/guides/latest-model ; https://developers.openai.com/api/docs/guides/fast-mode ; https://developers.openai.com/api/docs/guides/data-residency ; https://developers.openai.com/api/docs/pricing",
+      "observedAt": "2026-11-24",
+      "refreshedAt": "2026-11-24",
+      "surface": "openai-eu",
+      "accountScope": "public-api"
     }
   ],
   "defaultFactSourceId": "rdc-agent:openai-eu:0",
@@ -112,6 +121,370 @@
     }
   },
   "models": [
+    {
+      "modelId": "gpt-6.2-astra",
+      "label": "GPT-6.2 Astra",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 922000,
+          "maxOutputTokens": 128000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1050000
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted"
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:openai-eu:gpt62-2026-11-24",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      },
+      "cost": {
+        "input": 8.8,
+        "output": 44,
+        "cacheRead": 0.44,
+        "cacheWrite": 11
+      },
+      "executionBindings": [
+        {
+          "id": "route:omit-unsupported-sampling",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "top_logprobs": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
+          "id": "fast:service-tier",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "top_logprobs": null,
+                "service_tier": "fast"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ]
+    },
+    {
+      "modelId": "gpt-6.2-sol",
+      "label": "GPT-6.2 Sol",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 922000,
+          "maxOutputTokens": 128000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1050000
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted"
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "provider-docs:openai-eu:gpt62-2026-11-24",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      },
+      "cost": {
+        "input": 2.2,
+        "output": 11,
+        "cacheRead": 0.11,
+        "cacheWrite": 2.75
+      },
+      "executionBindings": [
+        {
+          "id": "route:omit-unsupported-sampling",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "top_logprobs": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
+          "id": "fast:service-tier",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "top_logprobs": null,
+                "service_tier": "fast"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ]
+    },
+    {
+      "modelId": "gpt-6.1-terra",
+      "label": "GPT-6.1 Terra",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1050000,
+          "maxOutputTokens": 128000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted",
+          "maxTotalTokens": 1050000
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted"
+        },
+        "maxContext": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:openai-eu:gpt62-2026-11-24",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      },
+      "cost": {
+        "input": 1.1,
+        "output": 5.5,
+        "cacheRead": 0.055,
+        "cacheWrite": 1.375
+      },
+      "executionBindings": [
+        {
+          "id": "fast:service-tier",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "service_tier": "fast"
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ]
+    },
     {
       "modelId": "gpt-6.1-sol",
       "label": "GPT-6.1 Sol",
@@ -1179,6 +1552,9 @@
   ],
   "protocolOverrides": [],
   "recommendedModels": [
+    "gpt-6.2-astra",
+    "gpt-6.2-sol",
+    "gpt-6.1-terra",
     "gpt-6-astra",
     "gpt-6.1-sol",
     "gpt-6-sol",

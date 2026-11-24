@@ -5,9 +5,13 @@ import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { Button } from '../../../../ui/Button';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField, SettingsSection } from '../parts';
-import type { AgentPermissionSettings } from '@shared/types/settings';
 
-type CustomRules = Pick<AgentPermissionSettings, 'readableRoots' | 'writableRoots' | 'allowedCommandPrefixes' | 'deniedCommandPrefixes'>;
+const ruleFields = [
+  ['readableRoots', 'settings.customPermissionReadableRoots'],
+  ['writableRoots', 'settings.customPermissionWritableRoots'],
+  ['allowedCommandPrefixes', 'settings.customPermissionAllowedPrefixes'],
+  ['deniedCommandPrefixes', 'settings.customPermissionDeniedPrefixes'],
+] as const;
 
 function lines(value: string): string[] {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -17,12 +21,12 @@ export const CustomPermissionFields: React.FC = () => {
   const { t } = useI18n();
   const saved = useAppSettingsStore((state) => state.settings.agentRuntime?.permissions ?? DEFAULT_AGENT_RUNTIME.permissions);
   const save = useAppSettingsStore((state) => state.setCustomPermissionRules);
-  const [draft, setDraft] = useState<CustomRules>({
-    readableRoots: saved.readableRoots,
-    writableRoots: saved.writableRoots,
-    allowedCommandPrefixes: saved.allowedCommandPrefixes,
-    deniedCommandPrefixes: saved.deniedCommandPrefixes,
-  });
+  const [draft, setDraft] = useState(() => ({
+    readableRoots: saved.readableRoots.join('\n'),
+    writableRoots: saved.writableRoots.join('\n'),
+    allowedCommandPrefixes: saved.allowedCommandPrefixes.join('\n'),
+    deniedCommandPrefixes: saved.deniedCommandPrefixes.join('\n'),
+  }));
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const statusText = status === 'saving'
     ? t('settings.customPermissionSaving')
@@ -31,43 +35,45 @@ export const CustomPermissionFields: React.FC = () => {
       : status === 'error'
         ? t('settings.customPermissionError')
         : '';
-  const edit = (patch: Partial<CustomRules>) => {
-    setStatus('idle');
-    setDraft((current) => ({ ...current, ...patch }));
-  };
+  const dirty = ruleFields.some(([field]) => lines(draft[field]).join('\n') !== saved[field].join('\n'));
 
   return (
     <SettingsSection
+      variant="rows"
+      className="settings-permission-rules"
       title={t('settings.customPermissionTitle')}
       description={t('settings.customPermissionHint')}
       data-testid="settings-custom-permissions"
     >
-      <SettingsField label={t('settings.customPermissionReadableRoots')} layout="stack">
-        <Textarea sizing="content" value={draft.readableRoots.join('\n')} onChange={(event) => edit({ readableRoots: lines(event.currentTarget.value) })} />
-      </SettingsField>
-      <SettingsField label={t('settings.customPermissionWritableRoots')} layout="stack">
-        <Textarea sizing="content" value={draft.writableRoots.join('\n')} onChange={(event) => edit({ writableRoots: lines(event.currentTarget.value) })} />
-      </SettingsField>
-      <SettingsField label={t('settings.customPermissionAllowedPrefixes')} layout="stack">
-        <Textarea sizing="content" value={draft.allowedCommandPrefixes.join('\n')} onChange={(event) => edit({ allowedCommandPrefixes: lines(event.currentTarget.value) })} />
-      </SettingsField>
-      <SettingsField label={t('settings.customPermissionDeniedPrefixes')} layout="stack">
-        <Textarea sizing="content" value={draft.deniedCommandPrefixes.join('\n')} onChange={(event) => edit({ deniedCommandPrefixes: lines(event.currentTarget.value) })} />
-      </SettingsField>
-      <div className="settings-profile-actions">
+      {ruleFields.map(([field, label]) => (
+        <SettingsField key={field} label={t(label)} htmlFor={`settings-permission-${field}`}>
+          <Textarea id={`settings-permission-${field}`} sizing="content" value={draft[field]} disabled={status === 'saving'}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setStatus('idle');
+              setDraft(current => ({ ...current, [field]: value }));
+            }} />
+        </SettingsField>
+      ))}
+      {dirty || status !== 'idle' ? <div className="settings-actions settings-actions-split">
         <span className="settings-save-status" role="status" data-status={status}>{statusText}</span>
-        <Button
-          variant="secondary"
+        {dirty || status === 'saving' ? <Button
+          variant="primary"
           size="sm"
           disabled={status === 'saving'}
           onClick={() => {
             setStatus('saving');
-            void save(draft).then(() => setStatus('saved')).catch(() => setStatus('error'));
+            void save({
+              readableRoots: lines(draft.readableRoots),
+              writableRoots: lines(draft.writableRoots),
+              allowedCommandPrefixes: lines(draft.allowedCommandPrefixes),
+              deniedCommandPrefixes: lines(draft.deniedCommandPrefixes),
+            }).then(() => setStatus('saved')).catch(() => setStatus('error'));
           }}
         >
           {t('settings.customPermissionSave')}
-        </Button>
-      </div>
+        </Button> : null}
+      </div> : null}
     </SettingsSection>
   );
 };

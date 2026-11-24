@@ -13,7 +13,7 @@ import {
   resolveEffectiveModelSelection,
 } from './EffectiveModelResolver';
 import { planModelRequest } from './RequestPlanner';
-import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';
+import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface, parseOllamaInstalledModels } from './LiveProviderCatalogParsers';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
@@ -431,9 +431,10 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       models: [{ id: 'local-model', label: 'Local model', enabled: true, defaultBudgetTokens: 65_536 }],
     };
     const request = buildEffectiveCatalogRequest(configured);
-    request.observed = {
-      source: 'observed', observedAt: '2026-11-06T00:00:00.000Z',
-      models: [{ modelId: 'local-model', toolCalling: { state: 'supported' } }],
+    request.discovery = {
+      source: 'discovery', observedAt: '2026-11-06T00:00:00.000Z',
+      models: parseOllamaInstalledModels({ models: [{ name: 'local-model' }] },
+        new Map([['local-model', { capabilities: ['tools'] }]]), getLoadedProviderSurface('ollama')!).contributions,
     };
     const models = mergeEffectiveCatalog(request);
     const model = models.find((candidate) => candidate.modelId === 'local-model')!;

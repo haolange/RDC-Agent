@@ -12,6 +12,8 @@ import type {
 } from './agentManifest';
 import type { ActionEvent } from './evidence';
 import type {
+  ConversationAccessAttachmentRequest,
+  ConversationAccessAttachmentResult,
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
   ConversationAnswerUserInputRequest,
@@ -229,6 +231,9 @@ export interface ElectronAPI {
     getAttachmentPreview: (
       request: ConversationGetAttachmentPreviewRequest,
     ) => Promise<ConversationGetAttachmentPreviewResult>;
+    accessAttachment: (
+      request: ConversationAccessAttachmentRequest,
+    ) => Promise<ConversationAccessAttachmentResult>;
     /** A session artifact, attachment or project file an answer embeds; images and mp4/webm video only. */
     resolveMedia: (request: { sessionId: string; src: string }) => Promise<
       { dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: string }

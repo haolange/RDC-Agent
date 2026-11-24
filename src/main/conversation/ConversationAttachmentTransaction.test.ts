@@ -141,4 +141,41 @@ describe('attachment staging bytes are the commit source', () => {
     expect(Array.isArray(manifest.attachments)).toBe(true);
     expect(manifest.attachments).toHaveLength(1);
   });
+
+  it('preserves the display name and independent bytes across initial send and edit-resend', async () => {
+    const { storageAdapter } = await import('../sessions/store/StorageAdapter');
+    await storageAdapter.initializeWorkspace();
+    const projectRoot = path.join(tempRoot, 'rewrite-project');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const sources = ['first', 'second'].map((text) => {
+      const root = path.join(tempRoot, text);
+      fs.mkdirSync(root, { recursive: true });
+      const file = path.join(root, 'stability.md');
+      fs.writeFileSync(file, text);
+      return file;
+    });
+    const reserved = storageAdapter.allocateStagedConversationSession(project.projectId, 'Attachments', 'req-start', 'turn-start');
+    const planned = storageAdapter.history.planAttachmentsForTurn(reserved.session, sources, path.join(reserved.finalPath, 'attachments'));
+    const staged = storageAdapter.beginStagedConversationSession(project.projectId, 'Attachments', sources, 'req-start', 'turn-start', {
+      reserved, plannedAttachments: planned,
+    });
+    const session = storageAdapter.commitStagedConversationSession(staged, [], null);
+    const original = storageAdapter.listSessionAttachments(session.sessionId);
+    expect(original.map((entry) => entry.fileName)).toEqual(['stability.md', 'stability.md']);
+    expect(original.map((entry) => path.basename(entry.filePath))).toEqual(['stability.md', 'stability-2.md']);
+    const previous = original[1]!;
+    const resend = storageAdapter.history.planAttachmentsForTurn(session, [previous.filePath], storageAdapter.getSessionAttachmentsDir(session.sessionId), [
+      { ...previous, layer: 'text' },
+    ]);
+    const commit = storageAdapter.beginExistingConversationTurnCommit(session.sessionId, [previous.filePath], 'req-edit', 'turn-edit', resend);
+    storageAdapter.commitExistingConversationTurn(commit, [], null);
+
+    const attachments = storageAdapter.listSessionAttachments(session.sessionId);
+    expect(attachments.slice(0, 2)).toEqual(original);
+    expect(attachments[2]).toMatchObject({ fileName: 'stability.md' });
+    expect(new Set(attachments.map((entry) => entry.attachmentId)).size).toBe(3);
+    expect(attachments.map((entry) => path.basename(entry.filePath))).toEqual(['stability.md', 'stability-2.md', 'stability-3.md']);
+    expect(attachments.map((entry) => fs.readFileSync(entry.filePath, 'utf8'))).toEqual(['first', 'second', 'second']);
+  });
 });

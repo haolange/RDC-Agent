@@ -61,13 +61,14 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
   return (
     <section className="settings-local-tool-form" data-testid="settings-agent-shell" data-settings-search="agent-shell">
       <div className="settings-local-tool-grid">
-        <SettingsField label={t('settings.shellExecutable')} layout="row" description={t('settings.shellHint')}
+        <SettingsField label={t('settings.shellExecutable')} htmlFor="settings-shell-executable" description={t('settings.shellHint')}
           warning={resolved?.ok && resolved.kind === 'windows-powershell' ? (
             <span data-testid="settings-agent-shell-upgrade">{t('settings.shellUpgradePwsh')}</span>
           ) : undefined}>
           <div className="settings-input-with-action">
             <Input
               type="text"
+              id="settings-shell-executable"
               data-testid="settings-agent-shell-executable"
               value={draft.executable}
               spellCheck={false}

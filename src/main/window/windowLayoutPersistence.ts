@@ -74,7 +74,7 @@ export function resolveWindowCreationOptions(
   };
 }
 
-/** Sync persist for close path — must finish before quit. */
+/** Persist current bounds after a resize settles or before closing the window. */
 export function persistWindowLayout(win: BrowserWindow | null): void {
   if (!win || win.isDestroyed()) return;
   try {
@@ -84,17 +84,13 @@ export function persistWindowLayout(win: BrowserWindow | null): void {
   }
 }
 
-/** Debounced async persist for move/resize — narrow window write only. */
 export function schedulePersistWindowLayout(win: BrowserWindow | null): void {
   if (saveTimer) {
     clearTimeout(saveTimer);
   }
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    if (!win || win.isDestroyed()) return;
-    void settingsService.persistWindowLayoutAsync(captureWindowLayout(win)).catch((error) => {
-      console.error('[WindowLayout] Failed to persist window bounds:', error);
-    });
+    persistWindowLayout(win);
   }, SAVE_DEBOUNCE_MS);
 }
 

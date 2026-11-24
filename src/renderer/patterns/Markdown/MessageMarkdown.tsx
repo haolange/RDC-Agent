@@ -23,9 +23,12 @@ import './markdown-rich.css';
 
 interface MessageMarkdownProps {
   content: string;
+  /** Reasoning preserves the Markdown supplied by the provider. */
+  preserveSource?: boolean;
   /** Skip KaTeX / math while the source is still streaming; only closed code blocks are highlighted. */
   deferHeavyPlugins?: boolean;
   renderImage?: (props: { src?: string; alt?: string }) => React.ReactNode;
+  renderLink?: (props: Pick<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children' | 'href'>) => React.ReactNode;
   /** Clipped excerpts must not contain unreachable links or code actions. */
   interactive?: boolean;
 }
@@ -59,9 +62,13 @@ const Callout: React.FC<{ kind: CalloutKind; children: React.ReactNode }> = ({ k
   );
 };
 
-function createMarkdownComponents(renderImage: MessageMarkdownProps['renderImage'], interactive: boolean): Components {
+function createMarkdownComponents(
+  renderImage: MessageMarkdownProps['renderImage'],
+  renderLink: MessageMarkdownProps['renderLink'],
+  interactive: boolean,
+): Components {
   return {
-    a: (props) => (interactive ? <MarkdownLink {...props} /> : <span>{props.children}</span>),
+    a: (props) => renderLink ? renderLink(props) : interactive ? <MarkdownLink {...props} /> : <span>{props.children}</span>,
     img: ({ src, alt }) => {
       const source = typeof src === 'string' ? src : undefined;
       if (renderImage) return renderImage({ src: source, alt });
@@ -124,13 +131,15 @@ function createMarkdownComponents(renderImage: MessageMarkdownProps['renderImage
  */
 const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({
   content,
+  preserveSource = false,
   deferHeavyPlugins = false,
   renderImage,
+  renderLink,
   interactive = true,
 }) => {
   const { t } = useI18n();
-  const normalized = useMemo(() => normalizeAssistantMarkdown(content), [content]);
-  const components = useMemo(() => createMarkdownComponents(renderImage, interactive), [renderImage, interactive]);
+  const normalized = useMemo(() => preserveSource ? content : normalizeAssistantMarkdown(content), [content, preserveSource]);
+  const components = useMemo(() => createMarkdownComponents(renderImage, renderLink, interactive), [renderImage, renderLink, interactive]);
   const remarkRehypeOptions = useMemo(() => ({
     footnoteLabel: t('chat.markdownFootnotes'),
     footnoteBackLabel: t('chat.markdownFootnoteBack'),

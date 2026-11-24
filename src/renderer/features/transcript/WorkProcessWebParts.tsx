@@ -90,9 +90,9 @@ export const WebGroupRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'webGr
         <div className={`work-process-tool-card status-${row.status}${expanded ? ' is-expanded' : ''} is-expandable`}
           data-testid="work-process-tool-card" data-family="web" data-locate>
           <WorkCardHeader onClick={(event) => { event.preventDefault(); toggle(); }} expanded={expanded}
-            titleText={headline} duration={row.duration}
+            title={headline} duration={row.duration}
             icon={<Icon name="web-fetch" className="work-process-icon work-process-tool-card-icon" />}
-            title={<ActiveSignalText active={isTrackActivity(row)} tone="info">{headline}</ActiveSignalText>} />
+            titleContent={<ActiveSignalText active={isTrackActivity(row)} tone="info">{headline}</ActiveSignalText>} />
           <div className="work-process-tool-card-body family-web">
             <WebPillStrip pages={row.pages} />
           </div>

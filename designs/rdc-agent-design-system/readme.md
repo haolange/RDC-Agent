@@ -15,7 +15,7 @@
 | 组件与契约 | 生产消费者 | 使用边界 |
 |---|---|---|
 | Button、Input、Textarea、Switch、Checkbox | Settings 八页、Composer、Knowledge | 基础控件不读写领域状态；标签、错误和操作由所属表单提供 |
-| Select、SearchMultiSelect | Settings 模型与工具配置、patterns/MaterialContextEditor | 固定单选和搜索多选分别使用现有入口，不保留原生 select 替代入口 |
+| Select、SearchMultiSelect | Settings 模型与工具配置 | 固定单选和搜索多选分别使用现有入口，不保留原生 select 替代入口 |
 | Details | Settings 高级配置、Knowledge 索引/元信息、素材上下文、RightRailInvestigationPreview | 内嵌与面板两种表现；子树保留挂载；历史任务展开仍由 ScopedWorkDisclosure 管理 |
 | Popover、ContextMenu | 工作台局部操作、全局编辑菜单、设置选择器 | Popover/Select/ContextMenu 共享 lib/anchoredSurface 几何；顶层 Escape 与原触发器焦点返回；Menu 作为公开基础控件在目录中展示，当前没有生产直接消费者 |
 | TaskDialog、ConfirmationDialog | Settings 子弹层、Knowledge 写入确认、项目操作 | 标题与操作区固定，正文占剩余空间；嵌套浮层不关闭父层 |

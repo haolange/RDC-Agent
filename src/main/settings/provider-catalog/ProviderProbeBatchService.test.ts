@@ -13,7 +13,7 @@ const verified = () => ({ success: true as const, status: 'verified' as const, r
 function fixture() {
   const providers = [provider(), provider('q')];
   const dependencies: ProbeBatchDependencies = {
-    providers: () => providers, refresh: vi.fn(async () => undefined),
+    providers: () => providers, loadSavedCatalog: vi.fn(async () => undefined),
     models: () => [model()], test: vi.fn(async () => verified()),
   };
   return { providers, dependencies, service: new ProviderProbeBatchService(dependencies) };
@@ -41,6 +41,8 @@ describe('ProviderProbeBatchService', () => {
     });
     const batch = await f.service.prepare({});
     expect(batch).toMatchObject({ modelCount: 2, requestCount: 4, state: 'ready' });
+    expect(f.dependencies.loadSavedCatalog).toHaveBeenCalledTimes(2);
+    expect(f.dependencies.test).not.toHaveBeenCalled();
     const finished = new Promise<void>(resolve => f.service.subscribe(b => { if (b.state === 'completed') resolve(); }));
     f.service.start(batch.id);
     expect(() => f.service.start(batch.id)).toThrow('not ready');
@@ -88,9 +90,9 @@ describe('ProviderProbeBatchService', () => {
     expect(f.service.get()?.items.every(i => i.state === 'skipped')).toBe(true);
   });
 
-  it('keeps refresh failures visible and refuses batches during disposal', async () => {
+  it('keeps saved catalog load failures visible and refuses batches during disposal', async () => {
     const f = fixture();
-    f.dependencies.refresh = async () => 'catalog unavailable';
+    f.dependencies.loadSavedCatalog = async () => 'catalog unavailable';
     const batch = await f.service.prepare({ providerIds: ['p'] });
     expect(batch.discoveryErrors).toEqual([{ providerId: 'p', detail: 'catalog unavailable' }]);
     await f.service.dispose();

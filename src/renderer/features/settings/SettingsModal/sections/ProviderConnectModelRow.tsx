@@ -1,5 +1,6 @@
 import React from 'react';
 import { Switch } from '../../../../ui/Switch';
+import { Button } from '../../../../ui/Button';
 import { resolveProviderModelAvailabilityBadge } from '../providerModelAvailabilityBadge';
 import { Chevron } from '../../../../ui/Chevron';
 import { formatContextCapability } from '../modelCapabilitySummaryUtils';
@@ -48,7 +49,6 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
     refreshError,
   });
   const isUnavailable = badge === 'unavailable';
-  const isUnverified = badge === 'unverified';
   const statusLabel = badge === 'unavailable'
     ? t('settings.providers.modelUnavailable')
     : badge === 'disabled'
@@ -63,45 +63,41 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
   const statusTitle = isUnavailable
     ? (model.availabilityReason || t('settings.providers.modelUnavailableReason'))
     : badge === 'refresh-failed'
-      ? refreshError
+      ? t('settings.providers.modelRefreshFailedReason')
       : badge === 'unverified'
         ? t('settings.providers.modelUnverifiedReason')
         : undefined;
 
   return (
     <div
-      className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}${isUnavailable || !model.enabled ? ' settings-model-row--disabled' : ''}${isUnverified || badge === 'refresh-failed' ? ' settings-model-row--unverified' : ''}`}
+      className={`settings-model-row${expanded ? ' is-expanded' : ''}${isUnavailable || !model.enabled ? ' is-disabled' : ''}`}
       data-testid={`settings-provider-model-row-${model.id}`}
       data-availability-badge={badge}
-      aria-disabled={isUnavailable}
     >
       <div className="settings-model-row-main">
-        <span className={`settings-model-row-check is-${badge}`} data-tooltip={statusTitle}>{statusLabel}</span>
         <span className="settings-model-row-identity">
           <span className="settings-model-row-label">{model.label}</span>
           {effectiveModel ? <span className="settings-model-row-context">{formatContextCapability(effectiveModel, t)}</span> : null}
         </span>
+        <span className={`settings-model-row-check is-${badge}`} data-tooltip={statusTitle}>{statusLabel}</span>
+        <span className="settings-model-row-capabilities"><ProviderModelCapabilityIcons model={effectiveModel} t={t} /></span>
         <Switch
           checked={model.enabled}
           disabled={disabled || isUnavailable}
           onCheckedChange={(enabled) => onModelChange(model.id, { enabled })}
           aria-label={t('settings.providers.capability.modelEnabled', { model: model.label })}
         />
-        <span className="settings-model-row-capabilities">
-        <ProviderModelCapabilityIcons model={effectiveModel} t={t} />
-        <button
-          type="button"
-          className="button button-ghost button-sm settings-model-capability-toggle"
+        <Button
+          variant="ghost" size="sm" className="settings-model-capability-toggle"
           aria-expanded={expanded}
-          aria-label={t('settings.providers.capability.toggle')}
+          aria-label={`${t('settings.providers.capability.toggle')} · ${model.label}`}
           data-tooltip={t('settings.providers.capability.toggle')}
           disabled={disabled}
           data-testid={`settings-provider-model-capability-toggle-${model.id}`}
           onClick={() => onToggleExpanded(model.id)}
         >
           <Chevron direction="down" open={expanded} />
-        </button>
-        </span>
+        </Button>
       </div>
       {expanded ? (
         <ProviderModelCapabilitySummary

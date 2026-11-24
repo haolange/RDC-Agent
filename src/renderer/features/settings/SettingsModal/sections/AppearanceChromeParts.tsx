@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { THEME_PRESET_CATALOG, getPresetChrome } from '@shared/theme/presets';
 import { serializeRdcThemeV1 } from '@shared/theme/rdcThemeV1';
-import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Button } from '../../../../ui/Button';
 import { ColorField } from '../../../../ui/ColorField';
 import { Select } from '../../../../ui/Select';
@@ -11,41 +10,6 @@ import type { ThemeChromeConfig, ThemePresetId, ThemeVariant } from '@shared/typ
 import type { AppearanceTranslate } from './appearanceChromeModel';
 
 export type { AppearanceTranslate };
-
-function useChromeVars(chrome: ThemeChromeConfig) {
-  return useDynStyle({
-    '--ap-surface': chrome.surface,
-    '--ap-ink': chrome.ink,
-    '--ap-accent': chrome.accent,
-  });
-}
-
-export function AppearanceChromePreview(props: {
-  chrome: ThemeChromeConfig;
-  variant: ThemeVariant;
-  label: string;
-}) {
-  const chromeStyle = useChromeVars(props.chrome);
-  return (
-    <div
-      className="appearance-preview-pane"
-      {...chromeStyle}
-      data-testid={`appearance-preview-${props.variant}`}
-      aria-hidden="true"
-    >
-      <div className="appearance-preview-side">
-        <span className="appearance-preview-nav appearance-preview-nav--accent" />
-        <span className="appearance-preview-nav" />
-        <span className="appearance-preview-nav" />
-      </div>
-      <div className="appearance-preview-main">
-        <div className="appearance-preview-line appearance-preview-line--wide" />
-        <div className="appearance-preview-line appearance-preview-line--mid" />
-        <div className="appearance-preview-cta" />
-      </div>
-    </div>
-  );
-}
 
 export function ChromeThemeCard(props: {
   variant: ThemeVariant;
@@ -89,7 +53,7 @@ export function ChromeThemeCard(props: {
   return (
     <div className="appearance-chrome-card" data-testid={`appearance-chrome-${props.variant}`}>
       <div className="appearance-chrome-header">
-        <h3 className="appearance-chrome-title">{title}</h3>
+        <h3 className="appearance-chrome-title">{props.t('settings.appearanceEditingTheme', { theme: title })}</h3>
         <div className="appearance-chrome-actions">
           <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
             {props.t('settings.appearanceImport')}
@@ -103,8 +67,6 @@ export function ChromeThemeCard(props: {
           </Button>
         </div>
       </div>
-
-      <AppearanceChromePreview chrome={props.chrome} variant={props.variant} label={title} />
 
       <div className="appearance-chrome-fields">
         <div className="appearance-preset-picker">

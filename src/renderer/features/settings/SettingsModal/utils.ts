@@ -51,35 +51,15 @@ export const getProviderDisplayLabel = (
 ): string => provider.label.trim() || fallbackLabel;
 
 const PROVIDER_CATEGORY_TRANSLATIONS = {
-  'login-authorization': {
-    label: 'settings.providerCategory.loginAuthorization.label',
-    description: 'settings.providerCategory.loginAuthorization.description',
-  },
-  'official-direct': {
-    label: 'settings.providerCategory.officialDirect.label',
-    description: 'settings.providerCategory.officialDirect.description',
-  },
-  'cloud-platform': {
-    label: 'settings.providerCategory.cloudPlatform.label',
-    description: 'settings.providerCategory.cloudPlatform.description',
-  },
-  'coding-token-plan': {
-    label: 'settings.providerCategory.codingTokenPlan.label',
-    description: 'settings.providerCategory.codingTokenPlan.description',
-  },
-  'compatible-access': {
-    label: 'settings.providerCategory.compatibleAccess.label',
-    description: 'settings.providerCategory.compatibleAccess.description',
-  },
-  local: {
-    label: 'settings.providerCategory.local.label',
-    description: 'settings.providerCategory.local.description',
-  },
-} as const satisfies Record<LlmProviderCategory, { label: TranslationKey; description: TranslationKey }>;
+  'login-authorization': 'settings.providerCategory.loginAuthorization.label',
+  'official-direct': 'settings.providerCategory.officialDirect.label',
+  'cloud-platform': 'settings.providerCategory.cloudPlatform.label',
+  'coding-token-plan': 'settings.providerCategory.codingTokenPlan.label',
+  'compatible-access': 'settings.providerCategory.compatibleAccess.label',
+  local: 'settings.providerCategory.local.label',
+} as const satisfies Record<LlmProviderCategory, TranslationKey>;
 
-export const getProviderCategoryTranslation = (category: LlmProviderCategory) => (
-  PROVIDER_CATEGORY_TRANSLATIONS[category]
-);
+export const getProviderCategoryTranslation = (category: LlmProviderCategory) => PROVIDER_CATEGORY_TRANSLATIONS[category];
 
 export const getProviderProtocolLabel = (protocol: ProviderProtocol): string => {
   const definition = LLM_PROVIDER_PROTOCOL_DEFINITIONS.find((entry) => entry.id === protocol);

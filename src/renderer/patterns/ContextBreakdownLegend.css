@@ -13,14 +13,14 @@
   flex-direction: column;
   gap: 0;
   margin: 0;
-  padding: var(--space-2) 0 0;
+  padding: 0;
   list-style: none;
   overflow: visible;
   flex: 0 0 auto;
 }
 
 .context-breakdown-group-header {
-  padding: var(--space-4) var(--space-2) var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-1);
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
@@ -37,25 +37,11 @@
   align-items: center;
   gap: var(--space-3);
   margin: 0;
-  padding: 0 var(--space-2);
-  min-height: var(--space-8);
-  border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
+  padding: var(--space-1) var(--space-2);
 }
 
-.context-breakdown-row:hover,
-.context-breakdown-row:focus-visible {
-  background: var(--token-interactive-hover);
-}
-
-.context-breakdown-row.is-free,
-.context-breakdown-row.is-deferred,
-.context-breakdown-row.is-zero {
-  opacity: 0.55;
-}
-
-.context-breakdown-row.is-deferred .context-breakdown-label,
-.context-breakdown-row.is-deferred .context-breakdown-tokens {
+.context-breakdown-row.is-deferred .context-breakdown-tokens,
+.context-breakdown-row.is-zero .context-breakdown-tokens {
   color: var(--token-text-secondary);
 }
 
@@ -72,10 +58,7 @@
   min-width: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .context-breakdown-count {

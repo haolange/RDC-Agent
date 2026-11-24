@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
 import { isBrowserAppSession } from '../../platform/browserSession';
-import { attachmentRejectKey, COMPOSER_MAX_ATTACHMENT_COUNT, isAttachmentStageOverflow } from './attachmentRejectCopy';
+import { COMPOSER_MAX_ATTACHMENT_COUNT, isAttachmentStageOverflow } from './attachmentRejectCopy';
 import { descriptorToDraft, filesToStageItems } from './composerAttachmentIngest';
 import type { ConversationAttachmentStageItem } from '@shared/types/conversation';
 import type { useI18n } from '../../i18n';
@@ -115,13 +115,8 @@ export function useComposerAttachments(options: {
         void electronAPI.conversation.releaseAttachments({ stagingIds: discardedIds });
       }
       const accepted = result.attachments.filter((item) => !item.error);
-      const rejected = result.attachments.filter((item) => item.error);
       if (accepted.length > 0) {
         showNotice(t('app.stageFilesSuccess', { count: accepted.length }));
-      }
-      if (rejected.length > 0) {
-        const code = rejected[0]?.error?.code;
-        showNotice(code ? t(attachmentRejectKey(code)) : t('app.attachRejected'));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

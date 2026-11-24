@@ -23,7 +23,7 @@ export function resolveProviderModelAvailabilityBadge(input: {
   const availability = input.availability ?? 'unknown';
   if (availability === 'unavailable') return 'unavailable';
   if (!input.enabled) return 'disabled';
-  if (input.loading || input.refreshing) return 'loading';
+  if (input.loading || (input.refreshing && availability === 'unknown')) return 'loading';
   if (availability === 'unknown') return input.refreshError ? 'refresh-failed' : 'unverified';
   return 'available';
 }

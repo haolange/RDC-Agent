@@ -9,7 +9,7 @@ export interface ResourceListDetailProps {
   emptyTitle: string;
   emptyDescription?: ReactNode;
   emptyActions?: ReactNode;
-  emptyVariant?: 'panel' | 'page';
+  emptyVariant?: 'inline' | 'panel';
   isEmpty: boolean;
   list?: ReactNode;
   detail?: ReactNode;

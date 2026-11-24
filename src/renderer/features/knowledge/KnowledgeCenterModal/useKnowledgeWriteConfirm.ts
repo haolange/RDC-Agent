@@ -149,6 +149,7 @@ export function useKnowledgeWriteConfirm(options: {
     basis,
     versionStale,
     contradicts,
+    conflictHits: pack?.hits ?? [],
     packReady,
     busy,
     error,

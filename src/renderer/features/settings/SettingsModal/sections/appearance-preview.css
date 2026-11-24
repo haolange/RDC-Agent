@@ -1,66 +1,90 @@
-.appearance-preview-pane {
-  /* The theme being edited sets these inline; until then the preview shows the window's own theme. */
-  --ap-surface: var(--token-bg-raised);
-  --ap-ink: var(--token-text-primary);
-  --ap-accent: var(--token-accent-primary);
+.appearance-theme-previews {
   display: grid;
-  grid-template-columns: 44px 1fr;
-  min-height: 6rem;
-  margin-bottom: var(--space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.appearance-theme-preview-button.button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+  align-items: start;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  color: var(--token-text-primary);
+  text-align: start;
+}
+
+.appearance-theme-preview-button.button:is(:hover, :focus-visible) {
+  background: var(--token-interactive-hover);
+}
+
+.appearance-theme-preview-button.button[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px var(--token-border-focus);
+  border-color: var(--token-border-focus);
+  background: var(--token-interactive-active);
+}
+
+.appearance-preview-pane {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ap-ink) 16%, transparent);
   border-radius: var(--radius-md);
-  overflow: hidden;
   background: var(--ap-surface);
   color: var(--ap-ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
+  white-space: normal;
+}
+
+.appearance-preview-side,
+.appearance-preview-main {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-2);
 }
 
 .appearance-preview-side {
-  display: grid;
-  gap: var(--space-2);
-  align-content: start;
-  padding: var(--space-3) var(--space-2);
-  background: color-mix(in srgb, var(--ap-ink) 10%, var(--ap-surface));
-  border-right: 1px solid color-mix(in srgb, var(--ap-ink) 12%, transparent);
+  background: var(--ap-sidebar);
+  border-inline-end: 1px solid color-mix(in srgb, var(--ap-ink) 14%, transparent);
+  color: var(--ap-secondary);
 }
 
 .appearance-preview-nav {
-  display: block;
-  width: 100%;
-  height: 8px;
+  box-shadow: inset 2px 0 var(--ap-accent);
+  padding-inline: var(--space-2);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ap-ink) 16%, transparent);
-}
-
-.appearance-preview-nav--accent {
-  background: var(--ap-accent);
+  background: color-mix(in srgb, var(--ap-accent) 14%, var(--ap-sidebar));
+  color: var(--ap-ink);
 }
 
 .appearance-preview-main {
-  display: grid;
-  gap: var(--space-2);
-  align-content: start;
-  padding: var(--space-4);
+  padding-inline: var(--space-3);
+  overflow-wrap: anywhere;
 }
 
-.appearance-preview-line {
-  height: 8px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ap-ink) 12%, transparent);
-}
-
-.appearance-preview-line--wide {
-  width: 80%;
-}
-
-.appearance-preview-line--mid {
-  width: 58%;
+.appearance-preview-main code {
+  font-family: var(--font-mono);
+  color: var(--ap-secondary);
+  white-space: normal;
 }
 
 .appearance-preview-cta {
-  margin-top: var(--space-1);
   justify-self: start;
-  width: 4rem;
-  height: var(--space-3);
-  border-radius: var(--radius-full);
+  padding-inline: var(--space-2);
   background: var(--ap-accent);
+  color: var(--ap-on-accent);
+  border-radius: var(--radius-sm);
+}
+
+@container settings-panel (max-width: 34rem) {
+  .appearance-theme-previews {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -65,11 +65,9 @@ import {
   deleteSecretsAfterCommit,
   normalizePersistedSettings,
   readJsonFile,
-  readJsonFileAsync,
   rebuildPersistedSettings,
   toRuntimeSettings,
   writeSettings,
-  writeSettingsAsync,
 } from './settingsServiceHelpers';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import type {
@@ -222,7 +220,7 @@ export class SettingsService {
   }
 
   /**
-   * Narrow sync write for window close — patches layout.window only.
+   * Patch layout.window in the same synchronous transaction used by other settings.
    * Skips provider normalization and secret hydration.
    */
   persistWindowLayout(window: WindowLayoutPreference): void {
@@ -230,17 +228,6 @@ export class SettingsService {
     const paths = appPathService.getRuntimePaths();
     const current = readJsonFile<PersistedSettingsPayload>(paths.settingsPath);
     writeSettings(this.assembleWindowLayoutPayload(window, current));
-  }
-
-  /**
-   * Narrow async write for move/resize debounce — patches layout.window only.
-   * Skips provider normalization and secret hydration.
-   */
-  async persistWindowLayoutAsync(window: WindowLayoutPreference): Promise<void> {
-    this.ensureInitialized();
-    const paths = appPathService.getRuntimePaths();
-    const current = await readJsonFileAsync<PersistedSettingsPayload>(paths.settingsPath);
-    await writeSettingsAsync(this.assembleWindowLayoutPayload(window, current));
   }
 
   private assembleWindowLayoutPayload(

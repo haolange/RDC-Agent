@@ -227,7 +227,7 @@ export class SessionRecordStore {
   ): import('@shared/types/session').SessionAttachmentRecord[] {
     for (let index = 0; index < planned.length; index += 1) {
       const sourcePath = path.resolve(sourceAttachmentPaths[index]!);
-      const targetPath = path.join(physicalAttachmentsDir, planned[index]!.fileName);
+      const targetPath = path.join(physicalAttachmentsDir, path.basename(planned[index]!.filePath));
       fs.copyFileSync(sourcePath, targetPath);
     }
     return planned;

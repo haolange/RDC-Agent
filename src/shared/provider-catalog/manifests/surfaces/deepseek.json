@@ -26,6 +26,15 @@
   "catalogOwnership": "app-managed",
   "factSources": [
     {
+      "id": "provider-docs:deepseek:2026-11-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "https://api-docs.deepseek.com/quick_start/pricing/ ; https://api-docs.deepseek.com/updates/ ; https://api-docs.deepseek.com/guides/thinking_mode/",
+      "observedAt": "2026-11-24",
+      "refreshedAt": "2026-11-24",
+      "surface": "deepseek",
+      "accountScope": "public-api"
+    },
+    {
       "id": "provider-docs:deepseek:2026-09-22",
       "sourceKind": "provider-docs",
       "sourceRevision": "https://api-docs.deepseek.com/quick_start/pricing/ ; https://api-docs.deepseek.com/api/create-response/ ; https://api-docs.deepseek.com/news/news260813/ ; https://api-docs.deepseek.com/guides/thinking_mode/ ; https://api-docs.deepseek.com/guides/anthropic_api/ @2026-09-22",
@@ -375,7 +384,13 @@
       ],
       "factSourceId": "provider-docs:deepseek:2026-09-10",
       "fieldFactSourceIds": {
-        "executionBindings": "provider-docs:deepseek:2026-09-22"
+        "executionBindings": "provider-docs:deepseek:2026-09-22",
+        "cost": "provider-docs:deepseek:2026-11-24",
+        "contextTiers": "provider-docs:deepseek:2026-11-24",
+        "toolCalling": "provider-docs:deepseek:2026-11-24",
+        "visionInput": "provider-docs:deepseek:2026-11-24",
+        "structuredOutput": "provider-docs:deepseek:2026-11-24",
+        "routeOptions": "provider-docs:deepseek:2026-11-24"
       }
     },
     {
@@ -517,7 +532,13 @@
       ],
       "factSourceId": "provider-docs:deepseek:2026-09-22",
       "fieldFactSourceIds": {
-        "executionBindings": "provider-docs:deepseek:2026-09-22"
+        "executionBindings": "provider-docs:deepseek:2026-09-22",
+        "cost": "provider-docs:deepseek:2026-11-24",
+        "contextTiers": "provider-docs:deepseek:2026-11-24",
+        "toolCalling": "provider-docs:deepseek:2026-11-24",
+        "visionInput": "provider-docs:deepseek:2026-11-24",
+        "structuredOutput": "provider-docs:deepseek:2026-11-24",
+        "routeOptions": "provider-docs:deepseek:2026-11-24"
       }
     }
   ],
@@ -651,5 +672,9 @@
     "deepseek-flash",
     "deepseek-v4-pro"
   ],
-  "docsUrl": "https://api-docs.deepseek.com/"
+  "docsUrl": "https://api-docs.deepseek.com/",
+  "retiredModelIds": [
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp"
+  ]
 }

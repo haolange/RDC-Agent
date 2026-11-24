@@ -9,7 +9,7 @@ export function useRdcInstallation(draft: RdcCliInvokerSettings, onApplied: (set
   const revision = useRef(0);
   const [root, setRoot] = useState(draft.workingDirectory);
   const [candidates, setCandidates] = useState<RdcInstallationCandidate[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<'detect' | 'select' | 'apply' | null>(null);
   const [summary, setSummary] = useState<ToolRuntimeSummary | null>(null);
   const [error, setError] = useState('');
   const [detected, setDetected] = useState(false);
@@ -25,32 +25,32 @@ export function useRdcInstallation(draft: RdcCliInvokerSettings, onApplied: (set
   // The modal owns one draft lifetime. Later selections must not be replaced by persisted settings.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const run = async (action: (current: () => boolean) => Promise<void>) => {
+  const run = async (name: NonNullable<typeof operation>, action: (current: () => boolean) => Promise<void>) => {
     const id = ++revision.current;
-    setBusy(true); setError(''); setSummary(null);
+    setOperation(name); setError(''); setSummary(null);
     const current = () => revision.current === id;
     try { await action(current); }
     catch (failure) { if (current()) setError(failure instanceof Error ? failure.message : String(failure)); }
-    finally { if (current()) setBusy(false); }
+    finally { if (current()) setOperation(null); }
   };
-  const invalidate = () => { revision.current += 1; setSummary(null); };
+  const invalidate = () => { revision.current += 1; setOperation(null); setError(''); setSummary(null); };
   return {
-    root, candidates, busy, summary, error, detected, invalidate,
-    choose: (value: string) => run(async (current) => {
+    root, candidates, busy: operation !== null, operation, summary, error, detected, invalidate,
+    choose: (value: string) => run('select', async (current) => {
       const result = await resolveRdcInstallation({ root: value, timeoutMs: draft.timeoutMs, env: draft.env });
       if (current()) setRoot(result.workingDirectory);
     }),
-    detect: () => run(async (current) => {
+    detect: () => run('detect', async (current) => {
       const result = await detectRdcInstallations();
       if (current()) { setCandidates(result); setDetected(true); }
     }),
-    select: () => run(async (current) => {
+    select: () => run('select', async (current) => {
       const selected = await selectRdcInstallation();
       if (!selected || !current()) return;
       const resolved = await resolveRdcInstallation({ root: selected, timeoutMs: draft.timeoutMs, env: draft.env });
       if (current()) setRoot(resolved.workingDirectory);
     }),
-    apply: () => run(async (current) => {
+    apply: () => run('apply', async (current) => {
       const result = await validateRdcInstallation({ root, timeoutMs: draft.timeoutMs, env: draft.env });
       if (!current()) return;
       const saved = await useAppSettingsStore.getState().patchSettings({ tooling: { rdcCli: result.settings } });

@@ -8,7 +8,7 @@ import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
-import { CopyDiagnosticsButton } from '../../../../patterns/CopyDiagnostics';
+import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { SettingsSection } from '../parts';
 import { Badge } from '../../../../ui/Badge';
 import { InlineError } from '../../../../ui/InlineError';
@@ -18,6 +18,7 @@ import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabi
 import { AgentHandoffEditor } from './AgentHandoffEditor';
 import { AgentModelBindingFields } from './AgentModelBindingFields';
 import { configStatus, provenanceLabel } from './agentConfigStatus';
+import { agentPanelSummary, type AgentPanel } from './agentPanelSummary';
 import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
 import type { useI18n } from '../../../../i18n';
@@ -25,7 +26,6 @@ import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
 import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-type AgentPanel = 'identity' | 'permissions' | 'handoffs' | 'instructions';
 interface AgentManifestEditorProps {
   skills: AgentSkillCatalog;
   settings: AppSettings;
@@ -105,17 +105,10 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           <AgentCapabilityPicker groups={capabilityGroups} skills={skills} targetAgentId={selectedAgent.id} t={t} />
           <AgentExecutionLimitField agent={selectedAgent} onUpdateAgent={onUpdateAgent} t={t} />
           {toolDiagnostics.length > 0 ? (
-            <div className="settings-agent-tool-diagnostics" data-testid="settings-agent-tool-diagnostics" role="status">
-              <div className="settings-agent-tool-diagnostics-title">{t('settings.agentToolDiagnosticsTitle')}</div>
-              <ul className="settings-agent-tool-diagnostics-list">
-                {toolDiagnostics.map((item) => (
-                  <li key={item.token}>
-                    <code>{item.token}</code>
-                    <span>{item.message}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <InlineError data-testid="settings-agent-tool-diagnostics"
+              detail={toolDiagnostics.map(item => `${item.token} · ${item.message}`).join('\n')}>
+              {t('settings.agentToolDiagnosticsTitle')}
+            </InlineError>
           ) : null}
         </>
       );
@@ -188,6 +181,14 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           {!builtinUpdate && provenanceScope !== 'builtin' ? (
             <Button variant="danger" size="sm" onClick={onDeleteAgent}>{t('settings.deleteAgent')}</Button>
           ) : null}
+          <CopyDiagnosticsMenu testId="settings-agent-diagnostics" facts={[
+            { label: t('settings.resourceFieldId'), value: selectedAgent.id },
+            { label: t('settings.resourceScope'), value: provenanceLabel(provenanceScope, t) },
+            ...(provenance ? [
+              { label: t('settings.scopeResourceLocation'), value: provenance.sourcePath },
+              { label: t('settings.contentFingerprint'), value: provenance.sourceHash },
+            ] : []),
+          ]} />
         </div>
       </div>
 
@@ -212,27 +213,13 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             ) : null}
 
             <div className="settings-agent-flags" role="group" aria-label={t('settings.agentAvailability')}>
-              <label className="settings-agent-flag">
-                <span className="settings-field-label">{t('settings.agentEnabled')}</span>
-                <span className="settings-switch-row">
-                  <Switch checked={selectedAgent.enabled} onCheckedChange={(enabled) => onUpdateAgent({ enabled })} aria-label={t('settings.agentEnabled')}
-                    disabled={selectedAgent.id === GENERAL_AGENT_ID} data-tooltip={selectedAgent.id === GENERAL_AGENT_ID ? t('settings.agentDefaultRequired') : undefined} />
-                </span>
-              </label>
-              <label className="settings-agent-flag">
-                <span className="settings-field-label">{t('settings.userInvocable')}</span>
-                <span className="settings-switch-row">
-                  <Switch checked={selectedAgent.userInvocable} onCheckedChange={(userInvocable) => onUpdateAgent({ userInvocable })} aria-label={t('settings.userInvocable')} />
-                </span>
-              </label>
-              <label className="settings-agent-flag">
-                <span className="settings-field-label">{t('settings.modelInvocable')}</span>
-                <span className="settings-switch-row">
-                  {/* Asked positively; the manifest keeps its own field, so the switch inverts it. */}
-                  <Switch checked={!selectedAgent.disableModelInvocation}
-                    onCheckedChange={(callable) => onUpdateAgent({ disableModelInvocation: !callable })} aria-label={t('settings.modelInvocable')} />
-                </span>
-              </label>
+              <Switch className="settings-agent-flag" label={t('settings.agentEnabled')} checked={selectedAgent.enabled}
+                onCheckedChange={(enabled) => onUpdateAgent({ enabled })} disabled={selectedAgent.id === GENERAL_AGENT_ID}
+                data-tooltip={selectedAgent.id === GENERAL_AGENT_ID ? t('settings.agentDefaultRequired') : undefined} />
+              <Switch className="settings-agent-flag" label={t('settings.userInvocable')} checked={selectedAgent.userInvocable}
+                onCheckedChange={(userInvocable) => onUpdateAgent({ userInvocable })} />
+              <Switch className="settings-agent-flag" label={t('settings.modelInvocable')} checked={!selectedAgent.disableModelInvocation}
+                onCheckedChange={(callable) => onUpdateAgent({ disableModelInvocation: !callable })} />
             </div>
             <AgentContractFields agent={selectedAgent} onChange={onUpdateAgent} t={t} />
           </div>
@@ -241,14 +228,14 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
         <div className="settings-agent-panels" data-testid="settings-agent-panels">
           {PANELS.map(({ id, icon }) => {
             const open = openPanel === id;
+            const summary = !open && agentPanelSummary(id, selectedAgent, settings, t);
             return (
               <section key={id} className={`settings-agent-panel${open ? ' is-open' : ''}`} data-panel={id}>
-                <button
-                  type="button"
+                <Button variant="ghost"
                   className="settings-agent-panel-toggle"
                   data-tooltip={open ? undefined : panelHint(id)}
                   aria-expanded={open}
-                  aria-controls={`settings-agent-panel-${id}`}
+                  aria-controls={open ? `settings-agent-panel-body-${id}` : undefined}
                   data-testid={`settings-agent-panel-${id}`}
                   onClick={(event) => {
                     const section = event.currentTarget.parentElement;
@@ -257,11 +244,14 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                   }}
                 >
                   <Icon name={icon} size={16} className="settings-agent-panel-icon" />
-                  <span className="settings-agent-panel-title">{panelLabel(id)}</span>
+                  <span className="settings-agent-panel-copy">
+                    <span className="settings-agent-panel-title">{panelLabel(id)}</span>
+                    {summary && <span className="settings-agent-panel-summary">{summary}</span>}
+                  </span>
                   <Chevron open={open} className="settings-agent-panel-caret" />
-                </button>
+                </Button>
                 {open ? (
-                  <div id={`settings-agent-panel-${id}`} className="settings-agent-panel-body">
+                  <div id={`settings-agent-panel-body-${id}`} className="settings-agent-panel-body">
                     {renderPanelBody(id)}
                   </div>
                 ) : null}
@@ -270,17 +260,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           })}
         </div>
 
-        <CopyDiagnosticsButton
-          testId="settings-agent-diagnostics"
-          facts={[
-            { label: t('settings.resourceFieldId'), value: selectedAgent.id },
-            { label: t('settings.resourceScope'), value: provenanceLabel(provenanceScope, t) },
-            ...(provenance ? [
-              { label: t('settings.scopeResourceLocation'), value: provenance.sourcePath },
-              { label: t('settings.contentFingerprint'), value: provenance.sourceHash },
-            ] : []),
-          ]}
-        />
       </div>
     </div>
   );

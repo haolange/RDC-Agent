@@ -9,6 +9,12 @@ import {
 import type { TranslationKey } from '../../../i18n';
 import type { SettingsSection } from './types';
 
+const GROUP_LABELS: Partial<Record<SettingsSection, TranslationKey>> = {
+  general: 'settings.navPersonal',
+  models: 'settings.navConnections',
+  agents: 'settings.navAgentConfiguration',
+};
+
 /** A model service the search can jump to, so a provider is found by its name. */
 export interface SettingsSearchProvider {
   id: string;
@@ -19,7 +25,10 @@ export interface SettingsSearchProvider {
 export function focusSettingsSearchTarget(target: string): void {
   const node = document.querySelector<HTMLElement>(`[data-settings-search="${target}"]`);
   if (!node) return;
-  node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  node.scrollIntoView({
+    block: 'center',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+  });
   node.classList.add('is-settings-search-hit');
   window.setTimeout(() => node.classList.remove('is-settings-search-hit'), 1600);
 }
@@ -154,22 +163,27 @@ export const SettingsCenterNav: React.FC<{
         aria-orientation={horizontal ? 'horizontal' : 'vertical'}
         onKeyDown={handleNavKeyDown}
       >
-        {sections.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            className={cn('settings-center-nav-item', activeSection === section.id && 'is-active')}
-            data-testid={`settings-nav-${section.id}`}
-            data-settings-nav-item="true"
-            data-section={section.id}
-            role="tab"
-            aria-selected={activeSection === section.id}
-            onClick={() => onSelectSection(section.id)}
-          >
-            <SettingsNavIcon section={section.id} />
-            <span>{section.label}</span>
-          </button>
-        ))}
+        {sections.map((section) => {
+          const group = GROUP_LABELS[section.id];
+          return (
+            <React.Fragment key={section.id}>
+              {group ? <span className="settings-center-nav-group" role="presentation">{t(group)}</span> : null}
+              <button
+                type="button"
+                className={cn('settings-center-nav-item', activeSection === section.id && 'is-active')}
+                data-testid={`settings-nav-${section.id}`}
+                data-settings-nav-item="true"
+                data-section={section.id}
+                role="tab"
+                aria-selected={activeSection === section.id}
+                onClick={() => onSelectSection(section.id)}
+              >
+                <SettingsNavIcon section={section.id} />
+                <span>{section.label}</span>
+              </button>
+            </React.Fragment>
+          );
+        })}
       </div>
     </>
   );

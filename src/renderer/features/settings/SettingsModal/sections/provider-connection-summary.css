@@ -3,30 +3,30 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--control-height-md);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-raised);
   color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
 }
 
-.settings-provider-readonly .ui-icon {
-  color: var(--token-text-secondary);
+.settings-provider-connection-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--type-meta-size);
 }
 
-.settings-provider-connection-status-dot {
-  width: var(--space-2);
-  height: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--token-text-disabled);
+.settings-provider-connection-status.ui-inline-error {
+  margin: 0;
 }
 
-.settings-provider-connection-status[data-phase='connected'] .settings-provider-connection-status-dot { background: var(--token-status-success); }
+.settings-provider-connection-status .ui-inline-error-line {
+  align-items: center;
+  font-size: inherit;
+}
 
-.settings-provider-connection-status[data-phase='failed'] .settings-provider-connection-status-dot { background: var(--token-status-error); }
-.settings-provider-connection-status[data-phase='testPassed'] .settings-provider-connection-status-dot { background: var(--token-accent-primary); }
+.settings-provider-connection-status[data-phase='connected'] .ui-icon,
+.settings-provider-connection-status[data-phase='testPassed'] .ui-icon {
+  color: var(--token-status-success);
+}
 
-.settings-provider-connection-status[data-phase='testing'] .settings-provider-connection-status-dot,
-.settings-provider-connection-status[data-phase='saving'] .settings-provider-connection-status-dot { background: var(--token-status-warning); }
+.settings-provider-connection-status[data-phase='failed'] {
+  color: var(--token-status-error);
+}

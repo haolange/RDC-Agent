@@ -16,7 +16,6 @@ interface CodeInterpreterSettingsFieldsProps {
   t: Translate;
 }
 
-/** Code interpreter (machine-local): a fixed two-column field grid; saving belongs to the Tools form. */
 export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFieldsProps> = ({ draft, onChange, t }) => {
   const [envText, setEnvText] = useState(() => envToText(draft.env));
   const [argsText, setArgsText] = useState(() => draft.argsPrefix.join(' '));
@@ -24,21 +23,19 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
 
   return (
     <section className="settings-local-tool-form" data-testid="settings-code-interpreter" data-settings-search="code-interpreter">
-      <header className="settings-local-tool-form-head">
-        <label className="settings-switch-row">
-          <span>{t('settings.codeInterpreterEnabled')}</span>
+      <div className="settings-local-tool-grid">
+        <SettingsField layout="row" label={t('settings.codeInterpreterEnabled')} htmlFor="settings-interpreter-enabled">
           <Switch
+            id="settings-interpreter-enabled"
             checked={draft.enabled}
             onCheckedChange={(enabled) => onChange({ ...draft, enabled })}
             aria-label={t('settings.codeInterpreterEnabled')}
             data-testid="settings-code-interpreter-enabled"
           />
-        </label>
-      </header>
-
-      <div className="settings-interpreter-grid">
-        <SettingsField label={t('settings.codeInterpreterCommand')}>
+        </SettingsField>
+        <SettingsField label={t('settings.codeInterpreterCommand')} htmlFor="settings-interpreter-command">
           <Input
+            id="settings-interpreter-command"
             type="text"
             value={draft.command}
             spellCheck={false}
@@ -46,9 +43,10 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             placeholder="python"
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterTimeout')}>
+        <SettingsField layout="row" label={t('settings.codeInterpreterTimeout')} htmlFor="settings-interpreter-timeout">
           {/* Stored in milliseconds, edited in seconds. */}
           <Input
+            id="settings-interpreter-timeout"
             type="number"
             min={1}
             max={600}
@@ -60,8 +58,9 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterArgs')} description={t('settings.rdcCliArgsPrefixHint')}>
+        <SettingsField label={t('settings.codeInterpreterArgs')} htmlFor="settings-interpreter-args" description={t('settings.rdcCliArgsPrefixHint')}>
           <Input
+            id="settings-interpreter-args"
             type="text"
             value={argsText}
             spellCheck={false}
@@ -71,9 +70,9 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterEnv')} description={t('settings.envLineHint')}>
+        <SettingsField label={t('settings.codeInterpreterEnv')} htmlFor="settings-interpreter-env" description={t('settings.envLineHint')}>
           <Textarea
-            aria-label={t('settings.codeInterpreterEnv')}
+            id="settings-interpreter-env"
             data-testid="settings-code-interpreter-env"
             value={envText}
             placeholder="NAME=value"
@@ -87,7 +86,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField className="settings-interpreter-artifacts" layout="row" label={t('settings.codeInterpreterArtifacts')} description={t('settings.codeInterpreterArtifactsHint')}>
+        <SettingsField layout="row" label={t('settings.codeInterpreterArtifacts')} description={t('settings.codeInterpreterArtifactsHint')}>
           <Checkbox
             checked={draft.artifactsEnabled}
             onCheckedChange={(checked) => onChange({ ...draft, artifactsEnabled: checked })}

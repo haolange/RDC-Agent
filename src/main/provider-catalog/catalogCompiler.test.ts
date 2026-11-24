@@ -330,7 +330,7 @@ describe('Provider Catalog compiler', () => {
         fast: { state: 'unsupported', fixedValue: false },
         maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
-          kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
+          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'max',
         },
       },
     });
@@ -495,6 +495,8 @@ describe('Provider Catalog compiler', () => {
     };
 
     verify('chatgpt-account', [
+      ['gpt-6.2-astra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
+      ['gpt-6.2-sol', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
       ['gpt-6-astra', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-6.1-sol', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
       ['gpt-6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
@@ -535,19 +537,21 @@ describe('Provider Catalog compiler', () => {
       ['claude-sonnet-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
       ['claude-opus-4.8', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-opus-4.8-fast', undefined, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['claude-opus-5', 1_000_000, 'unknown', 'unsupported', 'unknown', false, [], 'off'],
       ['claude-sonnet-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-fable-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.4-mini', 128_000, 'unsupported', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.4', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.5', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['gpt-5.6-luna', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-sol', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-terra', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gemini-3.5-flash', undefined, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
-      ['kimi-k2.7-code', 256_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const copilot = catalog.surfaces.get('github-copilot')?.surface;
+    expect(copilot?.retiredModelIds).toEqual(expect.arrayContaining([
+      'claude-opus-5', 'gemini-3.5-flash', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-terra', 'kimi-k2.7-code',
+    ]));
+    for (const modelId of ['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6.1-terra']) {
+      expect(copilot?.models.find(model => model.modelId === modelId)).toMatchObject({
+        availability: 'unknown', presencePolicy: 'account-entitled', defaultBudgetTokens: 0,
+        toolCalling: { state: 'unknown' },
+      });
+    }
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.6')).toBeUndefined();
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')).toMatchObject({
       controls: { fast: { state: 'unsupported' } },
@@ -742,9 +746,9 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(missingProfile)).toThrow(/unknown profile/u);
 
     const subMillionMax = clone(input());
-    const gemini = mutableSurface(subMillionMax, 'github-copilot').models
-      .find((model: Record<string, unknown>) => model.modelId === 'gpt-5.4');
-    gemini.contextTiers.find((tier: Record<string, unknown>) => tier.id === 'one-million')
+    const copilotModel = mutableSurface(subMillionMax, 'github-copilot').models
+      .find((model: Record<string, unknown>) => model.modelId === 'gpt-5.6-sol');
+    copilotModel.contextTiers.find((tier: Record<string, unknown>) => tier.id === 'one-million')
       .maxPromptTokens = 200_000;
     expect(() => compileProviderCatalog(subMillionMax)).toThrow(/Max mode control references a tier that is not larger than the default context window/u);
 

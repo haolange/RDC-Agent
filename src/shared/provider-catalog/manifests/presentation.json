@@ -1,0 +1,290 @@
+{
+  "recommended": [
+    "anthropic",
+    "github-copilot",
+    "google-ai-studio",
+    "openrouter"
+  ],
+  "featured": [
+    "amazon-bedrock",
+    "azure",
+    "anthropic-thirdparty",
+    "custom-endpoint",
+    "ollama",
+    "google-vertex",
+    "claude-account",
+    "groq",
+    "moonshot",
+    "kimi-coding-plan",
+    "lm-studio",
+    "minimax-cn",
+    "mistral",
+    "qwen",
+    "siliconflow",
+    "volcengine",
+    "xai",
+    "glm-cn",
+    "chatgpt-account",
+    "grok-account",
+    "deepseek",
+    "openai"
+  ],
+  "listed": [
+    "azure-cognitive-services",
+    "openai-eu",
+    "openai-us",
+    "google-vertex-anthropic",
+    "aihubmix",
+    "alibaba",
+    "bailian",
+    "bailian-coding-plan",
+    "alibaba-coding-plan",
+    "alibaba-token-plan",
+    "alibaba-token-plan-cn",
+    "bailing",
+    "baseten",
+    "cerebras",
+    "cline",
+    "cline-pass",
+    "cloudflare-ai-gateway",
+    "cloudflare-workers-ai",
+    "databricks",
+    "deepinfra",
+    "digitalocean",
+    "evroc",
+    "fireworks-ai",
+    "gitlab",
+    "huggingface",
+    "jiekou",
+    "kuae-cloud-coding-plan",
+    "longcat",
+    "meta",
+    "minimax-global",
+    "minimax-cn-coding-plan",
+    "minimax-global-coding-plan",
+    "moark",
+    "modelscope",
+    "moonshotai",
+    "nebius",
+    "neon",
+    "novita-ai",
+    "nvidia-nim",
+    "ollama-cloud",
+    "opencode-go",
+    "opencode-zen",
+    "perplexity",
+    "perplexity-agent",
+    "qiniu-ai",
+    "sap-ai-core",
+    "siliconflow-cn",
+    "snowflake-cortex",
+    "stepfun",
+    "stepfun-ai",
+    "stepfun-step-plan",
+    "stepfun-ai-step-plan",
+    "tencent-coding-plan",
+    "tencent-token-plan",
+    "tencent-tokenhub",
+    "umans-ai",
+    "umans-ai-coding-plan",
+    "vercel-ai-gateway",
+    "volcengine-coding-plan",
+    "wafer.ai",
+    "xiaomi-mimo",
+    "xiaomi-mimo-token-plan",
+    "xiaomi-token-plan-ams",
+    "xiaomi-token-plan-sgp",
+    "glm-global",
+    "glm-global-coding-plan",
+    "glm-cn-coding-plan"
+  ],
+  "families": [
+    {
+      "label": "OpenAI",
+      "aliases": "开放人工智能",
+      "brand": "openai",
+      "ids": [
+        "openai",
+        "openai-eu",
+        "openai-us"
+      ]
+    },
+    {
+      "label": "Azure",
+      "aliases": "微软 Microsoft",
+      "brand": "azure",
+      "ids": [
+        "azure",
+        "azure-cognitive-services"
+      ]
+    },
+    {
+      "label": "Vertex AI",
+      "aliases": "谷歌云 Google Cloud",
+      "brand": "vertexai",
+      "ids": [
+        "google-vertex",
+        "google-vertex-anthropic"
+      ]
+    },
+    {
+      "label": "Kimi",
+      "aliases": "月之暗面 Moonshot",
+      "brand": "kimi",
+      "ids": [
+        "moonshot",
+        "moonshotai",
+        "kimi-coding-plan"
+      ]
+    },
+    {
+      "label": "SiliconFlow",
+      "aliases": "硅基流动",
+      "brand": "siliconcloud",
+      "ids": [
+        "siliconflow",
+        "siliconflow-cn"
+      ]
+    },
+    {
+      "label": "Alibaba Cloud",
+      "aliases": "阿里云 通义千问 百炼 DashScope Qwen",
+      "brand": "qwen",
+      "ids": [
+        "qwen",
+        "alibaba",
+        "bailian",
+        "bailian-coding-plan",
+        "alibaba-coding-plan",
+        "alibaba-token-plan",
+        "alibaba-token-plan-cn"
+      ]
+    },
+    {
+      "label": "GLM",
+      "aliases": "智谱 清言 Zhipu",
+      "brand": "zhipu",
+      "ids": [
+        "glm-cn",
+        "glm-global",
+        "glm-global-coding-plan",
+        "glm-cn-coding-plan"
+      ]
+    },
+    {
+      "label": "MiniMax",
+      "aliases": "稀宇",
+      "brand": "minimax",
+      "ids": [
+        "minimax-cn",
+        "minimax-global",
+        "minimax-cn-coding-plan",
+        "minimax-global-coding-plan"
+      ]
+    },
+    {
+      "label": "Volcengine",
+      "aliases": "火山引擎 豆包",
+      "brand": "doubao",
+      "ids": [
+        "volcengine",
+        "volcengine-coding-plan"
+      ]
+    },
+    {
+      "label": "Tencent Cloud",
+      "aliases": "腾讯 混元",
+      "ids": [
+        "tencent-coding-plan",
+        "tencent-token-plan",
+        "tencent-tokenhub"
+      ]
+    },
+    {
+      "label": "StepFun",
+      "aliases": "阶跃星辰",
+      "ids": [
+        "stepfun",
+        "stepfun-ai",
+        "stepfun-step-plan",
+        "stepfun-ai-step-plan"
+      ]
+    },
+    {
+      "label": "Xiaomi MiMo",
+      "aliases": "小米",
+      "ids": [
+        "xiaomi-mimo",
+        "xiaomi-mimo-token-plan",
+        "xiaomi-token-plan-ams",
+        "xiaomi-token-plan-sgp"
+      ]
+    },
+    {
+      "label": "Umans AI",
+      "ids": [
+        "umans-ai",
+        "umans-ai-coding-plan"
+      ]
+    },
+    {
+      "label": "Cline",
+      "ids": [
+        "cline",
+        "cline-pass"
+      ]
+    },
+    {
+      "label": "Perplexity",
+      "ids": [
+        "perplexity",
+        "perplexity-agent"
+      ]
+    },
+    {
+      "label": "Custom endpoint",
+      "ids": [
+        "custom-endpoint",
+        "anthropic-thirdparty"
+      ]
+    }
+  ],
+  "brands": {
+    "chatgpt-account": "openai",
+    "grok-account": "grok",
+    "claude-account": "claude",
+    "google-ai-studio": "gemini",
+    "github-copilot": "githubcopilot",
+    "deepseek": "deepseek",
+    "anthropic": "anthropic",
+    "openrouter": "openrouter",
+    "xai": "xai",
+    "ollama": "ollama",
+    "lm-studio": "lmstudio",
+    "amazon-bedrock": "bedrock",
+    "mistral": "mistral",
+    "groq": "groq"
+  },
+  "aliases": {
+    "google-ai-studio": "谷歌 双子座 Gemini",
+    "moonshot": "国内 中国 CN",
+    "moonshotai": "国际 海外 Global",
+    "siliconflow-cn": "中国 国内 CN",
+    "qwen": "中国 国内",
+    "alibaba": "国际 海外",
+    "glm-cn": "中国 国内",
+    "glm-global": "国际 海外",
+    "minimax-cn": "中国 国内",
+    "minimax-global": "国际 海外",
+    "deepseek": "深度求索 深度搜索",
+    "nous": "Hermes 努斯",
+    "chatgpt-account": "ChatGPT 订阅 账号 Codex",
+    "grok-account": "Grok 订阅 账号 xAI",
+    "claude-account": "Claude 订阅 账号 Anthropic",
+    "github-copilot": "GitHub 账号 订阅",
+    "custom-endpoint": "自定义 端点 OpenAI compatible",
+    "anthropic-thirdparty": "自定义 端点 Anthropic compatible",
+    "openai-us": "美国 US",
+    "openai-eu": "欧盟 欧洲 EU"
+  }
+}

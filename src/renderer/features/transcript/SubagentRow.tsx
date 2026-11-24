@@ -99,7 +99,7 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
       : null
   ), [sessionId, row.id, header?.childSessionId, header?.executionId, header?.generation]);
   const latest = header?.latestAction
-    ? getToolVerb(header.latestAction, header.latestActionStatus ?? 'complete', undefined, undefined, t)
+    ? getToolVerb(header.latestAction, header.latestActionStatus ?? 'complete', undefined, t)
     : active ? t('chat.subagentStillRunning') : t('chat.subagentProcessEnded');
   const processPreview = latest;
   const finalPreview = headerLoading ? t('chat.subagentLoading') : header?.finalPreview || (header?.finalUnavailableReason
@@ -120,8 +120,8 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
     <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent" data-locate>
     <WorkCardHeader onClick={() => openCard(active)} expanded={expanded} controls={contentId}
       icon={<ModeGlyph mode={mode} icon={definition?.icon ?? undefined} className="work-process-tool-card-icon" />}
-      title={<span className="work-process-subagent-identity">{agentLabel}{routeLabel ? <span className="work-process-subagent-route">{routeLabel}</span> : null}</span>}
-      titleText={agentLabel} duration={headerLoading ? undefined : duration}
+      title={agentLabel} titleMeta={routeLabel ? <span className="work-process-subagent-route">{routeLabel}</span> : null}
+      duration={headerLoading ? undefined : duration}
       status={<span className={`work-process-subagent-status is-${status}`}>
         {status === 'queued' ? t('chat.subagentQueued')
           : status === 'waiting' ? t('chat.subagentWaiting')

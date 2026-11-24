@@ -9,7 +9,8 @@ import {
   assertSafeImageBytes,
   classifyAttachmentBytes,
 } from './attachmentClassify';
-import { createCardThumbnail, toDataUrl } from './attachmentPreview';
+import { assertAttachmentPreviewPath, createCardThumbnail, toDataUrl } from './attachmentPreview';
+import type { OwnedAttachment } from './ConversationAttachmentAccess';
 import type {
   AttachmentRejectCode,
   ComposerAttachmentDescriptor,
@@ -20,6 +21,7 @@ export interface StagedAttachmentRecord {
   descriptor: ComposerAttachmentDescriptor;
   bytesPath: string;
   previewPath?: string;
+  previewMimeType?: string;
   composerScopeKey: string;
   createdAt: number;
   size: number;
@@ -155,9 +157,20 @@ export class AttachmentStagingService {
 
   readPreviewDataUrl(previewId: string, composerScopeKey?: string): string | null {
     const record = this.getByPreviewId(previewId, composerScopeKey);
-    if (!record?.previewPath || !fs.existsSync(record.previewPath)) return null;
-    const bytes = fs.readFileSync(record.previewPath);
-    return toDataUrl(bytes, 'image/png');
+    if (!record?.previewPath || !record.previewMimeType || !fs.existsSync(record.previewPath)) return null;
+    const file = assertAttachmentPreviewPath(path.join(this.stagingRoot(), previewId), record.previewPath);
+    return toDataUrl(fs.readFileSync(file), record.previewMimeType);
+  }
+
+  getOwnedAttachment(stagingId: string, composerScopeKey: string): OwnedAttachment | undefined {
+    const record = this.getByPreviewId(stagingId, composerScopeKey);
+    return record && {
+      root: path.join(this.stagingRoot(), stagingId),
+      filePath: record.bytesPath,
+      fileName: record.descriptor.fileName,
+      mimeType: record.descriptor.mimeType,
+      layer: record.descriptor.layer,
+    };
   }
 
   private sweepExpired(): void {
@@ -226,18 +239,21 @@ export class AttachmentStagingService {
       return this.reject(stagingId, fileName, classification.rejectCode, classification.rejectMessage ?? classification.rejectCode);
     }
     const dir = path.join(this.stagingRoot(), stagingId);
-    fs.mkdirSync(dir, { recursive: true });
-    const bytesPath = path.join(dir, fileName);
+    const originals = path.join(dir, 'original');
+    fs.mkdirSync(originals, { recursive: true });
+    const bytesPath = path.join(originals, fileName);
     fs.writeFileSync(bytesPath, bytes);
     assertInsideRoot(dir, bytesPath);
     let previewId: string | undefined;
     let previewPath: string | undefined;
+    let previewMimeType: string | undefined;
     if (classification.layer === 'image') {
       try {
         assertSafeImageBytes(fileName, classification.mimeType, bytes);
         const thumb = createCardThumbnail(bytes, classification.mimeType);
         previewId = stagingId;
         previewPath = path.join(dir, 'preview.png');
+        previewMimeType = thumb.mimeType;
         fs.writeFileSync(previewPath, thumb.data);
       } catch (error) {
         fs.rmSync(dir, { recursive: true, force: true });
@@ -263,6 +279,7 @@ export class AttachmentStagingService {
       descriptor,
       bytesPath,
       previewPath,
+      previewMimeType,
       composerScopeKey,
       createdAt: Date.now(),
       size: bytes.byteLength,

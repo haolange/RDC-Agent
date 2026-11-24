@@ -502,11 +502,6 @@
         }
       ],
       "defaultBudgetTokens": 256000,
-      "cost": {
-        "input": 2,
-        "output": 6,
-        "cacheRead": 0.5
-      },
       "toolCalling": {
         "state": "supported"
       },

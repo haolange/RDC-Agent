@@ -1,12 +1,12 @@
 import React from 'react';
 import { formatTokenCount } from '@shared/utils/tokens';
-import { formatUsdCost } from '@shared/utils/cost';
 import { useDynStyle } from '../lib/useDynStyle';
 import { useI18n } from '../i18n';
 import { Disclosure } from '../ui/Disclosure';
+import { InlineError } from '../ui/InlineError';
 import { ReadingSheet } from '../ui/ReadingSheet';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
-import { ContextRunMeterBand, MeterStat } from './ContextRunMeterBand';
+import { ContextRunMeterBand, ContextUsageCost } from './ContextRunMeterBand';
 import {
   awaitsExecutionContextWindow,
   resolveDisplayedCompactionThreshold,
@@ -28,9 +28,9 @@ type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 const METER_UNAVAILABLE = '—';
 
 const ContextBarSegment: React.FC<{
-  id: ContextUsageBreakdownId;
+  id?: ContextUsageBreakdownId;
   widthPercent: number;
-  title: string;
+  title?: string;
 }> = ({ id, widthPercent, title }) => {
   const dynStyle = useDynStyle({
     '--context-segment-width': `${widthPercent}%`,
@@ -58,11 +58,18 @@ interface ContextBreakdownContentProps {
 }
 
 /** Context usage in the shared reading sheet: same area, size and single scroller as the plan reader. */
-export const ContextBreakdownSheet: React.FC<ContextBreakdownContentProps & { open: boolean; onClose: () => void }> = ({ open, onClose, ...content }) => {
+export const ContextBreakdownSheet: React.FC<ContextBreakdownContentProps & {
+  open: boolean;
+  onClose: () => void;
+  detailsSaveError?: string;
+}> = ({ open, onClose, detailsSaveError, ...content }) => {
   const { t } = useI18n();
   return (
     <ReadingSheet open={open} title={t('contextBreakdown.title')} closeLabel={t('contextBreakdown.close')} onClose={onClose}
-      className="context-breakdown" dataTestId="context-breakdown">
+      className="context-breakdown" dataTestId="context-breakdown" animateHeight
+      status={detailsSaveError === undefined ? undefined : (
+        <InlineError detail={detailsSaveError}>{t('contextBreakdown.detailsSaveFailed')}</InlineError>
+      )}>
       <ContextBreakdownContent {...content} />
     </ReadingSheet>
   );
@@ -84,11 +91,13 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
   const compactionThresholdTokens = resolveDisplayedCompactionThreshold(
     showPrepared, prepared, usage, selectedProfile,
   );
-  const generatableTokens = awaitingWindow ? null : resolveDisplayedGeneratable(showPrepared, prepared, usage, selectedProfile);
+  const generatableTokens = awaitingWindow || (!showPrepared && !showUsage)
+    ? null
+    : resolveDisplayedGeneratable(showPrepared, prepared, usage, selectedProfile);
   const occupiedTokens = showPrepared
     ? prepared.preparedInputTokens
     : usage?.occupiedTokens;
-  const displayUsagePercent = awaitingWindow
+  const displayUsagePercent = awaitingWindow || windowTokens === null
     ? null
     : showPrepared
     ? prepared.usagePercent
@@ -99,11 +108,7 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
     ? prepared.breakdown
     : usage?.breakdown ?? [];
   const hasAuthoritativeBreakdown = (showPrepared && !awaitingWindow) || Boolean(!showPrepared && usage && usage.breakdown !== null);
-  const denom = typeof windowTokens === 'number' && windowTokens > 0
-    ? windowTokens
-    : typeof occupiedTokens === 'number'
-      ? occupiedTokens
-      : 0;
+  const denom = windowTokens ?? 0;
   const pct = (tokens: number): number => (denom > 0 ? (tokens / denom) * 100 : 0);
   const orderedEntries = CONTEXT_BREAKDOWN_ORDER.map((id) => (
     breakdown.find((entry) => entry.id === id) ?? { id, tokens: 0 }
@@ -120,12 +125,12 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
     ? t('contextBreakdown.currentRequest')
     : showEstimated
       ? t('contextBreakdown.projected')
-      : showUsage
-        ? phase === 'actual'
+    : showUsage
+        ? stale ? t('contextBreakdown.staleNote') : phase === 'actual'
           ? t('contextBreakdown.actual')
           : t('contextBreakdown.lastActual')
         : t('contextBreakdown.noUsageYet');
-  const thresholdRatio = typeof compactionThresholdTokens === 'number'
+  const thresholdRatio = !awaitingWindow && typeof compactionThresholdTokens === 'number'
     && typeof windowTokens === 'number'
     && windowTokens > 0
     ? Math.max(0, Math.min(100, (compactionThresholdTokens / windowTokens) * 100))
@@ -133,61 +138,63 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
   const thresholdStyle = useDynStyle(
     thresholdRatio == null ? {} : { '--context-threshold-left': `${thresholdRatio}%` },
   );
-  const budgetNoteParts: string[] = [];
-  if (awaitingWindow) budgetNoteParts.push(t('contextBreakdown.windowPendingNote'));
-  if (typeof compactionThresholdTokens === 'number') {
-    budgetNoteParts.push(t('contextBreakdown.budgetNote.threshold', {
-      threshold: formatTokenCount(compactionThresholdTokens),
-    }));
-  }
-  if (
-    typeof fullWindowTokens === 'number'
+  const showFullWindow = typeof fullWindowTokens === 'number'
     && typeof windowTokens === 'number'
-    && fullWindowTokens > windowTokens
-  ) {
-    budgetNoteParts.push(t('contextBreakdown.budgetNote.window', {
-      window: formatTokenCount(fullWindowTokens),
-    }));
-  }
-  if (typeof generatableTokens === 'number') {
-    budgetNoteParts.push(t('contextBreakdown.budgetNote.generatable', {
-      tokens: formatTokenCount(generatableTokens),
-    }));
-  }
+    && fullWindowTokens > windowTokens;
   const formatKnownTokens = (value: number | null | undefined, projected = false): string => (
     typeof value === 'number' ? `${projected ? '~' : ''}${formatTokenCount(value)}` : METER_UNAVAILABLE
   );
 
   return (
     <div className="context-breakdown-content">
-        {/* One big number and one sentence; token counts, cache, reasoning and cost live under 详细用量. */}
         <div className="context-breakdown-hero">
           <div className="context-breakdown-hero-usage"
             data-tooltip={showEstimated ? t('contextBreakdown.projectedNote') : stale ? t('contextBreakdown.staleNote') : undefined}>
             <span className="context-breakdown-pct-large">
               {typeof displayUsagePercent === 'number'
-                ? `${showEstimated ? '~' : ''}${displayUsagePercent}%`
+                ? t('contextBreakdown.used', { percent: `${showEstimated ? '~' : ''}${displayUsagePercent}%` })
                 : METER_UNAVAILABLE}
             </span>
             <span className="context-breakdown-summary-caption">{summaryCaption}</span>
+            <span className="context-breakdown-hero-tokens">
+              {formatKnownTokens(occupiedTokens, showPrepared)}
+              {!awaitingWindow ? ` / ${formatKnownTokens(windowTokens)}` : null}{' '}
+              {t('contextBreakdown.tokensLabel')}
+            </span>
           </div>
-          <div className="context-breakdown-bar" aria-hidden="true">
-            {barEntries.map((entry) => (
-              <ContextBarSegment
-                key={entry.id}
-                id={entry.id}
-                widthPercent={pct(entry.tokens)}
-                title={`${t(SEGMENT_LABEL_KEYS[entry.id])} · ${formatTokenCount(entry.tokens)}`}
-              />
-            ))}
-            {thresholdRatio != null ? (
-              <span
-                className="context-breakdown-bar-threshold"
-                data-testid="context-breakdown-bar-threshold"
-                {...thresholdStyle}
-              />
+          <div className="context-breakdown-scale" {...thresholdStyle}>
+            <div className="context-breakdown-bar" aria-hidden="true">
+              {barEntries.map((entry) => (
+                <ContextBarSegment
+                  key={entry.id}
+                  id={entry.id}
+                  widthPercent={pct(entry.tokens)}
+                  title={`${t(SEGMENT_LABEL_KEYS[entry.id])} · ${formatTokenCount(entry.tokens)}`}
+                />
+              ))}
+              {barEntries.length === 0 && !awaitingWindow && typeof occupiedTokens === 'number' && occupiedTokens > 0 && denom > 0 ? (
+                <ContextBarSegment widthPercent={Math.min(100, pct(occupiedTokens))} />
+              ) : null}
+              {thresholdRatio != null ? (
+                <span
+                  className="context-breakdown-bar-threshold"
+                  data-testid="context-breakdown-bar-threshold"
+                />
+              ) : null}
+            </div>
+            {thresholdRatio !== null && compactionThresholdTokens !== null ? (
+              <span className="context-breakdown-scale-label">
+                {t('contextBreakdown.budgetNote.threshold', { threshold: formatTokenCount(compactionThresholdTokens) })}
+              </span>
             ) : null}
           </div>
+          {awaitingWindow && <p className="context-breakdown-window-note">{t('contextBreakdown.windowPendingNote')}</p>}
+          {showFullWindow || typeof generatableTokens === 'number' ? (
+            <dl className="context-breakdown-budget" data-testid="context-breakdown-window-note">
+              {showFullWindow && <div><dt>{t('contextBreakdown.fullWindow')}</dt><dd>{formatTokenCount(fullWindowTokens)}</dd></div>}
+              {typeof generatableTokens === 'number' && <div><dt>{t('contextBreakdown.turnOutput')}</dt><dd>~{formatTokenCount(generatableTokens)}</dd></div>}
+            </dl>
+          ) : null}
         </div>
         <Disclosure
           className="context-breakdown-disclosure"
@@ -198,40 +205,17 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
           triggerLabel={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
           summary={t('contextBreakdown.detailsLabel')}
         >
-        <p className="context-breakdown-hero-tokens">
-          {formatKnownTokens(occupiedTokens, showPrepared || showEstimated)} / {formatKnownTokens(windowTokens)}{' '}
-          {t('contextBreakdown.tokensLabel')}
-        </p>
-        {budgetNoteParts.length > 0 ? (
-          <p className="context-breakdown-window-note" data-testid="context-breakdown-window-note">
-            {budgetNoteParts.join(' · ')}
-          </p>
-        ) : null}
-        <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared && !awaitingWindow ? prepared : null} estimated={showEstimated} />
-        {showUsage && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
-          <div className="context-breakdown-cost-card" data-testid="context-breakdown-cost">
-            <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.costColumn')}</h3>
-            <div className="context-breakdown-meter-stats">
-              {usage.cost ? <MeterStat label={t('contextBreakdown.costThisTurn')} value={formatUsdCost(usage.cost.total)} /> : null}
-              {typeof usage.cumulativeCost === 'number' ? (
-                <MeterStat label={t('contextBreakdown.costThisRun')} value={formatUsdCost(usage.cumulativeCost)} />
-              ) : null}
-              {usage.cost ? (
-                <>
-                  <MeterStat label={t('contextBreakdown.costInput')} value={formatUsdCost(usage.cost.input)} />
-                  <MeterStat label={t('contextBreakdown.costOutput')} value={formatUsdCost(usage.cost.output)} />
-                  {typeof usage.cost.cacheRead === 'number' && usage.cost.cacheRead > 0 ? (
-                    <MeterStat label={t('contextBreakdown.costCacheRead')} value={formatUsdCost(usage.cost.cacheRead)} />
-                  ) : null}
-                  {typeof usage.cost.cacheWrite === 'number' && usage.cost.cacheWrite > 0 ? (
-                    <MeterStat label={t('contextBreakdown.costCacheWrite')} value={formatUsdCost(usage.cost.cacheWrite)} />
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-          <ContextBreakdownLegend entries={breakdown} unavailable={!hasAuthoritativeBreakdown} />
+          <ContextRunMeterBand usage={showUsage ? usage : null}
+            preparedInput={showPrepared && !awaitingWindow ? prepared.preparedInputTokens : undefined}
+            historical={stale || showEstimated} />
+          <ContextUsageCost usage={showUsage ? usage : null} />
+          <section>
+            <h3 className="context-breakdown-section-title">
+              {t(showEstimated ? 'contextBreakdown.estimatedBreakdown'
+                : showPrepared || !showUsage ? 'contextBreakdown.currentBreakdown' : 'contextBreakdown.latestBreakdown')}
+            </h3>
+            <ContextBreakdownLegend entries={breakdown} unavailable={!hasAuthoritativeBreakdown} estimatedFreeSpace={showEstimated} />
+          </section>
         </Disclosure>
     </div>
   );

@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
+import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import { isRetiredProviderModel } from '../../provider-catalog/ProviderCatalogRegistry';
 import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import type {
@@ -10,7 +11,7 @@ import type {
   CatalogModelRoute,
   JsonValue,
 } from '@shared/types/providerCapability';
-import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
+import type { LlmProviderCatalogOwnership, LlmProviderEntry } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
 import type {
   CatalogLayerContribution,
@@ -35,6 +36,10 @@ function stableJson(value: unknown): string {
 
 export function revisionFor(value: unknown): string {
   return createHash('sha256').update(stableJson(value), 'utf8').digest('hex');
+}
+
+export function providerConnectionRevision(provider: LlmProviderEntry): string {
+  return revisionFor(providerConnectionIdentity(provider));
 }
 
 function routeRevision(route: CatalogModelRoute, optionId?: string): string {
@@ -391,14 +396,11 @@ function applyLayer(
     const ordinaryPatch: Record<string, unknown> = rekeyFromDiscovery
       ? { ...ordinaryFields, ...availabilityPatch }
       : { ...ordinaryFields, ...availabilityPatch, ...(aliases !== undefined ? { aliases } : {}) };
-    // Historical declarative discovery projected the provider fallback as a
-    // catalog-sourced route even when the list payload carried no protocol.
-    // Such a row is availability evidence only and must not replace an already
-    // admitted model's manifest-owned route. Explicit live routes use
-    // `source: model` and continue to merge normally.
+    // Discovery may repeat the catalog default along with a model's availability.
+    // Keep the admitted model's route or the user's configured endpoint in that case.
     if (
       layer.source === 'discovery'
-      && matched
+      && (matched || model.route.source === 'user')
       && isObject(ordinaryPatch.route)
       && ordinaryPatch.route.source === 'catalog'
     ) {

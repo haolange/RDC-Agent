@@ -11,7 +11,10 @@ vi.mock('../../lib/useUiLabels', () => ({ useUiLabels: () => ({ imageViewer: {
 } }) }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: (pick: (s: unknown) => unknown) => pick({ currentSession: { sessionId: state.session } }) }));
 vi.mock('../../hooks/useToolImagePreviews', () => ({ useToolImagePreviews: () => ({
-  values: { image: state.failed ? { failed: true } : { url: 'data:image/png;base64,AA==' } }, retry: state.retry,
+  values: {
+    image: state.failed ? { failed: true } : { url: 'data:image/png;base64,AA==' },
+    comparison: { url: 'data:image/png;base64,AA==' },
+  }, retry: state.retry,
 }) }));
 it('opens the image viewer with a readable caption, closes with Escape, returns focus and isolates sessions', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -35,4 +38,28 @@ it('opens the image viewer with a readable caption, closes with Escape, returns 
     state.failed = true; await render(); await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
     expect(state.retry).toHaveBeenCalledWith('image');
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); state.session = 'one'; state.failed = false; }
+});
+
+it('returns to the opening thumbnail when Escape follows image navigation and zoom', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  state.session = 'gallery'; state.failed = false;
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const previews = [
+    { previewId: 'image', fileName: 'first-frame.png', mimeType: 'image/png' },
+    { previewId: 'comparison', fileName: 'second-frame.png', mimeType: 'image/png' },
+  ];
+  const key = (value: string) => act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true })));
+  try {
+    await act(async () => root.render(createElement(WorkProcessImageThumbs, { previews })));
+    const trigger = host.querySelector<HTMLButtonElement>('button')!;
+    trigger.focus();
+    await act(async () => trigger.click());
+    await key('ArrowRight');
+    expect(document.querySelector('.ui-image-viewer-position')?.textContent).toBe('2/2');
+    await key('+');
+    expect(document.querySelector('.ui-image-viewer-image.is-zoomed')).not.toBeNull();
+    await key('Escape');
+    expect(document.querySelector('.ui-image-viewer')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

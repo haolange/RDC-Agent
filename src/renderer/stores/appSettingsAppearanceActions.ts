@@ -10,7 +10,11 @@ import type { AppSettingsState } from './appSettingsStoreState';
 
 type AppearanceGet = () => Pick<AppSettingsState, 'settings' | 'patchSettings'>;
 
-export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
+export function createAppSettingsAppearanceActions(
+  get: AppearanceGet,
+  setContextBreakdownPreference: (preference: NonNullable<AppSettingsState['contextBreakdownPreference']>) => void,
+  persistContextBreakdownExpanded: (expanded: boolean) => Promise<void>,
+): Pick<
   AppSettingsState,
   | 'setTheme'
   | 'setLanguage'
@@ -21,11 +25,15 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
   | 'setWorkProcessExpansion'
 > {
   let pending: Promise<unknown> = Promise.resolve();
+  let contextBreakdownRevision = 0;
   type Patch = Parameters<AppSettingsState['patchSettings']>[0];
-  const save = (patch: Patch | (() => Patch)): Promise<void> => {
-    const next = pending.then(() => get().patchSettings(typeof patch === 'function' ? patch() : patch)).then(() => undefined);
+  const enqueue = (operation: () => Promise<unknown>): Promise<void> => {
+    const next = pending.then(operation).then(() => undefined);
     pending = next.catch(() => undefined);
     return next;
+  };
+  const save = (patch: Patch | (() => Patch)): Promise<void> => {
+    return enqueue(() => get().patchSettings(typeof patch === 'function' ? patch() : patch));
   };
   return {
     setTheme: async (theme: AppTheme) => {
@@ -49,8 +57,16 @@ export function createAppSettingsAppearanceActions(get: AppearanceGet): Pick<
         } } } };
       });
     },
-    setContextBreakdownExpanded: async (contextBreakdownExpanded: boolean) => {
-      await save({ appearance: { contextBreakdownExpanded } });
+    setContextBreakdownExpanded: async (expanded: boolean) => {
+      const revision = ++contextBreakdownRevision;
+      setContextBreakdownPreference({ expanded });
+      try {
+        await enqueue(() => persistContextBreakdownExpanded(expanded));
+      } catch (error) {
+        if (revision === contextBreakdownRevision) {
+          setContextBreakdownPreference({ expanded, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
     },
     setWorkProcessExpansion: async (workProcessExpansion: WorkProcessExpansion) => {
       await save({ appearance: { workProcessExpansion } });

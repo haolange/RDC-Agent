@@ -1,5 +1,4 @@
 import { supersededAnswerLoopIds } from '@shared/conversation/loopItems';
-import { aggregateSectionSteps } from './workProcessToolAggregate';
 import { projectLlmTurn } from './workProcessLlmProjection';
 import { pushStandaloneBlock } from './workProcessStandaloneProjection';
 import type { Translator } from '../../i18n/messages';
@@ -54,7 +53,6 @@ export function buildPresentationUnits(
   ctx: BlockProjectionContext,
 ): PresentationUnit[] {
   const units: PresentationUnit[] = [];
-  const { t } = ctx;
   const snapshotsByLoop = new Map<string, ConversationWorkBlock[]>();
   const interactionsByLoop = new Map<string, ConversationWorkBlock[]>();
   let previousLoop: string | undefined;
@@ -89,15 +87,6 @@ export function buildPresentationUnits(
     if (!groupedSnapshots.has(block.id) && !groupedInteractions.has(block.id)) pushStandaloneBlock(block, units, deps, ctx);
     }
 
-  const sources = new Map(blocks.map((block) => [block.id, block]));
-  for (const unit of units) {
-    if (unit.kind !== 'loop') continue;
-    const source = sources.get(unit.loopId);
-    const settled = !source?.toolCalls.some((call) => call.status === 'pending' || call.status === 'running');
-    for (const row of unit.rows) {
-      if (row.type === 'section') row.visibleSteps = aggregateSectionSteps(row.steps, t, settled);
-    }
-  }
   return units;
 }
 

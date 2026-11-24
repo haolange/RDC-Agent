@@ -4,6 +4,7 @@ import { Icon } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { SearchField } from '../../../../ui/SearchField';
+import { ProviderMark } from './ProviderMark';
 import {
   agentModelOptionAccessibleLabel,
   buildAgentModelGroups,
@@ -86,7 +87,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           >
             <span className="settings-model-cascade-trigger-copy">
               <strong>{triggerPrimary}</strong>
-              {selected ? <span>{selected.providerLabel}</span> : null}
+              {selected ? <span className="settings-service-title"><ProviderMark id={selected.providerId} size={14} />{selected.providerLabel}</span> : null}
             </span>
             <Chevron direction="down" />
           </button>
@@ -135,7 +136,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             {groups.map((group) => (
               <div key={group.providerId} className="settings-model-group" role="group" aria-label={group.label} data-provider-id={group.providerId}>
                 <div className="settings-model-group-title">
-                  <span>{group.label}</span>
+                  <span className="settings-service-title"><ProviderMark id={group.providerId} size={16} />{group.label}</span>
                   <span>{group.availableCount}</span>
                 </div>
                 {group.options.map((option) => {

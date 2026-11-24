@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React from 'react';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
@@ -10,6 +10,7 @@ import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveWorkProcessStatus } from './workProcessActiveSignal';
 import { ToolRow } from './WorkProcessRowParts';
 import { WorkCardHeader } from './WorkCardHeader';
+import { WorkRowTitle } from './WorkRowTitle';
 import { PlanCard } from './PlanCard';
 import { usePlanReader } from './PlanReaderHost';
 
@@ -23,9 +24,9 @@ export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summar
       <div className="work-process-step-content">
         <div className="work-process-summary-card">
           {row.detailLines.length > 0 ? (
-            <details className="work-process-disclosure">
+            <details className="work-process-disclosure" data-locate>
               <summary className="work-process-summary-line">
-                <span className="work-process-step-summary" data-work-node-prose>{title}</span>
+                <span className="work-process-step-summary" data-work-node-prose><WorkRowTitle text={title} wrap /></span>
                 <Chevron size={12} className="work-process-row-caret" />
               </summary>
               <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
@@ -49,7 +50,7 @@ const HookDiagnosticCard: React.FC<{
   return <li className={`work-process-step is-appear kind-diagnostic is-orphan-hook-row status-${row.status}`} data-testid="work-process-hook-diagnostic-card">
     <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
-      <div className={`work-process-tool-card is-orphan-hook severity-${row.severity}${density === 'compact' ? ' is-compact' : ''}${expanded ? ' is-expanded' : ''}`}>
+      <div className={`work-process-tool-card is-orphan-hook severity-${row.severity}${density === 'compact' ? ' is-compact' : ''}${expanded ? ' is-expanded' : ''}`} data-locate>
         <WorkCardHeader icon={<Icon name="plug" className="work-process-icon work-process-tool-card-icon" />}
           title={t('chat.workProcessHookDiagnostics')}
           status={row.severity === 'error' ? t('chat.workProcessStatusError')
@@ -78,9 +79,9 @@ export const DiagnosticRow: React.FC<{
     <WorkProcessRailIcon row={row} />
     <div className="work-process-step-content">
       {row.detailLines.length > 0 ? (
-        <details className="work-process-disclosure" open={row.status === 'error'}>
+        <details className="work-process-disclosure" open={row.status === 'error'} data-locate>
           <summary className="work-process-summary-line">
-            <span className="work-process-diagnostic-message" data-work-node-prose>{row.message}</span>
+            <span className="work-process-diagnostic-message" data-work-node-prose><WorkRowTitle text={row.message} wrap /></span>
             <Chevron size={12} className="work-process-row-caret" />
           </summary>
           <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
@@ -108,49 +109,27 @@ export const PlanReviewRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'pla
 export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'userInput' }> }> = ({ row }) => {
   const { t } = useI18n();
   const active = isActiveWorkProcessStatus(row.status);
-  const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`user-input-${row.id}`, row.status !== 'complete');
-  const transcriptId = useId();
   const headerText = row.incomplete
     ? row.verb
     : t('chat.workProcessAskCount', { verb: row.verb, count: row.questionCount });
-  const pendingAnswerLabel = row.status === 'error'
-    ? t('chat.workProcessUserAnswerMissing')
-    : t('chat.workProcessUserAnswerPending');
+  const pendingAnswerLabel = t(active ? 'chat.workProcessUserAnswerPending' : 'chat.workProcessUserAnswerMissing');
   const transcriptError = row.incomplete ? t('chat.userInputIncomplete') : row.error;
 
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-user-input`} data-testid="work-process-user-input">
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
-        <div className={`work-process-user-input${expanded ? ' is-expanded' : ''}`} data-testid="work-process-user-input-transcript">
-          <button
-            type="button"
-            className="work-process-user-input-header"
-            data-work-node-heading
-            aria-controls={transcriptId}
-            aria-expanded={expanded}
-            onClick={toggleDisclosure}
-          >
+        <div className="work-process-user-input" data-testid="work-process-user-input-transcript">
+          <div className="work-process-tool-card-header" data-work-node-heading>
             {active ? (
               <ActiveSignalText active tone="interaction" className="work-process-user-input-verb">{headerText}</ActiveSignalText>
             ) : <span className="work-process-user-input-verb">{headerText}</span>}
-            {row.status !== 'complete' ? (
+            {active ? (
               <span className="work-process-user-input-progress">{row.answeredCount}/{row.questionCount}</span>
             ) : null}
-            <Chevron open={expanded} size={12} className="work-process-row-caret" />
-          </button>
-          {!expanded && !row.incomplete && row.items[0] ? (
-            <p className="work-process-user-input-collapsed-summary">
-              <span className="work-process-user-input-collapsed-question">{row.items[0].prompt}</span>
-              {row.questionCount > 1 ? (
-                <span className="work-process-user-input-collapsed-count">
-                  {t('chat.workProcessAskRemaining', { count: row.questionCount - 1 })}
-                </span>
-              ) : null}
-            </p>
-          ) : null}
-          {expanded ? (
-            <ol id={transcriptId} className="work-process-user-input-transcript">
+          </div>
+          {row.items.length > 0 ? (
+            <ol className="work-process-user-input-transcript">
               {row.items.map((item, index) => (
                 <li className="work-process-user-input-transcript-item" key={item.questionId}>
                   <span className="work-process-user-input-transcript-index" aria-hidden="true">{index + 1}.</span>
@@ -160,9 +139,9 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
                   )}
                 </li>
               ))}
-              {transcriptError ? <li className="work-process-user-input-transcript-error" role="alert">{transcriptError}</li> : null}
             </ol>
           ) : null}
+          {transcriptError ? <p className="work-process-user-input-transcript-error" role="alert">{transcriptError}</p> : null}
         </div>
       </div>
     </li>

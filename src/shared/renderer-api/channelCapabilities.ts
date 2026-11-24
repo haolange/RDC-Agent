@@ -42,6 +42,8 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'conversation:stageAttachments': 'mutation',
   'conversation:releaseAttachments': 'mutation',
   'conversation:getAttachmentPreview': 'read',
+  // The scoped channel also opens and reveals local attachments after explicit renderer actions.
+  'conversation:accessAttachment': 'mutation',
   'conversation:resolveMedia': 'read',
   'workflow:getState': 'read',
   'workflow:resume': 'mutation',

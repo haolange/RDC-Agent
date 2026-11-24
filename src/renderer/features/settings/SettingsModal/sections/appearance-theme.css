@@ -4,27 +4,13 @@
   gap: var(--space-5);
 }
 
-.appearance-mode-tabs {
-  align-self: center;
-  --ui-tabs-min-width: 7rem;
-}
-
-/* Both themes side by side, each a live preview over its own editor; one column when the panel narrows. */
-.appearance-theme-editors {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-6);
-  --color-field-columns: minmax(5rem, 0.24fr) minmax(0, 0.76fr);
-  --color-field-justify: stretch;
-}
-
 .appearance-chrome-card {
   min-width: 0;
-}
-
-.appearance-chrome-card + .appearance-chrome-card {
-  border-left: 1px solid var(--token-border-muted);
-  padding-left: var(--space-6);
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--token-border-muted);
+  --color-field-columns: minmax(0, 1fr) minmax(10rem, 22rem);
+  --color-field-justify: start;
 }
 
 .appearance-chrome-header {
@@ -61,7 +47,7 @@
 .appearance-text-field,
 .appearance-contrast-field {
   display: grid;
-  grid-template-columns: minmax(5rem, 0.24fr) minmax(0, 0.76fr);
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 22rem);
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
@@ -73,7 +59,6 @@
 
 .appearance-preset-trigger {
   min-height: var(--control-height-md);
-  min-width: 148px;
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-full);
@@ -110,41 +95,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.appearance-preferences.settings-block {
-  border: 0;
-  border-top: 1px solid var(--token-border-muted);
-  border-radius: 0;
-  background: transparent;
-  padding: var(--space-4) 0 0;
-}
-
-.appearance-preferences .settings-preference-list {
-  display: grid;
-  gap: 0;
-}
-
-.appearance-preferences .settings-field.is-row {
-  padding: var(--space-3) 0;
-}
-
-.appearance-preferences .settings-field + .settings-field {
-  border-top: 1px solid var(--token-border-muted);
-}
-
-@container settings-panel (max-width: 60rem) {
-  .appearance-theme-editors {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .appearance-chrome-card + .appearance-chrome-card {
-    border-left: 0;
-    border-top: 1px solid var(--token-border-muted);
-    padding: var(--space-5) 0 0;
-  }
-}
-
 @container settings-panel (max-width: 36rem) {
-  .appearance-theme-editors {
+  .appearance-chrome-card {
     --color-field-columns: 1fr;
   }
 

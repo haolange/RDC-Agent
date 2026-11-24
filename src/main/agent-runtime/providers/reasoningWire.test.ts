@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyAnthropicReasoning,
   applyGeminiReasoning,
+  applyGoogleInteractionsReasoning,
   applyMoonshotReasoning,
   applyOllamaThink,
   applyOpenAiCompatibleReasoning,
@@ -146,7 +147,7 @@ describe('remaining reasoning wire profiles', () => {
     } satisfies ReasoningControl;
     const levelConfig: Record<string, unknown> = {};
     applyGeminiReasoning(levelConfig, { selection: 'high', control: levelControl }, null);
-    expect(levelConfig).toEqual({ thinkingConfig: { thinkingLevel: 'high' } });
+    expect(levelConfig).toEqual({ thinkingConfig: { thinkingLevel: 'HIGH' } });
 
     const budgetControl = {
       kind: 'levels', supportsOff: true, levels: ['medium'], defaultSelection: 'medium',
@@ -158,6 +159,22 @@ describe('remaining reasoning wire profiles', () => {
     const disabledBudget: Record<string, unknown> = {};
     applyGeminiReasoning(disabledBudget, { selection: 'off', control: budgetControl }, null);
     expect(disabledBudget).toEqual({ thinkingConfig: { thinkingBudget: 0 } });
+  });
+
+  it('uses the GenerateContent and Interactions wire forms for Gemini 4 extra-high effort', () => {
+    const control = {
+      kind: 'levels', supportsOff: false, levels: ['high', 'xhigh'], defaultSelection: 'high',
+      wireProfile: { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high', xhigh: 'xhigh' } },
+    } satisfies ReasoningControl;
+    const reasoning = { selection: 'xhigh', control } as const;
+    const generateContent: Record<string, unknown> = {};
+    const interactions: Record<string, unknown> = {};
+
+    applyGeminiReasoning(generateContent, reasoning, null);
+    applyGoogleInteractionsReasoning(interactions, reasoning, null);
+
+    expect(generateContent).toEqual({ thinkingConfig: { thinkingLevel: 'XHIGH' } });
+    expect(interactions).toEqual({ thinking_level: 'xhigh' });
   });
 
   it('asks Gemini for thought summaries only when the route declares that request', () => {

@@ -43,3 +43,31 @@ it('asks for its draft catalog again after settings reconciliation drops it, so 
     expect(badge()).toBe('available');
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
+
+it('keeps enabling a model independent from opening its capabilities, including when the model is unavailable', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  read.mockResolvedValue(snapshot);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const expand = vi.fn();
+  const change = vi.fn();
+  const render = (current: LlmProviderModel, opened: string | null) => act(async () => root.render(createElement(ProviderConnectModelList, {
+    provider, models: [current], expandedModelId: opened, disabled: false,
+    onToggleExpanded: expand, onModelChange: change, onModelCountChange: () => {},
+    t: (key, params) => translate('en', key, params),
+  })));
+  try {
+    await render(model, null);
+    const toggle = () => host.querySelector<HTMLInputElement>('[role="switch"]')!;
+    const details = () => host.querySelector<HTMLButtonElement>('[aria-expanded]')!;
+    await act(async () => toggle().click());
+    expect(change).toHaveBeenCalledWith(model.id, { ...model, enabled: false });
+    expect(expand).not.toHaveBeenCalled();
+    await render({ ...model, availability: 'unavailable' }, null);
+    expect(toggle().disabled).toBe(true);
+    await act(async () => details().click());
+    expect(expand).toHaveBeenCalledWith(model.id);
+    expect(details().getAttribute('aria-label')).toContain(model.label);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});

@@ -55,7 +55,7 @@ export function ComposerMenuRegistryProvider({ children }: { children: React.Rea
   const close = useCallback((id?: ComposerMenuId) => {
     setActiveId((current) => {
       const next = reduceComposerMenu(current, { type: 'close', id });
-      if (next === null && current) {
+      if (next === null && current && current !== 'usage') {
         restoreFocus(current);
       }
       return next;
@@ -65,7 +65,7 @@ export function ComposerMenuRegistryProvider({ children }: { children: React.Rea
   const toggle = useCallback((id: ComposerMenuId) => {
     setActiveId((current) => {
       const next = reduceComposerMenu(current, { type: 'toggle', id });
-      if (next === null && current === id) {
+      if (next === null && current === id && id !== 'usage') {
         restoreFocus(id);
       }
       return next;
@@ -91,10 +91,10 @@ export function ComposerMenuRegistryProvider({ children }: { children: React.Rea
   }, []);
 
   useEffect(() => {
-    if (!activeId) return undefined;
+    if (!activeId || activeId === 'usage') return undefined;
     const onPointerDown = (event: PointerEvent) => {
       const current = activeIdRef.current;
-      if (!current) return;
+      if (!current || current === 'usage') return;
       if (isInsideComposerMenuRoot(rootsRef.current.get(current) ?? null, event.target)) {
         return;
       }
@@ -104,7 +104,7 @@ export function ComposerMenuRegistryProvider({ children }: { children: React.Rea
     return () => window.removeEventListener('pointerdown', onPointerDown);
   }, [activeId, close]);
 
-  useOverlayDismiss(activeId !== null, () => close(activeIdRef.current ?? undefined), 'layout');
+  useOverlayDismiss(activeId !== null && activeId !== 'usage', () => close(activeIdRef.current ?? undefined), 'layout');
 
   const value = useMemo<ComposerMenuRegistryApi>(() => ({
     activeId,

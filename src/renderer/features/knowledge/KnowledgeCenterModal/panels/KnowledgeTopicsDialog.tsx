@@ -16,7 +16,7 @@ export function KnowledgeTopicsDialog({ topics }: { topics: ReturnType<typeof us
     ...(topics.proposal?.current.topics ?? []), ...(preview?.topics ?? []),
     ...(preview?.merges.map(item => item.target) ?? []),
   ].map(item => [item.id, item.label]));
-  const names = (ids: string[]) => ids.map(id => labels.get(id) ?? id).join(', ') || '—';
+  const names = (ids: string[]) => ids.map(id => labels.get(id) ?? t('knowledgeCenter.valueUnknown')).join(', ') || '—';
   return (
     <TaskDialog open={topics.open} size="lg" title={t('knowledgeCenter.topicsTitle')}
       description={t(preview ? 'knowledgeCenter.topicsPreviewDescription' : 'knowledgeCenter.topicsDescription')}
@@ -81,10 +81,34 @@ export function KnowledgeTopicsDialog({ topics }: { topics: ReturnType<typeof us
       ) : null}
       {preview ? (
         <>
-          {preview.topics.map(topic => <p key={topic.id}><strong>{topic.label}</strong>: {topic.synonyms.join(', ') || '—'}</p>)}
-          {preview.merges.map(merge => <p key={merge.source.id}>{merge.source.label} → {merge.target.label} ({merge.target.synonyms.join(', ')})</p>)}
-          {preview.cards.map(card => <p key={card.cardId}>{card.title}: {names(card.before)} → {names(card.after)}
-            {card.stale ? ` · ${t('knowledgeCenter.topicsStale')}` : ''}</p>)}
+          {preview.topics.length > 0 && (
+            <section className="knowledge-write-section">
+              <h3 className="knowledge-write-section-title">{t('knowledgeCenter.topicsTitle')}</h3>
+              <dl className="knowledge-write-facts">{preview.topics.map(topic => (
+                <div className="knowledge-write-fact" key={topic.id}>
+                  <dt>{topic.label}</dt><dd>{topic.synonyms.join(', ') || '—'}</dd>
+                </div>
+              ))}</dl>
+            </section>
+          )}
+          {preview.merges.map(merge => (
+            <section className="knowledge-write-section" key={merge.source.id}>
+              <h3 className="knowledge-write-section-title">{merge.source.label}</h3>
+              <dl className="knowledge-write-facts"><div className="knowledge-write-fact">
+                <dt>{t('knowledgeCenter.topicsMergeInto')}</dt><dd>{[merge.target.label, ...merge.target.synonyms].join(' · ')}</dd>
+              </div></dl>
+            </section>
+          ))}
+          {preview.cards.map(card => (
+            <section className="knowledge-write-section" key={card.cardId}>
+              <h3 className="knowledge-write-section-title">{card.title}</h3>
+              <dl className="knowledge-write-facts">
+                <div className="knowledge-write-fact"><dt>{t('knowledgeCenter.diffBefore')}</dt><dd>{names(card.before)}</dd></div>
+                <div className="knowledge-write-fact"><dt>{t('knowledgeCenter.diffAfter')}</dt><dd>{names(card.after)}</dd></div>
+              </dl>
+              {card.stale ? <p className="knowledge-write-hint">{t('knowledgeCenter.topicsStale')}</p> : null}
+            </section>
+          ))}
         </>
       ) : null}
       {topics.error ? <InlineError>{topics.error}</InlineError> : null}

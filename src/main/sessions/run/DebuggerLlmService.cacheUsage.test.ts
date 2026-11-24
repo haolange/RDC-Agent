@@ -119,6 +119,18 @@ describe('DebuggerLlmService cache aggregation', () => {
     expect(usage?.lastTurnCacheHitRate).toBeUndefined();
   });
 
+  it('retains reported zero values and leaves unreported telemetry absent', () => {
+    const turn = { turnId: 'turn_free', sessionId: 'sess_free', providerId: 'provider', modelId: 'model',
+      inputTokens: 12, outputTokens: 1, precomputedBreakdown: [] };
+    service.recordAgentTurnUsage({ ...turn, reasoningTokens: 0, cacheReadTokens: 0,
+      cost: { input: 0, output: 0, total: 0 } });
+    service.recordAgentTurnUsage(turn);
+    const { usage } = service.getSessionContextUsage({ sessionId: turn.sessionId });
+    expect(usage).toMatchObject({ cumulativeCost: 0, reasoningTokens: 0, cacheReadTokens: 0 });
+    expect(usage).not.toHaveProperty('cost');
+    expect(usage).not.toHaveProperty('cacheWriteTokens');
+  });
+
   it('omits cache block fields when no call reported cache stats', () => {
     service.recordAgentTurnUsage({
       runId: 'run_3',

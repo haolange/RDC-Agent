@@ -4,9 +4,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   createProviderEntryFromCatalog,
   getLoadedProviderSurface,
+  isRetiredProviderModel,
   loadProviderSurface,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
+import { applyDiscoveryAuthority, buildEffectiveCatalogRequest } from './EffectiveModelResolver';
 import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import {
   parseDeclarativeCatalog,
@@ -35,6 +36,9 @@ describe('data-only provider discovery fixtures', () => {
       ...cases.map(([providerId]) => loadProviderSurface(providerId)),
       loadProviderSurface('iflow'),
       loadProviderSurface('deepseek'),
+      loadProviderSurface('moonshot'),
+      loadProviderSurface('xai'),
+      loadProviderSurface('grok-account'),
     ]);
   });
 
@@ -71,6 +75,13 @@ describe('data-only provider discovery fixtures', () => {
     const chat = buildEffectiveCatalogRequest({ ...longcat, protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.longcat.chat/openai/v1' });
     expect(anthropic.fallbackRoute.protocol).toBe('AnthropicMessages');
     expect(chat.fallbackRoute.protocol).toBe('OpenAICompatibleChatCompletions');
+    expect(anthropic.catalog.models.find((model) => model.modelId === 'LongCat-2.5')).toMatchObject({
+      contextTiers: [{ maxTotalTokens: 1_048_576, maxOutputTokens: 262_144 }],
+      routeOptions: [
+        expect.objectContaining({ id: 'OpenAICompatibleChatCompletions' }),
+        expect.objectContaining({ id: 'AnthropicMessages' }),
+      ],
+    });
 
     const zen = createProviderEntryFromCatalog('opencode-zen');
     const gpt = buildEffectiveCatalogRequest(zen).catalog.models.find((model) => model.modelId === 'gpt-5.5');
@@ -104,6 +115,7 @@ describe('data-only provider discovery fixtures', () => {
     const parsed = parseDeclarativeCatalog(discovery, {
       data: [
         { id: 'deepseek-flash' },
+        { id: 'deepseek-v4-flash' },
       ],
     });
     const contributions = toDeclarativeCatalogContributions(parsed, {
@@ -130,6 +142,42 @@ describe('data-only provider discovery fixtures', () => {
     });
     expect(models.find((model) => model.modelId === 'deepseek-flash')?.route.protocol)
       .toBe('OpenAIResponses');
+    expect(models.some((model) => model.modelId === 'deepseek-v4-flash')).toBe(false);
+  });
+
+  it('only enables grandfathered Moonshot API models for eligible accounts', () => {
+    const provider = createProviderEntryFromCatalog('moonshot');
+    const request = buildEffectiveCatalogRequest(provider);
+    const availability = (allowedIds: string[]) => mergeEffectiveCatalog({
+      ...request,
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-11-24T00:00:00.000Z',
+        models: applyDiscoveryAuthority(provider, allowedIds.map((modelId) => ({
+          modelId, availability: 'available',
+        }))),
+      },
+    });
+
+    expect(availability(['kimi-k3']).find((model) => model.modelId === 'kimi-k2.7-code')?.availability)
+      .toBe('unavailable');
+    const grandfathered = availability(['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.5']);
+    expect(grandfathered.find((model) => model.modelId === 'kimi-k2.7-code')?.availability)
+      .toBe('available');
+    expect(grandfathered.some((model) => model.modelId === 'kimi-k2.5')).toBe(false);
+  });
+
+  it('keeps Grok API aliases, reasoning levels, and list prices on the direct surface', () => {
+    const surfaceModel = (providerId: string, modelId: string) =>
+      getLoadedProviderSurface(providerId)?.models.find((model) => model.modelId === modelId);
+
+    expect(surfaceModel('xai', 'grok-4.5')).toMatchObject({
+      aliases: ['grok-4.5-latest', 'grok-build-latest'],
+      controls: { reasoning: { levels: ['low', 'medium', 'high', 'xhigh'] } },
+    });
+    expect(isRetiredProviderModel('xai', 'grok-4-fast-reasoning')).toBe(true);
+    expect(surfaceModel('xai', 'grok-4.7')?.cost).toMatchObject({ input: 2, output: 6 });
+    expect(surfaceModel('grok-account', 'grok-4.7')?.cost).toBeUndefined();
   });
 
   it('projects documented context and capability metadata without static inference', () => {

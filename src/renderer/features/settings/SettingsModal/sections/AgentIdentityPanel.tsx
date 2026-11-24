@@ -45,14 +45,14 @@ export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, o
           onChange={(accent) => onUpdateAgent({ accent })}
         />
       </SettingsField>
-      <SettingsField label={t('settings.agentName')} layout="row">
-        <Input className="settings-agent-name-input" value={agent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
+      <SettingsField label={t('settings.agentName')} htmlFor="settings-agent-name" layout="row">
+        <Input id="settings-agent-name" className="settings-agent-name-input" value={agent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
       </SettingsField>
-      <SettingsField label={t('settings.agentArgumentHint')} layout="row">
-        <Textarea sizing="content" className="settings-agent-textarea-compact" value={agent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
+      <SettingsField label={t('settings.agentArgumentHint')} htmlFor="settings-agent-argument-hint" layout="row">
+        <Textarea id="settings-agent-argument-hint" sizing="content" className="settings-agent-textarea-compact" value={agent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
       </SettingsField>
-      <SettingsField label={t('settings.agentDescription')} layout="row">
-        <Textarea sizing="content" className="settings-agent-textarea-compact settings-agent-description-field" value={agent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
+      <SettingsField label={t('settings.agentDescription')} htmlFor="settings-agent-description" layout="row">
+        <Textarea id="settings-agent-description" sizing="content" className="settings-agent-textarea-compact settings-agent-description-field" value={agent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
       </SettingsField>
     </div>
   );

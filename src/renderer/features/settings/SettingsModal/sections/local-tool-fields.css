@@ -10,24 +10,6 @@
   border-top: 1px solid var(--token-border-muted);
 }
 
-.settings-local-tool-form-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-
-.settings-switch-row {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-}
-
 .settings-local-tool-grid {
   display: flex;
   flex-direction: column;
@@ -36,8 +18,9 @@
 
 .settings-local-tool-grid .settings-field.is-row {
   display: grid;
-  grid-template-columns: minmax(12rem, 0.32fr) minmax(0, 0.68fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .settings-local-tool-grid .settings-field-control {
@@ -45,8 +28,8 @@
   min-width: 0;
 }
 
-.settings-local-tool-grid .settings-field.is-row .settings-field-label {
-  padding-top: calc((var(--control-height-md) - var(--type-body-size) * 1.4) / 2);
+.settings-local-tool-grid .settings-field.is-row .settings-field-copy {
+  padding: 0;
 }
 
 .settings-local-tool-grid .ui-input,
@@ -60,6 +43,33 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
+}
+
+.settings-rdc-location,
+.settings-rdc-apply {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settings-rdc-location .input {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.settings-rdc-advanced {
+  border-block-start: 1px solid var(--token-border-muted);
+  padding-block-start: var(--space-2);
+}
+
+.settings-rdc-advanced .settings-local-tool-grid {
+  padding: var(--space-3) var(--space-2);
+}
+
+.settings-local-tool-grid input[type="number"],
+.settings-runtime-form-grid input[type="number"] {
+  inline-size: min(100%, 7rem);
 }
 
 .settings-readonly-status {
@@ -95,29 +105,4 @@
 
 .settings-rdc-status .ui-icon {
   color: var(--token-status-success);
-}
-
-.settings-interpreter-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-4);
-}
-
-.settings-interpreter-grid > .settings-field:not(.is-row) {
-  justify-content: flex-start;
-}
-
-.settings-interpreter-artifacts {
-  grid-column: 1 / -1;
-}
-
-@container settings-panel (max-width: 60rem) {
-  .settings-interpreter-grid,
-  .settings-local-tool-grid .settings-field.is-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-local-tool-grid .settings-field.is-row .settings-field-label {
-    padding-top: 0;
-  }
 }

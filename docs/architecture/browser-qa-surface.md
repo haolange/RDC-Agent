@@ -16,6 +16,7 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 - `src/shared/renderer-api/` 是唯一 `ElectronAPI` 工厂与 channel manifest；Desktop 和 Browser 各自只实现 transport。
 - manifest 中的全部 invoke channel 必须存在 main handler；启动时 `assertRendererIpcParity` fail-closed 校验。
 - Browser bridge 仅接受 canonical manifest 中且已登记 capability 并已注册的 channel。未知、内部、未注册 channel 与不存在的明文 `settings:getProviderSecret` 返回 403。capability 映射是闭合 Record，禁止默认 `mutation` fallback。`conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 是 `high-impact`：代答审批的 Browser QA 必须设置 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。
+- `conversation:accessAttachment` 包含用户触发的宿主打开与定位，登记为 `mutation`。Browser QA 和 Electron 都按待发所有者或已发送会话解析原件。
 - 事件流采用携带 cookie 的同源 `POST /events` fetch，保留 SSE 帧格式；不依赖原生 EventSource GET 的 Origin 行为。断流只重接同一事件流，不轮询应用状态；401/403 停止重连，最后订阅移除后 abort，迟到帧不得派发。
 - Cookie 认证的 `/invoke`、`/events`、`/api/*` 必须带精确 Origin。`browser-dev` 同源反代 Vite 时不得把 cookie / authorization / `x-rdc-*` 转给上游。
 - Secret 只可提交给主进程；renderer 只读取 `{ hasSecret, maskedPreview? }`，不得获得明文。
@@ -48,6 +49,8 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 `instance.lock` 回收不能只凭 PID 存活判断 owner：锁记录 owner 的进程身份（pid 与 birth，见 [`host-platform.md`](host-platform.md)），只有身份证明已退出（pid 不存在或 birth 不同，即 PID 被复用）才回收；身份不可读或未记录 birth 的活 pid 保持拒绝，也不向该进程发送终止信号。
 
 ## 验证
+
+- Ask 专项可用 `qa:ask` 经 Composer 发出双题请求。Working 展开后同时显示两题，Composer 完成选择和自由输入后核对两条回答都进入原卡。
 
 - 外观对照须匹配主题预设、字号、语言、Composer Markdown 开关及当前 Agent；disposable 默认偏好不能代表正常用户配置。需要复现正常外观时，仅将 appearance 字段复制到自有隔离配置，记录来源与差异，不复制凭据或会话，也不改变产品默认值。普通输入与 Markdown 编辑/预览是同一 Composer 的现有设置，不是 Browser/Desktop 分叉；原生窗口缩放仍需单独验收。
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`

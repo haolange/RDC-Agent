@@ -85,6 +85,16 @@
   background: var(--token-surface-sunken);
 }
 
+.ui-image-viewer-status {
+  padding: var(--space-3) var(--space-4);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+
+.ui-image-viewer-status + .ui-image-viewer-canvas:not(:has(img)) {
+  min-height: var(--space-16);
+}
+
 .ui-image-viewer-image {
   display: block;
   max-width: var(--ui-image-viewer-max-width);

@@ -27,6 +27,7 @@ export interface ProviderConnectionDraft {
   usingStoredSecret: boolean;
   busy: ProviderConnectionBusyState;
   error: string;
+  modelSaveError?: string;
   discoveryDiagnostic: LlmProviderConnectionResult['discoveryDiagnostic'] | null;
   testedApiKey: string;
   testedBaseUrl: string;

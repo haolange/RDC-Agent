@@ -1,7 +1,12 @@
-.settings-local-tool {
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-panel);
+.settings-local-tool-fields {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings-local-tool + .settings-local-tool {
+  border-block-start: 1px solid var(--token-border-muted);
 }
 
 .settings-local-tool-summary {
@@ -9,13 +14,22 @@
   align-items: center;
   gap: var(--space-3);
   min-height: var(--control-height-lg);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-2);
   cursor: pointer;
   list-style: none;
 }
 
 .settings-local-tool-summary::-webkit-details-marker {
   display: none;
+}
+
+.settings-local-tool-summary > .ui-details-chevron {
+  order: 1;
+}
+
+.settings-local-tool[open] {
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
 }
 
 .settings-local-tool-summary:hover,
@@ -39,12 +53,20 @@
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);
+  display: grid;
+  gap: var(--space-1);
 }
 
+.settings-local-tool-status {
+  flex: none;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
 
 .settings-local-tool-body {
-  padding: var(--space-4);
-  border-top: 1px solid var(--token-border-muted);
+  margin-inline-start: calc(var(--space-2) + var(--space-4));
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  border-inline-start: 1px solid var(--token-border-muted);
 }
 
 .settings-tools-save-bar {
@@ -57,20 +79,19 @@
   color: var(--token-status-warning);
 }
 
-.settings-tools-save-bar .settings-save-status[data-status='error'] {
-  color: var(--token-status-error);
-}
-
 .settings-tools-card-stack {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-1);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--token-border-muted);
 }
 
-.settings-page-tools .settings-field-label {
-  word-break: keep-all;
-  overflow-wrap: normal;
+.settings-tools-card-stack > .settings-section-header {
+  display: grid;
+  justify-content: start;
+  gap: var(--space-1);
 }
 
 @media (max-width: 48rem) {

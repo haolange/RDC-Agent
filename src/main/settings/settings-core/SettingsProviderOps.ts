@@ -4,6 +4,7 @@ import {
   isBuiltinProviderId,
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../../runtime/AppPathService';
+import { providerConnectionRevision } from '../provider-catalog/effectiveCatalogMerge';
 import { normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
 import { providerConnectionError } from '../provider-auth/providerConnectionErrors';
@@ -19,7 +20,6 @@ import {
   extractOAuthBundleAccountId,
   getProviderAccountSecretRef,
   isConnectionSchemaSatisfied,
-  normalizeUserProviders,
   resolveProviderModels,
   resolveSelectedAuthAvailability,
   sanitizeConnectionValues,
@@ -31,7 +31,7 @@ import {
   nowIso,
   normalizePersistedSettings,
   readJsonFile,
-  writeSettingsAsync,
+  writeSettings,
 } from './settingsServiceHelpers';
 import type { AppSettings, AppSettingsPatch, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
 
@@ -44,26 +44,8 @@ export interface SettingsProviderOpsHost {
 export class SettingsProviderOps {
   private readonly providerDefinitionRevisions = new Map<string, number>();
   private readonly providerDefinitionCommits = new Map<string, ProviderDefinitionCommitSnapshot>();
-  private readonly providerDefinitionWriteTails = new Map<string, Promise<void>>();
 
   constructor(private readonly host: SettingsProviderOpsHost) {}
-
-  private async withProviderDefinitionWriteLock<T>(providerId: string, task: () => Promise<T>): Promise<T> {
-    const previous = this.providerDefinitionWriteTails.get(providerId) ?? Promise.resolve();
-    let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => { release = resolve; });
-    const tail = previous.catch(() => undefined).then(() => gate);
-    this.providerDefinitionWriteTails.set(providerId, tail);
-    await previous.catch(() => undefined);
-    try {
-      return await task();
-    } finally {
-      release();
-      if (this.providerDefinitionWriteTails.get(providerId) === tail) {
-        this.providerDefinitionWriteTails.delete(providerId);
-      }
-    }
-  }
 
   private providerSaveResult(
     request: ProviderDefinitionSaveRequest,
@@ -83,60 +65,49 @@ export class SettingsProviderOps {
     };
   }
 
-  private async readProviderDefinitionCommit(providerId: string): Promise<ProviderDefinitionCommitSnapshot | null> {
+  private readProviderDefinitionCommit(providerId: string): ProviderDefinitionCommitSnapshot | null {
     const provider = this.host.getAll().llm.providers.find((entry) => entry.id === providerId) ?? null;
     if (!provider) return null;
     const hash = hashProviderDefinition(provider);
     const cached = this.providerDefinitionCommits.get(providerId);
+    if (cached?.commitHash === hash) return cached;
     const snapshot: ProviderDefinitionCommitSnapshot = {
-      clientRevision: cached?.commitHash === hash ? cached.clientRevision : 0,
+      clientRevision: 0,
       providerId,
       commitHash: hash,
       provider,
-      catalogRevision: cached?.catalogRevision ?? null,
+      catalogRevision: null,
     };
     this.providerDefinitionCommits.set(providerId, snapshot);
     return snapshot;
   }
 
-  private async persistProviderDefinition(provider: LlmProviderEntry): Promise<LlmProviderEntry> {
+  private persistProviderDefinition(provider: LlmProviderEntry): LlmProviderEntry {
     const paths = appPathService.initializeRuntime();
     const currentPersisted = normalizePersistedSettings(
       readJsonFile<PersistedSettingsPayload>(paths.settingsPath) ?? createDefaultPersistedSettings(),
       paths.userRdcRoot,
       { credentialView: 'storage-metadata' },
     );
-  const currentProviders = currentPersisted.llm?.providers ?? [];
-  const current = currentProviders.find((entry) => entry.id === provider.id);
-  if (!current) throw new Error(`Unknown provider: ${provider.id}`);
-  const sanitized = sanitizeUserProvider({
-    ...current,
-    ...provider,
-    apiKey: '',
-    secretRef: current.secretRef,
-    secretRefs: current.secretRefs,
-    authAccountIds: current.authAccountIds,
-    activeAccountId: current.activeAccountId,
-    hasStoredSecretByAuthMode: current.hasStoredSecretByAuthMode,
-    hasStoredConnectionSecrets: current.hasStoredConnectionSecrets,
-  }, paths.userRdcRoot, { credentialView: 'storage-metadata' });
-  if (!sanitized) throw new Error(`Provider ${provider.id} could not be sanitized.`);
-  const nextProviders = normalizeUserProviders(
-    currentProviders.map((entry) => entry.id === provider.id ? sanitized : entry),
-    paths.userRdcRoot,
-    { credentialView: 'storage-metadata' },
-  );
-  await writeSettingsAsync({
-    ...currentPersisted,
-    schemaVersion: SETTINGS_SCHEMA_VERSION,
-    llm: {
-      ...currentPersisted.llm,
-      providers: nextProviders.map((entry) => ({ ...entry, apiKey: '' })),
-    },
-  });
-  const committed = this.host.getAll().llm.providers.find((entry) => entry.id === provider.id);
-  if (!committed) throw new Error(`Provider ${provider.id} disappeared after commit.`);
-  return committed;
+    const currentProviders = currentPersisted.llm.providers;
+    const current = currentProviders.find((entry) => entry.id === provider.id);
+    if (!current) throw new Error(`Unknown provider: ${provider.id}`);
+    const sanitized = sanitizeUserProvider({
+      ...current,
+      models: provider.models,
+    }, paths.userRdcRoot, { credentialView: 'storage-metadata' });
+    if (!sanitized) throw new Error(`Provider ${provider.id} could not be sanitized.`);
+    writeSettings({
+      ...currentPersisted,
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
+      llm: {
+        ...currentPersisted.llm,
+        providers: currentProviders.map((entry) => entry.id === provider.id ? sanitized : entry),
+      },
+    });
+    const committed = this.host.getAll().llm.providers.find((entry) => entry.id === provider.id);
+    if (!committed) throw new Error(`Provider ${provider.id} disappeared after commit.`);
+    return committed;
   }
 
   async getProviderDefinitionCommit(providerIdDraft: string): Promise<ProviderDefinitionCommitSnapshot | null> {
@@ -152,26 +123,22 @@ export class SettingsProviderOps {
 
   async saveProviderDefinition(request: ProviderDefinitionSaveRequest): Promise<ProviderDefinitionSaveResult> {
     const providerId = request.provider.id.trim();
-  const previous = await this.readProviderDefinitionCommit(providerId);
-  if (!providerId || !Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
-    return this.providerSaveResult(request, 'failed', previous, 'clientRevision must be a positive safe integer.');
-  }
-  const latestRevision = this.providerDefinitionRevisions.get(providerId) ?? 0;
-  if (request.clientRevision <= latestRevision) {
-    return this.providerSaveResult(request, 'superseded', previous);
-  }
-  this.providerDefinitionRevisions.set(providerId, request.clientRevision);
-  await Promise.resolve();
-  return this.withProviderDefinitionWriteLock(providerId, async () => {
-    if (this.providerDefinitionRevisions.get(providerId) !== request.clientRevision) {
+    if (!providerId || !Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
+      return this.providerSaveResult(request, 'failed', this.readProviderDefinitionCommit(providerId), 'clientRevision must be a positive safe integer.');
+    }
+    if (request.clientRevision <= (this.providerDefinitionRevisions.get(providerId) ?? 0)) {
+      return this.providerSaveResult(request, 'superseded', this.readProviderDefinitionCommit(providerId));
+    }
+    this.providerDefinitionRevisions.set(providerId, request.clientRevision);
+    // Coalesce same-turn intents before starting the synchronous settings transaction.
+    await Promise.resolve();
+    const previous = this.readProviderDefinitionCommit(providerId);
+    if (this.providerDefinitionRevisions.get(providerId) !== request.clientRevision
+      || (previous?.provider && providerConnectionRevision(previous.provider) !== providerConnectionRevision(request.provider))) {
       return this.providerSaveResult(request, 'superseded', previous);
     }
     try {
-      const provider = await this.persistProviderDefinition(request.provider);
-      if (this.providerDefinitionRevisions.get(providerId) !== request.clientRevision) {
-        if (previous?.provider) await this.persistProviderDefinition(previous.provider);
-        return this.providerSaveResult(request, 'superseded', previous);
-      }
+      const provider = this.persistProviderDefinition(request.provider);
       const snapshot: ProviderDefinitionCommitSnapshot = {
         clientRevision: request.clientRevision,
         providerId,
@@ -183,11 +150,8 @@ export class SettingsProviderOps {
       return this.providerSaveResult(request, 'committed', snapshot);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return this.providerDefinitionRevisions.get(providerId) === request.clientRevision
-        ? this.providerSaveResult(request, 'failed', previous, message)
-        : this.providerSaveResult(request, 'superseded', previous);
+      return this.providerSaveResult(request, 'failed', previous, message);
     }
-  });
   }
 
   saveProviderConnection(
@@ -343,7 +307,7 @@ export class SettingsProviderOps {
     oauthExpiresAt: undefined,
     oauthRefreshAvailable: undefined,
     unavailableReason: undefined,
-    isConfigured: hasEnabledModels,
+    isConfigured: true,
   };
 
   try {
@@ -414,7 +378,7 @@ export class SettingsProviderOps {
     oauthExpiresAt: accountSummary.oauthExpiresAt,
     oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
     unavailableReason: undefined,
-    isConfigured: hasEnabledModels,
+    isConfigured: true,
   };
 
   const nextSettings = this.host.setAll({

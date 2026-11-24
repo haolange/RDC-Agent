@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useI18n } from '../i18n';
 import {
   awaitsExecutionContextWindow,
@@ -15,8 +15,6 @@ export interface ContextUsageMenuController {
   open: boolean;
   toggle: () => void;
   close: () => void;
-  setRoot: (node: HTMLElement | null) => void;
-  setTrigger: (node: HTMLElement | null) => void;
 }
 
 export const ContextUsageIndicator: React.FC<{
@@ -28,19 +26,13 @@ export const ContextUsageIndicator: React.FC<{
   estimated?: boolean;
   menu?: ContextUsageMenuController;
   detailsExpanded: boolean;
+  detailsSaveError?: string;
   onDetailsExpandedChange: (expanded: boolean) => void;
-}> = ({ usage, prepared, phase, selectedProfile, stale = false, estimated = false, menu, detailsExpanded, onDetailsExpandedChange }) => {
+}> = ({ usage, prepared, phase, selectedProfile, stale = false, estimated = false, menu, detailsExpanded,
+  detailsSaveError, onDetailsExpandedChange }) => {
   const { t } = useI18n();
   const [localOpen, setLocalOpen] = useState(false);
   const open = menu?.open ?? localOpen;
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const assignRoot = useCallback((node: HTMLDivElement | null) => {
-    menu?.setRoot(node);
-  }, [menu]);
-  const assignTrigger = useCallback((node: HTMLButtonElement | null) => {
-    triggerRef.current = node;
-    menu?.setTrigger(node);
-  }, [menu]);
   const showPrepared = phase === 'current' && prepared !== null;
   const awaitingWindow = showPrepared && awaitsExecutionContextWindow(prepared);
   const previewActive = estimated && !showPrepared && usage !== null;
@@ -58,7 +50,6 @@ export const ContextUsageIndicator: React.FC<{
       return;
     }
     setLocalOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
   }, [menu]);
   const togglePopover = useCallback(() => {
     if (menu) {
@@ -88,9 +79,8 @@ export const ContextUsageIndicator: React.FC<{
       : METER_UNAVAILABLE;
 
   return (
-    <div ref={assignRoot} className="composer-usage">
+    <div className="composer-usage">
       <button
-        ref={assignTrigger}
         type="button"
         className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' || awaitingWindow ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
@@ -126,6 +116,7 @@ export const ContextUsageIndicator: React.FC<{
           stale={stale}
           estimated={previewActive}
           detailsExpanded={detailsExpanded}
+          detailsSaveError={detailsSaveError}
           onDetailsExpandedChange={onDetailsExpandedChange}
           onClose={closePopover}
         />

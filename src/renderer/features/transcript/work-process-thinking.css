@@ -25,7 +25,7 @@
   gap: 0;
 }
 
-/* Beat kind-section / aggregate bottom padding so process→answer stays 10px. */
+/* Beat section bottom padding so process→answer stays 10px. */
 .work-process-steps > .work-process-step:last-child {
   padding-bottom: 0;
 }
@@ -79,13 +79,6 @@
   cursor: pointer;
   list-style: none;
   transition: color var(--transition-fast);
-}
-
-.work-process-thinking-caption {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin: 0;
 }
 
 .work-process-thinking-icon {

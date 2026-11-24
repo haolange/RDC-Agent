@@ -1,5 +1,6 @@
 import { cn } from '../lib/cn';
 import { COMMON_ICONS } from './icons/commonIcons';
+import { PROVIDER_BRAND_ICONS } from './icons/providerBrandIcons';
 import { INVESTIGATION_ICONS } from './icons/investigationIcons';
 import { KNOWLEDGE_ICONS } from './icons/knowledgeIcons';
 import { SHELL_ICONS } from './icons/shellIcons';
@@ -9,9 +10,10 @@ import './Icon.css';
 
 export type IconSize = 12 | 14 | 16 | 18 | 20 | 24;
 
-/** The single icon registry: every glyph in the app is a 24 × 24 stroke drawing from one of these domain tables. */
+/** Every glyph shares the 24 × 24 view box, including filled provider marks. */
 export const ICON_REGISTRY = {
   ...COMMON_ICONS,
+  ...PROVIDER_BRAND_ICONS,
   ...SHELL_ICONS,
   ...TRANSCRIPT_ICONS,
   ...KNOWLEDGE_ICONS,

@@ -35,6 +35,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     stageAttachments: 'conversation:stageAttachments',
     releaseAttachments: 'conversation:releaseAttachments',
     getAttachmentPreview: 'conversation:getAttachmentPreview',
+    accessAttachment: 'conversation:accessAttachment',
     resolveMedia: 'conversation:resolveMedia',
   },
   workflow: {

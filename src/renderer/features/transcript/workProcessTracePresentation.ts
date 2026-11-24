@@ -9,6 +9,7 @@ import { countWorkActions } from './workProcessSectionModel';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
 import { buildPresentationUnits, presentationUnitsToDetailRows, type ThinkingItemPresentation } from './workProcessBlockProjection';
 import { markReadSearchResults, mergeWebReadsAcrossSteps } from './workProcessWebFlow';
+import { hasVisibleThinkingMarkdown } from './workProcessThinkingContent';
 import type { Translator } from '../../i18n/messages';
 
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
@@ -68,8 +69,8 @@ const resolveThinkingItem = (
 ): ThinkingItemPresentation | null => {
   const { thinking } = item;
   if (thinking.kind === 'opaque' || thinking.visibility === 'hidden') return null;
-  const preview = normalizeWorkProcessText(thinking.text ?? '');
-  if (!preview) return null;
+  const preview = (thinking.text ?? '').replace(/\r\n?/gu, '\n');
+  if (!hasVisibleThinkingMarkdown(preview)) return null;
   const isActiveBlock = block.status === 'running' || block.status === 'pending';
   const status = isActiveBlock ? item.status : 'complete';
   return {
@@ -153,7 +154,6 @@ const groupProcessRows = groupImageRows;
 
 const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + countToolSteps(row.steps);
-  if (row.type === 'toolAggregate') return total + row.children.length;
   if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
   if (row.type === 'userInput' || row.type === 'planReview') return total + 1;
   return total;
@@ -161,13 +161,11 @@ const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, r
 
 const countSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + 1 + countSteps(row.steps);
-  if (row.type === 'toolAggregate') return total + 1;
   return total + 1;
 }, 0);
 
 const rowsHaveAttention = (rows: WorkProcessRow[]): boolean => rows.some((row) => {
   if (row.type === 'section') return row.status === 'running' || row.status === 'error' || row.status === 'skipped' || rowsHaveAttention(row.steps);
-  if (row.type === 'toolAggregate') return row.status === 'error' || row.status === 'running' || row.status === 'skipped';
   return row.status === 'error' || row.status === 'running' || row.status === 'skipped';
 });
 
