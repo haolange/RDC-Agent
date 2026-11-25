@@ -201,10 +201,10 @@ Settings 页标题与正文共用面板内边距。
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
 - 强调文本、图标与描边 CTA 读 `--token-accent-primary`（primitive `--color-accent-ink`）：`compileThemeChrome` 从 accent-400 出发，沿同一色相向远离背景的方向调亮度，直到在 `bg-1…bg-3` 上都达到 4.5:1；实心 accent 面上的文字/图标读 `--token-text-on-accent`（`--color-text-on-accent`），取近黑与近白中对比更高者。Composer Send 同理读 compose 派生的 `--composer-mode-on-accent`。任何主题与自定义 accent 都不再靠人工挑色保证可读。
 - **对比度由编译器保证**：`compileThemeChrome` 对每个读出来的颜色调用 `readableOn`，在 `bg-0…bg-3` 与浮层表面上检查。
-  - 文字色阶（主文、次要、tertiary、muted）与状态色（success、warning、error、info）要求 4.5:1，焦点环 `--color-focus-ring`（`--token-border-focus` 的来源，起点是 accent-500）要求 3:1。
+  - 文字色阶（主文、次要、tertiary、muted）与状态色（success、warning、error、info）要求 4.5:1，焦点环 `--color-focus-ring`（`--token-border-focus` 的来源，起点是 accent-500）与控件边界 `--color-control-boundary`（`--token-border-control` 的来源，起点是叠在面板上的强边框；未勾选的复选框只靠它辨认）要求 3:1。
   - 只移动不达标的值，达标的原样输出；禁用文字 `--color-text-disabled` 按 WCAG 豁免。
   - `src/shared/theme/compiler.test.ts` 逐个扫描全部预设的深浅两套。
-  - 默认 RDC 主题只有浅色的两处被移动：焦点环从 2.5:1 的 `27 157 204` 移到 `24 140 181`，info 从 1.7:1 的天蓝移到 `5 110 156`。
+  - 默认 RDC 主题被移动的值：浅色焦点环从 2.5:1 的 `27 157 204` 移到 `24 140 181`，浅色 info 从 1.7:1 的天蓝移到 `5 110 156`；控件边界深色为 `108 112 117`、浅色为 `127 133 142`（原先复选框用默认边框，约 1.3:1）。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
 - **双体系**：全局 chrome（`chromeThemes.light|dark` → `compileThemeChrome`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框、send、Effort/Max 滑条、Max 字色、Max mode / Fast 角标开态）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
 - Effort 弹层的 Max mode / Fast mode 只在模型支持时出现：unsupported 不占位，fixed 显示为锁定开启，selectable 才允许切换。收起胶囊只在对应模式开启时前置图标。
@@ -428,7 +428,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 浅色主题
 
-浅色不是深色的数值反转：它有自己的中性色阶与表面层级（`compileThemeChrome` 的 light 预设），两套主题的文字色阶与状态色达到 4.5:1、焦点环达到 3:1，由主题编译器保证（见「颜色使用规则」）；其他控件边界不经编译器检查。
+浅色不是深色的数值反转：它有自己的中性色阶与表面层级（`compileThemeChrome` 的 light 预设），两套主题的文字色阶与状态色达到 4.5:1、焦点环与控件边界达到 3:1，由主题编译器保证（见「颜色使用规则」）；装饰性分隔线与有底色区分的输入框边框不经编译器检查。
 
 - 组件 CSS 不写任何字面颜色（含 `white`、`black`、`rgb(...)`、`rgba(...)`），旧的 `rgb(var(--color-*))` 写法已删除。
 - 保留动效按主题校准：扫光在浅色上用略深的光带，折射边缘、Max 粒子与点阵分别校准亮度。

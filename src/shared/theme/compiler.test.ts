@@ -21,6 +21,7 @@ describe('preset contrast', () => {
     const status = ['success', 'warning', 'error', 'info'].map((name) => `--color-${name}`);
     for (const token of [...text, ...status, '--color-accent-ink']) expect(worst(token), token).toBeGreaterThanOrEqual(TEXT_CONTRAST);
     expect(worst('--color-focus-ring')).toBeGreaterThanOrEqual(BOUNDARY_CONTRAST);
+    expect(worst('--color-control-boundary')).toBeGreaterThanOrEqual(BOUNDARY_CONTRAST);
     expect(contrastRatio(tripletRgb(vars['--color-text-on-accent']), tripletRgb(vars['--color-accent-ink']))).toBeGreaterThanOrEqual(TEXT_CONTRAST);
   });
 
@@ -34,6 +35,8 @@ describe('preset contrast', () => {
     expect([light['--color-accent-500'], light['--color-focus-ring']]).toEqual(['27 157 204', '24 140 181']);
     expect(light['--color-info']).toBe('5 110 156');
     expect([light['--color-text-secondary'], light['--color-success']]).toEqual(['63 70 78', '20 108 61']);
+    // Declared fix: the unchecked checkbox outline was the default border (about 1.3:1); it now reads at 3:1.
+    expect([dark['--color-control-boundary'], light['--color-control-boundary']]).toEqual(['108 112 117', '127 133 142']);
   });
 });
 

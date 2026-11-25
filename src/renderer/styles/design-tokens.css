@@ -34,6 +34,8 @@
   --color-accent-ink: var(--color-accent-400);
   /* Focus ring; the theme compiler moves the accent until it reads at 3:1 on every chrome surface. */
   --color-focus-ring: var(--color-accent-500);
+  /* Outline of a control recognisable only by it (unchecked checkbox): the strong border moved to 3:1. */
+  --color-control-boundary: 108 112 117;
 
   /* Background Scale - layered graphite surfaces */
   --color-bg-0: 10 11 14;
@@ -258,6 +260,7 @@
   --color-accent-900: 38 68 84;
   --color-accent-ink: 26 111 142;
   --color-focus-ring: 24 140 181;
+  --color-control-boundary: 127 133 142;
   --color-text-on-accent: 248 251 255;
 
   --color-bg-0: 244 246 249;
@@ -402,6 +405,7 @@
   --token-border-focus:        rgb(var(--color-focus-ring));
   --token-border-card:         rgb(var(--color-border-secondary));
   --token-border-input:        rgb(var(--color-border-default));
+  --token-border-control:      rgb(var(--color-control-boundary));
 
   /* ── Typography ── */
   /* Three text levels: primary, secondary, disabled (placeholders share disabled). */
@@ -550,7 +554,7 @@
   /* ── Component: Checkbox / CheckPill box ──
    *  Multi-select stays an outline box + ink tick. Accent fill is Switch-only. */
   --checkbox-bg:               var(--token-bg-panel);
-  --checkbox-border:           var(--token-border-default);
+  --checkbox-border:           var(--token-border-control);
   --checkbox-checked-bg:       transparent;
   --checkbox-checked-border:   var(--token-border-strong);
   --checkbox-check-color:      var(--token-text-primary);
