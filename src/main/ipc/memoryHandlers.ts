@@ -14,6 +14,7 @@ import {
 } from './validation/ipcSchemas';
 import type { MemoryWriteRequest } from '@shared/types/electron';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import type { IpcChannelTable } from './invokeRegistry';
 
 const storeFor = (scope: 'user' | 'project', projectRoot?: string): MemoryStore => {
   if (scope === 'project') {
@@ -40,104 +41,110 @@ function validationFailure(error: unknown): { success: false; name?: string; err
 }
 
 export function registerMemoryHandlers(_context: WorkbenchIpcContext): void {
-  ipcMain.handle('memory:issueApprovalToken', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [request] = parseIpcArgs(MemoryIssueApprovalTokenArgsSchema, rawArgs, {
-        label: 'memory:issueApprovalToken',
+  const channels: IpcChannelTable = {
+    ...memoryChannels(),
+  };
+  for (const [channel, handler] of Object.entries(channels)) ipcMain.handle(channel, handler);
+}
+
+/** Scoped memories: list and read, and confirmed writes and deletes with single-use approval tokens. */
+function memoryChannels(): IpcChannelTable {
+  return {
+    'memory:issueApprovalToken': async (_event, ...rawArgs: unknown[]) => {
+      try {
+        const [request] = parseIpcArgs(MemoryIssueApprovalTokenArgsSchema, rawArgs, {
+          label: 'memory:issueApprovalToken',
+          maxBytes: 8 * 1024,
+        });
+        const confirmed = await confirmMemoryMutation(request.action, request.scope, request.name);
+        if (!confirmed) return { error: 'Memory mutation was not confirmed by the main-process dialog.' };
+        const token = ipcApprovalTokenService.issue(request);
+        return { token };
+      } catch (error) {
+        if (error instanceof IpcValidationError) {
+          return { error: error.message };
+        }
+        throw error;
+      }
+    },
+    'memory:list': async (_event, ...rawArgs: unknown[]) => {
+      const [scope, projectRoot] = parseIpcArgs(MemoryListArgsSchema, rawArgs, {
+        label: 'memory:list',
         maxBytes: 8 * 1024,
+        padTo: 2,
       });
-      const confirmed = await confirmMemoryMutation(request.action, request.scope, request.name);
-      if (!confirmed) return { error: 'Memory mutation was not confirmed by the main-process dialog.' };
-      const token = ipcApprovalTokenService.issue(request);
-      return { token };
-    } catch (error) {
-      if (error instanceof IpcValidationError) {
-        return { error: error.message };
-      }
-      throw error;
-    }
-  });
-
-  ipcMain.handle('memory:list', async (_event, ...rawArgs: unknown[]) => {
-    const [scope, projectRoot] = parseIpcArgs(MemoryListArgsSchema, rawArgs, {
-      label: 'memory:list',
-      maxBytes: 8 * 1024,
-      padTo: 2,
-    });
-    return {
-      memories: (await storeFor(scope, projectRoot).listMemories()).map((memory) => ({
-        ...memory,
-        scope,
-      })),
-    };
-  });
-
-  ipcMain.handle('memory:get', async (_event, ...rawArgs: unknown[]) => {
-    const [scope, name, projectRoot] = parseIpcArgs(MemoryGetArgsSchema, rawArgs, {
-      label: 'memory:get',
-      maxBytes: 8 * 1024,
-      padTo: 3,
-    });
-    const memory = await storeFor(scope, projectRoot).getMemory(name);
-    return { memory: memory ? { ...memory, scope } : null };
-  });
-
-  ipcMain.handle('memory:write', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [request] = parseIpcArgs(MemoryWriteArgsSchema, rawArgs, {
-        label: 'memory:write',
-        maxBytes: 512 * 1024,
-      }) as [MemoryWriteRequest];
-      const consumed = ipcApprovalTokenService.consume({
-        token: request.approvalToken,
-        action: 'memory.write',
-        scope: request.scope,
-        name: request.name,
-        projectRoot: request.projectRoot,
-      });
-      if (!consumed) {
-        return { success: false, name: request.name, error: 'Memory write requires a valid Main-issued approvalToken.' };
-      }
-      const memory = await storeFor(request.scope, request.projectRoot).writeMemory({
-        name: request.name,
-        description: request.description,
-        type: request.type,
-        content: request.content,
-        tags: request.tags,
-      });
-      return { success: true, name: memory.displayName };
-    } catch (error) {
-      if (error instanceof IpcValidationError) return validationFailure(error);
       return {
-        success: false,
-        name: typeof (rawArgs[0] as { name?: unknown })?.name === 'string'
-          ? (rawArgs[0] as { name: string }).name
-          : undefined,
-        error: error instanceof Error ? error.message : String(error),
+        memories: (await storeFor(scope, projectRoot).listMemories()).map((memory) => ({
+          ...memory,
+          scope,
+        })),
       };
-    }
-  });
-
-  ipcMain.handle('memory:delete', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [scope, name, approvalToken, projectRoot] = parseIpcArgs(MemoryDeleteArgsSchema, rawArgs, {
-        label: 'memory:delete',
+    },
+    'memory:get': async (_event, ...rawArgs: unknown[]) => {
+      const [scope, name, projectRoot] = parseIpcArgs(MemoryGetArgsSchema, rawArgs, {
+        label: 'memory:get',
         maxBytes: 8 * 1024,
-        padTo: 4,
+        padTo: 3,
       });
-      const consumed = ipcApprovalTokenService.consume({
-        token: approvalToken,
-        action: 'memory.delete',
-        scope,
-        name,
-        projectRoot,
-      });
-      if (!consumed) {
-        return { success: false, error: 'Memory deletion requires a valid Main-issued approvalToken.' };
+      const memory = await storeFor(scope, projectRoot).getMemory(name);
+      return { memory: memory ? { ...memory, scope } : null };
+    },
+    'memory:write': async (_event, ...rawArgs: unknown[]) => {
+      try {
+        const [request] = parseIpcArgs(MemoryWriteArgsSchema, rawArgs, {
+          label: 'memory:write',
+          maxBytes: 512 * 1024,
+        }) as [MemoryWriteRequest];
+        const consumed = ipcApprovalTokenService.consume({
+          token: request.approvalToken,
+          action: 'memory.write',
+          scope: request.scope,
+          name: request.name,
+          projectRoot: request.projectRoot,
+        });
+        if (!consumed) {
+          return { success: false, name: request.name, error: 'Memory write requires a valid Main-issued approvalToken.' };
+        }
+        const memory = await storeFor(request.scope, request.projectRoot).writeMemory({
+          name: request.name,
+          description: request.description,
+          type: request.type,
+          content: request.content,
+          tags: request.tags,
+        });
+        return { success: true, name: memory.displayName };
+      } catch (error) {
+        if (error instanceof IpcValidationError) return validationFailure(error);
+        return {
+          success: false,
+          name: typeof (rawArgs[0] as { name?: unknown })?.name === 'string'
+            ? (rawArgs[0] as { name: string }).name
+            : undefined,
+          error: error instanceof Error ? error.message : String(error),
+        };
       }
-      return { success: await storeFor(scope, projectRoot).deleteMemory(name) };
-    } catch (error) {
-      return validationFailure(error);
-    }
-  });
+    },
+    'memory:delete': async (_event, ...rawArgs: unknown[]) => {
+      try {
+        const [scope, name, approvalToken, projectRoot] = parseIpcArgs(MemoryDeleteArgsSchema, rawArgs, {
+          label: 'memory:delete',
+          maxBytes: 8 * 1024,
+          padTo: 4,
+        });
+        const consumed = ipcApprovalTokenService.consume({
+          token: approvalToken,
+          action: 'memory.delete',
+          scope,
+          name,
+          projectRoot,
+        });
+        if (!consumed) {
+          return { success: false, error: 'Memory deletion requires a valid Main-issued approvalToken.' };
+        }
+        return { success: await storeFor(scope, projectRoot).deleteMemory(name) };
+      } catch (error) {
+        return validationFailure(error);
+      }
+    },
+  };
 }

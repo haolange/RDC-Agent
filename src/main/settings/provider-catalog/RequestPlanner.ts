@@ -9,12 +9,13 @@ import {
   contextTierWindowTokens,
   resolveContextTierChoices,
   resolvePlanningOutputTokens,
+  type ContextTierChoices,
 } from '@shared/utils/contextTiers';
 import {
   resolveCompactionThresholdTokens,
   sanitizeCompactionThresholdPercent,
 } from '@shared/utils/contextBudget';
-import { resolveModelControls } from '@shared/utils/modelControls';
+import { resolveModelControls, type ModelControlEvaluation } from '@shared/utils/modelControls';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
 import {
   classifyAgentToolEligibility,
@@ -31,6 +32,7 @@ import type {
   ProviderStateMode,
   ToolLoopPhase,
   CatalogModelRoute,
+  ContextTier,
   ModelSelection,
   RequestPlan,
   RequestPlanningErrorCode,
@@ -100,11 +102,13 @@ function mergeHeaders(target: Record<string, string>, patch: Record<string, stri
   return undefined;
 }
 
+type PlanningFailure = Extract<RequestPlanningResult, { ok: false }>;
+
 function planningError(
   code: RequestPlanningErrorCode,
   message: string,
   controls: ConversationTurnControls,
-): RequestPlanningResult {
+): PlanningFailure {
   return { ok: false, code, message, controls };
 }
 
@@ -112,9 +116,44 @@ function routeMatches(left: CatalogModelRoute, right: CatalogModelRoute): boolea
   return left.protocol === right.protocol && left.baseUrl === right.baseUrl;
 }
 
-export function planModelRequest(input: RequestPlannerInput): RequestPlanningResult {
+
+/** A phase either yields its value or ends planning with the failure it found. */
+type PlanningStep<T> = { ok: true; value: T } | PlanningFailure;
+
+/**
+ * Facts the planning phases refine in order: eligibility, route selection, execution binding,
+ * context tier headers, context budget, reasoning wire, route contracts and execution identity.
+ */
+interface RequestPlanningState {
+  readonly input: RequestPlannerInput;
+  readonly model: EffectiveModel;
+  readonly evaluation: ModelControlEvaluation;
+  readonly controls: ConversationTurnControls;
+  readonly maxMode: boolean;
+  readonly tierChoices: ContextTierChoices;
+  readonly warnings: string[];
+  readonly bodyPatch: JsonObject;
+  readonly bindingHeaders: Record<string, string>;
+  activeTier: ContextTier;
+  effectiveModelId: string;
+  effectiveModel: EffectiveModel;
+  modelSelection: ModelSelection;
+  route: CatalogModelRoute;
+  selectedRouteOptionId: string | undefined;
+  selectedRouteRevision: string;
+  suppressReasoningWire: boolean;
+}
+
+interface ContextBudgetPlan {
+  contextWindowTokens: number;
+  contextBudgetTokens: number;
+  maxOutputTokens: RequestPlan['maxOutputTokens'];
+  compactionThresholdTokens: number;
+}
+
+/** Availability, Agent tool eligibility and control conflicts, before any route is chosen. */
+function rejectIneligibleModel(input: RequestPlannerInput, evaluation: ModelControlEvaluation): PlanningFailure | undefined {
   const { model } = input;
-  const evaluation = resolveModelControls(model, input.controls, input.catalogModels);
   const controls = evaluation.controls;
   if (model.availability !== 'available' || model.enabled === false) {
     return planningError(
@@ -141,23 +180,24 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
         : 'MODEL_UNAVAILABLE';
     return planningError(code, evaluation.error.message, controls);
   }
+  return undefined;
+}
 
+/** The usable context tier and the model's route, honouring a preferred route option. */
+function createPlanningState(input: RequestPlannerInput, evaluation: ModelControlEvaluation): PlanningStep<RequestPlanningState> {
+  const { model } = input;
+  const controls = evaluation.controls;
   const tierChoices = resolveContextTierChoices(model);
   const maxMode = evaluation.resolved.maxContext.value;
-  let activeTier = maxMode ? tierChoices.maxTier : tierChoices.normalTier;
+  const activeTier = maxMode ? tierChoices.maxTier : tierChoices.normalTier;
   if (!activeTier || activeTier.entitlement === 'denied') {
     return planningError('NO_USABLE_CONTEXT_TIER', `${model.modelId} has no usable context tier`, controls);
   }
-
-  const warnings: string[] = [];
-  let effectiveModelId = model.modelId;
-  let effectiveModel = model;
-  let modelSelection: ModelSelection = model.selection ?? { pickerVisibility: 'primary' };
   let route: CatalogModelRoute = {
     ...model.route,
     headers: model.route.headers ? { ...model.route.headers } : undefined,
   };
-  let selectedRouteOptionId = model.preferredRouteOptionId
+  const selectedRouteOptionId = model.preferredRouteOptionId
     ?? model.routeOptions?.find((option) => routeMatches(option.route, route))?.id;
   let selectedRouteRevision = model.routeRevision ?? revisionFor(route);
   if (model.preferredRouteOptionId) {
@@ -183,143 +223,162 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     selectedRouteRevision = preferredRoute.routeRevision
       ?? revisionFor({ modelId: model.modelId, routeOptionId: preferredRoute.id, route: preferredRoute.route });
   }
+  return { ok: true, value: {
+    input, model, evaluation, controls, maxMode, tierChoices,
+    warnings: [], bodyPatch: {}, bindingHeaders: {},
+    activeTier,
+    effectiveModelId: model.modelId,
+    effectiveModel: model,
+    modelSelection: model.selection ?? { pickerVisibility: 'primary' },
+    route,
+    selectedRouteOptionId,
+    selectedRouteRevision,
+    suppressReasoningWire: false,
+  } };
+}
 
-  const bodyPatch: JsonObject = {};
-  const bindingHeaders: Record<string, string> = {};
-  let suppressReasoningWire = false;
+/** A binding's model switch moves execution to a hidden catalog target on the same protocol. */
+function switchExecutionModel(
+  state: RequestPlanningState,
+  targetModelId: string,
+  routeOptionId?: string,
+): PlanningFailure | undefined {
+  const { input, model, controls } = state;
+  const target = input.catalogModels?.find((candidate) => candidate.modelId === targetModelId)
+    ?? input.catalogModels?.find((candidate) => candidate.aliases.includes(targetModelId));
+  if (!target) {
+    return planningError(
+      'MODEL_UNAVAILABLE',
+      `Internal execution target ${targetModelId} is missing from the effective Catalog`,
+      controls,
+    );
+  }
+  if (target.availability !== 'available' || target.enabled === false) {
+    return planningError(
+      'MODEL_UNAVAILABLE',
+      target.unavailableReason ?? `Internal execution target ${targetModelId} is unavailable`,
+      controls,
+    );
+  }
 
-  const switchModel = (
-    targetModelId: string,
-    routeOptionId?: string,
-  ): RequestPlanningResult | undefined => {
-    const target = input.catalogModels?.find((candidate) => candidate.modelId === targetModelId)
-      ?? input.catalogModels?.find((candidate) => candidate.aliases.includes(targetModelId));
-    if (!target) {
-      return planningError(
-        'MODEL_UNAVAILABLE',
-        `Internal execution target ${targetModelId} is missing from the effective Catalog`,
-        controls,
-      );
-    }
-    if (target.availability !== 'available' || target.enabled === false) {
-      return planningError(
-        'MODEL_UNAVAILABLE',
-        target.unavailableReason ?? `Internal execution target ${targetModelId} is unavailable`,
-        controls,
-      );
-    }
-
-    const targetRouteOption = routeOptionId
-      ? target.routeOptions?.find((option) => option.id === routeOptionId)
-      : target.routeOptions?.find((option) => option.id === selectedRouteOptionId && option.route.protocol === route.protocol)
-        ?? target.routeOptions?.find((option) => option.route.protocol === route.protocol);
-    if (routeOptionId && !targetRouteOption) {
-      return planningError('PLAN_CONFLICT', `Execution target route ${routeOptionId} is unavailable`, controls);
-    }
-    if (targetRouteOption && targetRouteOption.availability !== 'available') {
-      return planningError(
-        'MODEL_UNAVAILABLE',
-        targetRouteOption.unavailableReason
-          ?? `Execution target route ${targetRouteOption.id} is ${targetRouteOption.availability}`,
-        controls,
-      );
-    }
-    const targetRoute = targetRouteOption?.route ?? target.route;
-    if (targetRoute.protocol !== route.protocol) {
-      return planningError(
-        'PLAN_CONFLICT',
-        `Execution target ${targetModelId} requires ${targetRoute.protocol}, not ${route.protocol}`,
-        controls,
-      );
-    }
-    route = {
-      ...targetRoute,
-      headers: targetRoute.headers ? { ...targetRoute.headers } : undefined,
-    };
-    selectedRouteOptionId = targetRouteOption?.id ?? selectedRouteOptionId;
-    selectedRouteRevision = targetRouteOption?.routeRevision
-      ?? target.routeRevision
-      ?? revisionFor({ targetModelId, route: targetRoute, routeOptionId: targetRouteOption?.id ?? null });
-    effectiveModel = target;
-    effectiveModelId = target.modelId;
-    modelSelection = target.selection ?? {
-      pickerVisibility: 'internal',
-      relatedPrimaryModelIds: [model.modelId],
-    };
-    return undefined;
+  const targetRouteOption = routeOptionId
+    ? target.routeOptions?.find((option) => option.id === routeOptionId)
+    : target.routeOptions?.find((option) => option.id === state.selectedRouteOptionId && option.route.protocol === state.route.protocol)
+      ?? target.routeOptions?.find((option) => option.route.protocol === state.route.protocol);
+  if (routeOptionId && !targetRouteOption) {
+    return planningError('PLAN_CONFLICT', `Execution target route ${routeOptionId} is unavailable`, controls);
+  }
+  if (targetRouteOption && targetRouteOption.availability !== 'available') {
+    return planningError(
+      'MODEL_UNAVAILABLE',
+      targetRouteOption.unavailableReason
+        ?? `Execution target route ${targetRouteOption.id} is ${targetRouteOption.availability}`,
+      controls,
+    );
+  }
+  const targetRoute = targetRouteOption?.route ?? target.route;
+  if (targetRoute.protocol !== state.route.protocol) {
+    return planningError(
+      'PLAN_CONFLICT',
+      `Execution target ${targetModelId} requires ${targetRoute.protocol}, not ${state.route.protocol}`,
+      controls,
+    );
+  }
+  state.route = {
+    ...targetRoute,
+    headers: targetRoute.headers ? { ...targetRoute.headers } : undefined,
   };
+  state.selectedRouteOptionId = targetRouteOption?.id ?? state.selectedRouteOptionId;
+  state.selectedRouteRevision = targetRouteOption?.routeRevision
+    ?? target.routeRevision
+    ?? revisionFor({ targetModelId, route: targetRoute, routeOptionId: targetRouteOption?.id ?? null });
+  state.effectiveModel = target;
+  state.effectiveModelId = target.modelId;
+  state.modelSelection = target.selection ?? {
+    pickerVisibility: 'internal',
+    relatedPrimaryModelIds: [model.modelId],
+  };
+  return undefined;
+}
 
-  const binding = evaluation.binding;
-  if (binding) {
-    if (binding.entitlement === 'denied') {
+/** Apply the resolved execution binding's patches, headers, model switch and client tier. */
+function applyExecutionBinding(state: RequestPlanningState): PlanningFailure | undefined {
+  const { model, controls } = state;
+  const binding = state.evaluation.binding;
+  if (!binding) return undefined;
+  if (binding.entitlement === 'denied') {
+    return planningError(
+      'MODEL_UNAVAILABLE',
+      binding.unavailableReason ?? `Execution binding ${binding.id} is denied`,
+      controls,
+    );
+  }
+  if (binding.entitlement === 'unknown') {
+    state.warnings.push(`Execution binding ${binding.id} entitlement is unverified`);
+  }
+  if (binding.routeOptionIds?.length
+    && (!state.selectedRouteOptionId || !binding.routeOptionIds.includes(state.selectedRouteOptionId))) {
+    return planningError(
+      'PLAN_CONFLICT',
+      `Execution binding ${binding.id} is unavailable for the selected route`,
+      controls,
+    );
+  }
+
+  for (const action of binding.actions) {
+    if (action.kind === 'unsupported') {
       return planningError(
-        'MODEL_UNAVAILABLE',
-        binding.unavailableReason ?? `Execution binding ${binding.id} is denied`,
+        'CONSTRAINT_REJECTED',
+        action.reason ?? binding.unavailableReason ?? `Execution binding ${binding.id} is unsupported`,
         controls,
       );
     }
-    if (binding.entitlement === 'unknown') {
-      warnings.push(`Execution binding ${binding.id} entitlement is unverified`);
-    }
-    if (binding.routeOptionIds?.length
-      && (!selectedRouteOptionId || !binding.routeOptionIds.includes(selectedRouteOptionId))) {
-      return planningError(
-        'PLAN_CONFLICT',
-        `Execution binding ${binding.id} is unavailable for the selected route`,
-        controls,
-      );
-    }
-
-    for (const action of binding.actions) {
-      if (action.kind === 'unsupported') {
+    if (action.kind === 'request-patch') {
+      const conflict = mergePatch(state.bodyPatch, action.patch);
+      if (conflict) {
+        return planningError('PLAN_CONFLICT', `Execution binding conflicts at ${conflict}`, controls);
+      }
+    } else if (action.kind === 'request-headers') {
+      const conflict = mergeHeaders(state.bindingHeaders, action.headers);
+      if (conflict) {
+        return planningError('PLAN_CONFLICT', `Execution binding conflicts at header ${conflict}`, controls);
+      }
+    } else if (action.kind === 'model-switch') {
+      if (state.effectiveModelId !== model.modelId && state.effectiveModelId !== action.targetModelId) {
+        return planningError('PLAN_CONFLICT', 'Execution binding selects conflicting target models', controls);
+      }
+      const error = switchExecutionModel(state, action.targetModelId, action.routeOptionId);
+      if (error) return error;
+      state.suppressReasoningWire ||= action.suppressReasoningWire === true;
+    } else if (action.kind === 'client-tier') {
+      const tier = model.contextTiers.find((candidate) => (
+        candidate.id === action.tierId && candidate.entitlement !== 'denied'
+      ));
+      if (!tier) {
         return planningError(
-          'CONSTRAINT_REJECTED',
-          action.reason ?? binding.unavailableReason ?? `Execution binding ${binding.id} is unsupported`,
+          'NO_USABLE_CONTEXT_TIER',
+          `Execution tier ${action.tierId} is unavailable`,
           controls,
         );
       }
-      if (action.kind === 'request-patch') {
-        const conflict = mergePatch(bodyPatch, action.patch);
-        if (conflict) {
-          return planningError('PLAN_CONFLICT', `Execution binding conflicts at ${conflict}`, controls);
-        }
-      } else if (action.kind === 'request-headers') {
-        const conflict = mergeHeaders(bindingHeaders, action.headers);
-        if (conflict) {
-          return planningError('PLAN_CONFLICT', `Execution binding conflicts at header ${conflict}`, controls);
-        }
-      } else if (action.kind === 'model-switch') {
-        if (effectiveModelId !== model.modelId && effectiveModelId !== action.targetModelId) {
-          return planningError('PLAN_CONFLICT', 'Execution binding selects conflicting target models', controls);
-        }
-        const error = switchModel(action.targetModelId, action.routeOptionId);
-        if (error) return error;
-        suppressReasoningWire ||= action.suppressReasoningWire === true;
-      } else if (action.kind === 'client-tier') {
-        const tier = model.contextTiers.find((candidate) => (
-          candidate.id === action.tierId && candidate.entitlement !== 'denied'
-        ));
-        if (!tier) {
-          return planningError(
-            'NO_USABLE_CONTEXT_TIER',
-            `Execution tier ${action.tierId} is unavailable`,
-            controls,
-          );
-        }
-        activeTier = tier;
-      }
+      state.activeTier = tier;
     }
   }
+  return undefined;
+}
 
-  const headers = { ...(route.headers ?? {}) };
-  const bindingHeaderConflict = mergeHeaders(headers, bindingHeaders);
+/** Route headers merged with binding headers and the active tier's activation. */
+function resolveRequestHeaders(state: RequestPlanningState): PlanningStep<Record<string, string>> {
+  const { controls, activeTier, maxMode } = state;
+  const headers = { ...(state.route.headers ?? {}) };
+  const bindingHeaderConflict = mergeHeaders(headers, state.bindingHeaders);
   if (bindingHeaderConflict) {
     return planningError('PLAN_CONFLICT', `Execution binding conflicts at header ${bindingHeaderConflict}`, controls);
   }
-  if (maxMode && tierChoices.maxTierUnverified) {
-    warnings.push('Max mode entitlement is unverified');
+  if (maxMode && state.tierChoices.maxTierUnverified) {
+    state.warnings.push('Max mode entitlement is unverified');
   } else if (activeTier.entitlement === 'unknown') {
-    warnings.push(maxMode
+    state.warnings.push(maxMode
       ? 'Max mode entitlement is unverified'
       : `Context tier ${activeTier.label} is unverified`);
   }
@@ -329,12 +388,17 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
       return planningError('PLAN_CONFLICT', `Context tier conflicts at header ${conflict}`, controls);
     }
   } else if (activeTier.activation.kind === 'body') {
-    const conflict = mergePatch(bodyPatch, activeTier.activation.patch);
+    const conflict = mergePatch(state.bodyPatch, activeTier.activation.patch);
     if (conflict) {
       return planningError('PLAN_CONFLICT', `Context tier conflicts at ${conflict}`, controls);
     }
   }
+  return { ok: true, value: headers };
+}
 
+/** Context window, prompt budget, output ceiling and compaction threshold of the active tier. */
+function planContextBudget(state: RequestPlanningState): PlanningStep<ContextBudgetPlan> {
+  const { model, controls, activeTier } = state;
   const tierCap = contextTierPromptCap(activeTier);
   const contextWindowTokens = contextTierWindowTokens(activeTier)
     ?? tierCap
@@ -354,34 +418,47 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     );
   }
 
-  const requestedBudget = maxMode
+  const requestedBudget = state.maxMode
     ? (contextTierPromptCap(activeTier) ?? contextWindowTokens)
     : model.defaultBudgetTokens;
   const contextBudgetTokens = contextTierBudgetTokens(activeTier, requestedBudget);
   const maxOutputTokens = resolvePlanningOutputTokens(activeTier, contextWindowTokens);
   const compactionThresholdPercent = sanitizeCompactionThresholdPercent(
-    input.compactionThresholdPercent,
+    state.input.compactionThresholdPercent,
     DEFAULT_CONTEXT_COMPACTION_PERCENT,
   );
   const compactionThresholdTokens = resolveCompactionThresholdTokens(
     contextBudgetTokens,
     compactionThresholdPercent,
   );
+  return { ok: true, value: { contextWindowTokens, contextBudgetTokens, maxOutputTokens, compactionThresholdTokens } };
+}
+
+/** The reasoning selection sent on the wire; a known selection is written back to the controls. */
+function resolveReasoningWire(state: RequestPlanningState): RequestPlan['reasoningWire'] {
+  const { model, controls } = state;
   const reasoningSelection = model.controls.reasoning.kind === 'unknown'
     || (model.controls.reasoning.defaultState && model.controls.reasoning.defaultState !== 'known'
-      && input.controls?.reasoningLevel === undefined)
+      && state.input.controls?.reasoningLevel === undefined)
     ? 'unknown' as const
     : clampReasoningSelection(controls.reasoningLevel, model.controls.reasoning)
       ?? model.controls.reasoning.defaultSelection;
   if (reasoningSelection !== 'unknown') controls.reasoningLevel = reasoningSelection;
   const reasoningControl = createReasoningControl(model.controls.reasoning);
-  if (suppressReasoningWire) reasoningControl.wireProfile = { kind: 'none' };
+  if (state.suppressReasoningWire) reasoningControl.wireProfile = { kind: 'none' };
+  return { selection: reasoningSelection, control: reasoningControl };
+}
 
-  const routeContracts = route.contracts ?? createFailClosedProviderContracts(route.protocol);
-  const contracts = effectiveModel.cacheContract
-    ? { ...routeContracts, cache: effectiveModel.cacheContract }
+/** Route contracts (with the model cache contract), the tool-loop continuation patch and the state mode. */
+function resolveRouteContracts(
+  state: RequestPlanningState,
+): PlanningStep<{ contracts: RequestPlan['contracts']; stateMode: ProviderStateMode }> {
+  const { model, controls, effectiveModelId } = state;
+  const routeContracts = state.route.contracts ?? createFailClosedProviderContracts(state.route.protocol);
+  const contracts = state.effectiveModel.cacheContract
+    ? { ...routeContracts, cache: state.effectiveModel.cacheContract }
     : routeContracts;
-  route = { ...route, contracts };
+  state.route = { ...state.route, contracts };
   const continuationModelAdmitted = !contracts.reasoning.continuationModelIds
     || contracts.reasoning.continuationModelIds.includes(effectiveModelId);
   if (
@@ -390,12 +467,12 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     && contracts.reasoning.continuation !== 'unknown'
     && contracts.toolLoop.requestPatch
   ) {
-    const conflict = mergePatch(bodyPatch, contracts.toolLoop.requestPatch);
+    const conflict = mergePatch(state.bodyPatch, contracts.toolLoop.requestPatch);
     if (conflict) {
       return planningError('PLAN_CONFLICT', `Tool-loop continuation conflicts at ${conflict}`, controls);
     }
   }
-  const stateMode = input.stateMode ?? contracts.state.defaultMode;
+  const stateMode = state.input.stateMode ?? contracts.state.defaultMode;
   if (!contracts.state.supportedModes.includes(stateMode)) {
     return planningError(
       'CONSTRAINT_REJECTED',
@@ -403,18 +480,28 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
       controls,
     );
   }
-  const catalogRevision = model.catalogRevision ?? revisionFor({
-    providerId: model.providerId,
-    modelId: model.modelId,
-    provenance: modelIdentityProvenance(model),
-  });
-  const appliedBindingIds = binding ? [binding.id] : [];
-  const contextMode = maxMode ? 'one-million' as const : 'normal' as const;
-  const toolLoopPhase = input.toolLoopPhase ?? 'top-level';
+  return { ok: true, value: { contracts, stateMode } };
+}
+
+/** The execution identity that binds continuations and caches to the exact provider route and model. */
+function buildExecutionIdentity(
+  state: RequestPlanningState,
+  facts: {
+    contracts: RequestPlan['contracts'];
+    stateMode: ProviderStateMode;
+    catalogRevision: string;
+    appliedBindingIds: string[];
+    contextMode: RequestPlan['contextMode'];
+    toolLoopPhase: ToolLoopPhase;
+    reasoningSelection: RequestPlan['reasoningWire']['selection'];
+  },
+): ExecutionIdentity {
+  const { model, route, effectiveModelId, selectedRouteRevision } = state;
+  const { contracts, catalogRevision, appliedBindingIds, contextMode, reasoningSelection } = facts;
   const contractHash = revisionFor(contracts);
   const credentialScopeHash = revisionFor({
     providerId: model.providerId,
-    credentialScopeId: input.credentialScopeId ?? 'default',
+    credentialScopeId: state.input.credentialScopeId ?? 'default',
   });
   const endpointHash = revisionFor(
     (route.baseUrl ?? `${route.protocol}:default`).trim().replace(/\/+$/u, '').toLowerCase(),
@@ -431,101 +518,139 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     routeRevision: selectedRouteRevision,
     selectedModelId: model.modelId,
     effectiveModelId,
-    canonicalModelId: effectiveModel.modelId,
+    canonicalModelId: state.effectiveModel.modelId,
     modelSnapshotId: revisionFor({
       catalogRevision,
       routeRevision: selectedRouteRevision,
       effectiveModelId,
-      provenance: modelIdentityProvenance(effectiveModel),
+      provenance: modelIdentityProvenance(state.effectiveModel),
     }),
     compatibilityGroup: contracts.compatibilityGroup,
     bindingIds: appliedBindingIds,
     variantKey: revisionFor({
       bindingIds: appliedBindingIds,
-      fast: evaluation.resolved.fast.value,
+      fast: state.evaluation.resolved.fast.value,
       contextMode,
       reasoningSelection,
     }),
     reasoningMode: reasoningSelection,
     contextMode,
-    stateMode,
+    stateMode: facts.stateMode,
     artifactFormat: contracts.reasoning.artifactFormat,
     artifactVersion: contracts.reasoning.artifactVersion,
     contractHash,
-    toolLoopPhase,
+    toolLoopPhase: facts.toolLoopPhase,
   };
-  const executionIdentity: ExecutionIdentity = {
+  return {
     ...identityBase,
     fingerprint: revisionFor(identityBase),
   };
-  const statePlan = {
-    mode: stateMode,
-    carrier: stateMode === 'provider-managed' ? contracts.state.carrier : 'none' as const,
-    store: stateMode === 'provider-managed',
-    reuseProviderState: stateMode === 'provider-managed',
+}
+
+/** State, cache, tool-loop, streaming and context-transition plans derived from the route contracts. */
+function planContractBehaviour(
+  contracts: RequestPlan['contracts'],
+  stateMode: ProviderStateMode,
+  toolLoopPhase: ToolLoopPhase,
+): Pick<RequestPlan, 'statePlan' | 'cachePlan' | 'toolLoopPlan' | 'streamingPlan' | 'contextTransitionPlan'> {
+  return {
+    statePlan: {
+      mode: stateMode,
+      carrier: stateMode === 'provider-managed' ? contracts.state.carrier : 'none' as const,
+      store: stateMode === 'provider-managed',
+      reuseProviderState: stateMode === 'provider-managed',
+    },
+    cachePlan: {
+      enabled: contracts.cache.mode !== 'none' && contracts.cache.mode !== 'unknown',
+      mode: contracts.cache.mode,
+      keyCarrier: contracts.cache.keyCarrier,
+      breakpointCarrier: contracts.cache.breakpointCarrier,
+      telemetry: [...contracts.cache.telemetry],
+      ttl: contracts.cache.ttl,
+    },
+    toolLoopPlan: {
+      phase: toolLoopPhase,
+      pinned: true as const,
+      artifactPolicy: contracts.toolLoop.artifactPolicy,
+      artifactScope: contracts.toolLoop.artifactScope,
+      ordering: contracts.toolLoop.ordering,
+    },
+    streamingPlan: { ...contracts.streaming },
+    contextTransitionPlan: stateMode === 'provider-managed'
+      ? {
+          strategy: 'provider-managed' as const,
+          portable: false,
+          reason: 'Explicit provider-managed state mode.',
+        }
+      : {
+          strategy: 'semantic-replay' as const,
+          portable: true,
+          reason: 'Local stateless mode replays canonical semantic context.',
+        },
   };
-  const cachePlan = {
-    enabled: contracts.cache.mode !== 'none' && contracts.cache.mode !== 'unknown',
-    mode: contracts.cache.mode,
-    keyCarrier: contracts.cache.keyCarrier,
-    breakpointCarrier: contracts.cache.breakpointCarrier,
-    telemetry: [...contracts.cache.telemetry],
-    ttl: contracts.cache.ttl,
-  };
-  const toolLoopPlan = {
-    phase: toolLoopPhase,
-    pinned: true as const,
-    artifactPolicy: contracts.toolLoop.artifactPolicy,
-    artifactScope: contracts.toolLoop.artifactScope,
-    ordering: contracts.toolLoop.ordering,
-  };
-  const streamingPlan = { ...contracts.streaming };
-  const contextTransitionPlan = stateMode === 'provider-managed'
-    ? {
-        strategy: 'provider-managed' as const,
-        portable: false,
-        reason: 'Explicit provider-managed state mode.',
-      }
-    : {
-        strategy: 'semantic-replay' as const,
-        portable: true,
-        reason: 'Local stateless mode replays canonical semantic context.',
-      };
+}
+
+export function planModelRequest(input: RequestPlannerInput): RequestPlanningResult {
+  const { model } = input;
+  const evaluation = resolveModelControls(model, input.controls, input.catalogModels);
+  const controls = evaluation.controls;
+  const ineligible = rejectIneligibleModel(input, evaluation);
+  if (ineligible) return ineligible;
+  const created = createPlanningState(input, evaluation);
+  if (!created.ok) return created;
+  const state = created.value;
+  const bindingFailure = applyExecutionBinding(state);
+  if (bindingFailure) return bindingFailure;
+  const headers = resolveRequestHeaders(state);
+  if (!headers.ok) return headers;
+  const budget = planContextBudget(state);
+  if (!budget.ok) return budget;
+  const reasoningWire = resolveReasoningWire(state);
+  const resolvedContracts = resolveRouteContracts(state);
+  if (!resolvedContracts.ok) return resolvedContracts;
+  const { contracts, stateMode } = resolvedContracts.value;
+
+  const catalogRevision = model.catalogRevision ?? revisionFor({
+    providerId: model.providerId,
+    modelId: model.modelId,
+    provenance: modelIdentityProvenance(model),
+  });
+  const appliedBindingIds = evaluation.binding ? [evaluation.binding.id] : [];
+  const contextMode = state.maxMode ? 'one-million' as const : 'normal' as const;
+  const toolLoopPhase = input.toolLoopPhase ?? 'top-level';
+  const executionIdentity = buildExecutionIdentity(state, {
+    contracts, stateMode, catalogRevision, appliedBindingIds, contextMode, toolLoopPhase,
+    reasoningSelection: reasoningWire.selection,
+  });
+  const { route, effectiveModelId, effectiveModel } = state;
   const plan: RequestPlan = {
     providerId: model.providerId,
     adapterId: providerAdapterIdForProtocol(route.protocol),
     catalogRevision,
-    routeRevision: selectedRouteRevision,
+    routeRevision: state.selectedRouteRevision,
     selectedModelId: model.modelId,
     effectiveModelId,
     appliedBindingIds,
-    modelSelection,
+    modelSelection: state.modelSelection,
     route,
-    headers,
+    headers: headers.value,
     contracts,
     executionIdentity,
-    statePlan,
-    cachePlan,
-    toolLoopPlan,
-    streamingPlan,
-    contextTransitionPlan,
-    bodyPatch,
-    contextBudgetTokens,
+    ...planContractBehaviour(contracts, stateMode, toolLoopPhase),
+    bodyPatch: state.bodyPatch,
+    contextBudgetTokens: budget.value.contextBudgetTokens,
     contextMode,
-    contextWindowTokens,
-    maxOutputTokens,
-    compactionThresholdTokens,
-    activeTierId: activeTier.id,
+    contextWindowTokens: budget.value.contextWindowTokens,
+    maxOutputTokens: budget.value.maxOutputTokens,
+    compactionThresholdTokens: budget.value.compactionThresholdTokens,
+    activeTierId: state.activeTier.id,
     fastMode: evaluation.resolved.fast.value,
-    reasoningWire: {
-      selection: reasoningSelection,
-      control: reasoningControl,
-    },
+    reasoningWire,
     temperature: typeof effectiveModel.fixedTemperature === 'number'
       ? effectiveModel.fixedTemperature
       : typeof model.fixedTemperature === 'number'
         ? model.fixedTemperature
         : input.requestedTemperature,
   };
-  return { ok: true, plan, controls, warnings };
+  return { ok: true, plan, controls, warnings: state.warnings };
 }

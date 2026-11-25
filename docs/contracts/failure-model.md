@@ -143,7 +143,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 ### Agent loop 与 Work Process 投影
 
 - `AgentLoop` 不得把 provider `error` 事件 remap 为 `message_end`。
-- `AgentTurnRunner` 在 `stopReason === 'error'` 时跳过 `empty_response_without_tool_call`。
+- `AgentTurnRunner` 的订阅阶段（`AgentTurnSubscription`）在 `stopReason === 'error'` 时跳过 `empty_response_without_tool_call`。
 - `error_recovery_*` 不进 Work Process；最终失败为 **一条** diagnostic（含 `technicalMessage`）。
 
 ## 过度 fail-closed 的纠正原则

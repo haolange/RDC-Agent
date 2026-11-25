@@ -7,6 +7,9 @@ import { isTrustedRendererUrl } from '../window/rendererTrust';
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown | Promise<unknown>;
 
+/** Renderer invoke channels of one domain keyed by channel name; each handler parses its raw arguments itself. */
+export type IpcChannelTable = Record<string, InvokeHandler>;
+
 const invokeHandlers = new Map<string, InvokeHandler>();
 let registryInstalled = false;
 

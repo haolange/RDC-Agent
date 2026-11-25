@@ -141,6 +141,8 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const orchestrator = [
     'src/main/agent-runtime/orchestration/AgentOrchestrator.ts',
     'src/main/agent-runtime/orchestration/AgentTurnRunner.ts',
+    'src/main/agent-runtime/orchestration/AgentTurnSubscription.ts',
+    'src/main/agent-runtime/orchestration/AgentTurnCapabilityObservations.ts',
     'src/main/agent-runtime/orchestration/AgentSlotFactory.ts',
     'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts',
     'src/main/agent-runtime/orchestration/TurnPreparationService.ts',

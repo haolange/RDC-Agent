@@ -104,7 +104,7 @@ Agent/Composer executable models require source-backed `toolCalling.state === 's
 
 ## 通用完成接口与任务绑定
 
-AgentTurnRunner / ConversationTurnRunner 仅调用注入的 TurnCompletionValidator。AgentOrchestrator / ConversationService 组合现有 Investigation 校验器；prepareTurn 由主进程根据真实派发者选择校验策略并冻结 TaskCompletionBinding。普通 General turn 没有领域完成要求。RDC Capsule 扩展由 sessions/RdcDelegation 验证及注入；通用 Capsule 编译器不含租约方法段。详见 runtime-kernel 的结构化交接契约。
+AgentTurnRunner / ConversationTurnRunner 仅调用注入的 TurnCompletionValidator。`AgentTurnRunner.runAgentTurn` 以显式的 `AgentTurnRun` 状态依次执行 begin（scope、`turn.before-start`、beginTurn）、setup（完成守卫、Task 准备、工具与执行器、slot）、订阅（`AgentTurnSubscription`：流式文本、结构化工具调用证据、canonical final、用量与响应诊断、abort 桥接）、prompt 与 finalization；结束前必须结清的义务（capture 复位、完成就绪、未结直接 Task、委派结构化结果、Mission 计划、批准目标收口）在 `AgentTurnCompletionGuards`，路由能力诊断与工具调用能力证据在 `AgentTurnCapabilityObservations`。AgentOrchestrator / ConversationService 组合现有 Investigation 校验器；prepareTurn 由主进程根据真实派发者选择校验策略并冻结 TaskCompletionBinding。普通 General turn 没有领域完成要求。RDC Capsule 扩展由 sessions/RdcDelegation 验证及注入；通用 Capsule 编译器不含租约方法段。详见 runtime-kernel 的结构化交接契约。
 
 
 ## Live permission mode and frozen execution constraints

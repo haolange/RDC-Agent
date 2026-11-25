@@ -1,56 +1,45 @@
 import { createHash } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 /**
- * AgentTurnRunner — runs one prepared agent turn; slot construction lives in AgentSlotFactory.
+ * AgentTurnRunner — runs one prepared agent turn in named phases over an explicit AgentTurnRun:
+ * begin (scope, hook, turn), setup (completion guards, tools, executor, slot), subscription
+ * (AgentTurnSubscription), prompt, and finalization. Slot construction lives in AgentSlotFactory.
  */
 
-import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { generateEventId, nowMs } from '@shared/utils/id';
-import { charsToTokens } from '@shared/utils/tokens';
 import { permissionReviewAuthority, permissionReviewCaptureBaseline, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
 import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
 import { delegatedArtifactReferences } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { TokenizerService } from '../core/TokenizerService';
-import {
-  claimStructuredToolCallingEvidence,
-  describeRouteCapabilityDiagnostic,
-  isExplicitStructuredToolCallingRejection,
-} from '../capabilities/RouteCapabilityResolver';
-import {
-  buildDiagnosticAgentEvent,
-  mentionsTextualToolCall,
-  translateCoreToSharedAgentEvent,
-  type AgentEventBridgeContext,
-} from '../AgentEventBridge';
+import { isExplicitStructuredToolCallingRejection } from '../capabilities/RouteCapabilityResolver';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
-import { runtimeLogService } from '../../runtime/RuntimeLogService';
-import {
-  recordObservedToolCallingSupport,
-  recordObservedToolCallingUnsupported,
-} from '../../settings/provider-catalog/EffectiveModelResolver';
-import { debuggerLlmService } from '../../sessions/run/DebuggerLlmService';
-import { settingsService } from '../../settings/settings-core/SettingsService';
 import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
 import {
   turnCoordinator,
   createSubagentBudgetState,
   createPolicyBudgetState,
   DEFAULT_SUBAGENT_BUDGET,
+  type TurnHandle,
 } from './TurnCoordinator';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
 import { requireExecutionScopeId } from './executionScope';
-import {
-  isMcpPrefixedToolName,
-  partitionDeferredTools,
-} from './deferredTools';
-import { listUnfinishedDirectTasks, settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
+import { settleJoinedTurnTaskExecutions, settleUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
 import { cancelTurnInteractionRequests } from './cancelTurnInteractionRequests';
 import { completionBudgetEvidence } from './CompletionBudgetEvidence';
-import { createOrReuseAgentSlot, isSuccessfulProviderResponse, reportedUsageFields, type AgentSlotRequest } from './AgentSlotFactory';
+import { createOrReuseAgentSlot, type AgentSlotRequest } from './AgentSlotFactory';
 import { ApprovedCaptureController } from './ApprovedCaptureController';
 import { createApprovedCaptureHost } from './ApprovedCaptureHost';
+import {
+  createCaptureRestorationFeedback,
+  createMissionPlanningFeedback,
+  createTerminalResponseGuard,
+  installCompletionReadinessValidator,
+} from './AgentTurnCompletionGuards';
+import { subscribeAgentTurnEvents, type AgentTurnOutput } from './AgentTurnSubscription';
+import { persistToolCallingRejection, reportRouteDiagnostics } from './AgentTurnCapabilityObservations';
+import type { AgentEventBridgeContext } from '../AgentEventBridge';
 import type { TurnCompletionReadinessValidator, TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
 import type {
   AgentTurnOptions,
@@ -60,10 +49,9 @@ import type {
 } from './orchestratorTypes';
 import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import type {
-  AgentEvent as CoreAgentEvent,
   Message,
   StreamOptions,
   ToolDefinition,
@@ -71,7 +59,7 @@ import type {
 } from '../core/types';
 import type { ToolExecutor } from '../agent/AgentLoop';
 import type { AgentRole } from '@shared/types/agent';
-import type { ContextUsageBreakdownEntry } from '@shared/types/session';
+import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 
 export interface AgentTurnRunnerDeps {
   validateCompletion: TurnCompletionValidator;
@@ -100,6 +88,65 @@ export interface AgentTurnRunnerDeps {
   ) => ToolExecutor;
 }
 
+export interface AgentTurnInput {
+  agentId: AgentRole;
+  content: string;
+  providerId: string;
+  modelId: string;
+  temperature?: number;
+  profileId: string;
+  runId?: string;
+  sessionId?: string | null;
+  turnId?: string;
+  toolAllowlist: string[];
+  options?: AgentTurnOptions;
+  projectRootPath?: string | null;
+  projectId?: string | null;
+  effectiveModel?: EffectiveModel;
+  effectiveProfile?: EffectiveAgentProfile | null;
+  effectiveProfileIds?: readonly string[];
+  credentialHandle?: string;
+  contextWindow?: number;
+  contextTokenLimit: number;
+  initialMessages?: Message[];
+  contextDiagnostic?: Record<string, unknown>;
+  preparedRuntime?: PreparedAgentRuntime;
+  terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null, approvedPlan?: TurnHandle['approvedPlan'], completionReceipt?: TurnCompletionReceipt) => void;
+}
+
+/** What one turn owns from beginTurn to endTurn; every later phase reads and updates it. */
+export interface AgentTurnRun {
+  readonly input: AgentTurnInput;
+  readonly preparedRuntime: PreparedAgentRuntime;
+  readonly requestPlan: RequestPlan;
+  readonly effectiveModel: EffectiveModel | null;
+  readonly executionScopeId: string;
+  readonly turnHandle: TurnHandle;
+  readonly mcpLease: McpConnectionLease | null;
+  slotKey: string;
+  slot: AgentSlot | null;
+  unsubscribe: (() => void) | null;
+  unregisterAgentProducer: (() => void) | null;
+  abortListener: (() => void) | null;
+  turnEnded: boolean;
+  setupCleanupComplete: boolean;
+  captureRestoreFailure: string | null;
+  captureRestorationNeededForPartial: boolean;
+}
+
+/** Facts the setup phase fixes for the subscription, prompt and finalization phases. */
+export interface AgentTurnSetup {
+  readonly activeSlot: AgentSlot;
+  readonly effectivePlan: EffectiveRuntimePlan;
+  readonly runtimeTools: ResolvedRuntimeTools;
+  readonly sharedEventContext: AgentEventBridgeContext;
+  readonly turnGeneration: number;
+  readonly missionPlanningFeedback: () => string | undefined;
+  readonly userMessage: UserMessage;
+}
+
+type TerminalStatus = 'complete' | 'stopped' | 'error';
+
 export class AgentTurnRunner {
   constructor(private readonly deps: AgentTurnRunnerDeps) {}
 
@@ -107,31 +154,20 @@ export class AgentTurnRunner {
     return createOrReuseAgentSlot(this.deps, request);
   }
 
-  async runAgentTurn(input: {
-    agentId: AgentRole;
-    content: string;
-    providerId: string;
-    modelId: string;
-    temperature?: number;
-    profileId: string;
-    runId?: string;
-    sessionId?: string | null;
-    turnId?: string;
-    toolAllowlist: string[];
-    options?: AgentTurnOptions;
-    projectRootPath?: string | null;
-    projectId?: string | null;
-    effectiveModel?: EffectiveModel;
-    effectiveProfile?: EffectiveAgentProfile | null;
-    effectiveProfileIds?: readonly string[];
-    credentialHandle?: string;
-    contextWindow?: number;
-    contextTokenLimit: number;
-    initialMessages?: Message[];
-    contextDiagnostic?: Record<string, unknown>;
-    preparedRuntime?: PreparedAgentRuntime;
-    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null, approvedPlan?: import('./TurnCoordinator').TurnHandle['approvedPlan'], completionReceipt?: TurnCompletionReceipt) => void;
-  }): Promise<string> {
+  async runAgentTurn(input: AgentTurnInput): Promise<string> {
+    const run = await this.beginAgentTurn(input);
+    try {
+      const setup = await this.setupAgentTurn(run);
+      const output = subscribeAgentTurnEvents(run, setup);
+      return await this.promptAgentTurn(run, setup, output);
+    } catch (error) {
+      await this.cleanupFailedSetup(run);
+      throw error;
+    }
+  }
+
+  /** Validate the prepared turn, admit its scope through the turn.before-start hook and begin the turn. */
+  private async beginAgentTurn(input: AgentTurnInput): Promise<AgentTurnRun> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
     }
@@ -144,12 +180,8 @@ export class AgentTurnRunner {
       throw new AppError('TURN_NOT_PREPARED', 'preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
     }
     const preparedRuntime = input.preparedRuntime;
-    const promptPlan = preparedRuntime.promptPlan;
     const turnPolicy = preparedRuntime.effectivePlan.policy;
-    const effectiveModel = input.effectiveModel ?? null;
-    const routeCapability = preparedRuntime.routeCapability;
-    let mcpLease: McpConnectionLease | null = preparedRuntime.mcpLease ?? null;
-    let mcpConnectionErrors = preparedRuntime.mcpConnectionErrors ?? [];
+    const mcpLease: McpConnectionLease | null = preparedRuntime.mcpLease ?? null;
     let executionScopeId: string;
     try {
       executionScopeId = requireExecutionScopeId(input.sessionId);
@@ -168,108 +200,45 @@ export class AgentTurnRunner {
       await mcpLease?.release({ discardIfIdle: true });
       throw new AppError('HOOK_DENIED', 'turn.before-start');
     }
-    let turnHandle;
+    let turnHandle: TurnHandle;
     try {
       turnHandle = await turnCoordinator.beginTurn({
-      sessionKey,
-      turnId: input.turnId ?? generateEventId('turn'),
-      runId: input.runId,
-      parentSignal: input.options?.signal,
-      subagentBudget: input.options?.subagentBudget ?? createSubagentBudgetState({
-        ...DEFAULT_SUBAGENT_BUDGET,
-        maxDepth: turnPolicy.maxChildDepth ?? DEFAULT_SUBAGENT_BUDGET.maxDepth,
-        maxChildren: turnPolicy.maxSubagents ?? DEFAULT_SUBAGENT_BUDGET.maxChildren,
-        maxAggregateToolCalls: turnPolicy.maxToolCalls ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateToolCalls,
-        maxAggregateWallMs: turnPolicy.maxWallTimeMs ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateWallMs,
-      }),
-      policyBudget: createPolicyBudgetState(
-        turnPolicy,
-        input.options?.subagentBudget?.depth ?? 0,
-        input.options?.policyBudget,
-      ),
+        sessionKey,
+        turnId: input.turnId ?? generateEventId('turn'),
+        runId: input.runId,
+        parentSignal: input.options?.signal,
+        subagentBudget: input.options?.subagentBudget ?? createSubagentBudgetState({
+          ...DEFAULT_SUBAGENT_BUDGET,
+          maxDepth: turnPolicy.maxChildDepth ?? DEFAULT_SUBAGENT_BUDGET.maxDepth,
+          maxChildren: turnPolicy.maxSubagents ?? DEFAULT_SUBAGENT_BUDGET.maxChildren,
+          maxAggregateToolCalls: turnPolicy.maxToolCalls ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateToolCalls,
+          maxAggregateWallMs: turnPolicy.maxWallTimeMs ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateWallMs,
+        }),
+        policyBudget: createPolicyBudgetState(
+          turnPolicy,
+          input.options?.subagentBudget?.depth ?? 0,
+          input.options?.policyBudget,
+        ),
       });
     } catch (error) {
       await mcpLease?.release({ discardIfIdle: true });
       throw error;
     }
-    let slotKey = '';
-    let slot: AgentSlot | null = null;
-    let unsubscribe: (() => void) | null = null;
-    let unregisterAgentProducer: (() => void) | null = null;
-    let abortListener: (() => void) | null = null;
-    let turnEnded = false;
-    let setupCleanupComplete = false;
-    let captureRestoreFailure: string | null = null;
-    let captureRestorationNeededForPartial = false;
-    try {
-    turnHandle.requiresApprovedGoalClosure = Boolean(preparedRuntime.approvedExecution);
+    return {
+      input, preparedRuntime, requestPlan, effectiveModel: input.effectiveModel ?? null, executionScopeId, turnHandle, mcpLease,
+      slotKey: '', slot: null, unsubscribe: null, unregisterAgentProducer: null, abortListener: null,
+      turnEnded: false, setupCleanupComplete: false, captureRestoreFailure: null, captureRestorationNeededForPartial: false,
+    };
+  }
+
+  /** Completion guards, Task preparation, event sink, live tools, approved capture, executor, diagnostics and slot. */
+  private async setupAgentTurn(run: AgentTurnRun): Promise<AgentTurnSetup> {
+    const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId } = run;
+    const { promptPlan, routeCapability } = preparedRuntime;
     const toolCallsAtEntry = turnHandle.policyBudget.toolCalls;
-    const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
-    turnHandle.reviewCompletionDeclaration = (declaration) => approvedGoalContinuation.reviewDeclaration(declaration);
-    turnHandle.requiresApprovedCaptureScope = Boolean(preparedRuntime.approvedExecution?.investigation
-      && !preparedRuntime.approvedExecution.investigation.captureScope);
-    const captureRestorationFeedback = async (declaration: import('./TurnCoordinator').TurnCompletionDeclaration | null): Promise<string | undefined> => {
-      const control = turnHandle.captureControl;
-      if (!control) return undefined;
-      captureRestoreFailure = control.lastRestoreError ?? captureRestoreFailure;
-      const acknowledged = captureRestoreFailure && declaration?.disposition !== 'completed'
-        && declaration?.result?.recoveryState.some(value => value.includes(captureRestoreFailure!));
-      if (acknowledged) return undefined;
-      try {
-        const status = await control.restorationStatus(turnHandle.signal);
-        if (!status.restored) return `# Capture Restoration Required\nFrozen signed entry baseline: ${JSON.stringify({ receipt: status.receipt, original: status.original })}\nHost-observed current position: ${JSON.stringify(status.current)}\nUse rdc_probe capture_restore under the current permission mode to restore the signed entry position. If restore fails, record the actual failure and remaining recovery in turn_complete.result.recoveryState and unresolved.`;
-        captureRestoreFailure = null;
-        return undefined;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        captureRestoreFailure = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_RESTORE_UNCONFIRMED';
-        return `# Capture Restoration Unconfirmed\n${message}\nDo not declare completed. Record ${captureRestoreFailure} and the actual remaining recovery in turn_complete.result.recoveryState and unresolved, then report a partial or blocked outcome.`;
-      }
-    };
-    turnHandle.validateCompletionReadiness = async (declaration) => {
-      await this.deps.validateCompletionReadiness({
-        profileId: input.agentId,
-        completionContract: preparedRuntime.approvedExecution?.investigation ? 'investigation-report' : preparedRuntime.effectivePlan.completionContract,
-        investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? preparedRuntime.effectivePlan.investigationMission ?? undefined,
-        sessionId: executionScopeId, turnId: turnHandle.turnId,
-        disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs,
-        budgetEvidence: completionBudgetEvidence(turnHandle),
-      });
-      const feedback = await captureRestorationFeedback(declaration);
-      if (feedback) {
-        if (preparedRuntime.approvedExecution && ['partial', 'blocked'].includes(declaration.disposition)) {
-          captureRestorationNeededForPartial = true;
-        }
-        throw new Error(feedback);
-      }
-      if (captureRestorationNeededForPartial && turnHandle.captureControl && !captureRestoreFailure) {
-        captureRestorationNeededForPartial = false;
-        // The declaration is recorded; its review states what the restored position makes possible again.
-        approvedGoalContinuation.noteConditionsChanged('The host now verifies the signed entry position, so work that needed it may be possible again; continue it with the existing Task, preserving its consumption and deadline.');
-      }
-    };
-    slotKey = agentSlotKey(executionScopeId, input.agentId);
-    const capsule = preparedRuntime.effectivePlan.delegationCapsule;
-    turnHandle.taskPreparation = {
-      sessionId: executionScopeId, turnId: turnHandle.turnId,
-      runtimeFingerprint: preparedRuntime.effectivePlan.fingerprint,
-      profileId: preparedRuntime.effectivePlan.agentId,
-      ...(preparedRuntime.effectivePlan.profileProvenance?.sourceHash
-        ? { profileSourceHash: preparedRuntime.effectivePlan.profileProvenance.sourceHash } : {}),
-      ...(preparedRuntime.effectivePlan.profileProvenance
-        ? { profileSource: { scope: preparedRuntime.effectivePlan.profileProvenance.scope,
-          path: preparedRuntime.effectivePlan.profileProvenance.sourcePath } } : {}),
-      providerId: requestPlan.providerId,
-      modelId: requestPlan.effectiveModelId,
-      reasoningLevel: requestPlan.reasoningWire.selection,
-      skills: promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => ({
-        id: segment.id.replace(/^skill:/, ''), hash: segment.sourceHash.replace(/^sha256:/, ''),
-      })),
-      inputArtifacts: delegatedArtifactReferences(executionScopeId) ?? [],
-      selectedTurnCount: typeof input.contextDiagnostic?.selectedTurnCount === 'number' ? input.contextDiagnostic.selectedTurnCount : null,
-      ...(capsule ? { capsuleHash: createHash('sha256').update(JSON.stringify(capsule)).digest('hex') } : {}),
-      requestsDomainCapability: Object.values(capsule?.domainExtensions ?? {}).some(flags => Object.values(flags).some(Boolean)),
-    };
+    const { approvedGoalContinuation, captureRestorationFeedback } = this.installCompletionGuards(run);
+    run.slotKey = agentSlotKey(executionScopeId, input.agentId);
+    turnHandle.taskPreparation = this.describeTaskPreparation(run);
     await input.options?.onTaskPreparation?.(turnHandle.taskPreparation);
     const turnGeneration = turnHandle.generation;
     turnHandle.eventSink = {
@@ -283,6 +252,84 @@ export class AgentTurnRunner {
       projectId: input.projectId ?? null,
       agentId: input.agentId,
     };
+    const { runtimeTools, activeToolDefinitions, sharedEventContext } = this.bindTurnTools(run);
+    const effectivePlan = preparedRuntime.effectivePlan;
+    await this.initializeApprovedCapture(run);
+    const toolExecutor = this.createTurnToolExecutor(run, sharedEventContext, activeToolDefinitions);
+    const promptCache = preparedRuntime.promptCache;
+    const streamOptions: StreamOptions = {
+      temperature: requestPlan.temperature,
+      reasoning: requestPlan.reasoningWire,
+      reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
+      signal: input.options?.signal,
+      requestPlan,
+      promptCache,
+      credentialHandle: preparedRuntime.credentialHandle ?? input.credentialHandle,
+    };
+    reportRouteDiagnostics(run, sharedEventContext, runtimeTools.definitions.length);
+    const missionPlanningFeedback = createMissionPlanningFeedback(run, effectivePlan);
+    run.slot = this.getOrCreateAgentSlot({
+      agentId: input.agentId,
+      providerId: input.providerId,
+      modelId: input.modelId,
+      systemPrompt: promptPlan.systemPrompt,
+      streamOptions,
+      tools: activeToolDefinitions,
+      toolExecutor,
+      turnSignature: input.turnId ?? '',
+      sessionId: executionScopeId,
+      contextWindow: input.contextWindow,
+      contextTokenLimit: input.contextTokenLimit,
+      promptPlan,
+      initialMessages: input.initialMessages ?? [],
+      contextDiagnostic: input.contextDiagnostic,
+      signatureTools: runtimeTools.definitions,
+      routeCapabilityOverride: routeCapability,
+      policyMaxTurns: effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
+        ? undefined
+        : effectivePlan.policy.maxTurns,
+      profileMaxTurns: effectivePlan.profileMaxTurns,
+      onLoopBudget: (remaining, limit) => { turnHandle.providerLoopBudget = { remaining, limit }; },
+      resolvePromptPlan: () => turnHandle.promptPlan ?? promptPlan,
+      resolveRuntimeFingerprint: () => turnHandle.runtimePlan?.fingerprint ?? effectivePlan.fingerprint,
+      beforeTerminalResponse: createTerminalResponseGuard(run, {
+        validateCompletion: this.deps.validateCompletion,
+        approvedGoalContinuation, captureRestorationFeedback, missionPlanningFeedback, toolCallsAtEntry,
+      }),
+      beforeRequestMessages: input.options?.beforeProviderRequestMessages,
+      onProviderRequestCommitted: input.options?.onProviderRequestCommitted,
+    });
+    if (!run.slot) {
+      throw new Error('Agent slot setup did not produce a slot.');
+    }
+    const userMessage: UserMessage = {
+      role: 'user',
+      content: input.options?.userContent ?? input.content,
+      timestamp: nowMs(),
+    };
+    return { activeSlot: run.slot, effectivePlan, runtimeTools, sharedEventContext, turnGeneration, missionPlanningFeedback, userMessage };
+  }
+
+  /** Approved-goal review, the approved capture scope requirement and the completion readiness validator. */
+  private installCompletionGuards(run: AgentTurnRun) {
+    const { preparedRuntime, turnHandle, executionScopeId } = run;
+    turnHandle.requiresApprovedGoalClosure = Boolean(preparedRuntime.approvedExecution);
+    const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
+    turnHandle.reviewCompletionDeclaration = (declaration) => approvedGoalContinuation.reviewDeclaration(declaration);
+    turnHandle.requiresApprovedCaptureScope = Boolean(preparedRuntime.approvedExecution?.investigation
+      && !preparedRuntime.approvedExecution.investigation.captureScope);
+    const captureRestorationFeedback = createCaptureRestorationFeedback(run);
+    installCompletionReadinessValidator(run, this.deps.validateCompletionReadiness, approvedGoalContinuation, captureRestorationFeedback);
+    return { approvedGoalContinuation, captureRestorationFeedback };
+  }
+
+  /**
+   * Rebuild live tool instances over the frozen definitions, choose the injected schemas for the route,
+   * and bind deferred activation and the frozen plans to the turn.
+   */
+  private bindTurnTools(run: AgentTurnRun) {
+    const { input, preparedRuntime, turnHandle, executionScopeId, mcpLease, slotKey } = run;
+    const { promptPlan, routeCapability } = preparedRuntime;
     const frozenToolAllowlist = [...preparedRuntime.effectivePlan.toolAllowlist];
     const liveRuntimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
@@ -331,23 +378,19 @@ export class AgentTurnRunner {
     const effectivePlan = preparedRuntime.effectivePlan;
     turnHandle.runtimePlan = effectivePlan;
     turnHandle.promptPlan = promptPlan;
-    const approvedCapture = preparedRuntime.approvedExecution?.investigation?.captureScope;
-    if (approvedCapture) {
-      if (!input.sessionId || !input.projectId || input.agentId !== GENERAL_AGENT_ID || !preparedRuntime.approvedExecution?.investigation) {
-        throw new AppError('RDC_CAPTURE_SCOPE_INVALID', 'approved capture work requires the owning General session.');
-      }
-      const approved = preparedRuntime.approvedExecution;
-      const host = createApprovedCaptureHost({ sessionId: executionScopeId, projectId: input.projectId,
-        offer: approved.offer, contract: approved.investigation!, turn: turnHandle });
-      turnHandle.captureControl = new ApprovedCaptureController({ sessionId: executionScopeId, projectId: input.projectId,
-        planUri: approved.offer.plan.uri, planHash: approved.offer.plan.hash, captureScope: approvedCapture, turn: turnHandle, host });
-      await turnHandle.captureControl.initialize();
-    }
+    return { runtimeTools, activeToolDefinitions, sharedEventContext };
+  }
+
+  /** The executor for this turn, with the frozen plan, budget and the permission reviewer. */
+  private createTurnToolExecutor(run: AgentTurnRun, sharedEventContext: AgentEventBridgeContext, activeToolDefinitions: ToolDefinition[]): ToolExecutor {
+    const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId, mcpLease } = run;
+    const { promptPlan, routeCapability, effectivePlan } = preparedRuntime;
+    const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
     // native-structured：执行器用 plan 冻结 allowlist；其它路由与注入列表一致。
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? [...effectivePlan.toolAllowlist]
       : activeToolAllowlist;
-    const toolExecutor = this.deps.createToolExecutor(input.agentId, executorAllowlist, executionScopeId, {
+    return this.deps.createToolExecutor(input.agentId, executorAllowlist, executionScopeId, {
       sessionId: executionScopeId,
       runId: input.runId,
       turnId: input.turnId,
@@ -361,7 +404,7 @@ export class AgentTurnRunner {
       reviewPermission: (action, signal) => executePermissionReview({
         sessionId: executionScopeId, plan: requestPlan, credentialHandle: preparedRuntime.credentialHandle,
         reasoning: routeCapability.reasoningContract, evidence: {
-          ...permissionReviewEvidence(slot?.agent.messages ?? [], executionScopeId, action.arguments),
+          ...permissionReviewEvidence(run.slot?.agent.messages ?? [], executionScopeId, action.arguments),
           ...(action.tool === 'rdc_probe' && action.arguments.action === 'capture_restore'
             ? { captureBaseline: permissionReviewCaptureBaseline({ controller: turnHandle.captureControl, sessionId: executionScopeId,
               projectId: input.projectId, turnId: turnHandle.turnId, agentId: input.agentId, accessCeiling: effectivePlan.accessCeiling }) } : {}),
@@ -371,347 +414,61 @@ export class AgentTurnRunner {
           delegated: !!effectivePlan.delegationCapsule }), action, signal,
       }),
     });
-    const promptCache = preparedRuntime.promptCache;
-    const streamOptions: StreamOptions = {
-      temperature: requestPlan.temperature,
-      reasoning: requestPlan.reasoningWire,
-      reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
-      signal: input.options?.signal,
-      requestPlan,
-      promptCache,
-      credentialHandle: preparedRuntime.credentialHandle ?? input.credentialHandle,
+  }
+
+  /** Frozen facts a Task execution records about the turn that runs it. */
+  private describeTaskPreparation(run: AgentTurnRun): NonNullable<TurnHandle['taskPreparation']> {
+    const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId } = run;
+    const capsule = preparedRuntime.effectivePlan.delegationCapsule;
+    return {
+      sessionId: executionScopeId, turnId: turnHandle.turnId,
+      runtimeFingerprint: preparedRuntime.effectivePlan.fingerprint,
+      profileId: preparedRuntime.effectivePlan.agentId,
+      ...(preparedRuntime.effectivePlan.profileProvenance?.sourceHash
+        ? { profileSourceHash: preparedRuntime.effectivePlan.profileProvenance.sourceHash } : {}),
+      ...(preparedRuntime.effectivePlan.profileProvenance
+        ? { profileSource: { scope: preparedRuntime.effectivePlan.profileProvenance.scope,
+          path: preparedRuntime.effectivePlan.profileProvenance.sourcePath } } : {}),
+      providerId: requestPlan.providerId,
+      modelId: requestPlan.effectiveModelId,
+      reasoningLevel: requestPlan.reasoningWire.selection,
+      skills: preparedRuntime.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => ({
+        id: segment.id.replace(/^skill:/, ''), hash: segment.sourceHash.replace(/^sha256:/, ''),
+      })),
+      inputArtifacts: delegatedArtifactReferences(executionScopeId) ?? [],
+      selectedTurnCount: typeof input.contextDiagnostic?.selectedTurnCount === 'number' ? input.contextDiagnostic.selectedTurnCount : null,
+      ...(capsule ? { capsuleHash: createHash('sha256').update(JSON.stringify(capsule)).digest('hex') } : {}),
+      requestsDomainCapability: Object.values(capsule?.domainExtensions ?? {}).some(flags => Object.values(flags).some(Boolean)),
     };
-    const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
-    if (mcpConnectionErrors.length > 0) {
-      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-        code: 'mcp_connection_failed',
-        severity: 'warning',
-        message: 'One or more configured MCP servers could not be connected. MCP tools are unavailable for this turn.',
-        technicalMessage: mcpConnectionErrors.join('\n'),
-      }));
+  }
+
+  /** An approved plan with a frozen capture scope hands the owning General turn its capture controller. */
+  private async initializeApprovedCapture(run: AgentTurnRun): Promise<void> {
+    const { input, preparedRuntime, turnHandle, executionScopeId } = run;
+    const approvedCapture = preparedRuntime.approvedExecution?.investigation?.captureScope;
+    if (!approvedCapture) return;
+    if (!input.sessionId || !input.projectId || input.agentId !== GENERAL_AGENT_ID || !preparedRuntime.approvedExecution?.investigation) {
+      throw new AppError('RDC_CAPTURE_SCOPE_INVALID', 'approved capture work requires the owning General session.');
     }
-    if (routeDiagnostic) {
-      if (routeDiagnostic.surface === 'runtime-log') {
-        runtimeLogService.log({
-          scope: 'session',
-          namespace: 'agent',
-          severity: routeDiagnostic.severity,
-          title: 'Model route capability',
-          summary: routeDiagnostic.message,
-          sessionId: executionScopeId,
-          projectId: input.projectId,
-          runId: input.runId,
-          raw: {
-            code: routeDiagnostic.code,
-            surface: routeDiagnostic.surface,
-            providerId: input.providerId,
-            modelId: effectiveModel?.modelId ?? input.modelId,
-            protocol: requestPlan.route.protocol,
-          },
-        });
-      } else {
-        input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-          code: routeDiagnostic.code,
-          severity: routeDiagnostic.severity,
-          message: routeDiagnostic.message,
-          technicalMessage: JSON.stringify(routeCapability),
-        }));
-      }
-    }
-    const missionPlanningFeedback = () => {
-      const plan = turnHandle.runtimePlan ?? effectivePlan;
-      if (!plan.investigationMission || !plan.profileHandoffs.some(handoff => handoff.surface === 'plan-gate')
-        || preparedRuntime.approvedExecution || turnHandle.approvedPlan || turnHandle.completionDeclaration?.disposition === 'completed') return undefined;
-      return '# Mission Plan Required\nSubmit a plan with plan_artifact for user review, or use ask_user when clarification is needed before planning.';
-    };
-    slot = this.getOrCreateAgentSlot({
-      agentId: input.agentId,
-      providerId: input.providerId,
-      modelId: input.modelId,
-      systemPrompt: promptPlan.systemPrompt,
-      streamOptions,
-      tools: activeToolDefinitions,
-      toolExecutor,
-      turnSignature: input.turnId ?? '',
-      sessionId: executionScopeId,
-      contextWindow: input.contextWindow,
-      contextTokenLimit: input.contextTokenLimit,
-      promptPlan,
-      initialMessages: input.initialMessages ?? [],
-      contextDiagnostic: input.contextDiagnostic,
-      signatureTools: runtimeTools.definitions,
-      routeCapabilityOverride: routeCapability,
-      policyMaxTurns: effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
-        ? undefined
-        : effectivePlan.policy.maxTurns,
-      profileMaxTurns: effectivePlan.profileMaxTurns,
-      onLoopBudget: (remaining, limit) => { turnHandle.providerLoopBudget = { remaining, limit }; },
-      resolvePromptPlan: () => turnHandle.promptPlan ?? promptPlan,
-      resolveRuntimeFingerprint: () => turnHandle.runtimePlan?.fingerprint ?? effectivePlan.fingerprint,
-      beforeTerminalResponse: input.sessionId
-        ? async (message) => {
-          if (turnHandle.isAborted) return undefined;
-          const unfinished = await listUnfinishedDirectTasks({
-            sessionId: input.sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation,
-          });
-          if (unfinished.length) {
-            const redeclare = turnHandle.completionDeclaration
-              ? '\nThe previous completion declaration is no longer active; declare completion again after settling the Tasks.' : '';
-            turnHandle.completionDeclaration = null;
-            return `# Unsettled Direct Tasks\nThe current turn still owns unfinished direct Tasks: ${unfinished.map(item => item.taskId).join(', ')}. Continue useful work within the authorized scope, or use task_update to record a concrete blocker. Settle the Tasks before ending the turn; do not reset consumption or alter the deadline.${redeclare}`;
-          }
-          if (capsule && !turnHandle.completionDeclaration?.result) {
-            return '# Delegated Result Required\nThe delegated execution has not declared a structured result. Use turn_complete with result.summary, result.outputs (including the Task completion keys), counterevidence, unresolved, scope, sideEffects and recoveryState. Preserve the actual evidence and choose an honest partial or blocked disposition when work cannot be completed. Do not invent results, reset consumption or alter the deadline.';
-          }
-          const planningFeedback = missionPlanningFeedback();
-          if (planningFeedback) return planningFeedback;
-          if (!turnHandle.requiresApprovedGoalClosure) return undefined;
-          if (input.options?.allowInformationalReply && !turnHandle.completionDeclaration
-            && turnHandle.policyBudget.toolCalls === toolCallsAtEntry) return undefined;
-          const incomplete = await approvedGoalContinuation.closingCheck();
-          if (incomplete) return incomplete;
-          const restorationFeedback = await captureRestorationFeedback(turnHandle.completionDeclaration);
-          if (restorationFeedback) {
-            turnHandle.completionDeclaration = null;
-            return `${restorationFeedback}\nThe previous completion declaration is no longer active; call turn_complete again.`;
-          }
-          return approvedGoalContinuation.closingCheck(() => {
-          if (preparedRuntime.approvedExecution) assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
-          const mission = preparedRuntime.approvedExecution?.investigation?.mission;
-          if (!mission || !['completed', 'budget_paused'].includes(turnHandle.completionDeclaration?.disposition ?? '')) return;
-          this.deps.validateCompletion({ profileId: input.agentId, completionContract: 'investigation-report', investigationMission: mission,
-            sessionId: executionScopeId, turnId: turnHandle.turnId, disposition: turnHandle.completionDeclaration!.disposition,
-            evidenceRefs: turnHandle.completionDeclaration!.evidenceRefs, budgetEvidence: completionBudgetEvidence(turnHandle),
-            finalAnswerText: message.content.filter(block => block.type === 'text').map(block => block.text).join('').trim() });
-          });
-        }
-        : undefined,
-      beforeRequestMessages: input.options?.beforeProviderRequestMessages,
-      onProviderRequestCommitted: input.options?.onProviderRequestCommitted,
-    });
-    if (!slot) {
-      throw new Error('Agent slot setup did not produce a slot.');
-    }
-    const activeSlot = slot;
+    const approved = preparedRuntime.approvedExecution;
+    const host = createApprovedCaptureHost({ sessionId: executionScopeId, projectId: input.projectId,
+      offer: approved.offer, contract: approved.investigation!, turn: turnHandle });
+    turnHandle.captureControl = new ApprovedCaptureController({ sessionId: executionScopeId, projectId: input.projectId,
+      planUri: approved.offer.plan.uri, planHash: approved.offer.plan.hash, captureScope: approvedCapture, turn: turnHandle, host });
+    await turnHandle.captureControl.initialize();
+  }
 
-    const userMessage: UserMessage = {
-      role: 'user',
-      content: input.options?.userContent ?? input.content,
-      timestamp: nowMs(),
-    };
-
-    let responseText = '';
-    let canonicalFinalAnswerText = '';
-    let partialFinalSnapshot: { text: string; declaration: NonNullable<import('./TurnCoordinator').TurnHandle['completionDeclaration']>; toolCalls: number } | undefined;
-    let sawStructuredToolCall = false;
-    const structuredToolCallingEvidenceGate = { recorded: false };
-    unsubscribe = activeSlot.agent.subscribe((event: CoreAgentEvent) => {
-      if (event.type === 'message_update') {
-        const ev = event.assistantMessageEvent;
-        if (ev.type === 'text_delta' && typeof ev.delta === 'string') {
-          input.options?.onChunk?.(ev.delta);
-        }
-        if (ev.type === 'toolcall_end') {
-          sawStructuredToolCall = true;
-          claimStructuredToolCallingEvidence(
-            ev.type,
-            routeCapability,
-            structuredToolCallingEvidenceGate,
-          );
-        }
-      }
-      if (event.type === 'tool_execution_end' && !event.result.isError) {
-        if (claimStructuredToolCallingEvidence(
-          event.type,
-          routeCapability,
-          structuredToolCallingEvidenceGate,
-        )) {
-          try {
-            recordObservedToolCallingSupport(
-              input.providerId,
-              effectiveModel?.modelId ?? input.modelId,
-              settingsService.providerConnections,
-              requestPlan.route.protocol,
-            );
-          } catch (error) {
-            runtimeLogService.log({
-              scope: 'session',
-              namespace: 'agent',
-              severity: 'warning',
-              title: 'Tool capability evidence was not persisted',
-              summary: error instanceof Error ? error.message : String(error),
-              sessionId: executionScopeId,
-              projectId: input.projectId,
-              runId: input.runId,
-              raw: {
-                providerId: input.providerId,
-                modelId: effectiveModel?.modelId ?? input.modelId,
-                protocol: requestPlan.route.protocol,
-              },
-            });
-          }
-        }
-      }
-      if (event.type === 'message_end' && event.message.role === 'assistant') {
-        responseText = event.message.content
-          .filter((block) => block.type === 'text')
-          .map((block) => (block as { text: string }).text)
-          .join('');
-        const outputPhase = resolveConversationLoopOutputPhase({
-          stopReason: event.message.stopReason === 'stop' ? 'end_turn' : undefined,
-          loopHasTools: event.message.content.some((block) => block.type === 'toolCall'),
-          hasPendingContinuation: { handoff: Boolean(turnHandle.pendingHandoff) },
-        });
-        const finalText = turnHandle.isLive(turnGeneration) && outputPhase === 'final_answer'
-          ? event.message.content.map(block => block.type === 'text' && block.phase !== 'commentary' ? block.text : '')
-            .join('').trim() : '';
-        const declaration = turnHandle.completionDeclaration;
-        if (finalText) {
-          canonicalFinalAnswerText = finalText;
-          partialFinalSnapshot = declaration && ['partial', 'blocked'].includes(declaration.disposition)
-            ? { text: finalText, declaration, toolCalls: turnHandle.policyBudget.toolCalls } : undefined;
-        } else if (turnHandle.isLive(turnGeneration) && outputPhase === 'final_answer'
-          && partialFinalSnapshot && declaration === partialFinalSnapshot.declaration
-          && turnHandle.policyBudget.toolCalls === partialFinalSnapshot.toolCalls) {
-          // A reassessment can end without text after the same partial was already reported.
-          canonicalFinalAnswerText = partialFinalSnapshot.text;
-        } else {
-          canonicalFinalAnswerText = '';
-          partialFinalSnapshot = undefined;
-        }
-        if (event.message.usage && isSuccessfulProviderResponse(event.message)) {
-          // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
-          // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
-          const injectedDefs = activeSlot.agent.state.tools ?? [];
-          const { deferredMcp: deferredMcpDefs, deferredBuiltin: deferredBuiltinDefs } = partitionDeferredTools(
-            runtimeTools.definitions,
-            activeSlot.activatedDeferredTools,
-          );
-          const isMcpDef = (d: ToolDefinition) => isMcpPrefixedToolName(d.name);
-          const isSubagentDef = (d: ToolDefinition) => d.name === 'subagent';
-          const mcpDefs = injectedDefs.filter(isMcpDef);
-          const subagentDefs = injectedDefs.filter(isSubagentDef);
-          const systemDefs = injectedDefs.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
-
-          const pm = promptPlan.metrics;
-          const systemPromptChars = pm
-            ? pm.systemPrompt
-            : promptPlan.systemPrompt.length;
-          const rulesChars    = pm?.scopedInstructions ?? 0;
-          const skillsChars   = pm?.skills ?? 0;
-
-          // 压缩统计：在 message_end 时对当前 agent 的消息历史分类。
-          const compressionStats = activeSlot.contextManager.classifyMessages(
-            activeSlot.agent.messages as import('../core/types').AgentMessage[],
-          );
-
-          const precomputedBreakdown: ContextUsageBreakdownEntry[] = [
-            { id: 'system_prompt', tokens: charsToTokens(systemPromptChars) },
-            ...(rulesChars > 0 ? [{ id: 'memory_files' as const, tokens: charsToTokens(rulesChars) }] : []),
-            ...(skillsChars > 0 ? [{ id: 'skills' as const, tokens: charsToTokens(skillsChars) }] : []),
-            { id: 'system_tools',          tokens: charsToTokens(JSON.stringify(systemDefs).length),   count: systemDefs.length },
-            ...(mcpDefs.length > 0
-              ? [{
-                  id: 'mcp_tools' as const,
-                  tokens: charsToTokens(JSON.stringify(mcpDefs).length),
-                  count: mcpDefs.length,
-                }]
-              : []),
-            ...(deferredMcpDefs.length > 0
-              ? [{
-                  id: 'mcp_tools_deferred' as const,
-                  tokens: charsToTokens(JSON.stringify(deferredMcpDefs).length),
-                  count: deferredMcpDefs.length,
-                }]
-              : []),
-            ...(deferredBuiltinDefs.length > 0
-              ? [{
-                  id: 'builtin_tools_deferred' as const,
-                  tokens: charsToTokens(JSON.stringify(deferredBuiltinDefs).length),
-                  count: deferredBuiltinDefs.length,
-                }]
-              : []),
-            ...(subagentDefs.length > 0
-              ? [{
-                  id: 'subagent_definitions' as const,
-                  tokens: charsToTokens(JSON.stringify(subagentDefs).length),
-                  count: subagentDefs.length,
-                }]
-              : []),
-            ...(compressionStats.summaryTokens > 0
-              ? [{ id: 'summarized_conversation' as const, tokens: compressionStats.summaryTokens }]
-              : []),
-            { id: 'conversation', tokens: compressionStats.conversationTokens, count: compressionStats.conversationCount },
-          ];
-
-          debuggerLlmService.recordAgentTurnUsage({
-            runId: input.runId,
-            turnId: turnHandle.turnId,
-            sessionId: executionScopeId,
-            providerId: input.providerId,
-            modelId: input.modelId,
-            inputTokens: event.message.usage.inputTokens,
-            outputTokens: event.message.usage.outputTokens,
-            ...reportedUsageFields(event.message.usage),
-            ...(event.message.usage.cost ? { cost: event.message.usage.cost } : {}),
-            precomputedBreakdown,
-          });
-        }
-        const diagnosticIsLive = turnHandle.isLive(turnGeneration);
-        if (diagnosticIsLive && isSuccessfulProviderResponse(event.message) && !sawStructuredToolCall && !responseText.trim()) {
-          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-            code: 'empty_response_without_tool_call',
-            severity: 'warning',
-            message: 'Provider returned an empty assistant message without a structured tool call.',
-          }));
-        } else if (diagnosticIsLive && isSuccessfulProviderResponse(event.message) && !sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
-          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-            code: 'textual_tool_call_not_executed',
-            severity: 'warning',
-            message: 'The model wrote a textual tool call, but no structured provider tool call was returned. No tool was executed.',
-            technicalMessage: responseText.slice(0, 1200),
-          }));
-        }
-      }
-      const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
-      if (sharedEvent) {
-        if (turnHandle.isLive(turnGeneration)) {
-          turnHandle.eventSink?.onEvent?.(sharedEvent);
-        }
-      }
-    });
-
-    // abort 信号桥接到 Agent.abort()；同时注册为 turn producer。
-    unregisterAgentProducer = turnHandle.registerProducer({
-      id: `agent:${slotKey}`,
-      abort: () => {
-        try {
-            activeSlot.agent.abort();
-        } catch {
-          // ignore
-        }
-      },
-      join: async () => {
-        await activeSlot.agent.abortAndJoin();
-      },
-    });
-    if (input.options?.signal) {
-      if (input.options.signal.aborted) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
-      abortListener = () => {
-        void turnHandle.abortAndJoin({ reason: 'user_stop' });
-      };
-      input.options.signal.addEventListener('abort', abortListener, { once: true });
-    }
-
+  /** Run the prompt, enforce the turn's completion contract, and finalize whatever the outcome. */
+  private async promptAgentTurn(run: AgentTurnRun, setup: AgentTurnSetup, output: AgentTurnOutput): Promise<string> {
+    const { input, preparedRuntime, turnHandle, executionScopeId } = run;
+    const { activeSlot, effectivePlan } = setup;
     const initialMessageCount = activeSlot.agent.messages.length;
     const settleDirectTasks = (stopped: boolean) => settleUnfinishedDirectTasks({ sessionId: input.sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation, stopped });
-    let terminalStatus: 'complete' | 'stopped' | 'error' = 'complete';
+    let terminalStatus: TerminalStatus = 'complete';
     let completionReceipt: TurnCompletionReceipt | undefined;
     try {
-      await activeSlot.agent.prompt(userMessage);
-      if (!turnHandle.isAborted && missionPlanningFeedback()) throw new AppError('MISSION_PLAN_REQUIRED', 'the planning turn ended without a reviewed plan.');
+      await activeSlot.agent.prompt(setup.userMessage);
+      if (!turnHandle.isAborted && setup.missionPlanningFeedback()) throw new AppError('MISSION_PLAN_REQUIRED', 'the planning turn ended without a reviewed plan.');
       if (await settleDirectTasks(false)) throw new AppError('TASK_COMPLETION_DENIED', 'Direct Task executions must be settled before the parent turn completes.');
       if (turnHandle.completionDeclaration?.disposition === 'cancelled' && !turnHandle.isAborted) {
         throw new AppError('TURN_COMPLETION_INVALID', 'cancelled requires an actual abort and joined execution.');
@@ -725,7 +482,7 @@ export class AgentTurnRunner {
         investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? turnHandle.runtimePlan?.investigationMission ?? undefined,
         turnId: turnHandle.turnId,
         sessionId: executionScopeId,
-        finalAnswerText: canonicalFinalAnswerText,
+        finalAnswerText: output.canonicalFinalAnswerText,
         disposition: turnHandle.completionDeclaration?.disposition,
         evidenceRefs: turnHandle.completionDeclaration?.evidenceRefs,
         budgetEvidence: completionBudgetEvidence(turnHandle),
@@ -744,112 +501,101 @@ export class AgentTurnRunner {
         initialRuntimePlanFingerprint: effectivePlan.fingerprint,
         runtimePlanFingerprint: turnHandle.runtimePlan?.fingerprint ?? effectivePlan.fingerprint,
         runtimeEpochs: structuredClone(turnHandle.runtimeEpochs),
-        finalAnswerText: canonicalFinalAnswerText,
+        finalAnswerText: output.canonicalFinalAnswerText,
       };
-      return responseText;
+      return output.responseText;
     } catch (error) {
       terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
       if (terminalStatus !== 'stopped') await settleDirectTasks(false);
       if (terminalStatus === 'error' && isExplicitStructuredToolCallingRejection(error)) {
-        try {
-          recordObservedToolCallingUnsupported(
-            input.providerId,
-            effectiveModel?.modelId ?? input.modelId,
-            settingsService.providerConnections,
-            requestPlan.route.protocol,
-            error instanceof Error ? error.message : String(error),
-          );
-        } catch (persistError) {
-          runtimeLogService.log({
-            scope: 'session',
-            namespace: 'agent',
-            severity: 'warning',
-            title: 'Tool capability rejection was not persisted',
-            summary: persistError instanceof Error ? persistError.message : String(persistError),
-            sessionId: executionScopeId,
-            projectId: input.projectId,
-            runId: input.runId,
-            raw: {
-              providerId: input.providerId,
-              modelId: effectiveModel?.modelId ?? input.modelId,
-              protocol: requestPlan.route.protocol,
-            },
-          });
-        }
+        persistToolCallingRejection(run, error);
       }
       throw error;
     } finally {
-      if (turnHandle.isAborted) {
-        await activeSlot.agent.abortAndJoin();
+      await this.finalizeAgentTurn(run, activeSlot, initialMessageCount, terminalStatus, completionReceipt);
+    }
+  }
+
+  /** Join an aborted agent, release the subscription, report the terminal context and end the turn. */
+  private async finalizeAgentTurn(
+    run: AgentTurnRun,
+    activeSlot: AgentSlot,
+    initialMessageCount: number,
+    terminalStatus: TerminalStatus,
+    completionReceipt: TurnCompletionReceipt | undefined,
+  ): Promise<void> {
+    const { input, turnHandle, executionScopeId, slotKey, mcpLease } = run;
+    if (turnHandle.isAborted) {
+      await activeSlot.agent.abortAndJoin();
+    }
+    run.unsubscribe?.();
+    run.unregisterAgentProducer?.();
+    if (run.abortListener && input.options?.signal) {
+      input.options.signal.removeEventListener('abort', run.abortListener);
+    }
+    cancelTurnInteractionRequests(turnHandle.turnId);
+    input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration, terminalStatus === 'complete' ? turnHandle.approvedPlan : null, terminalStatus === 'complete' ? completionReceipt : undefined);
+    this.deps.slots.flush(activeSlot);
+    if (turnHandle.isAborted) {
+      await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });
+    }
+    await settleJoinedTurnTaskExecutions({ sessionId: input.sessionId, turnId: turnHandle.turnId,
+      generation: turnHandle.generation, stopped: turnHandle.isAborted, orphaned: turnHandle.isOrphaned });
+    if (turnHandle.isOrphaned) {
+      // Reserve the key until the orphaned provider/tool loop actually settles.
+      this.deps.slots.quarantineSlot(slotKey, activeSlot.agent.activeLoopPromise ?? Promise.resolve());
+      this.deps.slots.deleteSlot(slotKey);
+    }
+    await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
+    turnCoordinator.endTurn(turnHandle);
+    run.turnEnded = true;
+    await dispatchRuntimeHooks('turn.after-end', {
+      agentId: input.agentId,
+      sessionId: executionScopeId,
+      projectRoot: input.projectRootPath ?? undefined,
+      payload: { turnId: turnHandle.turnId },
+    });
+    run.setupCleanupComplete = true;
+  }
+
+  /** A failure before finalization completed: unwind whatever setup and subscription acquired. */
+  private async cleanupFailedSetup(run: AgentTurnRun): Promise<void> {
+    if (run.setupCleanupComplete) return;
+    const { input, turnHandle, executionScopeId, slot, slotKey, mcpLease } = run;
+    if (run.abortListener && input.options?.signal) {
+      input.options.signal.removeEventListener('abort', run.abortListener);
+    }
+    run.unsubscribe?.();
+    run.unregisterAgentProducer?.();
+    if (slot?.agent.isStreaming || slot?.agent.activeLoopPromise) {
+      try {
+        await slot.agent.abortAndJoin();
+      } catch {
+        // Preserve the setup failure; the turn join below owns orphan detection.
       }
-      unsubscribe?.();
-      unregisterAgentProducer?.();
-      if (abortListener && input.options?.signal) {
-        input.options.signal.removeEventListener('abort', abortListener);
-      }
-      cancelTurnInteractionRequests(turnHandle.turnId);
-      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration, terminalStatus === 'complete' ? turnHandle.approvedPlan : null, terminalStatus === 'complete' ? completionReceipt : undefined);
-      this.deps.slots.flush(activeSlot);
-      if (turnHandle.isAborted) {
-        await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });
-      }
-      await settleJoinedTurnTaskExecutions({ sessionId: input.sessionId, turnId: turnHandle.turnId,
-        generation: turnHandle.generation, stopped: turnHandle.isAborted, orphaned: turnHandle.isOrphaned });
-      if (turnHandle.isOrphaned) {
-        // Reserve the key until the orphaned provider/tool loop actually settles.
-        this.deps.slots.quarantineSlot(slotKey, activeSlot.agent.activeLoopPromise ?? Promise.resolve());
-        this.deps.slots.deleteSlot(slotKey);
-      }
-      await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
+    }
+    await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'unknown' });
+    if (slot) {
+      // Setup can create a reusable slot before a later subscription or
+      // executor step fails. Keep the slot only when it is not orphaned,
+      // but never leave setup messages in the execution cache.
+      this.deps.slots.flush(slot);
+    }
+    if (turnHandle.isOrphaned && slot && slotKey) {
+      this.deps.slots.quarantineSlot(slotKey, slot.agent.activeLoopPromise ?? Promise.resolve());
+      this.deps.slots.deleteSlot(slotKey);
+    }
+    await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
+    if (!run.turnEnded) {
       turnCoordinator.endTurn(turnHandle);
-      turnEnded = true;
+      run.turnEnded = true;
       await dispatchRuntimeHooks('turn.after-end', {
         agentId: input.agentId,
         sessionId: executionScopeId,
         projectRoot: input.projectRootPath ?? undefined,
         payload: { turnId: turnHandle.turnId },
       });
-      setupCleanupComplete = true;
     }
-    } catch (error) {
-      if (!setupCleanupComplete) {
-        if (abortListener && input.options?.signal) {
-          input.options.signal.removeEventListener('abort', abortListener);
-        }
-        unsubscribe?.();
-        unregisterAgentProducer?.();
-        if (slot?.agent.isStreaming || slot?.agent.activeLoopPromise) {
-          try {
-            await slot.agent.abortAndJoin();
-          } catch {
-            // Preserve the setup failure; the turn join below owns orphan detection.
-          }
-        }
-        await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'unknown' });
-        if (slot) {
-          // Setup can create a reusable slot before a later subscription or
-          // executor step fails. Keep the slot only when it is not orphaned,
-          // but never leave setup messages in the execution cache.
-          this.deps.slots.flush(slot);
-        }
-        if (turnHandle.isOrphaned && slot && slotKey) {
-          this.deps.slots.quarantineSlot(slotKey, slot.agent.activeLoopPromise ?? Promise.resolve());
-          this.deps.slots.deleteSlot(slotKey);
-        }
-        await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
-        if (!turnEnded) {
-          turnCoordinator.endTurn(turnHandle);
-          turnEnded = true;
-          await dispatchRuntimeHooks('turn.after-end', {
-            agentId: input.agentId,
-            sessionId: executionScopeId,
-            projectRoot: input.projectRootPath ?? undefined,
-            payload: { turnId: turnHandle.turnId },
-          });
-        }
-        setupCleanupComplete = true;
-      }
-      throw error;
-    }
+    run.setupCleanupComplete = true;
   }
 }
