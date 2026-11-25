@@ -230,7 +230,6 @@ export class KnowledgeImportService {
         card: entry.write.card,
         permissionMode: 'default',
         confirmation: { explicitHumanConfirmation: true },
-        approvalAlreadyConsumed: true,
         ...(entry.write.stagedImages ? { stagedImages: entry.write.stagedImages } : {}),
       });
       items.push({ ...entry.item, record: written });
@@ -284,7 +283,6 @@ export class KnowledgeImportService {
         },
         permissionMode: 'default',
         confirmation: { explicitHumanConfirmation: true },
-        approvalAlreadyConsumed: true,
       });
     }
     await this.deps.store.replaceLeftoverDrafts(sessionId, remaining);

@@ -35,24 +35,24 @@ export function unzipKnowledgeFiles(bytes: Uint8Array): Map<string, Uint8Array> 
   if (bytes.byteLength > KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED) {
     throw new Error('KNOWLEDGE_ZIP_TOO_LARGE');
   }
+  // Entries are budgeted by their declared size before anything is inflated; fflate sizes each output buffer from
+  // that declaration, so a header that understates its size cannot inflate past it either.
+  let declared = 0;
   let decoded: Record<string, Uint8Array>;
   try {
-    decoded = unzipSync(bytes);
-  } catch {
+    decoded = unzipSync(bytes, {
+      filter: (entry) => {
+        if (entry.name.endsWith('/')) return false;
+        declared += entry.originalSize;
+        if (declared > KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED) throw new Error('KNOWLEDGE_ZIP_TOO_LARGE');
+        return true;
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'KNOWLEDGE_ZIP_TOO_LARGE') throw error;
     throw new Error('KNOWLEDGE_ZIP_INVALID');
   }
-  const out = new Map<string, Uint8Array>();
-  let total = 0;
-  for (const [raw, data] of Object.entries(decoded)) {
-    if (raw.endsWith('/')) continue;
-    const name = normalizeZipEntryName(raw);
-    total += data.byteLength;
-    if (total > KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED) {
-      throw new Error('KNOWLEDGE_ZIP_TOO_LARGE');
-    }
-    out.set(name, data);
-  }
-  return out;
+  return new Map(Object.entries(decoded).map(([raw, data]) => [normalizeZipEntryName(raw), data]));
 }
 
 export function pickKnowledgeYamlEntry(names: Iterable<string>): string | null {

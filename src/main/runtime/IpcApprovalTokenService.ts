@@ -11,6 +11,8 @@ export interface IpcApprovalTokenIssueRequest {
   scope: 'user' | 'project';
   name?: string;
   projectRoot?: string;
+  /** Digest of the exact content the person approved; consumption must present the same digest. */
+  contentDigest?: string;
 }
 
 export interface IpcApprovalTokenConsumeRequest {
@@ -19,6 +21,7 @@ export interface IpcApprovalTokenConsumeRequest {
   scope: 'user' | 'project';
   name?: string;
   projectRoot?: string;
+  contentDigest?: string;
 }
 
 interface StoredApprovalToken {
@@ -26,6 +29,7 @@ interface StoredApprovalToken {
   scope: 'user' | 'project';
   name?: string;
   projectRoot?: string;
+  contentDigest?: string;
   expiresAt: number;
 }
 
@@ -44,6 +48,7 @@ export class IpcApprovalTokenService {
       scope: request.scope,
       name: request.name?.trim() || undefined,
       projectRoot: request.projectRoot?.trim() || undefined,
+      contentDigest: request.contentDigest,
       expiresAt: Date.now() + this.ttlMs,
     });
     return token;
@@ -59,6 +64,7 @@ export class IpcApprovalTokenService {
     if (entry.scope !== request.scope) return false;
     if ((entry.name ?? '') !== (request.name?.trim() ?? '')) return false;
     if ((entry.projectRoot ?? '') !== (request.projectRoot?.trim() ?? '')) return false;
+    if ((entry.contentDigest ?? '') !== (request.contentDigest ?? '')) return false;
     return true;
   }
 

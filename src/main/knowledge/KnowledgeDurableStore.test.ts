@@ -21,7 +21,6 @@ import { StorageIo } from '../sessions/store/StorageIo';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
 import { KNOWLEDGE_IMPORT_MAX_BYTES, ingestKnowledgeFromPath, sanitizeProvenanceToken } from './knowledgeIngest';
 import {
-  KnowledgeApprovalTokenInvalidError,
   KnowledgeHumanConfirmationRequiredError,
   KnowledgeLifecycleError,
   KnowledgeRevisionConflictError,
@@ -382,7 +381,7 @@ describe('knowledge path ingest', () => {
       source: [
         'case_id: secret-case',
         'title: Secret',
-        'symptoms: api_key leaked',
+        'symptoms: api_key=sk-live-fixture-0123456789abcdef',
       ].join('\n'),
     });
     expect(secret.items[0]?.status).toBe('quarantine');
@@ -405,13 +404,10 @@ describe('knowledge path ingest', () => {
 });
 
 describe('Knowledge write gates', () => {
-  function writeService(root: string, consume?: (token: string) => boolean): KnowledgeWriteService {
+  function writeService(root: string): KnowledgeWriteService {
     return new KnowledgeWriteService({
       listSpaces: () => [{ spaceId: 'user', kind: 'user', label: 'User', rootPath: root }],
       now: () => new Date('2026-09-01T00:00:00.000Z'),
-      ...(consume ? {
-        consumeApprovalToken: (token) => consume(token),
-      } : {}),
     });
   }
 
@@ -468,63 +464,15 @@ describe('Knowledge write gates', () => {
     expect(existsSync(path.join(outside, 'facts'))).toBe(false);
   });
 
-  it('rejects missing confirmation and a reused approvalToken', async () => {
-    const root = tempRoot('rdc-know-token-');
-    const tokens = new Set(['tok-once']);
-    const write = writeService(root, (token) => {
-      if (!tokens.has(token)) return false;
-      tokens.delete(token);
-      return true;
-    });
+  it('rejects a write without explicit human confirmation', async () => {
+    const root = tempRoot('rdc-know-confirm-');
+    const write = writeService(root);
     await expect(write.write({
       spaceId: 'user',
       card: factCard(),
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: false } as never,
-      approvalToken: 'tok-once',
     })).rejects.toBeInstanceOf(KnowledgeHumanConfirmationRequiredError);
-    const saved = await write.write({
-      spaceId: 'user',
-      card: factCard(),
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-once',
-    });
-    expect(saved.lifecycle).toBe('draft');
-    await expect(write.write({
-      spaceId: 'user',
-      card: { ...factCard(), title: 'Again' },
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-once',
-    })).rejects.toBeInstanceOf(KnowledgeApprovalTokenInvalidError);
-  });
-
-  it('consumes a promote approvalToken only once', async () => {
-    const root = tempRoot('rdc-know-promote-tok-');
-    const tokens = new Set(['tok-promote']);
-    const write = writeService(root, (token) => {
-      if (!tokens.has(token)) return false;
-      tokens.delete(token);
-      return true;
-    });
-    const saved = await write.promote({
-      spaceId: 'user',
-      card: { ...factCard(), lifecycle: 'candidate' },
-      to: 'verified',
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-promote',
-    });
-    expect(saved.lifecycle).toBe('verified');
-    await expect(write.promote({
-      spaceId: 'user',
-      card: { ...factCard(), lifecycle: 'candidate' },
-      to: 'verified',
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-promote',
-    })).rejects.toBeInstanceOf(KnowledgeApprovalTokenInvalidError);
   });
 
   it('never treats sourceStatus=fixed as verified', async () => {

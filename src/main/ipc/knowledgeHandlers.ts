@@ -18,6 +18,8 @@ import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import { knowledgeTopicService } from '../knowledge/KnowledgeTopicService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
+import { sha256Hex } from '../runtime/contentHash';
+import { serializeKnowledgeCard } from '../knowledge/knowledgeCardSchema';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
 import {
   KnowledgeCandidateCreateArgsSchema,
@@ -38,7 +40,7 @@ import {
   KnowledgeTopicPreviewArgsSchema,
   KnowledgeTopicApplyArgsSchema,
 } from './validation/knowledgeSchemas';
-import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
+import type { KnowledgeCardRecord, KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 const knowledgeExportService = new KnowledgeExportService(createDefaultExportDependencies({
@@ -105,16 +107,22 @@ async function confirmKnowledgeMutation(
   });
 }
 
+/** The approved content: the card exactly as it will be serialized, so a token cannot carry a different card. */
+function knowledgeCardDigest(card: KnowledgeCardRecord): string {
+  return sha256Hex(serializeKnowledgeCard(card));
+}
+
 function consumeKnowledgeToken(
   token: string,
   action: 'knowledge.write' | 'knowledge.promote',
   spaceId: string,
-  relativePath: string,
+  card: KnowledgeCardRecord,
 ): void {
   const consumed = ipcApprovalTokenService.consume({
     token,
     action,
-    ...knowledgeTokenBinding(spaceId, relativePath),
+    ...knowledgeTokenBinding(spaceId, card.relativePath),
+    contentDigest: knowledgeCardDigest(card),
   });
   if (!consumed) {
     const error = new Error('KNOWLEDGE_APPROVAL_TOKEN_INVALID');
@@ -381,10 +389,10 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     try {
       const [input] = parseIpcArgs(KnowledgeIssueApprovalTokenArgsSchema, rawArgs, {
         label: 'knowledge:issueApprovalToken',
-        maxBytes: 8 * 1024,
+        maxBytes: 256 * 1024,
       });
       assertKnownSpaces([input.spaceId]);
-      const confirmed = await confirmKnowledgeMutation(input.action, input.spaceId, input.relativePath);
+      const confirmed = await confirmKnowledgeMutation(input.action, input.spaceId, input.card.relativePath);
       if (!confirmed) {
         return { error: 'Knowledge mutation was not confirmed by the main-process dialog.' };
       }
@@ -392,7 +400,8 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
       return {
         token: ipcApprovalTokenService.issue({
           action: input.action,
-          ...knowledgeSpaceTokenBinding(space, input.relativePath),
+          ...knowledgeSpaceTokenBinding(space, input.card.relativePath),
+          contentDigest: knowledgeCardDigest(input.card),
         }),
       };
     } catch (error) {
@@ -411,7 +420,7 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     try {
       assertKnownSpaces([input.spaceId]);
       requireHumanConfirmation(input.confirmation);
-      consumeKnowledgeToken(input.approvalToken, 'knowledge.write', input.spaceId, input.card.relativePath);
+      consumeKnowledgeToken(input.approvalToken, 'knowledge.write', input.spaceId, input.card);
       return {
         card: await knowledgeWriteService.write(input),
       };
@@ -444,7 +453,7 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     try {
       assertKnownSpaces([input.spaceId]);
       requireHumanConfirmation(input.confirmation);
-      consumeKnowledgeToken(input.approvalToken, 'knowledge.promote', input.spaceId, input.card.relativePath);
+      consumeKnowledgeToken(input.approvalToken, 'knowledge.promote', input.spaceId, input.card);
       return {
         card: await knowledgeWriteService.promote(input),
       };

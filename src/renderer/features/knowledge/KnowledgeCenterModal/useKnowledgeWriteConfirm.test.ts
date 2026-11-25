@@ -179,7 +179,7 @@ describe('Cards write confirm without visiting Conflicts', () => {
     expect(issueApprovalToken).toHaveBeenCalledWith({
       action: 'knowledge.write',
       spaceId: 'user',
-      relativePath: 'facts/sample.md',
+      card: expect.objectContaining({ relativePath: 'facts/sample.md' }),
     });
     expect(write).toHaveBeenCalled();
     expect(promote).not.toHaveBeenCalled();

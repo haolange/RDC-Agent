@@ -98,11 +98,12 @@ export const KnowledgeImageArgsSchema = z.tuple([
   }).strict(),
 ]);
 
+/** The card the person approves; the token is bound to its serialized bytes, so a different card cannot use it. */
 export const KnowledgeIssueApprovalTokenArgsSchema = z.tuple([
   z.object({
     action: z.enum(['knowledge.write', 'knowledge.promote']),
     spaceId: KnowledgeSpaceIdSchema,
-    relativePath: ipcNonEmptyString(1024, 'relativePath'),
+    card: KnowledgeCardRecordSchema,
   }).strict(),
 ]);
 

@@ -321,7 +321,7 @@ export interface ElectronAPI {
     issueApprovalToken: (request: {
       action: 'knowledge.write' | 'knowledge.promote';
       spaceId: string;
-      relativePath: string;
+      card: KnowledgeCardRecord;
     }) => Promise<{ token?: string; error?: string }>;
     write: (request: {
       spaceId: string;

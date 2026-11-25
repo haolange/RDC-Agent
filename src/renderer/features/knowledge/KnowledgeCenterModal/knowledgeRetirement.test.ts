@@ -34,7 +34,7 @@ it('routes a human retirement through the promote approval and retired lifecycle
   expect(issueApprovalToken).toHaveBeenCalledWith({
     action: 'knowledge.promote',
     spaceId: after.spaceId,
-    relativePath: after.relativePath,
+    card: after,
   });
   expect(promote).toHaveBeenCalledWith(expect.objectContaining({ to: 'retired', approvalToken: 'retire-token' }));
   expect(write).not.toHaveBeenCalled();

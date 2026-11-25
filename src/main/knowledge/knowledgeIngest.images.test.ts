@@ -1,13 +1,14 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { zipSync } from 'fflate';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
+import { currentHost } from '../platform/host';
 import { createDisposableImportService } from './KnowledgeImportService';
 import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
-import { KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED, utf8ToZip, zipKnowledgeFiles } from './knowledgeZip';
+import { KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED, unzipKnowledgeFiles, utf8ToZip, zipKnowledgeFiles } from './knowledgeZip';
 
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -160,5 +161,44 @@ describe('knowledge import images', () => {
     });
     expect(huge.items[0]?.status).toBe('quarantine');
     expect(huge.items[0]?.reason).toBe('source-too-large');
+  });
+});
+
+describe('folder package asset boundary', () => {
+  const packageWith = (assetFile: string) => {
+    const root = tempRoot('rdc-know-boundary-');
+    const sourceRoot = path.join(root, 'package');
+    mkdirSync(sourceRoot);
+    writeFileSync(path.join(root, 'private.png'), PNG_1X1);
+    writeFileSync(path.join(sourceRoot, 'case.yaml'), caseYaml('boundary-case').replace('observed.png', assetFile), 'utf8');
+    return { root, sourceRoot };
+  };
+
+  it('refuses an asset path that leaves the package directory', async () => {
+    const { sourceRoot } = packageWith('../private.png');
+    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' }))
+      .rejects.toThrow(/KNOWLEDGE_ASSET_PATH_INVALID/);
+  });
+
+  it.skipIf(currentHost().isWindows)('refuses an asset that is a link to a file outside the package', async () => {
+    const { root, sourceRoot } = packageWith('observed.png');
+    symlinkSync(path.join(root, 'private.png'), path.join(sourceRoot, 'observed.png'));
+    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' }))
+      .rejects.toThrow(/KNOWLEDGE_ASSET_LINK_REJECTED/);
+  });
+
+  it('refuses image bytes that are not the format the name declares', async () => {
+    const { sourceRoot } = packageWith('observed.png');
+    writeFileSync(path.join(sourceRoot, 'observed.png'), 'not an image');
+    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' }))
+      .rejects.toThrow(/KNOWLEDGE_IMAGE_INVALID/);
+  });
+});
+
+describe('knowledge zip budget', () => {
+  it('refuses an archive whose declared contents exceed the limit before inflating it', () => {
+    const bomb = zipSync({ 'payload.bin': new Uint8Array(KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED + 1) }, { level: 9 });
+    expect(bomb.byteLength).toBeLessThan(1024 * 1024);
+    expect(() => unzipKnowledgeFiles(bomb)).toThrow('KNOWLEDGE_ZIP_TOO_LARGE');
   });
 });

@@ -101,7 +101,7 @@ export async function issueKnowledgeWrite(input: {
     issueApprovalToken: (request: {
       action: 'knowledge.write' | 'knowledge.promote';
       spaceId: string;
-      relativePath: string;
+      card: KnowledgeCardRecord;
     }) => Promise<{ token?: string; error?: string }>;
     write: (request: {
       spaceId: string;
@@ -128,7 +128,7 @@ export async function issueKnowledgeWrite(input: {
   const issued = await input.api.issueApprovalToken({
     action: isPromote ? 'knowledge.promote' : 'knowledge.write',
     spaceId: input.after.spaceId,
-    relativePath: input.after.relativePath,
+    card: input.after,
   });
   if (!issued.token) {
     return { ok: false, error: issued.error || 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' };

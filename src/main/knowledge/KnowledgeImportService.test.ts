@@ -120,7 +120,7 @@ describe('KnowledgeImportService', () => {
     const importer = createDisposableImportService({ spaceRoot });
     const secret = await importer.importToSpace({
       spaceId: 'user',
-      source: caseYaml('secret-case', 'Secret', 'api_key leaked'),
+      source: caseYaml('secret-case', 'Secret', 'token: ghp_FIXTUREfixture0123456789abcdefABCDEF'),
     });
     const leaked = await importer.importToSpace({
       spaceId: 'user',

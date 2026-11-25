@@ -60,14 +60,6 @@ export class KnowledgeWriteIntegrityError extends Error {
   }
 }
 
-export class KnowledgeApprovalTokenInvalidError extends Error {
-  readonly code = 'KNOWLEDGE_APPROVAL_TOKEN_INVALID';
-  constructor() {
-    super('KNOWLEDGE_APPROVAL_TOKEN_INVALID: approvalToken is missing, already consumed, or does not match.');
-    this.name = 'KnowledgeApprovalTokenInvalidError';
-  }
-}
-
 export class KnowledgeDraftMigrationConflictError extends Error {
   readonly code = 'KNOWLEDGE_DRAFT_MIGRATION_CONFLICT';
   readonly cardIds: string[];

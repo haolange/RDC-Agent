@@ -9,7 +9,7 @@ import {
   type KnowledgePackageCard,
 } from '@shared/types/knowledgeExport';
 import { resolveWithinRoot } from './knowledgeFs';
-import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeIngest';
+import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeSensitiveText';
 import { isSafeKnowledgeImageRelative, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
 import {
   KNOWLEDGE_PACKAGE_MANIFEST,

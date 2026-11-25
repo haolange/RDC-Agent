@@ -14,6 +14,8 @@ import {
 } from '@shared/types/knowledge';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
 import { structuredText } from './knowledgeFs';
+import { readPackageImage, resolvePackageAsset } from './knowledgePackageAsset';
+import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeSensitiveText';
 import {
   isKnowledgeImageFileName,
   knowledgeImageDestination,
@@ -89,24 +91,10 @@ function fromItems(items: KnowledgeImportItem[], extra: Partial<KnowledgeImportR
 
 export const KNOWLEDGE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
 
-const SECRET_RE = /\b(api[_-]?key|password|secret|credential|authorization|bearer\s+[a-z0-9._+\-/=]+)\b/i;
-const DRIVE_ABS_RE = /(?<![A-Za-z0-9/])[A-Za-z]:[/\\]/;
-const UNC_ABS_RE = /\\\\/;
-const POSIX_ABS_RE = /(?:^|[\s"'`([{,:=])\/[A-Za-z0-9._-]+/;
-
-export function containsAbsolutePath(text: string): boolean {
-  return DRIVE_ABS_RE.test(text) || UNC_ABS_RE.test(text) || POSIX_ABS_RE.test(text);
-}
-
-/** Single secret matcher shared by import and export, so both refuse the same content. */
-export function hasKnowledgeSecret(text: string): boolean {
-  return SECRET_RE.test(text);
-}
-
 function leakedSensitiveReason(...texts: Array<string | undefined>): 'secret-detected' | 'absolute-path' | null {
   for (const text of texts) {
     if (!text) continue;
-    if (SECRET_RE.test(text)) return 'secret-detected';
+    if (hasKnowledgeSecret(text)) return 'secret-detected';
     if (containsAbsolutePath(text)) return 'absolute-path';
   }
   return null;
@@ -433,7 +421,7 @@ export function ingestKnowledge(source: string, options: {
   availableAssetNames?: Iterable<string>;
   availableImagePaths?: Iterable<string>;
 } = {}): KnowledgeImportResult {
-  if (SECRET_RE.test(source)) {
+  if (hasKnowledgeSecret(source)) {
     return quarantineResult('secret-detected');
   }
   if (containsAbsolutePath(source)) {
@@ -474,8 +462,8 @@ export function ingestKnowledge(source: string, options: {
     })]);
   }
   for (const text of collectStrings(doc)) {
-    if (SECRET_RE.test(text) || containsAbsolutePath(text)) {
-      return quarantineResult(SECRET_RE.test(text) ? 'secret-detected' : 'absolute-path');
+    if (hasKnowledgeSecret(text) || containsAbsolutePath(text)) {
+      return quarantineResult(hasKnowledgeSecret(text) ? 'secret-detected' : 'absolute-path');
     }
   }
   const meta = asRecord(doc.meta);
@@ -744,12 +732,7 @@ export async function ingestKnowledgeFromPath(
   const availableImages = new Set(options.availableImagePaths ?? []);
   if (!options.availableAssetNames) {
     for (const name of collectAssets(doc.assets).map((asset) => asset.file)) {
-      try {
-        await io.stat(path.join(siblingDir, name));
-        available.add(name);
-      } catch {
-        // sibling absent
-      }
+      if (await resolvePackageAsset(siblingDir, name)) available.add(name);
     }
   }
   if (!options.availableImagePaths && readString(doc.schema) === KNOWLEDGE_PACKAGE_SCHEMA) {
@@ -760,12 +743,7 @@ export async function ingestKnowledgeFromPath(
         readString(asRecord(raw).caseId),
       );
       for (const image of images) {
-        try {
-          await io.stat(path.join(siblingDir, ...image.relativePath.split('/')));
-          availableImages.add(image.relativePath);
-        } catch {
-          // image absent at package root
-        }
+        if (await resolvePackageAsset(siblingDir, image.relativePath)) availableImages.add(image.relativePath);
       }
     }
   }
@@ -787,24 +765,15 @@ export async function ingestKnowledgeFromPath(
     }
     for (const [sourceName, image] of destBySource) {
       if (!available.has(sourceName)) continue;
-      try {
-        const bytes = await io.readFile(path.join(siblingDir, sourceName));
-        if (bytes.length > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
-        files.set(sourceName, bytes);
-        files.set(image.relativePath, bytes);
-      } catch {
-        // sibling unreadable
-      }
+      const bytes = await readPackageImage(siblingDir, sourceName, KNOWLEDGE_IMAGE_MAX_BYTES);
+      if (!bytes) continue;
+      files.set(sourceName, bytes);
+      files.set(image.relativePath, bytes);
     }
     for (const image of item.record.images) {
       if (files.has(image.relativePath)) continue;
-      try {
-        const bytes = await io.readFile(path.join(siblingDir, ...image.relativePath.split('/')));
-        if (bytes.length > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
-        files.set(image.relativePath, bytes);
-      } catch {
-        // package-relative image absent
-      }
+      const bytes = await readPackageImage(siblingDir, image.relativePath, KNOWLEDGE_IMAGE_MAX_BYTES);
+      if (bytes) files.set(image.relativePath, bytes);
     }
   }
   const stagedImagesByCardId = stageImagesFromMap(result.items, files, path.basename(filePath), doc);

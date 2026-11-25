@@ -99,6 +99,7 @@ const sampleCard = {
   relations: [],
   body: 'Body',
 };
+const cardAt = (spaceId: string, relativePath: string) => ({ ...sampleCard, cardId: `${spaceId}:${relativePath}`, spaceId, relativePath });
 
 describe('knowledge mutation approval boundaries', () => {
   beforeEach(() => {
@@ -136,7 +137,7 @@ describe('knowledge mutation approval boundaries', () => {
     const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
       action: 'knowledge.write',
       spaceId: 'user',
-      relativePath: 'facts/qa.md',
+      card: cardAt('user', 'facts/qa.md'),
     });
     expect(result).toEqual({ error: 'Knowledge mutation was not confirmed by the main-process dialog.' });
   });
@@ -149,7 +150,7 @@ describe('knowledge mutation approval boundaries', () => {
     const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
       action: 'knowledge.write',
       spaceId: 'user',
-      relativePath: 'facts/qa.md',
+      card: cardAt('user', 'facts/qa.md'),
     });
     expect(result).toMatchObject({ token: expect.any(String) });
     expect(showMessageBox).not.toHaveBeenCalled();
@@ -165,7 +166,7 @@ describe('knowledge mutation approval boundaries', () => {
     const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
       action: 'knowledge.write',
       spaceId: 'user',
-      relativePath: 'facts/focused.md',
+      card: cardAt('user', 'facts/focused.md'),
     });
 
     expect(result).toMatchObject({ token: expect.any(String) });
@@ -179,7 +180,7 @@ describe('knowledge mutation approval boundaries', () => {
     const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
       action: 'knowledge.promote',
       spaceId: 'project:a',
-      relativePath: 'facts/desktop.md',
+      card: cardAt('project:a', 'facts/desktop.md'),
     });
     expect(result).toMatchObject({ token: expect.any(String) });
     expect(showMessageBox).toHaveBeenCalledOnce();
@@ -190,7 +191,7 @@ describe('knowledge mutation approval boundaries', () => {
     const issued = await handlers.get('knowledge:issueApprovalToken')!({}, {
       action: 'knowledge.write',
       spaceId: 'project:a',
-      relativePath: 'facts/same.md',
+      card: cardAt('project:a', 'facts/same.md'),
     }) as { token?: string };
     expect(issued.token).toEqual(expect.any(String));
 
@@ -202,6 +203,25 @@ describe('knowledge mutation approval boundaries', () => {
       approvalToken: issued.token,
     })).rejects.toMatchObject({ message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' });
     expect(writeMocks.write).not.toHaveBeenCalled();
+  });
+
+  it('binds a token to the approved card so a different card or a second use is refused', async () => {
+    electronState.focused = {};
+    const approved = cardAt('project:a', 'facts/same.md');
+    const issue = async () => (await handlers.get('knowledge:issueApprovalToken')!({}, {
+      action: 'knowledge.write', spaceId: 'project:a', card: approved,
+    }) as { token: string }).token;
+    const write = (card: typeof approved, approvalToken: string) => handlers.get('knowledge:write')!({}, {
+      spaceId: 'project:a', card, permissionMode: 'full-access',
+      confirmation: { explicitHumanConfirmation: true }, approvalToken,
+    });
+
+    await expect(write({ ...approved, body: 'Swapped after approval' }, await issue()))
+      .rejects.toMatchObject({ message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' });
+    const token = await issue();
+    await write(approved, token);
+    await expect(write(approved, token)).rejects.toMatchObject({ message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' });
+    expect(writeMocks.write).toHaveBeenCalledOnce();
   });
 
   it('imports into the chosen space only after the person confirms in main', async () => {
@@ -251,7 +271,7 @@ it.each([['zh-CN', '确认更改知识', '取消'], ['en', 'Confirm knowledge ch
   electronState.focused = {};
   electronState.language = language;
   vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false });
-  const result = await handlers.get('knowledge:issueApprovalToken')!({}, { action: 'knowledge.write', spaceId: 'user', relativePath: 'facts/language.md' });
+  const result = await handlers.get('knowledge:issueApprovalToken')!({}, { action: 'knowledge.write', spaceId: 'user', card: cardAt('user', 'facts/language.md') });
   expect(result).not.toHaveProperty('token');
   expect(dialog.showMessageBox).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
     title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,

@@ -4,7 +4,6 @@ import path from 'node:path';
 import { missingCaseChapters, serializeKnowledgeCard } from './knowledgeCardSchema';
 import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
 import {
-  KnowledgeApprovalTokenInvalidError,
   KnowledgeAssetsMissingError,
   KnowledgeHumanConfirmationRequiredError,
   KnowledgeLifecycleError,
@@ -24,8 +23,6 @@ export interface KnowledgeWriteInput {
   card: KnowledgeCardRecord;
   permissionMode: AgentPermissionMode;
   confirmation: KnowledgeHumanConfirmation;
-  approvalToken?: string;
-  approvalAlreadyConsumed?: boolean;
   stagedImages?: KnowledgeStagedImage[];
 }
 
@@ -35,7 +32,6 @@ export interface KnowledgePromoteInput {
   to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'retired'>;
   permissionMode: AgentPermissionMode;
   confirmation: KnowledgeHumanConfirmation;
-  approvalToken?: string;
 }
 
 export interface KnowledgeWriteDependencies {
@@ -44,7 +40,6 @@ export interface KnowledgeWriteDependencies {
   mkdir?(dirPath: string): Promise<void>;
   index?: KnowledgeIndexService;
   now(): Date;
-  consumeApprovalToken?(token: string, action: 'knowledge.write' | 'knowledge.promote'): boolean;
 }
 
 function assertHumanConfirmation(
@@ -74,9 +69,6 @@ export class KnowledgeWriteService {
 
   async write(input: KnowledgeWriteInput): Promise<KnowledgeCardRecord> {
     assertHumanConfirmation(input.confirmation, input.permissionMode);
-    if (!input.approvalAlreadyConsumed) {
-      this.consumeToken(input.approvalToken, 'knowledge.write');
-    }
     if (input.card.lifecycle === 'candidate') {
       throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: persist Candidate via KnowledgeCandidateService, not Write.');
     }
@@ -144,7 +136,6 @@ export class KnowledgeWriteService {
 
   async promote(input: KnowledgePromoteInput): Promise<KnowledgeCardRecord> {
     assertHumanConfirmation(input.confirmation, input.permissionMode);
-    this.consumeToken(input.approvalToken, 'knowledge.promote');
     assertFixedIsNotVerified(input.card, input.to);
     const current = input.card.lifecycle;
     if (current === 'draft') {
@@ -167,18 +158,7 @@ export class KnowledgeWriteService {
       card: { ...input.card, lifecycle: input.to },
       permissionMode: input.permissionMode,
       confirmation: input.confirmation,
-      approvalAlreadyConsumed: true,
     });
-  }
-
-  private consumeToken(
-    token: string | undefined,
-    action: 'knowledge.write' | 'knowledge.promote',
-  ): void {
-    if (!this.overrides.consumeApprovalToken) return;
-    if (!token || this.overrides.consumeApprovalToken(token, action) !== true) {
-      throw new KnowledgeApprovalTokenInvalidError();
-    }
   }
 }
 
