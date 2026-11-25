@@ -31,7 +31,7 @@ import { authorizeToolPermission, ToolPermissionDenied } from '../permissions/To
 import { hookEngine } from '../../hooks/HookEngine';
 import { appPathService } from '../../runtime/AppPathService';
 import { countSubagentDispatches, isConcurrencySafeSpec, resourceClaimOf } from '../agent/toolConcurrency';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
 import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
 import { reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
@@ -246,7 +246,7 @@ export class ToolExecutorFactory {
     let sessionAttachmentsRoot: string | null = null;
     if (executorSessionId) {
       try {
-        sessionAttachmentsRoot = storageAdapter.getSessionAttachmentsDir(executorSessionId);
+        sessionAttachmentsRoot = sessionRecordStore.getSessionAttachmentsDir(executorSessionId);
       } catch {
         sessionAttachmentsRoot = null;
       }
@@ -498,8 +498,8 @@ export class ToolExecutorFactory {
       const investigation = sourcePlan?.completionContract === 'investigation-report' && sourcePlan.investigationMission
         ? await prepareInvestigationPlan({ mission: sourcePlan.investigationMission, sessionId,
           projectId: runtimeContext.projectId ?? sourcePlan.projectId, captureScope: args.captureScope,
-          host: { sessionProjectId: id => storageAdapter.sessions.readSession(id)?.projectId ?? null,
-            project: id => storageAdapter.getProjectById(id),
+          host: { sessionProjectId: id => sessionRecordStore.readSessionRecord(id)?.projectId ?? null,
+            project: id => projectWorkspaceStore.getProjectById(id),
             replayState: (owner, projectId) => rdcSessionService.snapshotReplayForSession({ sessionId: owner, projectId }) } })
         : null;
       for (const handoff of handoffOptions) assertDeclaredHandoffForPlan({ sourceAgentId: agentId,

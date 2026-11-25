@@ -7,7 +7,7 @@ import { AgentToolApprovalRequestService } from '../permissions/AgentToolApprova
 
 import { TaskRegistry, type TaskRecord } from '../tasks';
 import { createSessionTaskStore } from '../tasks/sessionTaskStore';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import {
@@ -90,8 +90,8 @@ describe('SubagentRunner', () => {
     process.env.RDC_AGENT_USER_DATA = root;
     try {
       const projectRoot = path.join(root, 'project'); fs.mkdirSync(projectRoot);
-      const project = await storageAdapter.createProject(projectRoot);
-      const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+      const project = await projectWorkspaceStore.createProject(projectRoot);
+      const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
       const registry = new TaskRegistry(createSessionTaskStore(sessionId));
       const task = await registry.createTask('Isolated analysis', {
         completionRequirements: ['analysis'],
@@ -294,11 +294,11 @@ describe('SubagentRunner', () => {
     const originalUserData = process.env.RDC_AGENT_USER_DATA;
     process.env.RDC_AGENT_USER_DATA = root;
     try {
-      await storageAdapter.initializeWorkspace();
+      await projectWorkspaceStore.initializeWorkspace();
       const projectRoot = path.join(root, 'project');
       fs.mkdirSync(projectRoot);
-      const project = await storageAdapter.createProject(projectRoot);
-      const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+      const project = await projectWorkspaceStore.createProject(projectRoot);
+      const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
       const registry = new TaskRegistry(createSessionTaskStore(sessionId));
       const task = await registry.createTask('Timed review');
       const runner = new SubagentRunner({

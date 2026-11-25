@@ -14,13 +14,10 @@ vi.mock('electron', () => ({
     getPath: () => process.env.TEMP ?? process.cwd(),
   },
 }));
-vi.mock('../../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    readSessionShellCwd: (sessionId: string) => cwdBySession.get(sessionId) ?? null,
-    writeSessionShellCwd: (sessionId: string, cwd: string) => {
+vi.mock('../../../sessions/store/sessionStores', () => ({
+  sessionContextStore: { readSessionShellCwd: (sessionId: string) => cwdBySession.get(sessionId) ?? null, writeSessionShellCwd: (sessionId: string, cwd: string) => {
       cwdBySession.set(sessionId, cwd);
-    },
-  },
+    } },
 }));
 import { toolToDefinition } from '../../agent/AgentTool';
 import { toolValidator } from '../../core/ToolValidator';

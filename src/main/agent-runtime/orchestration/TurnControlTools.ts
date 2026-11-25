@@ -10,7 +10,7 @@ import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionSc
 import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../sessions';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { readRdcHostControls } from '../../rdc/RdcHostControls';
 import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { AgentTool, AgentToolSpec } from '../agent/AgentTool';
@@ -114,8 +114,8 @@ export function createRuntimeContextTool(sessionId?: string | null, projectId?: 
         ? executionContext?.captureControl?.restorationBaselineFor(executionContext) : null;
       const captureRestoration = baseline ? { captureRestoration: baseline } : {};
       const ownedProject = sessionId && projectId && !isSubagentScopeId(sessionId)
-        && storageAdapter.sessions.readSession(sessionId)?.projectId === projectId
-        ? storageAdapter.getProjectById(projectId) : null;
+        && sessionRecordStore.readSessionRecord(sessionId)?.projectId === projectId
+        ? projectWorkspaceStore.getProjectById(projectId) : null;
       const state = ownedProject && sessionId && projectId
         ? rdcSessionService.snapshotReplayForSession({ sessionId, projectId }) : null;
       const capturePlanning = ownedProject ? {

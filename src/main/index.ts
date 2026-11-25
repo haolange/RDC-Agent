@@ -16,7 +16,7 @@ import { appPathService } from './runtime/AppPathService';
 
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
-import { storageAdapter } from './sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from './sessions/store/sessionStores';
 import { rdcSessionService } from './sessions';
 import { harvestOwnedRdcDaemons } from './rdc/OwnedRdcDaemonRegistry';
 import { settingsService } from './settings/settings-core/SettingsService';
@@ -460,7 +460,7 @@ app.whenReady().then(async () => {
   }
   settingsInitialized = true;
 
-  await storageAdapter.initializeWorkspace();
+  await projectWorkspaceStore.initializeWorkspace();
   onJsonlTailRepair((repair) => runtimeLogService.log({
     scope: 'app',
     namespace: 'system',
@@ -476,7 +476,7 @@ app.whenReady().then(async () => {
     title: 'App ready',
     summary: 'RDC Agent 主进程已启动。',
     raw: {
-      workspaceRoot: storageAdapter.getWorkspacePath(),
+      workspaceRoot: projectWorkspaceStore.getWorkspacePath(),
     },
   });
 

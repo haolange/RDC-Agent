@@ -13,17 +13,14 @@ const mocks = vi.hoisted(() => ({
   history: vi.fn(),
 }));
 
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    readSession: mocks.readSession,
-    getProjectById: mocks.getProjectById,
-    updateSession: mocks.updateSession,
-    readConversationHistory: mocks.history,
-    executionOffers: {
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: mocks.readSession, updateSession: mocks.updateSession },
+  projectWorkspaceStore: { getProjectById: mocks.getProjectById },
+  conversationHistoryStore: { readConversationHistory: mocks.history },
+  executionOfferStore: {
       write: mocks.offerWrite,
       read: mocks.offerRead,
     },
-  },
 }));
 vi.mock('../sessions/run/PlanReviewStateStore', () => ({
   planReviewStateStore: { read: mocks.planRead },

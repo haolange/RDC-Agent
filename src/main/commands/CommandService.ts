@@ -4,7 +4,7 @@
  * 职责：
  *  - 封装 CommandRegistry.execute()，构建 system message
  *  - 将命令执行结果转换为 ConversationMessage 供渲染层展示
- *  - 协调与 ConversationService、SettingsService、StorageAdapter 的交互
+ *  - 协调与 ConversationService、SettingsService 与会话存储（sessionStores）的交互
  */
 
 import { CommandRegistry } from './CommandRegistry';

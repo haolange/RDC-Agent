@@ -26,7 +26,7 @@ import {
 import { generateShortId } from '@shared/utils/id';
 import { normalizeSha256, sha256Hex } from '../../runtime/contentHash';
 import { StorageIo } from '../store/StorageIo';
-import { storageAdapter } from '../store/StorageAdapter';
+import { sessionRecordStore } from '../store/sessionStores';
 import { renameWithRetrySync } from '../../platform/fileRename';
 import { inspectArtifactJson, readArtifactJsonText, readDefaultToolResultText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';
 import { searchArtifactText, type ArtifactTextSearch } from './SessionArtifactTextSearch';
@@ -120,7 +120,7 @@ export interface SessionArtifactCapacity {
 
 function defaultResolveSessionPath(sessionId: string): string | null {
   try {
-    const session = storageAdapter.readSession(sessionId);
+    const session = sessionRecordStore.readSession(sessionId);
     const sessionPath = session?.sessionPath?.trim();
     return sessionPath || null;
   } catch {

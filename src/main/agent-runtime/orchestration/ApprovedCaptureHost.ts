@@ -8,7 +8,7 @@ import { ownsRdcInteractionLock } from '../../rdc/RdcOperationCoordinator';
 import { selectedProbeDeviceId } from '../../rdc/RdcProbeLifecycle';
 import { replayDeviceService } from '../../rdc/captures/ReplayDeviceService';
 import { rdcSessionService } from '../../sessions';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { approvedInvestigationContract } from '../../sessions/run/approvedInvestigationContract';
 import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
@@ -50,8 +50,8 @@ export function createApprovedCaptureHost(input: {
     if (JSON.stringify(current) !== JSON.stringify(input.contract)) throw new AppError('APPROVED_PLAN_CHANGED', 'capture scope changed after preparation.');
   };
   const project = () => {
-    if (storageAdapter.readSession(input.sessionId)?.projectId !== input.projectId) throw new AppError('RDC_CAPTURE_OWNER_INVALID');
-    const value = storageAdapter.getProjectById(input.projectId);
+    if (sessionRecordStore.readSession(input.sessionId)?.projectId !== input.projectId) throw new AppError('RDC_CAPTURE_OWNER_INVALID');
+    const value = projectWorkspaceStore.getProjectById(input.projectId);
     if (!value) throw new AppError('RDC_CAPTURE_PROJECT_MISSING');
     return value;
   };

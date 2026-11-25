@@ -32,7 +32,7 @@ import {
   agentManifestService,
   compiledRoutesFromDefinitions,
   settingsService,
-  storageAdapter,
+  sessionRecordStore,
   SubagentRunner,
   createBackgroundSubagentService,
   type BackgroundSubagentService,
@@ -245,7 +245,7 @@ export class AgentOrchestrator {
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
       const sessionControls = options?.sessionId
-        ? storageAdapter.readSession(options.sessionId)?.turnControls
+        ? sessionRecordStore.readSession(options.sessionId)?.turnControls
         : undefined;
       const planning = frozenRequestPlan
         ? {

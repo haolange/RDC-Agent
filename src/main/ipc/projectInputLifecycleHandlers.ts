@@ -3,7 +3,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { AppError } from '@shared/errors/appError';
 import { ProjectInputLifecycle } from '../rdc/captures/ProjectInputLifecycle';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { rdcSessionService } from '../sessions';
 import { conversationService } from '../conversation/ConversationService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -14,9 +14,9 @@ import { ProjectInputPrepareRemoveArgsSchema, ProjectInputRemoveArgsSchema } fro
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export const projectInputLifecycle = new ProjectInputLifecycle({
-  getProject: (id) => storageAdapter.getProjectById(id),
-  refresh: (id) => storageAdapter.refreshProjectInputs(id),
-  detachReference: (id, inputId) => storageAdapter.projects.detachProjectInputReference(id, inputId),
+  getProject: (id) => projectWorkspaceStore.getProjectById(id),
+  refresh: (id) => projectWorkspaceStore.refreshProjectInputs(id),
+  detachReference: (id, inputId) => projectWorkspaceStore.detachProjectInputReference(id, inputId),
   bindings: (id) => rdcSessionService.listBindingsForProject(id),
   close: (projectId, inputId) => rdcSessionService.closeMatchingCaptures(projectId, inputId),
   rebind: (projectId, inputId, input) => rdcSessionService.rebindInput(projectId, inputId, input),
@@ -52,8 +52,8 @@ async function confirmRemoval(fileName: string, filePath: string, sessions: stri
 
 /** Installs one reconciliation path for imports, refresh, startup and file changes. */
 export function registerProjectInputLifecycleHandlers(context: WorkbenchIpcContext): void {
-  storageAdapter.projects.setInputReconciler((project, inputs) => projectInputLifecycle.reconcile(project, inputs));
-  storageAdapter.projects.setInputCommitListener((projectId, inputs) => context.broadcastToRenderer('project:inputsChanged', { projectId, inputs }));
+  projectWorkspaceStore.setInputReconciler((project, inputs) => projectInputLifecycle.reconcile(project, inputs));
+  projectWorkspaceStore.setInputCommitListener((projectId, inputs) => context.broadcastToRenderer('project:inputsChanged', { projectId, inputs }));
   ipcMain.handle('project:inputs:prepareRemove', async (_event, ...rawArgs: unknown[]) => {
     try {
       const [projectId, inputId] = parseIpcArgs(ProjectInputPrepareRemoveArgsSchema, rawArgs, { label: 'project:inputs:prepareRemove', maxBytes: 4096 });
@@ -95,14 +95,14 @@ function installProjectInputWatchers(context: WorkbenchIpcContext): void {
     if (pending.has(projectId)) clearTimeout(pending.get(projectId));
     pending.set(projectId, setTimeout(() => {
       pending.delete(projectId);
-      void storageAdapter.refreshProjectInputs(projectId).then(inputs => {
+      void projectWorkspaceStore.refreshProjectInputs(projectId).then(inputs => {
         lastErrors.delete(projectId);
         context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
       }).catch(error => report(projectId, error));
     }, 250));
   };
   const sync = () => {
-    const projects = storageAdapter.listProjects();
+    const projects = projectWorkspaceStore.listProjects();
     for (const [projectId, watcher] of watchers) if (!projects.some(project => project.projectId === projectId)) {
       watcher.close(); watchers.delete(projectId);
     }

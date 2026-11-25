@@ -19,11 +19,9 @@ vi.mock('../runtime/AppPathService', () => ({
   appPathService: { getAppStatePaths: () => ({ appStateRoot: deps.root, attachmentStagingPath: join(deps.root, 'staging') }) },
 }));
 vi.mock('../sessions/artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver: {} }));
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    listSessionAttachments: deps.sessionAttachments,
-    getSessionAttachmentsDir: () => join(deps.root, 'owned'),
-  },
+vi.mock('../sessions/store/sessionStores', () => ({
+  conversationHistoryStore: { listSessionAttachments: deps.sessionAttachments },
+  sessionRecordStore: { getSessionAttachmentsDir: () => join(deps.root, 'owned') },
 }));
 
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9X8AAAAASUVORK5CYII=';

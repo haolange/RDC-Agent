@@ -2,7 +2,7 @@
 import path from 'path';
 import { resolvedPathKey } from '../../platform/paths';
 import { artifactStore } from '../../reports/ArtifactStore';
-import { storageAdapter } from '../store/StorageAdapter';
+import { conversationHistoryStore, sessionRecordStore } from '../store/sessionStores';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 
 export type SessionArtifactSourceKind = 'attachment' | 'output';
@@ -84,10 +84,10 @@ const add = (items: SessionArtifactSource[], seen: Set<string>, item: SessionArt
 export async function listSessionArtifactSources(sessionId: string): Promise<SessionArtifactSource[]> {
   const items: SessionArtifactSource[] = [];
   const seen = new Set<string>();
-  const session = storageAdapter.readSession(sessionId);
+  const session = sessionRecordStore.readSession(sessionId);
   if (!session) return items;
 
-  for (const attachment of storageAdapter.listSessionAttachments(sessionId)) {
+  for (const attachment of conversationHistoryStore.listSessionAttachments(sessionId)) {
     const metadata = fileMetadata(attachment.filePath);
     items.push({
       id: attachment.attachmentId,
@@ -104,7 +104,7 @@ export async function listSessionArtifactSources(sessionId: string): Promise<Ses
     });
   }
 
-  for (const run of storageAdapter.listRuns(sessionId)) {
+  for (const run of sessionRecordStore.listRuns(sessionId)) {
     for (const artifact of artifactStore.list(sessionId, run.runId)) {
       const metadata = fileMetadata(artifact.filePath);
       add(items, seen, {

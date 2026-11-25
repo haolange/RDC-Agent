@@ -19,8 +19,9 @@ vi.mock('../rdc/captures/replay/ReplayHistoryStore', () => ({
 vi.mock('../rdc/captures/replay/ReplayLivePreviewStore', () => ({
   replayLivePreviewStore: { read: mocks.readLive },
 }));
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: { readSession: mocks.readSession, getProjectById: mocks.getProjectById },
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: mocks.readSession },
+  projectWorkspaceStore: { getProjectById: mocks.getProjectById },
 }));
 
 import { registerCaptureReplayReadHandlers } from './captureReplayReadHandlers';

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ offer: vi.fn(), plan: vi.fn(), receipt: vi.fn(), lifecycle: vi.fn() }));
-vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { executionOffers: { read: mock.offer } } }));
+vi.mock('../../sessions/store/sessionStores', () => ({ executionOfferStore: { read: mock.offer } }));
 vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.plan } }));
 vi.mock('../../rdc/RdcExecutionReceipts', () => ({ rdcExecutionReceipts: { read: mock.receipt } }));
 vi.mock('../../rdc/RdcLifecycleReceipts', () => ({ rdcLifecycleReceipts: { read: mock.lifecycle } }));

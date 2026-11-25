@@ -6,7 +6,7 @@ import { BrowserWindow, nativeTheme } from 'electron';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
@@ -53,10 +53,10 @@ let nativeThemeSubscribed = false;
 
 export async function initializeIpcState(): Promise<void> {
   try {
-    state.currentSessionId = storageAdapter.getCurrentSessionId();
-    state.currentProjectId = storageAdapter.getCurrentProjectId();
+    state.currentSessionId = projectWorkspaceStore.getCurrentSessionId();
+    state.currentProjectId = projectWorkspaceStore.getCurrentProjectId();
     state.currentRunId = state.currentSessionId
-      ? storageAdapter.getLatestRun(state.currentSessionId)?.runId || null
+      ? sessionRecordStore.getLatestRun(state.currentSessionId)?.runId || null
       : null;
   } catch (error) {
     console.warn('[IPC] Failed to restore current session id:', error);
@@ -100,7 +100,7 @@ function applyCurrentLlmConfig(): void {
 }
 
 async function appendActionEvent(event: ActionEvent): Promise<void> {
-  await storageAdapter.appendActionEvent(event.session_id, event);
+  await sessionRecordStore.appendActionEvent(event.session_id, event);
   broadcastToRenderer('evidence:eventAdded', event);
 }
 
@@ -123,7 +123,7 @@ async function setRunLifecycleState(
     updatePayload.finishedAt = patch.finishedAt;
   }
 
-  await storageAdapter.updateRun(sessionId, runId, updatePayload);
+  await sessionRecordStore.updateRun(sessionId, runId, updatePayload);
   broadcastRunStatusChanged({
     runId,
     sessionId,
@@ -137,7 +137,7 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
     state.currentProjectId = null;
     state.currentSessionId = null;
     state.currentRunId = null;
-    storageAdapter.setCurrentProjectId(null);
+    projectWorkspaceStore.setCurrentProjectId(null);
     return {
       project: null,
       currentSession: null,
@@ -145,7 +145,7 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
     };
   }
 
-  const project = storageAdapter.getProjectById(projectId);
+  const project = projectWorkspaceStore.getProjectById(projectId);
   if (!project) {
     return {
       project: null,
@@ -156,23 +156,23 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
 
   state.currentProjectId = projectId;
   const selectedSession: SessionRecord | null = state.currentSessionId
-    ? storageAdapter.readSession(state.currentSessionId)
+    ? sessionRecordStore.readSession(state.currentSessionId)
     : null;
   if (!selectedSession || selectedSession.projectId !== projectId) {
     state.currentSessionId = null;
     state.currentRunId = null;
-    storageAdapter.setCurrentSessionId(null);
+    projectWorkspaceStore.setCurrentSessionId(null);
   } else {
     state.currentRunId = selectedSession.lastRunId || state.currentRunId;
   }
-  storageAdapter.setCurrentProjectId(projectId);
+  projectWorkspaceStore.setCurrentProjectId(projectId);
 
   return {
     project,
     currentSession: selectedSession?.projectId === projectId
       ? sessionRevisions.snapshot(selectedSession)
       : null,
-    currentRun: state.currentSessionId ? storageAdapter.getLatestRun(state.currentSessionId) : null,
+    currentRun: state.currentSessionId ? sessionRecordStore.getLatestRun(state.currentSessionId) : null,
   };
 }
 
@@ -194,7 +194,7 @@ function registerToolTraceBridge(): void {
   rdcCliInvokerService.onInvocationTrace((trace) => {
     broadcastToRenderer('tool:executionComplete', trace);
     if (state.currentSessionId && state.currentRunId) {
-      void appendActionEvent(storageAdapter.createActionEvent({
+      void appendActionEvent(sessionRecordStore.createActionEvent({
         runId: state.currentRunId,
         sessionId: state.currentSessionId,
         agentId: trace.runtimeOwner || 'debugger',

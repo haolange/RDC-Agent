@@ -91,45 +91,45 @@ vi.mock('../../runtime/AppPathService', () => {
   };
 });
 
-describe('StorageAdapter session locations', () => {
+describe('session stores: session locations', () => {
   it('finds a session again without the registry, and follows moves, removals and project changes', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore } = await import('./sessionStores');
     const root = (name: string) => { const dir = path.join(tempRoot, name); fs.mkdirSync(dir, { recursive: true }); return dir; };
-    const first = await storageAdapter.createProject(root('location-first'));
-    const second = await storageAdapter.createProject(root('location-second'));
-    const session = storageAdapter.createSession(first.projectId, 'Located');
-    const locate = (sessionId: string) => storageAdapter.sessions.findSessionLocation(sessionId);
+    const first = await projectWorkspaceStore.createProject(root('location-first'));
+    const second = await projectWorkspaceStore.createProject(root('location-second'));
+    const session = sessionRecordStore.createSession(first.projectId, 'Located');
+    const locate = (sessionId: string) => sessionRecordStore.findSessionLocation(sessionId);
 
     expect(locate(session.sessionId)).toMatchObject({ project: { projectId: first.projectId }, sessionPath: session.sessionPath });
-    const registryReads = vi.spyOn(storageAdapter.projects, 'readRegistry');
+    const registryReads = vi.spyOn(projectWorkspaceStore, 'readRegistry');
     try {
       expect(locate(session.sessionId)?.sessionPath).toBe(session.sessionPath);
-      storageAdapter.appendConversationMessage(session.sessionId, {
+      conversationHistoryStore.appendConversationMessage(session.sessionId, {
         id: 'located-user', turnId: 'located-turn', role: 'user', content: 'hi',
         sessionId: session.sessionId, projectId: first.projectId, createdAt: 1,
       });
       expect(registryReads).not.toHaveBeenCalled();
 
       // Moved on disk into the other project's sessions directory.
-      const movedPath = path.join(storageAdapter.projects.getProjectSessionsRoot(second), session.sessionId);
+      const movedPath = path.join(projectWorkspaceStore.getProjectSessionsRoot(second), session.sessionId);
       fs.renameSync(session.sessionPath, movedPath);
       expect(locate(session.sessionId)).toMatchObject({ project: { projectId: second.projectId }, sessionPath: movedPath });
 
-      storageAdapter.renameProject(second.projectId, 'Renamed second');
+      projectWorkspaceStore.renameProject(second.projectId, 'Renamed second');
       expect(locate(session.sessionId)?.project.name).toBe('Renamed second');
 
-      storageAdapter.removeSession(session.sessionId);
+      sessionRecordStore.removeSession(session.sessionId);
       expect(locate(session.sessionId)).toBeNull();
 
-      const removedOnDisk = storageAdapter.createSession(first.projectId, 'Removed on disk');
+      const removedOnDisk = sessionRecordStore.createSession(first.projectId, 'Removed on disk');
       expect(locate(removedOnDisk.sessionId)).not.toBeNull();
       fs.rmSync(removedOnDisk.sessionPath, { recursive: true, force: true });
       expect(locate(removedOnDisk.sessionId)).toBeNull();
 
       // Removing a project keeps its session directories, but its sessions are no longer found.
-      const orphaned = storageAdapter.createSession(first.projectId, 'Orphaned');
+      const orphaned = sessionRecordStore.createSession(first.projectId, 'Orphaned');
       expect(locate(orphaned.sessionId)).not.toBeNull();
-      storageAdapter.removeProject(first.projectId);
+      projectWorkspaceStore.removeProject(first.projectId);
       expect(fs.existsSync(path.join(orphaned.sessionPath, 'session.json'))).toBe(true);
       expect(locate(orphaned.sessionId)).toBeNull();
     } finally {
@@ -138,13 +138,13 @@ describe('StorageAdapter session locations', () => {
   });
 });
 
-describe('StorageAdapter.removeSession side-channel cleanup', () => {
+describe('sessionRecordStore.removeSession side-channel cleanup', () => {
   it('keeps an unsupported session visible without recovering or rewriting it during startup', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'unsupported-startup');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, 'Old session');
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Old session');
     const oldSession = { ...session } as Partial<typeof session>;
     delete oldSession.schemaVersion;
     const original = JSON.stringify(oldSession);
@@ -152,23 +152,23 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     const journal = path.join(session.sessionPath, 'turn-commit.json');
     fs.writeFileSync(file, original);
     fs.writeFileSync(journal, 'Unsupported session journal must remain untouched');
-    await expect(storageAdapter.initializeWorkspace()).resolves.toBeUndefined();
-    expect(storageAdapter.listSessions(project.projectId)).toContainEqual(expect.objectContaining({
+    await expect(projectWorkspaceStore.initializeWorkspace()).resolves.toBeUndefined();
+    expect(sessionRecordStore.listSessions(project.projectId)).toContainEqual(expect.objectContaining({
       sessionId: session.sessionId, storageDiagnostic: 'unsupported-schema',
     }));
-    expect(() => storageAdapter.updateSession(session.sessionId, { title: 'Changed' })).toThrow('STORAGE_SCHEMA_UNSUPPORTED');
+    expect(() => sessionRecordStore.updateSession(session.sessionId, { title: 'Changed' })).toThrow('STORAGE_SCHEMA_UNSUPPORTED');
     expect(fs.readFileSync(file, 'utf8')).toBe(original);
     expect(fs.readFileSync(journal, 'utf8')).toBe('Unsupported session journal must remain untouched');
     fs.rmSync(session.sessionPath, { recursive: true, force: true });
   });
   it('removes tasks, llm-calls, and matching trace run files for the session', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
     const { appPathService } = await import('../../runtime/AppPathService');
     const paths = appPathService.getAppStatePaths();
 
-    const project = await storageAdapter.createProject(path.join(tempRoot, 'project-root'));
-    const session = storageAdapter.createSession(project.projectId, 'Cleanup Session');
-    const run = await storageAdapter.createRun({
+    const project = await projectWorkspaceStore.createProject(path.join(tempRoot, 'project-root'));
+    const session = sessionRecordStore.createSession(project.projectId, 'Cleanup Session');
+    const run = await sessionRecordStore.createRun({
       caseId: session.sessionId,
       sessionId: session.sessionId,
       capturePaths: [],
@@ -209,7 +209,7 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     fs.writeFileSync(eventFile, '', 'utf8');
     fs.writeFileSync(sequenceFile, '1', 'utf8');
 
-    storageAdapter.removeSession(session.sessionId);
+    sessionRecordStore.removeSession(session.sessionId);
 
     expect(fs.existsSync(session.sessionPath)).toBe(false);
     expect(fs.existsSync(taskDir)).toBe(false);
@@ -248,13 +248,13 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
   });
 
   it('keeps a new session invisible until its prepared turn is atomically committed', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'staged-project-root');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
+    const project = await projectWorkspaceStore.createProject(projectRoot);
     const sourcePath = path.join(tempRoot, 'staged-attachment.txt');
     fs.writeFileSync(sourcePath, 'attachment', 'utf8');
-    const staged = storageAdapter.beginStagedConversationSession(
+    const staged = sessionRecordStore.beginStagedConversationSession(
       project.projectId,
       'Prepared turn',
       [sourcePath],
@@ -262,7 +262,7 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
       'turn-staged',
     );
 
-    expect(storageAdapter.listSessions(project.projectId)).toEqual([]);
+    expect(sessionRecordStore.listSessions(project.projectId)).toEqual([]);
     expect(fs.existsSync(staged.finalPath)).toBe(false);
 
     const preparedContext = {
@@ -323,50 +323,50 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
       sessionId: staged.session.sessionId, projectId: project.projectId, role: 'assistant',
       content: '', status: 'streaming', createdAt: 2, preparedContext,
     };
-    storageAdapter.commitStagedConversationSession(staged, [user, assistant], null);
+    sessionRecordStore.commitStagedConversationSession(staged, [user, assistant], null);
 
-    expect(storageAdapter.listSessions(project.projectId)).toHaveLength(1);
-    expect(storageAdapter.readConversationHistory(staged.session.sessionId)).toEqual([
+    expect(sessionRecordStore.listSessions(project.projectId)).toHaveLength(1);
+    expect(conversationHistoryStore.readConversationHistory(staged.session.sessionId)).toEqual([
       { ...user, workTrace: null },
       { ...assistant, workTrace: null },
     ]);
-    expect(storageAdapter.listSessionAttachments(staged.session.sessionId)).toHaveLength(1);
+    expect(conversationHistoryStore.listSessionAttachments(staged.session.sessionId)).toHaveLength(1);
     expect(fs.readFileSync(staged.attachments[0]!.filePath, 'utf8')).toBe('attachment');
   });
 
   it('recovers a prepared existing-session commit without leaving orphan attachments or messages', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'recover-project-root');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, 'Recover turn');
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Recover turn');
     const sourcePath = path.join(tempRoot, 'recover-attachment.txt');
     fs.writeFileSync(sourcePath, 'pending', 'utf8');
 
-    const pending = storageAdapter.beginExistingConversationTurnCommit(
+    const pending = conversationHistoryStore.beginExistingConversationTurnCommit(
       session.sessionId,
       [sourcePath],
       'request-recover',
       'turn-recover',
     );
-    expect(storageAdapter.listSessionAttachments(session.sessionId)).toHaveLength(1);
+    expect(conversationHistoryStore.listSessionAttachments(session.sessionId)).toHaveLength(1);
     expect(fs.existsSync(pending.attachments[0]!.filePath)).toBe(true);
 
-    await storageAdapter.initializeWorkspace();
+    await projectWorkspaceStore.initializeWorkspace();
 
-    expect(storageAdapter.listSessionAttachments(session.sessionId)).toEqual([]);
-    expect(storageAdapter.readConversationHistory(session.sessionId)).toEqual([]);
+    expect(conversationHistoryStore.listSessionAttachments(session.sessionId)).toEqual([]);
+    expect(conversationHistoryStore.readConversationHistory(session.sessionId)).toEqual([]);
     expect(fs.existsSync(pending.attachments[0]!.filePath)).toBe(false);
     expect(fs.existsSync(path.join(session.sessionPath, 'turn-commit.json'))).toBe(false);
   });
 
   it('refuses to change kind, mission, or profileId after createRun', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'immutable-run-root');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, 'Immutable run');
-    const run = await storageAdapter.createRun({
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Immutable run');
+    const run = await sessionRecordStore.createRun({
       caseId: session.sessionId,
       sessionId: session.sessionId,
       capturePaths: [],
@@ -374,13 +374,13 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
       completionContract: 'investigation-report',
       investigationMission: 'debugger',
     });
-    await storageAdapter.updateRun(session.sessionId, run.runId, {
+    await sessionRecordStore.updateRun(session.sessionId, run.runId, {
       kind: 'conversation',
       mission: 'optimizer',
       profileId: 'general',
       status: 'completed',
     });
-    const updated = await storageAdapter.readRun(session.sessionId, run.runId);
+    const updated = await sessionRecordStore.readRun(session.sessionId, run.runId);
     expect(updated?.kind).toBe('mission');
     expect(updated?.profileId).toBe('debugger');
     expect((updated as { mission?: string } | null)?.mission).toBe('debugger');
@@ -388,21 +388,21 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
   });
 
   it('rejects non-empty conversation captures on updateRun', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'conversation-captures-root');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, 'Conversation captures');
-    const run = await storageAdapter.createRun({
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Conversation captures');
+    const run = await sessionRecordStore.createRun({
       caseId: session.sessionId,
       sessionId: session.sessionId,
       capturePaths: [],
       profileId: 'general',
     });
-    await expect(storageAdapter.updateRun(session.sessionId, run.runId, {
+    await expect(sessionRecordStore.updateRun(session.sessionId, run.runId, {
       captures: [{ id: 'cap', filePath: 'a.rdc', role: 'primary', backendHint: 'local', status: 'pending' }],
     })).rejects.toThrow(/CONVERSATION_RUN_CAPTURES_FORBIDDEN/);
-    const persisted = await storageAdapter.readRun(session.sessionId, run.runId);
+    const persisted = await sessionRecordStore.readRun(session.sessionId, run.runId);
     expect(persisted?.captures).toEqual([]);
   });
 });
@@ -459,66 +459,66 @@ function makeTerminalContextEntry(): SessionContextTurnEntry {
   };
 }
 
-describe('StorageAdapter terminal transaction', () => {
+describe('conversationHistoryStore terminal transaction', () => {
   it('keeps compaction progress across short turns after append-only terminal commits', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'terminal-compaction-progress');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, 'Short terminal turns');
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Short terminal turns');
     for (let turn = 0; turn < 6; turn += 1) {
       const base = { sessionId: session.sessionId, projectId: project.projectId, turnId: `turn-${turn}`, requestId: `request-${turn}`, createdAt: turn * 100 };
-      storageAdapter.appendConversationMessage(session.sessionId, { ...base, id: `user-${turn}`, role: 'user', content: 'question' });
+      conversationHistoryStore.appendConversationMessage(session.sessionId, { ...base, id: `user-${turn}`, role: 'user', content: 'question' });
       const assistant: ConversationMessage = { ...base, id: `assistant-${turn}`, role: 'assistant', content: '', status: 'streaming' };
-      storageAdapter.appendConversationMessage(session.sessionId, assistant);
+      conversationHistoryStore.appendConversationMessage(session.sessionId, assistant);
       for (let delta = 1; delta <= 20; delta += 1) {
-        storageAdapter.appendConversationMessage(session.sessionId, { ...assistant, content: `part-${delta}`, updatedAt: base.createdAt + delta });
+        conversationHistoryStore.appendConversationMessage(session.sessionId, { ...assistant, content: `part-${delta}`, updatedAt: base.createdAt + delta });
       }
-      storageAdapter.commitConversationTerminal(session.sessionId, base.requestId, base.turnId,
+      conversationHistoryStore.commitConversationTerminal(session.sessionId, base.requestId, base.turnId,
         { ...assistant, content: 'final', status: 'complete', updatedAt: base.createdAt + 21 },
         { ...makeTerminalContextEntry(), turnId: base.turnId, userMessageId: `user-${turn}`, assistantMessageId: assistant.id });
       // Compaction runs after the event that crossed the threshold, as it does between real streaming events.
       await new Promise((resolve) => setImmediate(resolve));
     }
-    const history = storageAdapter.readConversationHistory(session.sessionId);
+    const history = conversationHistoryStore.readConversationHistory(session.sessionId);
     const raw = fs.readFileSync(path.join(session.sessionPath, 'conversation.jsonl'), 'utf8').trim().split('\n');
     expect(history).toHaveLength(12);
     expect(history.filter((message) => message.role === 'assistant').every((message) => message.content === 'final')).toBe(true);
     expect(raw.length).toBeLessThan(history.length + 24);
-    expect(storageAdapter.readSessionContextJournal(session.sessionId)).toHaveLength(6);
+    expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(6);
   });
 
   it.each(['prepared', 'committing', 'committed'] as const)('recovers bounded %s WAL without replay duplicates', async (phase) => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, `bounded-terminal-${phase}`);
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, phase);
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, phase);
     const assistant: ConversationMessage = {
       id: 'assistant-terminal', requestId: 'request-terminal', turnId: 'turn-terminal',
       sessionId: session.sessionId, projectId: project.projectId, role: 'assistant',
       content: 'partial', status: 'streaming', createdAt: 1, updatedAt: 2,
     };
-    storageAdapter.writeConversationHistory(session.sessionId, [assistant]);
+    conversationHistoryStore.writeConversationHistory(session.sessionId, [assistant]);
     const terminal: ConversationMessage = { ...assistant, content: 'final', status: 'complete', updatedAt: 1 };
     const wal = prepareTerminalAppend(session.sessionPath, 'request-terminal', 'turn-terminal', terminal, makeTerminalContextEntry(), true, true);
     fs.appendFileSync(path.join(session.sessionPath, 'conversation.jsonl'), Buffer.from(wal.history.append).subarray(0, 17));
     fs.writeFileSync(path.join(session.sessionPath, 'terminal-commit.json'), JSON.stringify({ ...wal, phase }));
-    await storageAdapter.initializeWorkspace();
-    await storageAdapter.initializeWorkspace();
-    const history = storageAdapter.readConversationHistory(session.sessionId);
+    await projectWorkspaceStore.initializeWorkspace();
+    await projectWorkspaceStore.initializeWorkspace();
+    const history = conversationHistoryStore.readConversationHistory(session.sessionId);
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({ content: phase === 'prepared' ? 'partial' : 'final', status: phase === 'prepared' ? 'streaming' : 'complete' });
-    expect(storageAdapter.readSessionContextJournal(session.sessionId)).toHaveLength(phase === 'prepared' ? 0 : 1);
+    expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(phase === 'prepared' ? 0 : 1);
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
 
   it('commits the terminal message and context journal as one durable snapshot', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'terminal-commit-project');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, 'Terminal commit');
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Terminal commit');
     const user: ConversationMessage = {
       id: 'user-terminal',
       requestId: 'request-terminal',
@@ -551,9 +551,9 @@ describe('StorageAdapter terminal transaction', () => {
       status: 'complete',
       updatedAt: 3,
     };
-    storageAdapter.writeConversationHistory(session.sessionId, [user, draft]);
+    conversationHistoryStore.writeConversationHistory(session.sessionId, [user, draft]);
 
-    storageAdapter.commitConversationTerminal(
+    conversationHistoryStore.commitConversationTerminal(
       session.sessionId,
       'request-terminal',
       'turn-terminal',
@@ -561,11 +561,11 @@ describe('StorageAdapter terminal transaction', () => {
       makeTerminalContextEntry(),
     );
 
-    expect(storageAdapter.readConversationHistory(session.sessionId)).toMatchObject([
+    expect(conversationHistoryStore.readConversationHistory(session.sessionId)).toMatchObject([
       { id: 'user-terminal', content: 'question' },
       { id: 'assistant-terminal', content: 'final answer', status: 'complete' },
     ]);
-    expect(storageAdapter.readSessionContextJournal(session.sessionId))
+    expect(sessionContextStore.readSessionContextJournal(session.sessionId))
       .toMatchObject([{ turnId: 'turn-terminal', schemaVersion: 2 }]);
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
@@ -574,11 +574,11 @@ describe('StorageAdapter terminal transaction', () => {
     { phase: 'prepared' as const, rollForward: false },
     { phase: 'committing' as const, rollForward: true },
   ])('recovers a $phase terminal transaction without a split state', async ({ phase, rollForward }) => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
     const projectRoot = path.join(tempRoot, `terminal-recovery-${phase}`);
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
-    const session = storageAdapter.createSession(project.projectId, `Terminal recovery ${phase}`);
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, `Terminal recovery ${phase}`);
     const beforeHistory: ConversationMessage[] = [{
       id: 'assistant-terminal',
       requestId: 'request-terminal',
@@ -616,15 +616,15 @@ describe('StorageAdapter terminal transaction', () => {
       'utf8',
     );
 
-    storageAdapter.writeConversationHistory(session.sessionId, afterHistory);
-    storageAdapter.appendSessionContextTurn(session.sessionId, afterContext[0]!);
-    await storageAdapter.initializeWorkspace();
+    conversationHistoryStore.writeConversationHistory(session.sessionId, afterHistory);
+    sessionContextStore.appendSessionContextTurn(session.sessionId, afterContext[0]!);
+    await projectWorkspaceStore.initializeWorkspace();
 
-    expect(storageAdapter.readConversationHistory(session.sessionId)[0]).toMatchObject({
+    expect(conversationHistoryStore.readConversationHistory(session.sessionId)[0]).toMatchObject({
       content: rollForward ? 'final answer' : 'partial',
       status: rollForward ? 'complete' : 'streaming',
     });
-    expect(storageAdapter.readSessionContextJournal(session.sessionId))
+    expect(sessionContextStore.readSessionContextJournal(session.sessionId))
       .toHaveLength(rollForward ? 1 : 0);
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
@@ -632,16 +632,16 @@ describe('StorageAdapter terminal transaction', () => {
 
 describe('session revisions', () => {
   it('numbers every session write in order, broadcasts the written record and pairs reads with the last write', async () => {
-    const { storageAdapter } = await import('./StorageAdapter');
+    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
     const { sessionRevisions } = await import('./SessionRevisionRegistry');
     const projectRoot = path.join(tempRoot, 'revision-root');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await storageAdapter.createProject(projectRoot);
+    const project = await projectWorkspaceStore.createProject(projectRoot);
     const seen: Array<import('@shared/types/session').SessionRecordSnapshot> = [];
     const off = sessionRevisions.subscribe((snapshot) => seen.push(snapshot));
-    const session = storageAdapter.createSession(project.projectId, 'Revisions');
-    storageAdapter.updateSession(session.sessionId, { agentId: 'debugger' });
-    storageAdapter.updateSession(session.sessionId, { agentId: 'analyzer' });
+    const session = sessionRecordStore.createSession(project.projectId, 'Revisions');
+    sessionRecordStore.updateSession(session.sessionId, { agentId: 'debugger' });
+    sessionRecordStore.updateSession(session.sessionId, { agentId: 'analyzer' });
     off();
 
     const own = seen.filter((snapshot) => snapshot.record.sessionId === session.sessionId);
@@ -649,7 +649,7 @@ describe('session revisions', () => {
     expect(new Set(own.map((snapshot) => snapshot.revision.epoch)).size).toBe(1);
     expect(own[1]!.revision.n).toBeGreaterThan(own[0]!.revision.n);
     expect(own[2]!.revision.n).toBeGreaterThan(own[1]!.revision.n);
-    expect(storageAdapter.readSessionSnapshot(session.sessionId)).toMatchObject({
+    expect(sessionRecordStore.readSessionSnapshot(session.sessionId)).toMatchObject({
       record: { agentId: 'analyzer' }, revision: own[2]!.revision,
     });
   });

@@ -1,13 +1,13 @@
 import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
 import { resolveVisibleConversationMessages } from '../../conversation/ConversationBranchResolver';
 import { assertDeclaredHandoffForPlan } from '../../conversation/applyDeclaredHandoff';
-import { storageAdapter } from '../store/StorageAdapter';
+import { conversationHistoryStore, executionOfferStore, projectWorkspaceStore, sessionRecordStore } from '../store/sessionStores';
 import { readReferencedPlan } from './sessionPlanReference';
 import type { PlanReviewStateDocument, RecoverableApprovedHandoff } from '@shared/types/planReview';
 
 /** An accepted user request after approval may already have consumed the intended action. */
 export function hasRequestAfterApproval(sessionId: string, approval: PlanReviewStateDocument): boolean {
-  return storageAdapter.readConversationHistory(sessionId).some(message =>
+  return conversationHistoryStore.readConversationHistory(sessionId).some(message =>
     message.role === 'user' && message.createdAt >= approval.updatedAt);
 }
 
@@ -15,13 +15,13 @@ export function hasRequestAfterApproval(sessionId: string, approval: PlanReviewS
 export function resolveApprovedHandoff(sessionId: string, approval: PlanReviewStateDocument | null): RecoverableApprovedHandoff | null {
   if (!approval || approval.status !== 'approved' || !approval.ownerTurnId || !approval.approvedHash
     || !approval.frozenUri || !approval.approvedHandoff || hasRequestAfterApproval(sessionId, approval)) return null;
-  const offer = storageAdapter.executionOffers.read(sessionId);
+  const offer = executionOfferStore.read(sessionId);
   if (!offer || offer.plan.hash !== approval.approvedHash || offer.plan.uri !== approval.frozenUri
     || offer.approvedAt !== approval.updatedAt || offer.targetAgentId !== approval.approvedHandoff.agent
     || offer.label !== approval.approvedHandoff.label) return null;
 
-  const history = storageAdapter.readConversationHistory(sessionId);
-  const visible = resolveVisibleConversationMessages(history, storageAdapter.readConversationBranchState(sessionId));
+  const history = conversationHistoryStore.readConversationHistory(sessionId);
+  const visible = resolveVisibleConversationMessages(history, conversationHistoryStore.readConversationBranchState(sessionId));
   const ownerReview = visible.filter(message => message.turnId === approval.ownerTurnId && message.agentId === offer.sourceAgentId)
     .flatMap(message => (message.workTrace?.blocks ?? []).flatMap(block => block.toolCalls))
     .find(call => call.toolName === 'plan_artifact' && call.planReview?.planId === approval.planId
@@ -30,9 +30,9 @@ export function resolveApprovedHandoff(sessionId: string, approval: PlanReviewSt
   const source = readReferencedPlan({ sessionId, planId: approval.planId, revision: approval.revision,
     uri: approval.frozenUri, expectedHash: approval.approvedHash });
   if (source.ownerSessionId !== sessionId || source.turnId !== approval.ownerTurnId || source.agentId !== offer.sourceAgentId) return null;
-  const session = storageAdapter.readSession(sessionId);
+  const session = sessionRecordStore.readSession(sessionId);
   if (!session) return null;
-  const projectRoot = storageAdapter.getProjectById(session.projectId)?.rootPath ?? null;
+  const projectRoot = projectWorkspaceStore.getProjectById(session.projectId)?.rootPath ?? null;
   const declared = assertDeclaredHandoffForPlan({ sourceAgentId: offer.sourceAgentId, projectRoot,
     handoff: { agent: offer.targetAgentId, label: offer.label }, tasks: parsePlanTaskRequirements(source.markdown) });
   const same = (left: readonly string[], right: readonly string[]) => JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());

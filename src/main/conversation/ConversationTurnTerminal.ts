@@ -1,5 +1,5 @@
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore } from '../sessions/store/sessionStores';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { traceService } from '../agent-trace/TraceService';
 import { normalizeBranchId } from './ConversationBranchResolver';
@@ -13,7 +13,7 @@ export function persistConversationSnapshot(
       return null;
     }
     try {
-      storageAdapter.appendConversationMessage(sessionId, message);
+      conversationHistoryStore.appendConversationMessage(sessionId, message);
       return null;
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error));
@@ -33,7 +33,7 @@ export function assertTerminalContextOwnership(
     assistantMessageId: string,
     branchId: string,
   ): void {
-    const history = storageAdapter.readConversationHistory(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
     const user = history.find((message) => message.id === userMessageId);
     const assistant = history.find((message) => message.id === assistantMessageId);
     const normalizedBranchId = normalizeBranchId(branchId);
@@ -50,7 +50,7 @@ export function assertTerminalContextOwnership(
       throw new Error(`Conversation message ownership changed before context journal append for turn ${turnId}.`);
     }
     if (normalizedBranchId === ROOT_BRANCH_ID) return;
-    const branchState = storageAdapter.readConversationBranchState(sessionId);
+    const branchState = conversationHistoryStore.readConversationBranchState(sessionId);
     const concreteBranch = branchState?.forks
       .flatMap((fork) => fork.branches)
       .find((branch) => branch.branchId === normalizedBranchId);

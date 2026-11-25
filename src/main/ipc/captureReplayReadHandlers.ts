@@ -2,13 +2,13 @@ import { ipcMain } from 'electron';
 import { AppError } from '@shared/errors/appError';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
 import { replayLivePreviewStore } from '../rdc/captures/replay/ReplayLivePreviewStore';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { SessionScopeArgsSchema } from './validation/captureDeviceSchemas';
 import type { SessionScope } from '@shared/types/session';
 function authorize(scope: SessionScope) {
-  const session = storageAdapter.readSession(scope.sessionId);
-  const project = storageAdapter.getProjectById(scope.projectId);
+  const session = sessionRecordStore.readSession(scope.sessionId);
+  const project = projectWorkspaceStore.getProjectById(scope.projectId);
   if (!session || session.projectId !== scope.projectId || !project) throw new AppError('REPLAY_SCOPE_DENIED');
   return project.rootPath;
 }

@@ -23,10 +23,8 @@ vi.mock('../../runtime/resolveConfiguredShell', () => ({
   }),
 }));
 
-vi.mock('../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    readSessionShellCwd: () => null,
-  },
+vi.mock('../../sessions/store/sessionStores', () => ({
+  sessionContextStore: { readSessionShellCwd: () => null },
 }));
 
 vi.mock('../../settings/settings-core/SettingsService', () => ({

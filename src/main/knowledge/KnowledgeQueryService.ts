@@ -4,7 +4,7 @@ import path from 'node:path';
 import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, type KnowledgeCardDetail, type KnowledgeCardSummary, type KnowledgeSpace, type KnowledgeTopicDocument, type KnowledgeTopic } from '@shared/types/knowledge';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import {
   extractPreview,
@@ -44,7 +44,7 @@ function defaultDependencies(): KnowledgeQueryDependencies {
         label: 'User',
         rootPath: appPathService.getUserRdcPaths().knowledgePath,
       }];
-      for (const project of storageAdapter.listProjects()) {
+      for (const project of projectWorkspaceStore.listProjects()) {
         spaces.push({
           spaceId: `project:${project.projectId}`,
           kind: 'project',

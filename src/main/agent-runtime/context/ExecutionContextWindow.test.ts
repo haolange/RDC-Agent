@@ -5,7 +5,7 @@ import path from 'path';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ hook: vi.fn(), save: vi.fn(), verify: vi.fn(), state: vi.fn(), generate: vi.fn(), assemble: vi.fn(), message: vi.fn(), write: vi.fn(), read: vi.fn(), list: vi.fn(), resolve: vi.fn(), journal: vi.fn(), archive: vi.fn(), project: vi.fn() }));
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: mocks.hook }));
-vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSession: () => ({ projectId: 'project' }), readSessionContextJournal: mocks.journal } }));
+vi.mock('../../sessions/store/sessionStores', () => ({ sessionRecordStore: { readSession: () => ({ projectId: 'project' }) }, sessionContextStore: { readSessionContextJournal: mocks.journal } }));
 vi.mock('../../settings/settings-core/projectRegistryLookup', () => ({ lookupProjectById: () => ({ rootPath: 'project-root' }) }));
 vi.mock('../../sessions/store/CompactionAuthoritySource', () => ({ saveCompactionAuthoritySource: mocks.save, verifyCompactionAuthoritySource: mocks.verify, readCompactionAuthorityState: mocks.state, readCompactionAuthorityJournal: mocks.archive, projectCompactionJournalMessages: mocks.project }));
 vi.mock('./CompactionHandoffService', () => ({ generateCompactionSections: mocks.generate }));

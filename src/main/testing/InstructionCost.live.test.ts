@@ -8,7 +8,7 @@ import { parseAgentMarkdownStrict } from '../settings/agent-manifests/agentManif
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
 vi.mock('../runtime/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Text-only comparison'); } }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSessionShellCwd: () => null } }));
+vi.mock('../sessions/store/sessionStores', () => ({ sessionContextStore: { readSessionShellCwd: () => null } }));
 
 const output = process.env.RDC_AGENT_LIVE_COST_OUTPUT;
 const enabled = process.env.RDC_AGENT_LIVE_COST_REQUESTS === '2' && !!output && !!process.env.DEEPSEEK_API_KEY;

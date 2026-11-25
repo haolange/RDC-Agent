@@ -6,25 +6,25 @@ import { readCurrentStoredJson, StorageSchemaError } from '../store/storageSchem
 import { PersistedRunRecordV3Schema } from './runV3/runRecordSchema';
 import type { RunSummary } from '@shared/types/session';
 import type { PersistedRunRecord } from '../store/storageTypes';
-import type { StorageHost } from '../store/storageHost';
+import type { StorageIo } from '../store/StorageIo';
 
 export function toRunSummary(run: PersistedRunRecord): RunSummary {
   const { createdAt: _createdAt, updatedAt: _updatedAt, runtime: _runtime, ...summary } = run;
   return summary;
 }
 
-export function writeRunFiles(host: StorageHost, runPath: string, run: PersistedRunRecord): void {
+export function writeRunFiles(io: StorageIo, runPath: string, run: PersistedRunRecord): void {
   const parsed = PersistedRunRecordV3Schema.safeParse(run);
   if (!parsed.success) {
     throw new AppError('STORAGE_SCHEMA', `refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
   }
-  host.io.ensureDir(runPath);
-  host.io.writeUtf8Atomic(path.join(runPath, 'run.json'), `${JSON.stringify(parsed.data, null, 2)}\n`);
-  host.io.writeUtf8Atomic(path.join(runPath, 'run.yaml'), stringifyYaml(parsed.data));
+  io.ensureDir(runPath);
+  io.writeUtf8Atomic(path.join(runPath, 'run.json'), `${JSON.stringify(parsed.data, null, 2)}\n`);
+  io.writeUtf8Atomic(path.join(runPath, 'run.yaml'), stringifyYaml(parsed.data));
 }
 
 export function readPersistedRun(
-  host: StorageHost,
+  io: StorageIo,
   runPath: string,
   sessionId: string,
   runId: string,
@@ -36,7 +36,7 @@ export function readPersistedRun(
     }
     return null;
   }
-  const parsed = readCurrentStoredJson(host.io, filePath, '3', PersistedRunRecordV3Schema);
+  const parsed = readCurrentStoredJson(io, filePath, '3', PersistedRunRecordV3Schema);
   if (parsed === null) return null;
   if (parsed.runId !== runId || parsed.sessionId !== sessionId || parsed.caseId !== sessionId) {
     throw new StorageSchemaError('STORAGE_SCHEMA', `${filePath} Run identity does not match its session or directory`);

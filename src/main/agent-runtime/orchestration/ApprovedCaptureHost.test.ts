@@ -12,7 +12,7 @@ const mock = vi.hoisted(() => ({ state: vi.fn(), opened: vi.fn(), open: vi.fn(),
   entries: vi.fn(), readRecord: vi.fn(), assertOffer: vi.fn(), readPlan: vi.fn(), parsePlan: vi.fn() }));
 vi.mock('../../sessions', () => ({ rdcSessionService: { snapshotReplayForSession: mock.state, snapshotOpenedCaptureForSession: mock.opened,
   openProjectInput: mock.open, clearOpenedCaptureForSession: mock.close, restoreAgentPosition: mock.restore, prepareAgentDevice: mock.prepareDevice } }));
-vi.mock('../../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSession: mock.session, getProjectById: mock.project } }));
+vi.mock('../../sessions/store/sessionStores', () => ({ sessionRecordStore: { readSession: mock.session }, projectWorkspaceStore: { getProjectById: mock.project } }));
 vi.mock('../../sessions/run/prepareInvestigationPlan', () => ({ verifyPlanInput: mock.verifyInput }));
 vi.mock('../../sessions/run/handoffSkills', () => ({ assertApprovedExecutionCurrent: mock.assertOffer }));
 vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.readPlan } }));

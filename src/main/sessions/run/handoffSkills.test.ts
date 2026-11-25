@@ -8,11 +8,9 @@ const mocks = vi.hoisted(() => ({
   journalRead: vi.fn(),
 }));
 
-vi.mock('../store/StorageAdapter', () => ({
-  storageAdapter: {
-    executionOffers: { read: mocks.offerRead },
-    readSessionContextJournal: mocks.journalRead,
-  },
+vi.mock('../store/sessionStores', () => ({
+  executionOfferStore: { read: mocks.offerRead },
+  sessionContextStore: { readSessionContextJournal: mocks.journalRead },
 }));
 vi.mock('./PlanReviewStateStore', () => ({
   planReviewStateStore: { read: mocks.planRead },

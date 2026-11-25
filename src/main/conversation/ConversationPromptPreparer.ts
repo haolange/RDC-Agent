@@ -5,7 +5,7 @@ import { delegableProfileIds } from '../agent-runtime/orchestration/delegablePro
 import { appPathService } from '../runtime/AppPathService';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { resolveAgentToolAllowlistFromDefinition } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { buildTurnPromptPlan } from '../agent-runtime/orchestration/TurnPromptPlan';
 import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
@@ -30,7 +30,7 @@ export interface PrepareConversationPromptInput {
 
 export function prepareConversationPrompt(input: PrepareConversationPromptInput): PreparedConversationPrompt {
   const projectRootPath = input.context.projectId
-    ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
+    ? projectWorkspaceStore.getProjectById(input.context.projectId)?.rootPath ?? null
     : null;
   const effectiveProfiles = agentManifestService.getEffectiveProfiles(
     appPathService.getRuntimePaths(),
@@ -66,8 +66,8 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   const sessionId = input.context.session?.sessionId ?? null;
   let visibleTurnIds: string[] = [];
   if (sessionId) {
-    const history = storageAdapter.readConversationHistory(sessionId);
-    const currentBranchState = storageAdapter.readConversationBranchState(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
+    const currentBranchState = conversationHistoryStore.readConversationBranchState(sessionId);
     const { branchState } = repairConversationBranchState(history, currentBranchState);
     visibleTurnIds = Array.from(new Set(
       resolveVisibleConversationMessages(history, branchState)

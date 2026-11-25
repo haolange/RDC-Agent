@@ -2,7 +2,7 @@ import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore'
 import { TaskRegistry } from '../agent-runtime/tasks/TaskRegistry';
 import { rdcSessionService } from '../sessions';
 import { listSessionArtifactSources } from '../sessions/artifacts/SessionArtifactSource';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { runtimePermissionStateService } from '../agent-runtime/permissions/RuntimePermissionStateService';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { mapRightRailInvestigationArtifacts } from './rightRailInvestigationArtifacts';
@@ -41,18 +41,18 @@ export class RightRailProjectionService {
     events: ActionEvent[];
     profileId?: string;
   }): Promise<RightPanelViewModel> {
-    const session = storageAdapter.readSession(input.sessionId);
+    const session = sessionRecordStore.readSession(input.sessionId);
     if (!session) return emptyRightPanel(input.sessionId);
 
     const taskRegistry = new TaskRegistry(createSessionTaskStore(input.sessionId));
     const [sources, taskSnapshot, conversations, promptSegments, artifacts] = await Promise.all([
       listSessionArtifactSources(input.sessionId),
       taskRegistry.reconcileInterruptedExecutions().then(() => taskRegistry.readConsistentSnapshot()),
-      Promise.resolve(storageAdapter.readConversationHistory(input.sessionId)),
+      Promise.resolve(conversationHistoryStore.readConversationHistory(input.sessionId)),
       Promise.resolve().then(() => requestSnapshotStore.listPromptSegments(input.sessionId)).catch(() => []),
       Promise.resolve().then(() => mapRightRailInvestigationArtifacts(input.sessionId)),
     ]);
-    const project = storageAdapter.getProjectById(session.projectId);
+    const project = projectWorkspaceStore.getProjectById(session.projectId);
     const openedCapture = rdcSessionService.snapshotOpenedCaptureForSession({
       projectId: session.projectId,
       sessionId: input.sessionId,

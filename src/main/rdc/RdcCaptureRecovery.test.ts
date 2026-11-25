@@ -7,7 +7,7 @@ const mock = vi.hoisted(() => ({ pending: vi.fn(), write: vi.fn(), session: vi.f
 vi.mock('../sessions', () => ({ rdcSessionService: { snapshotReplayForSession: mock.snapshot, snapshotOpenedCaptureForSession: mock.opened,
   recoveryBinding: mock.binding, getDeviceOwner: mock.deviceOwner, clearOpenedCaptureForSession: mock.clear,
   prepareAgentDevice: mock.prepare, openProjectInput: mock.open, restoreAgentPosition: mock.restore } }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSession: mock.session, getProjectById: mock.project } }));
+vi.mock('../sessions/store/sessionStores', () => ({ sessionRecordStore: { readSession: mock.session }, projectWorkspaceStore: { getProjectById: mock.project } }));
 vi.mock('../sessions/run/prepareInvestigationPlan', () => ({ verifyPlanInput: mock.verify }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: cli } } }) } }));
 vi.mock('./withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));

@@ -3,13 +3,13 @@ import { resolveFaviconDataUrl } from '../media/FaviconResolveService';
 import { RemoteImageProvenance } from '../media/RemoteImageProvenance';
 import { fetchRemoteImage, type RemoteImageResult } from '../media/RemoteImageService';
 import { auditArgumentsHash, auditLog } from '../runtime/AuditLog';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore } from '../sessions/store/sessionStores';
 import { requireActiveSessionOwner } from './sessionOwnerGate';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { WebFetchImageArgsSchema, WebResolveFaviconArgsSchema } from './validation/webSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
-const remoteImageProvenance = new RemoteImageProvenance((sessionId) => storageAdapter.readConversationHistory(sessionId));
+const remoteImageProvenance = new RemoteImageProvenance((sessionId) => conversationHistoryStore.readConversationHistory(sessionId));
 
 export function registerWebHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;

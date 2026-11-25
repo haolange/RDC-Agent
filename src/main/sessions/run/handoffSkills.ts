@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../store/StorageAdapter';
+import { executionOfferStore, sessionContextStore } from '../store/sessionStores';
 import { planReviewStateStore } from './PlanReviewStateStore';
 import { executionOfferMatches } from './ExecutionOfferStore';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
@@ -16,7 +16,7 @@ export function approvedExecutionOfferForAgent(
   agentId: string,
 ): ExecutionOffer | null {
   if (!sessionId) return null;
-  const offer = storageAdapter.executionOffers.read(sessionId);
+  const offer = executionOfferStore.read(sessionId);
   const approved = planReviewStateStore.read(sessionId);
   if (!approved || approved.status !== 'approved'
     || !approved.approvedHash || !approved.frozenUri
@@ -28,7 +28,7 @@ export function approvedExecutionOfferForAgent(
   })) {
     return null;
   }
-  const completions = storageAdapter.readSessionContextJournal(sessionId, entry => entry.approvedExecutionCompletion !== undefined);
+  const completions = sessionContextStore.readSessionContextJournal(sessionId, entry => entry.approvedExecutionCompletion !== undefined);
   for (const entry of completions) {
     const receipt = completionReceiptSchema.parse(entry.approvedExecutionCompletion);
     if (entry.status === 'complete' && receipt.offerId === offer.offerId

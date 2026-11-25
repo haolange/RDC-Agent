@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { z, type ZodType } from 'zod';
 import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../sessions/store/sessionStores';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../runtime/atomicFile';
 import { safeDelegationText as safeText } from './DelegationTraceText';
@@ -105,7 +105,7 @@ function identity(header: Pick<DelegationTraceHeader, 'childSessionId' | 'execut
 }
 const preview = delegationTextPreview;
 function location(sessionId: string, callId: string): string | null {
-  const session = storageAdapter.readSession(sessionId);
+  const session = sessionRecordStore.readSession(sessionId);
   if (!session) return null;
   return path.join(session.sessionPath, 'delegations', `${createHash('sha256').update(callId).digest('hex')}.jsonl`);
 }

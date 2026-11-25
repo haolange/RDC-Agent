@@ -27,7 +27,6 @@ import {
   type StorageMigration,
 } from './storageSchema';
 import { StorageIo } from './StorageIo';
-import type { StorageHost } from './storageHost';
 
 describe('storageSchema parseStoredDocument', () => {
   const current = z.object({
@@ -479,7 +478,7 @@ describe('storage schema store quartet', () => {
       corrupt: { runId: 1 },
       missingOrLegacy: legalRun,
       higher: { ...legalRun, schemaVersion: '99' },
-      read: (filePath: string) => readPersistedRun({ io } as StorageHost, path.dirname(filePath), 'sess_1', 'run_1'),
+      read: (filePath: string) => readPersistedRun(io, path.dirname(filePath), 'sess_1', 'run_1'),
     },
     {
       name: 'settings',
@@ -570,7 +569,7 @@ describe('storage schema store quartet', () => {
     const yamlPath = path.join(runPath, 'run.yaml');
     const original = stringifyYaml({ schema_version: '3', run_id: 'run_1' });
     fs.writeFileSync(yamlPath, original, 'utf8');
-    expect(() => readPersistedRun({ io } as StorageHost, runPath, 'sess_1', 'run_1'))
+    expect(() => readPersistedRun(io, runPath, 'sess_1', 'run_1'))
       .toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
     expect(fs.readFileSync(yamlPath, 'utf8')).toBe(original);
   });

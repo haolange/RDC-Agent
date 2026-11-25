@@ -13,7 +13,7 @@ vi.mock('electron', () => ({ ipcMain: { handle: (channel: string, listener: (...
 vi.mock('../media/RemoteImageService', () => ({ fetchRemoteImage: mocks.fetchRemoteImage }));
 vi.mock('../media/FaviconResolveService', () => ({ resolveFaviconDataUrl: vi.fn() }));
 vi.mock('../runtime/AuditLog', () => ({ auditLog: { record: mocks.audit }, auditArgumentsHash: () => 'sha256:url' }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { readConversationHistory: () => mocks.history } }));
+vi.mock('../sessions/store/sessionStores', () => ({ conversationHistoryStore: { readConversationHistory: () => mocks.history } }));
 
 const fetchImage = (request: unknown) => mocks.handlers.get('web:fetchImage')!({}, request);
 

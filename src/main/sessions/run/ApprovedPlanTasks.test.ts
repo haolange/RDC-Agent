@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { renderPlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 
 const mocks = vi.hoisted(() => ({ readOffer: vi.fn(), readMarkdown: vi.fn() }));
-vi.mock('../store/StorageAdapter', () => ({ storageAdapter: { executionOffers: { read: mocks.readOffer } } }));
+vi.mock('../store/sessionStores', () => ({ executionOfferStore: { read: mocks.readOffer } }));
 vi.mock('./sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mocks.readMarkdown } }));
 import { readApprovedPlanTasks } from './ApprovedPlanTasks';
 

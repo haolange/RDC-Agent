@@ -10,7 +10,7 @@ import { executeRdcShell } from '../../../rdc/executeRdcShell';
 import { processSupervisor } from '../../../runtime/ProcessSupervisor';
 import { shellResolver, type ShellKind } from '../../../runtime/ShellResolver';
 import { describeResolvedShell, resolveConfiguredShell } from '../../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../../sessions/store/StorageAdapter';
+import { sessionContextStore } from '../../../sessions/store/sessionStores';
 import {
   SHELL_DEFAULT_TIMEOUT_MS,
   SHELL_MAX_OUTPUT_BYTES,
@@ -58,7 +58,7 @@ function withSessionShellLock<T>(sessionId: string | null, work: () => Promise<T
 
 function resolvePersistedCwd(sessionId: string | null, projectRoot: string): string {
   if (!sessionId) return projectRoot;
-  const persisted = storageAdapter.readSessionShellCwd(sessionId);
+  const persisted = sessionContextStore.readSessionShellCwd(sessionId);
   if (!persisted) return projectRoot;
   if (!isPathInsideRoot(persisted, projectRoot)) {
     persistCwd(sessionId, projectRoot);
@@ -70,7 +70,7 @@ function resolvePersistedCwd(sessionId: string | null, projectRoot: string): str
 function persistCwd(sessionId: string | null, cwd: string): void {
   if (!sessionId) return;
   try {
-    storageAdapter.writeSessionShellCwd(sessionId, cwd);
+    sessionContextStore.writeSessionShellCwd(sessionId, cwd);
   } catch {
     /* session may have been removed mid-turn */
   }

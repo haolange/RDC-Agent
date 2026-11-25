@@ -27,9 +27,31 @@ import type {
   ProjectRecord,
   RunSummary,
   SessionRecord,
+  SessionRecordSnapshot,
 } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
 import type { ReservedStagedConversationSession, StagedConversationSessionCommit } from './storageCommitTypes';
+import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
+import type { ConversationHistoryStore } from './ConversationHistoryStore';
+import type { ExecutionOfferStore } from '../run/ExecutionOfferStore';
+import type { StorageIo } from './StorageIo';
+
+/** What session records need from storage: file I/O and the project registry that places them. */
+export interface SessionRecordHost {
+  io: StorageIo;
+  projects: Pick<
+    ProjectWorkspaceStore,
+    | 'getProjectById' | 'listProjects' | 'ensureProjectSessionsRoot' | 'touchProject' | 'readSelection'
+    | 'writeSelection' | 'getCurrentProjectId' | 'setCurrentProjectId' | 'setCurrentSessionId'
+  >;
+}
+
+export interface SessionRecordLinks {
+  /** Copies a staged session's turn attachments. */
+  attachments: Pick<ConversationHistoryStore, 'copyAttachmentsForTurn'>;
+  /** Reading a session discards the state file of the removed handoff flow. */
+  removedHandoffState: Pick<ExecutionOfferStore, 'discardRemovedHandoffState'>;
+}
 
 
 const SAFE_RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -46,7 +68,14 @@ export class SessionRecordStore {
   /** The project each session was last found under; see `findSessionLocation`. */
   private readonly sessionProjects = new Map<string, ProjectRecord>();
 
-  constructor(private readonly host: import('./storageHost').StorageHost) {}
+  private links!: SessionRecordLinks;
+
+  constructor(private readonly host: SessionRecordHost) {}
+
+  /** Wired once by the storage composition root (`sessionStores.ts`): the stores reference each other. */
+  connect(links: SessionRecordLinks): void {
+    this.links = links;
+  }
 
   removeSession(sessionId: string): void {
     const location = this.findSessionLocation(sessionId);
@@ -216,7 +245,7 @@ export class SessionRecordStore {
           options.plannedAttachments,
           path.join(stagingPath, 'attachments'),
         )
-        : this.host.history.copyAttachmentsForTurn(
+        : this.links.attachments.copyAttachmentsForTurn(
           session,
           sourceAttachmentPaths,
           path.join(stagingPath, 'attachments'),
@@ -272,7 +301,20 @@ export class SessionRecordStore {
     if (fs.existsSync(commit.stagingPath)) fs.rmSync(commit.stagingPath, { recursive: true, force: true });
   }
 
+  /** Reads a session for a caller that opens it: the removed handoff flow's state file is discarded first. */
   readSession(sessionId: string): SessionRecord | null {
+    const session = this.readSessionRecord(sessionId);
+    if (session) this.links.removedHandoffState.discardRemovedHandoffState(sessionId);
+    return session;
+  }
+
+  readSessionSnapshot(sessionId: string): SessionRecordSnapshot | null {
+    const session = this.readSession(sessionId);
+    return session ? sessionRevisions.snapshot(session) : null;
+  }
+
+  /** The stored session record, as the other stores read it. */
+  readSessionRecord(sessionId: string): SessionRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
     const sessions = reconcileProjectSessionTitles(this.host, location.project, (session, sessionPath) => (
@@ -361,7 +403,7 @@ export class SessionRecordStore {
     }
 
     if (input.caseId) {
-      const existingSession = this.readSession(input.caseId);
+      const existingSession = this.readSessionRecord(input.caseId);
       if (existingSession) {
         return existingSession.sessionId;
       }
@@ -376,7 +418,7 @@ export class SessionRecordStore {
   }
 
   async readCase(caseId: string): Promise<Record<string, unknown> | null> {
-    const session = this.readSession(caseId);
+    const session = this.readSessionRecord(caseId);
     if (!session) return null;
 
     return {
@@ -421,7 +463,7 @@ export class SessionRecordStore {
     status?: PersistedRunRecord['status'];
   }): Promise<{ runId: string; sessionId: string }> {
     const sessionId = input.sessionId || input.caseId;
-    const session = this.readSession(sessionId);
+    const session = this.readSessionRecord(sessionId);
     if (!session) {
       throw new Error(`Session not found: ${sessionId}`);
     }
@@ -474,7 +516,7 @@ export class SessionRecordStore {
       },
     });
 
-    persistRunFiles(this.host, runPath, persistedRun);
+    persistRunFiles(this.host.io, runPath, persistedRun);
 
     this.updateSession(sessionId, {
       goal: persistedRun.goal,
@@ -550,7 +592,7 @@ export class SessionRecordStore {
     assertNoRunV3StageFields(merged as unknown as Record<string, unknown>, 'merged run');
     merged.updatedAt = nowMs();
 
-    persistRunFiles(this.host, this.getRunPath(merged.sessionId, merged.runId), merged);
+    persistRunFiles(this.host.io, this.getRunPath(merged.sessionId, merged.runId), merged);
     this.updateSession(caseId, {
       lastRunId: runId,
     });
@@ -621,7 +663,7 @@ export class SessionRecordStore {
   }
 
   writeRunFiles(run: PersistedRunRecord): void {
-    persistRunFiles(this.host, this.getRunPath(run.sessionId, run.runId), run);
+    persistRunFiles(this.host.io, this.getRunPath(run.sessionId, run.runId), run);
   }
 
   /**
@@ -665,7 +707,7 @@ export class SessionRecordStore {
   readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    return loadPersistedRun(this.host, this.getRunPath(sessionId, runId), sessionId, runId);
+    return loadPersistedRun(this.host.io, this.getRunPath(sessionId, runId), sessionId, runId);
   }
 
   private normalizeSessionTitle(projectId: string, title?: string): string {

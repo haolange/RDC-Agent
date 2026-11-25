@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { resolveDelegatedArtifactRead } from '../sessions/artifacts/DelegatedArtifactAccess';
 import { grantDelegatedArtifactAccess } from '../sessions/artifacts/DelegatedArtifactAccess';
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {} }));
+vi.mock('../sessions/store/sessionStores', () => ({}));
 vi.mock('../conversation/SessionContextJournal', () => ({ sessionContextJournal: {} }));
 import { materializeRecordedRdcRequest } from './RecordedRdcRequest';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';

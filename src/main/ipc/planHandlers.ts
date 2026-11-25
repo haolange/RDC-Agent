@@ -6,7 +6,7 @@ import { nativeMessage } from '../window/nativeI18n';
 import { confirmInMainProcess } from '../window/mainConfirmation';
 import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
 import { assertPlanWritePath, composeProjectPlan, writePlanFile } from '../sessions/run/planFilePersistence';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../sessions/store/sessionStores';
 import { appPathService } from '../runtime/AppPathService';
 import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
@@ -29,13 +29,13 @@ async function confirmPlanMutation(action: 'plan.saveToProject' | 'plan.export',
 
 
 function requireCurrentSession(context: WorkbenchIpcContext, sessionId: string): void {
-  if (context.state.currentSessionId !== sessionId || !storageAdapter.sessions.findSessionLocation(sessionId)) {
+  if (context.state.currentSessionId !== sessionId || !sessionRecordStore.findSessionLocation(sessionId)) {
     throw new AppError('PLAN_SESSION_DENIED', 'plan actions require the current session.');
   }
 }
 
 function projectTarget(sessionId: string): string {
-  const location = storageAdapter.sessions.findSessionLocation(sessionId);
+  const location = sessionRecordStore.findSessionLocation(sessionId);
   if (!location) throw new AppError('PLAN_SESSION_NOT_FOUND');
   return path.join(appPathService.getProjectRdcPaths(location.project.rootPath).plansPath, sessionId, 'plan.md');
 }

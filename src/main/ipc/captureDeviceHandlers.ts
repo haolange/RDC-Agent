@@ -4,7 +4,7 @@ import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRef
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { rdcSessionService } from '../sessions';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { replayDeviceIssue } from '../rdc/captures/ReplayDeviceIssue';
 import { captureRecoveryStatus, restorePreviousCapture } from '../rdc/RdcCaptureRecovery';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -39,7 +39,7 @@ interface CaptureChannelContext {
 export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): void {
   registerCaptureReplayReadHandlers();
   const authorizeReplayScope = (scope: SessionScope) => {
-    if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new AppError('REPLAY_SCOPE_DENIED');
+    if (sessionRecordStore.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new AppError('REPLAY_SCOPE_DENIED');
   };
   const lastReplayHint = new Map<string, { phase: string; contextId: string | null; imageEventId: number | null }>();
   rdcSessionService.subscribe(state => {
@@ -127,11 +127,11 @@ function captureChannels({ context, authorizeReplayScope, broadcastContext, broa
           label: 'capture:openProjectInput',
           maxBytes: 16 * 1024,
         }) as [Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number }];
-        const session = storageAdapter.readSession(request.sessionId);
+        const session = sessionRecordStore.readSession(request.sessionId);
         if (!session || session.projectId !== request.projectId) {
           return { success: false, error: 'Session does not belong to the requested project.' };
         }
-        const input = (await storageAdapter.listProjectInputs(request.projectId))
+        const input = (await projectWorkspaceStore.listProjectInputs(request.projectId))
           .find((entry) => entry.inputId === request!.inputId && entry.filePath === request!.filePath);
         if (!input) return { success: false, error: `Project input not found: ${request.inputId}` };
 

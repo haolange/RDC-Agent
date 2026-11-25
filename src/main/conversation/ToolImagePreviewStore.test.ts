@@ -7,8 +7,8 @@ const { readSession } = vi.hoisted(() => ({
   readSession: vi.fn(),
 }));
 
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: { readSession },
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession },
 }));
 
 import { readToolImagePreviewDataUrl, recordToolImagePreview } from './ToolImagePreviewStore';

@@ -6,7 +6,7 @@ import {
 } from '@shared/types/planReview';
 import { generateShortId, nowMs } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../store/StorageAdapter';
+import { executionOfferStore, sessionRecordStore, storageIo } from '../store/sessionStores';
 import type { StorageIo } from '../store/StorageIo';
 
 const planReviewStateSchema = z.object({
@@ -38,7 +38,7 @@ export interface BeginPlanRevisionResult {
 }
 
 export class PlanReviewStateStore {
-  constructor(private readonly host: PlanReviewStateHost = storageAdapter) {}
+  constructor(private readonly host: PlanReviewStateHost) {}
 
   getStatePath(sessionId: string): string | null {
     const location = this.host.sessions.findSessionLocation(sessionId);
@@ -65,7 +65,7 @@ export class PlanReviewStateStore {
       updatedAt: nowMs(),
     };
     this.write(sessionId, next);
-    storageAdapter.executionOffers.clear(sessionId);
+    executionOfferStore.clear(sessionId);
     return { planId: next.planId, revision: next.revision, newCycle };
   }
 
@@ -74,7 +74,7 @@ export class PlanReviewStateStore {
     if (!current || current.ownerTurnId !== ownerTurnId || current.planId !== planId
       || current.revision !== revision || current.status !== 'awaiting') return false;
     this.write(sessionId, { ...current, status: 'cancelled', updatedAt: nowMs() });
-    storageAdapter.executionOffers.clear(sessionId);
+    executionOfferStore.clear(sessionId);
     return true;
   }
 
@@ -101,7 +101,7 @@ export class PlanReviewStateStore {
   markRejected(sessionId: string, owner: { turnId: string; planId: string; revision: number }): PlanReviewStateDocument {
     const next: PlanReviewStateDocument = { ...this.assertAwaiting(sessionId, owner), status: 'rejected', updatedAt: nowMs() };
     this.write(sessionId, next);
-    storageAdapter.executionOffers.clear(sessionId);
+    executionOfferStore.clear(sessionId);
     return next;
   }
 
@@ -119,4 +119,8 @@ export class PlanReviewStateStore {
   }
 }
 
-export const planReviewStateStore = new PlanReviewStateStore();
+/** The host resolves on use, so the store always reads through the shared session stores. */
+export const planReviewStateStore = new PlanReviewStateStore({
+  get io() { return storageIo; },
+  get sessions() { return sessionRecordStore; },
+});

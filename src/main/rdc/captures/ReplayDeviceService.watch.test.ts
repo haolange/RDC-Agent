@@ -12,10 +12,8 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService
 vi.mock('../RdcCliInvokerService', () => ({ rdcCliInvokerService: { loadCatalog: vi.fn(async () => ({})) } }));
 vi.mock('../withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
 
-vi.mock('../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    getWorkspacePath: () => '/tmp/rdc-agent-test-workspace',
-  },
+vi.mock('../../sessions/store/sessionStores', () => ({
+  projectWorkspaceStore: { getWorkspacePath: () => '/tmp/rdc-agent-test-workspace' },
 }));
 
 vi.mock('../../browserAppBridge/rendererEventHub', () => ({

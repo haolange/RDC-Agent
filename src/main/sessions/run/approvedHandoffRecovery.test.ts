@@ -8,11 +8,12 @@ const f = vi.hoisted(() => ({ history: [] as ConversationMessage[], offer: null 
   source: { ownerSessionId: 's', turnId: 'turn', agentId: 'debugger', markdown: '# Plan' },
   declaration: { agent: 'general', label: 'Execute', prompt: 'Execute the plan.', send: true,
     requiredSkillIds: ['method'], requiredToolIds: ['read'] } }));
-vi.mock('../store/StorageAdapter', () => ({ storageAdapter: {
-  readConversationHistory: () => f.history, readConversationBranchState: () => null,
-  readSession: () => ({ sessionId: 's', projectId: 'p' }), getProjectById: () => ({ rootPath: '/p' }),
-  executionOffers: { read: () => f.offer },
-} }));
+vi.mock('../store/sessionStores', () => ({
+  conversationHistoryStore: { readConversationHistory: () => f.history, readConversationBranchState: () => null },
+  sessionRecordStore: { readSession: () => ({ sessionId: 's', projectId: 'p' }) },
+  projectWorkspaceStore: { getProjectById: () => ({ rootPath: '/p' }) },
+  executionOfferStore: { read: () => f.offer },
+}));
 vi.mock('./sessionPlanReference', () => ({ readReferencedPlan: () => f.source }));
 vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: () => f.declaration }));
 

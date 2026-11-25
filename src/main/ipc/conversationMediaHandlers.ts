@@ -6,7 +6,7 @@ import { accessOwnedAttachment, type OwnedAttachment } from '../conversation/Con
 import { layerFromPersistedKind } from '../conversation/attachmentClassify';
 import { resolveConversationMedia } from '../conversation/ConversationMediaResolver';
 import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { appPathService } from '../runtime/AppPathService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { ConversationAccessAttachmentArgsSchema, ConversationResolveMediaArgsSchema } from './validation/conversationSchemas';
@@ -29,12 +29,12 @@ export function registerConversationMediaHandlers({ state }: WorkbenchIpcContext
     try {
       if (owner.scope === 'session') {
         if (owner.sessionId !== state.currentSessionId) return { kind: 'error', code: 'denied' };
-        const record = storageAdapter.listSessionAttachments(owner.sessionId)
+        const record = conversationHistoryStore.listSessionAttachments(owner.sessionId)
           .find((item) => item.attachmentId === owner.attachmentId && item.sessionId === owner.sessionId);
         if (record) attachment = {
           ...record,
           layer: record.layer ?? layerFromPersistedKind(record.kind, record.mimeType, record.fileName),
-          root: storageAdapter.getSessionAttachmentsDir(owner.sessionId),
+          root: sessionRecordStore.getSessionAttachmentsDir(owner.sessionId),
         };
       } else {
         attachment = attachmentStagingService.getOwnedAttachment(owner.stagingId, owner.composerScopeKey);
@@ -58,12 +58,12 @@ export function registerConversationMediaHandlers({ state }: WorkbenchIpcContext
     if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
       return { dataUrl: null, error: 'MEDIA_SCOPE_DENIED' };
     }
-    const location = storageAdapter.sessions.findSessionLocation(request.sessionId);
+    const location = sessionRecordStore.findSessionLocation(request.sessionId);
     return resolveConversationMedia(request.src, {
       resolveArtifact: (uri) => sessionArtifactResolver.resolve(request.sessionId, uri).absolutePath,
       projectRoot: location?.project.rootPath ?? null,
-      attachmentsRoot: storageAdapter.getSessionAttachmentsDir(request.sessionId),
-      attachments: storageAdapter.listSessionAttachments(request.sessionId),
+      attachmentsRoot: sessionRecordStore.getSessionAttachmentsDir(request.sessionId),
+      attachments: conversationHistoryStore.listSessionAttachments(request.sessionId),
     });
   });
 }

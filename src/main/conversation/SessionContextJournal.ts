@@ -4,7 +4,7 @@ import {
   type ContinuationReplayReason,
 } from '../agent-runtime/reasoning/ContinuationReplayPolicy';
 import { providerStateReuseReason } from '../agent-runtime/reasoning/ProviderStateRefs';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, sessionContextStore } from '../sessions/store/sessionStores';
 import { INTERRUPTED_CONVERSATION_SUMMARY } from './DelegatedInteractionRecovery';
 import { normalizeBranchId } from './ConversationBranchResolver';
 import type { AgentRole } from '@shared/types/agent';
@@ -168,7 +168,7 @@ export class SessionContextJournal {
   }
 
   private recoverInterruptedMessages(sessionId: string, missingTurnIds: string[]): Map<string, Message[]> {
-    const history = storageAdapter.readConversationHistory(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
     const recovered = new Map<string, Message[]>();
     for (const turnId of missingTurnIds) {
       const pair = history.filter(message => message.turnId === turnId && message.sessionId === sessionId);
@@ -207,12 +207,12 @@ export class SessionContextJournal {
       }
       return;
     }
-    storageAdapter.appendSessionContextTurn(sessionId, canonicalEntry);
+    sessionContextStore.appendSessionContextTurn(sessionId, canonicalEntry);
   }
 
   readEntries(sessionId: string, turnIds?: readonly string[]): SessionContextTurnEntry[] {
     const selected = turnIds ? new Set(turnIds) : null;
-    return storageAdapter.readSessionContextJournal(sessionId, (entry) => !selected || selected.has(entry.turnId));
+    return sessionContextStore.readSessionContextJournal(sessionId, (entry) => !selected || selected.has(entry.turnId));
   }
 }
 

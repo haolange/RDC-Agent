@@ -4,7 +4,7 @@ import { nowMs } from '@shared/utils/id';
 import { assertDeclaredHandoffForPlan, declaredExecutionOffer, declaredHandoffSuggestion } from '../../conversation/applyDeclaredHandoff';
 import { assertSessionModelAndControls } from '../../conversation/sessionModelGate';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { executionOfferStore, projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
 import type { PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import type { PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
@@ -76,9 +76,9 @@ export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps:
     throw new AppError('SESSION_REVISION_STALE', 'the session record changed after the approval was chosen.');
   }
   deps.store.assertAwaiting(sessionId, owner);
-  const session = storageAdapter.readSession(sessionId);
+  const session = sessionRecordStore.readSession(sessionId);
   if (!session) throw new AppError('PLAN_SESSION_NOT_FOUND', sessionId);
-  const projectRoot = storageAdapter.getProjectById(session.projectId)?.rootPath ?? null;
+  const projectRoot = projectWorkspaceStore.getProjectById(session.projectId)?.rootPath ?? null;
   const staged = deps.writer.stageFrozenPlan(sessionId, input.expectedPlanHash);
   const declared = assertDeclaredHandoffForPlan({
     sourceAgentId: input.sourceAgentId, projectRoot, handoff: input.handoff, tasks: staged.taskRequirements,
@@ -108,7 +108,7 @@ export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps:
     approvedHandoff: { ...input.handoff },
     updatedAt: approvedAt,
   };
-  const previousOffer = storageAdapter.executionOffers.read(sessionId);
+  const previousOffer = executionOfferStore.read(sessionId);
   const sameApproval = previousOffer?.plan.uri === staged.uri && previousOffer.plan.hash === staged.hash
     && previousOffer.sourceAgentId === input.sourceAgentId && previousOffer.targetAgentId === declared.agent;
   const offer = declaredExecutionOffer({
@@ -126,12 +126,12 @@ export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps:
     undo.push(() => deps.writer.discardFrozenPlan(sessionId, staged.uri));
     deps.store.replace(sessionId, planState);
     undo.push(() => deps.store.replace(sessionId, previousState));
-    storageAdapter.executionOffers.write(sessionId, offer);
+    executionOfferStore.write(sessionId, offer);
     undo.push(() => (previousOffer
-      ? storageAdapter.executionOffers.write(sessionId, previousOffer)
-      : storageAdapter.executionOffers.clear(sessionId)));
+      ? executionOfferStore.write(sessionId, previousOffer)
+      : executionOfferStore.clear(sessionId)));
     // The last step: an atomic write that either lands whole or leaves session.json as it was.
-    const updated = storageAdapter.updateSession(sessionId, {
+    const updated = sessionRecordStore.updateSession(sessionId, {
       agentId: declared.agent, modelOverride: { ...input.model }, turnControls: { ...input.controls },
     });
     if (!updated) throw new AppError('PLAN_SESSION_NOT_FOUND', sessionId);

@@ -5,7 +5,7 @@
  * pool reconnects on demand, so there is no manual connect or disconnect here; servers are managed in Settings.
  */
 import { agentOrchestrator } from '../../agent-runtime/orchestration/AgentOrchestrator';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from '../../sessions/store/sessionStores';
 import type { CommandDefinition } from '@shared/types/command';
 
 export const mcpCommand: CommandDefinition = {
@@ -22,7 +22,7 @@ export const mcpCommand: CommandDefinition = {
     if (action !== 'list') {
       return { success: false, message: 'Usage: /mcp [list | settings]. Servers connect when an agent turn needs them.' };
     }
-    const projectRoot = ctx.projectId ? storageAdapter.getProjectById(ctx.projectId)?.rootPath ?? null : null;
+    const projectRoot = ctx.projectId ? projectWorkspaceStore.getProjectById(ctx.projectId)?.rootPath ?? null : null;
     const servers = agentOrchestrator.getMcpServerStatusSummary(projectRoot);
     if (servers.length === 0) {
       return { success: true, message: 'No MCP servers are configured.', data: { servers } };

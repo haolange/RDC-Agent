@@ -21,7 +21,7 @@ vi.mock('../window/trustConfirmation', () => ({ confirmResourceTrust: mocks.conf
 vi.mock('../window/nativeI18n', () => ({ nativeMessage: (key: string, params?: { value?: string }) => `${key}=${params?.value ?? ''}` }));
 vi.mock('../hooks/HookEngine', () => ({ hookEngine: { load: vi.fn(() => []), list: vi.fn(() => []) } }));
 vi.mock('../agent-runtime/prompt', () => ({ requestSnapshotStore: {} }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { listProjects: () => [{ rootPath: projectRoot }] } }));
+vi.mock('../sessions/store/sessionStores', () => ({ projectWorkspaceStore: { listProjects: () => [{ rootPath: projectRoot }] } }));
 vi.mock('../settings/agent-manifests/AgentRuntimeConfigService', () => ({ agentRuntimeConfigService: { listMcpServers: mocks.listMcpServers } }));
 vi.mock('../runtime/ScopedRuntimeService', () => ({
   SCOPED_IMPORT_EXTENSIONS: { hook: ['yml', 'yaml'] },

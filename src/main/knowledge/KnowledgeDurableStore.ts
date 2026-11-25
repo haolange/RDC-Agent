@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../sessions/store/sessionStores';
 import { StorageIo } from '../sessions/store/StorageIo';
 import { assertNoUnsupportedSchemaVersion } from '../sessions/store/storageSchema';
 import { withDirectoryFileLock } from '../sessions/store/directoryFileLock';
@@ -50,7 +50,7 @@ export function createSessionScopedKnowledgeStore(rootPath: string): KnowledgeDu
 }
 
 function defaultSessionStatePath(sessionId: string): string {
-  const location = storageAdapter.sessions.findSessionLocation(sessionId);
+  const location = sessionRecordStore.findSessionLocation(sessionId);
   if (!location) {
     throw new AppError('KNOWLEDGE_SESSION_UNKNOWN', `no durable session path for ${sessionId}.`);
   }

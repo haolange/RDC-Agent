@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('electron', () => ({ ipcMain: { handle: (id: string, fn: (...args: unknown[]) => Promise<any>) => mocks.handlers.set(id, fn) },
   BrowserWindow: { getFocusedWindow: () => ({}) }, dialog: { showSaveDialog: mocks.saveDialog, showMessageBox: mocks.confirm } }));
 vi.mock('../sessions/run/sessionPlanReference', () => ({ readReferencedPlan: mocks.read }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { sessions: { findSessionLocation: mocks.location }, get io() { return new StorageIo(); } } }));
+vi.mock('../sessions/store/sessionStores', () => ({ sessionRecordStore: { findSessionLocation: mocks.location }, get storageIo() { return new StorageIo(); } }));
 vi.mock('../runtime/AppPathService', () => ({ appPathService: { getProjectRdcPaths: mocks.paths } }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../conversation/ConversationService', () => ({ conversationService: {

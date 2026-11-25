@@ -3,10 +3,17 @@ import * as path from 'path';
 import { errorCodeOf } from '@shared/errors/appError';
 import { SessionRecordSchema } from './storageSchema';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { StorageHost } from './storageHost';
+import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
+import type { StorageIo } from './StorageIo';
+
+/** The session files of a project: where its sessions live and how they are read and rewritten. */
+export interface ProjectSessionFiles {
+  io: StorageIo;
+  projects: Pick<ProjectWorkspaceStore, 'ensureProjectSessionsRoot'>;
+}
 
 export function readProjectSessions(
-  host: StorageHost,
+  host: ProjectSessionFiles,
   project: ProjectRecord,
 ): Array<{ session: SessionRecord; sessionPath: string }> {
   const sessionsRoot = host.projects.ensureProjectSessionsRoot(project);
@@ -41,7 +48,7 @@ export function readProjectSessions(
 }
 
 export function reconcileProjectSessionTitles(
-  host: StorageHost,
+  host: ProjectSessionFiles,
   project: ProjectRecord,
   normalizeSessionRecord: (session: SessionRecord, sessionPath?: string) => SessionRecord,
   onRewritten: (session: SessionRecord) => void,

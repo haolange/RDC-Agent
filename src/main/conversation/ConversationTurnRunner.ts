@@ -7,7 +7,7 @@ import { agentPlanReviewRequestService } from '../agent-runtime/interactions/Age
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { diagnosticText } from './diagnosticText';
 import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
@@ -109,7 +109,7 @@ export async function completeProfileTurn(
   const planning = input.planning;
   const turnControls = planning.controls;
   if (sessionId && turnControls) {
-    storageAdapter.updateSession(sessionId, { turnControls });
+    sessionRecordStore.updateSession(sessionId, { turnControls });
   }
 
   let streamScheduler: ConversationStreamPatchScheduler | null = null;
@@ -592,7 +592,7 @@ export async function completeProfileTurn(
               },
             } : {}),
         });
-        storageAdapter.commitConversationTerminal(
+        conversationHistoryStore.commitConversationTerminal(
           sessionId,
           input.requestId,
           assistantMessage.turnId,
@@ -637,7 +637,7 @@ export async function completeProfileTurn(
           ? 'failed'
           : 'completed';
       try {
-        await storageAdapter.updateRun(sessionId, ownedRun.runId, {
+        await sessionRecordStore.updateRun(sessionId, ownedRun.runId, {
           status: terminalRunStatus,
           finishedAt: nowMs(),
         });

@@ -16,8 +16,8 @@ vi.mock('electron', () => ({
 vi.mock('../investigation/InvestigationArtifactService', () => ({
   investigationArtifactService: { readRecord },
 }));
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: { readSession },
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession },
 }));
 vi.mock('../agent-trace/rightRailInvestigationArtifacts', () => ({ listInvestigationArtifacts: vi.fn(() => ({ rows: [], totalCount: 0, storeDegraded: false })) }));
 

@@ -8,15 +8,15 @@ import type { ConversationPlanReview, PlanReviewStateDocument } from '@shared/ty
 
 const fixture = vi.hoisted(() => ({ state: null as PlanReviewStateDocument | null, history: [] as ConversationMessage[],
   content: 'A verified plan', failWrite: false, freeze: vi.fn(), offer: vi.fn(), readOffer: vi.fn(), session: vi.fn() }));
-vi.mock('../store/StorageAdapter', () => ({ storageAdapter: {
-  sessions: { findSessionLocation: () => ({ sessionPath: '/session' }) },
-  io: { readJson: () => fixture.state, writeJsonAtomic: (_path: string, state: PlanReviewStateDocument) => {
+vi.mock('../store/sessionStores', () => ({
+  sessionRecordStore: { findSessionLocation: () => ({ sessionPath: '/session' }), readSession: () => ({ sessionId: 'session', projectId: 'project' }), updateSession: (_id: string, patch: object) => { fixture.session(patch); return { sessionId: 'session', projectId: 'project', ...patch }; } },
+  storageIo: { readJson: () => fixture.state, writeJsonAtomic: (_path: string, state: PlanReviewStateDocument) => {
     if (fixture.failWrite) throw new Error('disk failed'); fixture.state = structuredClone(state);
-  } }, readConversationHistory: () => fixture.history, readConversationBranchState: () => null,
-  readSession: () => ({ sessionId: 'session', projectId: 'project' }), getProjectById: () => ({ rootPath: '/project' }),
-  updateSession: (_id: string, patch: object) => { fixture.session(patch); return { sessionId: 'session', projectId: 'project', ...patch }; },
-  executionOffers: { clear: vi.fn(), read: fixture.readOffer, write: fixture.offer },
-} }));
+  } },
+  conversationHistoryStore: { readConversationHistory: () => fixture.history, readConversationBranchState: () => null },
+  projectWorkspaceStore: { getProjectById: () => ({ rootPath: '/project' }) },
+  executionOfferStore: { clear: vi.fn(), read: fixture.readOffer, write: fixture.offer },
+}));
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: async () => true }));
 vi.mock('../../conversation/sessionModelGate', () => ({ assertSessionModelAndControls: async () => undefined }));
 vi.mock('./sessionPlanArtifact', () => ({ planArtifactWriter: {

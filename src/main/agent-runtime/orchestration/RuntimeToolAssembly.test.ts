@@ -33,7 +33,7 @@ vi.mock('../../sessions', () => ({ rdcSessionService: {
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../sessions';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { toolValidator } from '../core/ToolValidator';
 import { toolToDefinition } from '../agent/AgentTool';
@@ -509,8 +509,8 @@ describe('RuntimeToolAssembly', () => {
   });
 
   it('shows the owning planner registered capture identities and selected device without paths', async () => {
-    const session = vi.spyOn(storageAdapter.sessions, 'readSession').mockReturnValue({ projectId: 'proj-1' } as never);
-    const project = vi.spyOn(storageAdapter, 'getProjectById').mockReturnValue({ inputs: [{ inputId: 'capture-1', fileName: 'one.rdc',
+    const session = vi.spyOn(sessionRecordStore, 'readSessionRecord').mockReturnValue({ projectId: 'proj-1' } as never);
+    const project = vi.spyOn(projectWorkspaceStore, 'getProjectById').mockReturnValue({ inputs: [{ inputId: 'capture-1', fileName: 'one.rdc',
       filePath: 'D:/private/one.rdc', source: 'external_reference', contentSha256: 'a'.repeat(64) }] } as never);
     vi.mocked(rdcSessionService.snapshotReplayForSession).mockReturnValueOnce({ replayDeviceId: null,
       preparation: { targetDeviceId: 'android-1', phase: 'ready', issue: null } } as never);

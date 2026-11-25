@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../sessions/store/sessionStores';
 import {
   assertSafeImageAttachment,
   detectImageMagicMime,
@@ -28,7 +28,7 @@ function previewRoot(sessionPath: string): string {
 }
 
 function resolveSessionPath(sessionId: string): string {
-  const session = storageAdapter.readSession(sessionId);
+  const session = sessionRecordStore.readSession(sessionId);
   const sessionPath = session?.sessionPath?.trim();
   if (!sessionPath) {
     throw new AppError('IMAGE_PREVIEW_SESSION_NOT_FOUND', sessionId);

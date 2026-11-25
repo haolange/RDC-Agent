@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { stringify } from 'yaml';
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../store/StorageAdapter';
+import { storageIo } from '../store/sessionStores';
 import type { ProjectPlanFrontmatter } from '@shared/types/planReview';
 import type { StorageIo } from '../store/StorageIo';
 
@@ -29,7 +29,7 @@ export function composeProjectPlan(markdown: string, fields: ProjectPlanFrontmat
   return '---\n' + stringify(fields) + '---\n\n' + markdown;
 }
 
-export function writePlanFile(targetPath: string, document: string, io: StorageIo = storageAdapter.io): void {
+export function writePlanFile(targetPath: string, document: string, io: StorageIo = storageIo): void {
   const target = assertPlanWritePath(targetPath);
   const original = fs.existsSync(target) ? fs.readFileSync(target) : null;
   io.writeUtf8Atomic(target, document);

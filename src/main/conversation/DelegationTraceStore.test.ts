@@ -6,9 +6,9 @@ import { delegationTraceStore } from './DelegationTraceStore';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const fixture = vi.hoisted(() => ({ root: '', publish: vi.fn() }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {
-  readSession: (id: string) => id === 'owner' ? { sessionPath: fixture.root } : null,
-} }));
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: (id: string) => id === 'owner' ? { sessionPath: fixture.root } : null },
+}));
 vi.mock('../agent-runtime/orchestration/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: { publish: fixture.publish } }));
 
 afterEach(() => {

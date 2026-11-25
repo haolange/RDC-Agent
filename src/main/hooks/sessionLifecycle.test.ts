@@ -18,13 +18,9 @@ const {
   clearReplayHistory: vi.fn(async () => undefined),
 }));
 
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    getProjectById,
-    createSession,
-    readSession,
-    removeSession,
-  },
+vi.mock('../sessions/store/sessionStores', () => ({
+  projectWorkspaceStore: { getProjectById },
+  sessionRecordStore: { createSession, readSession, removeSession },
 }));
 
 vi.mock('./runtimeHookDispatch', () => ({

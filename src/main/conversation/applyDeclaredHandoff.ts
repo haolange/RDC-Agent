@@ -4,7 +4,7 @@ import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
 import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
 import { dispatchRuntimeHooks } from '../hooks/runtimeHookDispatch';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, executionOfferStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { assertDeclaredHandoffSkillCompatibility } from '../sessions/run/handoffSkillCompatibility';
@@ -88,14 +88,14 @@ export function assertDeclaredHandoffForPlan(input: {
 }
 
 export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Promise<ApplyDeclaredHandoffResult> {
-  const session = storageAdapter.readSession(input.sessionId);
+  const session = sessionRecordStore.readSession(input.sessionId);
   if (!session) return { success: false, error: `Session not found: ${input.sessionId}` };
-  const projectRoot = storageAdapter.getProjectById(session.projectId)?.rootPath ?? null;
+  const projectRoot = projectWorkspaceStore.getProjectById(session.projectId)?.rootPath ?? null;
   const target = resolveEnabledAgentDefinition(input.agent, projectRoot);
   if (!target) {
     return { success: false, error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${input.agent}\` is not enabled.` };
   }
-  const offer = storageAdapter.executionOffers.read(input.sessionId);
+  const offer = executionOfferStore.read(input.sessionId);
   const sourceAgentId = findDeclaredHandoff(session.agentId ?? '', projectRoot, input.agent, input.label)
     ? (session.agentId ?? '')
     : offer?.sourceAgentId ?? session.agentId ?? '';
@@ -111,7 +111,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
     if (!input.expectedPlanHash) return false;
     const latest = planReviewStateStore.read(input.sessionId);
     return latest?.status !== 'approved' || latest.approvedHash !== input.expectedPlanHash
-      || storageAdapter.readConversationHistory(input.sessionId).some(message => message.role === 'user' && message.createdAt >= latest.updatedAt);
+      || conversationHistoryStore.readConversationHistory(input.sessionId).some(message => message.role === 'user' && message.createdAt >= latest.updatedAt);
   };
   if (approvalChanged()) return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
@@ -119,7 +119,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
       if (approved.approvedHandoff?.agent !== input.agent || approved.approvedHandoff.label !== input.label) {
         throw new AppError('EXECUTION_OFFER_TARGET_MISMATCH', 'declare the handoff selected by the approved plan.');
       }
-      const offer = storageAdapter.executionOffers.read(input.sessionId);
+      const offer = executionOfferStore.read(input.sessionId);
       if (offer && (offer.plan.hash !== approved.approvedHash || offer.plan.uri !== approved.frozenUri
         || offer.targetAgentId !== input.agent || offer.label !== input.label
         || JSON.stringify([...offer.requiredSkillIds].sort()) !== JSON.stringify([...(declared.requiredSkillIds ?? [])].sort()))) {
@@ -146,7 +146,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
   }
   if (approvalChanged()) return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
-    storageAdapter.executionOffers.write(input.sessionId, declaredExecutionOffer({
+    executionOfferStore.write(input.sessionId, declaredExecutionOffer({
       offerId: randomUUID(),
       sourceAgentId,
       declared,
@@ -154,7 +154,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
       approvedAt: approved.updatedAt,
     }));
   }
-  const updated = sessionRevisions.snapshot(storageAdapter.updateSession(input.sessionId, { agentId: input.agent }) ?? session);
+  const updated = sessionRevisions.snapshot(sessionRecordStore.updateSession(input.sessionId, { agentId: input.agent }) ?? session);
   if (!await dispatchRuntimeHooks('agent.after-handoff', hookContext)) {
     return { success: false, error: 'HOOK_DENIED: agent.after-handoff' };
   }

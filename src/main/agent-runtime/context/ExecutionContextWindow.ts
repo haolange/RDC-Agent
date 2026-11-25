@@ -8,7 +8,7 @@ import { projectCompactionJournalMessages, readCompactionAuthorityJournal, readC
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { sessionContextStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { lookupProjectById } from '../../settings/settings-core/projectRegistryLookup';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { assembleDerivedContextView, createStructuredHandoffMessage, serializeHandoffSourceTranscript } from './StructuredHandoffBuilder';
@@ -96,7 +96,7 @@ export function createExecutionContextWindow(input: {
 }): RecoverableContextWindow {
   const sources = new Map<string, Awaited<ReturnType<typeof saveCompactionAuthoritySource>>>();
   const owner = delegatedArtifactOwner(input.sessionId) ?? input.sessionId;
-  const session = storageAdapter.readSession(owner);
+  const session = sessionRecordStore.readSession(owner);
   const projectRoot = session ? lookupProjectById(session.projectId)?.rootPath : undefined;
   const routeIdentity = input.plan.executionIdentity;
   const routeFingerprint = routeIdentity?.fingerprint
@@ -110,7 +110,7 @@ export function createExecutionContextWindow(input: {
       // session journal from which a later execution could authorize restore.
       if (isSubagentScopeId(input.sessionId)) return null;
       const priorRoutes = routeIdentity ? new Map<string, ExecutionIdentity>() : null;
-      if (priorRoutes) storageAdapter.readSessionContextJournal(input.sessionId, entry => {
+      if (priorRoutes) sessionContextStore.readSessionContextJournal(input.sessionId, entry => {
         priorRoutes.set(entry.executionIdentity.fingerprint, entry.executionIdentity);
         // The JSONL reader still parses/checks every line, but this lookup needs
         // only identities, never another retained copy of the session messages.

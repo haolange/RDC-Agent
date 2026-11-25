@@ -38,8 +38,10 @@ vi.mock('electron', () => ({
     },
   },
 }));
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: storage,
+vi.mock('../sessions/store/sessionStores', () => ({
+  projectWorkspaceStore: { ...storage, ...storage.projects },
+  sessionRecordStore: storage,
+  executionOfferStore: storage.executionOffers,
 }));
 vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
 vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
@@ -166,8 +168,8 @@ describe('session:remove slot sync', () => {
     const result = await handler!({}, 'sess_1');
     // Diagnosed 2026-09-03: ipcId allows underscore (`sess_1` matches
     // /^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/). The real payload was
-    // {"success":false,"error":"__vite_ssr_import_0__.storageAdapter.getProjectById is not a function"}
-    // because unmocked removeSessionWithHooks called storageAdapter.getProjectById,
+    // {"success":false,"error":"__vite_ssr_import_0__.projectWorkspaceStore.getProjectById is not a function"}
+    // because unmocked removeSessionWithHooks called projectWorkspaceStore.getProjectById,
     // which the hoisted storage stub omitted. attachmentStagingService is also
     // imported by the handler and is mocked so this test does not load AppPathService/HookEngine.
     expect(result, `session:remove payload=${JSON.stringify(result)}`).toMatchObject({ success: true });

@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { nowIso } from '@shared/utils/id';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { rdcSessionService } from '../sessions';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -18,8 +18,8 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 
 function readWorkflowState(sessionId: string, runId: string | null): WorkflowState | null {
   const run = runId
-    ? storageAdapter.listRuns(sessionId).find((entry) => entry.runId === runId) ?? null
-    : storageAdapter.getLatestRun(sessionId);
+    ? sessionRecordStore.listRuns(sessionId).find((entry) => entry.runId === runId) ?? null
+    : sessionRecordStore.getLatestRun(sessionId);
   if (!run) return null;
   return {
     caseId: run.caseId,
@@ -57,8 +57,8 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
       });
       if (sessionId) {
         state.currentSessionId = sessionId;
-        storageAdapter.setCurrentSessionId(sessionId);
-        state.currentRunId = storageAdapter.getLatestRun(sessionId)?.runId || null;
+        projectWorkspaceStore.setCurrentSessionId(sessionId);
+        state.currentRunId = sessionRecordStore.getLatestRun(sessionId)?.runId || null;
       }
       return { success: true };
     } catch (err) {
@@ -80,7 +80,7 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
       const result = runExecutionService.stopRun(targetRunId)
         ? { success: true }
         : { success: false, error: 'No active run.' };
-      const session = state.currentSessionId ? storageAdapter.readSession(state.currentSessionId) : null;
+      const session = state.currentSessionId ? sessionRecordStore.readSession(state.currentSessionId) : null;
       if (session) {
         const scope = { projectId: session.projectId, sessionId: session.sessionId };
         context.broadcastToRenderer('capture:openedStateChanged', {

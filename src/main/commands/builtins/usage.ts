@@ -1,4 +1,4 @@
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../../sessions/store/sessionStores';
 import type { CommandDefinition } from '@shared/types/command';
 
 export const usageCommand: CommandDefinition = {
@@ -16,7 +16,7 @@ export const usageCommand: CommandDefinition = {
       };
     }
 
-    const runs = storageAdapter.listRuns(sessionId);
+    const runs = sessionRecordStore.listRuns(sessionId);
     if (runs.length === 0) {
       return {
         success: true,

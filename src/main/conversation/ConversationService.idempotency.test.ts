@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { beginRdcLifecycle, getRdcInteractionLock } from '../rdc/RdcOperationCoordinator';
 import { conversationService } from './ConversationService';
@@ -9,16 +9,11 @@ import '../rdc/registerConversationRdcHost';
 vi.mock('../sessions', () => ({
   rdcSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    readSession: vi.fn(),
-    listSessions: vi.fn(() => []),
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: vi.fn(), listSessions: vi.fn(() => []) },
+  conversationHistoryStore: {
     readConversationHistory: vi.fn(() => []),
     readConversationBranchState: vi.fn(() => null),
-    handoffs: {
-      getActive: vi.fn(() => null),
-      cancel: vi.fn(() => null),
-    },
   },
 }));
 vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
@@ -65,9 +60,9 @@ describe('ConversationService idempotency scoping', () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(storageAdapter.readSession).mockReturnValue(null);
-    vi.mocked(storageAdapter.listSessions).mockReturnValue([]);
-    vi.mocked(storageAdapter.readConversationHistory).mockReturnValue([]);
+    vi.mocked(sessionRecordStore.readSession).mockReturnValue(null);
+    vi.mocked(sessionRecordStore.listSessions).mockReturnValue([]);
+    vi.mocked(conversationHistoryStore.readConversationHistory).mockReturnValue([]);
     const service = conversationService as unknown as IdempotentService;
     service.sendRequests.clear();
     service.sendRequestFingerprints.clear();
@@ -89,7 +84,7 @@ describe('ConversationService idempotency scoping', () => {
     }
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(service.startProfileTurn).not.toHaveBeenCalled();
-    expect(vi.mocked(storageAdapter.readConversationHistory)).not.toHaveBeenCalled();
+    expect(vi.mocked(conversationHistoryStore.readConversationHistory)).not.toHaveBeenCalled();
   });
 
   it('does not share in-flight promises across sessions with the same requestId', async () => {

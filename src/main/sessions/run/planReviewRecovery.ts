@@ -1,6 +1,6 @@
 import { AppError } from '@shared/errors/appError';
 import { resolveVisibleConversationMessages } from '../../conversation/ConversationBranchResolver';
-import { storageAdapter } from '../store/StorageAdapter';
+import { conversationHistoryStore } from '../store/sessionStores';
 import { planReviewStateStore, type PlanReviewStateStore } from './PlanReviewStateStore';
 import { readReferencedPlan } from './sessionPlanReference';
 import type { PlanReadRequest } from '@shared/types/planReview';
@@ -8,8 +8,8 @@ import type { ConversationMessage } from '@shared/types/conversation';
 
 /** Durable plan ownership is separate from the interrupted producer's lifetime. */
 export function resolveRecoverablePlan(sessionId: string, store: PlanReviewStateStore = planReviewStateStore) {
-  const history = storageAdapter.readConversationHistory(sessionId);
-  const branch = storageAdapter.readConversationBranchState(sessionId);
+  const history = conversationHistoryStore.readConversationHistory(sessionId);
+  const branch = conversationHistoryStore.readConversationBranchState(sessionId);
   const visible = resolveVisibleConversationMessages(history, branch);
   const candidates = visible.flatMap((message: ConversationMessage) => (message.workTrace?.blocks ?? []).flatMap(block =>
     block.toolCalls.filter(call => call.toolName === 'plan_artifact' && call.planReview).map(call => ({ message, call }))));

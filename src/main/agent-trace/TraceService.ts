@@ -1,7 +1,7 @@
 import { loopFinalAnswerText, loopThinkingItems } from '@shared/conversation/loopItems';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { nowIso } from '@shared/utils/id';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { traceStateStore } from '../agent-runtime/orchestration/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
 import { TraceEventStore, TraceRunStore } from './TraceEventStore';
@@ -109,7 +109,7 @@ export class TraceService {
 
   async getSession(sessionId: string): Promise<TraceSessionResult> {
     try {
-      const session = storageAdapter.readSession(sessionId);
+      const session = sessionRecordStore.readSession(sessionId);
       if (!session) {
         return { success: false, error: `Session not found: ${sessionId}` };
       }
@@ -122,11 +122,11 @@ export class TraceService {
 
   async buildPresentation(sessionId: string): Promise<AgentRunPresentation> {
     const state = traceStateStore.read(sessionId);
-    const conversations = storageAdapter.readConversationHistory(sessionId);
-    const events = await storageAdapter.readActionChain(sessionId);
+    const conversations = conversationHistoryStore.readConversationHistory(sessionId);
+    const events = await sessionRecordStore.readActionChain(sessionId);
     return this.buildPresentationFromData(
       sessionId,
-      storageAdapter.listRuns(sessionId),
+      sessionRecordStore.listRuns(sessionId),
       conversations,
       events,
       state,
@@ -330,7 +330,7 @@ export class TraceService {
       });
     }
 
-    const projectId = storageAdapter.readSession(sessionId)?.projectId;
+    const projectId = sessionRecordStore.readSession(sessionId)?.projectId;
     if (!projectId) {
       throw new Error('Trace projection requires an owned project/session scope.');
     }
@@ -361,7 +361,7 @@ export class TraceService {
     sessionId: string,
     conversations: ConversationMessage[],
   ): Promise<AgentRunPresentation> {
-    const state = storageAdapter.readSession(sessionId)
+    const state = sessionRecordStore.readSession(sessionId)
       ? traceStateStore.read(sessionId)
       : {
           schemaVersion: '1' as const,

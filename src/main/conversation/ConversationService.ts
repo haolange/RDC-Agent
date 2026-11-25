@@ -8,7 +8,7 @@ import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { traceService } from '../agent-trace/TraceService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, projectWorkspaceStore, sessionContextStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { resolvePlanReference } from './planReferenceResolution';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
@@ -114,13 +114,13 @@ export class ConversationService {
     branchState: ConversationBranchState | null;
     planReview: import('@shared/types/planReview').PlanReviewProjection;
   }> {
-    const allMessages = storageAdapter.readConversationHistory(sessionId).map((message) => {
+    const allMessages = conversationHistoryStore.readConversationHistory(sessionId).map((message) => {
       const recovered = reconcileInterruptedConversationTurn(
         reconcileDelegatedInteractionRequests(sessionId, message),
         this.activeTurns.has(message.turnId),
         message.updatedAt,
       );
-      if (recovered !== message) storageAdapter.appendConversationMessage(sessionId, recovered);
+      if (recovered !== message) conversationHistoryStore.appendConversationMessage(sessionId, recovered);
       return recovered;
     });
     const branchState = this.readRepairedBranchState(sessionId, allMessages);
@@ -136,14 +136,14 @@ export class ConversationService {
   async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
     const stopped = await this.cancelActiveTurn({ sessionId });
     if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${sessionId}.`);
-    storageAdapter.writeConversationHistory(sessionId, []);
-    storageAdapter.clearSessionContextState(sessionId);
+    conversationHistoryStore.writeConversationHistory(sessionId, []);
+    sessionContextStore.clearSessionContextState(sessionId);
     publishConversationTrace(sessionId, [], sessionId, publishTraceProjection);
     return [];
   }
 
   async undoLastTurn(sessionId: string): Promise<ConversationMessage[]> {
-    const history = storageAdapter.readConversationHistory(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
     const lastUserMessage = history
       .slice()
       .reverse()
@@ -153,8 +153,8 @@ export class ConversationService {
     }
 
     const nextHistory = history.filter((message) => message.turnId !== lastUserMessage.turnId);
-    storageAdapter.writeConversationHistory(sessionId, nextHistory);
-    storageAdapter.writeSessionContextJournal(
+    conversationHistoryStore.writeConversationHistory(sessionId, nextHistory);
+    sessionContextStore.writeSessionContextJournal(
       sessionId,
       sessionContextJournal.readEntries(sessionId).filter((entry) => entry.turnId !== lastUserMessage.turnId),
     );
@@ -319,7 +319,7 @@ export class ConversationService {
     const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), `rdc-agent-att-fp-${requestId.slice(0, 24)}-`));
     try {
       const sourcePaths = attachments.map((attachment) => attachment.sourcePath);
-      const stagedPaths = storageAdapter.history.stageAttachmentInputs(sourcePaths, stagingDir);
+      const stagedPaths = conversationHistoryStore.stageAttachmentInputs(sourcePaths, stagingDir);
       const stagedAttachments = attachments.map((attachment, index) => ({
         ...attachment,
         sourcePath: stagedPaths[index]!,
@@ -346,12 +346,12 @@ export class ConversationService {
     const explicitSessionId = input.sessionId ?? input.fallbackSessionId ?? null;
     const explicitProjectId = input.projectId ?? input.fallbackProjectId ?? null;
     const sessions = explicitSessionId
-      ? [storageAdapter.readSession(explicitSessionId)].filter((entry): entry is SessionRecord => entry !== null)
+      ? [sessionRecordStore.readSession(explicitSessionId)].filter((entry): entry is SessionRecord => entry !== null)
       : explicitProjectId
-        ? storageAdapter.listSessions(explicitProjectId)
+        ? sessionRecordStore.listSessions(explicitProjectId)
         : [];
     for (const session of sessions) {
-      const history = storageAdapter.readConversationHistory(session.sessionId);
+      const history = conversationHistoryStore.readConversationHistory(session.sessionId);
       const requestMessages = history.filter((message) => message.requestId === requestId);
       const userMessage = requestMessages.find((message) => message.role === 'user');
       const assistantDraftMessage = requestMessages.find((message) => message.role === 'assistant');
@@ -380,7 +380,7 @@ export class ConversationService {
       );
       return {
         requestId,
-        session: storageAdapter.readSessionSnapshot(session.sessionId),
+        session: sessionRecordStore.readSessionSnapshot(session.sessionId),
         mode: 'talk',
         userMessage,
         assistantDraftMessage,
@@ -388,7 +388,7 @@ export class ConversationService {
         branchState,
         executionTransition: { action: 'none' },
         runUpdate: assistantDraftMessage.runId
-          ? storageAdapter.listRuns(session.sessionId).find(run => run.runId === assistantDraftMessage.runId) ?? null
+          ? sessionRecordStore.listRuns(session.sessionId).find(run => run.runId === assistantDraftMessage.runId) ?? null
           : null,
         tracePresentation,
         errorViewModel: assistantDraftMessage.diagnostic
@@ -564,7 +564,7 @@ export class ConversationService {
       );
     }
 
-    const initialHistory = storageAdapter.readConversationHistory(sessionId);
+    const initialHistory = conversationHistoryStore.readConversationHistory(sessionId);
     const initialTargetIndex = initialHistory.findIndex((message) => message.id === input.messageId);
     const initialTargetMessage = initialTargetIndex >= 0 ? initialHistory[initialTargetIndex] : null;
     if (!initialTargetMessage || initialTargetMessage.role !== 'user') {
@@ -593,14 +593,14 @@ export class ConversationService {
 
     // Re-read after every stopped turn has fully left completeProfileTurn. Its
     // terminal flush may have appended a newer snapshot for the target branch.
-    const history = storageAdapter.readConversationHistory(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
     const targetIndex = history.findIndex((message) => message.id === input.messageId);
     const targetMessage = targetIndex >= 0 ? history[targetIndex] : null;
     if (!targetMessage || targetMessage.role !== 'user') {
       throw new Error('Can only edit and resend an existing user message.');
     }
 
-    let branchState = storageAdapter.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
+    let branchState = conversationHistoryStore.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
     const targetBranchId = normalizeBranchId(targetMessage.branchId);
     const forkId = targetMessage.forkId ?? targetMessage.id;
     const anchorMessageId = branchState.forks.find((fork) => fork.forkId === forkId)?.anchorMessageId ?? targetMessage.id;
@@ -638,7 +638,7 @@ export class ConversationService {
 
     const updatedContext: ResolvedConversationContext = {
       ...context,
-      session: storageAdapter.readSession(sessionId) ?? context.session,
+      session: sessionRecordStore.readSession(sessionId) ?? context.session,
     };
     return this.startProfileTurn(
       updatedContext,
@@ -673,7 +673,7 @@ export class ConversationService {
     agentOrchestrator.syncSessionSlots(input.sessionId);
     await agentOrchestrator.abortAndJoin(input.sessionId, { reason: 'branch_switch' }).catch(() => undefined);
 
-    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
+    const allMessages = conversationHistoryStore.readConversationHistory(input.sessionId);
     const branchState = this.readRepairedBranchState(input.sessionId, allMessages);
     if (!branchState) {
       return { success: false, messages: [], error: 'No conversation branch state found.' };
@@ -687,7 +687,7 @@ export class ConversationService {
     fork.activeBranchId = input.branchId;
     agentPlanReviewRequestService.retireRecovered(input.sessionId);
     branchState.activeLeafBranchId = input.branchId;
-    storageAdapter.writeConversationBranchState(input.sessionId, branchState);
+    conversationHistoryStore.writeConversationBranchState(input.sessionId, branchState);
     agentPlanReviewRequestService.projection(input.sessionId);
 
     const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
@@ -707,24 +707,24 @@ export class ConversationService {
     sessionId: string,
     allMessages: ConversationMessage[],
   ): ConversationBranchState | null {
-    const current = storageAdapter.readConversationBranchState(sessionId);
+    const current = conversationHistoryStore.readConversationBranchState(sessionId);
     const { branchState, repaired } = repairConversationBranchState(allMessages, current);
     if (branchState && repaired) {
-      storageAdapter.writeConversationBranchState(sessionId, branchState);
+      conversationHistoryStore.writeConversationBranchState(sessionId, branchState);
     }
     return branchState;
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
-    const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
-    const persistedSessionId = storageAdapter.getCurrentSessionId();
+    const projectId = input.projectId ?? input.fallbackProjectId ?? projectWorkspaceStore.getCurrentProjectId() ?? null;
+    const persistedSessionId = projectWorkspaceStore.getCurrentSessionId();
     const resolvedSessionId = input.sessionId ?? input.fallbackSessionId ?? persistedSessionId ?? null;
-    const session = resolvedSessionId ? storageAdapter.readSession(resolvedSessionId) : null;
+    const session = resolvedSessionId ? sessionRecordStore.readSession(resolvedSessionId) : null;
     const currentRun = resolvedSessionId
-      ? storageAdapter.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId))
-        ?? storageAdapter.getLatestRun(resolvedSessionId)
+      ? sessionRecordStore.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId))
+        ?? sessionRecordStore.getLatestRun(resolvedSessionId)
       : null;
-    const projectInputs = projectId ? await storageAdapter.listProjectInputs(projectId) : [];
+    const projectInputs = projectId ? await projectWorkspaceStore.listProjectInputs(projectId) : [];
     const openedCapture = projectId && resolvedSessionId
       ? conversationRdcHost().snapshotOpenedCapture({ projectId, sessionId: resolvedSessionId })
       : null;

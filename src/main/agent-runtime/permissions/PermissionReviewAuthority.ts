@@ -2,7 +2,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { AppError } from '@shared/errors/appError';
 import { pathComparisonKey } from '../../platform/paths';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { executionOfferStore } from '../../sessions/store/sessionStores';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
@@ -159,7 +159,7 @@ export function permissionReviewAuthority(input: {
   promptPlan: PromptPlan; workspace: string | null | undefined; agentId: string; delegated?: boolean;
 }): string {
   const approvedOffer = input.promptPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer')?.content ?? null;
-  const offer = approvedOffer ? storageAdapter.executionOffers.read(input.sessionId) : null;
+  const offer = approvedOffer ? executionOfferStore.read(input.sessionId) : null;
   if (approvedOffer && (!offer || !approvedOffer.includes(JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))))) {
     throw new AppError('PERMISSION_REVIEW_AUTHORITY_CHANGED', 'approved offer no longer matches preparation.');
   }

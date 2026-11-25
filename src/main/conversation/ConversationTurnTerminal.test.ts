@@ -9,7 +9,7 @@ const storage = vi.hoisted(() => ({
   readConversationHistory: vi.fn(),
   readConversationBranchState: vi.fn(),
 }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: storage }));
+vi.mock('../sessions/store/sessionStores', () => ({ sessionRecordStore: storage, conversationHistoryStore: storage }));
 vi.mock('../agent-runtime/orchestration/WorkflowProjectionPublisher', () => ({ workflowProjectionPublisher: {} }));
 vi.mock('../agent-trace/TraceService', () => ({ traceService: {} }));
 

@@ -1,5 +1,5 @@
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../store/StorageAdapter';
+import { conversationHistoryStore } from '../store/sessionStores';
 import { planArtifactWriter } from './sessionPlanArtifact';
 import { planReviewStateStore } from './PlanReviewStateStore';
 import type { PlanReadRequest } from '@shared/types/planReview';
@@ -17,7 +17,7 @@ function matchesPlanUri(request: PlanReadRequest, call: ConversationToolCall): b
 
 /** Resolve provenance from persisted history, never from mutable session settings. */
 export function resolvePlanReference(request: PlanReadRequest, history: (sessionId: string) => ConversationMessage[] =
-  (sessionId) => storageAdapter.readConversationHistory(sessionId)) {
+  (sessionId) => conversationHistoryStore.readConversationHistory(sessionId)) {
   const matches = history(request.sessionId).flatMap(message =>
     collectCalls(message.workTrace?.blocks ?? [])
       .filter(call => call.toolName === 'plan_artifact' && call.planReview?.planId === request.planId

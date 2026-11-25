@@ -8,12 +8,11 @@ const state = vi.hoisted(() => ({
   listInputs: vi.fn(async () => { throw new Error('Projection must not rescan inputs'); }),
 }));
 
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {
-  readSession: () => ({ sessionId: 'session-a', projectId: 'project-a', title: 'Session', sessionPath: 'D:/session' }),
-  readConversationHistory: () => [],
-  getProjectById: () => state.project,
-  listProjectInputs: state.listInputs,
-} }));
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: () => ({ sessionId: 'session-a', projectId: 'project-a', title: 'Session', sessionPath: 'D:/session' }) },
+  conversationHistoryStore: { readConversationHistory: () => [] },
+  projectWorkspaceStore: { getProjectById: () => state.project, listProjectInputs: state.listInputs },
+}));
 vi.mock('../agent-runtime/tasks/sessionTaskStore', () => ({ createSessionTaskStore: () => ({}) }));
 vi.mock('../agent-runtime/tasks/TaskRegistry', () => ({ TaskRegistry: class {
   async reconcileInterruptedExecutions() { return this; }

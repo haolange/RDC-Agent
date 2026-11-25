@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { appPathService } from '../runtime/AppPathService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { StorageIo } from '../sessions/store/StorageIo';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KNOWLEDGE_INDEX_MIGRATIONS } from './knowledgeIndexSchema';
@@ -34,7 +34,7 @@ const defaultDependencies = (): KnowledgeIndexDependencies => {
         label: 'User',
         rootPath: appPathService.getUserRdcPaths().knowledgePath,
       }];
-      for (const project of storageAdapter.listProjects()) {
+      for (const project of projectWorkspaceStore.listProjects()) {
         spaces.push({
           spaceId: `project:${project.projectId}`,
           kind: 'project',

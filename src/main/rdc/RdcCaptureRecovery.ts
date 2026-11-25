@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { verifyPlanInput } from '../sessions/run/prepareInvestigationPlan';
 import { rdcSessionService } from '../sessions';
 import { replayDeviceService } from './captures/ReplayDeviceService';
@@ -17,7 +17,7 @@ import type { SessionScope } from '@shared/types/session';
 import type { CaptureRecoveryStatus, CaptureReplayBindingRequest, CaptureReplayState } from '@shared/types/captureReplay';
 
 function authorize(scope: SessionScope): void {
-  if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new AppError('REPLAY_SCOPE_DENIED');
+  if (sessionRecordStore.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new AppError('REPLAY_SCOPE_DENIED');
 }
 
 export function captureRecoveryStatus(scope: SessionScope): CaptureRecoveryStatus | null {
@@ -25,7 +25,7 @@ export function captureRecoveryStatus(scope: SessionScope): CaptureRecoveryStatu
   const pending = rdcLifecycleReceipts.pending(scope.sessionId, scope.projectId);
   if (!pending) return null;
   const original = pending.baseline.original;
-  const fileName = original ? storageAdapter.getProjectById(scope.projectId)?.inputs.find(value => value.inputId === original.inputId)?.fileName : undefined;
+  const fileName = original ? projectWorkspaceStore.getProjectById(scope.projectId)?.inputs.find(value => value.inputId === original.inputId)?.fileName : undefined;
   return { pendingCount: pending.count, original: original ? { inputId: original.inputId, fileName: fileName ?? original.inputId,
     deviceId: original.deviceId, eventId: original.native.eventId } : null };
 }
@@ -50,7 +50,7 @@ export async function restorePreviousCapture(scope: CaptureReplayBindingRequest)
     guard();
     assertPriorProcessesReleased(initial, state.contextId);
     const original = initial.baseline.original;
-    const project = storageAdapter.getProjectById(scope.projectId);
+    const project = projectWorkspaceStore.getProjectById(scope.projectId);
     if (!project) throw new AppError('RDC_CAPTURE_PROJECT_MISSING');
     const capture = original ? project.inputs.find(value => value.inputId === original.inputId) : undefined;
     const device = original ? replayDeviceService.getDeviceById(original.deviceId) : undefined;

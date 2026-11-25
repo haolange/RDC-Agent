@@ -6,12 +6,9 @@ vi.mock('../../agent-runtime/orchestration/WorkflowProjectionPublisher', () => (
   },
 }));
 
-vi.mock('../store/StorageAdapter', () => ({
-  storageAdapter: {
-    writeSessionUsage: vi.fn(),
-    readSessionUsage: vi.fn(() => null),
-    readSession: vi.fn(() => null),
-  },
+vi.mock('../store/sessionStores', () => ({
+  sessionContextStore: { writeSessionUsage: vi.fn(), readSessionUsage: vi.fn(() => null) },
+  sessionRecordStore: { readSession: vi.fn(() => null) },
 }));
 
 vi.mock('../../settings/provider-catalog/EffectiveModelResolver', () => ({
@@ -35,7 +32,7 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
   },
 }));
 
-import { storageAdapter } from '../store/StorageAdapter';
+import { sessionContextStore } from '../store/sessionStores';
 import { DebuggerLlmService } from './DebuggerLlmService';
 
 describe('DebuggerLlmService cache aggregation', () => {
@@ -185,7 +182,7 @@ describe('DebuggerLlmService cache aggregation', () => {
   });
 
   it('marks only persisted usage as stale', () => {
-    vi.mocked(storageAdapter.readSessionUsage).mockReturnValue({
+    vi.mocked(sessionContextStore.readSessionUsage).mockReturnValue({
       runId: 'run_persisted',
       providerId: 'openai',
       modelId: 'gpt',
@@ -208,7 +205,7 @@ describe('DebuggerLlmService cache aggregation', () => {
     });
   });
   it('does not persist telemetry-free zero usage as an actual snapshot', () => {
-    vi.mocked(storageAdapter.readSessionUsage).mockReturnValue(null);
+    vi.mocked(sessionContextStore.readSessionUsage).mockReturnValue(null);
     service.recordAgentTurnUsage({
       turnId: 'turn_zero',
       sessionId: 'sess_zero',
@@ -223,11 +220,11 @@ describe('DebuggerLlmService cache aggregation', () => {
       usage: null,
       stale: false,
     });
-    expect(storageAdapter.writeSessionUsage).not.toHaveBeenCalled();
+    expect(sessionContextStore.writeSessionUsage).not.toHaveBeenCalled();
   });
 
   it('treats a persisted telemetry-free zero snapshot as absent', () => {
-    vi.mocked(storageAdapter.readSessionUsage).mockReturnValue({
+    vi.mocked(sessionContextStore.readSessionUsage).mockReturnValue({
       runId: 'turn_zero_persisted',
       providerId: 'kimi-coding-plan',
       modelId: 'kimi-for-coding',

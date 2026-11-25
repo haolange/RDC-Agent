@@ -20,7 +20,7 @@ vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({ agentMan
 
 import { TaskRegistry } from '../tasks/TaskRegistry';
 import { createSessionTaskStore } from '../tasks/sessionTaskStore';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactReferences, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
@@ -45,8 +45,8 @@ it.each(['wait', 'background'] as const)('returns the exact missing delegation s
   process.env.RDC_AGENT_USER_DATA = root;
   try {
     const projectRoot = path.join(root, 'project'); fs.mkdirSync(projectRoot);
-    const project = await storageAdapter.createProject(projectRoot);
-    const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
     const source = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/source.json', '{"value":1}');
     const missing = 'session://tool-outputs/missing.json';
     const sendProfileMessage = vi.fn(async () => 'must not start');
@@ -90,8 +90,8 @@ it('does not promote a child exception into a trusted source-grant failure', asy
   process.env.RDC_AGENT_USER_DATA = root;
   try {
     const projectRoot = path.join(root, 'project'); fs.mkdirSync(projectRoot);
-    const project = await storageAdapter.createProject(projectRoot);
-    const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
     const source = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/source.json', '{"value":1}');
     const sendProfileMessage = vi.fn(async () => { throw new SessionArtifactError('ARTIFACT_NOT_FOUND', 'child-private-text'); });
     const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
@@ -121,8 +121,8 @@ it.each([
   try {
     const projectRoot = path.join(root, 'project');
     fs.mkdirSync(projectRoot);
-    const project = await storageAdapter.createProject(projectRoot);
-    const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
     const source = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/findings.json', '{"finding":"compare the data"}');
     const raw = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/measurements.json', '{"samples":[3,5,7]}');
     const registry = new TaskRegistry(createSessionTaskStore(sessionId));
@@ -217,8 +217,8 @@ it('grants an independent review the evidence its granted records depend on', as
   const readAll = vi.spyOn(investigationArtifactService, 'readAllRecords');
   try {
     const projectRoot = path.join(root, 'project'); fs.mkdirSync(projectRoot);
-    const project = await storageAdapter.createProject(projectRoot);
-    const sessionId = storageAdapter.createSession(project.projectId).sessionId;
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
     const source = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/findings.json', '{"finding":"anchor"}');
     const claim = sessionArtifactResolver.write(sessionId, 'session://investigation/claim-anchor.json', '{"claimId":"anchor"}');
     const evidence = sessionArtifactResolver.write(sessionId, 'session://investigation/ev-anchor.json', '{"evidenceId":"ev-anchor"}');

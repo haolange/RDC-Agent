@@ -10,7 +10,26 @@ import { createExternalCaptureReference, verifyExternalCaptureReference } from '
 import { withDirectoryFileLockSync } from './directoryFileLock';
 import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSchema';
 import type { ProjectRegistry, SelectionState } from './storageTypes';
-import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
+import type { ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { StorageIo } from './StorageIo';
+
+/** Session records the project registry reads: the selected session, startup reconciliation, cached locations. */
+export interface ProjectSessionRecords {
+  readSessionRecord(sessionId: string): SessionRecord | null;
+  listSessions(projectId: string): SessionRecord[];
+  /** Session locations found under a previous registry are dropped whenever the registry changes. */
+  forgetSessionLocations(): void;
+}
+
+/** Conversation turn commits interrupted by a previous run are recovered once the workspace exists. */
+export interface ConversationTurnRecovery {
+  recoverConversationTurnCommits(): void;
+}
+
+export interface ProjectWorkspaceLinks {
+  sessions: ProjectSessionRecords;
+  turnCommits: ConversationTurnRecovery;
+}
 
 
 export class ProjectWorkspaceStore {
@@ -18,7 +37,19 @@ export class ProjectWorkspaceStore {
   private readonly inputRefreshes = new Map<string, Promise<ProjectInputRecord[]>>();
   private inputReconciler?: (project: ProjectRecord, inputs: ProjectInputRecord[]) => Promise<void>;
   private inputCommitListener?: (projectId: string, inputs: ProjectInputRecord[]) => void;
-  constructor(private readonly host: import('./storageHost').StorageHost) {}
+  private dataRootPath = '';
+  private projectsRootPath = '';
+  private globalKnowledgePath = '';
+  private registryPath = '';
+  private selectionPath = '';
+  private links!: ProjectWorkspaceLinks;
+
+  constructor(private readonly io: StorageIo) {}
+
+  /** Wired once by the storage composition root (`sessionStores.ts`): the stores reference each other. */
+  connect(links: ProjectWorkspaceLinks): void {
+    this.links = links;
+  }
 
   setInputReconciler(callback: (project: ProjectRecord, inputs: ProjectInputRecord[]) => Promise<void>): void {
     this.inputReconciler = callback;
@@ -29,22 +60,24 @@ export class ProjectWorkspaceStore {
 
   getWorkspacePath(): string {
     this.syncRuntimePaths();
-    return this.host.dataRootPath;
+    return this.dataRootPath;
   }
 
   getGlobalKnowledgePath(): string {
     this.syncRuntimePaths();
-    return this.host.globalKnowledgePath;
+    return this.globalKnowledgePath;
   }
 
   async initializeWorkspace(): Promise<void> {
     this.syncRuntimePaths();
-    this.host.io.ensureDir(this.host.dataRootPath);
-    this.host.io.ensureDir(this.host.projectsRootPath);
+    this.io.ensureDir(this.dataRootPath);
+    this.io.ensureDir(this.projectsRootPath);
     this.ensureRegistry();
     this.ensureSelection();
-    this.host.io.ensureDir(this.host.globalKnowledgePath);
-    this.host.history.recoverConversationTurnCommits();
+    this.io.ensureDir(this.globalKnowledgePath);
+    this.links.turnCommits.recoverConversationTurnCommits();
+    // Reading every project's sessions once reconciles their records (default titles) before anything lists them.
+    for (const project of this.listProjects()) this.links.sessions.listSessions(project.projectId);
   }
 
   listProjects(): ProjectRecord[] {
@@ -90,8 +123,8 @@ export class ProjectWorkspaceStore {
     if (!result) {
       throw new Error(`Failed to create project: ${normalizedRootPath}`);
     }
-    this.host.io.ensureDir(this.getProjectDataPath(result));
-    this.host.io.ensureDir(this.getProjectSessionsRoot(result));
+    this.io.ensureDir(this.getProjectDataPath(result));
+    this.io.ensureDir(this.getProjectSessionsRoot(result));
     this.writeProjectMetadata(result);
     this.setCurrentProjectId(result.projectId);
     return result;
@@ -207,7 +240,7 @@ export class ProjectWorkspaceStore {
     }
 
     const normalizedProject = this.normalizeProjectRecord(project);
-    this.host.io.ensureDir(normalizedProject.inputsPath);
+    this.io.ensureDir(normalizedProject.inputsPath);
 
     for (const filePath of filePaths) {
       const sourcePath = path.resolve(filePath);
@@ -263,7 +296,7 @@ export class ProjectWorkspaceStore {
     if (!projectId) {
       selection.sessionId = null;
     } else if (selection.sessionId) {
-      const selectedSession = this.host.sessions.readSession(selection.sessionId);
+      const selectedSession = this.links.sessions.readSessionRecord(selection.sessionId);
       if (!selectedSession || selectedSession.projectId !== projectId) {
         selection.sessionId = null;
       }
@@ -279,7 +312,7 @@ export class ProjectWorkspaceStore {
     const selection = this.readSelection();
     selection.sessionId = sessionId;
     if (sessionId) {
-      const session = this.host.sessions.readSession(sessionId);
+      const session = this.links.sessions.readSessionRecord(sessionId);
       if (session) {
         selection.projectId = session.projectId;
       }
@@ -290,16 +323,16 @@ export class ProjectWorkspaceStore {
   syncRuntimePaths(): void {
     const paths = appPathService.getRuntimePaths();
     const registryPath = path.join(paths.projectsPath, 'registry.json');
-    if (registryPath !== this.host.registryPath) this.host.sessions.forgetSessionLocations();
-    this.host.dataRootPath = paths.appStateRoot;
-    this.host.projectsRootPath = paths.projectsPath;
-    this.host.globalKnowledgePath = paths.knowledgePath;
-    this.host.registryPath = registryPath;
-    this.host.selectionPath = path.join(this.host.projectsRootPath, 'selection.json');
+    if (registryPath !== this.registryPath) this.links.sessions.forgetSessionLocations();
+    this.dataRootPath = paths.appStateRoot;
+    this.projectsRootPath = paths.projectsPath;
+    this.globalKnowledgePath = paths.knowledgePath;
+    this.registryPath = registryPath;
+    this.selectionPath = path.join(this.projectsRootPath, 'selection.json');
   }
 
   private ensureRegistry(): void {
-    if (fs.existsSync(this.host.registryPath)) {
+    if (fs.existsSync(this.registryPath)) {
       return;
     }
 
@@ -310,11 +343,11 @@ export class ProjectWorkspaceStore {
   }
 
   private ensureSelection(): void {
-    if (fs.existsSync(this.host.selectionPath)) {
+    if (fs.existsSync(this.selectionPath)) {
       return;
     }
 
-    this.host.io.writeJsonAtomic(this.host.selectionPath, {
+    this.io.writeJsonAtomic(this.selectionPath, {
       projectId: null,
       sessionId: null,
     } satisfies SelectionState);
@@ -322,7 +355,7 @@ export class ProjectWorkspaceStore {
 
   readRegistry(): ProjectRegistry {
     return this.withRegistryLock(() => {
-      const loaded = this.host.io.readJson(this.host.registryPath, PROJECT_REGISTRY_MIGRATIONS);
+      const loaded = this.io.readJson(this.registryPath, PROJECT_REGISTRY_MIGRATIONS);
       if (!loaded) {
         const empty: ProjectRegistry = {
           schemaVersion: '1',
@@ -351,14 +384,14 @@ export class ProjectWorkspaceStore {
   }
 
   private withRegistryLock<T>(operation: () => T): T {
-    return withDirectoryFileLockSync(path.dirname(this.host.registryPath), {
+    return withDirectoryFileLockSync(path.dirname(this.registryPath), {
       lockFileName: '.registry.lock',
       timeoutCode: 'PROJECT_REGISTRY_LOCK_TIMEOUT',
     }, operation);
   }
 
   private loadRegistryUnlocked(): ProjectRegistry {
-    const loaded = this.host.io.readJson(this.host.registryPath, PROJECT_REGISTRY_MIGRATIONS);
+    const loaded = this.io.readJson(this.registryPath, PROJECT_REGISTRY_MIGRATIONS);
     if (!loaded) {
       return {
         schemaVersion: '1',
@@ -373,8 +406,8 @@ export class ProjectWorkspaceStore {
 
   /** The only registry write; session locations found from the previous registry are dropped with it. */
   private persistRegistryUnlocked(registry: ProjectRegistry): void {
-    this.host.sessions.forgetSessionLocations();
-    this.host.io.writeJsonAtomic(this.host.registryPath, registry);
+    this.links.sessions.forgetSessionLocations();
+    this.io.writeJsonAtomic(this.registryPath, registry);
   }
 
   private mutateRegistry(mutator: (registry: ProjectRegistry) => void): ProjectRegistry {
@@ -387,7 +420,7 @@ export class ProjectWorkspaceStore {
   }
 
   readSelection(): SelectionState {
-    const loaded = this.host.io.readJson(this.host.selectionPath, SelectionStateSchema);
+    const loaded = this.io.readJson(this.selectionPath, SelectionStateSchema);
     if (!loaded) {
       const empty: SelectionState = {
         projectId: null,
@@ -403,13 +436,13 @@ export class ProjectWorkspaceStore {
   }
 
   writeSelection(selection: SelectionState): void {
-    this.host.io.writeJsonAtomic(this.host.selectionPath, selection);
+    this.io.writeJsonAtomic(this.selectionPath, selection);
   }
 
   writeProjectMetadata(project: ProjectRecord): void {
     const normalizedProject = this.normalizeProjectRecord(project);
-    this.host.io.ensureDir(this.getProjectDataPath(normalizedProject));
-    this.host.io.writeJsonAtomic(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
+    this.io.ensureDir(this.getProjectDataPath(normalizedProject));
+    this.io.writeJsonAtomic(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
     const projectPaths = appPathService.initializeProjectRdc(normalizedProject.rootPath);
     writeYaml(projectPaths.projectMetadataPath, {
       schema_version: '1',
@@ -443,7 +476,7 @@ export class ProjectWorkspaceStore {
     if (!target) {
       throw new Error(`Project not found: ${project}`);
     }
-    return path.join(this.host.projectsRootPath, target.slug);
+    return path.join(this.projectsRootPath, target.slug);
   }
 
   getProjectSessionsRoot(project: ProjectRecord | string): string {
@@ -461,7 +494,7 @@ export class ProjectWorkspaceStore {
     }
 
     const sessionsRoot = this.getProjectSessionsRoot(target);
-    this.host.io.ensureDir(sessionsRoot);
+    this.io.ensureDir(sessionsRoot);
 
     return sessionsRoot;
   }

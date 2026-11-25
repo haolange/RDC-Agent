@@ -1,7 +1,7 @@
 import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { cacheHitRatePercent } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
 import { workflowProjectionPublisher } from '../../agent-runtime/orchestration/WorkflowProjectionPublisher';
-import { storageAdapter } from '../store/StorageAdapter';
+import { sessionContextStore, sessionRecordStore } from '../store/sessionStores';
 import { planEffectiveModelRequest } from '../../settings/provider-catalog/EffectiveModelResolver';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { resolveCompactionPercentForSession } from '../../settings/settings-core/compactionPercent';
@@ -233,12 +233,12 @@ export class DebuggerLlmService {
     this.runSummaries.set(key, existing);
     this.latestUsageKeysBySession.set(params.sessionId, key);
     const usage = this.toContextUsageSummary(key, existing);
-    storageAdapter.writeSessionUsage(params.sessionId, usage);
+    sessionContextStore.writeSessionUsage(params.sessionId, usage);
     this.broadcastRunUsage(existing, usage);
   }
 
   private readPersistedContextUsage(sessionId: string): RunContextUsageSummary | null {
-    const usage = storageAdapter.readSessionUsage(sessionId);
+    const usage = sessionContextStore.readSessionUsage(sessionId);
     return usage && hasMaterialProviderUsageTelemetry(usage) ? usage : null;
   }
 
@@ -304,12 +304,12 @@ export class DebuggerLlmService {
   }
 
   private resolveSessionTurnControls(summary: RunLlmExecutionSummary): ConversationTurnControls | null {
-    return summary.sessionId ? storageAdapter.readSession(summary.sessionId)?.turnControls ?? null : null;
+    return summary.sessionId ? sessionRecordStore.readSession(summary.sessionId)?.turnControls ?? null : null;
   }
 
   private broadcastRunUsage(summary: RunLlmExecutionSummary, usage: RunContextUsageSummary): void {
     if (!summary.sessionId) return;
-    const session = storageAdapter.readSession(summary.sessionId);
+    const session = sessionRecordStore.readSession(summary.sessionId);
     if (!session) return;
     workflowProjectionPublisher.publishRunUsage({
       projectId: session.projectId,

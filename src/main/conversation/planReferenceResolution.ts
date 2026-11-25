@@ -2,7 +2,7 @@ import { AppError } from '@shared/errors/appError';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
 import { resolveApprovedHandoff } from '../sessions/run/approvedHandoffRecovery';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore } from '../sessions/store/sessionStores';
 import { resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import type { ConversationPlanReference, PlanReadRequest, PlanReferenceRequest } from '@shared/types/planReview';
 
@@ -34,8 +34,8 @@ function resolveRevision(request: Extract<PlanReferenceRequest, { intent: 'revis
   const { intent: _intent, ...readRequest } = request;
   const source = readReferencedPlan(readRequest);
   const state = planReviewStateStore.read(source.ownerSessionId);
-  const history = storageAdapter.readConversationHistory(request.sessionId);
-  const visible = resolveVisibleConversationMessages(history, storageAdapter.readConversationBranchState(request.sessionId));
+  const history = conversationHistoryStore.readConversationHistory(request.sessionId);
+  const visible = resolveVisibleConversationMessages(history, conversationHistoryStore.readConversationBranchState(request.sessionId));
   const review = visible.flatMap(message => message.workTrace?.blocks ?? []).flatMap(block => block.toolCalls)
     .find(call => call.planReview?.planId === request.planId && call.planReview.revision === request.revision
       && call.planReview.hash === request.expectedHash)?.planReview;

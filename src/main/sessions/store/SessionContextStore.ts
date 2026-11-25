@@ -13,10 +13,17 @@ import {
 } from './storageSchema';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { StorageIo } from './StorageIo';
+
+/** What the per-session context files need: file I/O and where each session lives. */
+export interface SessionContextHost {
+  io: StorageIo;
+  sessions: { findSessionLocation(sessionId: string): { sessionPath: string } | null };
+}
 
 
 export class SessionContextStore {
-  constructor(private readonly host: import('./storageHost').StorageHost) {}
+  constructor(private readonly host: SessionContextHost) {}
 
   getSessionUsagePath(sessionId: string): string | null {
     const location = this.host.sessions.findSessionLocation(sessionId);

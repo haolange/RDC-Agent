@@ -41,7 +41,7 @@ import { AgentOrchestrator } from '../../agent-runtime/orchestration/AgentOrches
 import { PromptPlanForTurn } from '../../agent-runtime/orchestration/PromptPlanForTurn';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import { appPathService } from '../../runtime/AppPathService';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { resolveAgentToolAllowlistFromDefinition } from '../../agent-runtime/orchestration/RuntimeToolPolicy';
 import type { LlmProviderEntry } from '@shared/types/settings';
@@ -77,10 +77,10 @@ beforeAll(async () => {
   await refreshEffectiveCatalogDiscovery(provider, [], parseOllamaInstalledModels(
     { models: [{ name: MODEL_ID }] }, new Map([[MODEL_ID, { capabilities: ['tools', 'vision'] }]]), getLoadedProviderSurface('ollama')!,
   ).contributions);
-  await storageAdapter.initializeWorkspace();
-  const project = await storageAdapter.createProject(roots.project);
+  await projectWorkspaceStore.initializeWorkspace();
+  const project = await projectWorkspaceStore.createProject(roots.project);
   projectId = project.projectId;
-  sessionId = storageAdapter.createSession(projectId, 'Characterization').sessionId;
+  sessionId = sessionRecordStore.createSession(projectId, 'Characterization').sessionId;
   const written = planArtifactWriter.writeLivePlan(sessionId,
     `# Plan\n\n1. Read the hair pass.\n\n${renderInvestigationPlanContract({ schemaVersion: 1, mission: 'debugger' })}`);
   approvedPlan = { uri: written.uri, hash: written.hash };

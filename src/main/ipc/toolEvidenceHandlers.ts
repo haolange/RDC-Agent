@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { detectRdcInstallations, resolveRdcInstallation } from '../rdc/RdcInstallationService';
@@ -31,25 +31,25 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('mcp:getStatusSummary', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'mcp:getStatusSummary', maxBytes: 1024 });
-    const projectId = state.currentProjectId ?? storageAdapter.getCurrentProjectId();
+    const projectId = state.currentProjectId ?? projectWorkspaceStore.getCurrentProjectId();
     const projectRoot = projectId
-      ? storageAdapter.getProjectById(projectId)?.rootPath ?? null
+      ? projectWorkspaceStore.getProjectById(projectId)?.rootPath ?? null
       : null;
     return agentOrchestrator.getMcpServerStatusSummary(projectRoot);
   });
 
   ipcMain.handle('evidence:getChain', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'evidence:getChain', maxBytes: 1024 });
-    const sessionId = storageAdapter.getCurrentSessionId();
+    const sessionId = projectWorkspaceStore.getCurrentSessionId();
     if (!sessionId) {
       return { sessionId: '', runId: '', events: [], isValid: true };
     }
 
-    const events = await storageAdapter.readActionChain(sessionId);
+    const events = await sessionRecordStore.readActionChain(sessionId);
 
     return {
       sessionId,
-      runId: state.currentRunId || storageAdapter.getLatestRun(sessionId)?.runId || '',
+      runId: state.currentRunId || sessionRecordStore.getLatestRun(sessionId)?.runId || '',
       events,
       isValid: true,
     };

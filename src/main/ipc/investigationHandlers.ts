@@ -3,7 +3,7 @@ import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { AppError } from '@shared/errors/appError';
 import { InvestigationError, isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../sessions/store/sessionStores';
 import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { InvestigationReadArgsSchema, InvestigationListArgsSchema } from './validation/investigationSchemas';
@@ -26,7 +26,7 @@ function assertActiveInvestigationOwner(
   if (!state.currentSessionId || sessionId !== state.currentSessionId) {
     return sessionDenied('investigation:read requires the active session');
   }
-  const session = storageAdapter.readSession(sessionId);
+  const session = sessionRecordStore.readSession(sessionId);
   if (!session) {
     return sessionDenied('investigation:read session was not found');
   }

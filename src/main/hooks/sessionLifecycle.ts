@@ -1,5 +1,5 @@
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { rdcSessionService } from '../sessions';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
 import { dispatchRuntimeHooks } from './runtimeHookDispatch';
@@ -9,7 +9,7 @@ export async function createSessionWithHooks(
   title?: string,
   goal = '',
 ) {
-  const project = storageAdapter.getProjectById(projectId);
+  const project = projectWorkspaceStore.getProjectById(projectId);
   if (!project) {
     throw new Error(`Project not found: ${projectId}`);
   }
@@ -20,15 +20,15 @@ export async function createSessionWithHooks(
   if (!allowed) {
     throw new AppError('HOOK_DENIED', 'session.before-start');
   }
-  return storageAdapter.createSession(projectId, title, goal);
+  return sessionRecordStore.createSession(projectId, title, goal);
 }
 
 export async function removeSessionWithHooks(sessionId: string): Promise<void> {
-  const session = storageAdapter.readSession(sessionId);
-  const project = session ? storageAdapter.getProjectById(session.projectId) : null;
+  const session = sessionRecordStore.readSession(sessionId);
+  const project = session ? projectWorkspaceStore.getProjectById(session.projectId) : null;
   if (session) await rdcSessionService.clearOpenedCaptureForSession({ projectId: session.projectId, sessionId });
   if (project) await replayHistoryStore.clearSession(project.rootPath, sessionId);
-  storageAdapter.removeSession(sessionId);
+  sessionRecordStore.removeSession(sessionId);
   if (!session) return;
   await dispatchRuntimeHooks('session.after-end', {
     sessionId,

@@ -6,7 +6,7 @@ import { createFailClosedProviderContracts } from '@shared/provider-catalog/prov
 import { createContinuationArtifact } from '../agent-runtime/reasoning/ContinuationArtifacts';
 import { createProviderStateRef } from '../agent-runtime/reasoning/ProviderStateRefs';
 import { createTestRequestPlan } from '../testing/createTestRequestPlan';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, sessionContextStore } from '../sessions/store/sessionStores';
 import { SessionContextStore } from '../sessions/store/SessionContextStore';
 import {
   canonicalizeTerminalContextMessages,
@@ -18,7 +18,7 @@ import type { AssistantMessage, Message } from '../agent-runtime/core/types';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
-import type { StorageHost } from '../sessions/store/storageHost';
+import type { SessionContextHost } from '../sessions/store/SessionContextStore';
 
 
 afterEach(() => vi.restoreAllMocks());
@@ -355,7 +355,7 @@ describe('SessionContextJournal v2', () => {
         ],
       });
     });
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue(entries);
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue(entries);
 
     const result = journal.materialize(
       'session-1',
@@ -434,7 +434,7 @@ describe('SessionContextJournal v2', () => {
         && message.content.some((block) => block.type === 'thinking' && block.continuation)
       ))).toBe(true);
 
-      vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([entry({
+      vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([entry({
         executionIdentity: plan.executionIdentity,
         messages: [
           { role: 'user', content: 'inspect', timestamp: 1 },
@@ -491,7 +491,7 @@ describe('SessionContextJournal v2', () => {
         }]),
       ],
     }));
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue(entries);
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue(entries);
 
     const result = journal.materialize(
       'session-1',
@@ -529,8 +529,8 @@ describe('SessionContextJournal v2', () => {
   it('rejects conflicting duplicate turns and accepts byte-identical retries', () => {
     const journal = new SessionContextJournal();
     const existing = entry();
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([existing]);
-    const append = vi.spyOn(storageAdapter, 'appendSessionContextTurn');
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([existing]);
+    const append = vi.spyOn(sessionContextStore, 'appendSessionContextTurn');
 
     expect(() => journal.append('session-1', existing)).not.toThrow();
     expect(append).not.toHaveBeenCalled();
@@ -542,7 +542,7 @@ describe('SessionContextJournal v2', () => {
     const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-context-'));
     try {
       fs.writeFileSync(path.join(sessionPath, 'session-context.jsonl'), `${JSON.stringify({ schemaVersion: 1, turnId: 'turn-1' })}\n`);
-      const store = new SessionContextStore({ sessions: { findSessionLocation: () => ({ sessionPath }) } } as unknown as StorageHost);
+      const store = new SessionContextStore({ sessions: { findSessionLocation: () => ({ sessionPath }) } } as unknown as SessionContextHost);
       expect(() => store.readSessionContextJournal('session-1')).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
       expect(() => store.readSessionContextJournal('session-1', () => false)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
     } finally {
@@ -552,20 +552,20 @@ describe('SessionContextJournal v2', () => {
 
   it('fails closed when a visible turn is missing from the journal', () => {
     const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
-    vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue([]);
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
+    vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue([]);
     expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan))
       .toThrow('Session context journal is incomplete');
   });
 
   it('continues after a process-interrupted turn without promoting partial tool output into context', () => {
     const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
     const history = [
       { id: 'user-1', turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1', role: 'user', content: 'Inspect event 42', createdAt: 1 },
       { id: 'assistant-1', turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: 'Unverified partial answer', status: 'error', createdAt: 2, updatedAt: 3, diagnostic: { code: 'CONVERSATION_INTERRUPTED', severity: 'error', userMessage: 'Interrupted' } },
     ] as ConversationMessage[];
-    vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue(history);
+    vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue(history);
 
     const result = journal.materialize('session-1', ['interrupted-turn'], responsesPlan);
     expect(result.messages).toHaveLength(2);
@@ -576,8 +576,8 @@ describe('SessionContextJournal v2', () => {
 
   it('does not recover an unrelated missing terminal entry', () => {
     const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
-    vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue([
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
+    vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue([
       { id: 'user-1', turnId: 'missing-turn', sessionId: 'session-1', projectId: 'project-1', role: 'user', content: 'Inspect', createdAt: 1 },
       { id: 'assistant-1', turnId: 'missing-turn', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: 'Answer', status: 'error', createdAt: 2 },
     ] as ConversationMessage[]);
@@ -588,7 +588,7 @@ describe('SessionContextJournal v2', () => {
 
   it('keeps semantic messages and paired tool facts while dropping incompatible native state', () => {
     const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([entry({
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([entry({
       messages: [
         { role: 'user', content: 'inspect the capture', timestamp: 1 },
         assistant([

@@ -9,7 +9,7 @@ import { samePath } from '../platform/paths';
 import { appPathService } from '../runtime/AppPathService';
 import { SCOPED_IMPORT_EXTENSIONS, scopedRuntimeService } from '../runtime/ScopedRuntimeService';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import {
   RdcRuntimeDeleteArgsSchema,
@@ -36,7 +36,7 @@ import type { IpcChannelTable } from './invokeRegistry';
 function ownedProjectRoot(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
   const target = path.resolve(raw);
-  const project = storageAdapter.listProjects().find((entry) => samePath(entry.rootPath, target));
+  const project = projectWorkspaceStore.listProjects().find((entry) => samePath(entry.rootPath, target));
   if (!project) throw new AppError('PROJECT_ROOT_UNKNOWN', 'the folder is not an open project.');
   return project.rootPath;
 }

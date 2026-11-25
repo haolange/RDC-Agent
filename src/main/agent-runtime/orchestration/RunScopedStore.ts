@@ -1,11 +1,11 @@
 import * as path from 'path';
 import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { sessionRecordStore, storageIo } from '../../sessions/store/sessionStores';
 import type { ZodType } from 'zod';
 
 export class RunScopedStore {
   getRunRoot(sessionId: string, runId: string): string {
-    return storageAdapter.getRunPath(sessionId, runId);
+    return sessionRecordStore.getRunPath(sessionId, runId);
   }
 
   /** The run-scoped document, or null when it was never written; a damaged document throws `STORAGE_CORRUPT`. */
@@ -15,7 +15,7 @@ export class RunScopedStore {
 
   writeJson(sessionId: string, runId: string, relativePath: string, data: unknown): string {
     const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    storageAdapter.io.writeJsonAtomic(filePath, data);
+    storageIo.writeJsonAtomic(filePath, data);
     return filePath;
   }
 

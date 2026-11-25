@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 const transaction = vi.hoisted(() => vi.fn());
 vi.mock('./PlanApprovalTransaction', () => ({ runPlanApprovalTransaction: transaction }));
-vi.mock('../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: { sessions: { findSessionLocation: () => null }, executionOffers: { clear: vi.fn() } },
+vi.mock('../../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { findSessionLocation: () => null },
+  executionOfferStore: { clear: vi.fn() },
 }));
 
 import { AgentPlanReviewRequestService } from './AgentPlanReviewRequestService';

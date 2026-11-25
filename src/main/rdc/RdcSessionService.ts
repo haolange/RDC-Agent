@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { verifyExternalCaptureReference } from './captures/ExternalCaptureReference';
 import { hashCaptureFile } from './captures/replay/captureContentHash';
 import { replayHistoryStore } from './captures/replay/ReplayHistoryStore';
@@ -75,7 +75,7 @@ export class RdcSessionService extends RdcDevicePreparation {
       if (remoteId) this.devices.set(remoteId, key);
       this.publish(binding, { phase: 'validating', operationId: randomUUID(), generation: binding.state.generation + 1, error: null });
       try {
-        const project = storageAdapter.getProjectById(scope.projectId);
+        const project = projectWorkspaceStore.getProjectById(scope.projectId);
         const reference = project?.inputs?.find(input => input.inputId === request.inputId && input.source === 'external_reference');
         if (reference && reference.filePath !== request.filePath) throw new AppError('CAPTURE_REFERENCE_INVALID_PATH');
         const verifyInput = async () => {
@@ -188,7 +188,7 @@ export class RdcSessionService extends RdcDevicePreparation {
       if (binding.state.projectId !== projectId || binding.state.inputId !== oldInputId || binding.state.captureHash !== hash.sha256) continue;
       binding.runtime.rebindInput(input.inputId, input.filePath);
       this.publish(binding, { inputId: input.inputId });
-      const project = storageAdapter.getProjectById(projectId);
+      const project = projectWorkspaceStore.getProjectById(projectId);
       if (project) await replayHistoryStore.saveSelection(project.rootPath, binding.state.sessionId, {
         inputId: input.inputId, captureSha256: hash.sha256, deviceId: binding.state.replayDeviceId ?? undefined,
       });
@@ -271,7 +271,7 @@ export class RdcSessionService extends RdcDevicePreparation {
     const generation = this.binding(scope).state.generation;
     const state = await this.observe(scope, {}, false, frozenCli, alreadySerialized);
     if (this.binding(scope).state.generation !== generation) return;
-    const project = storageAdapter.getProjectById(scope.projectId);
+    const project = projectWorkspaceStore.getProjectById(scope.projectId);
     if (!project || !state.captureHash || (state.appliedEventId === null && !state.error)) return;
     const summary = `${operationId}${state.appliedEventId === null ? '' : ` · EID ${state.appliedEventId}`}${state.target ? ` · ${state.target.textureId}` : ''}${state.observation ? ` · ${state.observation.modificationState}` : ''}`;
     try {

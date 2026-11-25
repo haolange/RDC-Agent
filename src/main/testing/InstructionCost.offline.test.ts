@@ -9,7 +9,7 @@ import { parseAgentMarkdownStrict } from '../settings/agent-manifests/agentManif
 import { appPathService } from '../runtime/AppPathService';
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
 vi.mock('../runtime/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Offline fixed environment'); } }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSessionShellCwd: () => null } }));
+vi.mock('../sessions/store/sessionStores', () => ({ sessionContextStore: { readSessionShellCwd: () => null } }));
 const model = 'offline-fixture';
 const headSources = new Map<string, string>();
 let headSkillFiles: string[] | undefined;

@@ -13,9 +13,9 @@ const f = vi.hoisted(() => ({
 vi.mock('../sessions/run/approvedHandoffRecovery', () => ({ resolveApprovedHandoff: () => f.handoff }));
 vi.mock('../sessions/run/PlanReviewStateStore', () => ({ planReviewStateStore: { read: () => f.state } }));
 vi.mock('../sessions/run/sessionPlanReference', () => ({ readReferencedPlan: () => f.source }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: {
-  readConversationHistory: () => f.history, readConversationBranchState: () => null,
-} }));
+vi.mock('../sessions/store/sessionStores', () => ({
+  conversationHistoryStore: { readConversationHistory: () => f.history, readConversationBranchState: () => null },
+}));
 
 const execute = { intent: 'execute' as const, sessionId: 's', planId: 'plan', revision: 2, expectedHash: hash };
 

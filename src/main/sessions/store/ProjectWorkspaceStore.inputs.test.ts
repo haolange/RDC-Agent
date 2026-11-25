@@ -4,7 +4,7 @@ import os from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import type { ProjectRecord } from '@shared/types/session';
-import type { StorageHost } from './storageHost';
+import type { StorageIo } from './StorageIo';
 
 vi.mock('electron', () => ({ app: {} }));
 const roots: string[] = [];
@@ -14,7 +14,7 @@ async function setup() {
   const inputsPath = path.join(rootPath, '.rdc-agent', 'inputs'); await fs.mkdir(inputsPath, { recursive: true });
   const project: ProjectRecord = { projectId: 'project', name: 'project', rootPath, inputsPath, resourcePath: path.dirname(inputsPath),
     knowledgePath: '', slug: 'project', inputsUpdatedAt: 1, createdAt: 1, updatedAt: 1, inputs: [] };
-  const store = new ProjectWorkspaceStore({} as StorageHost);
+  const store = new ProjectWorkspaceStore({} as StorageIo);
   vi.spyOn(store, 'getProjectById').mockReturnValue(project);
   const persist = vi.spyOn(store, 'persistProject').mockImplementation(() => undefined);
   const reconcile = vi.fn(async () => undefined);
@@ -39,7 +39,7 @@ describe('Project input complete scans', () => {
     expect(first).toHaveLength(1); expect(first[0].source).toBe('external_reference');
     expect(await fs.readdir(project.inputsPath)).toEqual([]);
     expect(await store.referenceProjectInput(project.projectId, source)).toHaveLength(1);
-    const restarted = new ProjectWorkspaceStore({} as StorageHost);
+    const restarted = new ProjectWorkspaceStore({} as StorageIo);
     vi.spyOn(restarted, 'getProjectById').mockImplementation(() => structuredClone(durable));
     vi.spyOn(restarted, 'persistProject').mockImplementation(next => { durable = structuredClone(next); });
     expect(await restarted.refreshProjectInputs(project.projectId)).toEqual(first);
@@ -91,7 +91,7 @@ describe('Project input complete scans', () => {
     expect(publish).toHaveBeenCalledWith('project', []);
     expect(durable.inputs).toEqual([]);
     expect(durable.replayCleanupPending).toMatchObject({ captureHashes: ['a'.repeat(64)], error: failure });
-    const restarted = new ProjectWorkspaceStore({} as StorageHost);
+    const restarted = new ProjectWorkspaceStore({} as StorageIo);
     vi.spyOn(restarted, 'getProjectById').mockImplementation(() => structuredClone(durable));
     vi.spyOn(restarted, 'persistProject').mockImplementation(value => { durable = structuredClone(value); });
     const retry = vi.fn(async () => undefined); restarted.setInputReconciler(retry);

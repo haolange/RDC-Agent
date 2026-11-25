@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ runRoot: '' }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { getRunPath: () => fixture.runRoot } }));
+vi.mock('../sessions/store/sessionStores', () => ({ sessionRecordStore: { getRunPath: () => fixture.runRoot } }));
 import { artifactStore } from './ArtifactStore';
 
 afterEach(() => { if (fixture.runRoot) fs.rmSync(fixture.runRoot, { recursive: true, force: true }); });

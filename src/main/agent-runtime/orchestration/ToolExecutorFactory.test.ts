@@ -100,10 +100,8 @@ vi.mock('../../runtime/AppPathService', () => ({
     getAppPath: () => process.cwd(),
   },
 }));
-vi.mock('../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    getSessionAttachmentsDir: () => 'D:/sessions/session-a/attachments',
-  },
+vi.mock('../../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { getSessionAttachmentsDir: () => 'D:/sessions/session-a/attachments' },
 }));
 vi.mock('../permissions/AgentPermissionPolicy', () => ({
   agentPermissionPolicyService: {

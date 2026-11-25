@@ -11,7 +11,7 @@ import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel
 import { resolveCompactionPercentForProject } from '../settings/settings-core/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { traceService } from '../agent-trace/TraceService';
 import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
 import { createDefaultBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
@@ -84,7 +84,7 @@ export async function startProfileTurn(
   // Turn preparation is where edits made outside the app (secrets, Agent files, trust) are picked up.
   settingsService.revalidateExternalInputs();
   const pendingProjectRootPath = context.projectId
-    ? storageAdapter.getProjectById(context.projectId)?.rootPath ?? null
+    ? projectWorkspaceStore.getProjectById(context.projectId)?.rootPath ?? null
     : null;
   const effectiveMessage = rawMessage;
   const conversationAgentId = resolveConversationAgentId(requestedAgentId, requestedProfileId, pendingProjectRootPath);
@@ -214,7 +214,7 @@ export async function startProfileTurn(
   const pendingAttachmentDescriptors = await resolvePendingAttachmentDescriptors(pendingAttachments);
   throwIfPreparationCancelled();
   const reservedSession = !context.session && context.projectId && pendingAttachmentDescriptors.length > 0
-    ? storageAdapter.allocateStagedConversationSession(
+    ? sessionRecordStore.allocateStagedConversationSession(
       context.projectId,
       rawMessage.slice(0, 80),
       requestId,
@@ -224,10 +224,10 @@ export async function startProfileTurn(
   const plannedAttachmentRecords: SessionAttachmentRecord[] = pendingAttachmentDescriptors.length === 0
     ? []
     : context.session
-      ? storageAdapter.history.planAttachmentsForTurn(
+      ? conversationHistoryStore.planAttachmentsForTurn(
         context.session,
         pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
-        storageAdapter.sessions.getSessionAttachmentsDir(context.session.sessionId),
+        sessionRecordStore.getSessionAttachmentsDir(context.session.sessionId),
         pendingAttachmentDescriptors.map((attachment) => ({
           material: attachment.material, sourceHash: attachment.sourceHash,
           layer: attachment.layer,
@@ -238,7 +238,7 @@ export async function startProfileTurn(
         })),
       )
       : reservedSession
-        ? storageAdapter.history.planAttachmentsForTurn(
+        ? conversationHistoryStore.planAttachmentsForTurn(
           reservedSession.session,
           pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
           path.join(reservedSession.finalPath, 'attachments'),
@@ -287,7 +287,7 @@ export async function startProfileTurn(
     excludeTurnId,
   });
   const preparedBranchState = branchContext?.branchState ?? (context.session
-    ? storageAdapter.readConversationBranchState(context.session.sessionId)
+    ? conversationHistoryStore.readConversationBranchState(context.session.sessionId)
     : null);
   const preparedBranchId = branchContext?.branchId
     ?? preparedBranchState?.activeLeafBranchId
@@ -329,8 +329,8 @@ export async function startProfileTurn(
   if (requestState) requestState.phase = 'committing';
 
   let workingSession = context.session;
-  let stagedSessionCommit: ReturnType<typeof storageAdapter.beginStagedConversationSession> | null = null;
-  let existingTurnCommit: ReturnType<typeof storageAdapter.beginExistingConversationTurnCommit> | null = null;
+  let stagedSessionCommit: ReturnType<typeof sessionRecordStore.beginStagedConversationSession> | null = null;
+  let existingTurnCommit: ReturnType<typeof conversationHistoryStore.beginExistingConversationTurnCommit> | null = null;
   let importedAttachments: SessionAttachmentRecord[] = [];
   let persistedHistoryBeforeCommit: ConversationMessage[] = [];
   let persistedBranchBeforeCommit: ConversationBranchState | null = null;
@@ -342,7 +342,7 @@ export async function startProfileTurn(
   try {
     const attachmentPaths = pendingAttachmentDescriptors.map((entry) => entry.filePath);
     if (!workingSession && context.projectId) {
-      stagedSessionCommit = storageAdapter.beginStagedConversationSession(
+      stagedSessionCommit = sessionRecordStore.beginStagedConversationSession(
         context.projectId,
         rawMessage.slice(0, 80),
         attachmentPaths,
@@ -355,7 +355,7 @@ export async function startProfileTurn(
       workingSession = stagedSessionCommit.session;
       importedAttachments = stagedSessionCommit.attachments;
     } else if (workingSession) {
-      existingTurnCommit = storageAdapter.beginExistingConversationTurnCommit(
+      existingTurnCommit = conversationHistoryStore.beginExistingConversationTurnCommit(
         workingSession.sessionId,
         attachmentPaths,
         requestId,
@@ -455,13 +455,13 @@ export async function startProfileTurn(
         assistantDraftMessage,
       ];
       if (stagedSessionCommit) {
-        workingSession = storageAdapter.commitStagedConversationSession(
+        workingSession = sessionRecordStore.commitStagedConversationSession(
           stagedSessionCommit,
           committedHistory,
           branchState,
         );
       } else if (existingTurnCommit) {
-        storageAdapter.commitExistingConversationTurn(existingTurnCommit, committedHistory, branchState);
+        conversationHistoryStore.commitExistingConversationTurn(existingTurnCommit, committedHistory, branchState);
       }
     }
 
@@ -469,7 +469,7 @@ export async function startProfileTurn(
     // agent starts. This is the sole owner for explicit user Outputs; no
     // renderer or action-payload fallback is allowed to invent an output.
     if (workingSession) {
-      const createdRun = await storageAdapter.createRun({
+      const createdRun = await sessionRecordStore.createRun({
         caseId: workingSession.sessionId,
         sessionId: workingSession.sessionId,
         turnId,
@@ -486,16 +486,16 @@ export async function startProfileTurn(
       if (continuationNotice) {
         continuationNotice = { ...continuationNotice, runId: turnRunId };
       }
-      storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
+      conversationHistoryStore.appendConversationMessage(workingSession.sessionId, userMessage);
       if (continuationNotice) {
-        storageAdapter.appendConversationMessage(workingSession.sessionId, continuationNotice);
+        conversationHistoryStore.appendConversationMessage(workingSession.sessionId, continuationNotice);
       }
-      storageAdapter.appendConversationMessage(workingSession.sessionId, assistantDraftMessage);
+      conversationHistoryStore.appendConversationMessage(workingSession.sessionId, assistantDraftMessage);
     }
   } catch (error) {
     try {
-      if (stagedSessionCommit) storageAdapter.rollbackStagedConversationSession(stagedSessionCommit);
-      if (existingTurnCommit) storageAdapter.rollbackExistingConversationTurn(existingTurnCommit);
+      if (stagedSessionCommit) sessionRecordStore.rollbackStagedConversationSession(stagedSessionCommit);
+      if (existingTurnCommit) conversationHistoryStore.rollbackExistingConversationTurn(existingTurnCommit);
     } catch (rollbackError) {
       console.error(`[ConversationService] Failed to roll back turn ${turnId}:`, rollbackError);
     }
@@ -504,12 +504,12 @@ export async function startProfileTurn(
   }
   const cancelAfterCommit = host.getPreparingRequestByRequestId(requestId)?.cancelAfterCommit === true;
   if (workingSession && conversationAgentId) {
-    storageAdapter.updateSession(workingSession.sessionId, { agentId: conversationAgentId });
-    workingSession = storageAdapter.readSession(workingSession.sessionId) ?? workingSession;
+    sessionRecordStore.updateSession(workingSession.sessionId, { agentId: conversationAgentId });
+    workingSession = sessionRecordStore.readSession(workingSession.sessionId) ?? workingSession;
   }
   let visibleMessages = workingSession?.sessionId && branchState
     ? resolveVisibleConversationMessages(
-        storageAdapter.readConversationHistory(workingSession.sessionId),
+        conversationHistoryStore.readConversationHistory(workingSession.sessionId),
         branchState,
       )
     : [userMessage, ...(continuationNotice ? [continuationNotice] : []), assistantDraftMessage];
@@ -530,7 +530,7 @@ export async function startProfileTurn(
     if (persistError) console.error(`[ConversationService] Failed to persist cancelled turn ${turnId}:`, persistError);
     visibleMessages = workingSession?.sessionId && branchState
       ? resolveVisibleConversationMessages(
-          storageAdapter.readConversationHistory(workingSession.sessionId),
+          conversationHistoryStore.readConversationHistory(workingSession.sessionId),
           branchState,
         )
       : [userMessage, assistantDraftMessage];
@@ -547,7 +547,7 @@ export async function startProfileTurn(
   host.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
   const committedTurnRun = workingSession && turnRunId
-    ? storageAdapter.listRuns(workingSession.sessionId).find(run => run.runId === turnRunId) ?? null
+    ? sessionRecordStore.listRuns(workingSession.sessionId).find(run => run.runId === turnRunId) ?? null
     : null;
 
   if (cancelAfterCommit) {
@@ -582,7 +582,7 @@ export async function startProfileTurn(
 
   return {
     requestId,
-    session: workingSession ? storageAdapter.readSessionSnapshot(workingSession.sessionId) : null,
+    session: workingSession ? sessionRecordStore.readSessionSnapshot(workingSession.sessionId) : null,
     mode: 'talk',
     userMessage,
     assistantDraftMessage,

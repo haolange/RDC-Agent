@@ -4,7 +4,7 @@ import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
 import { sessionContextJournal, type SessionContextJournal } from '../conversation/SessionContextJournal';
 import { delegatedArtifactOwner } from '../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore } from '../sessions/store/sessionStores';
 import { canonicalJson } from './RdcOperationCatalog';
 import { containsSensitiveRequestKey } from './RdcInvocationRecord';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
@@ -13,7 +13,7 @@ export type RecordedRequestQualification = 'recorded-model-request-only' | 'reco
 interface RecordedRdcDeps {
   resolver: Pick<SessionArtifactResolver, 'read' | 'write'>;
   journal: Pick<SessionContextJournal, 'readEntries'>;
-  history?: Pick<typeof storageAdapter, 'readConversationHistory'>;
+  history?: Pick<typeof conversationHistoryStore, 'readConversationHistory'>;
 }
 
 const digest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
@@ -28,7 +28,7 @@ function experimentField(request: Record<string, unknown>): { experimentId?: str
 /** Own-session recorded requests are provenance, not proof of native execution/defaults. */
 export function materializeRecordedRdcRequest(
   context: ToolExecutionContext, uri: string, expectedHash: string | undefined,
-  deps: RecordedRdcDeps = { resolver: sessionArtifactResolver, journal: sessionContextJournal, history: storageAdapter },
+  deps: RecordedRdcDeps = { resolver: sessionArtifactResolver, journal: sessionContextJournal, history: conversationHistoryStore },
   operationIndex = false,
 ): { uri: string; hash: string; qualification: RecordedRequestQualification } {
   const sessionId = context.sessionId;

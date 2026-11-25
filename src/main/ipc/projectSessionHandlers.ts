@@ -7,7 +7,7 @@ import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
 import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { nativeMessage } from '../window/nativeI18n';
@@ -61,13 +61,13 @@ async function recoverStaleRunOnSelection(run: RunSummary | null): Promise<RunSu
     return run;
   }
 
-  await storageAdapter.updateRun(run.sessionId, run.runId, {
+  await sessionRecordStore.updateRun(run.sessionId, run.runId, {
     status: 'interrupted',
     stopReason: 'Recovered after app restart',
     stoppedAt: Date.now(),
     finishedAt: Date.now(),
   });
-  return storageAdapter.getLatestRun(run.sessionId);
+  return sessionRecordStore.getLatestRun(run.sessionId);
 }
 
 export function registerProjectSessionHandlers(context: WorkbenchIpcContext): void {
@@ -78,7 +78,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
 
   ipcMain.handle('project:list', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'project:list', maxBytes: 1024 });
-    return { projects: storageAdapter.listProjects() };
+    return { projects: projectWorkspaceStore.listProjects() };
   });
 
   ipcMain.handle('project:add', async (_event, ...rawArgs: unknown[]) => {
@@ -87,7 +87,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:add',
         maxBytes: 8 * 1024,
       });
-      const project = await storageAdapter.createProject(rootPath);
+      const project = await projectWorkspaceStore.createProject(rootPath);
       await context.selectCurrentProject(project.projectId);
       return { success: true, project };
     } catch (err) {
@@ -122,7 +122,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:rename',
         maxBytes: 4 * 1024,
       });
-      const project = storageAdapter.renameProject(projectId, newName);
+      const project = projectWorkspaceStore.renameProject(projectId, newName);
       return { success: true, project };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -135,12 +135,12 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:remove',
         maxBytes: 4 * 1024,
       });
-      await Promise.all(storageAdapter.listSessions(projectId).map(async (session) => {
+      await Promise.all(sessionRecordStore.listSessions(projectId).map(async (session) => {
         const stopped = await conversationService.cancelActiveTurn({ sessionId: session.sessionId });
         if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${session.sessionId}.`);
         await rdcSessionService.clearOpenedCaptureForSession({ projectId, sessionId: session.sessionId });
       }));
-      storageAdapter.removeProject(projectId);
+      projectWorkspaceStore.removeProject(projectId);
       if (state.currentProjectId === projectId) {
         state.currentProjectId = null;
         state.currentSessionId = null;
@@ -157,7 +157,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       label: 'project:inputs:list',
       maxBytes: 4 * 1024,
     });
-    return { inputs: await storageAdapter.listProjectInputs(projectId) };
+    return { inputs: await projectWorkspaceStore.listProjectInputs(projectId) };
   });
 
   ipcMain.handle('project:inputs:refresh', async (_event, ...rawArgs: unknown[]) => {
@@ -165,7 +165,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       label: 'project:inputs:refresh',
       maxBytes: 4 * 1024,
     });
-    const inputs = await storageAdapter.refreshProjectInputs(projectId);
+    const inputs = await projectWorkspaceStore.refreshProjectInputs(projectId);
     context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
     return { inputs };
   });
@@ -182,10 +182,10 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     });
 
     if (result.canceled || result.filePaths.length === 0) {
-      return { success: true, inputs: await storageAdapter.listProjectInputs(projectId) };
+      return { success: true, inputs: await projectWorkspaceStore.listProjectInputs(projectId) };
     }
 
-    const inputs = await storageAdapter.importProjectInputs(projectId, result.filePaths);
+    const inputs = await projectWorkspaceStore.importProjectInputs(projectId, result.filePaths);
     context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
     return { success: true, inputs };
   });
@@ -196,7 +196,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:inputs:importPaths',
         maxBytes: 64 * 1024,
       });
-      const inputs = await storageAdapter.importProjectInputs(projectId, filePaths);
+      const inputs = await projectWorkspaceStore.importProjectInputs(projectId, filePaths);
       context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
       return { success: true, inputs };
     } catch (error) {
@@ -213,7 +213,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       const [projectId, filePath] = parseIpcArgs(ProjectInputReferenceArgsSchema, rawArgs, {
         label: 'project:inputs:reference', maxBytes: 8192,
       });
-      const inputs = await storageAdapter.projects.referenceProjectInput(projectId, filePath);
+      const inputs = await projectWorkspaceStore.referenceProjectInput(projectId, filePath);
       context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
       return { success: true, inputs };
     } catch (error) {
@@ -231,7 +231,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     if (!resolvedProjectId) {
       return { sessions: [] as SessionRecordSnapshot[] };
     }
-    return { sessions: storageAdapter.listSessions(resolvedProjectId).map((session) => sessionRevisions.snapshot(session)) };
+    return { sessions: sessionRecordStore.listSessions(resolvedProjectId).map((session) => sessionRevisions.snapshot(session)) };
   });
 
   ipcMain.handle('session:create', async (_event, ...rawArgs: unknown[]) => {
@@ -245,7 +245,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       state.currentProjectId = session.projectId;
       state.currentSessionId = session.sessionId;
       state.currentRunId = null;
-      storageAdapter.setCurrentSessionId(session.sessionId);
+      projectWorkspaceStore.setCurrentSessionId(session.sessionId);
       return { success: true, session: sessionRevisions.snapshot(session) };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -263,7 +263,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         return { success: false, error: 'Session 名称不能为空。' };
       }
 
-      const session = storageAdapter.updateSession(id, { title: trimmedTitle });
+      const session = sessionRecordStore.updateSession(id, { title: trimmedTitle });
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
@@ -280,7 +280,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'session:remove',
         maxBytes: 4 * 1024,
       });
-      const session = storageAdapter.readSession(id);
+      const session = sessionRecordStore.readSession(id);
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
@@ -288,7 +288,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       const stopped = await conversationService.cancelActiveTurn({ sessionId: id });
       if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${id}.`);
 
-      const runs = storageAdapter.listRuns(id);
+      const runs = sessionRecordStore.listRuns(id);
       const activeRun = runs.find((run) => ['queued', 'running', 'stopping'].includes(run.status));
       if (activeRun) {
         runExecutionService.stopRun(activeRun.runId);
@@ -305,7 +305,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       attachmentStagingService.releaseBySessionId(id);
       agentOrchestrator.syncSessionSlots(id);
       agentOrchestrator.releaseSessionToolState(id);
-      const remainingSessions = storageAdapter.listSessions(session.projectId);
+      const remainingSessions = sessionRecordStore.listSessions(session.projectId);
       const nextSession = remainingSessions[0]
         ? sessionRevisions.snapshot(remainingSessions[0])
         : null;
@@ -315,11 +315,11 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         state.currentRunId = nextSession?.record.lastRunId || null;
         state.currentProjectId = session.projectId;
         if (state.currentSessionId) {
-          storageAdapter.setCurrentSessionId(state.currentSessionId);
-          nextRun = storageAdapter.getLatestRun(state.currentSessionId);
+          projectWorkspaceStore.setCurrentSessionId(state.currentSessionId);
+          nextRun = sessionRecordStore.getLatestRun(state.currentSessionId);
         } else {
-          storageAdapter.setCurrentSessionId(null);
-          storageAdapter.setCurrentProjectId(session.projectId);
+          projectWorkspaceStore.setCurrentSessionId(null);
+          projectWorkspaceStore.setCurrentProjectId(session.projectId);
         }
       }
 
@@ -337,7 +337,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'session:open',
         maxBytes: 4 * 1024,
       });
-      const session = storageAdapter.readSession(id);
+      const session = sessionRecordStore.readSession(id);
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
@@ -346,15 +346,15 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
 
       state.currentSessionId = id;
       state.currentProjectId = session.projectId;
-      const currentRun = await recoverStaleRunOnSelection(storageAdapter.getLatestRun(id));
+      const currentRun = await recoverStaleRunOnSelection(sessionRecordStore.getLatestRun(id));
       state.currentRunId = currentRun?.runId || session.lastRunId || null;
-      storageAdapter.setCurrentSessionId(id);
+      projectWorkspaceStore.setCurrentSessionId(id);
       const [history, trace] = await Promise.all([conversationService.getHistory(id), traceService.getSession(id)]);
       return {
         success: true,
         session: opened,
         currentRun,
-        runs: storageAdapter.listRuns(id),
+        runs: sessionRecordStore.listRuns(id),
         history,
         trace,
       };
@@ -370,14 +370,14 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         maxBytes: 4 * 1024,
       });
       requireActiveSessionOwner(state, id);
-      const session = storageAdapter.readSession(id);
+      const session = sessionRecordStore.readSession(id);
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
       if (request.modelOverride) await assertSessionModelExecutable(request.modelOverride);
       // Checked after the await and written in the same synchronous step: a newer intent's field is never overwritten.
       const fields = sessionModelLanes.newer(id, request);
-      const updated = Object.keys(fields).length > 0 ? storageAdapter.updateSession(id, fields) : storageAdapter.readSession(id);
+      const updated = Object.keys(fields).length > 0 ? sessionRecordStore.updateSession(id, fields) : sessionRecordStore.readSession(id);
       if (updated) sessionModelLanes.wrote(id, request.clientRevision, fields);
       return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };
     } catch (err) {
@@ -392,16 +392,16 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         maxBytes: 4 * 1024,
       });
       requireActiveSessionOwner(state, id);
-      const session = storageAdapter.readSession(id);
+      const session = sessionRecordStore.readSession(id);
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
-      const projectRoot = storageAdapter.getProjectById(session.projectId)?.rootPath ?? null;
+      const projectRoot = projectWorkspaceStore.getProjectById(session.projectId)?.rootPath ?? null;
       const definition = resolveEnabledAgentDefinition(agentId, projectRoot);
       if (!definition) {
         return { success: false, error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${agentId}\` is not enabled.` };
       }
-      const updated = storageAdapter.updateSession(id, { agentId });
+      const updated = sessionRecordStore.updateSession(id, { agentId });
       return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -427,6 +427,6 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       label: 'run:list',
       maxBytes: 4 * 1024,
     });
-    return { runs: storageAdapter.listRuns(sessionId) };
+    return { runs: sessionRecordStore.listRuns(sessionId) };
   });
 }

@@ -11,17 +11,19 @@ const disk = vi.hoisted(() => ({
   model: vi.fn(async () => undefined),
   profiles: vi.fn(),
 }));
-vi.mock('../../sessions/store/StorageAdapter', async () => {
+vi.mock('../../sessions/store/sessionStores', async () => {
   const { sessionRevisions } = await import('../../sessions/store/SessionRevisionRegistry');
-  return { storageAdapter: {
-    readSession: () => disk.session,
-    getProjectById: () => ({ rootPath: '/project' }),
-    updateSession: (_id: string, patch: Partial<SessionRecord>) => {
-      disk.session = { ...disk.session!, ...patch, updatedAt: disk.session!.updatedAt + 1 };
-      sessionRevisions.written(disk.session);
-      return disk.session;
+  return {
+    sessionRecordStore: {
+      readSession: () => disk.session,
+      updateSession: (_id: string, patch: Partial<SessionRecord>) => {
+        disk.session = { ...disk.session!, ...patch, updatedAt: disk.session!.updatedAt + 1 };
+        sessionRevisions.written(disk.session);
+        return disk.session;
+      },
     },
-    executionOffers: {
+    projectWorkspaceStore: { getProjectById: () => ({ rootPath: '/project' }) },
+    executionOfferStore: {
       read: () => disk.offer,
       write: (_id: string, offer: ExecutionOffer) => {
         if (disk.failOfferWrite) throw new Error('disk full');
@@ -29,7 +31,7 @@ vi.mock('../../sessions/store/StorageAdapter', async () => {
       },
       clear: () => { disk.offer = null; },
     },
-  } };
+  };
 });
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: disk.hooks }));
 vi.mock('../../conversation/sessionModelGate', () => ({ assertSessionModelAndControls: disk.model }));

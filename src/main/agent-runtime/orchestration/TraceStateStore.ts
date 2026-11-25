@@ -3,7 +3,7 @@ import * as path from 'path';
 import { z, type ZodType } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../../sessions/store/sessionStores';
 import { runScopedStore } from './RunScopedStore';
 import type {
   RequestBranch,
@@ -242,7 +242,7 @@ export class TraceStateStore {
   }
 
   private resolvePath(sessionId: string): string {
-    const session = storageAdapter.readSession(sessionId);
+    const session = sessionRecordStore.readSession(sessionId);
     if (!session) {
       throw new Error(`Session not found for trace state: ${sessionId}`);
     }

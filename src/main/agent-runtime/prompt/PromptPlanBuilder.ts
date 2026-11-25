@@ -8,7 +8,7 @@ import { currentHost } from '../../platform/host';
 import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
 import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
 import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { sessionContextStore } from '../../sessions/store/sessionStores';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
 import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
@@ -312,7 +312,7 @@ function resolvePromptShellLabel(): string {
 function resolvePromptShellCwd(sessionId: string | null | undefined, workDir: string): string {
   if (sessionId) {
     try {
-      const persisted = storageAdapter.readSessionShellCwd(sessionId);
+      const persisted = sessionContextStore.readSessionShellCwd(sessionId);
       if (persisted) return persisted;
     } catch {
       /* session may not exist yet */

@@ -11,10 +11,8 @@ vi.mock('../../runtime/resolveConfiguredShell', () => ({
     throw new Error('SHELL_UNAVAILABLE: test stub');
   },
 }));
-vi.mock('../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    readSessionShellCwd: () => null,
-  },
+vi.mock('../../sessions/store/sessionStores', () => ({
+  sessionContextStore: { readSessionShellCwd: () => null },
 }));
 
 describe('PromptPlanBuilder', () => {

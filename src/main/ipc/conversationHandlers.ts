@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import { AppError } from '@shared/errors/appError';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { conversationService } from '../conversation/ConversationService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import {
@@ -66,7 +66,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       if (result.session) {
         state.currentProjectId = result.session.record.projectId;
         state.currentSessionId = result.session.record.sessionId;
-        storageAdapter.setCurrentSessionId(result.session.record.sessionId);
+        projectWorkspaceStore.setCurrentSessionId(result.session.record.sessionId);
       }
       if (result.runUpdate?.runId) {
         state.currentRunId = result.runUpdate.runId;
@@ -98,7 +98,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
     if (result.session) {
       state.currentProjectId = result.session.record.projectId;
       state.currentSessionId = result.session.record.sessionId;
-      storageAdapter.setCurrentSessionId(result.session.record.sessionId);
+      projectWorkspaceStore.setCurrentSessionId(result.session.record.sessionId);
     }
     if (result.runUpdate?.runId) {
       state.currentRunId = result.runUpdate.runId;
@@ -268,13 +268,13 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
         if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
           return { dataUrl: null, error: 'IMAGE_PREVIEW_SESSION_DENIED' };
         }
-        const attachment = storageAdapter.listSessionAttachments(request.sessionId)
+        const attachment = conversationHistoryStore.listSessionAttachments(request.sessionId)
           .find((item) => item.attachmentId === request.previewId);
         if (!attachment || !NATIVE_IMAGE_MIME_TYPES.has(attachment.mimeType)) {
           return { dataUrl: null, error: 'IMAGE_PREVIEW_NOT_FOUND' };
         }
         const safePath = assertAttachmentPreviewPath(
-          storageAdapter.getSessionAttachmentsDir(request.sessionId),
+          sessionRecordStore.getSessionAttachmentsDir(request.sessionId),
           attachment.filePath,
         );
         return { dataUrl: readAttachmentFilePreviewDataUrl(safePath, attachment.mimeType) };
