@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = createDefaultAppSettings();
 const mocks = vi.hoisted(() => ({ save: vi.fn(), revision: 0 }));
 vi.mock('../../../stores/appSettingsStore', () => ({
   nextAgentDefinitionClientRevision: () => ++mocks.revision,
-  useAppSettingsStore: (select: (state: object) => unknown) => select({ saveAgentDefinition: mocks.save }),
+  useAppSettingsStore: (select: (state: object) => unknown) => select({ saveAgentDefinition: mocks.save, refreshSettings: async () => undefined }),
 }));
 vi.mock('../../../stores/projectStore', () => ({ useProjectStore: (select: (state: object) => unknown) => select({ currentProject: null }) }));
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -29,7 +29,6 @@ let host: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('electronAPI', undefined);
-  Object.defineProperty(window, 'electronAPI', { configurable: true, value: { settings: { getProviderCatalog: async () => ({}) } } });
   mocks.save.mockReset(); mocks.revision = 0;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });

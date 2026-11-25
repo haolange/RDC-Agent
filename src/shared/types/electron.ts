@@ -55,9 +55,9 @@ import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type { RuntimePermissionState } from './runtimePermission';
 import type {
   AgentPermissionMode,
-  AppSettings,
   SettingsPatchOp,
   SettingsPatchResult,
+  SettingsView,
   ResolvedShellSnapshot,
   LlmProviderAccountStatus,
   LlmProviderAccountLoginStartRequest,
@@ -420,19 +420,19 @@ export interface ElectronAPI {
   };
 
   settings: {
-    get: () => Promise<AppSettings>;
+    get: () => Promise<SettingsView>;
     getProviderCatalog: () => Promise<LlmProviderCatalogResponse>;
     getEffectiveModel: (agentId: string) => Promise<EffectiveModel | null>;
     getEffectiveCatalog: (providerId: string, accountId?: string) => Promise<EffectiveCatalogSnapshot | null>;
     hasProviderSecret: (providerId: string) => Promise<{ hasSecret: boolean; maskedPreview?: string }>;
-    importAgentManifest: (filePath: string) => Promise<AppSettings>;
+    importAgentManifest: (filePath: string) => Promise<SettingsView>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
     getAgentDefinitionCommit: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<AgentDefinitionCommitSnapshot | null>;
     previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
-    applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
-    deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
+    applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
+    deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
     previewProjectAgentTrust: (sourcePath: string) => Promise<import('./agentManifest').ProjectAgentTrustPreview>;
-    trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
+    trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
     getAgentBuiltinComparison: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<import('./agentManifest').AgentBuiltinComparison>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;

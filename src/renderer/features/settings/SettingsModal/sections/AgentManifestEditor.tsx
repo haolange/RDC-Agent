@@ -24,12 +24,13 @@ import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
 import type { useI18n } from '../../../../i18n';
 import type { AppSettings } from '@shared/types/settings';
-import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance } from '@shared/types/agentManifest';
+import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance, AgentModelOption } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 interface AgentManifestEditorProps {
   skills: AgentSkillCatalog;
   settings: AppSettings;
+  modelOptions: AgentModelOption[];
   selectedAgent: AgentManifestDraft;
   /** Read-only origin of the definition (builtin / user / project, its file and hash); new drafts have none yet. */
   provenance: AgentManifestProvenance | null;
@@ -59,6 +60,7 @@ const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
 export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   skills,
   settings,
+  modelOptions,
   selectedAgent,
   provenance,
   builtinUpdate,
@@ -76,7 +78,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   const provenanceScope = provenance?.scope ?? null;
   const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
   const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
-  const status = configStatus(selectedAgent, settings, t);
+  const status = configStatus(selectedAgent, settings, modelOptions, t);
   // A healthy or switched-off Agent says nothing here: the switch already shows it is off.
   const statusProblem = status.tone === 'warning' || status.tone === 'error';
   const agentAccentStyle = useDynStyle({
@@ -198,7 +200,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           <div className="settings-agent-route-body">
             <AgentModelBindingFields
               binding={settings.agentModels.byAgent[selectedAgent.id] ?? {}}
-              options={settings.agents.modelOptions}
+              options={modelOptions}
               fallback={settings.agentModels.default}
               onChange={onModelFieldChange}
               testIdPrefix="settings-agent"

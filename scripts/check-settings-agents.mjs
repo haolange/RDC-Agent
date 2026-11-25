@@ -5,7 +5,6 @@ const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
 const { AGENT_ROLES } = require('../src/shared/constants/agents.ts');
-const { createProviderEntryFromCatalog } = require('../src/main/provider-catalog/ProviderCatalogRegistry.ts');
 const {
   canonicalAgentModelId,
   splitCanonicalAgentModelId,
@@ -23,23 +22,6 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
-}
-
-function configuredProvider(id, modelIds) {
-  const provider = createProviderEntryFromCatalog(id);
-  return {
-    ...provider,
-    enabled: true,
-    hasStoredSecret: true,
-    isConfigured: true,
-    status: 'verified',
-    models: modelIds.map((modelId) => ({
-      id: modelId,
-      label: modelId,
-      enabled: true,
-      contextWindowTokens: null,
-    })),
-  };
 }
 
 function route(agentId, providerId, modelId) {
@@ -112,7 +94,6 @@ function walkSourceFiles(directory) {
 }
 
 async function main() {
-  const ollama = configuredProvider('ollama', ['llama3']);
   const validRoutes = AGENT_ROLES.map((agentId) => route(agentId, 'ollama', 'llama3'));
   const customAgentId = 'custom-browser-use-agent';
 
@@ -274,7 +255,7 @@ async function main() {
         'custom-invalid-route-agent': { model: canonicalAgentModelId('ollama', 'missing-model') },
       },
     }));
-    const manifestSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
+    const manifestSettings = manifestService.getSettings({ agentsPath, instructionsPath });
     const customDefinition = manifestSettings.definitions.find((definition) => definition.id === customAgentId);
     assert(customDefinition, 'Agent manifest settings should load a safe custom .agent.md profile.');
     assert(customDefinition.userInvocable === true, 'Custom profile should preserve user-invocable status.');
@@ -307,7 +288,7 @@ async function main() {
     }));
     manifestService.saveGlobalInstructions({ instructionsPath }, 'global custom instructions');
     assert(fs.existsSync(path.join(agentsPath, `${savedAgentId}.agent.md`)), 'Saving a custom profile should write a safe id-based file name.');
-    const savedSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
+    const savedSettings = manifestService.getSettings({ agentsPath, instructionsPath });
     assert(savedSettings.definitions.some((definition) => definition.id === savedAgentId), 'Saved custom profile should reload by custom id.');
 
     const invalidRouteSettings = manifestService.routesFromDefinitions([], [
@@ -326,7 +307,7 @@ async function main() {
     fs.writeFileSync(movedFieldPath, fs.readFileSync(importPath, 'utf8').replace('icon: spark', 'model: [ollama:llama3]\nicon: spark'));
     // Files written outside the app are picked up when manifest inputs are re-checked (turn preparation, Settings open).
     manifestService.revalidate();
-    const movedFieldSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
+    const movedFieldSettings = manifestService.getSettings({ agentsPath, instructionsPath });
     assert(movedFieldSettings.diagnostics.some((issue) => issue.code === 'AGENT_MANIFEST_FIELD_MOVED' && issue.sourcePath === movedFieldPath),
       'A manifest that still declares a model must stay inactive with a migratable diagnostic.');
     fs.rmSync(movedFieldPath);
@@ -364,13 +345,7 @@ Reserved historical filename.
     writeCustomManifest(path.join(projectAgents, 'ask.agent.md'), { name: 'Project Ask' });
 
     manifestService.revalidate();
-    const reservedSettings = manifestService.getSettings(
-      { agentsPath, instructionsPath },
-      [ollama],
-      validRoutes,
-      [],
-      projectRoot,
-    );
+    const reservedSettings = manifestService.getSettings({ agentsPath, instructionsPath }, projectRoot);
     const effectiveIds = reservedSettings.definitions.map((definition) => definition.id);
     const userInvocableIds = reservedSettings.definitions
       .filter((definition) => definition.userInvocable)

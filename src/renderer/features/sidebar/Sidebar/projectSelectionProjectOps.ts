@@ -41,7 +41,7 @@ export async function loadSessionsOp(
   }
 
   ctx.setSessions(nextSessions);
-  await ctx.reloadSettings();
+  await ctx.reloadSettings(selectedProject.projectId);
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return;
   }
@@ -130,7 +130,7 @@ export async function loadProjectsOp(
     ctx.setCaptures([]);
     ctx.setSessions([]);
     ctx.setRuns([]);
-    await ctx.reloadSettings();
+    await ctx.reloadSettings(null);
     return;
   }
 

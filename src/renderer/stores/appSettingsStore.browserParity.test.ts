@@ -1,15 +1,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+import { providerConnectionState } from '@shared/utils/providerEntryView';
 import { useAppSettingsStore } from './appSettingsStore';
 import { buildConversationConfigurationCommit } from './conversationConfigurationCommit';
-import type { LlmProviderEntry, ProviderDefinitionSaveResult } from '@shared/types/settings';
+import type { AppSettings, LlmProviderCatalogResponse, LlmProviderEntry, ProviderDefinitionSaveResult, SettingsView } from '@shared/types/settings';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
+
+/** `settings` as main sends it: the view at `revision`, and a catalog holding each provider's catalog facts. */
+function viewOf(settings: AppSettings, revision = 1): [SettingsView, LlmProviderCatalogResponse] {
+  const view: SettingsView = {
+    ...settings,
+    revision,
+    llm: { connections: settings.llm.providers.map(providerConnectionState), agentRoutes: settings.llm.agentRoutes },
+    agents: { ...settings.agents, projectId: null },
+  };
+  const providers = settings.llm.providers.map((provider) => ({ ...provider, recommendedModels: provider.recommendedModels ?? [] }));
+  return [view, { categories: [], protocols: [], providers }];
+}
 
 describe('app settings browser parity', () => {
   afterEach(() => {
     useAppSettingsStore.setState({
       settings: DEFAULT_SETTINGS,
+      providerCatalog: null,
       contextBreakdownPreference: null,
       hydrated: false,
       systemTheme: 'dark',
@@ -23,7 +37,7 @@ describe('app settings browser parity', () => {
     vi.stubGlobal('window', {
       electronAPI: { settings: { patch } },
     });
-    useAppSettingsStore.getState().hydrate(DEFAULT_SETTINGS, 'dark');
+    useAppSettingsStore.getState().hydrate(...viewOf(DEFAULT_SETTINGS), 'dark');
 
     await useAppSettingsStore.getState().setLanguage('en');
 
@@ -37,13 +51,13 @@ describe('app settings browser parity', () => {
     const patch = vi.fn().mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
     vi.stubGlobal('window', { electronAPI: { settings: { patch } } });
     const store = useAppSettingsStore;
-    store.getState().hydrate(DEFAULT_SETTINGS, 'dark');
+    store.getState().hydrate(...viewOf(DEFAULT_SETTINGS), 'dark');
 
     const saving = store.getState().setContextBreakdownExpanded(true);
     expect(store.getState().contextBreakdownPreference).toEqual({ expanded: true });
     expect(store.getState().settings.appearance.contextBreakdownExpanded).toBe(true);
     const older = { ...DEFAULT_SETTINGS.appearance, theme: 'light' as const };
-    store.getState().replaceSettings({ ...DEFAULT_SETTINGS, appearance: older });
+    store.getState().replaceSettings(viewOf({ ...DEFAULT_SETTINGS, appearance: older }, 2)[0]);
     expect(store.getState().settings.appearance).toMatchObject({ theme: 'light', contextBreakdownExpanded: true });
     resolveSave({ revision: 3, changed: { appearance: { ...older, contextBreakdownExpanded: true } } });
     await saving;
@@ -64,7 +78,7 @@ describe('app settings browser parity', () => {
       getProviderDefinitionCommit: getCommit,
     } } });
     const store = useAppSettingsStore.getState();
-    store.hydrate({ ...DEFAULT_SETTINGS, llm: { ...DEFAULT_SETTINGS.llm, providers: [provider] } }, 'dark');
+    store.hydrate(...viewOf({ ...DEFAULT_SETTINGS, llm: { ...DEFAULT_SETTINGS.llm, providers: [provider] } }), 'dark');
     const saving = store.saveProvider({ ...provider, models: [{ ...provider.models[0], enabled: false }] });
     const attempt = () => buildConversationConfigurationCommit({
       selectedAgentId: 'general',
@@ -96,13 +110,13 @@ describe('app settings browser parity', () => {
       getProviderDefinitionCommit: vi.fn().mockResolvedValue(null),
     } } });
     const store = useAppSettingsStore.getState();
-    store.hydrate(stored(provider), 'dark');
+    store.hydrate(...viewOf(stored(provider)), 'dark');
 
     const edit = { ...provider, models: [{ ...provider.models[0], enabled: false }] };
     const pending = store.saveProvider(edit);
     const flush = store.flushProviderSaves(provider.id);
     const next = { ...provider, activeAccountId: 'current' };
-    store.replaceSettings(stored(next));
+    store.replaceSettings(viewOf(stored(next), 2)[0]);
     const receipt = {
       clientRevision: save.mock.calls[0][0].clientRevision,
       providerId: provider.id, provider: edit, commitHash: 'previous-account', catalogRevision: null,
@@ -111,6 +125,6 @@ describe('app settings browser parity', () => {
 
     await expect(pending).resolves.toMatchObject({ status: 'superseded' });
     await flush;
-    expect(useAppSettingsStore.getState().settings.llm.providers).toEqual([next]);
+    expect(useAppSettingsStore.getState().settings.llm.providers.map((entry) => entry.activeAccountId)).toEqual(['current']);
   });
 });

@@ -10,13 +10,12 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "5140fa7b21e2aec2918d0ce6"
-   },
+    "ref": "56880e90c26d8d50cd1761c7"
+   }
+  ],
+  "settings:getProviderCatalog": [
    {
-    "ref": "5140fa7b21e2aec2918d0ce6"
-   },
-   {
-    "ref": "5140fa7b21e2aec2918d0ce6"
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -33,8 +32,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-e16f25599601-1795596342892",
-       "timestamp": 1795596342892,
+       "id": "rlog-43baa64188a0-1795618424240",
+       "timestamp": 1795618424240,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -48,8 +47,8 @@
        }
       },
       {
-       "id": "rlog-139987d5493a-1795596343180",
-       "timestamp": 1795596343180,
+       "id": "rlog-68533957fc29-1795618424275",
+       "timestamp": 1795618424275,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -61,8 +60,8 @@
        "raw": null
       },
       {
-       "id": "rlog-068368bcb4e2-1795596343181",
-       "timestamp": 1795596343181,
+       "id": "rlog-c66bd5469fb0-1795618424276",
+       "timestamp": 1795618424276,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -74,18 +73,18 @@
        "raw": null
       },
       {
-       "id": "rlog-77df39be7646-1795596343196",
-       "timestamp": 1795596343196,
+       "id": "rlog-236e153b5675-1795618424290",
+       "timestamp": 1795618424290,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
        "title": "Browser app session ready",
-       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:38303/app",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
        "sessionId": null,
        "projectId": null,
        "runId": null,
        "raw": {
-        "bridgeUrl": "http://127.0.0.1:38303",
+        "bridgeUrl": "http://127.0.0.1:5127",
         "userDataPath": "/visual-diff"
        }
       }

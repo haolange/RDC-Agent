@@ -29,13 +29,15 @@ export function useShellBootstrap(options: {
           setConnectionStatus('offline');
           return;
         }
-        const [appSettings, appMeta, isMaximized] = await Promise.all([
+        // The one startup read of the settings view; the catalog's static provider facts come once with it.
+        const [view, providerCatalog, appMeta, isMaximized] = await Promise.all([
           electronAPI.settings.get(),
+          electronAPI.settings.getProviderCatalog(),
           electronAPI.appMeta.get(),
           electronAPI.windowControls.isMaximized().catch(() => false),
         ]);
-        hydrateSettings(appSettings, appMeta.systemTheme);
-        hydrateLayout(appSettings);
+        hydrateSettings(view, providerCatalog, appMeta.systemTheme);
+        hydrateLayout(useAppSettingsStore.getState().settings);
         setShellReady(true);
         setWindowMaximized(isMaximized);
         setConnectionStatus('connected');

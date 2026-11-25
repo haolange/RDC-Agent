@@ -20,13 +20,13 @@ export interface AgentConfigStatus {
 }
 
 /** Read-only configuration status from the enabled flag, the model the Agent resolves to, and its tool grant. */
-export function configStatus(agent: AgentManifestDraft, settings: AppSettings, t: Translate): AgentConfigStatus {
+export function configStatus(agent: AgentManifestDraft, settings: AppSettings, modelOptions: AgentModelOption[], t: Translate): AgentConfigStatus {
   if (!agent.enabled) return { label: t('settings.disabled'), tone: 'primary' };
   const resolved = resolveAgentModel(agent.id, settings.agentModels);
   const modelId = resolved.route ? canonicalAgentModelId(resolved.route.providerId, resolved.route.modelId) : '';
   const reasoningLevel = resolved.reasoningLevel;
   if (!modelId) return { label: t('settings.agentStatusNoModel'), tone: 'warning' };
-  const option = settings.agents.modelOptions.find((entry) => entry.canonicalId === modelId);
+  const option = modelOptions.find((entry) => entry.canonicalId === modelId);
   if (!option) return { label: t('settings.routeReasonModelInvalid'), tone: 'error' };
   const detail = option.disabledReason ? { detail: option.disabledReason } : {};
   if (option.status === 'provider-unavailable') {

@@ -116,7 +116,7 @@ describe('loadSessionsOp project-aware settings refresh', () => {
     await loadSessionsOp(ctx, project('proj_b'), { autoSelectSession: false, requestId: 1 });
 
     expect(selectProject).toHaveBeenCalledWith('proj_b');
-    expect(reloadSettings).toHaveBeenCalledTimes(1);
+    expect(reloadSettings).toHaveBeenCalledExactlyOnceWith('proj_b');
     expect(setCurrentProject).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'proj_b' }));
     expect(order).toEqual(['select', 'reloadSettings', 'setCurrentProject']);
   });

@@ -19,6 +19,7 @@ import { AgentDefaultModelSection } from './AgentDefaultModelSection';
 import { AgentReviewDialogs } from './AgentReviewDialogs';
 import { NewAgentDialog } from './NewAgentDialog';
 import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
+import { useAgentModelOptions } from './useAgentModelOptions';
 import type { AgentProvenanceScope } from './agentConfigStatus';
 import type { useI18n } from '../../../../i18n';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
@@ -59,6 +60,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 }) => {
   const [scope, setScope] = useState<AgentScope>('user');
   const models = useAgentModelControls(modelCommands);
+  const modelOptions = useAgentModelOptions(settings);
   const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
   const clearAgentRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
   const [missingAgentId, setMissingAgentId] = useState<string | null>(null);
@@ -163,6 +165,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
     <div className={`settings-manifest-page${detailRequested && selectedAgent ? ' is-detail-open' : ''}`}>
       <AgentDefaultModelSection
         settings={settings}
+        modelOptions={modelOptions}
         error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
         onChange={models.setDefaultField}
         t={t}
@@ -251,6 +254,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               key={selectedAgent.id}
               skills={skills}
               settings={settings}
+              modelOptions={modelOptions}
               selectedAgent={selectedAgent}
               provenance={selectedDefinition?.provenance ?? null}
               builtinUpdate={builtinUpdate}
@@ -271,7 +275,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           </div>
         )}
       </div>
-      <AgentReviewDialogs models={models} options={settings.agents.modelOptions} onRestore={deleteAgent} t={t} />
+      <AgentReviewDialogs models={models} options={modelOptions} onRestore={deleteAgent} t={t} />
       {naming ? (
         <NewAgentDialog scopeLabel={scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser')}
           existingIds={agentManifestDrafts.map((agent) => agent.id)} onCreate={addAgent} onClose={() => setNaming(false)} t={t} />

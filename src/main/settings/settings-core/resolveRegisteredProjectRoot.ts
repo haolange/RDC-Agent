@@ -23,6 +23,15 @@ export function resolveRegisteredProjectRoot(projectId?: string | null): string 
   return project.rootPath;
 }
 
+/** The project main has selected, or null when none is (or the selection cannot be read). */
+export function tryCurrentProjectId(): string | null {
+  try {
+    return lookupCurrentProjectId() || null;
+  } catch {
+    return null;
+  }
+}
+
 export function tryCurrentProjectRoot(): string | undefined {
   try {
     const projectId = lookupCurrentProjectId();

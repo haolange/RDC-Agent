@@ -19,13 +19,12 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "5140fa7b21e2aec2918d0ce6"
-   },
+    "ref": "56880e90c26d8d50cd1761c7"
+   }
+  ],
+  "settings:getProviderCatalog": [
    {
-    "ref": "5140fa7b21e2aec2918d0ce6"
-   },
-   {
-    "ref": "5140fa7b21e2aec2918d0ce6"
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -42,8 +41,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-6cb2474bc2f4-1795596368628",
-       "timestamp": 1795596368628,
+       "id": "rlog-d71075449306-1795618448339",
+       "timestamp": 1795618448339,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -57,8 +56,8 @@
        }
       },
       {
-       "id": "rlog-f39d7e8abb3b-1795596368940",
-       "timestamp": 1795596368940,
+       "id": "rlog-ce9fc333bcd0-1795618448378",
+       "timestamp": 1795618448378,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -70,8 +69,8 @@
        "raw": null
       },
       {
-       "id": "rlog-52a5a6cfdeba-1795596368940",
-       "timestamp": 1795596368940,
+       "id": "rlog-24434b9d353d-1795618448378",
+       "timestamp": 1795618448378,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -83,18 +82,18 @@
        "raw": null
       },
       {
-       "id": "rlog-7fd756258209-1795596368956",
-       "timestamp": 1795596368956,
+       "id": "rlog-e19ef3529299-1795618448391",
+       "timestamp": 1795618448391,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
        "title": "Browser app session ready",
-       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:46077/app",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
        "sessionId": null,
        "projectId": null,
        "runId": null,
        "raw": {
-        "bridgeUrl": "http://127.0.0.1:46077",
+        "bridgeUrl": "http://127.0.0.1:5127",
         "userDataPath": "/visual-diff"
        }
       }
@@ -149,7 +148,7 @@
      ],
      "index": {
       "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "builtAt": "2026-11-25T08:46:10.764Z",
+      "builtAt": "2026-11-25T14:54:09.424Z",
       "cardCount": 0,
       "cardsBySpace": {}
      }
@@ -196,7 +195,7 @@
    {
     "result": {
      "packId": "pack:e2b02937fd0c7754",
-     "compiledAt": "2026-11-25T08:46:10.782Z",
+     "compiledAt": "2026-11-25T14:54:09.451Z",
      "hits": [],
      "conflicts": []
     }

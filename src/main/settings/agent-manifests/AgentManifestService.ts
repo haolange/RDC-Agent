@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
-import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import { GENERAL_AGENT_ID, isSafeAgentProfileId } from '@shared/types/agent';
 import {
   AGENT_PROJECT_CEILING_NARROWED,
@@ -11,9 +10,7 @@ import {
   type AgentAccessCeiling,
 } from '@shared/types/agentManifest';
 import { AGENT_ROLES } from '@shared/constants/agents';
-import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
-import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
+import { resolveAgentModel } from '@shared/utils/agentModelRoute';
 import { AppError } from '@shared/errors/appError';
 import { deepFreeze } from '@shared/utils/deepFreeze';
 import { appPathService } from '../../runtime/AppPathService';
@@ -25,15 +22,13 @@ import { writeFileAtomic } from '../../runtime/atomicFile';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { projectAgentTrust } from './ProjectAgentTrust';
 import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute } from '@shared/types/settings';
 import type {
   AgentManifestDefinition,
   AgentManifestDiagnostic,
   AgentManifestDraft,
   AgentManifestSettings,
   AgentManifestWriteScope,
-  AgentModelOption,
   AgentBuiltinComparison,
 } from '@shared/types/agentManifest';
 
@@ -415,15 +410,11 @@ export class AgentManifestService {
 
   getSettings(
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
-    providers: LlmProviderEntry[],
-    routes: LlmAgentRoute[],
-    catalogs: EffectiveCatalogSnapshot[] = [],
     projectRoot?: string,
   ): AgentManifestSettings {
     return {
       directoryPath: this.getAgentsDirectory(paths),
       definitions: [...this.definitions(paths, projectRoot)],
-      modelOptions: this.getModelOptions(providers, routes, catalogs),
       globalInstructions: this.readGlobalInstructions(paths),
       diagnostics: [...this.resolveEffectiveSnapshot(paths, projectRoot).diagnostics],
     };
@@ -670,194 +661,7 @@ export class AgentManifestService {
     });
   }
 
-  projectEffectiveModelOptions(
-    settings: AgentManifestSettings,
-    providers: LlmProviderEntry[],
-    routes: LlmAgentRoute[],
-    catalogs: EffectiveCatalogSnapshot[],
-  ): AgentManifestSettings {
-    return {
-      ...settings,
-      modelOptions: this.getModelOptions(providers, routes, catalogs),
-    };
-  }
 
-  modelOptionCatalogProviderIds(
-    providers: LlmProviderEntry[],
-    routes: LlmAgentRoute[],
-  ): string[] {
-    return [...new Set([
-      ...routes
-        .map((route) => route.providerId)
-        .filter((providerId): providerId is string => Boolean(providerId)),
-      ...providers
-        .filter((provider) => (
-          provider.enabled
-          && provider.isConfigured
-        ))
-        .map((provider) => provider.id),
-    ])];
-  }
-
-  private getModelOptions(
-    providers: LlmProviderEntry[],
-    routes: LlmAgentRoute[],
-    catalogs: EffectiveCatalogSnapshot[],
-  ): AgentModelOption[] {
-    const agentModels = this.readAgentModels();
-    const referenced = new Set([
-      ...[agentModels.default, ...Object.values(agentModels.byAgent)].map((binding) => binding.model ?? '').filter(Boolean),
-      ...routes.map((route) => canonicalAgentModelId(route.providerId, route.modelId)).filter(Boolean),
-    ]);
-    const options: AgentModelOption[] = [];
-    const seen = new Set<string>();
-    const internalTargets = new Set(catalogs.flatMap((catalog) => catalog.models
-      .filter((model) => model.selection?.pickerVisibility === 'internal')
-      .map((model) => canonicalAgentModelId(catalog.providerId, model.modelId))));
-    const addOption = (option: AgentModelOption): void => {
-      if (!option.canonicalId || seen.has(option.canonicalId)) return;
-      seen.add(option.canonicalId);
-      options.push(option);
-    };
-    const providerIssue = (provider: LlmProviderEntry): Pick<AgentModelOption, 'providerIssue' | 'disabledReason'> => {
-      const state = provider.status === 'unconfigured' || provider.status === 'failed'
-        ? provider.status : 'unavailable';
-      const detail = state === 'failed' ? provider.lastError : state === 'unavailable' ? provider.unavailableReason : undefined;
-      return { providerIssue: state, ...(detail ? { disabledReason: detail } : {}) };
-    };
-    const fromEffectiveModel = (provider: LlmProviderEntry, model: EffectiveModel): AgentModelOption => {
-      const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
-      const providerUnavailable = !isProviderExecutable(provider);
-      const modelDisabled = model.enabled === false;
-      const eligibility = classifyAgentToolEligibility(model);
-      const toolExecutable = eligibility === 'executable';
-      const status: AgentModelOption['status'] = providerUnavailable
-        ? 'provider-unavailable'
-        : modelDisabled
-          ? 'model-disabled'
-          : model.availability === 'unavailable' || eligibility === 'unsupported' || eligibility === 'no-adapter'
-            ? 'model-unavailable'
-            : model.availability === 'available' && toolExecutable
-              ? 'ready'
-              : 'model-unverified';
-      const disabledReason = status === 'provider-unavailable'
-        ? undefined
-        : status === 'model-disabled'
-          ? 'Model is disabled.'
-          : status === 'model-unavailable'
-            ? eligibility === 'unsupported'
-              ? 'This provider route explicitly does not support native structured agent tools.'
-              : eligibility === 'no-adapter'
-                ? 'This provider route has no implemented native structured-tool adapter.'
-                : model.unavailableReason ?? 'Model is unavailable for this account and route.'
-            : status === 'model-unverified'
-              ? eligibility === 'budget-unknown'
-                ? 'Model has no verified positive context budget and cannot be executed safely.'
-                : eligibility === 'tools-unknown'
-                  ? 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.'
-                  : 'Model availability has not been verified for this account and route.'
-              : undefined;
-      // models.json user overrides are the only layer that carries sourceKind 'user'.
-      const isUserOverride = model.provenance.some((evidence) => (
-        evidence.source === 'user' && evidence.sourceKind === 'user'
-      ));
-      return {
-        canonicalId,
-        providerId: provider.id,
-        providerLabel: provider.label || provider.id,
-        modelId: model.modelId,
-        modelLabel: model.label || model.modelId,
-        configured: status === 'ready',
-        status,
-        reasoningSelections: model.controls.reasoning.kind === 'unknown'
-          ? null : getReasoningSelectionOrder(model.controls.reasoning),
-        ...(status === 'provider-unavailable' ? providerIssue(provider) : disabledReason ? { disabledReason } : {}),
-        ...(model.cost ? { cost: model.cost } : {}),
-        ...(isUserOverride ? { custom: true } : {}),
-      };
-    };
-
-    for (const provider of providers) {
-      if (provider.catalogOwnership !== 'user-managed') {
-        const snapshot = catalogs.find((catalog) => (
-          catalog.providerId === provider.id
-          && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
-          && catalog.protocol === provider.protocol
-        ));
-        for (const model of snapshot?.models ?? []) {
-          if (model.selection?.pickerVisibility === 'internal') continue;
-          const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
-          const executable = isAgentToolExecutableModel(model);
-          if (executable || referenced.has(canonicalId)) {
-            addOption(fromEffectiveModel(provider, model));
-          }
-        }
-        continue;
-      }
-      const snapshot = catalogs.find((catalog) => (
-        catalog.providerId === provider.id
-        && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
-        && catalog.protocol === provider.protocol
-      ));
-      for (const model of provider.models) {
-        const canonicalId = canonicalAgentModelId(provider.id, model.id);
-        const effective = snapshot?.models.find((entry) => (
-          entry.modelId === model.id || entry.aliases.includes(model.id)
-        ));
-        if (effective) {
-          const executable = isAgentToolExecutableModel(effective);
-          if (executable || referenced.has(canonicalId)) {
-            addOption(fromEffectiveModel(provider, effective));
-          }
-          continue;
-        }
-        if (!referenced.has(canonicalId)) continue;
-        const providerUnavailable = !isProviderExecutable(provider);
-        const disabled = model.enabled === false;
-        const status: AgentModelOption['status'] = providerUnavailable
-          ? 'provider-unavailable'
-          : disabled ? 'model-disabled' : 'model-unverified';
-        addOption({
-          canonicalId,
-          providerId: provider.id,
-          providerLabel: provider.label || provider.id,
-          modelId: model.id,
-          modelLabel: model.label || model.id,
-          configured: false,
-          status,
-          ...(status === 'provider-unavailable'
-            ? providerIssue(provider)
-            : status === 'model-disabled'
-              ? { disabledReason: 'Model is disabled.' }
-              : { disabledReason: 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.' }),
-        });
-      }
-    }
-
-    for (const canonicalId of referenced) {
-      if (seen.has(canonicalId) || internalTargets.has(canonicalId)) continue;
-      const parsed = splitCanonicalAgentModelId(canonicalId);
-      if (!parsed) continue;
-      const provider = providers.find((entry) => entry.id === parsed.providerId);
-      addOption({
-        canonicalId,
-        providerId: parsed.providerId,
-        providerLabel: provider?.label || parsed.providerId,
-        modelId: parsed.modelId,
-        modelLabel: parsed.modelId,
-        configured: false,
-        ...(provider && !isProviderExecutable(provider)
-          ? { status: 'provider-unavailable' as const, ...providerIssue(provider) }
-          : { status: 'missing' as const, disabledReason: 'This model is not present in the current account catalog.' }),
-      });
-    }
-
-    return options.sort((left, right) => (
-      left.providerLabel.localeCompare(right.providerLabel)
-      || Number(right.configured) - Number(left.configured)
-      || left.modelLabel.localeCompare(right.modelLabel)
-    ));
-  }
 
   private readGlobalInstructions(paths: Pick<AppRuntimePaths, 'instructionsPath'>): string {
     const filePath = this.getGlobalInstructionsPath(paths);

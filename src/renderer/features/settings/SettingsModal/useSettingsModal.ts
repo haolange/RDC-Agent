@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useI18n } from '../../../i18n';
@@ -14,21 +14,10 @@ import {
   getProviderDisplayLabel,
   sortProvidersByLabel,
 } from './utils';
-import type { ProviderCatalogSnapshot } from './types';
-import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
+import type { AppSettings, LlmProviderCatalogResponse, LlmProviderEntry } from '@shared/types/settings';
 import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 
-const EMPTY_PROVIDER_CATALOG_SNAPSHOT: ProviderCatalogSnapshot = {
-  categories: [],
-  protocols: [],
-  providers: [],
-};
-
-const normalizeProviderCatalogSnapshot = (snapshot: ProviderCatalogSnapshot | null | undefined): ProviderCatalogSnapshot => ({
-  categories: Array.isArray(snapshot?.categories) ? snapshot.categories : [],
-  protocols: Array.isArray(snapshot?.protocols) ? snapshot.protocols : [],
-  providers: Array.isArray(snapshot?.providers) ? snapshot.providers : [],
-});
+const NO_CATEGORIES: LlmProviderCatalogResponse['categories'] = [];
 
 export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const { t } = useI18n();
@@ -48,26 +37,13 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const modalState = useSettingsModalState(open, settings, currentProjectId);
   // Bound after autosave is created below; adopting settings rebases its saved baseline.
   const rebaseAgentDraftsRef = useRef<(definitions: AgentManifestDefinition[]) => void>(() => {});
-  const [providerCatalogSnapshot, setProviderCatalogSnapshot] = useState<ProviderCatalogSnapshot>(EMPTY_PROVIDER_CATALOG_SNAPSHOT);
+  const providerCatalogCategories = useAppSettingsStore((state) => state.providerCatalog?.categories ?? NO_CATEGORIES);
 
+  const refreshSettings = useAppSettingsStore((state) => state.refreshSettings);
+  // Opening Settings is where edits made outside the app (secrets, Agent files, trust) are picked up.
   useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    void window.electronAPI.settings.getProviderCatalog()
-      .then((snapshot) => {
-        if (!cancelled) {
-          setProviderCatalogSnapshot(normalizeProviderCatalogSnapshot(snapshot));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setProviderCatalogSnapshot(EMPTY_PROVIDER_CATALOG_SNAPSHOT);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+    if (open) void refreshSettings().catch(() => undefined);
+  }, [open, refreshSettings]);
 
   const providerConnection = useProviderConnection({
     open,
@@ -183,7 +159,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     routableProviders,
     accountProviders,
     providerCatalog,
-    providerCatalogCategories: providerCatalogSnapshot.categories,
+    providerCatalogCategories,
     configuredProvidersWithoutEnabledModels,
     getResolvedProviderLabel,
     setTheme,

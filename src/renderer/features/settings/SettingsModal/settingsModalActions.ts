@@ -5,6 +5,7 @@ import type {
   AppSettings,
   LlmProviderEntry,
   SettingsPatchOp,
+  SettingsView,
 } from '@shared/types/settings';
 import type {
   AgentDefinitionSaveRequest,
@@ -31,7 +32,7 @@ interface SettingsModalActionsOptions {
   t: Translate;
   blockSubmit?: (draft: AgentManifestDraft) => string | null;
   blockProjectedSubmit?: (projectedDrafts: AgentManifestDraft[]) => string | null;
-  replaceSettings: (settings: AppSettings) => void;
+  replaceSettings: (view: SettingsView) => void;
   /** Makes definitions main committed outside autosave the autosave baseline. */
   rebaseAgentDrafts: (definitions: AgentManifestDefinition[]) => void;
 }
@@ -55,10 +56,10 @@ export function createSettingsModalActions({
   rebaseAgentDrafts,
 }: SettingsModalActionsOptions) {
   /** Settings main committed outside autosave (import, migration) replace the store and the Agent drafts. */
-  const adoptAgentSettings = (nextSettings: AppSettings) => {
-    replaceSettings(nextSettings);
-    rebaseAgentDrafts(nextSettings.agents.definitions);
-    modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => (
+  const adoptAgentSettings = (view: SettingsView) => {
+    replaceSettings(view);
+    rebaseAgentDrafts(view.agents.definitions);
+    modalState.setAgentManifestDrafts(view.agents.definitions.map((definition) => (
       toAgentManifestEditorDraft(definition, currentProjectId)
     )));
   };

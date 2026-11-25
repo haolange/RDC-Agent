@@ -9,13 +9,14 @@
  *
  * Narrow reads: `snapshot()` for user sections, `providerConnections` for composed providers (catalog + user state +
  * secret presence, memoized per settings and secret revision), `agentModelRoutes` for an Agent's model route,
- * `agentDefinitions` for effective Agent profiles, and `rendererSettingsDto()` for the renderer's whole view.
+ * `agentDefinitions` for effective Agent profiles, and `settingsView()` for the renderer's view (no catalog facts).
  *
  * External inputs (secrets, Agent manifests and project trust, global instructions) keep their own revisions; edits
  * made outside the app are re-checked by file stamp in `revalidateExternalInputs` (turn preparation, Settings open).
  */
 import { deepFreeze } from '@shared/utils/deepFreeze';
 import { diffAgentModels } from '@shared/utils/settingsPatch';
+import { providerConnectionState } from '@shared/utils/providerEntryView';
 import { resolveAgentModel } from '@shared/utils/agentModelRoute';
 import { appPathService } from '../../runtime/AppPathService';
 import { shellResolver } from '../../runtime/ShellResolver';
@@ -39,7 +40,7 @@ import { SettingsAgentOps } from './SettingsAgentOps';
 import { SettingsProviderOps } from './SettingsProviderOps';
 import { SettingsAgentOverrideOps } from './SettingsAgentOverrideOps';
 import { planSettingsPatch } from './settingsPatch';
-import { tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
+import { tryCurrentProjectId, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
 import { SettingsStore, type SettingsSnapshot } from './settingsStore';
 import { orphanProviderDiagnostics, stableSerialize } from './settingsServiceHelpers';
 import type { SettingsFile, UserProviderState } from './settingsFileSchema';
@@ -56,8 +57,7 @@ import type {
   ProjectAgentTrustPreview,
 } from '@shared/types/agentManifest';
 import type {
-  AppRuntimePaths,
-  AppSettings,
+  SettingsView,
   LlmAgentRoute,
   LlmProviderAuthMode,
   LlmProviderEntry,
@@ -165,31 +165,33 @@ export class SettingsService {
   }
 
   /** Everything the renderer's Settings view needs, composed from the snapshot and the external inputs. */
-  rendererSettingsDto(runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
-    const { user } = this.snapshot();
+  /** The renderer's settings view: user sections and connection state at the current revision, no catalog facts. */
+  settingsView(): SettingsView {
+    const { revision, user } = this.snapshot();
     const view = this.connectionView();
     const paths = appPathService.getRuntimePaths();
+    const projectId = tryCurrentProjectId();
     const projectRoot = tryCurrentProjectRoot();
-    const providers = [...view.list];
     const agentRoutes = normalizeManifestRoutes(
       agentManifestService.routesFromDefinitions(createEmptyAgentRoutes(), [...this.agentDefinitions(projectRoot)]),
     );
     return {
+      revision,
       appearance: user.appearance,
       layout: user.layout,
       profile: user.profile,
       tooling: user.tooling,
       agentRuntime: user.agentRuntime,
       agentModels: user.agentModels,
-      llm: { providers, agentRoutes },
-      agents: agentManifestService.getSettings(paths, providers, agentRoutes, [], projectRoot),
+      llm: { connections: view.list.map(providerConnectionState), agentRoutes },
+      agents: { ...agentManifestService.getSettings(paths, projectRoot), projectId: projectRoot ? projectId : null },
       resourceCatalog: {
         diagnostics: [
-          ...executionProfileService.getDiagnostics(providers),
+          ...executionProfileService.getDiagnostics([...view.list]),
           ...orphanProviderDiagnostics([...view.orphanProviderIds], paths.settingsPath),
         ],
       },
-      paths: { ...paths, ...(runtimePaths ?? {}) },
+      paths,
     };
   }
 

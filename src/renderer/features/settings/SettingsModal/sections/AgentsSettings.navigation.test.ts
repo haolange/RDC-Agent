@@ -16,7 +16,7 @@ const t = ((key: string, params?: Record<string, string>) => `${key}${params?.id
 const first = createNewAgent({ name: 'First', id: 'first' }, t, 'user', 'project-a');
 const target = createNewAgent({ name: 'Target', id: 'target' }, t, 'project', 'project-a');
 const other = createNewAgent({ name: 'Other', id: 'other' }, t, 'project', 'project-a');
-const settings = { agents: { definitions: [], diagnostics: [], modelOptions: [] }, agentModels: { default: {}, byAgent: {} } } as never;
+const settings = { agents: { definitions: [], diagnostics: [] }, agentModels: { default: {}, byAgent: {} }, llm: { providers: [], agentRoutes: [] } } as never;
 
 it('waits for drafts, opens the target scope once, and reports a missing target without selecting another', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

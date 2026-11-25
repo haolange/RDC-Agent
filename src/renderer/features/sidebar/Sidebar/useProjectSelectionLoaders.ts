@@ -81,7 +81,7 @@ export function useProjectSelectionLoaders({
     setRuns,
     setCaptures,
     getCurrentSession: () => useProjectStore.getState().currentSession,
-    reloadSettings: () => useAppSettingsStore.getState().reloadSettings(),
+    reloadSettings: (projectId) => useAppSettingsStore.getState().reloadSettings(projectId),
   }), [
     t,
     setSidebarError,

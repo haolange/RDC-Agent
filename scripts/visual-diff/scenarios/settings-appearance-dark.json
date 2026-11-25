@@ -30,13 +30,15 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "5140fa7b21e2aec2918d0ce6"
+    "ref": "56880e90c26d8d50cd1761c7"
    },
    {
-    "ref": "5140fa7b21e2aec2918d0ce6"
-   },
+    "ref": "56880e90c26d8d50cd1761c7"
+   }
+  ],
+  "settings:getProviderCatalog": [
    {
-    "ref": "5140fa7b21e2aec2918d0ce6"
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -53,8 +55,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-0d9bbf1551c5-1795596361490",
-       "timestamp": 1795596361490,
+       "id": "rlog-278d8db05ea3-1795618442341",
+       "timestamp": 1795618442342,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -68,8 +70,8 @@
        }
       },
       {
-       "id": "rlog-068726cc15bb-1795596361831",
-       "timestamp": 1795596361831,
+       "id": "rlog-cca0203548f0-1795618442378",
+       "timestamp": 1795618442378,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -81,8 +83,8 @@
        "raw": null
       },
       {
-       "id": "rlog-df8376b9abf4-1795596361832",
-       "timestamp": 1795596361832,
+       "id": "rlog-5a3555a27204-1795618442378",
+       "timestamp": 1795618442378,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -94,18 +96,18 @@
        "raw": null
       },
       {
-       "id": "rlog-e84d5ab9771f-1795596361852",
-       "timestamp": 1795596361852,
+       "id": "rlog-2f08b69ff235-1795618442394",
+       "timestamp": 1795618442394,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
        "title": "Browser app session ready",
-       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:38197/app",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
        "sessionId": null,
        "projectId": null,
        "runId": null,
        "raw": {
-        "bridgeUrl": "http://127.0.0.1:38197",
+        "bridgeUrl": "http://127.0.0.1:5127",
         "userDataPath": "/visual-diff"
        }
       }
@@ -147,14 +149,9 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "rdc-runtime:overview": [
    {
-    "ref": "07877ded74882f7a8dd4e3e0"
+    "ref": "554e996a3a5d148a415c874e"
    }
   ]
  }

@@ -1,5 +1,5 @@
 import { applyAgentModelChanges, applySettingsPatchOps, type SettingsPatchView } from '@shared/utils/settingsPatch';
-import type { AppSettings, SettingsPatchChanges, SettingsPatchOp } from '@shared/types/settings';
+import type { AppSettings, SettingsPatchChanges, SettingsPatchOp, SettingsPatchResult } from '@shared/types/settings';
 
 const patchViewOf = (settings: AppSettings): SettingsPatchView => ({
   appearance: settings.appearance,
@@ -46,6 +46,8 @@ function applyChanges(view: SettingsPatchView, changed: SettingsPatchChanges, op
  */
 export class SettingsPatchIntents {
   private confirmed: SettingsPatchView | null = null;
+  /** The settings revision the confirmed view is at; an older view read meanwhile does not replace it. */
+  private revision = 0;
   private readonly pending = new Map<number, readonly SettingsPatchOp[]>();
   private sequence = 0;
 
@@ -53,9 +55,15 @@ export class SettingsPatchIntents {
     return this.pending.size > 0;
   }
 
-  /** Adopts sections main sent whole (startup, a reload); ops in flight stay on top of them. */
-  rebase(settings: AppSettings): AppSettings {
-    this.confirmed = patchViewOf(settings);
+  /**
+   * Adopts sections main sent whole at `revision` (startup, a read); ops in flight stay on top of them. A view read
+   * before a patch this renderer has already settled keeps the settled sections.
+   */
+  rebase(settings: AppSettings, revision: number): AppSettings {
+    if (revision >= this.revision || !this.confirmed) {
+      this.confirmed = patchViewOf(settings);
+      this.revision = Math.max(this.revision, revision);
+    }
     return this.project(settings);
   }
 
@@ -72,10 +80,11 @@ export class SettingsPatchIntents {
     return { id, settings: this.project(settings) };
   }
 
-  settle(settings: AppSettings, id: number, changed: SettingsPatchChanges): AppSettings {
+  settle(settings: AppSettings, id: number, result: SettingsPatchResult): AppSettings {
     const ops = this.pending.get(id) ?? [];
     this.pending.delete(id);
-    this.confirmed = applyChanges(this.baseline(settings), changed, ops);
+    this.confirmed = applyChanges(this.baseline(settings), result.changed, ops);
+    this.revision = Math.max(this.revision, result.revision);
     return this.project(settings);
   }
 

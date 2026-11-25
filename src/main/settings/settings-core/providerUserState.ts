@@ -1,3 +1,4 @@
+import { offeredRecommendedModels } from '@shared/utils/providerEntryView';
 import {
   createProviderEntryFromCatalog,
   getProviderCatalogModelSummaries,
@@ -162,9 +163,7 @@ export function composeProviderEntry(
     baseUrl: catalog.baseUrlEditable ? state?.baseUrl ?? catalog.baseUrl : catalog.baseUrl,
     baseUrlEditable: catalog.baseUrlEditable,
     models,
-    recommendedModels: catalog.recommendedModels.filter((id) => models.some((model) => (
-      model.id === id && model.enabled !== false && model.availability !== 'unavailable'
-    ))),
+    recommendedModels: offeredRecommendedModels(catalog.recommendedModels, models),
     docsUrl: catalog.docsUrl,
     status,
     lastTestedAt: state?.lastTestedAt,

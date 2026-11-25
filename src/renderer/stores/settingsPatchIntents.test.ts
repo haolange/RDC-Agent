@@ -1,9 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+import { providerConnectionState } from '@shared/utils/providerEntryView';
 import { useAppSettingsStore } from './appSettingsStore';
-import type { SettingsPatchOp, SettingsPatchResult } from '@shared/types/settings';
+import type { AppSettings, LlmProviderCatalogResponse, SettingsPatchOp, SettingsPatchResult, SettingsView } from '@shared/types/settings';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
+
+/** `settings` as main sends it: the view at `revision`, and a catalog holding each provider's catalog facts. */
+function viewOf(settings: AppSettings, revision = 1): [SettingsView, LlmProviderCatalogResponse] {
+  const view: SettingsView = {
+    ...settings,
+    revision,
+    llm: { connections: settings.llm.providers.map(providerConnectionState), agentRoutes: settings.llm.agentRoutes },
+    agents: { ...settings.agents, projectId: null },
+  };
+  const providers = settings.llm.providers.map((provider) => ({ ...provider, recommendedModels: provider.recommendedModels ?? [] }));
+  return [view, { categories: [], protocols: [], providers }];
+}
 
 function deferredPatches() {
   const calls: Array<{ ops: SettingsPatchOp[]; resolve: (result: SettingsPatchResult) => void; reject: (error: Error) => void }> = [];
@@ -23,7 +36,7 @@ describe('optimistic settings patches', () => {
   it('rolls back only the failed intent and keeps a later one in the same section', async () => {
     const calls = deferredPatches();
     const store = useAppSettingsStore;
-    store.getState().hydrate(DEFAULT_SETTINGS, 'dark');
+    store.getState().hydrate(...viewOf(DEFAULT_SETTINGS), 'dark');
     const theme = store.getState().setTheme('light');
     const language = store.getState().setLanguage('en');
     expect(store.getState().settings.appearance).toMatchObject({ theme: 'light', language: 'en' });
@@ -40,7 +53,7 @@ describe('optimistic settings patches', () => {
   it('keeps two Agents edited before the first save returns', async () => {
     const calls = deferredPatches();
     const store = useAppSettingsStore;
-    store.getState().hydrate(DEFAULT_SETTINGS, 'dark');
+    store.getState().hydrate(...viewOf(DEFAULT_SETTINGS), 'dark');
     const first = store.getState().patchSettings([{ op: 'agentModels.setAgentField', agentId: 'debugger', field: 'model', value: 'ollama:local-model' }]);
     const second = store.getState().patchSettings([{ op: 'agentModels.setAgentField', agentId: 'analyzer', field: 'model', value: 'ollama:other-model' }]);
 
@@ -59,7 +72,7 @@ describe('optimistic settings patches', () => {
   it('adopts the value main stored, not the optimistic one', async () => {
     const calls = deferredPatches();
     const store = useAppSettingsStore;
-    store.getState().hydrate(DEFAULT_SETTINGS, 'dark');
+    store.getState().hydrate(...viewOf(DEFAULT_SETTINGS), 'dark');
     const saving = store.getState().patchSettings([{ op: 'layout', value: { leftSidebar: { width: 5 } } }]);
     expect(store.getState().settings.layout.leftSidebar.width).toBe(5);
     const layout = { ...DEFAULT_SETTINGS.layout, leftSidebar: { ...DEFAULT_SETTINGS.layout.leftSidebar, width: 240 } };

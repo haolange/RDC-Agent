@@ -49,7 +49,6 @@ import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSche
 import type { WorkbenchIpcContext } from './workbenchContext';
 import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
 import type {
-  AppSettings,
   LlmModelCapabilityProbeRequest,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountLoginFinishRequest,
@@ -82,31 +81,6 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   ));
   const catalogChanges = new CatalogChangePublisher((change) => context.broadcastToRenderer('llm:effectiveCatalogChanged', change));
   effectiveCatalogService.subscribe((snapshot) => catalogChanges.publish(snapshot));
-
-  const withEffectiveAgentModelOptions = async (settings: AppSettings): Promise<AppSettings> => {
-    const catalogProviderIds = agentManifestService.modelOptionCatalogProviderIds(
-      settings.llm.providers,
-      settings.llm.agentRoutes,
-    );
-    await Promise.all(catalogProviderIds.map((providerId) => loadProviderSurface(providerId)));
-    const catalogs = settings.llm.providers.flatMap((provider) => {
-      if (!catalogProviderIds.includes(provider.id)) return [];
-      const snapshot = resolveEffectiveCatalog(provider.id, settingsService.providerConnections);
-      return snapshot ? [snapshot] : [];
-    });
-    return {
-      ...settings,
-      agents: agentManifestService.projectEffectiveModelOptions(
-        settings.agents,
-        settings.llm.providers,
-        settings.llm.agentRoutes,
-        catalogs,
-      ),
-    };
-  };
-
-  /** The renderer's settings view with the executable Agent model options resolved against live catalogs. */
-  const rendererSettings = (): Promise<AppSettings> => withEffectiveAgentModelOptions(settingsService.rendererSettingsDto());
 
   const broadcastCatalog = async (providerId: string): Promise<void> => {
     await loadProviderSurface(providerId);
@@ -226,7 +200,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'settings:get', maxBytes: 1024 });
     // Opening Settings is where edits made outside the app (secrets, Agent files, trust) are picked up.
     settingsService.revalidateExternalInputs();
-    return rendererSettings();
+    return settingsService.settingsView();
   });
 
   ipcMain.handle('settings:getProviderCatalog', async (_event, ...rawArgs: unknown[]) => {
@@ -290,7 +264,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       maxBytes: 8 * 1024,
     });
     await agentManifestService.importFile(appPathService.getRuntimePaths(), filePath);
-    return rendererSettings();
+    return settingsService.settingsView();
   });
 
   ipcMain.handle('settings:saveAgentDefinition', async (_event, ...rawArgs: unknown[]) => {
@@ -324,7 +298,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     });
     await settingsService.applyAgentModelMigration(request);
     await notifyCommitted(() => context.applyCurrentLlmConfig());
-    return rendererSettings();
+    return settingsService.settingsView();
   });
 
   ipcMain.handle('settings:deleteAgentOverrideFile', async (_event, ...rawArgs: unknown[]) => {
@@ -333,7 +307,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       maxBytes: 8 * 1024,
     });
     await settingsService.deleteAgentOverrideFile(request);
-    return rendererSettings();
+    return settingsService.settingsView();
   });
 
   ipcMain.handle('settings:previewProjectAgentTrust', async (_event, ...rawArgs: unknown[]) => {
@@ -351,11 +325,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     });
     const preview = settingsService.previewProjectAgentTrust(request.sourcePath);
     if (!await confirmResourceTrust('agent', preview.agentId, preview.sourcePath)) {
-      return rendererSettings();
+      return settingsService.settingsView();
     }
     settingsService.trustProjectAgent(request);
     await notifyCommitted(() => context.applyCurrentLlmConfig());
-    return rendererSettings();
+    return settingsService.settingsView();
   });
 
   ipcMain.handle('settings:getAgentBuiltinComparison', async (_event, ...rawArgs: unknown[]) => {
@@ -382,7 +356,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const lastSuccessful = result.lastSuccessful
       ? { ...result.lastSuccessful, catalogRevision }
       : null;
-    return { ...result, catalogRevision, lastSuccessful };
+    return { ...result, catalogRevision, lastSuccessful, revision: settingsService.snapshot().revision };
   });
 
   ipcMain.handle('settings:getProviderDefinitionCommit', async (_event, ...rawArgs: unknown[]) => {

@@ -32,7 +32,8 @@ export interface ProjectSelectionLoaderOpsContext {
   setRuns: ReturnType<typeof useSessionStore.getState>['setRuns'];
   setCaptures: ReturnType<typeof useCaptureStore.getState>['setCaptures'];
   getCurrentSession: () => ReturnType<typeof useProjectStore.getState>['currentSession'];
-  reloadSettings: () => Promise<unknown>;
+  /** Brings the settings view to the Agents of `projectId` (null: no project); reads only when they differ. */
+  reloadSettings: (projectId: string | null) => Promise<unknown>;
 }
 
 export interface ProjectSelectionHandlerOpsContext extends ProjectSelectionLoaderOpsContext {

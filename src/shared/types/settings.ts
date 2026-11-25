@@ -473,6 +473,8 @@ export interface ProviderDefinitionSaveResult {
   clientRevision: number;
   providerId: LlmProviderId;
   status: ProviderDefinitionSaveStatus;
+  /** The settings revision a committed save produced; the renderer's `settings:changed` for it needs no read. */
+  revision?: number;
   commitHash: string | null;
   provider: LlmProviderEntry | null;
   catalogRevision: string | null;
@@ -534,6 +536,35 @@ export interface LlmSettings {
   providers: LlmProviderEntry[];
   /** Read-only runtime projection derived from canonical `.agent.md` manifests. */
   agentRoutes: LlmAgentRoute[];
+}
+
+/** The fields of a provider entry that are catalog facts; `settings:getProviderCatalog` sends them once. */
+export const LLM_PROVIDER_CATALOG_FIELDS = [
+  'protocol', 'routeCount', 'authModeOptions', 'authModeAvailability', 'lifecycleStatus', 'providerAvailability',
+  'category', 'catalogOwnership', 'serviceOperator', 'endpointClass', 'catalogProvenance', 'label', 'connectionSchema',
+  'baseUrlEditable', 'recommendedModels', 'docsUrl', 'accountLogin', 'capabilities', 'apiKey',
+] as const satisfies ReadonlyArray<keyof LlmProviderEntry>;
+
+/** A provider as `settings:get` sends it: its connection and the user's state, without the catalog facts. */
+export type LlmProviderConnectionState = Omit<LlmProviderEntry, (typeof LLM_PROVIDER_CATALOG_FIELDS)[number]>;
+
+/**
+ * `settings:get`: the user's settings and connection state at one revision. The renderer joins the connections with
+ * the catalog it read once and computes the Agent model choices from the effective catalogs.
+ */
+export interface SettingsView {
+  revision: number;
+  appearance: UiPreferences;
+  layout: LayoutPreferences;
+  profile: ProfileSettings;
+  tooling: ToolingSettings;
+  agentRuntime: AgentRuntimeSettings;
+  agentModels: AgentModelSettings;
+  llm: { connections: LlmProviderConnectionState[]; agentRoutes: LlmAgentRoute[] };
+  /** The Agents of the project main has selected (`projectId`), or the user's alone when none is selected. */
+  agents: AgentManifestSettings & { projectId: string | null };
+  resourceCatalog: RuntimeResourceCatalog;
+  paths: AppRuntimePaths;
 }
 
 /** A section of the user's settings file, or the global instructions Settings also writes. */

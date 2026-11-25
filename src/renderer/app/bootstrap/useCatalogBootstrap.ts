@@ -8,24 +8,12 @@ export function useCatalogBootstrap(): void {
   const settings = useAppSettingsStore((state) => state.settings);
   const currentSessionId = useProjectStore((state) => state.currentSession?.sessionId);
 
-  useEffect(() => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI?.events?.onEffectiveCatalogChanged) return undefined;
-    let debounceTimer: number | undefined;
-    const unsubscribe = electronAPI.events.onEffectiveCatalogChanged(() => {
-      if (debounceTimer !== undefined) window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => {
-        debounceTimer = undefined;
-        void useAppSettingsStore.getState().reloadSettings().catch(() => undefined);
-      }, 250);
-    });
-    return () => {
-      if (debounceTimer !== undefined) window.clearTimeout(debounceTimer);
-      unsubscribe?.();
-    };
-  }, []);
-
+  // Model choices follow the effective catalog in the renderer; a catalog change needs no settings read.
   useEffect(() => startCatalogProjection(), []);
+
+  useEffect(() => window.electronAPI?.events.onSettingsChanged(
+    (change) => useAppSettingsStore.getState().adoptSettingsChange(change),
+  ), []);
 
   useEffect(() => {
     if (!currentSessionId) return;

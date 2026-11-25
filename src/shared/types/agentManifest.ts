@@ -162,10 +162,10 @@ export interface AgentManifestDiagnostic {
   message: string;
 }
 
+/** The Agents part of the settings view; the model choices are computed in the renderer from the effective catalogs. */
 export interface AgentManifestSettings {
   directoryPath: string;
   definitions: AgentManifestDefinition[];
-  modelOptions: AgentModelOption[];
   globalInstructions: string;
   diagnostics: AgentManifestDiagnostic[];
 }
