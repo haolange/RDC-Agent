@@ -1,0 +1,36 @@
+[
+  { "id": "welcome-dark-1440", "viewport": [1440, 900], "theme": "dark", "steps": [], "settleMs": 1200 },
+  { "id": "welcome-dark-720", "viewport": [720, 900], "theme": "dark", "steps": [], "settleMs": 1200 },
+  {
+    "id": "welcome-light-1440", "viewport": [1440, 900], "theme": "light",
+    "setup": [
+      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
+      { "click": true, "testId": "sidebar-user-settings-trigger" },
+      { "click": true, "testId": "open-settings-entry" },
+      { "waitFor": "[data-testid=\"settings-nav-appearance\"]" },
+      { "click": true, "testId": "settings-nav-appearance" },
+      { "waitFor": ".appearance-mode-tabs [role=\"tab\"]" },
+      { "click": true, "selector": ".appearance-mode-tabs button[role=\"tab\"]:nth-of-type(2)", "waitMs": 800 }
+    ],
+    "steps": [], "settleMs": 1200
+  },
+  {
+    "id": "settings-appearance-dark", "viewport": [1440, 900], "theme": "dark",
+    "steps": [
+      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
+      { "click": true, "testId": "sidebar-user-settings-trigger" },
+      { "click": true, "testId": "open-settings-entry" },
+      { "waitFor": "[data-testid=\"settings-nav-appearance\"]" },
+      { "click": true, "testId": "settings-nav-appearance", "waitMs": 400 }
+    ],
+    "settleMs": 1000
+  },
+  {
+    "id": "knowledge-center-dark", "viewport": [1440, 900], "theme": "dark",
+    "steps": [
+      { "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]" },
+      { "click": true, "testId": "sidebar-knowledge-center-trigger", "waitMs": 600 }
+    ],
+    "settleMs": 1200
+  }
+]

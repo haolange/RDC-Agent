@@ -110,6 +110,7 @@
 | 提交前 | `pnpm run check:git-diff`（需 `RDC_DIFF_BASE`） |
 | 发布配置 | 才执行 pack |
 | 宿主相关行为（`src/main/platform`） | 另加 `pnpm run check:host-platform`；Linux 单元测试由 CI `build` 运行，Windows 由 CI `windows-unit` 运行 |
+| 渲染结果（renderer 样式、组件、布局） | 另加差分渲染：`node scripts/visual-diff/run.mjs capture <head>`、对本轮起点构建 `capture <base> --build <base 检出>`、`compare <base> <head>`；有意的可见变化在提交 trailer 写 `Visual-Diff-Allow: <场景 id,…>`。IPC 契约变化时用 `run.mjs record` 重录场景（启动一次性 Browser QA 实例，从真实后端取响应） |
 | 内置方法文本（`resources/agent-runtime`） | 另加 `src/main/testing/investigationSystemContract.test.ts`、`src/main/testing/InstructionCost.offline.test.ts`、`pnpm run check:investigation-system` |
 
 行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。

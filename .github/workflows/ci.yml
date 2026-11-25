@@ -131,6 +131,63 @@ jobs:
       - name: Browser QA smoke on Linux
         run: xvfb-run -a pnpm run smoke:agent-browser
 
+  # Renders recorded UI states from the base and head builds with the same harness and fails on differences no
+  # commit declared with a `Visual-Diff-Allow:` trailer. Only runs when rendered code or the harness changed.
+  visual-diff:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+      - name: Resolve the comparison base
+        id: base
+        shell: bash
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$base" ]; then base="$(git merge-base "origin/${{ github.event.repository.default_branch }}" HEAD)"; fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+          if git diff --quiet "$base" HEAD -- src/renderer src/shared src/preload scripts/visual-diff; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.base.outputs.changed == 'true'
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        if: steps.base.outputs.changed == 'true'
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      - name: Build head and base
+        if: steps.base.outputs.changed == 'true'
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+          git worktree add "$RUNNER_TEMP/base" "${{ steps.base.outputs.sha }}"
+          (cd "$RUNNER_TEMP/base" && pnpm install --frozen-lockfile && pnpm run build)
+      - name: Allow the Electron sandbox
+        if: steps.base.outputs.changed == 'true'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Capture and compare
+        if: steps.base.outputs.changed == 'true'
+        env:
+          VISUAL_DIFF_RANGE: ${{ steps.base.outputs.sha }}..HEAD
+        run: |
+          node scripts/visual-diff/run.mjs capture "$RUNNER_TEMP/visual-diff/head"
+          node scripts/visual-diff/run.mjs capture "$RUNNER_TEMP/visual-diff/base" --build "$RUNNER_TEMP/base"
+          node scripts/visual-diff/run.mjs compare "$RUNNER_TEMP/visual-diff/base" "$RUNNER_TEMP/visual-diff/head"
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.base.outputs.changed == 'true'
+        with:
+          name: visual-diff
+          path: ${{ runner.temp }}/visual-diff
+          retention-days: 7
+
   launcher-fresh-checkout:
     strategy:
       fail-fast: false

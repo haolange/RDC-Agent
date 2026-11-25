@@ -1,0 +1,206 @@
+{
+ "id": "knowledge-center-dark",
+ "viewport": [
+  1440,
+  900
+ ],
+ "theme": "dark",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-knowledge-center-trigger",
+   "waitMs": 600
+  }
+ ],
+ "settleMs": 1200,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "5140fa7b21e2aec2918d0ce6"
+   },
+   {
+    "ref": "5140fa7b21e2aec2918d0ce6"
+   },
+   {
+    "ref": "5140fa7b21e2aec2918d0ce6"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-6cb2474bc2f4-1795596368628",
+       "timestamp": 1795596368628,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-f39d7e8abb3b-1795596368940",
+       "timestamp": 1795596368940,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-52a5a6cfdeba-1795596368940",
+       "timestamp": 1795596368940,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-7fd756258209-1795596368956",
+       "timestamp": 1795596368956,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:46077/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:46077",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ],
+  "knowledge:overview": [
+   {
+    "result": {
+     "spaces": [
+      {
+       "spaceId": "user",
+       "kind": "user",
+       "label": "User",
+       "rootPath": "/visual-diff/.rdc-agent/knowledge"
+      }
+     ],
+     "index": {
+      "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "builtAt": "2026-11-25T08:46:10.764Z",
+      "cardCount": 0,
+      "cardsBySpace": {}
+     }
+    }
+   }
+  ],
+  "knowledge:query": [
+   {
+    "result": {
+     "hits": [],
+     "lanes": [
+      {
+       "lane": "Identity/Path",
+       "hits": []
+      },
+      {
+       "lane": "Scope/Metadata",
+       "hits": []
+      },
+      {
+       "lane": "Lexical",
+       "hits": []
+      },
+      {
+       "lane": "Structural",
+       "hits": []
+      },
+      {
+       "lane": "Relation/Graph",
+       "hits": []
+      },
+      {
+       "lane": "Temporal/Version",
+       "hits": []
+      }
+     ],
+     "revision": "491c3f2aa938256d9d2f5a09cd4fb9715843c2b4d3f2edacb2b9b7290193499d",
+     "total": 0,
+     "queryFingerprint": "df655964509fd4ab3e2a30029a6420050466b5070be6b55e99c483b73156f0aa"
+    }
+   }
+  ],
+  "knowledge:compile": [
+   {
+    "result": {
+     "packId": "pack:e2b02937fd0c7754",
+     "compiledAt": "2026-11-25T08:46:10.782Z",
+     "hits": [],
+     "conflicts": []
+    }
+   }
+  ]
+ }
+}

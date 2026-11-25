@@ -1,0 +1,131 @@
+{
+ "id": "welcome-light-1440",
+ "viewport": [
+  1440,
+  900
+ ],
+ "theme": "light",
+ "steps": [],
+ "settleMs": 1200,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "c5499d0a3c5acfdff6c6d1a4"
+   },
+   {
+    "ref": "c5499d0a3c5acfdff6c6d1a4"
+   },
+   {
+    "ref": "c5499d0a3c5acfdff6c6d1a4"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-09b00c7ebdfb-1795596353435",
+       "timestamp": 1795596353435,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-97503bbebdef-1795596353742",
+       "timestamp": 1795596353742,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-3ab743334654-1795596353742",
+       "timestamp": 1795596353742,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-b91755331e00-1795596353759",
+       "timestamp": 1795596353759,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:44917/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:44917",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ]
+ }
+}

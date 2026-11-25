@@ -60,8 +60,9 @@ for (const filePath of sources) {
   const content = fs.readFileSync(filePath, 'utf8');
   for (const { pattern, prefix } of referencePatterns) {
     for (const match of content.matchAll(pattern)) {
-      referenceCount += 1;
       const id = match[1];
+      if (id.includes('${')) continue; // a harness template, not an id
+      referenceCount += 1;
       const found = prefix
         ? [...rendered].some((renderedId) => renderedId.startsWith(id) || id.startsWith(renderedId.split('${')[0]))
         : matchers.some(({ exact }) => exact.test(id));
