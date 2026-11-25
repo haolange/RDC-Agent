@@ -78,7 +78,7 @@ export class ProfileTurnPreparation {
     turnControls: ConversationTurnControls;
     effectiveModel: EffectiveModel;
   }> {
-    const settings = settingsService.getAll();
+    const providers = settingsService.providerConnections;
     const planning = input.requestPlan
       ? {
           ok: true as const,
@@ -95,7 +95,7 @@ export class ProfileTurnPreparation {
       : planEffectiveModelRequest({
           providerId: input.providerId,
           modelId: input.modelId,
-          settings,
+          providers,
           controls: {
             ...(input.turnControls ?? {}),
           },
@@ -106,13 +106,13 @@ export class ProfileTurnPreparation {
       if (input.frozenDelegationCapsule) throw new DelegationConfigurationError(planning.code, message);
       throw new Error(message);
     }
-    const effectiveModel = resolveEffectiveModel(input.providerId, input.modelId, settings);
+    const effectiveModel = resolveEffectiveModel(input.providerId, input.modelId, providers);
     if (!effectiveModel) {
       const message = `MODEL_UNAVAILABLE: ${input.providerId}/${input.modelId}`;
       if (input.frozenDelegationCapsule) throw new DelegationConfigurationError('MODEL_UNAVAILABLE', message);
       throw new Error(message);
     }
-    const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
+    const routeProvider = providers.get(input.providerId);
     const routeCapability = resolveAgentRouteCapability(
       routeProvider,
       input.modelId,

@@ -40,10 +40,8 @@ vi.mock('electron', () => ({
 }));
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({
-      agents: { definitions: [{ id: 'ask', enabled: true, skills: [] }] },
-      agentRuntime: { permissions: { mode: 'default' } },
-    }),
+    agentDefinitions: () => [{ id: 'ask', enabled: true, skills: [] }],
+    snapshot: () => ({ revision: 1, user: { agentRuntime: { permissions: { mode: 'default' } } } }),
   },
 }));
 vi.mock('../../settings/agent-manifests/AgentRuntimeConfigService', () => ({

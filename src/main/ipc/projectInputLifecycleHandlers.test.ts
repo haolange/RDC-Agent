@@ -37,7 +37,7 @@ vi.mock('../sessions', () => ({ rdcSessionService: {} }));
 vi.mock('../conversation/ConversationService', () => ({ conversationService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
-  getAll: () => ({ appearance: { language: mocks.language } }),
+  snapshot: () => ({ revision: 1, user: { appearance: { language: mocks.language } } }),
 } }));
 
 describe('project input file watching', () => {

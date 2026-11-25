@@ -368,7 +368,7 @@ function setupKeyboardShortcuts(window: BrowserWindow): void {
  * Create the main window.
  */
 function createMainWindow(): void {
-  const savedWindow = settingsService.getAll().layout.window;
+  const savedWindow = settingsService.snapshot().user.layout.window;
   const windowOptions = resolveWindowCreationOptions(savedWindow);
 
   mainWindow = new BrowserWindow({
@@ -391,12 +391,12 @@ function createMainWindow(): void {
     frame: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    backgroundColor: windowBackgroundColor(settingsService.getAll().appearance),
+    backgroundColor: windowBackgroundColor(settingsService.snapshot().user.appearance),
   });
   bindProductIcon(mainWindow);
 
   // Load the renderer. The boot theme rides along so the first paint already uses the chosen light or dark palette.
-  const bootTheme = resolvedAppearanceMode(settingsService.getAll().appearance);
+  const bootTheme = resolvedAppearanceMode(settingsService.snapshot().user.appearance);
   if (isDev) {
     const rendererUrl = getDevRendererUrl();
     trustRendererEntry(rendererUrl);

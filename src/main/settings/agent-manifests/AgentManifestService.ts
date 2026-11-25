@@ -15,10 +15,12 @@ import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } 
 import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
 import { AppError } from '@shared/errors/appError';
+import { deepFreeze } from '@shared/utils/deepFreeze';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import { resolvedPathKey, samePath } from '../../platform/paths';
 import { isReservedAgentId } from '../settings-core/reservedAgentIds';
+import { StampedValue, directoryStamp, fileStamp } from '../settings-core/externalInput';
 import { writeFileAtomic } from '../../runtime/atomicFile';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { projectAgentTrust } from './ProjectAgentTrust';
@@ -101,12 +103,12 @@ interface ParsedManifestCandidate {
   builtinInvalid?: string;
 }
 
+const isAgentManifestFileName = (entry: string): boolean => entry.endsWith('.agent.md') && !entry.startsWith('.');
+
 const listAgentManifestFiles = (directory: string): string[] => {
   if (!fs.existsSync(directory)) return [];
   return fs.readdirSync(directory).filter((entry) => (
-    entry.endsWith('.agent.md')
-    && !entry.startsWith('.')
-    && isSafeAgentProfileId(idFromFileName(entry))
+    isAgentManifestFileName(entry) && isSafeAgentProfileId(idFromFileName(entry))
   ));
 };
 
@@ -205,12 +207,72 @@ const loadManifestCandidates = (
   return results;
 };
 
+interface ManifestFiles {
+  resolved: ReturnType<typeof scopedResourceResolver.resolve<AgentManifestDefinition>>;
+  diagnostics: AgentManifestDiagnostic[];
+  builtinHashes: Map<string, string>;
+  sourceHashes: Map<string, string>;
+  trustRevision: number;
+}
+
+interface EffectiveSnapshot {
+  profiles: EffectiveAgentProfile[];
+  diagnostics: AgentManifestDiagnostic[];
+}
+
+/**
+ * Agent manifests (builtin, user and project files, with project trust) are read once per project and kept until a
+ * write through this service, a trust decision, or a changed file stamp at `revalidate` (turn preparation and
+ * Settings open). The Agent model choice comes from Settings and is applied on top without reading files.
+ */
 export class AgentManifestService {
   private readAgentModels: () => AgentModelSettings = () => ({ default: {}, byAgent: {} });
+  private readonly manifestFiles = new Map<string, StampedValue<ManifestFiles>>();
+  private readonly effective = new WeakMap<ManifestFiles, { agentModels: AgentModelSettings; snapshot: EffectiveSnapshot }>();
+  private readonly globalInstructions = new Map<string, StampedValue<string>>();
+  private readonly sortedDefinitions = new WeakMap<EffectiveSnapshot, readonly AgentManifestDefinition[]>();
 
   /** Settings owns which model each Agent uses; manifests never carry it. */
   bindAgentModelSettings(read: () => AgentModelSettings): void {
     this.readAgentModels = read;
+  }
+
+  /** Re-checks every cached manifest input against the files; true when anything changed outside the app. */
+  revalidate(): boolean {
+    let changed = false;
+    for (const value of [...this.manifestFiles.values(), ...this.globalInstructions.values()]) {
+      changed = value.revalidate() || changed;
+    }
+    return changed;
+  }
+
+  /** Drops every cached manifest input after the app changed manifest files itself. */
+  invalidate(): void {
+    for (const value of [...this.manifestFiles.values(), ...this.globalInstructions.values()]) value.invalidate();
+  }
+
+  private loadManifestFiles(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    projectRoot?: string,
+  ): ManifestFiles {
+    const key = JSON.stringify([paths.agentsPath, projectRoot ?? '']);
+    let value = this.manifestFiles.get(key);
+    if (!value) {
+      const directories = [
+        appPathService.getBuiltinAgentsPath(),
+        this.getAgentsDirectory(paths),
+        ...(projectRoot ? [appPathService.getProjectRdcPaths(projectRoot).agentsPath] : []),
+      ];
+      value = new StampedValue(
+        () => [...directories.map((directory) => directoryStamp(directory, isAgentManifestFileName)), projectAgentTrust.stamp()].join('#'),
+        () => this.readManifestFiles(paths, projectRoot),
+      );
+      this.manifestFiles.set(key, value);
+    }
+    const files = value.get();
+    if (files.trustRevision === projectAgentTrust.revision) return files;
+    value.invalidate();
+    return value.get();
   }
 
   private getAgentsDirectory(paths: Pick<AppRuntimePaths, 'agentsPath'>): string {
@@ -224,7 +286,41 @@ export class AgentManifestService {
   resolveEffectiveSnapshot(
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     projectRoot?: string,
-  ): { profiles: EffectiveAgentProfile[]; diagnostics: AgentManifestDiagnostic[] } {
+  ): EffectiveSnapshot {
+    const files = this.loadManifestFiles(paths, projectRoot);
+    const agentModels = this.readAgentModels();
+    const cached = this.effective.get(files);
+    if (cached?.agentModels === agentModels) return cached.snapshot;
+    const profiles = files.resolved.resources.map((resource) => {
+      const model = resolveAgentModel(resource.value.id, agentModels);
+      const builtinSourceHash = resource.provenance.scope === 'builtin' ? undefined : files.builtinHashes.get(resource.value.id);
+      return {
+        ...resource.value,
+        builtin: resource.provenance.scope === 'builtin',
+        effectiveStatus: resource.effectiveStatus,
+        provenance: {
+          ...resource.provenance,
+          sourceHash: files.sourceHashes.get(resource.provenance.sourcePath)!,
+        },
+        compiledRoute: { agentId: resource.value.id, providerId: model.route?.providerId ?? '', modelId: model.route?.modelId ?? '' },
+        ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
+        modelSource: model.source,
+        ...(builtinSourceHash ? { builtinUpdate: {
+          builtinSourceHash,
+          status: !resource.value.basedOn ? 'unknown-base' as const : resource.value.basedOn === builtinSourceHash ? 'current' as const : 'updated' as const,
+        } } : {}),
+      };
+    });
+    const snapshot = deepFreeze({ profiles, diagnostics: files.diagnostics });
+    this.effective.set(files, { agentModels, snapshot });
+    return snapshot;
+  }
+
+  private readManifestFiles(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    projectRoot?: string,
+  ): ManifestFiles {
+    const trustRevision = projectAgentTrust.revision;
     const candidates: Array<ScopedResourceCandidate<AgentManifestDefinition>> = [];
     const diagnostics: AgentManifestDiagnostic[] = [];
 
@@ -295,28 +391,26 @@ export class AgentManifestService {
     })).values()].sort((a, b) => a.scope.localeCompare(b.scope) || a.sourcePath.localeCompare(b.sourcePath) || a.code.localeCompare(b.code));
     const builtinHashes = new Map(candidates.filter((candidate) => candidate.scope === 'builtin')
       .map((candidate) => [candidate.id, hashManifestFile(candidate.sourcePath)] as const));
-    const agentModels = this.readAgentModels();
-    const profiles = resolved.resources.map((resource) => {
-      const model = resolveAgentModel(resource.value.id, agentModels);
-      const builtinSourceHash = resource.provenance.scope === 'builtin' ? undefined : builtinHashes.get(resource.value.id);
-      return {
-        ...resource.value,
-        builtin: resource.provenance.scope === 'builtin',
-        effectiveStatus: resource.effectiveStatus,
-        provenance: {
-          ...resource.provenance,
-          sourceHash: hashManifestFile(resource.provenance.sourcePath),
-        },
-        compiledRoute: { agentId: resource.value.id, providerId: model.route?.providerId ?? '', modelId: model.route?.modelId ?? '' },
-        ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
-        modelSource: model.source,
-        ...(builtinSourceHash ? { builtinUpdate: {
-          builtinSourceHash,
-          status: !resource.value.basedOn ? 'unknown-base' as const : resource.value.basedOn === builtinSourceHash ? 'current' as const : 'updated' as const,
-        } } : {}),
-      };
-    });
-    return { profiles, diagnostics: uniqueDiagnostics };
+    const sourceHashes = new Map(resolved.resources.map((resource) => (
+      [resource.provenance.sourcePath, hashManifestFile(resource.provenance.sourcePath)] as const
+    )));
+    return { resolved, diagnostics: uniqueDiagnostics, builtinHashes, sourceHashes, trustRevision };
+  }
+
+  /** Effective profiles in the order Settings lists them: user-invocable first, then by name. */
+  definitions(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    projectRoot?: string,
+  ): readonly AgentManifestDefinition[] {
+    const snapshot = this.resolveEffectiveSnapshot(paths, projectRoot);
+    let sorted = this.sortedDefinitions.get(snapshot);
+    if (!sorted) {
+      sorted = Object.freeze(snapshot.profiles
+        .slice()
+        .sort((left, right) => Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name)));
+      this.sortedDefinitions.set(snapshot, sorted);
+    }
+    return sorted;
   }
 
   getSettings(
@@ -326,25 +420,19 @@ export class AgentManifestService {
     catalogs: EffectiveCatalogSnapshot[] = [],
     projectRoot?: string,
   ): AgentManifestSettings {
-    const { profiles, diagnostics } = this.resolveEffectiveSnapshot(paths, projectRoot);
-    const definitions = profiles
-      .slice()
-      .sort((left, right) => Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name));
     return {
       directoryPath: this.getAgentsDirectory(paths),
-      definitions,
+      definitions: [...this.definitions(paths, projectRoot)],
       modelOptions: this.getModelOptions(providers, routes, catalogs),
       globalInstructions: this.readGlobalInstructions(paths),
-      diagnostics,
+      diagnostics: [...this.resolveEffectiveSnapshot(paths, projectRoot).diagnostics],
     };
   }
 
   getEffectiveProfiles(
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
-    _providers: LlmProviderEntry[],
-    _routes: LlmAgentRoute[],
     projectRoot?: string,
-  ): EffectiveAgentProfile[] {
+  ): readonly EffectiveAgentProfile[] {
     return this.resolveEffectiveSnapshot(paths, projectRoot).profiles;
   }
 
@@ -353,6 +441,7 @@ export class AgentManifestService {
     globalInstructions: string,
   ): void {
     fs.writeFileSync(this.getGlobalInstructionsPath(paths), globalInstructions.trim(), 'utf8');
+    this.globalInstructions.get(this.getGlobalInstructionsPath(paths))?.invalidate();
   }
 
   async saveDefinition(
@@ -380,6 +469,8 @@ export class AgentManifestService {
       throw new AppError('BUILTIN_AGENT_MANIFEST_READONLY', 'edit requires an explicit user copy-on-write.');
     }
     await fs.promises.mkdir(directory, { recursive: true });
+    // A save compares against the files as they are now, including edits made outside the app.
+    this.revalidate();
     const fileName = safeFileNameForDraft(draft);
     const filePath = path.join(directory, fileName);
     const current = this.resolveEffectiveSnapshot(
@@ -397,6 +488,7 @@ export class AgentManifestService {
         throw new AppError('BUILTIN_AGENT_MANIFEST_READONLY', 'deleting a builtin profile is not allowed.');
       }
       await fs.promises.rm(filePath, { force: true });
+      this.invalidate();
       if (options.scope === 'project') projectAgentTrust.revoke(options.projectRoot!, agentId);
       return {
         definition: this.resolveEffectiveDefinition(paths, agentId, resolutionRoot),
@@ -421,6 +513,7 @@ export class AgentManifestService {
       ...(basedOn ? { basedOn } : {}),
     });
     await writeFileAtomic(filePath, content);
+    this.invalidate();
 
     const ownedFileName = fileNameForId(agentId);
     if (path.basename(filePath) !== ownedFileName) {
@@ -486,6 +579,7 @@ export class AgentManifestService {
     code: string,
     projectRoot?: string,
   ): { agentId: string; scope: AgentManifestWriteScope; sourcePath: string; sourceHash: string } {
+    this.revalidate();
     const diagnostic = this.resolveEffectiveSnapshot(paths, projectRoot).diagnostics.find((issue) => (
       issue.code === code && issue.scope !== 'builtin' && samePath(issue.sourcePath, sourcePath)
     ));
@@ -501,6 +595,7 @@ export class AgentManifestService {
     agentId: string,
     projectRoot?: string,
   ): AgentBuiltinComparison {
+    this.revalidate();
     const profile = this.resolveEffectiveSnapshot(paths, projectRoot).profiles.find((entry) => entry.id === agentId);
     const builtinPath = path.join(appPathService.getBuiltinAgentsPath(), `${agentId}.agent.md`);
     if (!profile || profile.provenance.scope === 'builtin' || !profile.builtinUpdate || !fs.existsSync(builtinPath)) {
@@ -766,10 +861,12 @@ export class AgentManifestService {
 
   private readGlobalInstructions(paths: Pick<AppRuntimePaths, 'instructionsPath'>): string {
     const filePath = this.getGlobalInstructionsPath(paths);
-    if (!fs.existsSync(filePath)) {
-      return '';
+    let value = this.globalInstructions.get(filePath);
+    if (!value) {
+      value = new StampedValue(() => fileStamp(filePath), () => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : ''));
+      this.globalInstructions.set(filePath, value);
     }
-    return fs.readFileSync(filePath, 'utf8');
+    return value.get();
   }
 }
 

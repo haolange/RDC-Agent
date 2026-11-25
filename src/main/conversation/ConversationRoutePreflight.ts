@@ -12,6 +12,7 @@ import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { AppError } from '@shared/errors/appError';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
+import { appPathService } from '../runtime/AppPathService';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
 import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
@@ -206,12 +207,8 @@ export function createConversationMessage(
 }
 
 export function findEffectiveAgentProfile(agentId: string, projectRootPath?: string | null) {
-  const settings = settingsService.getAll();
-  if (!settings.paths) {
-    return { found: false as const, enabled: false as const, profile: null };
-  }
   const snapshot = agentManifestService.resolveEffectiveSnapshot(
-    settings.paths,
+    appPathService.getRuntimePaths(),
     projectRootPath ?? undefined,
   );
   const profile = snapshot.profiles.find((entry) => entry.id === agentId) ?? null;
@@ -223,12 +220,8 @@ export function findEffectiveAgentProfile(agentId: string, projectRootPath?: str
 }
 
 export function resolveEffectiveAgentSnapshot(agentId: string, projectRootPath?: string | null) {
-  const settings = settingsService.getAll();
-  if (!settings.paths) {
-    return { profile: null, overlayDiagnostics: [] as AgentManifestDiagnostic[], diagnostics: [] as AgentManifestDiagnostic[] };
-  }
   const snapshot = agentManifestService.resolveEffectiveSnapshot(
-    settings.paths,
+    appPathService.getRuntimePaths(),
     projectRootPath ?? undefined,
   );
   const profile = snapshot.profiles.find((entry) => entry.id === agentId && entry.enabled) ?? null;
@@ -305,7 +298,7 @@ export function resolveAgentRoutePreflight(
   modelOverride?: { providerId: string; modelId: string } | null,
   projectRootPath?: string | null,
 ): AgentRoutePreflight {
-  const settings = settingsService.getAll();
+  const providers = settingsService.providerConnections;
   const snapshot = resolveEffectiveAgentSnapshot(agentId, projectRootPath);
   const effectiveProfile = snapshot.profile;
   const compiled = effectiveProfile?.compiledRoute;
@@ -334,7 +327,7 @@ export function resolveAgentRoutePreflight(
     });
   }
 
-  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const provider = providers.get(providerId);
   if (!provider || !provider.enabled || !provider.isConfigured) {
     return withOverlay({
       ok: false,
@@ -365,7 +358,7 @@ export function resolveAgentRoutePreflight(
     });
   }
 
-  const selection = resolveEffectiveModelSelection(providerId, modelId, settings);
+  const selection = resolveEffectiveModelSelection(providerId, modelId, providers);
   const effectiveModel = selection.model;
   if (!effectiveModel) {
     const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');

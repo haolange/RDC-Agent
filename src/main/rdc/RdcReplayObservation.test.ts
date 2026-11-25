@@ -3,7 +3,7 @@ import path from 'node:path';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ execute: vi.fn(), write: vi.fn(), encode: vi.fn() }));
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: mocks.execute } }));
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: { argsPrefix: [], enabled: true, command: 'rdc' } } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: { argsPrefix: [], enabled: true, command: 'rdc' } } } }) } }));
 vi.mock('./captures/replay/replayPngCodec', () => ({ replayPngCodec: { encode: mocks.encode } }));
 vi.mock('./captures/replay/ReplayLivePreviewStore', () => ({ replayLivePreviewStore: { write: mocks.write } }));
 import { observeReplay, readReplayEvents } from './RdcReplayObservation';

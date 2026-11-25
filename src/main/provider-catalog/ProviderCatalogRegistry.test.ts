@@ -18,8 +18,9 @@ describe('ProviderCatalogRegistry lazy loading', () => {
       registry.loadProviderSurface('kimi-coding-plan'),
     ]);
     expect(left?.id).toBe('kimi-coding-plan');
-    expect(right).toEqual(left);
-    expect(right).not.toBe(left);
+    // Catalog facts are frozen and shared, never cloned per reader.
+    expect(right).toBe(left);
+    expect(Object.isFrozen(right)).toBe(true);
     expect(registry.getLoadedProviderSurface('kimi-coding-plan')?.id).toBe('kimi-coding-plan');
   });
 

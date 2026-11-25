@@ -272,7 +272,7 @@ export class ReplayDeviceService {
   }
 
   private async detectAdbDevices(signal: AbortSignal): Promise<ReplayDeviceEntry[]> {
-    const cli = withRdcHostRuntimeEnv(settingsService.getAll().tooling.rdcCli);
+    const cli = withRdcHostRuntimeEnv(settingsService.snapshot().user.tooling.rdcCli);
     const key = JSON.stringify(cli);
     if (this.validatedDiscoveryCli !== key) {
       await rdcCliInvokerService.loadCatalog(cli);

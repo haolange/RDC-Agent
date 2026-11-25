@@ -46,7 +46,7 @@ export class RdcCliInvokerService {
   constructor(private readonly shell: ShellInvocationService = shellInvocationService) {}
 
   private getSettings(): RdcCliInvokerSettings {
-    return settingsService.getAll().tooling.rdcCli;
+    return settingsService.snapshot().user.tooling.rdcCli;
   }
 
   private createRuntimeMetadata(settings = this.getSettings(), catalog?: Partial<ToolCatalog>): ToolRuntimeMetadata {

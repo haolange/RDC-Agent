@@ -14,15 +14,7 @@ vi.mock('../../hooks/runtimeHookDispatch', () => ({
 
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({
-      agents: {
-        definitions: [
-          { id: 'ask', enabled: true, maxTurns: 12 },
-          { id: 'debugger', enabled: true },
-          { id: 'edit', enabled: true, maxTurns: 0 },
-        ],
-      },
-    }),
+    providerConnections: { get: () => undefined, list: () => [] },
   },
 }));
 

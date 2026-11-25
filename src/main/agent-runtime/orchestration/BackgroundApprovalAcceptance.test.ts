@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 const artifacts = vi.hoisted(() => ({ contents: [] as string[] }));
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP, getAppPath: () => process.cwd() } }));
-vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ paths: {}, llm: { providers: [], agentRoutes: [] } }) } }));
+vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { providerConnections: { get: () => undefined, list: () => [] } } }));
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: { getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'General', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { providerId: 'openai', modelId: 'gpt-5.6-sol' } }] } }));
 vi.mock('../tasks/sessionTaskStore', () => ({ createSessionTaskStore: () => store, releaseScopeTaskStore: () => undefined, taskStoreForExecutionScope: (_scope: string | null, owner?: string | null) => owner ? store : store }));
 vi.mock('../../sessions/artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver: { write: (_session: string, uri: string, content: string | Buffer) => { artifacts.contents.push(String(content)); return { uri, hash: 'a'.repeat(64) }; }, read: () => ({ hash: 'a'.repeat(64) }) } }));

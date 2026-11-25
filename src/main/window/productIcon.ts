@@ -20,7 +20,7 @@ export function bindProductIcon(window: BrowserWindow): void {
 export function applyProductIcon(): void {
   if (!target || target.isDestroyed()) return;
   try {
-    const accent = activeChromeAccent(settingsService.getAll().appearance);
+    const accent = activeChromeAccent(settingsService.snapshot().user.appearance);
     if (!cached || cached.accent !== accent) {
       if (!source) {
         const logoPath = app.isPackaged

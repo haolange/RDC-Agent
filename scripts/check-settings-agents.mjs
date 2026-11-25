@@ -324,10 +324,13 @@ async function main() {
 
     const movedFieldPath = path.join(agentsPath, 'custom-moved-field-agent.agent.md');
     fs.writeFileSync(movedFieldPath, fs.readFileSync(importPath, 'utf8').replace('icon: spark', 'model: [ollama:llama3]\nicon: spark'));
+    // Files written outside the app are picked up when manifest inputs are re-checked (turn preparation, Settings open).
+    manifestService.revalidate();
     const movedFieldSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
     assert(movedFieldSettings.diagnostics.some((issue) => issue.code === 'AGENT_MANIFEST_FIELD_MOVED' && issue.sourcePath === movedFieldPath),
       'A manifest that still declares a model must stay inactive with a migratable diagnostic.');
     fs.rmSync(movedFieldPath);
+    manifestService.revalidate();
     const imported = await manifestService.importFile({ agentsPath, instructionsPath }, importPath);
     assert(imported.id === 'custom-imported-agent', 'Import should accept safe non-built-in .agent.md profiles.');
 
@@ -360,6 +363,7 @@ Reserved historical filename.
     writeCustomManifest(path.join(projectAgents, 'edit.agent.md'), { name: 'Project Edit' });
     writeCustomManifest(path.join(projectAgents, 'ask.agent.md'), { name: 'Project Ask' });
 
+    manifestService.revalidate();
     const reservedSettings = manifestService.getSettings(
       { agentsPath, instructionsPath },
       [ollama],

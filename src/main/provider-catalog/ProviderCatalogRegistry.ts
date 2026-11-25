@@ -6,6 +6,7 @@ import {
   type ProviderAccountAuth,
   type ProviderSurfaceManifest,
 } from '@shared/provider-catalog/catalogManifestSchema';
+import { deepFreeze } from '@shared/utils/deepFreeze';
 import {
   PROVIDER_CATALOG_SCHEMA_VERSION,
   type CompiledProviderCatalogIndex,
@@ -27,8 +28,9 @@ import type {
 const loadedSurfaces = new Map<string, ProviderSurfaceManifest>();
 const surfaceLoads = new Map<string, Promise<ProviderSurfaceManifest>>();
 
-function cloneJson<T>(value: T): T {
-  return structuredClone(value);
+/** Catalog facts are immutable: frozen once and shared by every reader instead of cloned per call. */
+function frozen<T>(value: T): T {
+  return deepFreeze(value);
 }
 
 function isCompiledIndex(value: unknown): value is CompiledProviderCatalogIndex {
@@ -114,19 +116,19 @@ export function getProviderCatalogRevision(): string {
 }
 
 export function listProviderSummaries(): ProviderSurfaceSummary[] {
-  return cloneJson(loadCatalogIndex().surfaces);
+  return frozen(loadCatalogIndex().surfaces);
 }
 
 export function getProviderSurfaceSummary(id: string): ProviderSurfaceSummary | null {
   const summary = summaryById(id);
-  return summary ? cloneJson(summary) : null;
+  return summary ? frozen(summary) : null;
 }
 
 export async function loadProviderSurface(id: string): Promise<ProviderSurfaceManifest | null> {
   const cached = loadedSurfaces.get(id);
-  if (cached) return cloneJson(cached);
+  if (cached) return frozen(cached);
   const active = surfaceLoads.get(id);
-  if (active) return cloneJson(await active);
+  if (active) return frozen(await active);
   if (!summaryById(id)) return null;
   const index = loadCatalogIndex();
   const load = loadCompiledProviderSurface(id).then((surface) => {
@@ -137,7 +139,7 @@ export async function loadProviderSurface(id: string): Promise<ProviderSurfaceMa
   try {
     const surface = await load;
     loadedSurfaces.set(id, surface);
-    return cloneJson(surface);
+    return frozen(surface);
   } finally {
     surfaceLoads.delete(id);
   }
@@ -145,7 +147,7 @@ export async function loadProviderSurface(id: string): Promise<ProviderSurfaceMa
 
 export function getLoadedProviderSurface(id: string): ProviderSurfaceManifest | null {
   const surface = loadedSurfaces.get(id);
-  return surface ? cloneJson(surface) : null;
+  return surface ? frozen(surface) : null;
 }
 
 export function isBuiltinProviderId(id: string): id is BuiltinLlmProviderId {
@@ -190,12 +192,12 @@ export function getProviderModelSummaries(id: string): LlmProviderModel[] {
 }
 
 export function getProviderCatalogModelSummaries(id: string): ProviderSurfaceSummary['models'] {
-  return cloneJson(summaryById(id)?.models ?? []);
+  return frozen(summaryById(id)?.models ?? []);
 }
 
 
 export function getProviderModelDefinitions(id: string): ModelManifest[] {
-  return cloneJson(loadedSurfaces.get(id)?.models ?? []);
+  return frozen(loadedSurfaces.get(id)?.models ?? []);
 }
 
 export function lookupProviderModelDefinition(id: string, modelId: string): ModelManifest | null {
@@ -204,7 +206,7 @@ export function lookupProviderModelDefinition(id: string, modelId: string): Mode
     entry.modelId.trim().toLowerCase() === normalized
     || entry.aliases.some((alias) => alias.trim().toLowerCase() === normalized)
   ));
-  return model ? cloneJson(model) : null;
+  return model ? frozen(model) : null;
 }
 
 export function getProviderDefaultBaseUrl(id: string): string | undefined {
@@ -220,7 +222,7 @@ export function getProviderAuthSchemaId(id: string): ProviderAuthSchemaId | unde
 /** The surface's account sign-in descriptor; null when it has no account login. */
 export function getProviderAccountAuth(id: string): ProviderAccountAuth | null {
   const accountAuth = summaryById(id)?.accountAuth;
-  return accountAuth ? cloneJson(accountAuth) : null;
+  return accountAuth ? frozen(accountAuth) : null;
 }
 
 /** Fixed request headers the surface's route for this protocol sends with every call. */

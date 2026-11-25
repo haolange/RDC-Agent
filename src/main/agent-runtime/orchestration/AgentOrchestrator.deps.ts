@@ -13,7 +13,6 @@ export { sessionContextJournal } from '../../conversation/SessionContextJournal'
 export { runtimeLogService } from '../../runtime/RuntimeLogService';
 export { appPathService } from '../../runtime/AppPathService';
 export { storageAdapter } from '../../sessions/store/StorageAdapter';
-export { executionProfileService } from '../../settings/settings-core/ExecutionProfileService';
 export { settingsService } from '../../settings/settings-core/SettingsService';
 export { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 export { compiledRoutesFromDefinitions } from '../../settings/provider-catalog/compiledAgentRoutes';
@@ -23,7 +22,7 @@ export {
   planEffectiveModelRequest,
   resolveEffectiveModel,
 } from '../../settings/provider-catalog/EffectiveModelResolver';
-export { resolveCompactionPercentForSettings } from '../../settings/settings-core/compactionPercent';
+export { resolveCompactionPercentForProject } from '../../settings/settings-core/compactionPercent';
 
 export {
   turnCoordinator,

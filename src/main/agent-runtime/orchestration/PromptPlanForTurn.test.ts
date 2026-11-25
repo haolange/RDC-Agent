@@ -31,17 +31,8 @@ vi.mock('../../sessions/store/StorageAdapter', () => ({
 
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({
-      paths: {},
-      llm: { providers: [], agentRoutes: [] },
-      agents: {
-        definitions: [{
-          id: 'ask',
-          enabled: true,
-          skills: ['inspect'],
-          instructions: 'Ask instructions',
-        }],
-      },
+    providerConnections: { get: () => undefined, list: () => [] },
+    snapshot: () => ({ revision: 1, user: {
       agentRuntime: {
         permissions: {
           mode: 'default',
@@ -51,7 +42,7 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
           deniedCommandPrefixes: [],
         },
       },
-    }),
+    } }),
   },
 }));
 

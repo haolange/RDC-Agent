@@ -28,9 +28,10 @@ vi.mock('../../settings/provider-catalog/EffectiveModelResolver', () => ({
 
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: vi.fn(() => ({
+    snapshot: vi.fn(() => ({ revision: 1, user: {
       agentRuntime: { context: { compactionThresholdPercent: 80 } },
-    })),
+    } })),
+    providerConnections: { get: () => undefined, list: () => [] },
   },
 }));
 

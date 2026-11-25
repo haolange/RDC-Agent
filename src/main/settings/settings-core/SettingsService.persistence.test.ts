@@ -4,6 +4,7 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APPEARANCE, DEFAULT_LAYOUT } from '@shared/constants/appSettingsDefaults';
 import { isolateHome } from '../../testing/isolatedHome';
+import type { AppSettings } from '@shared/types/settings';
 
 const electronMock = vi.hoisted(() => ({
   userDataRoot: '',
@@ -29,9 +30,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-// Every case rebuilds the full settings view several times (about 100 ms each here, several times that on a loaded
-// Windows runner), so the suite has its own budget instead of the 5 s default.
-describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
+describe('SettingsService provider persistence', () => {
   let userDataRoot = '';
   let previousUserDataEnv: string | undefined;
   let restoreHome: () => void = () => undefined;
@@ -57,6 +56,12 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   });
 
   const settingsPathFor = () => path.join(userDataRoot, '.rdc-agent', 'config.json');
+
+  /** Starts a service and returns the settings view the renderer would receive. */
+  const started = (service: { initialize(): unknown; rendererSettingsDto(): AppSettings }): AppSettings => {
+    service.initialize();
+    return service.rendererSettingsDto();
+  };
 
   /** Writes a v9 settings file whose sections are the defaults, with the given overrides. */
   async function writeSettingsFixture(overrides: Record<string, unknown> = {}): Promise<string> {
@@ -91,16 +96,16 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const notifications = vi.fn(); const stop = runtimePermissionStateService.subscribe(notifications);
     const rename = vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => { throw new Error('permission commit failed'); });
     try {
-      expect(() => service.setAll({ agentRuntime: { permissions: { mode: 'full-access' } } })).toThrow('permission commit failed');
+      expect(() => service.update({ agentRuntime: { permissions: { mode: 'full-access' } } })).toThrow('permission commit failed');
       expect(runtimePermissionStateService.getSnapshot()).toBe(before);
       expect(notifications).not.toHaveBeenCalled();
     } finally { rename.mockRestore(); }
     const stopBroken = runtimePermissionStateService.subscribe(() => { throw new Error('notification failed'); });
     try {
-      expect(service.setAll({ agentRuntime: { permissions: { mode: 'full-access' } } }).agentRuntime.permissions.mode).toBe('full-access');
+      expect(service.update({ agentRuntime: { permissions: { mode: 'full-access' } } }).user.agentRuntime.permissions.mode).toBe('full-access');
       expect(runtimePermissionStateService.getSnapshot()).toEqual({ mode: 'full-access', revision: before.revision + 1 });
       expect(notifications).toHaveBeenCalledOnce();
-      expect(service.getAll().agentRuntime.permissions.mode).toBe('full-access');
+      expect(service.rendererSettingsDto().agentRuntime.permissions.mode).toBe('full-access');
     } finally { stop(); stopBroken(); }
   });
 
@@ -111,8 +116,8 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
 
-    const runtime = service.initialize();
-    service.getAll();
+    const runtime = started(service);
+    service.rendererSettingsDto();
 
     expect(runtime.llm.providers.find((provider) => provider.id === 'deepseek')).toMatchObject({
       isConfigured: false, configuredAuthMode: 'api-key', activeAccountId: 'account-stored', lastTestedAt: '2026-11-01T00:00:00.000Z',
@@ -121,18 +126,67 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     expect(fs.statSync(settingsPath).mtimeMs).toBe(beforeMtime);
   });
 
+  it('serves reads from a frozen snapshot and commits each real change once with a revision and its sections', async () => {
+    await createVerifiedPersistedSettings();
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const initial = service.initialize();
+    const changes: unknown[] = [];
+    service.onChanged((change) => changes.push(change));
+    const reads = vi.spyOn(fs, 'readFileSync');
+    try {
+      for (let index = 0; index < 5; index += 1) {
+        expect(service.snapshot()).toBe(initial);
+        service.providerConnections.get('deepseek');
+        service.agentModelRoutes.resolve('general');
+      }
+      expect(reads.mock.calls.filter(([file]) => file === settingsPathFor())).toHaveLength(0);
+    } finally {
+      reads.mockRestore();
+    }
+    expect(Object.isFrozen(initial.user.appearance)).toBe(true);
+    expect(service.providerConnections.list()).toBe(service.providerConnections.list());
+
+    service.update({ appearance: { theme: initial.user.appearance.theme } });
+    expect(service.snapshot()).toBe(initial);
+    expect(changes).toEqual([]);
+
+    const next = service.update({ appearance: { theme: 'light' }, agentModels: { default: { model: 'deepseek:deepseek-flash' }, byAgent: {} } });
+    expect(next.revision).toBe(initial.revision + 1);
+    expect(changes).toEqual([{ revision: next.revision, sections: ['appearance', 'agentModels'] }]);
+    expect(service.agentModelRoutes.resolve('general')).toEqual({ agentId: 'general', providerId: 'deepseek', modelId: 'deepseek-flash' });
+  });
+
+  it('picks up a secret written outside the app only when external inputs are re-checked', async () => {
+    await createVerifiedPersistedSettings();
+    const { SettingsService } = await import('./SettingsService');
+    const { SecretStorageService, secretStorageService } = await import('./SecretStorageService');
+    const service = new SettingsService();
+    service.initialize();
+    expect(service.providerConnections.get('deepseek')?.isConfigured).toBe(false);
+
+    // Another writer of the same secret file stands in for an edit made outside the app.
+    const secretRef = secretStorageService.createProviderAccountSecretRef('deepseek', 'account-stored', 'api-key');
+    new SecretStorageService().setSecret(secretRef, 'sk-written-elsewhere');
+    expect(service.providerConnections.get('deepseek')?.isConfigured).toBe(false);
+
+    service.revalidateExternalInputs();
+    expect(service.providerConnections.get('deepseek')?.isConfigured).toBe(true);
+    expect(service.getProviderSecret('deepseek')).toBe('sk-written-elsewhere');
+  });
+
   it('starts from defaults without creating the settings file', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const runtime = service.initialize();
-    service.getAll();
+    const runtime = started(service);
+    service.rendererSettingsDto();
 
     expect(runtime.appearance.theme).toBe('dark');
     expect(runtime.llm.providers.length).toBeGreaterThan(0);
     expect(fs.existsSync(settingsPathFor())).toBe(false);
-    service.setAll({ appearance: { theme: 'dark' } });
+    service.update({ appearance: { theme: 'dark' } });
     expect(fs.existsSync(settingsPathFor()), 'an unchanged patch writes nothing').toBe(false);
-    service.setAll({ appearance: { theme: 'light' } });
+    service.update({ appearance: { theme: 'light' } });
     const written = fs.readFileSync(settingsPathFor(), 'utf8');
     expect(written).not.toContain('\n');
     expect(JSON.parse(written)).toMatchObject({ schemaVersion: 9, appearance: { theme: 'light' }, providers: {} });
@@ -145,7 +199,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
 
     service.initialize();
     const providersBefore = (JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: unknown }).providers;
-    service.setAll({ appearance: { theme: 'light' } });
+    service.update({ appearance: { theme: 'light' } });
 
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { appearance: { theme: string }; providers: unknown };
     expect(persisted.appearance.theme).toBe('light');
@@ -158,12 +212,12 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
 
-    const runtime = service.initialize();
+    const runtime = started(service);
     expect(runtime.llm.providers.some((provider) => provider.id === 'retired-provider')).toBe(false);
     expect(runtime.resourceCatalog.diagnostics).toContainEqual(expect.objectContaining({
       code: 'settings_provider_not_in_catalog', severity: 'warning', path: settingsPath,
     }));
-    service.setAll({ appearance: { theme: 'light' } });
+    service.update({ appearance: { theme: 'light' } });
     service.saveProviderConnection('deepseek', 'sk-deepseek', [{ id: 'deepseek-flash', label: 'Flash', enabled: true }]);
     expect((JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, unknown> }).providers['retired-provider'])
       .toEqual(orphan);
@@ -173,18 +227,18 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const { settingsPath } = await createVerifiedPersistedSettings();
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const providers = service.initialize().llm.providers;
+    const providers = started(service).llm.providers;
     const longcat = providers.find((entry) => entry.id === 'longcat')!;
     const target = longcat.models[0]!;
 
-    service.setAll({ llm: { providers: providers.map((entry) => entry.id === 'longcat'
+    service.update({ llm: { providers: providers.map((entry) => entry.id === 'longcat'
       ? { ...entry, models: entry.models.map((model) => model.id === target.id ? { ...model, enabled: false } : model) }
       : entry) } });
     const afterEdit = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, { models?: Record<string, unknown> }> };
     expect(Object.keys(afterEdit.providers).sort()).toEqual(['deepseek', 'longcat']);
     expect(afterEdit.providers.longcat?.models?.[target.id]).toEqual({ enabled: false });
 
-    service.setAll({ llm: { providers: service.getAll().llm.providers.filter((entry) => entry.id !== 'deepseek') } });
+    service.update({ llm: { providers: service.rendererSettingsDto().llm.providers.filter((entry) => entry.id !== 'deepseek') } });
     const afterRemove = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, unknown> };
     expect(Object.keys(afterRemove.providers)).toEqual(['longcat']);
   });
@@ -226,14 +280,14 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const { SettingsService } = await import('./SettingsService');
     const { getProviderModelSummaries } = await import('../../provider-catalog/ProviderCatalogRegistry');
     const service = new SettingsService();
-    const settings = service.initialize();
+    const settings = started(service);
     service.saveProviderConnection('deepseek', 'sk-deepseek-test', getProviderModelSummaries('deepseek'));
     service.saveProviderAccountConnection(
       'chatgpt-account',
       JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-size', accessToken: 'token' }),
       getProviderModelSummaries('chatgpt-account'),
     );
-    service.setAll({
+    service.update({
       appearance: { theme: 'light' },
       agentModels: { default: { model: 'deepseek:deepseek-flash', reasoningLevel: 'high' }, byAgent: {} },
     });
@@ -256,7 +310,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     ]) {
       expect(keys.has(catalogField), catalogField).toBe(false);
     }
-    expect(service.getAll().llm.providers.filter((provider) => provider.isConfigured).map((provider) => provider.id).sort())
+    expect(service.rendererSettingsDto().llm.providers.filter((provider) => provider.isConfigured).map((provider) => provider.id).sort())
       .toEqual(['chatgpt-account', 'deepseek']);
   });
 
@@ -271,14 +325,14 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
 
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const runtime = service.initialize();
+    const runtime = started(service);
 
     expect(runtime.llm.providers.find((entry) => entry.id === 'chatgpt-account')).toMatchObject({
       activeAccountId: undefined,
       hasStoredSecret: false,
       isConfigured: false,
     });
-    expect(service.getProviderOAuthSecret('chatgpt-account', workspaceRoot)).toBe('');
+    expect(service.getProviderOAuthSecret('chatgpt-account')).toBe('');
     expect(secretStorageService.hasSecret(unkeyedRef, workspaceRoot)).toBe(true);
   });
 
@@ -294,7 +348,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const raw = fs.readFileSync(settingsPath, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
-    const runtime = new SettingsService().initialize();
+    const runtime = started(new SettingsService());
 
     expect(runtime.llm.providers.find((entry) => entry.id === 'grok-account')?.models.map((model) => model.id))
       .toEqual([]);
@@ -314,7 +368,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       ],
     );
 
-    const connected = service.getAll().llm.providers.find((entry) => entry.id === 'grok-account');
+    const connected = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'grok-account');
     expect(connected).toMatchObject({ isConfigured: true });
     expect(connected?.models.map((model) => model.id)).toEqual(['grok-composer-2.5-fast']);
     expect(connected?.models.some((model) => model.id === 'grok-imagine-video-1.5')).toBe(false);
@@ -337,14 +391,14 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const { secretStorageService } = await import('./SecretStorageService');
     const { getProviderModelSummaries } = await import('../../provider-catalog/ProviderCatalogRegistry');
     const service = new SettingsService();
-    const settings = service.initialize();
+    const settings = started(service);
     const models = getProviderModelSummaries('chatgpt-account').slice(0, 2);
     service.saveProviderAccountConnection(
       'chatgpt-account',
       JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-rotate', accessToken: 'old', refreshToken: 'refresh-old' }),
       models,
     );
-    const modelIdsBeforeRotation = service.getAll().llm.providers
+    const modelIdsBeforeRotation = service.rendererSettingsDto().llm.providers
       .find((entry) => entry.id === 'chatgpt-account')?.models.map((model) => model.id);
 
     service.rotateProviderAccountCredential(
@@ -353,7 +407,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       { oauthExpiresAt: '2026-07-13T01:00:00.000Z', oauthRefreshAvailable: true },
     );
 
-    const provider = service.getAll().llm.providers.find((entry) => entry.id === 'chatgpt-account');
+    const provider = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'chatgpt-account');
     const secretRef = secretStorageService.createProviderAccountSecretRef('chatgpt-account', 'acct-rotate', 'oauth');
     expect(provider?.models.map((model) => model.id)).toEqual(modelIdsBeforeRotation);
     expect(JSON.parse(secretStorageService.getSecret(secretRef, settings.paths.userRdcRoot)) as { refreshToken: string })
@@ -372,7 +426,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       { id: 'kimi-k2.7-code', label: 'Kimi K2.7 Code', enabled: true, availability: 'available' },
     ]);
 
-    const reloaded = service.getAll();
+    const reloaded = service.rendererSettingsDto();
     const models = reloaded.llm.providers
       .find((provider) => provider.id === 'volcengine-coding-plan')?.models ?? [];
     expect(models.map((model) => model.id))
@@ -398,7 +452,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       { id: 'kimi-k2-thinking', label: 'Kimi K2 Thinking', enabled: true, availability: 'available' },
     ]);
 
-    const provider = service.getAll().llm.providers.find((entry) => entry.id === 'kimi-coding-plan');
+    const provider = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'kimi-coding-plan');
     expect(provider?.models.map((model) => model.id)).toEqual(['kimi-for-coding']);
     expect(provider?.recommendedModels).toEqual(['kimi-for-coding']);
   });
@@ -414,7 +468,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       { id: 'kimi-for-coding-highspeed', label: 'Kimi for Coding HighSpeed', enabled: true, availability: 'available' },
     ]);
 
-    const provider = service.getAll().llm.providers.find((entry) => entry.id === 'kimi-coding-plan');
+    const provider = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'kimi-coding-plan');
     expect(provider?.models.map((model) => model.id)).toEqual(['kimi-for-coding', 'k3']);
     expect(provider?.models.find((model) => model.id === 'k3')).toMatchObject({
       label: 'Kimi K3',
@@ -440,7 +494,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
         preferredRouteOptionId: 'OpenAICompatibleChatCompletions',
       }],
     );
-    expect(service.getAll().llm.providers.find((provider) => provider.id === 'deepseek')
+    expect(service.rendererSettingsDto().llm.providers.find((provider) => provider.id === 'deepseek')
       ?.models.find((model) => model.id === target!.id)).toMatchObject({
         enabled: false,
         defaultReasoningSelection: 'high',
@@ -449,7 +503,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       });
 
     service.saveProviderConnection('deepseek', '', discovered);
-    expect(service.getAll().llm.providers.find((provider) => provider.id === 'deepseek')
+    expect(service.rendererSettingsDto().llm.providers.find((provider) => provider.id === 'deepseek')
       ?.models.find((model) => model.id === target!.id)).toMatchObject({
         enabled: false,
         defaultReasoningSelection: 'high',
@@ -461,7 +515,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   it('atomically persists an unconfigured provider model route preference', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const initialized = service.initialize();
+    const initialized = started(service);
     const provider = initialized.llm.providers.find((entry) => entry.id === 'longcat');
     expect(provider).toBeDefined();
 
@@ -476,7 +530,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     });
 
     expect(result.status).toBe('committed');
-    expect(service.getAll().llm.providers.find((entry) => entry.id === 'longcat')
+    expect(service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'longcat')
       ?.models.find((model) => model.id === 'LongCat-2.0')?.preferredRouteOptionId)
       .toBe('AnthropicMessages');
   });
@@ -491,7 +545,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       JSON.stringify({ providerId: 'openrouter', accountId: 'account-under-test', apiKey: 'sk-or-oauth' }),
       [{ id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', enabled: true }],
     );
-    const openRouter = () => service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')!;
+    const openRouter = () => service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter')!;
     const connected = openRouter();
     const model = connected.models.find((entry) => entry.enabled)!;
     const result = await service.saveProviderDefinition({
@@ -513,7 +567,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   it('commits concurrent model choices and an independent settings write without replacing either provider', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const settings = service.initialize();
+    const settings = started(service);
     const change = (id: string) => {
       const provider = settings.llm.providers.find((entry) => entry.id === id)!;
       return service.saveProviderDefinition({
@@ -525,10 +579,10 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const second = change('longcat');
     const window = { width: 1600, height: 1000, x: 10, y: 20, isMaximized: true };
     service.persistWindowLayout(window);
-    service.setAll({ appearance: { contextBreakdownExpanded: true } });
+    service.update({ appearance: { contextBreakdownExpanded: true } });
 
     expect((await Promise.all([first, second])).map((item) => item.status)).toEqual(['committed', 'committed']);
-    const persisted = service.getAll();
+    const persisted = service.rendererSettingsDto();
     expect(persisted.layout.window).toEqual(window);
     expect(persisted.appearance.contextBreakdownExpanded).toBe(true);
     for (const providerId of ['deepseek', 'longcat']) {
@@ -547,22 +601,23 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       JSON.stringify({ providerId: 'openrouter', accountId: 'account-under-test', apiKey: 'sk-or-oauth' }),
       [{ id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', enabled: true }],
     );
-    const connected = service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')!;
+    const connected = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter')!;
     const pending = service.saveProviderDefinition({
       provider: { ...connected, models: connected.models.map((model) => ({ ...model, enabled: false })) },
       clientRevision: 1,
     });
-    const disconnected = service.disconnectProvider('openrouter', 'account').llm.providers.find((entry) => entry.id === 'openrouter');
+    const disconnected = service.disconnectProvider('openrouter', 'account');
 
     await expect(pending).resolves.toMatchObject({ status: 'superseded' });
-    expect(service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')).toEqual(disconnected);
+    expect(service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter')).toEqual(disconnected);
   });
 
   it('returns the prior model choices and keeps config bytes after a provider commit fails', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     service.initialize();
-    const settings = service.setAll({ appearance: { theme: 'light' } });
+    service.update({ appearance: { theme: 'light' } });
+    const settings = service.rendererSettingsDto();
     const provider = settings.llm.providers.find((entry) => entry.id === 'deepseek')!;
     const filePath = path.join(settings.paths.userRdcRoot, 'config.json');
     const before = fs.readFileSync(filePath, 'utf8');
@@ -583,15 +638,15 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   it('preserves an invalid Volc route id so Settings can require an explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const initialized = service.initialize();
+    const initialized = started(service);
     service.saveProviderConnection('volcengine-coding-plan', 'test-key', [
       { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
     ]);
 
     expect(initialized.agents.definitions.some((definition) => definition.id === 'general')).toBe(true);
-    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'volcengine-coding-plan:glm-5.2' } } } });
+    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'volcengine-coding-plan:glm-5.2' } } } });
 
-    expect(service.getAll().llm.agentRoutes).toContainEqual({
+    expect(service.rendererSettingsDto().llm.agentRoutes).toContainEqual({
       agentId: 'general',
       providerId: 'volcengine-coding-plan',
       modelId: 'glm-5.2',
@@ -602,14 +657,14 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const { SettingsService } = await import('./SettingsService');
     const { secretStorageService } = await import('./SecretStorageService');
     const service = new SettingsService();
-    const initialized = service.initialize();
+    const initialized = started(service);
     const models = [{ id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', enabled: true }];
 
     service.saveProviderConnection(
       'openrouter', 'sk-or-api-key', models, 'https://openrouter.ai/api/v1',
       'OpenRouterChatCompletions', 'api-key',
     );
-    const apiProvider = service.getAll().llm.providers.find((entry) => entry.id === 'openrouter');
+    const apiProvider = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter');
     const apiSecretRef = apiProvider?.secretRef;
     expect(apiProvider).toMatchObject({
       authMode: 'api-key', configuredAuthMode: 'api-key',
@@ -621,7 +676,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       JSON.stringify({ providerId: 'openrouter', accountId: 'or-user', apiKey: 'sk-or-oauth' }),
       models,
     );
-    const accountProvider = service.getAll().llm.providers.find((entry) => entry.id === 'openrouter');
+    const accountProvider = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter');
     expect(accountProvider).toMatchObject({
       authMode: 'account', configuredAuthMode: 'account', activeAccountId: 'or-user',
       hasStoredSecretByAuthMode: { 'api-key': true, account: true },
@@ -636,7 +691,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       'openrouter', '', models, 'https://openrouter.ai/api/v1',
       'OpenRouterChatCompletions', 'api-key',
     );
-    expect(service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')).toMatchObject({
+    expect(service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter')).toMatchObject({
       authMode: 'api-key', configuredAuthMode: 'api-key', isConfigured: true,
       hasStoredSecretByAuthMode: { 'api-key': true, account: false },
     });
@@ -645,10 +700,10 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   it('preserves invalid routes so model removal requires explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const initialized = service.initialize();
+    const initialized = started(service);
     expect(initialized.agents.definitions.some((definition) => definition.id === 'general')).toBe(true);
-    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'missing-provider:missing-model' } } } });
-    expect(service.getAll().llm.agentRoutes).toContainEqual({
+    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'missing-provider:missing-model' } } } });
+    expect(service.rendererSettingsDto().llm.agentRoutes).toContainEqual({
       agentId: 'general', providerId: 'missing-provider', modelId: 'missing-model',
     });
   });
@@ -656,11 +711,11 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   it('coalesces A -> B -> C so only C is committed and settings never mirrors the route', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const initialized = service.initialize();
+    const initialized = started(service);
     const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
-    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
+    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
     const settingsBeforeSave = fs.readFileSync(initialized.paths.settingsPath, 'utf8');
 
     const first = service.saveAgentDefinition({
@@ -697,10 +752,10 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     });
     expect(newestResult.commitHash).toMatch(/^[a-f0-9]{64}$/);
     expect(newestResult.lastSuccessful?.commitHash).toBe(newestResult.commitHash);
-    expect(service.getAll().llm.agentRoutes).toContainEqual({
+    expect(service.rendererSettingsDto().llm.agentRoutes).toContainEqual({
       agentId: 'general', providerId: 'deepseek', modelId: 'model-c',
     });
-    const saved = service.getAll().agents.definitions.find((definition) => definition.id === 'general');
+    const saved = service.rendererSettingsDto().agents.definitions.find((definition) => definition.id === 'general');
     expect(saved?.compiledRoute).toEqual({ agentId: 'general', providerId: 'deepseek', modelId: 'model-c' });
     expect(fs.readdirSync(initialized.paths.agentsPath).some((entry) => entry.endsWith('.tmp'))).toBe(false);
     const persisted = JSON.parse(fs.readFileSync(initialized.paths.settingsPath, 'utf8')) as Record<string, unknown>;
@@ -712,11 +767,11 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const { SettingsService } = await import('./SettingsService');
     const { agentManifestService } = await import('../agent-manifests/AgentManifestService');
     const service = new SettingsService();
-    const initialized = service.initialize();
+    const initialized = started(service);
     const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
-    service.setAll({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
+    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
     const committed = await service.saveAgentDefinition({
       draft: {
         ...draft,
@@ -741,7 +796,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       route: { agentId: 'general', providerId: 'deepseek', modelId: 'model-c' },
     });
     expect(failed.lastSuccessful?.commitHash).toBe(committed.commitHash);
-    expect(service.getAll().agents.definitions.find((definition) => definition.id === 'general')?.compiledRoute)
+    expect(service.rendererSettingsDto().agents.definitions.find((definition) => definition.id === 'general')?.compiledRoute)
       .toEqual({ agentId: 'general', providerId: 'deepseek', modelId: 'model-c' });
     saveSpy.mockRestore();
   });
@@ -793,7 +848,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const raw = fs.readFileSync(settingsPath, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
-    const runtime = new SettingsService().initialize();
+    const runtime = started(new SettingsService());
     expect(runtime.appearance.chromeThemes.dark.accent).toBe('#ff0000');
     expect(runtime.appearance.chromeThemes.light.presetId).toBe('dracula');
     expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
@@ -823,7 +878,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     });
 
     const { SettingsService } = await import('./SettingsService');
-    const runtime = new SettingsService().initialize();
+    const runtime = started(new SettingsService());
     expect(runtime.tooling.rdcCli.timeoutMs).toBe(timeoutMs);
     expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.timeoutMs).toBe(timeoutMs);
   });

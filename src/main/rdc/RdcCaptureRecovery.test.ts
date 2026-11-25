@@ -9,7 +9,7 @@ vi.mock('../sessions', () => ({ rdcSessionService: { snapshotReplayForSession: m
   prepareAgentDevice: mock.prepare, openProjectInput: mock.open, restoreAgentPosition: mock.restore } }));
 vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { readSession: mock.session, getProjectById: mock.project } }));
 vi.mock('../sessions/run/prepareInvestigationPlan', () => ({ verifyPlanInput: mock.verify }));
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: cli } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: cli } } }) } }));
 vi.mock('./withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
 vi.mock('./captures/ReplayDeviceService', () => ({ replayDeviceService: { getDeviceById: mock.device } }));
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { loadCatalog: mock.catalog } }));

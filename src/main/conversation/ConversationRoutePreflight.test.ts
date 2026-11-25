@@ -27,7 +27,8 @@ const { editProfile } = vi.hoisted(() => ({
 }));
 vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: vi.fn(),
+    providerConnections: { get: vi.fn(), list: vi.fn() },
+    snapshot: vi.fn(),
   },
 }));
 vi.mock('../settings/agent-manifests/AgentManifestService', () => ({
@@ -62,6 +63,19 @@ function settingsWith(): AppSettings {
   } as unknown as AppSettings;
 }
 
+/** Serves the narrow settings reads the preflight uses from one settings fixture. */
+function useSettings(settings: AppSettings): void {
+  vi.mocked(settingsService.providerConnections.get).mockImplementation((id) => settings.llm.providers.find((entry) => entry.id === id));
+  vi.mocked(settingsService.providerConnections.list).mockReturnValue(settings.llm.providers);
+  vi.mocked(settingsService.snapshot).mockReturnValue({ revision: 1, user: settings } as never);
+}
+
+function resetSettings(): void {
+  vi.mocked(settingsService.providerConnections.get).mockReset();
+  vi.mocked(settingsService.providerConnections.list).mockReset();
+  vi.mocked(settingsService.snapshot).mockReset();
+}
+
 function model(state: 'supported' | 'unknown' | 'unsupported'): EffectiveModel {
   return {
     providerId: 'cline-pass',
@@ -89,7 +103,7 @@ function model(state: 'supported' | 'unknown' | 'unsupported'): EffectiveModel {
 
 describe('resolveAgentRoutePreflight tool eligibility', () => {
   afterEach(() => {
-    vi.mocked(settingsService.getAll).mockReset();
+    resetSettings();
     vi.mocked(resolveEffectiveModelSelection).mockReset();
     vi.mocked(agentManifestService.getEffectiveProfiles).mockClear();
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockClear();
@@ -100,7 +114,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
   });
 
   it('admits a source-backed supported model', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(resolveEffectiveModelSelection).mockReturnValue({
       requestedModelId: 'cline-pass/kimi-k2.7-code',
       model: model('supported'),
@@ -111,7 +125,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
   });
 
   it('fails closed for unknown tool calling without silent fallback', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(resolveEffectiveModelSelection).mockReturnValue({
       requestedModelId: 'cline-pass/kimi-k2.7-code',
       model: model('unknown'),
@@ -129,7 +143,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
   });
 
   it('fails closed for explicit unsupported tool calling', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(resolveEffectiveModelSelection).mockReturnValue({
       requestedModelId: 'cline-pass/kimi-k2.7-code',
       model: model('unsupported'),
@@ -143,7 +157,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
   });
 
   it('uses the project-scoped compiledRoute and ignores leftover user agentRoutes', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue({
+    useSettings({
       ...settingsWith(),
       llm: {
         providers: [provider],
@@ -167,7 +181,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
   });
 
   it('keeps a valid lower-scope profile and surfaces invalid high-scope overlay diagnostics', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [editProfile],
       diagnostics: [
@@ -188,7 +202,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
   });
 
   it('attaches overlay invalid diagnostics on the blocked missing-route path', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue({
+    useSettings({
       ...settingsWith(),
       llm: { providers: [provider], agentRoutes: [] },
     } as unknown as AppSettings);
@@ -214,7 +228,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
 
   it('records overlay invalid diagnostics on the blocked path', () => {
     vi.mocked(runtimeLogService.log).mockClear();
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     recordOverlayProfileDiagnostics(
       { projectId: 'proj', session: null, currentRun: null } as never,
       'edit',
@@ -228,7 +242,7 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
   });
 
   it('reports disabled custom profiles without rewriting their id', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [{ id: 'ask', name: 'Ask', enabled: false }],
       diagnostics: [],
@@ -247,12 +261,12 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
 
 describe('resolveConversationAgentId', () => {
   afterEach(() => {
-    vi.mocked(settingsService.getAll).mockReset();
+    resetSettings();
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReset();
   });
 
   it('uses general only when both agentId and profileId are empty and general is enabled', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [{ id: 'general', name: 'General', enabled: true }],
       diagnostics: [],
@@ -262,7 +276,7 @@ describe('resolveConversationAgentId', () => {
   });
 
   it('throws when a requested custom profile is disabled instead of rewriting to general', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [
         { id: 'general', name: 'General', enabled: true },
@@ -278,7 +292,7 @@ describe('resolveConversationAgentId', () => {
   });
 
   it('throws when a requested profile is absent from the project-aware snapshot', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [{ id: 'general', name: 'General', enabled: true }],
       diagnostics: [],
@@ -293,7 +307,7 @@ describe('resolveConversationAgentId', () => {
   });
 
   it('fail-closes when even the default general profile is unavailable', () => {
-    vi.mocked(settingsService.getAll).mockReturnValue(settingsWith());
+    useSettings(settingsWith());
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [{ id: 'general', name: 'General', enabled: false }],
       diagnostics: [],

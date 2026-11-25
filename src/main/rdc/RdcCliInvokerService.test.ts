@@ -6,7 +6,7 @@ import { rdcInstallationFiles } from '../platform/rdcLayout';
 
 vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({
+    snapshot: () => ({ revision: 1, user: {
       tooling: {
         rdcCli: {
           enabled: false,
@@ -17,7 +17,7 @@ vi.mock('../settings/settings-core/SettingsService', () => ({
           timeoutMs: 30_000,
         },
       },
-    }),
+    } }),
   },
 }));
 

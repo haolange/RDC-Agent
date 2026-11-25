@@ -8,7 +8,7 @@ import type { OpenProjectInputRequest } from '@shared/types/session';
 
 const nativeStop = vi.hoisted(() => vi.fn());
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: nativeStop, loadCatalog: vi.fn(async () => ({ tools: [] })) } }));
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: { enabled: true, command: 'rdc', argsPrefix: [], env: {} } } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: { enabled: true, command: 'rdc', argsPrefix: [], env: {} } } } }) } }));
 vi.mock('./captures/ReplayDeviceService', () => ({ replayDeviceService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));

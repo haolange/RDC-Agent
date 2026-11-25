@@ -39,11 +39,10 @@ vi.mock('electron', () => ({
 
 vi.mock('../settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({
-      llm: {
-        providers: [mocks.provider],
-      },
-    }),
+    providerConnections: {
+      get: (providerId: string) => [mocks.provider].find((entry) => entry.id === providerId),
+      list: () => [mocks.provider],
+    },
     getProviderOAuthSecret: () => mocks.oauthSecret,
     saveProviderAccountConnection: (providerId: string, secretPayload: string, models: unknown[], accountSummary: unknown) => {
       mocks.savedConnections.push({ providerId, secretPayload, models, accountSummary });

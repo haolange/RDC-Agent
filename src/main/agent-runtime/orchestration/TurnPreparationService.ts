@@ -184,7 +184,7 @@ export class TurnPreparationService {
     throwIfCancelled();
     // Compile the immutable policy before acquiring any external MCP lease.
     // Invalid policy must not spawn processes or establish network connections.
-    const turnSettings = settingsService.getAll();
+    const turnSettings = settingsService.snapshot().user;
     const cliSettings = withRdcHostRuntimeEnv(structuredClone(turnSettings.tooling.rdcCli));
     const leaseIdentity = assertRdcContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId });
     const catalog = leaseIdentity ? await rdcCliInvokerService.loadCatalog(cliSettings, true) : null;

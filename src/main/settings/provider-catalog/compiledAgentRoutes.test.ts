@@ -6,7 +6,6 @@ import {
   compiledRoutesFromDefinitions,
   resolveCompiledRouteForAgent,
 } from './compiledAgentRoutes';
-import type { AppSettings } from '@shared/types/settings';
 
 vi.mock('../agent-manifests/AgentManifestService', () => ({
   agentManifestService: {
@@ -40,18 +39,13 @@ describe('compiledAgentRoutes leftover isolation', () => {
       }],
       diagnostics: [],
     } as never);
-    const settings = {
-      paths: { agentsPath: 'C:/agents', instructionsPath: 'C:/RDC.md' },
-      agents: { definitions: [{ id: 'general', compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' } }] },
-      llm: { agentRoutes: [{ agentId: 'general', providerId: 'leftover', modelId: 'leftover-model' }] },
-    } as unknown as AppSettings;
-    expect(resolveCompiledRouteForAgent('general', settings, 'D:/Project')).toEqual({
+    expect(resolveCompiledRouteForAgent('general', 'D:/Project')).toEqual({
       agentId: 'general',
       providerId: 'real',
       modelId: 'real-model',
     });
     expect(vi.mocked(agentManifestService.resolveEffectiveSnapshot)).toHaveBeenCalledWith(
-      settings.paths,
+      expect.objectContaining({ agentsPath: expect.any(String) }),
       'D:/Project',
     );
   });

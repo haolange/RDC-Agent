@@ -250,6 +250,9 @@ export const RENDERER_EVENT_CHANNEL = {
     logAppended: 'runtime:logAppended',
     permissionStateChanged: 'runtime:permissionStateChanged',
   },
+  settings: {
+    changed: 'settings:changed',
+  },
 } as const;
 
 type Values<T> = T[keyof T];

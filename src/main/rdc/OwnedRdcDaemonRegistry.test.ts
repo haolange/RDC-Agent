@@ -7,7 +7,7 @@ import { rdcInstallationFiles } from '../platform/rdcLayout';
 
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({
-  settingsService: { getAll: () => ({ tooling: { rdcCli: { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1_000 } } }) },
+  settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1_000 } } } }) },
 }));
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: vi.fn() } }));
 vi.mock('../runtime/AppPathService', () => ({

@@ -26,6 +26,15 @@ import type {
   LlmProviderModel,
 } from '@shared/types/settings';
 
+/** Composed providers by id. `SettingsService.providerConnections` is the live, memoized one. */
+export interface ProviderConnections {
+  get(providerId: string): LlmProviderEntry | undefined;
+  list(): readonly LlmProviderEntry[];
+}
+
+/** What a reader needs to look one provider up. */
+export type ProviderLookup = Pick<ProviderConnections, 'get'>;
+
 /**
  * The runtime provider entry is composed from three inputs: the catalog (everything about the service), the user's
  * stored state (`UserProviderState`), and which credentials the secret store holds. `toUserProviderState` is the way

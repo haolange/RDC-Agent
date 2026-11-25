@@ -51,8 +51,10 @@ it('records the builtin a copy was taken from and reports when the builtin moved
   expect(saved.definition).toMatchObject({ provenance: { scope: 'user' }, builtinUpdate: { status: 'current', builtinSourceHash: builtin.provenance.sourceHash } });
 
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(builtin.provenance.sourceHash, 'f'.repeat(64)));
+  service.revalidate();
   expect(service.resolveEffectiveSnapshot(paths).profiles.find((profile) => profile.id === 'general')?.builtinUpdate?.status).toBe('updated');
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/^based-on: .*\n/mu, ''));
+  service.revalidate();
   expect(service.resolveEffectiveSnapshot(paths).profiles.find((profile) => profile.id === 'general')?.builtinUpdate?.status).toBe('unknown-base');
   expect(service.readBuiltinComparison(paths, 'general').overrideContent).toContain('Extra.');
 });

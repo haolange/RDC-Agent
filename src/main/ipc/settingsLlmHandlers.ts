@@ -71,8 +71,9 @@ async function notifyCommitted(notify: () => unknown): Promise<void> {
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   registerProviderProbeHandlers(context);
+  settingsService.onChanged((change) => context.broadcastToRenderer('settings:changed', change));
   effectiveCatalogService.setConfigurationValidator((request) => {
-    const provider = settingsService.getAll().llm.providers.find(entry => entry.id === request.providerId);
+    const provider = settingsService.providerConnections.get(request.providerId);
     return !!provider && buildEffectiveCatalogRequest(provider).configurationRevision === request.configurationRevision;
   });
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
@@ -90,7 +91,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     await Promise.all(catalogProviderIds.map((providerId) => loadProviderSurface(providerId)));
     const catalogs = settings.llm.providers.flatMap((provider) => {
       if (!catalogProviderIds.includes(provider.id)) return [];
-      const snapshot = resolveEffectiveCatalog(provider.id, settings);
+      const snapshot = resolveEffectiveCatalog(provider.id, settingsService.providerConnections);
       return snapshot ? [snapshot] : [];
     });
     return {
@@ -104,9 +105,12 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     };
   };
 
+  /** The renderer's settings view with the executable Agent model options resolved against live catalogs. */
+  const rendererSettings = (): Promise<AppSettings> => withEffectiveAgentModelOptions(settingsService.rendererSettingsDto());
+
   const broadcastCatalog = async (providerId: string): Promise<void> => {
     await loadProviderSurface(providerId);
-    const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
+    const snapshot = resolveEffectiveCatalog(providerId, settingsService.providerConnections);
     if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   };
   ipcMain.handle('llm:testProviderDraft', async (_event, ...rawArgs: unknown[]) => {
@@ -220,20 +224,9 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
 
   ipcMain.handle('settings:get', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'settings:get', maxBytes: 1024 });
-    const paths = appPathService.getRuntimePaths();
-    return withEffectiveAgentModelOptions(settingsService.getAll({
-      userRdcRoot: paths.userRdcRoot,
-      settingsPath: paths.settingsPath,
-      instructionsPath: paths.instructionsPath,
-      agentsPath: paths.agentsPath,
-      profileStatePath: paths.profileStatePath,
-      logsPath: paths.logsPath,
-      logPath: paths.logPath,
-      projectsPath: paths.projectsPath,
-      knowledgePath: paths.knowledgePath,
-      policiesPath: paths.policiesPath,
-      secretsPath: paths.secretsPath,
-    }));
+    // Opening Settings is where edits made outside the app (secrets, Agent files, trust) are picked up.
+    settingsService.revalidateExternalInputs();
+    return rendererSettings();
   });
 
   ipcMain.handle('settings:getProviderCatalog', async (_event, ...rawArgs: unknown[]) => {
@@ -248,11 +241,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
         label: 'settings:getEffectiveModel',
         maxBytes: 4 * 1024,
       });
-      const settings = settingsService.getAll();
-      const route = resolveCompiledRouteForAgent(agentId, settings, tryCurrentProjectRoot());
+      const route = resolveCompiledRouteForAgent(agentId, tryCurrentProjectRoot());
       if (!route?.providerId || !route.modelId) return null;
       await loadProviderSurface(route.providerId);
-      return resolveEffectiveModel(route.providerId, route.modelId, settings);
+      return resolveEffectiveModel(route.providerId, route.modelId, settingsService.providerConnections);
     } catch (error) {
       runtimeLogService.log({
         scope: 'app',
@@ -276,7 +268,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     await loadProviderSurface(providerId);
     return resolveEffectiveCatalog(
       providerId,
-      settingsService.getAll(),
+      settingsService.providerConnections,
       undefined,
       accountId ?? undefined,
     );
@@ -287,8 +279,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       label: 'settings:hasProviderSecret',
       maxBytes: 4 * 1024,
     });
-    const paths = appPathService.getRuntimePaths();
-    return settingsService.hasProviderSecret(providerId, paths.userRdcRoot);
+    return settingsService.hasProviderSecret(providerId);
   });
 
   ipcMain.handle('settings:importAgentManifest', async (_event, ...rawArgs: unknown[]) => {
@@ -296,9 +287,8 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       label: 'settings:importAgentManifest',
       maxBytes: 8 * 1024,
     });
-    const paths = appPathService.getRuntimePaths();
-    await agentManifestService.importFile(paths, filePath);
-    return withEffectiveAgentModelOptions(settingsService.getAll(paths));
+    await agentManifestService.importFile(appPathService.getRuntimePaths(), filePath);
+    return rendererSettings();
   });
 
   ipcMain.handle('settings:saveAgentDefinition', async (_event, ...rawArgs: unknown[]) => {
@@ -330,9 +320,9 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       label: 'settings:applyAgentModelMigration',
       maxBytes: 8 * 1024,
     });
-    const settings = await settingsService.applyAgentModelMigration(request);
+    await settingsService.applyAgentModelMigration(request);
     await notifyCommitted(() => context.applyCurrentLlmConfig());
-    return withEffectiveAgentModelOptions(settings);
+    return rendererSettings();
   });
 
   ipcMain.handle('settings:deleteAgentOverrideFile', async (_event, ...rawArgs: unknown[]) => {
@@ -340,7 +330,8 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       label: 'settings:deleteAgentOverrideFile',
       maxBytes: 8 * 1024,
     });
-    return withEffectiveAgentModelOptions(await settingsService.deleteAgentOverrideFile(request));
+    await settingsService.deleteAgentOverrideFile(request);
+    return rendererSettings();
   });
 
   ipcMain.handle('settings:previewProjectAgentTrust', async (_event, ...rawArgs: unknown[]) => {
@@ -358,11 +349,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     });
     const preview = settingsService.previewProjectAgentTrust(request.sourcePath);
     if (!await confirmResourceTrust('agent', preview.agentId, preview.sourcePath)) {
-      return withEffectiveAgentModelOptions(settingsService.getAll());
+      return rendererSettings();
     }
-    const settings = settingsService.trustProjectAgent(request);
+    settingsService.trustProjectAgent(request);
     await notifyCommitted(() => context.applyCurrentLlmConfig());
-    return withEffectiveAgentModelOptions(settings);
+    return rendererSettings();
   });
 
   ipcMain.handle('settings:getAgentBuiltinComparison', async (_event, ...rawArgs: unknown[]) => {
@@ -382,7 +373,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     if (result.status !== 'committed' || !result.provider) return result;
     context.applyCurrentLlmConfig();
     await loadProviderSurface(result.provider.id);
-    const snapshot = resolveEffectiveCatalog(result.provider.id, settingsService.getAll());
+    const snapshot = resolveEffectiveCatalog(result.provider.id, settingsService.providerConnections);
     const catalogRevision = snapshot?.catalogRevision ?? null;
     settingsService.setProviderDefinitionCatalogRevision(result.provider.id, catalogRevision);
     if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
@@ -400,7 +391,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const commit = await settingsService.getProviderDefinitionCommit(providerId);
     if (!commit) return null;
     await loadProviderSurface(providerId);
-    const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
+    const snapshot = resolveEffectiveCatalog(providerId, settingsService.providerConnections);
     const catalogRevision = snapshot?.catalogRevision ?? null;
     settingsService.setProviderDefinitionCatalogRevision(providerId, catalogRevision);
     return { ...commit, catalogRevision };
@@ -412,23 +403,25 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       maxBytes: 2 * 1024 * 1024,
     });
     const patch = settings as AppSettingsPatch;
-    const previousSettings = settingsService.getAll();
-    const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
+    const previous = settingsService.snapshot().user;
+    const previousProviders = settingsService.providerConnections.list();
+    const next = settingsService.update(patch).user;
     if (patch.appearance?.theme !== undefined || patch.appearance?.chromeThemes !== undefined) {
       await notifyCommitted(applyProductIcon);
       await notifyCommitted(applyWindowBackgrounds);
     }
-    if (previousSettings.appearance.language !== nextSettings.appearance.language) await notifyCommitted(refreshApplicationMenu);
-    const changedProviderIds = new Set<string>();
+    if (previous.appearance.language !== next.appearance.language) await notifyCommitted(refreshApplicationMenu);
     if (patch.llm?.providers || patch.agentModels) await notifyCommitted(() => context.applyCurrentLlmConfig());
-    for (const provider of patch.llm?.providers ? nextSettings.llm.providers : []) {
-      const previous = previousSettings.llm.providers.find((entry) => entry.id === provider.id);
-      const changed = !previous || JSON.stringify(previous) !== JSON.stringify(provider);
-      if (changed) changedProviderIds.add(provider.id);
-    }
-    const settledSettings = settingsService.getAll();
+    const changedProviderIds = patch.llm?.providers
+      ? settingsService.providerConnections.list()
+        .filter((provider) => {
+          const before = previousProviders.find((entry) => entry.id === provider.id);
+          return !before || JSON.stringify(before) !== JSON.stringify(provider);
+        })
+        .map((provider) => provider.id)
+      : [];
     for (const providerId of changedProviderIds) await notifyCommitted(() => broadcastCatalog(providerId));
-    return withEffectiveAgentModelOptions(settledSettings);
+    return rendererSettings();
   });
 
   ipcMain.handle('settings:getResolvedShell', async (_event, ...rawArgs: unknown[]) => {

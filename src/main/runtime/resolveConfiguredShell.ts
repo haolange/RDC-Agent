@@ -8,7 +8,7 @@ import {
 } from './ShellResolver';
 
 export function resolveConfiguredShell(): ResolvedShell {
-  return shellResolver.resolve(settingsService.getAll().tooling?.shell?.executable ?? '');
+  return shellResolver.resolve(settingsService.snapshot().user.tooling.shell.executable);
 }
 
 export function describeResolvedShell(shell: ResolvedShell): string {

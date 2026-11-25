@@ -74,7 +74,7 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
   permissionHint: 'mutation',
 
   async execute(toolCallId, params, signal, onUpdate, context) {
-    const settings = settingsService.getAll().tooling.codeInterpreter;
+    const settings = settingsService.snapshot().user.tooling.codeInterpreter;
     if (!settings.enabled) {
       throw new AppError('CODE_INTERPRETER_DISABLED', 'enable the interpreter in Settings → Tools.');
     }

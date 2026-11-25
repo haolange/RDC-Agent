@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
   shell: { openExternal: vi.fn() },
 }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
-  getAll: () => ({ appearance: { language: state.language } }),
+  snapshot: () => ({ revision: 1, user: { appearance: { language: state.language } } }),
 } }));
 
 import { installApplicationMenu, refreshApplicationMenu } from './applicationMenu';

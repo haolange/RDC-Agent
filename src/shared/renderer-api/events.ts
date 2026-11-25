@@ -2,6 +2,7 @@ import { RENDERER_EVENT_CHANNEL as EVENT } from './channels';
 import type { EventSubscriptionApi } from '../types/electron-api';
 import type { RuntimePermissionState } from '../types/runtimePermission';
 import type { RuntimeLogEntry } from '../types/runtimeLog';
+import type { SettingsChangedPayload } from '../types/settings';
 import type {
   ContextSnapshot,
   OpenedCaptureState,
@@ -83,6 +84,9 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
     ),
     onRuntimeLogAppended: (callback) => (
       transport.subscribe(EVENT.runtime.logAppended, (entry) => callback(entry as RuntimeLogEntry))
+    ),
+    onSettingsChanged: (callback) => (
+      transport.subscribe(EVENT.settings.changed, (change) => callback(change as SettingsChangedPayload))
     ),
     onAppThemeChanged: (callback) => (
       transport.subscribe(EVENT.shell.themeChanged, (theme) => callback(theme as Parameters<typeof callback>[0]))

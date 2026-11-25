@@ -114,7 +114,7 @@ export type {
 export type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 export type { ActionEvent, EventStatus, EventType } from './evidence';
 export type { ArtifactRecord } from './harness';
-export type { LLMConfig, LLMStreamEvent, ToolCall } from './llm';
+export type { LLMStreamEvent, ToolCall } from './llm';
 export type {
   ConversationTurnControls,
   NamedReasoningLevel,

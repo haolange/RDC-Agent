@@ -44,7 +44,7 @@ import { appPathService } from '../../runtime/AppPathService';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { resolveAgentToolAllowlistFromDefinition } from '../../agent-runtime/orchestration/RuntimeToolPolicy';
-import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
+import type { LlmProviderEntry } from '@shared/types/settings';
 import type { PreparedAgentTurnContext } from '../../agent-runtime/orchestration/orchestratorTypes';
 
 /**
@@ -61,7 +61,7 @@ const provider = {
   enabled: true, isConfigured: true, status: 'verified',
   baseUrl: 'http://127.0.0.1:11434/v1', models: [{ id: MODEL_ID, label: 'Local model', enabled: true, defaultBudgetTokens: 65_536 }],
 } as unknown as LlmProviderEntry;
-const settings = { llm: { providers: [provider], agentRoutes: [] } } as unknown as AppSettings;
+const providers = { get: (providerId: string) => (providerId === provider.id ? provider : undefined) };
 
 type Scenario = 'no-session' | 'session' | 'attachment' | 'approved-plan' | 'subagent';
 const SCENARIOS: Scenario[] = ['no-session', 'session', 'attachment', 'approved-plan', 'subagent'];
@@ -97,13 +97,11 @@ async function prepare(agentId: (typeof AGENTS)[number], scenario: Scenario): Pr
     schemaVersion: EXECUTION_OFFER_SCHEMA, sourceAgentId: 'debugger', targetAgentId: 'general', plan: approvedPlan,
     requiredSkillIds: [], label: 'Execute', prompt: 'Execute the approved plan.', approvedAt: Date.parse('2026-11-25T00:00:00.000Z'),
   } : null;
-  const profiles = agentManifestService.getEffectiveProfiles(
-    appPathService.getUserRdcPaths(), settings.llm.providers, [], roots.project,
-  );
+  const profiles = agentManifestService.getEffectiveProfiles(appPathService.getUserRdcPaths(), roots.project);
   const profile = profiles.find((entry) => entry.id === agentId)!;
-  const planning = planEffectiveModelRequest({ providerId: 'ollama', modelId: MODEL_ID, settings, controls: {} });
+  const planning = planEffectiveModelRequest({ providerId: 'ollama', modelId: MODEL_ID, providers, controls: {} });
   if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
-  const effectiveModel = resolveEffectiveModel('ollama', MODEL_ID, settings)!;
+  const effectiveModel = resolveEffectiveModel('ollama', MODEL_ID, providers)!;
   const toolAllowlist = resolveAgentToolAllowlistFromDefinition(agentId, profile.tools, agentAccessCeiling(profile));
   const scoped = scenario === 'session' || scenario === 'attachment' || scenario === 'approved-plan';
   const promptPlan = new PromptPlanForTurn().buildPromptPlanForAgentTurn({
@@ -193,11 +191,10 @@ describe('turn preparation characterization', () => {
 
 describe('turn preparation budget', () => {
   /**
-   * Preparing one turn may read the committed settings at most once; every further read re-parses and rebuilds the
-   * whole configuration on the turn's critical path. Today preparation re-reads it several times. Turns green with
-   * the settings snapshot; `it.fails` reports it then.
+   * Preparing one turn may read the committed settings at most once; every further read would re-parse and rebuild
+   * the whole configuration on the turn's critical path. Settings are served from the in-memory snapshot.
    */
-  it.fails('reads the settings file at most once while preparing a turn', async () => {
+  it('reads the settings file at most once while preparing a turn', async () => {
     const settingsPath = appPathService.getRuntimePaths().settingsPath;
     const read = vi.spyOn(fs, 'readFileSync');
     try {

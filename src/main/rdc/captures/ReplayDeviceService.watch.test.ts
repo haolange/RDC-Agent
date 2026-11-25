@@ -8,7 +8,7 @@ import {
 } from './ReplayDeviceService';
 import { POLL_BASE_MS } from './replayDeviceDiff';
 
-vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: { env: {} } } }) } }));
+vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: { env: {} } } } }) } }));
 vi.mock('../RdcCliInvokerService', () => ({ rdcCliInvokerService: { loadCatalog: vi.fn(async () => ({})) } }));
 vi.mock('../withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
 

@@ -3,7 +3,7 @@ import { TurnPreparationService } from './TurnPreparationService';
 
 const mock = vi.hoisted(() => ({ load: vi.fn(), acquire: vi.fn(), deniedTools: [] as string[] }));
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP, getAppPath: () => process.cwd() } }));
-vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ tooling: { rdcCli: {} }, agentRuntime: { context: {} } }) } }));
+vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: {} }, agentRuntime: { context: {} } } }) } }));
 vi.mock('../../settings/agent-manifests/AgentRuntimeConfigService', () => ({ agentRuntimeConfigService: { loadSkill: mock.load } }));
 vi.mock('../permissions/PolicyCompiler', () => ({ compileEffectivePolicy: () => ({ maxTurns: 10, maxChildDepth: 1, contextCompactionPercent: 100, deniedTools: mock.deniedTools }) }));
 vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: () => null }));

@@ -62,7 +62,7 @@ export async function restorePreviousCapture(scope: CaptureReplayBindingRequest)
     guard();
 
     const priorBinding = rdcSessionService.recoveryBinding(scope);
-    const cli = priorBinding?.cli ?? withRdcHostRuntimeEnv(structuredClone(settingsService.getAll().tooling.rdcCli));
+    const cli = priorBinding?.cli ?? withRdcHostRuntimeEnv(structuredClone(settingsService.snapshot().user.tooling.rdcCli));
     const catalog = original ? (await rdcCliInvokerService.loadCatalog(cli, true)).tools : [];
     guard();
     let current = await observedPosition(scope);

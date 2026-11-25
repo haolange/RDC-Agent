@@ -3,6 +3,7 @@ import {
   getProviderDefaultBaseUrl,
   isBuiltinProviderId,
 } from '../../provider-catalog/ProviderCatalogRegistry';
+import { appPathService } from '../../runtime/AppPathService';
 import { providerConnectionRevision } from '../provider-catalog/effectiveCatalogMerge';
 import { normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
@@ -23,13 +24,14 @@ import {
   hashProviderDefinition,
   nowIso,
 } from './settingsServiceHelpers';
-import type { AppSettings, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
+import type { ProviderConnections } from './providerUserState';
+import type { LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
 
 export interface SettingsProviderOpsHost {
-  getAll(): AppSettings;
-  /** Commits this provider's user state only; other providers are not rewritten. */
-  commitProvider(entry: LlmProviderEntry): AppSettings;
-  getProviderConnectionValues(providerId: string, workspaceRoot?: string): Record<string, string>;
+  readonly providerConnections: ProviderConnections;
+  /** Commits this provider's user state only and returns it composed; other providers are not rewritten. */
+  commitProvider(entry: LlmProviderEntry): LlmProviderEntry;
+  getProviderConnectionValues(providerId: string): Record<string, string>;
 }
 
 export class SettingsProviderOps {
@@ -57,7 +59,7 @@ export class SettingsProviderOps {
   }
 
   private readProviderDefinitionCommit(providerId: string): ProviderDefinitionCommitSnapshot | null {
-    const provider = this.host.getAll().llm.providers.find((entry) => entry.id === providerId) ?? null;
+    const provider = this.host.providerConnections.get(providerId) ?? null;
     if (!provider) return null;
     const hash = hashProviderDefinition(provider);
     const cached = this.providerDefinitionCommits.get(providerId);
@@ -74,13 +76,10 @@ export class SettingsProviderOps {
   }
 
   private persistProviderDefinition(provider: LlmProviderEntry): LlmProviderEntry {
-    const current = this.host.getAll().llm.providers.find((entry) => entry.id === provider.id);
+    const current = this.host.providerConnections.get(provider.id);
     if (!current) throw new Error(`Unknown provider: ${provider.id}`);
     // Only the model choices change; the commit keeps the user's part of the rows (see toUserProviderState).
-    const committed = this.host.commitProvider({ ...current, models: provider.models })
-      .llm.providers.find((entry) => entry.id === provider.id);
-    if (!committed) throw new Error(`Provider ${provider.id} disappeared after commit.`);
-    return committed;
+    return this.host.commitProvider({ ...current, models: provider.models });
   }
 
   async getProviderDefinitionCommit(providerIdDraft: string): Promise<ProviderDefinitionCommitSnapshot | null> {
@@ -136,9 +135,8 @@ export class SettingsProviderOps {
     authModeDraft?: LlmProviderAuthMode,
     modelPreferences?: LlmProviderModelPreference[],
     connectionValuesDraft?: Record<string, string>,
-  ): AppSettings {
-  const current = this.host.getAll();
-  const provider = current.llm.providers.find((entry) => entry.id === providerId);
+  ): LlmProviderEntry {
+  const provider = this.host.providerConnections.get(providerId);
   if (!provider || !isBuiltinProviderId(provider.id)) {
     throw new Error(`Unknown provider: ${providerId}`);
   }
@@ -170,7 +168,7 @@ export class SettingsProviderOps {
     : (defaultBaseUrl || provider.baseUrl);
   const schema = provider.connectionSchema;
   const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(schema) ?? 'apiKey';
-  const existingHydratedValues = this.host.getProviderConnectionValues(provider.id, current.paths.userRdcRoot);
+  const existingHydratedValues = this.host.getProviderConnectionValues(provider.id);
   const draftHas = (fieldId: string): boolean => (
     Object.prototype.hasOwnProperty.call(connectionValuesDraft ?? {}, fieldId)
   );
@@ -242,8 +240,8 @@ export class SettingsProviderOps {
         nextSecretRefs[field.id] = targetRef;
       }
       retainedSecretRefs.add(targetRef);
-      if (credentialChanged || !secretStorageService.hasSecretRecord(targetRef, current.paths.userRdcRoot)) {
-        secretStorageService.setSecret(targetRef, plannedSecrets[field.id], current.paths.userRdcRoot);
+      if (credentialChanged || !secretStorageService.hasSecretRecord(targetRef, appPathService.getUserRdcRoot())) {
+        secretStorageService.setSecret(targetRef, plannedSecrets[field.id], appPathService.getUserRdcRoot());
         stagedSecretRefs.add(targetRef);
       }
     }
@@ -284,16 +282,16 @@ export class SettingsProviderOps {
   };
 
   try {
-    const nextSettings = this.host.commitProvider(nextProvider);
+    const committed = this.host.commitProvider(nextProvider);
     deleteSecretsAfterCommit(
       [...previousSecretRefs].filter((secretRef) => !retainedSecretRefs.has(secretRef)),
-      current.paths.userRdcRoot,
+      appPathService.getUserRdcRoot(),
     );
-    return nextSettings;
+    return committed;
   } catch (error) {
     deleteSecretsAfterCommit(
       [...stagedSecretRefs].filter((secretRef) => !previousSecretRefs.has(secretRef)),
-      current.paths.userRdcRoot,
+      appPathService.getUserRdcRoot(),
     );
     throw error;
   }
@@ -304,9 +302,8 @@ export class SettingsProviderOps {
     secretPayload: string,
     models: LlmProviderModel[],
     accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
-  ): AppSettings {
-  const current = this.host.getAll();
-  const provider = current.llm.providers.find((entry) => entry.id === providerId);
+  ): LlmProviderEntry {
+  const provider = this.host.providerConnections.get(providerId);
   if (!provider || !isBuiltinProviderId(provider.id) || !provider.authModeOptions?.includes('account')) {
     throw new Error(`Unknown account provider: ${providerId}`);
   }
@@ -325,7 +322,7 @@ export class SettingsProviderOps {
   const previousSecretRef = provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId
     ? getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth')
     : undefined;
-  secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdcRoot);
+  secretStorageService.setSecret(nextSecretRef, secretPayload, appPathService.getUserRdcRoot());
 
   const timestamp = nowIso();
   const nextProvider: LlmProviderEntry = {
@@ -350,18 +347,17 @@ export class SettingsProviderOps {
     isConfigured: true,
   };
 
-  const nextSettings = this.host.commitProvider(nextProvider);
-  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdcRoot);
-  return nextSettings;
+  const committed = this.host.commitProvider(nextProvider);
+  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], appPathService.getUserRdcRoot());
+  return committed;
   }
 
   rotateProviderAccountCredential(
     providerId: LlmProviderId,
     secretPayload: string,
     accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
-  ): AppSettings {
-  const current = this.host.getAll();
-  const provider = current.llm.providers.find((entry) => entry.id === providerId);
+  ): LlmProviderEntry {
+  const provider = this.host.providerConnections.get(providerId);
   if (!provider || !isBuiltinProviderId(provider.id) || !provider.authModeOptions?.includes('account')) {
     throw new Error(`Unknown account provider: ${providerId}`);
   }
@@ -372,7 +368,7 @@ export class SettingsProviderOps {
   const previousSecretRef = provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId
     ? getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth')
     : undefined;
-  secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdcRoot);
+  secretStorageService.setSecret(nextSecretRef, secretPayload, appPathService.getUserRdcRoot());
   const nextProvider: LlmProviderEntry = {
     ...provider,
     authMode: 'account',
@@ -386,21 +382,19 @@ export class SettingsProviderOps {
     oauthExpiresAt: accountSummary.oauthExpiresAt,
     oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
   };
-  const nextSettings = this.host.commitProvider(nextProvider);
-  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdcRoot);
-  return nextSettings;
+  const committed = this.host.commitProvider(nextProvider);
+  deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], appPathService.getUserRdcRoot());
+  return committed;
   }
 
-  markProviderAccountRefreshFailure(providerId: LlmProviderId, message: string): AppSettings {
-    const current = this.host.getAll();
-    const provider = current.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider) return current;
-    return this.host.commitProvider({ ...provider, enabled: false, status: 'failed', isConfigured: false, lastError: message });
+  markProviderAccountRefreshFailure(providerId: LlmProviderId, message: string): void {
+    const provider = this.host.providerConnections.get(providerId);
+    if (!provider) return;
+    this.host.commitProvider({ ...provider, enabled: false, status: 'failed', isConfigured: false, lastError: message });
   }
 
-  disconnectProvider(providerId: LlmProviderId, authModeDraft?: LlmProviderAuthMode): AppSettings {
-  const current = this.host.getAll();
-  const provider = current.llm.providers.find((entry) => entry.id === providerId);
+  disconnectProvider(providerId: LlmProviderId, authModeDraft?: LlmProviderAuthMode): LlmProviderEntry {
+  const provider = this.host.providerConnections.get(providerId);
   if (!provider || !isBuiltinProviderId(provider.id)) {
     throw new Error(`Unknown provider: ${providerId}`);
   }
@@ -424,9 +418,9 @@ export class SettingsProviderOps {
   }
 
   if (authMode !== provider.authMode) {
-    const nextSettings = this.host.commitProvider({ ...provider, authAccountIds, hasStoredSecretByAuthMode });
-    deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdcRoot);
-    return nextSettings;
+    const committed = this.host.commitProvider({ ...provider, authAccountIds, hasStoredSecretByAuthMode });
+    deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], appPathService.getUserRdcRoot());
+    return committed;
   }
 
   const fallback = createProviderEntryFromCatalog(provider.id);
@@ -451,8 +445,8 @@ export class SettingsProviderOps {
     isConfigured: false,
   };
 
-  const nextSettings = this.host.commitProvider(nextProvider);
-  deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdcRoot);
-  return nextSettings;
+  const committed = this.host.commitProvider(nextProvider);
+  deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], appPathService.getUserRdcRoot());
+  return committed;
   }
 }

@@ -9,9 +9,9 @@ vi.mock('electron', () => ({
   BrowserWindow: class { static getAllWindows() { return []; } },
   app: { getPath: () => process.env.TEMP ?? process.cwd(), getAppPath: () => process.cwd() },
 }));
-vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({
-  agents: { definitions: [] }, paths: { userRdcRoot: 'C:/tmp/rdc-agent-test' }, llm: { providers: [], agentRoutes: [] },
-}) } }));
+vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: {
+  providerConnections: { get: () => undefined, list: () => [] }, agentDefinitions: () => [],
+} }));
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: {
   getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'Review', tools: [], skills: [],
     mcpServers: [], handoffs: [], agents: ['general'], reasoningLevel: 'medium',

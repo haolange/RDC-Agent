@@ -79,9 +79,8 @@ function manifestDeclaresEntitlementDenial(
 
 const productionDependencies: ProviderCapabilityProbeDependencies = {
   resolve: (request) => {
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    const model = resolveEffectiveCatalog(request.providerId, settings)?.models.find(candidate =>
+    const provider = settingsService.providerConnections.get(request.providerId);
+    const model = resolveEffectiveCatalog(request.providerId, settingsService.providerConnections)?.models.find(candidate =>
       candidate.selection?.pickerVisibility !== 'internal'
       && (candidate.modelId === request.modelId || candidate.aliases.includes(request.modelId)));
     return provider && provider.isConfigured && model ? { provider, model } : null;
@@ -90,7 +89,7 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
     providerId: request.providerId,
     modelId: request.modelId,
     mode: request.mode,
-    settings: settingsService.getAll(),
+    providers: settingsService.providerConnections,
     controls,
   }),
   execute: executeCapabilityProbe,

@@ -174,13 +174,10 @@ export class EffectiveCatalogService {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
     this.bindRequest(key, request);
     const snapshot = this.createSnapshot(request);
-    const activeLoader = loader ?? this.discoveryLoaderResolver?.(request);
-    if (
-      (!this.resolveDiscovery(request) || snapshot.stale)
-      && activeLoader
-      && !this.isInBackoffWindow(key)
-    ) {
-      void this.refreshDiscovery(request, activeLoader);
+    // The loader is resolved only when a refresh is due: resolving it reads the provider's settings.
+    if ((!this.resolveDiscovery(request) || snapshot.stale) && !this.isInBackoffWindow(key)) {
+      const activeLoader = loader ?? this.discoveryLoaderResolver?.(request);
+      if (activeLoader) void this.refreshDiscovery(request, activeLoader);
     }
     return this.refreshes.has(key) ? this.createSnapshot(request) : snapshot;
   }

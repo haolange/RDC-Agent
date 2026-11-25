@@ -32,11 +32,8 @@ vi.mock('electron', () => ({
 }));
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({
-      agents: { definitions: [] },
-      paths: { userRdcRoot: 'C:/tmp/rdc-agent-test', projectRdcRoot: 'C:/tmp/rdc-agent-test/projects' },
-      llm: { providers: [], agentRoutes: [] },
-    }),
+    providerConnections: { get: () => undefined, list: () => [] },
+    agentDefinitions: () => [],
   },
 }));
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({

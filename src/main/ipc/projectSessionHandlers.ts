@@ -379,7 +379,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         const model = resolveEffectiveModel(
           modelOverride.providerId,
           modelOverride.modelId,
-          settingsService.getAll(),
+          settingsService.providerConnections,
         );
         if (!model || !isAgentToolExecutableModel(model)) {
           const eligibility = model

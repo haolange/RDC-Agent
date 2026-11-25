@@ -196,7 +196,7 @@ async function stopOwnedDaemon(
   record: OwnedRdcDaemonRecord,
   options: OwnedRdcDaemonHarvestOptions,
 ): Promise<void> {
-  const current = withRdcHostRuntimeEnv(options.settings ?? settingsService.getAll().tooling.rdcCli);
+  const current = withRdcHostRuntimeEnv(options.settings ?? settingsService.snapshot().user.tooling.rdcCli);
   const command = record.command.trim() || current.command.trim();
   const commandMissing = Boolean(command) && (path.isAbsolute(command) || command.includes(path.sep)) && !fs.existsSync(command);
   if (!command || commandMissing) {
@@ -265,7 +265,7 @@ function killVerifiedOwnedPids(
 }
 
 function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {
-  return withRdcHostRuntimeEnv(settings ?? settingsService.getAll().tooling.rdcCli).env[RDC_INTERMEDIATE_ROOT_ENV] ?? '';
+  return withRdcHostRuntimeEnv(settings ?? settingsService.snapshot().user.tooling.rdcCli).env[RDC_INTERMEDIATE_ROOT_ENV] ?? '';
 }
 
 /** A missing registry is empty; a damaged one throws `STORAGE_CORRUPT`, so no daemon is treated as ours. */

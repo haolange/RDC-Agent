@@ -24,10 +24,16 @@ vi.mock('electron', () => ({
 }));
 vi.mock('../runtime/AppPathService', () => ({ appPathService: { getRuntimePaths: () => ({}) } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
-  getAll: () => structuredClone(fixture.settings),
-  setAll: (patch: { appearance: { theme: string } }) => {
+  onChanged: () => () => undefined,
+  snapshot: () => ({ revision: 1, user: structuredClone(fixture.settings) }),
+  providerConnections: {
+    get: (providerId: string) => fixture.settings.llm.providers.find((entry) => entry.id === providerId),
+    list: () => structuredClone(fixture.settings.llm.providers),
+  },
+  rendererSettingsDto: () => structuredClone(fixture.settings),
+  update: (patch: { appearance: { theme: string } }) => {
     fixture.settings.appearance = { ...fixture.settings.appearance, ...patch.appearance };
-    return structuredClone(fixture.settings);
+    return { revision: 2, user: structuredClone(fixture.settings) };
   },
 } }));
 vi.mock('../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: {

@@ -26,7 +26,7 @@ import { resolveRdcDelegation } from '../../rdc/RdcDelegation';
  * admission and child tool effects enforce the actual resource constraints.
  */
 
-import { settingsService } from '../../settings/settings-core/SettingsService';
+import { appPathService } from '../../runtime/AppPathService';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import { compileDelegationCapsule } from '../prompt/DelegationCapsuleCompiler';
 import {
@@ -121,15 +121,10 @@ export class SubagentRunner {
     }
     const task = capsule.task;
     // Resolve and authorize the exact project profile before mutating parent budgets or emitting a child event.
-    const childSettings = settingsService.getAll();
-    const effectiveProfiles = childSettings.paths
-      ? agentManifestService.getEffectiveProfiles(
-          childSettings.paths,
-          childSettings.llm?.providers ?? [],
-          childSettings.llm?.agentRoutes ?? [],
-          input.projectRootPath ?? undefined,
-        )
-      : [];
+    const effectiveProfiles = agentManifestService.getEffectiveProfiles(
+      appPathService.getRuntimePaths(),
+      input.projectRootPath ?? undefined,
+    );
     const rejectConfiguration = (code: DelegationConfigurationError['code'], text: string) => {
       const subagentId = generateEventId('subagent');
       const childSessionId = input.childSessionId ?? subagentScopeId(input.parentSessionId ?? createEphemeralScopeId(), subagentId);

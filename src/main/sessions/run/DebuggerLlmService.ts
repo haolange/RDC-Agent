@@ -232,8 +232,9 @@ export class DebuggerLlmService {
     existing.lastSnapshotAt = Date.now();
     this.runSummaries.set(key, existing);
     this.latestUsageKeysBySession.set(params.sessionId, key);
-    this.persistRunUsage(key, params.sessionId);
-    this.broadcastRunUsage(key);
+    const usage = this.toContextUsageSummary(key, existing);
+    storageAdapter.writeSessionUsage(params.sessionId, usage);
+    this.broadcastRunUsage(existing, usage);
   }
 
   private readPersistedContextUsage(sessionId: string): RunContextUsageSummary | null {
@@ -243,11 +244,10 @@ export class DebuggerLlmService {
 
   private toContextUsageSummary(key: string, summary: RunLlmExecutionSummary): RunContextUsageSummary {
     const turnControls = this.resolveSessionTurnControls(summary);
-    const settings = settingsService.getAll();
     const planning = planEffectiveModelRequest({
       providerId: summary.providerId,
       modelId: summary.modelId,
-      settings,
+      providers: settingsService.providerConnections,
       controls: turnControls ?? undefined,
       compactionThresholdPercent: resolveCompactionPercentForSession(summary.sessionId),
     });
@@ -307,24 +307,10 @@ export class DebuggerLlmService {
     return summary.sessionId ? storageAdapter.readSession(summary.sessionId)?.turnControls ?? null : null;
   }
 
-  private contextUsageForKey(key: string): RunContextUsageSummary | null {
-    const summary = this.runSummaries.get(key);
-    return summary ? this.toContextUsageSummary(key, summary) : null;
-  }
-
-  private persistRunUsage(key: string, sessionId: string): void {
-    const usage = this.contextUsageForKey(key);
-    if (usage) storageAdapter.writeSessionUsage(sessionId, usage);
-  }
-
-  private broadcastRunUsage(key: string): void {
-    const summary = this.runSummaries.get(key);
-    if (!summary?.sessionId) return;
-
+  private broadcastRunUsage(summary: RunLlmExecutionSummary, usage: RunContextUsageSummary): void {
+    if (!summary.sessionId) return;
     const session = storageAdapter.readSession(summary.sessionId);
-    const usage = this.contextUsageForKey(key);
-    if (!session || !usage) return;
-
+    if (!session) return;
     workflowProjectionPublisher.publishRunUsage({
       projectId: session.projectId,
       sessionId: session.sessionId,

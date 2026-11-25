@@ -4,7 +4,7 @@ vi.mock('electron', () => ({ app: {
   getPath: () => process.env.TEMP ?? process.cwd(), getAppPath: () => process.cwd(),
 } }));
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: vi.fn(async () => true) }));
-vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({}) } }));
+vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { providerConnections: { get: () => undefined, list: () => [] } } }));
 vi.mock('../../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../../sessions/run/DebuggerLlmService', () => ({ debuggerLlmService: { recordAgentTurnUsage: vi.fn() } }));
 vi.mock('../../sessions/run/handoffSkills', () => ({ assertApprovedExecutionCurrent: vi.fn() }));

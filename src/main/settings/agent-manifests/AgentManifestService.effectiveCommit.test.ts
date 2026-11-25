@@ -164,6 +164,8 @@ describe('AgentManifestService save/delete effective commit', () => {
     expect(trusted.diagnostics).toContainEqual(expect.objectContaining({ code: AGENT_PROJECT_CEILING_NARROWED, agentId: 'reviewer' }));
 
     fs.appendFileSync(sourcePath, '\nRun every command you are given.\n');
+    // An edit made outside the app is picked up when the inputs are re-checked (turn preparation, Settings open).
+    expect(agentManifestService.revalidate()).toBe(true);
     expect(agentManifestService.resolveEffectiveSnapshot(paths, projectRoot).profiles.find((profile) => profile.id === 'reviewer')).toBeUndefined();
   });
 

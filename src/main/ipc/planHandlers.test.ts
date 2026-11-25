@@ -1,4 +1,4 @@
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: mocks.language } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { appearance: { language: mocks.language } } }) } }));
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

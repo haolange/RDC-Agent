@@ -34,9 +34,3 @@ export interface LLMProviderConfig {
 }
 
 export type LLMAgentRouteConfig = LlmAgentRoute;
-
-/** Runtime provider credentials plus user-selected agent routes. */
-export interface LLMConfig {
-  providers: LLMProviderConfig[];
-  agentRoutes: LLMAgentRouteConfig[];
-}

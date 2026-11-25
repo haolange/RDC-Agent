@@ -19,6 +19,7 @@ import { providerConnectionRevision } from './effectiveCatalogMerge';
 import { planModelRequest } from './RequestPlanner';
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
+import type { ProviderLookup } from '../settings-core/providerUserState';
 import type { AssistantMessage } from '../../agent-runtime/core/types';
 import type {
   CatalogLayerContribution,
@@ -37,7 +38,6 @@ import type {
 } from '@shared/types/providerCapability';
 import type { ConversationTurnControls, ReasoningControl } from '@shared/types/modelCapability';
 import type {
-  AppSettings,
   LlmModelCapabilityProbeMode,
   LlmProviderEntry,
   LlmProviderModel,
@@ -436,11 +436,11 @@ function customModelToContribution(custom: CustomModel, provider: LlmProviderEnt
 
 export function resolveEffectiveCatalog(
   providerId: string,
-  settings: AppSettings,
+  providers: ProviderLookup,
   requestedModelId?: string,
   accountIdOverride?: string,
 ): EffectiveCatalogSnapshot | null {
-  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const provider = providers.get(providerId);
   if (!provider) {
     return null;
   }
@@ -460,11 +460,11 @@ export const FIRST_CATALOG_LOAD_WAIT_MS = 8_000;
  */
 export async function awaitFirstCatalogLoad(
   providerId: string,
-  settings: AppSettings,
+  providers: ProviderLookup,
   signal?: AbortSignal,
   timeoutMs = FIRST_CATALOG_LOAD_WAIT_MS,
 ): Promise<void> {
-  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const provider = providers.get(providerId);
   if (!provider) return;
   const request = buildEffectiveCatalogRequest(provider);
   effectiveCatalogService.getSnapshot(request);
@@ -579,9 +579,9 @@ export function refreshEffectiveCatalogDiscovery(
 export function resolveEffectiveModel(
   providerId: string,
   modelId: string,
-  settings: AppSettings,
+  providers: ProviderLookup,
 ): EffectiveModel | null {
-  return resolveEffectiveModelSelection(providerId, modelId, settings).model;
+  return resolveEffectiveModelSelection(providerId, modelId, providers).model;
 }
 
 export interface EffectiveModelSelection {
@@ -628,11 +628,11 @@ export function selectEffectiveModelFromSnapshot(
 export function resolveEffectiveModelSelection(
   providerId: string,
   modelId: string,
-  settings: AppSettings,
+  providers: ProviderLookup,
 ): EffectiveModelSelection {
-  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const provider = providers.get(providerId);
   if (!provider) return { requestedModelId: modelId, model: null, recommendations: [] };
-  const snapshot = resolveEffectiveCatalog(providerId, settings, modelId);
+  const snapshot = resolveEffectiveCatalog(providerId, providers, modelId);
   if (!snapshot) {
     return { requestedModelId: modelId, model: null, recommendations: [] };
   }
@@ -646,12 +646,12 @@ export function resolveEffectiveModelSelection(
 export function planEffectiveModelRequest(input: {
   providerId: string;
   modelId: string;
-  settings: AppSettings;
+  providers: ProviderLookup;
   controls?: Partial<ConversationTurnControls> & { reasoningLevel?: unknown };
   requestedTemperature?: number;
   compactionThresholdPercent?: number;
 }): RequestPlanningResult {
-  const snapshot = resolveEffectiveCatalog(input.providerId, input.settings, input.modelId);
+  const snapshot = resolveEffectiveCatalog(input.providerId, input.providers, input.modelId);
   const selection = snapshot
     ? selectEffectiveModelFromSnapshot(
         snapshot,
@@ -698,10 +698,10 @@ export function planEffectiveModelCapabilityProbe(input: {
   providerId: string;
   modelId: string;
   mode: LlmModelCapabilityProbeMode;
-  settings: AppSettings;
+  providers: ProviderLookup;
   controls: Partial<ConversationTurnControls> & { reasoningLevel?: unknown };
 }): RequestPlanningResult {
-  const snapshot = resolveEffectiveCatalog(input.providerId, input.settings, input.modelId);
+  const snapshot = resolveEffectiveCatalog(input.providerId, input.providers, input.modelId);
   const selection = snapshot
     ? selectEffectiveModelFromSnapshot(
         snapshot,
@@ -752,12 +752,12 @@ export const OBSERVED_ENTITLEMENT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export function recordResponseReceipt(
   providerId: string,
   modelId: string,
-  settings: AppSettings,
+  providers: ProviderLookup,
   plan: RequestPlan,
   message: AssistantMessage,
 ): void {
-  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
-  const model = resolveEffectiveModel(providerId, modelId, settings);
+  const provider = providers.get(providerId);
+  const model = resolveEffectiveModel(providerId, modelId, providers);
   if (!provider || !model) return;
   const activeTier = model.contextTiers.find((tier) => tier.id === plan.activeTierId);
   const grantsTier = activeTier?.entitlement === 'unknown' && receiptExceedsSmallerTiers(model, activeTier.id, message);
@@ -811,11 +811,11 @@ export const OBSERVED_TOOL_CALLING_UNSUPPORTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export function recordObservedToolCallingSupport(
   providerId: string,
   modelId: string,
-  settings: AppSettings,
+  providers: ProviderLookup,
   protocol: LlmProviderProtocol,
 ): boolean {
-  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
-  const model = resolveEffectiveModel(providerId, modelId, settings);
+  const provider = providers.get(providerId);
+  const model = resolveEffectiveModel(providerId, modelId, providers);
   if (!provider || !model) return false;
   effectiveCatalogService.recordObserved({
     providerId,
@@ -831,12 +831,12 @@ export function recordObservedToolCallingSupport(
 export function recordObservedToolCallingUnsupported(
   providerId: string,
   modelId: string,
-  settings: AppSettings,
+  providers: ProviderLookup,
   protocol: LlmProviderProtocol,
   reason: string,
 ): boolean {
-  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
-  const model = resolveEffectiveModel(providerId, modelId, settings);
+  const provider = providers.get(providerId);
+  const model = resolveEffectiveModel(providerId, modelId, providers);
   if (!provider || !model) return false;
   effectiveCatalogService.recordObserved({
     providerId,

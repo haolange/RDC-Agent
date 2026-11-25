@@ -17,7 +17,7 @@ export interface ReplayLiveWriteTarget {
 }
 
 async function call(owner: RdcRuntimeContext, operation: string, args: Record<string, unknown>, frozenCli?: RdcCliInvokerSettings, signal?: AbortSignal) {
-  const settings = structuredClone(frozenCli ?? settingsService.getAll().tooling.rdcCli);
+  const settings = structuredClone(frozenCli ?? settingsService.snapshot().user.tooling.rdcCli);
   const result = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('call', [operation, '--args-json',
     JSON.stringify(args), '--daemon-context', owner.contextId,
   ], { contextId: owner.contextId, settings, abortSignal: signal }), owner.contextId);

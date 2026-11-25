@@ -124,7 +124,7 @@ Structural capability, account entitlement, expiring execution evidence, and tra
 
 ## 凭据与请求事务
 
-版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。Settings 只存用户状态，provider/model 目录事实每次由 manifest 组合；稳定的 provider/model ID、账号 ID（secret ref 由它派生）与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。Settings 只存用户状态，provider/model 目录事实由 manifest 组合：`SettingsService.providerConnections` 在内存里把冻结的目录事实、用户状态与凭据存在性组合一次，只在用户的 provider 状态或凭据 revision 变化时重组；目录 Registry 冻结一次后共享，不按调用克隆；稳定的 provider/model ID、账号 ID（secret ref 由它派生）与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
 
 发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `ModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
 
@@ -178,7 +178,7 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 
 最终操作 URL 按 operation builder 构建并逐 route 测试，禁止重复追加 `/chat/completions`、`/responses` 或 Anthropic `/v1`。所有 stable surface 必须具有 adapter、auth schema、endpoint、Connection Test 与 operation URL；无凭据显示 `Unconfigured`，不得显示假 `Available`。
 
-Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入 Effective Catalog；已配置 Refresh 与自动 SWR 共用 `EffectiveCatalogService.refreshDiscovery` 和同一 discovery loader，不再先写回 Provider 设置。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「待确认」；刷新失败且可用性未知时显示「刷新失败」并以失败原因为提示，只有刷新完成而账号目录仍未确认时才显示「待确认」。被新配置取代的刷新不落盘、不发布旧结果，但会广播当前配置的快照，以清除旧一代的加载状态。
+Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入 Effective Catalog；已配置 Refresh 与自动 SWR 共用 `EffectiveCatalogService.refreshDiscovery` 和同一 discovery loader，不再先写回 Provider 设置；读取快照时只在需要刷新（无发现结果或已过期、且不在退避窗口）时才解析 loader。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「待确认」；刷新失败且可用性未知时显示「刷新失败」并以失败原因为提示，只有刷新完成而账号目录仍未确认时才显示「待确认」。被新配置取代的刷新不落盘、不发布旧结果，但会广播当前配置的快照，以清除旧一代的加载状态。
 
 首轮目录加载期间所有模型都是可用性未知。回合开始时若该 Provider 尚无 discovery 且首轮加载在进行，`awaitFirstCatalogLoad` 最多等待 8 秒再做 preflight；有缓存（即使过期）时从不等待。可用性未知与工具不可执行分属两个诊断码：`CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED` 与 `CONVERSATION_LLM_TOOLS_UNAVAILABLE`。Settings → 智能体、Composer、会话覆盖、preflight 与 RequestPlanner 共用 `isAgentToolExecutableModel`，其中包含正的 `defaultBudgetTokens`（缺失为 `budget-unknown`），不再各自追加条件。
 

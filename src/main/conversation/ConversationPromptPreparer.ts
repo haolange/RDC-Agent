@@ -2,6 +2,7 @@ import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { charsToTokens } from '@shared/utils/tokens';
 import { AppError } from '@shared/errors/appError';
 import { delegableProfileIds } from '../agent-runtime/orchestration/delegableProfiles';
+import { appPathService } from '../runtime/AppPathService';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -31,11 +32,8 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   const projectRootPath = input.context.projectId
     ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
     : null;
-  const runtimeSettings = settingsService.getAll();
   const effectiveProfiles = agentManifestService.getEffectiveProfiles(
-    runtimeSettings.paths,
-    runtimeSettings.llm.providers,
-    runtimeSettings.llm.agentRoutes,
+    appPathService.getRuntimePaths(),
     projectRootPath ?? undefined,
   );
   const definition = effectiveProfiles.find((profile) => profile.id === input.agentId && profile.enabled) ?? null;
@@ -54,7 +52,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     sessionId: input.context.session?.sessionId ?? null,
     messageText: input.messageText,
     pendingSkillIds: input.preloadSkillIds,
-    permissionConstraints: runtimeSettings.agentRuntime.permissions,
+    permissionConstraints: settingsService.snapshot().user.agentRuntime.permissions,
     routeCapability: input.routePreflight.routeCapability,
     effectiveModel: input.effectiveModel ?? undefined,
     requestPlan: input.requestPlan,

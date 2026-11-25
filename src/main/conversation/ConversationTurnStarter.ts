@@ -7,7 +7,7 @@ import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
-import { resolveCompactionPercentForSettings } from '../settings/settings-core/compactionPercent';
+import { resolveCompactionPercentForProject } from '../settings/settings-core/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -80,6 +80,8 @@ export async function startProfileTurn(
   excludeTurnId?: string,
   policyBudget?: PolicyBudgetState,
 ): Promise<ConversationTurnResult> {
+  // Turn preparation is where edits made outside the app (secrets, Agent files, trust) are picked up.
+  settingsService.revalidateExternalInputs();
   const pendingProjectRootPath = context.projectId
     ? storageAdapter.getProjectById(context.projectId)?.rootPath ?? null
     : null;
@@ -126,7 +128,7 @@ export async function startProfileTurn(
   if (surfaceProviderId) {
     const surface = await loadProviderSurface(surfaceProviderId);
     if (!surface) throw new AppError('PROVIDER_UNAVAILABLE', `${surfaceProviderId} is not in the compiled Catalog.`);
-    await awaitFirstCatalogLoad(surfaceProviderId, settingsService.getAll(), preparationController.signal);
+    await awaitFirstCatalogLoad(surfaceProviderId, settingsService.providerConnections, preparationController.signal);
   }
   throwIfPreparationCancelled();
 
@@ -162,11 +164,11 @@ export async function startProfileTurn(
     throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}${overlay ? ` ${overlay}` : ''}`);
   }
 
-  const settings = settingsService.getAll();
+  const providers = settingsService.providerConnections;
   const effectiveModel = resolveEffectiveModel(
     routePreflight.providerId,
     routePreflight.modelId,
-    settings,
+    providers,
   );
   if (!effectiveModel) {
     throw new AppError('MODEL_UNAVAILABLE', `${routePreflight.providerId}/${routePreflight.modelId}`);
@@ -184,14 +186,14 @@ export async function startProfileTurn(
   const planning = planEffectiveModelRequest({
     providerId: routePreflight.providerId,
     modelId: routePreflight.modelId,
-    settings,
+    providers,
     controls: requestedControls,
-    compactionThresholdPercent: resolveCompactionPercentForSettings(settings, pendingProjectRootPath),
+    compactionThresholdPercent: resolveCompactionPercentForProject(pendingProjectRootPath),
   });
   if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
   assertAgentReasoningHonored(effectiveSnapshot.reasoningLevel, requestedControls, planning.plan.reasoningWire.selection);
   const plannedRouteCapability = resolveAgentRouteCapability(
-    settings.llm.providers.find((entry) => entry.id === routePreflight.providerId),
+    providers.get(routePreflight.providerId),
     routePreflight.modelId,
     effectiveModel,
     planning.plan,

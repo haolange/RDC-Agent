@@ -24,7 +24,7 @@ import {
   PromptPlanForTurn,
   providerRuntimeCredentialService,
   resolveAgentToolAllowlistFromDefinition,
-  resolveCompactionPercentForSettings,
+  resolveCompactionPercentForProject,
   resolveEffectiveModel,
   RuntimeToolAssembly,
   runtimeLogService,
@@ -60,7 +60,6 @@ import type {
   AgentState,
 } from '@shared/types/agent';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
-import type { LLMConfig } from '@shared/types/llm';
 import type { LlmProviderId } from '@shared/types/settings';
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
@@ -135,10 +134,9 @@ export class AgentOrchestrator {
     });
   }
 
-  applyLlmConfig(_config: LLMConfig): void {
-    this.slots.applyLlmConfig(
-      compiledRoutesFromDefinitions(settingsService.getAll().agents.definitions),
-    );
+  /** Re-reads the Agent model routes Settings assigns (after a settings or credential change). */
+  applyLlmConfig(): void {
+    this.slots.applyLlmConfig(compiledRoutesFromDefinitions([...settingsService.agentDefinitions()]));
   }
 
   syncSessionSlots(sessionId: string): void {
@@ -164,7 +162,7 @@ export class AgentOrchestrator {
   async refreshProviderRuntimeCredentials(providerId: LlmProviderId): Promise<string> {
     const lease = await freezeProviderRuntimeCredentials(providerId);
     if (lease.accountCredentialsRefreshed) {
-      this.applyLlmConfig(settingsService.getLlmConfig());
+      this.applyLlmConfig();
     }
     return lease.handle;
   }
@@ -192,16 +190,13 @@ export class AgentOrchestrator {
 
     try {
       let preparedTurn = options?.preparedTurn;
-      let settings = settingsService.getAll();
       const routeAgentId = options?.routeAgentId ?? agentId;
       const modelOverride = options?.modelOverride ?? null;
       const frozenRequestPlan = options?.requestPlan;
       const effectiveProfiles = options?.effectiveProfile
         ? [options.effectiveProfile]
         : agentManifestService.getEffectiveProfiles(
-            settings.paths,
-            settings.llm.providers,
-            [],
+            appPathService.getRuntimePaths(),
             options?.projectRootPath ?? undefined,
           );
       const effectiveProfile = options?.effectiveProfile
@@ -219,7 +214,6 @@ export class AgentOrchestrator {
         ?? route?.providerId;
       if (credentialProviderId && !preparedTurn) {
         ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
-        settings = settingsService.getAll();
         const refreshed = this.resolveEffectiveAgentProfileSnapshot(agentId, options?.projectRootPath);
         route = refreshed.profile?.compiledRoute?.providerId
           ? refreshed.profile.compiledRoute
@@ -269,7 +263,7 @@ export class AgentOrchestrator {
         : planEffectiveModelRequest({
             providerId: routeProviderId,
             modelId: routeModelId,
-            settings,
+            providers: settingsService.providerConnections,
             controls: {
               ...(effectiveProfile.reasoningLevel ? { reasoningLevel: effectiveProfile.reasoningLevel } : {}),
               ...(sessionControls ?? {}),
@@ -279,10 +273,7 @@ export class AgentOrchestrator {
                 : {}),
             },
             requestedTemperature: config.temperature,
-            compactionThresholdPercent: resolveCompactionPercentForSettings(
-              settings,
-              options?.projectRootPath ?? null,
-            ),
+            compactionThresholdPercent: resolveCompactionPercentForProject(options?.projectRootPath ?? null),
           });
       if (!planning.ok) {
         const message = `${planning.code}: ${planning.message}`;
@@ -293,7 +284,7 @@ export class AgentOrchestrator {
         throw new DelegationConfigurationError('DELEGATION_REASONING_UNSUPPORTED', 'DELEGATION_REASONING_UNSUPPORTED: selected route cannot honor the Agent reasoning level.');
       }
       const capability = preparedTurn?.effectiveModel
-        ?? resolveEffectiveModel(routeProviderId, routeModelId, settings);
+        ?? resolveEffectiveModel(routeProviderId, routeModelId, settingsService.providerConnections);
       if (!capability) {
         const message = `MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`;
         if (options?.frozenDelegationCapsule) throw new DelegationConfigurationError('MODEL_UNAVAILABLE', message);
@@ -493,13 +484,7 @@ export class AgentOrchestrator {
   }
 
   private resolveEffectiveAgentProfileSnapshot(agentId: AgentRole, projectRootPath?: string | null) {
-    const settings = settingsService.getAll();
-    const profiles = agentManifestService.getEffectiveProfiles(
-      settings.paths,
-      settings.llm.providers,
-      [],
-      projectRootPath ?? undefined,
-    );
+    const profiles = agentManifestService.getEffectiveProfiles(appPathService.getRuntimePaths(), projectRootPath ?? undefined);
     return {
       profile: profiles.find((definition) => definition.id === agentId && definition.enabled) ?? null,
       profiles,
@@ -508,7 +493,7 @@ export class AgentOrchestrator {
   }
 
   private getAgentDisplayName(agentId: AgentRole): string {
-    const definition = settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId);
+    const definition = settingsService.agentDefinitions().find((entry) => entry.id === agentId);
     return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
   }
 

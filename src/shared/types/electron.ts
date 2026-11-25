@@ -72,6 +72,7 @@ import type {
   ProviderDefinitionSaveRequest,
   ProviderDefinitionSaveResult,
   ResolvedTheme,
+  SettingsChangedPayload,
 } from './settings';
 import type {
   CaptureDescriptor,
@@ -618,6 +619,7 @@ export interface ElectronAPI {
     onOpenedCaptureStateChanged: (callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void) => () => void;
     onPermissionStateChanged: (callback: (state: RuntimePermissionState) => void) => () => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
+    onSettingsChanged: (callback: (change: SettingsChangedPayload) => void) => () => void;
     onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => () => void;
     removeAllListeners: (channel: string) => void;
   };

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({ agents: { definitions: [] }, appearance: { language: 'zh-CN' } }),
+    snapshot: () => ({ revision: 1, user: { appearance: { language: 'zh-CN' } } }),
   },
 }));
 import { SessionArtifactError } from '@shared/types/sessionArtifact';

@@ -83,6 +83,6 @@ const EN: Record<DiagnosticTextKey, string> = {
 };
 
 export function diagnosticText(key: DiagnosticTextKey, params: Record<string, string | number> = {}): string {
-  const template = settingsService.getAll().appearance.language === 'en' ? EN[key] : ZH[key];
+  const template = settingsService.snapshot().user.appearance.language === 'en' ? EN[key] : ZH[key];
   return template.replace(/\{(\w+)\}/g, (placeholder, name: string) => (params[name] == null ? placeholder : String(params[name])));
 }

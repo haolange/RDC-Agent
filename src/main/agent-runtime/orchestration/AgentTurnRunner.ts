@@ -530,7 +530,7 @@ export class AgentTurnRunner {
             recordObservedToolCallingSupport(
               input.providerId,
               effectiveModel?.modelId ?? input.modelId,
-              settingsService.getAll(),
+              settingsService.providerConnections,
               requestPlan.route.protocol,
             );
           } catch (error) {
@@ -755,7 +755,7 @@ export class AgentTurnRunner {
           recordObservedToolCallingUnsupported(
             input.providerId,
             effectiveModel?.modelId ?? input.modelId,
-            settingsService.getAll(),
+            settingsService.providerConnections,
             requestPlan.route.protocol,
             error instanceof Error ? error.message : String(error),
           );

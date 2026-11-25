@@ -4,7 +4,7 @@ import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({ app: { getPath: () => process.cwd(), getAppPath: () => process.cwd() } }));
-vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ paths: {}, llm: { providers: [], agentRoutes: [] } }) } }));
+vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { providerConnections: { get: () => undefined, list: () => [] } } }));
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: { getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'General', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { providerId: 'openai', modelId: 'gpt-5.6-sol' } }] } }));
 
 import { TaskRegistry } from '../tasks';

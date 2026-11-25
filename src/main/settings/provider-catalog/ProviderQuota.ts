@@ -67,7 +67,7 @@ export function parseQuotaFromHeaders(
 
 export function recordQuotaFromResponse(plan: RequestPlan, response: Response): void {
   if (response.status !== 429) return;
-  const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === plan.providerId);
+  const provider = settingsService.providerConnections.get(plan.providerId);
   effectiveCatalogService.recordTransientQuota({
     providerId: plan.providerId,
     accountId: provider?.activeAccountId ?? `anonymous:${plan.providerId}`,

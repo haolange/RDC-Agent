@@ -9,14 +9,14 @@ import type { ProviderProbeBatch, ProviderProbeBatchItem, ProviderProbeBatchRequ
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
 export interface ProbeBatchDependencies {
-  providers(): LlmProviderEntry[];
+  providers(): readonly LlmProviderEntry[];
   loadSavedCatalog(providerId: string): Promise<string | undefined>;
   models(providerId: string): EffectiveModel[];
   test(item: ProviderProbeBatchItem, signal: AbortSignal): Promise<LlmModelCapabilityProbeResult>;
 }
 
 const production: ProbeBatchDependencies = {
-  providers: () => settingsService.getAll().llm.providers,
+  providers: () => settingsService.providerConnections.list(),
   loadSavedCatalog: async id => {
     try {
       await loadProviderSurface(id);
@@ -25,7 +25,7 @@ const production: ProbeBatchDependencies = {
     }
     return undefined;
   },
-  models: id => resolveEffectiveCatalog(id, settingsService.getAll())?.models ?? [],
+  models: id => resolveEffectiveCatalog(id, settingsService.providerConnections)?.models ?? [],
   test: (item, signal) => providerCapabilityProbeService.test(item, signal),
 };
 

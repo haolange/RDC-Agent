@@ -136,16 +136,16 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     contextWindow: activeContextWindow,
     maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
   });
-  const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
+  const routeProvider = settingsService.providerConnections.get(providerId);
   const reasoningContract = (routeCapabilityOverride ?? resolveAgentRouteCapability(
     routeProvider,
     modelId,
-    resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
+    resolveEffectiveModel(providerId, modelId, settingsService.providerConnections),
   )).reasoningContract;
 
   const contextManager = createExecutionContextManager({
     sessionId: executionScopeId, provider: routeProvider,
-    model: resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
+    model: resolveEffectiveModel(providerId, modelId, settingsService.providerConnections),
     plan: streamOptions.requestPlan, credentialHandle: streamOptions.credentialHandle,
     config: { modelId, contextTokenLimit: resolvedContextTokenLimit, tokenizer: deps.tokenizerService },
   });
@@ -224,7 +224,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     },
     onResponse: (requestId, message) => {
       if (!requestId || !isSuccessfulProviderResponse(message)) return;
-      recordResponseReceipt(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan, message);
+      recordResponseReceipt(providerId, modelId, settingsService.providerConnections, streamOptions.requestPlan, message);
       requestSnapshotStore.complete(requestId, executionScopeId, turnSignature || undefined, {
         inputTokens: message.usage.inputTokens,
         outputTokens: message.usage.outputTokens,

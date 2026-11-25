@@ -93,6 +93,21 @@ describe('SecretStorageService fail-closed', () => {
     expect(fs.readdirSync(secretsPath)).toEqual(['provider-secrets.json']);
   });
 
+  it('reads the secret file and decrypts each secret once until a write replaces them', async () => {
+    const { safeStorage } = await import('electron');
+    const { secretStorageService } = await import('./SecretStorageService');
+    secretStorageService.setSecret('provider-test-api-key', 'sk-first');
+    const decrypt = vi.spyOn(safeStorage, 'decryptString');
+    const reads = vi.spyOn(fs, 'readFileSync');
+    for (let read = 0; read < 3; read += 1) expect(secretStorageService.getSecret('provider-test-api-key')).toBe('sk-first');
+    expect(decrypt).toHaveBeenCalledTimes(1);
+    expect(reads).not.toHaveBeenCalled();
+    const revision = secretStorageService.revision;
+    secretStorageService.setSecret('provider-test-api-key', 'sk-second');
+    expect(secretStorageService.revision).toBeGreaterThan(revision);
+    expect(secretStorageService.getSecret('provider-test-api-key')).toBe('sk-second');
+  });
+
   it('stores and decrypts with safeStorage only', async () => {
     const { secretStorageService } = await import('./SecretStorageService');
     secretStorageService.setSecret('provider-test-api-key', 'sk-live-secret');

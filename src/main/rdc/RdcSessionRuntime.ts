@@ -257,7 +257,7 @@ export class RdcSessionRuntime {
 
   private async resolveBinding(options: RdcLifecycleOptions): Promise<RdcTurnBinding> {
     if (options.binding) return options.binding;
-    const cli = withRdcHostRuntimeEnv(structuredClone(settingsService.getAll().tooling.rdcCli));
+    const cli = withRdcHostRuntimeEnv(structuredClone(settingsService.snapshot().user.tooling.rdcCli));
     const catalog = await rdcCliInvokerService.loadCatalog(cli);
     options.signal?.throwIfAborted();
     return freezeRdcTurnBinding(cli, catalog.tools);

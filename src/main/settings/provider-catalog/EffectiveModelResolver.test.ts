@@ -14,7 +14,7 @@ import {
 } from './EffectiveModelResolver';
 import { planModelRequest } from './RequestPlanner';
 import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface, parseOllamaInstalledModels } from './LiveProviderCatalogParsers';
-import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
+import type { LlmProviderEntry } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
   app: {
@@ -40,6 +40,12 @@ function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProvid
     catalogOwnership: 'app-managed',
     models: [],
   } as unknown as LlmProviderEntry;
+}
+
+
+/** A provider lookup holding exactly the given providers. */
+function providersOf(...providers: LlmProviderEntry[]) {
+  return { get: (providerId: string) => providers.find((provider) => provider.id === providerId) };
 }
 
 describe('EffectiveModelResolver compiled Catalog projection', () => {
@@ -172,7 +178,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
 
   it('projects account-scoped structure before entitlement refresh while planning stays fail-closed', () => {
     const chatgpt = provider('chatgpt-account', 'OpenAIResponses');
-    const settings = { llm: { providers: [chatgpt], agentRoutes: [] } } as unknown as AppSettings;
+    const settings = providersOf(chatgpt);
     const selection = resolveEffectiveModelSelection('chatgpt-account', 'gpt-5.6-sol', settings);
 
     expect(selection.model).toMatchObject({
@@ -190,7 +196,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     expect(planEffectiveModelRequest({
       providerId: 'chatgpt-account',
       modelId: 'gpt-5.6-sol',
-      settings,
+      providers: settings,
       controls: { fastModel: true },
     })).toMatchObject({
       ok: false,
@@ -249,21 +255,21 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
   });
   it('keeps normal K3 Max planning selectable while an explicit probe may verify the same model tier', async () => {
     const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
-    const settings = { llm: { providers: [kimi], agentRoutes: [] } } as unknown as AppSettings;
+    const settings = providersOf(kimi);
     const parsed = parseKimiCodeCatalog({ data: [{
       id: 'k3', context_length: 256_000, supports_reasoning: true,
     }] });
     await refreshEffectiveCatalogDiscovery(kimi, [], parsed.contributions);
 
     expect(planEffectiveModelRequest({
-      providerId: 'kimi-coding-plan', modelId: 'k3', settings,
+      providerId: 'kimi-coding-plan', modelId: 'k3', providers: settings,
       controls: { maxContextMode: false },
     })).toMatchObject({
       ok: true,
       plan: { selectedModelId: 'k3', effectiveModelId: 'k3', contextBudgetTokens: 256_000 },
     });
     expect(planEffectiveModelRequest({
-      providerId: 'kimi-coding-plan', modelId: 'k3', settings,
+      providerId: 'kimi-coding-plan', modelId: 'k3', providers: settings,
       controls: { maxContextMode: true },
     })).toMatchObject({
       ok: true,
@@ -275,7 +281,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       },
     });
     expect(planEffectiveModelCapabilityProbe({
-      providerId: 'kimi-coding-plan', modelId: 'k3', mode: 'max-context', settings,
+      providerId: 'kimi-coding-plan', modelId: 'k3', mode: 'max-context', providers: settings,
       controls: { maxContextMode: true },
     })).toMatchObject({
       ok: true,
@@ -539,7 +545,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         { id: 'model-next', label: 'Next', enabled: true, availability: 'available' as const },
       ],
     };
-    const settings = { llm: { providers: [customProvider], agentRoutes: [] } } as unknown as AppSettings;
+    const settings = providersOf(customProvider);
     await refreshEffectiveCatalogDiscovery(customProvider, customProvider.models, [
       {
         modelId: 'model-current', label: 'Current', aliases: ['model-old'], availability: 'available',
@@ -558,7 +564,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       remappedFrom: 'model-old', model: { modelId: 'model-current' },
     });
     expect(planEffectiveModelRequest({
-      providerId: 'custom-provider-alias-test', modelId: 'model-old', settings,
+      providerId: 'custom-provider-alias-test', modelId: 'model-old', providers: settings,
     })).toMatchObject({
       ok: true,
       plan: { selectedModelId: 'model-current', effectiveModelId: 'model-current' },

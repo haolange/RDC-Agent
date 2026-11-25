@@ -31,7 +31,7 @@ async function confirmRemoval(fileName: string, filePath: string, sessions: stri
   const owner = BrowserWindow.getFocusedWindow() ?? undefined;
   if (process.env.RDC_AGENT_BROWSER_QA === '1' && !owner) return process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1';
   if (!owner) return false;
-  const english = settingsService.getAll().appearance.language === 'en';
+  const english = settingsService.snapshot().user.appearance.language === 'en';
   const action = english ? (reference ? 'Remove reference' : 'Delete capture') : (reference ? '移除引用' : '删除抓帧');
   const consequence = english
     ? (reference ? 'Associated replays will close and the reference will be removed. The external RDC original will be kept. '

@@ -14,7 +14,7 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
   const { state } = context;
   ipcMain.handle('tool:detectInstallations', (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:detectInstallations', maxBytes: 1024 });
-    return detectRdcInstallations(settingsService.getAll().tooling.rdcCli);
+    return detectRdcInstallations(settingsService.snapshot().user.tooling.rdcCli);
   });
   ipcMain.handle('tool:resolveInstallation', (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(RdcInstallationArgsSchema, rawArgs, { label: 'tool:resolveInstallation', maxBytes: 65536 });

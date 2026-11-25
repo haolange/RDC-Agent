@@ -6,7 +6,6 @@ import { BrowserWindow, nativeTheme } from 'electron';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
-import { settingsService } from '../settings/settings-core/SettingsService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -97,8 +96,7 @@ function broadcastRunStatusChanged(payload: {
 }
 
 function applyCurrentLlmConfig(): void {
-  const llmConfig = settingsService.getLlmConfig();
-  agentOrchestrator.applyLlmConfig(llmConfig);
+  agentOrchestrator.applyLlmConfig();
 }
 
 async function appendActionEvent(event: ActionEvent): Promise<void> {

@@ -85,6 +85,8 @@ sequenceDiagram
 
 ## Settings Flow
 
-Settings are persisted by `SettingsService`, sanitized before write, and exposed to renderer through settings IPC.
+`SettingsService` is the single writer of `config.json`. It reads the file once at startup into a frozen `SettingsSnapshot { revision, user }`; every later read is in memory through narrow accessors: `snapshot()` for user sections, `providerConnections` (catalog facts + the user's provider state + secret presence, memoized until the provider states or the secrets change), `agentModelRoutes.resolve(agentId)`, `agentDefinitions()` (cached effective Agent profiles) and `rendererSettingsDto()` for the renderer's whole view; paths come from `appPathService`. `update` sanitizes and validates the patch, writes only a changed document, bumps the revision and broadcasts `settings:changed { revision, sections }`.
+
+Inputs Settings does not own keep their own revisions: the secret store (secret map and decrypted values cached in memory), Agent manifests with project trust and the selected project, and the global instructions file. Writes through the app invalidate them; edits made outside the app are re-checked by file mtime and size when a turn is prepared (`startProfileTurn`) and when Settings opens (`settings:get`). Nothing polls.
 
 Renderer Settings editors never invent provider/model facts; Effective Catalog and connection state come from main. Secret material stays in main-process opaque storage.

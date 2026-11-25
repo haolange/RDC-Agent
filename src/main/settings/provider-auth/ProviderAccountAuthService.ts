@@ -136,7 +136,7 @@ export class ProviderAccountAuthService {
 
     await loadProviderSurface(providerId);
     const activeBundle = await this.refreshBundleIfNeeded(bundle);
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const provider = settingsService.providerConnections.get(providerId);
     const refreshedAt = provider?.lastModelRefreshAt ? Date.parse(provider.lastModelRefreshAt) : Number.NaN;
     const catalogIsFresh = Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000;
     if (JSON.stringify(activeBundle) === JSON.stringify(bundle) && catalogIsFresh) {
@@ -174,7 +174,7 @@ export class ProviderAccountAuthService {
     forcedState?: LlmProviderAccountStatus['state'],
     diagnostic?: LlmProviderAccountDiagnostic,
   ): LlmProviderAccountStatus {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const provider = settingsService.providerConnections.get(providerId);
     const accountAuth = getProviderAccountAuth(providerId);
     const flow = accountAuth ? this.findFlow(providerId) : null;
     const authenticated = Boolean(provider?.isConfigured && provider.status === 'verified' && provider.authMode === 'account');
@@ -282,10 +282,10 @@ export class ProviderAccountAuthService {
 
   private async refreshBundleIfNeeded(bundle: OAuthSecretBundle, force = false): Promise<OAuthSecretBundle> {
     const flow = this.flowFor(bundle);
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === bundle.providerId);
+    const provider = settingsService.providerConnections.get(bundle.providerId);
     const accountId = provider?.activeAccountId ?? bundle.accountId ?? `anonymous:${bundle.providerId}`;
     const ownsAccount = () => {
-      const current = settingsService.getAll().llm.providers.find(entry => entry.id === bundle.providerId);
+      const current = settingsService.providerConnections.get(bundle.providerId);
       return current?.activeAccountId === provider?.activeAccountId
         && JSON.stringify(this.readBundle(bundle.providerId)) === JSON.stringify(bundle);
     };

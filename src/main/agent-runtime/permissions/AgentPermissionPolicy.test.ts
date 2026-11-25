@@ -48,7 +48,7 @@ const externalRoot = path.join(fixtureRoot, 'external');
 const readableRoot = path.join(fixtureRoot, 'shared');
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => mockSettings,
+    snapshot: () => ({ revision: 1, user: mockSettings }),
   },
 }));
 vi.mock('../../runtime/resolveConfiguredShell', () => ({

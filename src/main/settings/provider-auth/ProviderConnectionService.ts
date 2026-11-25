@@ -55,7 +55,7 @@ export { resolveProviderConnectionDraft, resolveTestDiscoveryAccountId } from '.
 export class ProviderConnectionService {
   constructor() {
     providerAccountAuthService.setCatalogPublisher(async (providerId, discovery) => {
-      const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+      const provider = settingsService.providerConnections.get(providerId);
       if (provider) {
         await refreshEffectiveCatalogDiscovery(
           provider,
@@ -69,7 +69,7 @@ export class ProviderConnectionService {
   }
 
   createEffectiveCatalogDiscoveryLoader(request: EffectiveCatalogRequest): DiscoveryLoader | undefined {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === request.providerId);
+    const provider = settingsService.providerConnections.get(request.providerId);
     const accountId = provider?.activeAccountId ?? (provider ? `anonymous:${provider.id}` : '');
     if (
       !provider
@@ -167,7 +167,7 @@ export class ProviderConnectionService {
       const { apiKey, baseUrl } = connection;
       const discovery = await discoverProviderModels(provider, apiKey, baseUrl, connection.values);
       const { models } = discovery;
-      const nextSettings = settingsService.saveProviderConnection(
+      const nextProvider = settingsService.saveProviderConnection(
         provider.id,
         apiKey,
         models,
@@ -177,15 +177,12 @@ export class ProviderConnectionService {
         request.modelPreferences,
         request.connectionValues,
       );
-      const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
-      if (nextProvider) {
-        await refreshEffectiveCatalogDiscovery(
-          nextProvider,
-          models,
-          discovery.contributions,
-          discovery.entitlementContributions,
-        );
-      }
+      await refreshEffectiveCatalogDiscovery(
+        nextProvider,
+        models,
+        discovery.contributions,
+        discovery.entitlementContributions,
+      );
       return {
         success: true,
         provider: nextProvider,
@@ -210,7 +207,7 @@ export class ProviderConnectionService {
       const loader = this.createEffectiveCatalogDiscoveryLoader(request);
       if (!loader) throw new ProviderConnectionError('Provider is not configured for catalog discovery.');
       const snapshot = await effectiveCatalogService.refreshDiscovery(request, loader);
-      const current = settingsService.getAll().llm.providers.find(entry => entry.id === providerId);
+      const current = settingsService.providerConnections.get(providerId);
       if (!current || buildEffectiveCatalogRequest(current).configurationRevision !== request.configurationRevision) {
         throw new ProviderConnectionError('Provider configuration changed while refreshing.');
       }
@@ -231,12 +228,11 @@ export class ProviderConnectionService {
 
   disconnectProvider(providerId: LlmProviderId): LlmProviderConnectionResult {
     try {
-      const nextSettings = settingsService.disconnectProvider(providerId);
-      const provider = nextSettings.llm.providers.find((entry) => entry.id === providerId);
+      const provider = settingsService.disconnectProvider(providerId);
       return {
         success: true,
         provider,
-        models: provider?.models ?? [],
+        models: provider.models,
       };
     } catch (error) {
       return {
@@ -284,7 +280,7 @@ export class ProviderConnectionService {
   }
 
   private getProvider(providerId: LlmProviderId): LlmProviderEntry {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const provider = settingsService.providerConnections.get(providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
       throw providerConnectionError('unknown-provider', 'Unknown provider.');
     }

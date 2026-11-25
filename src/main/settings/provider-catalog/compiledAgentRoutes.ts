@@ -1,7 +1,7 @@
+import { appPathService } from '../../runtime/AppPathService';
 import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { LlmAgentRoute } from '@shared/types/settings';
-import type { AppSettings } from '@shared/types/settings';
 
 export function compiledRouteFromDefinition(
   definition: Pick<AgentManifestDefinition, 'id' | 'compiledRoute'> | null | undefined,
@@ -24,19 +24,7 @@ export function compiledRoutesFromDefinitions(
   });
 }
 
-export function resolveCompiledRouteForAgent(
-  agentId: string,
-  settings: Pick<AppSettings, 'agents' | 'paths'>,
-  projectRoot?: string | null,
-): LlmAgentRoute | null {
-  if (settings.paths?.agentsPath && settings.paths.instructionsPath) {
-    const snapshot = agentManifestService.resolveEffectiveSnapshot(
-      settings.paths,
-      projectRoot ?? undefined,
-    );
-    return compiledRouteFromDefinition(snapshot.profiles.find((profile) => profile.id === agentId));
-  }
-  return compiledRouteFromDefinition(
-    settings.agents.definitions.find((definition) => definition.id === agentId),
-  );
+export function resolveCompiledRouteForAgent(agentId: string, projectRoot?: string | null): LlmAgentRoute | null {
+  const snapshot = agentManifestService.resolveEffectiveSnapshot(appPathService.getRuntimePaths(), projectRoot ?? undefined);
+  return compiledRouteFromDefinition(snapshot.profiles.find((profile) => profile.id === agentId));
 }

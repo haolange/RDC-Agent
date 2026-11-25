@@ -7,7 +7,6 @@ import {
 } from '@shared/constants/agentToolTokens';
 import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
 import { AppError } from '@shared/errors/appError';
-import { executionProfileService } from '../../settings/settings-core/ExecutionProfileService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import type { AgentRole } from '@shared/types/agent';
 
@@ -96,15 +95,8 @@ export function resolveAgentToolAllowlistFromDefinition(
 }
 
 export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
-  const settings = settingsService.getAll();
-  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, agentId);
-  const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
-  const profileTools = manifest
-    ? manifest.tools
-    : runtimeProfile.toolAllowlist?.length
-      ? runtimeProfile.toolAllowlist
-      : [];
-  return finalizeAllowlist(agentId, profileTools, agentAccessCeiling(manifest));
+  const manifest = settingsService.agentDefinitions().find((definition) => definition.id === agentId && definition.enabled);
+  return finalizeAllowlist(agentId, manifest?.tools ?? [], agentAccessCeiling(manifest));
 }
 
 export function isBuiltinToolAllowedForAgent(toolName: string, _agentId: AgentRole): boolean {

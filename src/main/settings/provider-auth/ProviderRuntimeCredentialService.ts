@@ -37,11 +37,10 @@ interface ProviderRuntimeCredentialDependencies {
 const MAX_LEASE_AGE_MS = 24 * 60 * 60 * 1000;
 
 const defaultDependencies: ProviderRuntimeCredentialDependencies = {
-  getProvider: (providerId) => settingsService.getLlmConfig().providers.find((entry) => entry.id === providerId),
+  getProvider: (providerId) => settingsService.runtimeProviderConfig(providerId),
   getConnectionValues: (providerId) => settingsService.getProviderConnectionValues(providerId),
   getConnectionHeaders: (providerId, values) => {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
-    return resolveProviderConnectionHeaders(provider?.connectionSchema, values);
+    return resolveProviderConnectionHeaders(settingsService.providerConnections.get(providerId)?.connectionSchema, values);
   },
   resolveGoogleVertex: resolveGoogleVertexAccessToken,
   resolveAwsBedrock: resolveAwsBedrockCredentials,

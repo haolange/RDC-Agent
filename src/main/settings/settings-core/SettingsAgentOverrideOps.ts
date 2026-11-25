@@ -8,7 +8,8 @@ import { planAgentModelFieldMigration } from '../agent-manifests/agentModelField
 import { projectAgentTrust } from '../agent-manifests/ProjectAgentTrust';
 import { writeFileAtomic } from '../../runtime/atomicFile';
 import { resolveRegisteredProjectRoot, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
-import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
+import type { SettingsSnapshot } from './settingsStore';
+import type { AppSettingsPatch } from '@shared/types/settings';
 import type {
   AgentBuiltinComparison,
   AgentDefinitionCommitQuery,
@@ -18,8 +19,8 @@ import type {
 } from '@shared/types/agentManifest';
 
 interface SettingsAccess {
-  getAll(): AppSettings;
-  setAll(patch: AppSettingsPatch): AppSettings;
+  snapshot(): SettingsSnapshot;
+  update(patch: AppSettingsPatch): SettingsSnapshot;
 }
 
 /** User-triggered actions on override files that do not apply as written. */
@@ -42,7 +43,7 @@ export class SettingsAgentOverrideOps {
   previewModelMigration(sourcePath: string): AgentModelMigrationPreview {
     const target = this.resolveMovedFieldOverride({ sourcePath });
     const plan = planAgentModelFieldMigration(fs.readFileSync(target.sourcePath, 'utf8'));
-    const currentBinding = this.settings.getAll().agentModels.byAgent[target.agentId] ?? {};
+    const currentBinding = this.settings.snapshot().user.agentModels.byAgent[target.agentId] ?? {};
     return {
       sourcePath: target.sourcePath,
       sourceHash: target.sourceHash,
@@ -57,7 +58,7 @@ export class SettingsAgentOverrideOps {
   }
 
   /** Backup → Settings binding → manifest without the moved fields, replaced atomically. */
-  async applyModelMigration(request: AgentOverrideFileRequest): Promise<AppSettings> {
+  async applyModelMigration(request: AgentOverrideFileRequest): Promise<void> {
     const target = this.resolveMovedFieldOverride(request);
     const raw = await fs.promises.readFile(target.sourcePath, 'utf8');
     const plan = planAgentModelFieldMigration(raw);
@@ -66,21 +67,21 @@ export class SettingsAgentOverrideOps {
       throw new AppError('AGENT_MODEL_MIGRATION_STILL_INVALID', migrated.reason);
     }
     await writeFileAtomic(`${target.sourcePath}.bak`, raw);
-    const agentModels = this.settings.getAll().agentModels;
-    this.settings.setAll({
+    const agentModels = this.settings.snapshot().user.agentModels;
+    this.settings.update({
       agentModels: {
         ...agentModels,
         byAgent: { ...agentModels.byAgent, [target.agentId]: { ...agentModels.byAgent[target.agentId], ...plan.binding } },
       },
     });
     await writeFileAtomic(target.sourcePath, plan.content);
-    return this.settings.getAll();
+    agentManifestService.invalidate();
   }
 
-  async deleteOverrideFile(request: AgentOverrideFileRequest): Promise<AppSettings> {
+  async deleteOverrideFile(request: AgentOverrideFileRequest): Promise<void> {
     const target = this.resolveMovedFieldOverride(request);
     await fs.promises.rm(target.sourcePath);
-    return this.settings.getAll();
+    agentManifestService.invalidate();
   }
 
   previewProjectAgentTrust(sourcePath: string): ProjectAgentTrustPreview {
@@ -94,10 +95,9 @@ export class SettingsAgentOverrideOps {
   }
 
   /** Trusts the reviewed bytes only; a file edited after the preview needs a new review. */
-  trustProjectAgent(request: AgentOverrideFileRequest): AppSettings {
+  trustProjectAgent(request: AgentOverrideFileRequest): void {
     const { target, projectRoot } = this.resolveUntrustedProjectAgent(request);
     projectAgentTrust.trust(projectRoot, target.agentId, target.sourcePath);
-    return this.settings.getAll();
   }
 
   private resolveUntrustedProjectAgent(request: Pick<AgentOverrideFileRequest, 'sourcePath'> & { sourceHash?: string }) {

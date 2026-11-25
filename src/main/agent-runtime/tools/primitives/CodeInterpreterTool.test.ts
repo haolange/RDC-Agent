@@ -5,13 +5,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getAll, spawn } = vi.hoisted(() => ({
-  getAll: vi.fn(),
+const { snapshot, spawn } = vi.hoisted(() => ({
+  snapshot: vi.fn(),
   spawn: vi.fn(),
 }));
 
 vi.mock('../../../settings/settings-core/SettingsService', () => ({
-  settingsService: { getAll },
+  settingsService: { snapshot },
 }));
 
 vi.mock('../../../runtime/ProcessSupervisor', () => ({
@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 function enabledSettings(overrides: Record<string, unknown> = {}) {
-  return {
+  return { revision: 1, user: {
     tooling: {
       codeInterpreter: {
         enabled: true,
@@ -48,17 +48,17 @@ function enabledSettings(overrides: Record<string, unknown> = {}) {
         ...overrides,
       },
     },
-  };
+  } };
 }
 
 describe('CodeInterpreterTool', () => {
   beforeEach(() => {
-    getAll.mockReset();
+    snapshot.mockReset();
     spawn.mockReset();
   });
 
   it('fails closed when the interpreter is disabled', async () => {
-    getAll.mockReturnValue(enabledSettings({ enabled: false }));
+    snapshot.mockReturnValue(enabledSettings({ enabled: false }));
     await expect(codeInterpreterTool.execute(
       'py-1',
       { code: 'print(1)' },
@@ -69,7 +69,7 @@ describe('CodeInterpreterTool', () => {
   });
 
   it('rejects unsupported languages', async () => {
-    getAll.mockReturnValue(enabledSettings());
+    snapshot.mockReturnValue(enabledSettings());
     await expect(codeInterpreterTool.execute(
       'py-1',
       { code: 'puts 1', language: 'ruby' },
@@ -80,7 +80,7 @@ describe('CodeInterpreterTool', () => {
   });
 
   it('requires a project root before spawning', async () => {
-    getAll.mockReturnValue(enabledSettings());
+    snapshot.mockReturnValue(enabledSettings());
     await expect(codeInterpreterTool.execute(
       'py-1',
       { code: 'print(1)' },
@@ -91,7 +91,7 @@ describe('CodeInterpreterTool', () => {
   });
 
   it('runs the configured interpreter and returns stdout', async () => {
-    getAll.mockReturnValue(enabledSettings());
+    snapshot.mockReturnValue(enabledSettings());
     const stdout = new EventEmitter();
     const stderr = new EventEmitter();
     spawn.mockReturnValue({
@@ -135,7 +135,7 @@ describe('CodeInterpreterTool', () => {
     { reason: 'exit', code: 7 },
     { reason: 'timeout', code: null },
   ])('retains exact executed source and observed $reason failure', async ({ reason, code }) => {
-    getAll.mockReturnValue(enabledSettings({ argsPrefix: ['-B'], env: { PRIVATE_TOKEN: 'never-record-env' } }));
+    snapshot.mockReturnValue(enabledSettings({ argsPrefix: ['-B'], env: { PRIVATE_TOKEN: 'never-record-env' } }));
     spawn.mockReturnValue({
       child: { stdout: new EventEmitter(), stderr: new EventEmitter() },
       stdout: { toString: () => '' }, stderr: { toString: () => 'actual failure' },

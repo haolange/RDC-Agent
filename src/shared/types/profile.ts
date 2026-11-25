@@ -27,17 +27,3 @@ export interface AgentProfile {
   modelId?: string;
   temperature?: number;
 }
-
-export interface EffectiveAgentRuntimeConfig {
-  agentId: AgentRole;
-  systemPrompt: string;
-  providerId: LlmProviderId;
-  modelId: string;
-  temperature?: number;
-  toolAllowlist: string[];
-  skillIds: string[];
-  mcpServerIds: string[];
-  source: {
-    agentProfileId: string;
-  };
-}

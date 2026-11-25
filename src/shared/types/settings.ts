@@ -1,9 +1,5 @@
 import type { AgentRole } from './agent';
 import type { AgentManifestSettings } from './agentManifest';
-import type {
-  AgentRuntimeMcpDescriptor,
-  AgentRuntimeSkillDescriptor,
-} from './agentRuntime';
 import type { ReasoningSelection } from './modelCapability';
 
 export type AppTheme = 'dark' | 'light' | 'system';
@@ -530,6 +526,23 @@ export interface LlmSettings {
   agentRoutes: LlmAgentRoute[];
 }
 
+/** A section of the user's settings file, or the global instructions Settings also writes. */
+export type SettingsFileSection =
+  | 'appearance'
+  | 'layout'
+  | 'profile'
+  | 'tooling'
+  | 'agentRuntime'
+  | 'agentModels'
+  | 'providers'
+  | 'globalInstructions';
+
+/** Broadcast on `settings:changed` after every committed settings write. */
+export interface SettingsChangedPayload {
+  revision: number;
+  sections: SettingsFileSection[];
+}
+
 export interface SettingsDiagnostic {
   code: string;
   severity: 'error' | 'warning' | 'info';
@@ -538,8 +551,6 @@ export interface SettingsDiagnostic {
 }
 
 export interface RuntimeResourceCatalog {
-  availableSkills: AgentRuntimeSkillDescriptor[];
-  availableMcpServers: AgentRuntimeMcpDescriptor[];
   diagnostics: SettingsDiagnostic[];
 }
 

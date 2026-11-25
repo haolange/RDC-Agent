@@ -107,7 +107,7 @@ export function createDefaultAppSettings(): AppSettings {
       agentRoutes: TOP_LEVEL_AGENT_IDS.map((agentId) => ({ agentId, providerId: '', modelId: '' })),
     },
     agents: { directoryPath: '', definitions: [], modelOptions: [], globalInstructions: '', diagnostics: [] },
-    resourceCatalog: { availableSkills: [], availableMcpServers: [], diagnostics: [] },
+    resourceCatalog: { diagnostics: [] },
     paths: EMPTY_PATHS,
   };
 }
