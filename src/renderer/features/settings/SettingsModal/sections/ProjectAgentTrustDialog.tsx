@@ -5,10 +5,8 @@ import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { errorDetail } from '../../../../lib/errorDetail';
-import type { useI18n } from '../../../../i18n';
+import { useI18n } from '../../../../i18n';
 import type { ProjectAgentTrustPreview } from '@shared/types/agentManifest';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 /** A project Agent profile under review: the file loads first, then the user trusts what they read. */
 export interface ProjectAgentTrustReview {
@@ -22,12 +20,12 @@ export interface ProjectAgentTrustReview {
  * The whole profile is shown before trusting it, because its instructions and tool list run in every
  * turn of this project. Trust covers these bytes only; a later edit outside Settings asks again.
  */
-export function ProjectAgentTrustDialog({ review, onConfirm, onClose, t }: {
+export function ProjectAgentTrustDialog({ review, onConfirm, onClose }: {
   review: ProjectAgentTrustReview;
   onConfirm: (preview: ProjectAgentTrustPreview) => Promise<void>;
   onClose: () => void;
-  t: Translate;
 }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { preview } = review;

@@ -1,16 +1,13 @@
 import React from 'react';
+import { useI18n } from '../../../../i18n';
 import { authModeLabelKey } from './providerCardModel';
 import type { LlmProviderAuthMode, LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderAuthModeFieldProps {
   provider: LlmProviderEntry;
   value: LlmProviderAuthMode;
   disabled: boolean;
   onChange: (mode: LlmProviderAuthMode) => void;
-  t: Translate;
 }
 
 export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
@@ -18,8 +15,8 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
   value,
   disabled,
   onChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const options = provider.authModeOptions ?? [provider.authMode];
   if (options.length < 2) return null;
   const selectedAvailability = provider.authModeAvailability?.[value] ?? provider.providerAvailability;

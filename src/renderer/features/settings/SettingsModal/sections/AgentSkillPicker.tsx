@@ -1,18 +1,18 @@
 import { SearchMultiSelect } from '../../../../ui/SearchMultiSelect';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { projectSkillSelection } from '../scopedSkillSelection';
-import type { useI18n } from '../../../../i18n';
+import { useI18n } from '../../../../i18n';
 import type { useScopedSkillSelection } from '../useScopedSkillSelection';
 
 export type AgentSkillCatalog = ReturnType<typeof useScopedSkillSelection>;
 
-export function AgentSkillPicker({ skills, targetAgentId, value, onChange, t }: {
+export function AgentSkillPicker({ skills, targetAgentId, value, onChange }: {
   skills: AgentSkillCatalog;
   targetAgentId: string;
   value: readonly string[];
   onChange: (ids: string[]) => void;
-  t: ReturnType<typeof useI18n>['t'];
 }) {
+  const { t } = useI18n();
   const projected = skills.catalog ? projectSkillSelection(skills.catalog, targetAgentId, value) : null;
   const unavailable = Object.fromEntries(Object.entries(projected?.unavailable ?? {}).map(([id, reason]) => [id,
     reason === 'target' ? t('settings.skillSelectionTargetUnavailable')

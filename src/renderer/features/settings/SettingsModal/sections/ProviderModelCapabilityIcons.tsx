@@ -1,11 +1,10 @@
 import { Icon, type IconName } from '../../../../ui/Icon';
+import { useI18n } from '../../../../i18n';
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 /** What a model can do, one glyph per supported capability; an unknown or missing capability shows nothing. */
-export function ProviderModelCapabilityIcons({ model, t }: { model: EffectiveModel | null; t: Translate }) {
+export function ProviderModelCapabilityIcons({ model }: { model: EffectiveModel | null;  }) {
+  const { t } = useI18n();
   if (!model) return null;
   const capabilities: Array<{ icon: IconName; label: string; on: boolean }> = [
     { icon: 'tool', label: t('settings.providers.capability.toolCalling'), on: model.toolCalling.state === 'supported' },

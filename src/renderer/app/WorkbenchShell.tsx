@@ -8,9 +8,9 @@ import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
 import { Composer } from '../features/composer/Composer';
 import { useDynStyle } from '../lib/useDynStyle';
 import { isDockedResizeHandleVisible, ResizeHandle } from '../shell/ResizeHandle';
+import { useI18n } from '../i18n';
 import { WorkbenchPanelDrawer } from './WorkbenchPanelDrawer';
 import { SidebarFooter } from './SidebarFooter';
-import type { TranslationKey } from '../i18n';
 import type { ComposerController } from '../features/composer/useComposer';
 
 type DragSide = 'left' | 'right';
@@ -39,7 +39,6 @@ export interface WorkbenchShellProps {
   composer: ComposerController;
   showMainPromptBar: boolean;
   mainPage: ReactNode;
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onOpenKnowledgeCenter: () => void;
   isUserMenuOpen: boolean;
   onUserMenuToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -69,12 +68,12 @@ export function WorkbenchShell({
   composer,
   showMainPromptBar,
   mainPage,
-  t,
   onOpenKnowledgeCenter,
   isUserMenuOpen,
   onUserMenuToggle,
   onStartDrag,
 }: WorkbenchShellProps) {
+  const { t } = useI18n();
   const workArea = useRef<HTMLElement>(null);
   const [composerShell, setComposerShell] = useState<HTMLDivElement | null>(null);
   const readingLayout = useMemo(() => ({ workArea, composerShell,
@@ -100,7 +99,6 @@ export function WorkbenchShell({
     </nav>
     {(isLeftDrawerMode || !effectiveLeftCollapsed) && (
       <SidebarFooter
-        t={t}
         nickname={nickname}
         avatarPath={avatarPath}
         isUserMenuOpen={isUserMenuOpen}

@@ -5,6 +5,9 @@ import { translate } from '../../../../i18n/messages';
 import { isTopOverlayLayer } from '../../../../lib/overlayStack';
 import { ProvidersSettings } from './ProvidersSettings';
 import type { LlmProviderEntry } from '@shared/types/settings';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params),
+}) }));
 
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -26,7 +29,7 @@ function Sample() {
   return createElement(ProvidersSettings, { providerCatalog: entries, accountProviders: [], providerCatalogCategories: [],
     getResolvedProviderLabel: provider => provider.label, onOpenProviderConnection: () => undefined,
     onDisconnectProvider: provider => setEntries(current => current.map(entry => entry.id === provider.id
-      ? { ...entry, isConfigured: false } : entry)), t: translate.bind(null, 'en') });
+      ? { ...entry, isConfigured: false } : entry)) });
 }
 
 const find = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`)!;

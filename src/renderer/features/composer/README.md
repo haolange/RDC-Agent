@@ -4,10 +4,10 @@ Composer 保留产品专属输入、附件、Agent 配置与运行态视觉；�
 
 ## 入口与所有权
 
-- `Composer.tsx`：组合附件、输入与底栏，计算 accent 和会话作用域；菜单 registry 随项目/会话作用域重新挂载，防止旧会话菜单、焦点和 Effort 生命周期延续。
-- `ComposerEditor.tsx`：受控书写区，接收文本、事件、Markdown 模式与 slash 菜单数据；不读取 store，也不复制 draft/send 状态。发送策略仍由 `useComposerSend` 负责，IME 确认与 Shift+Enter 不发送。
-- `ComposerFooter.tsx`：组合附件按钮、Agent、Permission、Model/Effort、上下文用量和发送/停止按钮。Context Breakdown 展开设置由这里读取与写入，pattern 只接收值和回调。
-- `useComposer.ts`：既有会话草稿、附件、发送/停止与运行态的唯一协调入口；子视图仅接收各自使用的字段。
+- `Composer.tsx`：组合附件、输入与底栏，计算 accent 和会话作用域，经 `ComposerControllerContext` 的 `ComposerViewProvider` 把控制器、当前会话、作用域、Markdown 模式、slash 菜单与过渡播报交给各部件，不逐项转发 props；菜单 registry 随项目/会话作用域重新挂载，防止旧会话菜单、焦点和 Effort 生命周期延续。
+- `ComposerEditor.tsx`：受控书写区，从 `useComposerView()` 取文本、事件、Markdown 模式与 slash 菜单数据；不读取 store，也不复制 draft/send 状态。发送策略仍由 `useComposerSend` 负责，IME 确认与 Shift+Enter 不发送。
+- `ComposerFooter.tsx`：组合附件按钮、Agent、Permission、Model/Effort、上下文用量和发送/停止按钮，与 `ComposerAgentMenu`、`ComposerAttachmentTray` 一样从 `useComposerView()` 读取所需字段。Context Breakdown 展开设置由这里读取与写入，pattern 只接收值和回调。
+- `useComposer.ts`：既有会话草稿、附件、发送/停止与运行态的唯一协调入口；子视图只解构各自使用的字段。文案由各组件自己调用 `useI18n`，不经 props 传 `t`。
 - `pendingRequestSelection.ts`：从当前会话投影纯函数选择待处理请求，优先级为工具审批、计划审阅、用户提问。`useComposerPendingRequest` 订阅投影，`ComposerPendingRequest` 展示选中请求；计划 key 继续包含会话/turn/call/plan/revision/hash。
 - 审批与提问的挂载身份包含 session、turn 和请求标识；提问另包含问题 fingerprint。提交在异步调用前同步锁定，失败后允许重试；旧请求完成不能修改新请求的错误、草稿或提交锁。`ComposerPendingRequest.test.ts` 从真实入口覆盖快速重复提交和跨请求完成顺序。
 

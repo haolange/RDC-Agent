@@ -4,9 +4,9 @@ import { Button } from '../../../../ui/Button';
 import { Switch } from '../../../../ui/Switch';
 import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { AppearanceChromePreview } from './AppearanceChromePreview';
 import { ChromeThemeCard } from './AppearanceChromeParts';
-import type { useI18n } from '../../../../i18n';
 import type {
   AppSettings,
   AppTheme,
@@ -15,15 +15,12 @@ import type {
   ThemeVariant,
 } from '@shared/types/settings';
 
-type Translate = ReturnType<typeof useI18n>['t'];
-
 interface AppearanceSettingsProps {
   settings: AppSettings;
   onThemeChange: (theme: AppTheme) => void | Promise<void>;
   onFontScaleChange: (fontScale: FontScale) => void | Promise<void>;
   onComposerMarkdownChange: (enabled: boolean) => void | Promise<void>;
   onChromeThemeChange: (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => void | Promise<void>;
-  t: Translate;
 }
 
 export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
@@ -32,8 +29,8 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   onFontScaleChange,
   onComposerMarkdownChange,
   onChromeThemeChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const resolvedTheme = useResolvedTheme();
   const [editing, setEditing] = useState<ThemeVariant>(resolvedTheme);
 
@@ -56,12 +53,12 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             <Button key={variant} variant="ghost" className="appearance-theme-preview-button"
               aria-pressed={editing === variant} onClick={() => setEditing(variant)}>
               <span>{t(variant === 'light' ? 'settings.appearanceLightTheme' : 'settings.appearanceDarkTheme')}</span>
-              <AppearanceChromePreview chrome={settings.appearance.chromeThemes[variant]} variant={variant} t={t}
+              <AppearanceChromePreview chrome={settings.appearance.chromeThemes[variant]} variant={variant}
                 data-testid={`appearance-preview-${variant}`} />
             </Button>
           ))}
         </div>
-        <ChromeThemeCard key={editing} variant={editing} chrome={settings.appearance.chromeThemes[editing]} t={t}
+        <ChromeThemeCard key={editing} variant={editing} chrome={settings.appearance.chromeThemes[editing]}
           onChange={(chrome) => void onChromeThemeChange(editing, chrome)} />
       </SettingsSection>
 

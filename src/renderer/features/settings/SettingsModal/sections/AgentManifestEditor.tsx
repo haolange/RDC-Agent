@@ -13,6 +13,7 @@ import { SettingsSection } from '../parts';
 import { Badge } from '../../../../ui/Badge';
 import { InlineError } from '../../../../ui/InlineError';
 import { humanizeError } from '../../../../i18n/humanizeError';
+import { useI18n } from '../../../../i18n';
 import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
@@ -22,11 +23,9 @@ import { configStatus, provenanceLabel } from './agentConfigStatus';
 import { agentPanelSummary, type AgentPanel } from './agentPanelSummary';
 import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
-import type { useI18n } from '../../../../i18n';
 import type { AppSettings } from '@shared/types/settings';
 import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance, AgentModelOption } from '@shared/types/agentManifest';
 
-type Translate = ReturnType<typeof useI18n>['t'];
 interface AgentManifestEditorProps {
   skills: AgentSkillCatalog;
   settings: AppSettings;
@@ -47,7 +46,6 @@ interface AgentManifestEditorProps {
   onShowBuiltinDiff: () => void;
   /** A save is blocked until required handoff fields are filled; the handoff editor then shows them. */
   agentManifestSaveBlocked?: boolean;
-  t: Translate;
 }
 
 const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
@@ -72,8 +70,8 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   onDeleteAgent,
   onShowBuiltinDiff,
   agentManifestSaveBlocked = false,
-  t,
 }) => {
+  const { t } = useI18n();
   const [openPanel, setOpenPanel] = useState<AgentPanel | null>(null);
   const provenanceScope = provenance?.scope ?? null;
   const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
@@ -100,13 +98,13 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
 
   const renderPanelBody = (panel: AgentPanel) => {
     if (panel === 'identity') {
-      return <AgentIdentityPanel agent={selectedAgent} onUpdateAgent={onUpdateAgent} t={t} />;
+      return <AgentIdentityPanel agent={selectedAgent} onUpdateAgent={onUpdateAgent} />;
     }
     if (panel === 'permissions') {
       return (
         <>
-          <AgentCapabilityPicker groups={capabilityGroups} skills={skills} targetAgentId={selectedAgent.id} t={t} />
-          <AgentExecutionLimitField agent={selectedAgent} onUpdateAgent={onUpdateAgent} t={t} />
+          <AgentCapabilityPicker groups={capabilityGroups} skills={skills} targetAgentId={selectedAgent.id} />
+          <AgentExecutionLimitField agent={selectedAgent} onUpdateAgent={onUpdateAgent} />
           {toolDiagnostics.length > 0 ? (
             <InlineError data-testid="settings-agent-tool-diagnostics"
               detail={toolDiagnostics.map(item => `${item.token} · ${item.message}`).join('\n')}>
@@ -126,7 +124,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           definitions={settings.agents.definitions}
           forceShowRequired={agentManifestSaveBlocked}
           onChange={(handoffs) => onUpdateAgent({ handoffs })}
-          t={t}
         />
       );
     }
@@ -204,7 +201,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               fallback={settings.agentModels.default}
               onChange={onModelFieldChange}
               testIdPrefix="settings-agent"
-              t={t}
             />
             {modelError ? <InlineError detail={modelError}>{humanizeError(modelError, t, 'settings.agentModelSaveFailed')}</InlineError> : null}
             {statusProblem ? (
@@ -224,7 +220,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               <Switch className="settings-agent-flag" label={t('settings.modelInvocable')} checked={!selectedAgent.disableModelInvocation}
                 onCheckedChange={(callable) => onUpdateAgent({ disableModelInvocation: !callable })} />
             </div>
-            <AgentContractFields agent={selectedAgent} onChange={onUpdateAgent} t={t} />
+            <AgentContractFields agent={selectedAgent} onChange={onUpdateAgent} />
           </div>
         </SettingsSection>
 

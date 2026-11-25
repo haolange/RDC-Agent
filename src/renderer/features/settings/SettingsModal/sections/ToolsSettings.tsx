@@ -2,15 +2,14 @@ import React, { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
 import { errorDetail } from '../../../../lib/errorDetail';
+import { useI18n } from '../../../../i18n';
 import { RdcCliInvokerSettingsFields } from './RdcCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
 import { LocalToolDisclosure } from './LocalToolDisclosure';
 import { useRdcInstallation } from './useRdcInstallation';
-import type { useI18n } from '../../../../i18n';
 import type { AgentShellSettings, CodeInterpreterSettings, RdcCliInvokerSettings } from '@shared/types/settings';
 
-type Translate = ReturnType<typeof useI18n>['t'];
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 interface ToolsSettingsProps {
@@ -23,7 +22,6 @@ interface ToolsSettingsProps {
   onSaveToolsConfig: () => void | Promise<void>;
   /** True while the drafts differ from the persisted Tools settings. */
   dirty: boolean;
-  t: Translate;
 }
 
 export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
@@ -35,8 +33,8 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   onShellDraftChange,
   onSaveToolsConfig,
   dirty,
-  t,
 }) => {
+  const { t } = useI18n();
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState('');
   const saving = status === 'saving';
@@ -85,7 +83,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
           status={t(rdcCliDraft.enabled ? 'settings.localToolEnabled' : 'settings.disabled')}
           testId="settings-rdc-block"
         >
-          <RdcCliInvokerSettingsFields rdcCliDraft={rdcCliDraft} onRdcCliDraftChange={onRdcCliDraftChange} installation={installation} t={t} />
+          <RdcCliInvokerSettingsFields rdcCliDraft={rdcCliDraft} onRdcCliDraftChange={onRdcCliDraftChange} installation={installation} />
         </LocalToolDisclosure>
 
         <LocalToolDisclosure
@@ -95,7 +93,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
           status={t(shellDraft.executable.trim() ? 'settings.localToolCustom' : 'settings.localToolAutomatic')}
           testId="settings-shell-block"
         >
-          <ShellSettingsFields draft={shellDraft} onChange={onShellDraftChange} t={t} />
+          <ShellSettingsFields draft={shellDraft} onChange={onShellDraftChange} />
         </LocalToolDisclosure>
 
         <LocalToolDisclosure
@@ -105,7 +103,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
           status={t(codeInterpreterDraft.enabled ? 'settings.localToolEnabled' : 'settings.disabled')}
           testId="settings-code-interpreter-block"
         >
-          <CodeInterpreterSettingsFields draft={codeInterpreterDraft} onChange={onCodeInterpreterDraftChange} t={t} />
+          <CodeInterpreterSettingsFields draft={codeInterpreterDraft} onChange={onCodeInterpreterDraftChange} />
         </LocalToolDisclosure>
       </fieldset>
 

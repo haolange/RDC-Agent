@@ -3,6 +3,7 @@ import { cn } from '../../../lib/cn';
 import { isImeComposing } from '../../../lib/ime';
 import { motionScrollBehavior } from '../../../lib/motion';
 import { SearchField } from '../../../ui/SearchField';
+import { useI18n } from '../../../i18n';
 import { SettingsNavIcon } from './SettingsNavIcon';
 import {
   matchSettingsSearchEntries,
@@ -40,8 +41,8 @@ export const SettingsCenterNav: React.FC<{
   activeSection: SettingsSection;
   onSelectSection: (section: SettingsSection) => void;
   providers: SettingsSearchProvider[];
-  t: (key: TranslationKey) => string;
-}> = ({ sections, activeSection, onSelectSection, providers, t }) => {
+}> = ({ sections, activeSection, onSelectSection, providers }) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [activeResult, setActiveResult] = useState(0);
   const resultsId = useId();

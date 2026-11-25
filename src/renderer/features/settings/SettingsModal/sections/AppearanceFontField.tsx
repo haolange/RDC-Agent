@@ -5,8 +5,8 @@ import { IconButton } from '../../../../ui/IconButton';
 import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { useDynStyle } from '../../../../lib/useDynStyle';
+import { useI18n } from '../../../../i18n';
 import type { ThemeVariant } from '@shared/types/settings';
-import type { AppearanceTranslate } from './appearanceChromeModel';
 
 /**
  * Engine-guaranteed generic families only. The app never enumerates installed
@@ -21,7 +21,6 @@ interface AppearanceFontFieldProps {
   variant: ThemeVariant;
   value: string | null;
   onChange: (value: string | null) => void;
-  t: AppearanceTranslate;
 }
 
 interface FontOptionProps {
@@ -62,7 +61,8 @@ function FontPreview({ family, sample, title }: { family: string; sample: string
   );
 }
 
-export function AppearanceFontField({ kind, variant, value, onChange, t }: AppearanceFontFieldProps) {
+export function AppearanceFontField({ kind, variant, value, onChange }: AppearanceFontFieldProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const label = kind === 'ui' ? t('settings.appearanceUiFont') : t('settings.appearanceCodeFont');

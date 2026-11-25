@@ -4,20 +4,18 @@ import { ColorField } from '../../../../ui/ColorField';
 import { Input } from '../../../../ui/Input';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { AgentIconPresetPicker } from './AgentIconPresetPicker';
-import type { useI18n } from '../../../../i18n';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentIdentityPanelProps {
   agent: AgentManifestDraft;
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
-  t: Translate;
 }
 
 /** Identity & description: icon → accent → short name → argument hint → description. Autosaved. */
-export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, onUpdateAgent, t }) => {
+export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, onUpdateAgent }) => {
+  const { t } = useI18n();
   const accentStyle = useDynStyle({ '--settings-agent-accent': agent.accent || '#33d1ff' });
   return (
     <div className="settings-agent-identity-grid" data-testid="settings-agent-identity">
@@ -26,7 +24,6 @@ export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, o
           <AgentIconPresetPicker
             value={agent.icon ?? 'message-orbit'}
             onChange={(icon) => onUpdateAgent({ icon })}
-            t={t}
           />
         </div>
       </SettingsField>

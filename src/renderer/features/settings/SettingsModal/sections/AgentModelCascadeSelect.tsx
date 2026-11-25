@@ -4,18 +4,16 @@ import { Icon } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { SearchField } from '../../../../ui/SearchField';
+import { useI18n } from '../../../../i18n';
 import { ProviderMark } from './ProviderMark';
 import {
   agentModelOptionAccessibleLabel,
   buildAgentModelGroups,
   isAgentModelSelectionInvalid,
 } from './agentModelCascadeModel';
-import type { useI18n } from '../../../../i18n';
 import type { AgentModelOption } from '@shared/types/agentManifest';
 
 export { agentModelOptionAccessibleLabel, isAgentModelSelectionInvalid };
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentModelCascadeSelectProps {
   value: string;
@@ -23,7 +21,6 @@ interface AgentModelCascadeSelectProps {
   /** For one Agent: the first choice follows the default model, named in this label; choosing it clears the value. */
   followDefaultLabel?: string;
   onChange: (value: string) => void;
-  t: Translate;
 }
 
 /**
@@ -34,8 +31,8 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   options,
   followDefaultLabel,
   onChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 

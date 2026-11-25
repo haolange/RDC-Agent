@@ -7,6 +7,7 @@ import { ProviderModelCapabilitySummary, type ProviderModelCapabilitySummaryProp
 import { testModelCapability } from './providerCatalogActions';
 import { providerProbeResultText } from './providerProbeResultText';
 import type { EffectiveModel } from '@shared/types/providerCapability';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('./providerCatalogActions', () => ({ testModelCapability: vi.fn() }));
 
 it.each([
@@ -86,7 +87,7 @@ it('shows warnings, tiers and the probe in the expanded model, and the probe out
   const props: ProviderModelCapabilitySummaryProps = {
     provider: { id: 'provider-a', isConfigured: true, protocol: 'AnthropicMessages', serviceOperator: 'anthropic', authMode: 'api-key', catalogOwnership: 'app-managed' },
     model: { id: 'model-a', label: 'Model A', enabled: true },
-    effectiveModel, snapshot: null, loading: false, loadFailed: false, onModelChange, t: (key) => key,
+    effectiveModel, snapshot: null, loading: false, loadFailed: false, onModelChange,
   };
   vi.mocked(testModelCapability).mockResolvedValue({ success: false, status: 'inconclusive', requestSent: true, detail: 'Need actual threshold evidence' });
   try {

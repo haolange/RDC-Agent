@@ -185,7 +185,6 @@ export const ComposerModelEffortControl: React.FC<{
           fastModelStatusLabel={effort.fastModelStatusLabel}
           maxContextMode={effort.turnControls.maxContextMode}
           fastModel={effort.turnControls.fastModel}
-          t={t}
           onTrackPointerDown={effort.sliderHandlers.handleTrackPointerDown}
           onTrackPointerMove={effort.sliderHandlers.handleTrackPointerMove}
           onTrackPointerUp={effort.sliderHandlers.handleTrackPointerUp}

@@ -7,6 +7,7 @@ import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
 import {
   AGENT_HANDOFF_ISSUE_KEYS,
@@ -14,10 +15,9 @@ import {
   persistAgentHandoff,
   type AgentHandoffIssue,
 } from './agentHandoffValidation';
-import type { TranslationKey, useI18n } from '../../../../i18n';
+import type { TranslationKey } from '../../../../i18n';
 import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
 
-type Translate = ReturnType<typeof useI18n>['t'];
 type Field = AgentHandoffIssue['field'];
 
 interface AgentHandoffCardProps {
@@ -30,7 +30,6 @@ interface AgentHandoffCardProps {
   isFirst: boolean;
   isLast: boolean;
   expanded: boolean;
-  t: Translate;
   onToggle: () => void;
   onChange: (handoff: AgentHandoffDefinition) => void;
   onMoveUp: () => void;
@@ -51,7 +50,6 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
   isFirst,
   isLast,
   expanded,
-  t,
   onToggle,
   onChange,
   onMoveUp,
@@ -60,6 +58,7 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
   labelRef,
   deleteRef,
 }) => {
+  const { t } = useI18n();
   const [touched, setTouched] = useState<Record<Field, boolean>>({
     label: false,
     labelTranslations: false,
@@ -223,7 +222,7 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
         </SettingsField>
         <SettingsField label={t('settings.agentHandoffRequiredSkills')} layout="stack">
           <AgentSkillPicker skills={skills} targetAgentId={handoff.agent}
-            value={handoff.requiredSkillIds ?? []} onChange={(requiredSkillIds) => patch({ requiredSkillIds })} t={t} />
+            value={handoff.requiredSkillIds ?? []} onChange={(requiredSkillIds) => patch({ requiredSkillIds })} />
         </SettingsField>
       </div>
     </article>

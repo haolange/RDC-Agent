@@ -6,31 +6,16 @@ import { Pill } from '../../ui/Pill';
 import { useI18n } from '../../i18n';
 import { Chevron } from '../../ui/Chevron';
 import { useComposerMenu } from './useComposerMenuRegistry';
-import type { AgentMode, ModeConfig } from '@shared/types/layout';
+import { useComposerView } from './ComposerControllerContext';
+import type { AgentMode } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
-export const ComposerAgentMenu: React.FC<{
-  currentMode: AgentMode;
-  currentModeConfig: ModeConfig;
-  currentModeLabel: string;
-  selectedAgentId: string;
-  selectedAgentDefinition: AgentManifestDefinition | undefined;
-  selectedAgentCapability: string;
-  userInvocableAgents: AgentManifestDefinition[];
-  activeAgentId: string | null;
-  setSelectedAgentId: (agentId: string) => void;
-}> = ({
-  currentMode,
-  currentModeConfig,
-  currentModeLabel,
-  selectedAgentId,
-  selectedAgentDefinition,
-  selectedAgentCapability,
-  userInvocableAgents,
-  activeAgentId,
-  setSelectedAgentId,
-}) => {
+export const ComposerAgentMenu: React.FC = () => {
   const { t, language } = useI18n();
+  const { composer, activeAgentId } = useComposerView();
+  const { currentMode, currentModeConfig, currentModeLabel, selectedAgentId, userInvocableAgents, setSelectedAgentId } = composer;
+  const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
+  const selectedAgentCapability = agentDescription(selectedAgentDefinition, language);
   const menu = useComposerMenu('agent');
   const popupRef = useRef<HTMLDivElement>(null);
   const setRootRef = useCallback((node: HTMLDivElement | null) => {

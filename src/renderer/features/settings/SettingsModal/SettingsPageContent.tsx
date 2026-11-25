@@ -89,7 +89,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         globalInstructionsDraft={globalInstructionsDraft}
         onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
         onSavePersonalization={handleSavePersonalization}
-        t={t}
       />
     )}
 
@@ -100,7 +99,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         onFontScaleChange={setFontScale}
         onComposerMarkdownChange={setComposerMarkdown}
         onChromeThemeChange={setChromeTheme}
-        t={t}
       />
     )}
 
@@ -112,7 +110,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         getResolvedProviderLabel={getResolvedProviderLabel}
         onDisconnectProvider={handleDisconnectProvider}
         onOpenProviderConnection={openProviderConnection}
-        t={t}
       />
     )}
 
@@ -142,7 +139,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         onPreviewProjectAgentTrust={previewProjectAgentTrust}
         onTrustProjectAgent={handleTrustProjectAgent}
         onLoadAgentBuiltinComparison={loadAgentBuiltinComparison}
-        t={t}
       /></section>
     )}
 
@@ -162,7 +158,6 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         onShellDraftChange={setShellDraft}
         onSaveToolsConfig={handleSaveToolsConfig}
         dirty={dirty.tools}
-        t={t}
       /></section>
     )}
 

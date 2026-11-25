@@ -5,6 +5,9 @@ import { expect, it, vi } from 'vitest';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 import { AgentsSettings } from './AgentsSettings';
 import { createNewAgent } from './agentDraftFactory';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: string, params?: Record<string, string>) => `${key}${params?.id ? `:${params.id}` : ''}`,
+}) }));
 
 vi.mock('../useScopedSkillSelection', () => ({ useScopedSkillSelection: () => ({}) }));
 vi.mock('./AgentManifestEditor', () => ({ AgentManifestEditor: ({ selectedAgent }: { selectedAgent: { id: string } }) =>
@@ -26,7 +29,7 @@ it('waits for drafts, opens the target scope once, and reports a missing target 
     agentManifestDrafts: ready ? [first, target, other] : [], agentManifestContextReady: ready,
     onAgentManifestDraftsChange: () => undefined, onRetrySaveAgentManifests: () => undefined,
     onImportAgentManifest: () => undefined, agentManifestSaveState: 'idle', agentManifestSaveMessage: '',
-    canProject: true, currentProjectId: 'project-a', t,
+    canProject: true, currentProjectId: 'project-a',
     onAgentModelOps: vi.fn(async () => undefined), onPreviewAgentModelMigration: vi.fn(), onCommitAgentOverrideFile: vi.fn(), onLoadAgentBuiltinComparison: vi.fn(),
     onPreviewProjectAgentTrust: vi.fn(), onTrustProjectAgent: vi.fn() }));
   try {

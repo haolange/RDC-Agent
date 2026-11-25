@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { getChangedAgentManifestDrafts } from '../agentManifestAutosaveState';
 import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
 it('saves a deliberate future limit through the manifest draft and rejects invalid limits', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -13,7 +14,7 @@ it('saves a deliberate future limit through the manifest draft and rejects inval
   const update = vi.fn();
   const agent = { id: 'general', maxTurns: 50 } as AgentManifestDraft;
   const render = () => act(() => root.render(createElement(AgentExecutionLimitField, {
-    agent, onUpdateAgent: update, t: ((key: string) => key) as never,
+    agent, onUpdateAgent: update,
   })));
   const commit = (value: string) => {
     const input = host.querySelector('input')!;

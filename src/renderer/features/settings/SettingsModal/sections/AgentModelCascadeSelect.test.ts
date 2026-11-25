@@ -8,6 +8,9 @@ import {
   isAgentModelSelectionInvalid,
 } from './AgentModelCascadeSelect';
 import type { AgentModelOption } from '@shared/types/agentManifest';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('zh-CN', key, params),
+}) }));
 
 const primaryOption: AgentModelOption = {
   canonicalId: 'kimi-coding-plan/kimi-for-coding',
@@ -28,7 +31,6 @@ describe('AgentModelCascadeSelect selection validation', () => {
       status: 'provider-unavailable', providerIssue: 'unconfigured' };
     const render = (option: AgentModelOption) => root.render(createElement(AgentModelCascadeSelect, {
       value: option.canonicalId, options: [option], onChange: () => {},
-      t: (key, params) => translate('zh-CN', key, params),
     }));
     try {
       await act(async () => render(unavailable));

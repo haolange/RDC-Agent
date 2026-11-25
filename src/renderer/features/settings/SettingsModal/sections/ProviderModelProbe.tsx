@@ -1,15 +1,17 @@
 import { Button } from '../../../../ui/Button';
 import { SplitButton } from '../../../../ui/SplitButton';
+import { useI18n } from '../../../../i18n';
 import type { LlmModelCapabilityProbeMode } from '@shared/types/settings';
 import type { ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 
-interface Props extends Pick<ProviderModelCapabilitySummaryProps, 'model' | 'provider' | 't'> {
+interface Props extends Pick<ProviderModelCapabilitySummaryProps, 'model' | 'provider'> {
   probeMode: LlmModelCapabilityProbeMode | null;
   probeModes: LlmModelCapabilityProbeMode[];
   runProbe: (mode: LlmModelCapabilityProbeMode) => Promise<void>;
 }
 
-export function ProviderModelProbe({ model, provider, t, probeMode, probeModes, runProbe }: Props) {
+export function ProviderModelProbe({ model, provider,  probeMode, probeModes, runProbe }: Props) {
+  const { t } = useI18n();
   const disabled = !provider.isConfigured || !model.enabled || probeMode !== null;
   const modes = probeModes.filter(mode => mode !== 'default');
   const label = probeMode ? t('settings.providers.capability.probing')

@@ -3,11 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { AgentSkillPicker } from './AgentSkillPicker';
 import type { ComponentProps } from 'react';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
 type Props = ComponentProps<typeof AgentSkillPicker>;
-const t: Props['t'] = (key) => key;
 const props: Props = {
-  t, targetAgentId: 'analyzer', value: ['missing', 'restricted'], onChange: vi.fn(),
+  targetAgentId: 'analyzer', value: ['missing', 'restricted'], onChange: vi.fn(),
   skills: { enabled: true, loading: false, error: '', refresh: vi.fn(), catalog: {
     status: 'ready', options: [
       { id: 'visible', name: 'Visible skill', description: 'not a list description', scope: 'user', sourcePath: '/skill', sourceHash: 'hash', effectiveStatus: 'effective', allowedTools: [], unavailableToAgentIds: [] },

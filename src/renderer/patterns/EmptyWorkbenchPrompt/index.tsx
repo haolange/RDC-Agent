@@ -42,8 +42,8 @@ const HERO_COPY: Record<EmptyVariant, { title: TranslationKey; subtitle: Transla
 const EmptyToolCard: React.FC<{
   toolMode: FocusMode;
   agentDefinitions: AgentManifestDefinition[];
-  t: ReturnType<typeof useI18n>['t'];
-}> = ({ toolMode, agentDefinitions, t }) => {
+}> = ({ toolMode, agentDefinitions }) => {
+  const { t } = useI18n();
   const dynStyle = useDynStyle({
     '--empty-card-accent': resolveAgentDisplay(toolMode, agentDefinitions).accent,
   });
@@ -101,7 +101,6 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
                 key={toolMode}
                 toolMode={toolMode}
                 agentDefinitions={agentDefinitions}
-                t={t}
               />
             ))}
           </div>

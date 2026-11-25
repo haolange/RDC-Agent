@@ -10,15 +10,14 @@ import {
 } from '@shared/types/agentManifest';
 import { Select } from '../../../../ui/Select';
 import { SettingsField } from '../parts';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
+import { useI18n } from '../../../../i18n';
 
 export const AgentContractFields: React.FC<{
   agent: AgentManifestDraft;
   onChange: (patch: Partial<AgentManifestDraft>) => void;
-  t: Translate;
-}> = ({ agent, onChange, t }) => (
+}> = ({ agent, onChange }) => {
+  const { t } = useI18n();
+  return (
   <div className="settings-agent-route-grid">
     <SettingsField label={t('settings.agentAccessCeiling')}>
       <Select
@@ -52,3 +51,4 @@ export const AgentContractFields: React.FC<{
     </SettingsField>
   </div>
 );
+};

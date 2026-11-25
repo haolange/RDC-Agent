@@ -1,8 +1,10 @@
 import { buildContextTierRows, buildPricingRows } from '../modelCapabilitySummaryUtils';
+import { useI18n } from '../../../../i18n';
 import type { ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 
 /** Context sizes with what the account is entitled to and what they cost, then the price list. */
-export function ProviderModelDetails({ model, effectiveModel, t }: Pick<ProviderModelCapabilitySummaryProps, 'model' | 'effectiveModel' | 't'>) {
+export function ProviderModelDetails({ model, effectiveModel }: Pick<ProviderModelCapabilitySummaryProps, 'model' | 'effectiveModel'>) {
+  const { t } = useI18n();
   if (!effectiveModel) return null;
   const tiers = buildContextTierRows(effectiveModel, t);
   const pricing = buildPricingRows(effectiveModel, t);

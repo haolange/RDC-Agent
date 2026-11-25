@@ -5,13 +5,14 @@ import { Button } from '../../../../ui/Button';
 import { Details } from '../../../../ui/Details';
 import { InlineError } from '../../../../ui/InlineError';
 import { TaskDialog } from '../../../../ui/TaskDialog';
+import { useI18n } from '../../../../i18n';
 import { providerProbeResultText } from './providerProbeResultText';
-import type { useI18n } from '../../../../i18n';
 import './provider-probe-batch.css';
 
-interface Props { providerIds?: string[]; disabled?: boolean; t: ReturnType<typeof useI18n>['t'] }
+interface Props { providerIds?: string[]; disabled?: boolean;  }
 
-export function ProviderProbeBatchPanel({ providerIds, disabled, t }: Props) {
+export function ProviderProbeBatchPanel({ providerIds, disabled }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const { batch, busy, error, action, occupied } = useProviderProbeBatch(providerIds);
   const singleService = providerIds?.length === 1;

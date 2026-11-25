@@ -7,6 +7,9 @@ import { reconcileCatalogProviders, resetCatalogProjection } from '../../../../s
 import { ProviderConnectModelList } from './ProviderConnectModelList';
 import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params),
+}) }));
 
 const { read } = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../../../../platform/getElectronApi', () => ({ getElectronApi: () => undefined }));
@@ -35,7 +38,6 @@ it('asks for its draft catalog again after settings reconciliation drops it, so 
     await act(async () => root.render(createElement(ProviderConnectModelList, {
       provider, models: [model], expandedModelId: null, disabled: false,
       onToggleExpanded: () => {}, onModelChange: () => {}, onModelCountChange: () => {},
-      t: (key, params) => translate('en', key, params),
     })));
     expect(badge()).toBe('available');
     await act(async () => { reconcileCatalogProviders([]); });
@@ -55,7 +57,6 @@ it('keeps enabling a model independent from opening its capabilities, including 
   const render = (current: LlmProviderModel, opened: string | null) => act(async () => root.render(createElement(ProviderConnectModelList, {
     provider, models: [current], expandedModelId: opened, disabled: false,
     onToggleExpanded: expand, onModelChange: change, onModelCountChange: () => {},
-    t: (key, params) => translate('en', key, params),
   })));
   try {
     await render(model, null);

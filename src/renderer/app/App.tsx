@@ -200,7 +200,6 @@ const App: React.FC = () => {
           composer={composer}
           showMainPromptBar={Boolean(currentProject)}
           mainPage={<DebuggerPage mode={composer.currentMode} />}
-          t={t}
           onOpenKnowledgeCenter={() => setKnowledgeCenterOpen(true)}
           isUserMenuOpen={Boolean(userMenuAnchor)}
           onUserMenuToggle={(event) => {

@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { NewAgentDialog } from './NewAgentDialog';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
 let host: HTMLDivElement;
 let root: Root;
@@ -15,7 +16,7 @@ afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(
 it('lets Enter commit an IME candidate without creating the Agent', () => {
   const onCreate = vi.fn();
   act(() => root.render(createElement(NewAgentDialog, {
-    scopeLabel: 'User', existingIds: [], onCreate, onClose: () => undefined, t: (key: string) => key,
+    scopeLabel: 'User', existingIds: [], onCreate, onClose: () => undefined,
   })));
   const input = document.querySelector<HTMLInputElement>('input[aria-label="settings.agentName"]')!;
   const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;

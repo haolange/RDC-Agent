@@ -3,11 +3,9 @@ import { catalogScopeKey, useEffectiveCatalogStore } from '../../../../stores/ef
 import { projectProviderModels } from '../providerModelProjection';
 import { InlineError } from '../../../../ui/InlineError';
 import { SearchField } from '../../../../ui/SearchField';
+import { useI18n } from '../../../../i18n';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
-import type { useI18n } from '../../../../i18n';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderConnectModelListProps {
   provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
@@ -18,7 +16,6 @@ interface ProviderConnectModelListProps {
   onToggleExpanded: (modelId: string) => void;
   onModelChange: (modelId: string, patch: Partial<LlmProviderModel>) => void;
   onModelCountChange: (count: number) => void;
-  t: Translate;
 }
 
 export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> = ({
@@ -30,8 +27,8 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   onToggleExpanded,
   onModelChange,
   onModelCountChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const catalogAccountId = discoveryAccountId?.trim() || provider.activeAccountId || `anonymous:${provider.id}`;
   const scope = useMemo(() => ({ id: provider.id, activeAccountId: catalogAccountId, protocol: provider.protocol }),
@@ -125,7 +122,6 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
             disabled={disabled}
             onToggleExpanded={onToggleExpanded}
             onModelChange={(modelId, patch) => onModelChange(modelId, { ...model, ...patch })}
-            t={t}
           />
         ))}
       </div>

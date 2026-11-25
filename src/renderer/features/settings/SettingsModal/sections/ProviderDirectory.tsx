@@ -6,11 +6,11 @@ import { EmptyState } from '../../../../ui/EmptyState';
 import { SearchField } from '../../../../ui/SearchField';
 import { Select } from '../../../../ui/Select';
 import { getProviderCategoryTranslation } from '../utils';
+import { useI18n } from '../../../../i18n';
 import { ProviderMark } from './ProviderMark';
 import { directoryCategory, directoryGroups, isSuggestedProvider } from './providerDirectoryModel';
 import { connectHintKey, isProviderActionBlocked } from './providerCardModel';
 import type { ProviderCatalogCategory } from '../types';
-import type { useI18n } from '../../../../i18n';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { Ref } from 'react';
 
@@ -18,11 +18,11 @@ interface Props {
   entries: LlmProviderEntry[];
   categories: ProviderCatalogCategory[];
   onChoose: (entry: LlmProviderEntry) => void;
-  t: ReturnType<typeof useI18n>['t'];
   searchRef?: Ref<HTMLInputElement>;
 }
 
-export function ProviderDirectory({ entries, categories, onChoose, t, searchRef }: Props) {
+export function ProviderDirectory({ entries, categories, onChoose,  searchRef }: Props) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [choice, setFilter] = useState('recommended');
   const hasSuggestions = entries.some(entry => isSuggestedProvider(entry.id));

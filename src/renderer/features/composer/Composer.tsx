@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
-import { agentDescription } from '../../lib/agentDescription';
 import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
@@ -22,6 +21,7 @@ import { ComposerMenuRegistryProvider } from './useComposerMenuRegistry';
 import { ComposerTurnControlsProvider } from './ComposerTurnControlsContext';
 import { ComposerAttachIngest } from './ComposerAttachIngest';
 import { ComposerAttachmentTray } from './ComposerAttachmentTray';
+import { ComposerViewProvider, type ComposerView } from './ComposerControllerContext';
 import { ApprovedPlanHandoff } from './ApprovedPlanHandoff';
 import { COMPOSER_PROMPT_MAX_HEIGHT, COMPOSER_PROMPT_MIN_HEIGHT } from './composerPromptGeometry';
 import { useComposerAttachmentDrop } from './useComposerAttachmentDrop';
@@ -43,7 +43,7 @@ export const Composer: React.FC<ComposerProps> = ({
   composer,
   shellRef,
 }) => {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
   const [markdownMode, setMarkdownMode] = useState<ComposerMarkdownMode>('write');
   const appearanceTheme = useAppSettingsStore((state) => state.settings.appearance.theme);
@@ -67,38 +67,8 @@ export const Composer: React.FC<ComposerProps> = ({
   );
 
   const {
-    promptValue,
-    setPromptValue,
-    pendingAttachments,
-    pendingSkills,
-    removePendingSkill,
-    promptInputRef,
-    currentMode,
-    currentModeConfig,
-    currentModeLabel,
-    selectedAgentId,
-    userInvocableAgents,
-    setSelectedAgentId,
-    lastKnownUsage,
-    usageEstimated,
-    usageStale,
-    preparedTurnContext,
-    conversationPreparationPhase,
-    selectedContextProfile,
-    isComposerBusy,
-    promptPlaceholder,
-    attachButtonLabel,
-    primaryButtonDisabled,
-    primaryButtonDescription,
-    handlePrimaryStop,
-    handleAttachmentSelect,
-    handleFilesIngest,
-    handlePendingAttachmentRemove,
-    fileInputRef,
-    isDropActive,
-    setIsDropActive,
-    handlePromptSend,
-    handlePromptKeyDown,
+    currentModeConfig, selectedAgentId, conversationPreparationPhase, isComposerBusy, handleFilesIngest, fileInputRef,
+    isDropActive, setIsDropActive,
   } = composer;
   const visionSupported = useComposerVisionCapability(selectedAgentId, currentSession);
   const attachmentDrop = useComposerAttachmentDrop({
@@ -106,8 +76,6 @@ export const Composer: React.FC<ComposerProps> = ({
     setIsDropActive,
     handleFilesIngest,
   });
-  const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
-  const selectedAgentCapability = agentDescription(userInvocableAgents.find(agent => agent.id === selectedAgentId), language);
   const composeAccentVars = useMemo(
     () => deriveComposeAccentVars(currentModeConfig.accentColor, resolvedTheme),
     [currentModeConfig.accentColor, resolvedTheme],
@@ -137,10 +105,15 @@ export const Composer: React.FC<ComposerProps> = ({
   const transitionLabel = conversationPreparationPhase === 'preparing' || handoffPhase === 'preparing'
     ? t('composer.handoff.preparing')
     : handoffPhase ? t('composer.handoff.switching') : '';
+  const view: ComposerView = {
+    composer, currentSession, activeAgentId, scopeKey: composerScopeKey, markdown: composerMarkdown, markdownMode,
+    slashCommand, transitionLabel, visionSupported,
+  };
   return (
     <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
     {/* A session switch starts a fresh Composer; a request arriving or settling only changes which menus may be open. */}
     <ComposerMenuRegistryProvider key={composerScopeKey} scope={pendingRequest ? composerPendingRequestKey(pendingRequest) : 'composer'}>
+    <ComposerViewProvider value={view}>
     <div className="composer-frame" {...requestReserveStyle}>
     {pendingRequest ? <ComposerPendingRequest shellRef={assignRequestShell} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
       agentId={pendingRequest.kind === 'plan-review' ? selectedAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onReplan={composer.sendExplicitPrompt} /> : <div
@@ -165,16 +138,7 @@ export const Composer: React.FC<ComposerProps> = ({
           disabled={isComposerBusy}
         />
       ) : null}
-      <ComposerAttachmentTray
-        pendingSkills={pendingSkills}
-        pendingAttachments={pendingAttachments}
-        composerScopeKey={composerScopeKey}
-        visionUnsupported={!visionSupported}
-        removePendingSkill={removePendingSkill}
-        handlePendingAttachmentRemove={handlePendingAttachmentRemove}
-        armedSkillMeta={t('app.armedSkillMeta')}
-        removeArmedSkillLabel={(skill) => t('app.removeArmedSkill', { skill })}
-      />
+      <ComposerAttachmentTray />
       {composer.handoff?.error ? (
         <InlineError detail={composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? undefined : composer.handoff.error}
           onRetry={() => void composer.handoff.retry()}
@@ -182,49 +146,11 @@ export const Composer: React.FC<ComposerProps> = ({
           {t(composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? 'app.handoffUnconfirmed' : 'app.handoffFailed')}
         </InlineError>
       ) : null}
-      <ComposerEditor
-        promptValue={promptValue}
-        setPromptValue={setPromptValue}
-        promptInputRef={promptInputRef}
-        isComposerBusy={isComposerBusy}
-        promptPlaceholder={promptPlaceholder}
-        handlePromptSend={handlePromptSend}
-        handleFilesIngest={handleFilesIngest}
-        handlePromptKeyDown={handlePromptKeyDown}
-        composerMarkdown={composerMarkdown}
-        composerScopeKey={composerScopeKey}
-        markdownMode={markdownMode}
-        slashCommand={slashCommand}
-      />
-      <ComposerFooter
-        currentMode={currentMode}
-        currentModeConfig={currentModeConfig}
-        currentModeLabel={currentModeLabel}
-        selectedAgentId={selectedAgentId}
-        userInvocableAgents={userInvocableAgents}
-        setSelectedAgentId={setSelectedAgentId}
-        lastKnownUsage={lastKnownUsage}
-        usageEstimated={usageEstimated}
-        usageStale={usageStale}
-        preparedTurnContext={preparedTurnContext}
-        conversationPreparationPhase={conversationPreparationPhase}
-        selectedContextProfile={selectedContextProfile}
-        isComposerBusy={isComposerBusy}
-        stopPending={composer.stopPending}
-        attachButtonLabel={attachButtonLabel}
-        primaryButtonDisabled={primaryButtonDisabled}
-        primaryButtonDescription={primaryButtonDescription}
-        transitionLabel={transitionLabel}
-        handlePrimaryStop={handlePrimaryStop}
-        handleAttachmentSelect={handleAttachmentSelect}
-        handlePromptSend={handlePromptSend}
-        selectedAgentDefinition={selectedAgentDefinition}
-        selectedAgentCapability={selectedAgentCapability}
-        activeAgentId={activeAgentId}
-        currentSession={currentSession}
-      />
+      <ComposerEditor />
+      <ComposerFooter />
     </div>}
     </div>
+    </ComposerViewProvider>
     </ComposerMenuRegistryProvider>
     </ComposerTurnControlsProvider>
   );

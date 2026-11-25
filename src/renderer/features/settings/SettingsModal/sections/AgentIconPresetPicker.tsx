@@ -5,22 +5,19 @@ import { Icon } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Popover } from '../../../../ui/Popover';
+import { useI18n } from '../../../../i18n';
 import type { ModeIconKey } from '@shared/types/layout';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentIconPresetPickerProps {
   value: ModeIconKey;
   onChange: (value: ModeIconKey) => void;
-  t: Translate;
 }
 
 export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
   value,
   onChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 

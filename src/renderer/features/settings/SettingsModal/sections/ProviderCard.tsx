@@ -3,22 +3,20 @@ import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { IconButton } from '../../../../ui/IconButton';
 import { Menu } from '../../../../ui/Menu';
+import { useI18n } from '../../../../i18n';
 import { providerIdentityDetail, resolveProviderCardStatus } from './providerCardModel';
 import { ProviderMark } from './ProviderMark';
 import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderCardProps {
   provider: LlmProviderEntry;
   label: string;
   onDisconnect: (provider: LlmProviderEntry) => void | Promise<void>;
   onOpenConnection: (provider: LlmProviderEntry) => void;
-  t: Translate;
 }
 
-export function ProviderCard({ provider, label, onDisconnect, onOpenConnection, t }: ProviderCardProps) {
+export function ProviderCard({ provider, label, onDisconnect, onOpenConnection }: ProviderCardProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const status = resolveProviderCardStatus(provider);
   return <article className={`settings-provider-card is-tone-${status.tone}`} data-testid={`settings-provider-card-${provider.id}`}>

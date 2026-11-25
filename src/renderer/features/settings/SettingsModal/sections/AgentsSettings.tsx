@@ -10,6 +10,7 @@ import { Chevron } from '../../../../ui/Chevron';
 import { SettingsSaveMark, SettingsScopeBar } from '../parts';
 import { useScopedSkillSelection } from '../useScopedSkillSelection';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
+import { useI18n } from '../../../../i18n';
 import { uniqueResourceId } from './uniqueResourceId';
 import { createNewAgent, draftScope, toSlug, visibleDrafts, type AgentScope } from './agentDraftFactory';
 import { AgentManifestEditor } from './AgentManifestEditor';
@@ -21,11 +22,8 @@ import { NewAgentDialog } from './NewAgentDialog';
 import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
 import { useAgentModelOptions } from './useAgentModelOptions';
 import type { AgentProvenanceScope } from './agentConfigStatus';
-import type { useI18n } from '../../../../i18n';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentsSettingsProps extends AgentModelCommands {
   settings: AppSettings;
@@ -40,7 +38,6 @@ interface AgentsSettingsProps extends AgentModelCommands {
   /** Whether a project is open; the Project tab is disabled without one. */
   canProject: boolean;
   currentProjectId: string | null;
-  t: Translate;
 }
 
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
@@ -55,9 +52,9 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   agentManifestSaveBlocked = false,
   canProject,
   currentProjectId,
-  t,
   ...modelCommands
 }) => {
+  const { t } = useI18n();
   const [scope, setScope] = useState<AgentScope>('user');
   const models = useAgentModelControls(modelCommands);
   const modelOptions = useAgentModelOptions(settings);
@@ -168,7 +165,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         modelOptions={modelOptions}
         error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
         onChange={models.setDefaultField}
-        t={t}
       />
       <div className="settings-manifest-toolbar settings-manifest-page-toolbar" data-testid="settings-agents-toolbar">
         <SettingsScopeBar
@@ -195,7 +191,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics}
         onMigrate={(issue) => models.openOverrideAction('migrate', issue)}
         onDeleteOverride={(issue) => models.openOverrideAction('delete', issue)}
-        onReviewTrust={models.openTrustReview} t={t} />
+        onReviewTrust={models.openTrustReview} />
       {missingAgentId ? <InlineError>{t('settings.agentNavigationNotFound', { id: missingAgentId })}</InlineError> : null}
       <div className="settings-manifest-layout">
         <div className="settings-manifest-list-column">
@@ -266,7 +262,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               onDeleteAgent={deleteAgent}
               onShowBuiltinDiff={() => models.showBuiltinDiff(selectedAgent, builtinUpdate?.status === 'updated')}
               agentManifestSaveBlocked={agentManifestSaveBlocked}
-              t={t}
             />
           </div>
         ) : (
@@ -275,10 +270,10 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           </div>
         )}
       </div>
-      <AgentReviewDialogs models={models} options={modelOptions} onRestore={deleteAgent} t={t} />
+      <AgentReviewDialogs models={models} options={modelOptions} onRestore={deleteAgent} />
       {naming ? (
         <NewAgentDialog scopeLabel={scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser')}
-          existingIds={agentManifestDrafts.map((agent) => agent.id)} onCreate={addAgent} onClose={() => setNaming(false)} t={t} />
+          existingIds={agentManifestDrafts.map((agent) => agent.id)} onCreate={addAgent} onClose={() => setNaming(false)} />
       ) : null}
       {pendingDelete ? (
         <ConfirmationDialog

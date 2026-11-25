@@ -1,10 +1,9 @@
 import React from 'react';
 import { ProfileAvatar } from '../../../../patterns/ProfileAvatar';
 import { SettingsSaveMark, SettingsSection, useSettingsAutosave } from '../parts';
-import type { useI18n } from '../../../../i18n';
+import { useI18n } from '../../../../i18n';
 import type { AppSettings } from '@shared/types/settings';
 
-type Translate = ReturnType<typeof useI18n>['t'];
 interface ProfileSettingsProps {
   accountDraft: AppSettings['profile'];
   /** The saved profile; the draft autosaves while it differs. */
@@ -12,7 +11,6 @@ interface ProfileSettingsProps {
   onAccountDraftChange: React.Dispatch<React.SetStateAction<AppSettings['profile']>>;
   onAvatarSelect: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
-  t: Translate;
 }
 
 /** One row: the avatar (click to change it) and the nickname edited in place; both save on their own. */
@@ -22,8 +20,8 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   onAccountDraftChange,
   onAvatarSelect,
   onSave,
-  t,
 }) => {
+  const { t } = useI18n();
   const pending = accountDraft.nickname !== savedProfile.nickname || accountDraft.avatarPath !== savedProfile.avatarPath;
   const { status, flush } = useSettingsAutosave(`${accountDraft.nickname}\u0000${accountDraft.avatarPath ?? ''}`, pending, onSave);
 

@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { AgentHandoffCard } from './AgentHandoffCard';
 import type { AgentHandoffDefinition } from '@shared/types/agentManifest';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
 it('edits and clears optional locale labels while retaining them through default-label edits', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -14,7 +15,7 @@ it('edits and clears optional locale labels while retaining them through default
     index: 0, handoff, issues: [], targets: [],
     skills: { catalog: null, loading: false, enabled: false, error: '', refresh: vi.fn() },
     forceShowRequired: false, isFirst: true, isLast: true, expanded: true,
-    t: key => key, onToggle: vi.fn(), onChange: next => { handoff = next; render(); },
+    onToggle: vi.fn(), onChange: next => { handoff = next; render(); },
     onMoveUp: vi.fn(), onMoveDown: vi.fn(), onDelete: vi.fn(), labelRef: vi.fn(), deleteRef: vi.fn(),
   }));
   const input = async (index: number, value: string) => act(async () => {

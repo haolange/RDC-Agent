@@ -3,11 +3,9 @@ import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
 import { Input } from '../../../../ui/Input';
 import { Spinner } from '../../../../ui/Spinner';
+import { useI18n } from '../../../../i18n';
 import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderAccountOAuthPanelProps {
   connectionDraft: ProviderConnectionDraft;
@@ -16,7 +14,6 @@ interface ProviderAccountOAuthPanelProps {
   connectionDevicePending: boolean;
   onUpdateConnectionDraft: (patch: Partial<ProviderConnectionDraft>) => void;
   onStartAccountLogin: () => void | Promise<void>;
-  t: Translate;
 }
 
 const copyText = (value?: string) => {
@@ -58,8 +55,8 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   connectionDevicePending,
   onUpdateConnectionDraft,
   onStartAccountLogin,
-  t,
 }) => {
+  const { t } = useI18n();
   const status = connectionDraft.accountStatus;
   const diagnostic = status?.diagnostic;
   const selectedMode = connectionProvider.accountLogin?.mode ?? 'device';

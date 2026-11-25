@@ -7,8 +7,8 @@ import {
   resolvePrimarySecretField,
 } from '../providerConnectionState';
 import { STORED_SECRET_MASK } from '../utils';
+import { useI18n } from '../../../../i18n';
 import type { LlmProviderConnectionField, LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -17,7 +17,6 @@ interface ProviderConnectionFieldsProps {
   connectionDraft: ProviderConnectionDraft;
   connectionProvider: LlmProviderEntry;
   onUpdateConnectionDraft: (patch: Partial<ProviderConnectionDraft>) => void;
-  t: Translate;
 }
 
 const resetTest = {
@@ -44,8 +43,8 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
   connectionDraft,
   connectionProvider,
   onUpdateConnectionDraft,
-  t,
 }) => {
+  const { t } = useI18n();
   const schema = connectionProvider.connectionSchema;
   const primarySecret = resolvePrimarySecretField(schema);
 

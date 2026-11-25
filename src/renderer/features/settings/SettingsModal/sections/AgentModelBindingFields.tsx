@@ -3,13 +3,11 @@ import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/mod
 import { EFFORT_LABEL_KEYS, isReasoningLevelLabel } from '../../../../lib/reasoningLabels';
 import { Select } from '../../../../ui/Select';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 import { modelOptionLabel } from './agentConfigStatus';
-import type { useI18n } from '../../../../i18n';
 import type { AgentModelBinding } from '@shared/types/settings';
 import type { AgentModelOption } from '@shared/types/agentManifest';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 /** The binding an Agent falls back to field by field when it has no value of its own. */
 export interface AgentModelFallback {
@@ -29,7 +27,6 @@ interface AgentModelBindingFieldsProps {
   fallback?: AgentModelFallback;
   onChange: (change: AgentModelFieldChange) => void;
   testIdPrefix: string;
-  t: Translate;
 }
 
 /** Model and reasoning level; each field is set or left to the fallback on its own. */
@@ -39,8 +36,8 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
   fallback,
   onChange,
   testIdPrefix,
-  t,
 }) => {
+  const { t } = useI18n();
   const effectiveModel = binding.model ?? fallback?.model;
   const supported = options.find((option) => option.canonicalId === effectiveModel)?.reasoningSelections;
   // A saved level the current model does not list stays selectable; the status row reports it.
@@ -59,7 +56,6 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
           options={options}
           followDefaultLabel={fallback ? t('settings.agentModelUseDefault', { model: fallbackModelLabel }) : undefined}
           onChange={(model) => onChange({ field: 'model', value: model || undefined })}
-          t={t}
         />
       </SettingsField>
       <SettingsField label={t('settings.agentReasoningLevel')}>

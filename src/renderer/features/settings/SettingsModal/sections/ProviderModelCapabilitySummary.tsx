@@ -4,12 +4,12 @@ import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
 import { errorDetail } from '../../../../lib/errorDetail';
 import { InlineError } from '../../../../ui/InlineError';
 import { Skeleton } from '../../../../ui/Skeleton';
+import { useI18n } from '../../../../i18n';
 import { testModelCapability } from './providerCatalogActions';
 import { ProviderModelProbe } from './ProviderModelProbe';
 import { ProviderModelPreferences } from './ProviderModelPreferences';
 import { ProviderModelDetails } from './ProviderModelDetails';
 import { providerProbeResultText } from './providerProbeResultText';
-import type { useI18n } from '../../../../i18n';
 import type {
   LlmModelCapabilityProbeMode,
   LlmModelCapabilityProbeResult,
@@ -17,8 +17,6 @@ import type {
   LlmProviderModel,
 } from '@shared/types/settings';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 export interface ProviderModelCapabilitySummaryProps {
   provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
@@ -28,7 +26,6 @@ export interface ProviderModelCapabilitySummaryProps {
   loading: boolean;
   loadFailed: boolean;
   onModelChange: (patch: Partial<LlmProviderModel>) => void;
-  t: Translate;
 }
 
 export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySummaryProps> = ({
@@ -39,8 +36,8 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   loading,
   loadFailed,
   onModelChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const [probeMode, setProbeMode] = useState<LlmModelCapabilityProbeMode | null>(null);
   const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
   const chips = buildCapabilityChips(effectiveModel, t);

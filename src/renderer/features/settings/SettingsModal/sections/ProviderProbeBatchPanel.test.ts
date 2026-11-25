@@ -5,6 +5,9 @@ import { translate } from '../../../../i18n/messages';
 import { useProviderProbeBatch } from '../useProviderProbeBatch';
 import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import type { ProviderProbeBatch } from '@shared/types/providerProbe';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params),
+}) }));
 
 vi.mock('../useProviderProbeBatch', () => ({ useProviderProbeBatch: vi.fn() }));
 
@@ -16,7 +19,7 @@ it('opens a service preview and waits for explicit confirmation to send requests
   const action = vi.fn();
   const state = { busy: false, occupied: false, error: '', action };
   const props: Parameters<typeof ProviderProbeBatchPanel>[0] = {
-    providerIds: ['service'], t: (key, params) => translate('en', key, params),
+    providerIds: ['service'],
   };
   try {
     vi.mocked(useProviderProbeBatch).mockReturnValue({ ...state, batch: null });
@@ -54,7 +57,7 @@ it('keeps the closed launcher informative without treating an inconclusive check
   const action = vi.fn();
   vi.mocked(useProviderProbeBatch).mockReturnValue({ batch, busy: false, occupied: false, error: '', action });
   try {
-    await act(async () => root.render(createElement(ProviderProbeBatchPanel, { t: (key, params) => translate('en', key, params) })));
+    await act(async () => root.render(createElement(ProviderProbeBatchPanel, {})));
     expect(host.querySelector('[role="status"]')?.textContent).toBe('Completed · 2/2 processed · 1 failed');
     await act(async () => host.querySelector('button')!.click());
     expect(document.querySelector('[role="dialog"] [data-testid="settings-provider-probe-batch"]')).toBeTruthy();

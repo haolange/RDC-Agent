@@ -1,16 +1,14 @@
 import React from 'react';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsSaveMark, SettingsSection, useSettingsAutosave } from '../parts';
-import type { useI18n } from '../../../../i18n';
+import { useI18n } from '../../../../i18n';
 
-type Translate = ReturnType<typeof useI18n>['t'];
 interface PersonalizationSettingsProps {
   globalInstructionsDraft: string;
   /** The saved value; the draft autosaves while it differs. */
   savedGlobalInstructions: string;
   onGlobalInstructionsDraftChange: (value: string) => void;
   onSavePersonalization: () => void | Promise<void>;
-  t: Translate;
 }
 
 export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = ({
@@ -18,8 +16,8 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
   savedGlobalInstructions,
   onGlobalInstructionsDraftChange,
   onSavePersonalization,
-  t,
 }) => {
+  const { t } = useI18n();
   const { status, flush } = useSettingsAutosave(globalInstructionsDraft,
     globalInstructionsDraft !== savedGlobalInstructions, onSavePersonalization);
   const textareaId = 'settings-global-instructions';

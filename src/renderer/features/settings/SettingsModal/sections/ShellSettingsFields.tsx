@@ -7,16 +7,13 @@ import { InlineError } from '../../../../ui/InlineError';
 import { SettingsField } from '../parts';
 import { errorDetail } from '../../../../lib/errorDetail';
 import { abortableDelay, useAsyncValue } from '../../../../lib/useAsyncValue';
+import { useI18n } from '../../../../i18n';
 import { getResolvedShell } from './shellSettingsActions';
-import type { useI18n } from '../../../../i18n';
 import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ShellSettingsFieldsProps {
   draft: AgentShellSettings;
   onChange: (next: AgentShellSettings) => void;
-  t: Translate;
 }
 
 /**
@@ -27,7 +24,8 @@ interface ShellSettingsFieldsProps {
 const shellPlaceholder = (api: { isWindows: boolean; isMac: boolean } | undefined): string =>
   api?.isWindows ? 'C:\\Program Files\\PowerShell\\7\\pwsh.exe' : api?.isMac ? '/bin/zsh' : '/bin/bash';
 
-export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft, onChange, t }) => {
+export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft, onChange }) => {
+  const { t } = useI18n();
   const api = useElectronApi();
   // The detection follows the executable after a pause in typing; the last result stays until the next one lands.
   const detection = useAsyncValue(draft.executable, async (signal) => {

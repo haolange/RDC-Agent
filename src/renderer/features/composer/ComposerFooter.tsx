@@ -10,33 +10,7 @@ import { PermissionModeSelector, PermissionSwitchNotice } from './PermissionMode
 import { ComposerModelEffortControl } from './ComposerModelEffortControl';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { useComposerMenu } from './useComposerMenuRegistry';
-import type { ComposerController } from './useComposer';
-
-type ComposerFooterProps = Pick<ComposerController,
-  'currentMode'
-  | 'currentModeConfig'
-  | 'currentModeLabel'
-  | 'selectedAgentId'
-  | 'userInvocableAgents'
-  | 'setSelectedAgentId'
-  | 'lastKnownUsage'
-  | 'usageEstimated'
-  | 'usageStale'
-  | 'preparedTurnContext'
-  | 'conversationPreparationPhase'
-  | 'selectedContextProfile'
-  | 'isComposerBusy'
-  | 'stopPending'
-  | 'attachButtonLabel'
-  | 'primaryButtonDisabled'
-  | 'primaryButtonDescription'
-  | 'handlePrimaryStop'
-  | 'handleAttachmentSelect'
-  | 'handlePromptSend'> & Pick<React.ComponentProps<typeof ComposerAgentMenu>,
-  'selectedAgentDefinition' | 'selectedAgentCapability' | 'activeAgentId'> & {
-  currentSession: React.ComponentProps<typeof ComposerModelEffortControl>['currentSession'];
-  transitionLabel: string;
-};
+import { useComposerView } from './ComposerControllerContext';
 
 function RegisteredContextUsageIndicator(
   props: Omit<React.ComponentProps<typeof ContextUsageIndicator>, 'menu' | 'detailsExpanded' |
@@ -54,14 +28,13 @@ function RegisteredContextUsageIndicator(
   );
 }
 
-export function ComposerFooter({
-  currentMode, currentModeConfig, currentModeLabel, selectedAgentId, userInvocableAgents,
-  setSelectedAgentId, lastKnownUsage, usageEstimated, usageStale, preparedTurnContext,
-  conversationPreparationPhase, selectedContextProfile, isComposerBusy, stopPending, attachButtonLabel,
-  primaryButtonDisabled, primaryButtonDescription, handlePrimaryStop, handleAttachmentSelect,
-  handlePromptSend, transitionLabel,
-  selectedAgentDefinition, selectedAgentCapability, activeAgentId, currentSession,
-}: ComposerFooterProps) {
+export function ComposerFooter() {
+  const { composer, currentSession, transitionLabel } = useComposerView();
+  const {
+    selectedAgentId, lastKnownUsage, usageEstimated, usageStale, preparedTurnContext, conversationPreparationPhase,
+    selectedContextProfile, isComposerBusy, stopPending, attachButtonLabel, primaryButtonDisabled,
+    primaryButtonDescription, handlePrimaryStop, handleAttachmentSelect, handlePromptSend,
+  } = composer;
   const handingOff = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
   // From the Stop click until main answers, the button stays Stop and shows that it is stopping.
   const stopSlot = isComposerBusy || stopPending;
@@ -81,17 +54,7 @@ export function ComposerFooter({
           >
             <Icon name="plus" size={14} />
           </IconButton>
-          <ComposerAgentMenu
-            currentMode={currentMode}
-            currentModeConfig={currentModeConfig}
-            currentModeLabel={currentModeLabel}
-            selectedAgentId={selectedAgentId}
-            selectedAgentDefinition={selectedAgentDefinition}
-            selectedAgentCapability={selectedAgentCapability}
-            userInvocableAgents={userInvocableAgents}
-            activeAgentId={activeAgentId}
-            setSelectedAgentId={setSelectedAgentId}
-          />
+          <ComposerAgentMenu />
           <PermissionModeSelector />
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">

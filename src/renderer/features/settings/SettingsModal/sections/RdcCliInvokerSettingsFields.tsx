@@ -7,19 +7,19 @@ import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { envToText, textToEnv } from './toolEnvText';
 import type { useRdcInstallation } from './useRdcInstallation';
-import type { useI18n } from '../../../../i18n';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 interface Props {
   installation: ReturnType<typeof useRdcInstallation>;
   rdcCliDraft: RdcCliInvokerSettings;
   onRdcCliDraftChange: Dispatch<SetStateAction<RdcCliInvokerSettings>>;
-  t: ReturnType<typeof useI18n>['t'];
 }
 
-export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftChange: change, installation, t }: Props) {
+export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftChange: change, installation }: Props) {
+  const { t } = useI18n();
   const [envText, setEnvText] = useState(() => envToText(draft.env));
   const patch = (value: Partial<RdcCliInvokerSettings>) => { installation.invalidate(); change({ ...draft, ...value }); };
   return <section className="settings-local-tool-form settings-renderdoc-toolchain" data-testid="settings-rdc-toolchain">

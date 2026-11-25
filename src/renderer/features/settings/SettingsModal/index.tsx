@@ -96,7 +96,6 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
       onTest={handleTestProviderDraft}
       onSave={handleSaveProviderConnection}
       onStartAccountLogin={handleStartAccountLogin}
-      t={t}
     />
   ) : null;
 
@@ -154,7 +153,6 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
                 label: modal.getResolvedProviderLabel(provider),
                 open: () => guardLeave(() => { setActiveSection('models'); modal.openProviderConnection(provider); }),
               }))}
-              t={t}
             />
 
           </div>

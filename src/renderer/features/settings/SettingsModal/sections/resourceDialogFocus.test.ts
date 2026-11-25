@@ -5,6 +5,9 @@ import { translate } from '../../../../i18n/messages';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { NewAgentDialog } from './NewAgentDialog';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params),
+}) }));
 
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -53,7 +56,7 @@ it('focuses the name in a new Agent dialog and returns to its opener on Escape',
     return createElement('div', null,
       createElement('button', { onClick: () => setOpen(true) }, 'New Agent'),
       open && createElement(NewAgentDialog, {
-        scopeLabel: 'User', existingIds: [], t: translate.bind(null, 'en'),
+        scopeLabel: 'User', existingIds: [],
         onCreate: () => {}, onClose: () => setOpen(false),
       }),
     );

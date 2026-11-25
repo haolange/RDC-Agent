@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { compileThemeChrome } from '@shared/theme/compiler';
 import { useDynStyle } from '../../../../lib/useDynStyle';
+import { useI18n } from '../../../../i18n';
 import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
-import type { AppearanceTranslate } from './appearanceChromeModel';
 
 function useChromeVars(chrome: ThemeChromeConfig, variant: ThemeVariant) {
   const palette = useMemo(() => compileThemeChrome(chrome, variant), [chrome, variant]);
@@ -21,10 +21,10 @@ function useChromeVars(chrome: ThemeChromeConfig, variant: ThemeVariant) {
 export function AppearanceChromePreview(props: {
   chrome: ThemeChromeConfig;
   variant: ThemeVariant;
-  t: AppearanceTranslate;
   'data-testid': string;
   description?: string;
 }) {
+  const { t } = useI18n();
   const chromeStyle = useChromeVars(props.chrome, props.variant);
   return (
     <span
@@ -36,13 +36,13 @@ export function AppearanceChromePreview(props: {
       aria-hidden={props.description ? undefined : true}
     >
       <span className="appearance-preview-side">
-        <span>{props.t('settings.general')}</span>
-        <span className="appearance-preview-nav">{props.t('settings.appearance')}</span>
+        <span>{t('settings.general')}</span>
+        <span className="appearance-preview-nav">{t('settings.appearance')}</span>
       </span>
       <span className="appearance-preview-main">
-        <strong>{props.t('settings.appearanceCodeFont')}</strong>
+        <strong>{t('settings.appearanceCodeFont')}</strong>
         <code>float4 color;</code>
-        <span className="appearance-preview-cta">{props.t('settings.edit')}</span>
+        <span className="appearance-preview-cta">{t('settings.edit')}</span>
       </span>
     </span>
   );

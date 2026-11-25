@@ -4,11 +4,13 @@ import { Input } from '../../../../ui/Input';
 import { SettingsField } from '../parts';
 import { formatReasoningDefault, getReasoningLabelKey } from '../modelCapabilitySummaryUtils';
 import { getProviderProtocolLabel } from '../utils';
+import { useI18n } from '../../../../i18n';
 import type { ProviderModelCapabilitySummaryProps } from './ProviderModelCapabilitySummary';
 
-type Props = Pick<ProviderModelCapabilitySummaryProps, 'model' | 'effectiveModel' | 'snapshot' | 'loading' | 'onModelChange' | 't'>;
+type Props = Pick<ProviderModelCapabilitySummaryProps, 'model' | 'effectiveModel' | 'snapshot' | 'loading' | 'onModelChange'>;
 
-export function ProviderModelPreferences({ model, effectiveModel, snapshot, loading, onModelChange, t }: Props) {
+export function ProviderModelPreferences({ model, effectiveModel, snapshot, loading, onModelChange }: Props) {
+  const { t } = useI18n();
   if (!effectiveModel) return null;
   const reasoning = effectiveModel?.controls.reasoning;
   const reasoningUnverified = reasoning?.kind === 'unknown';

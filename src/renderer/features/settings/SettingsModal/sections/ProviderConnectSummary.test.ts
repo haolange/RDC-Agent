@@ -1,9 +1,12 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { translate } from '../../../../i18n/messages';
 import { connectionPhase, ProviderConnectionStatusLine } from './ProviderConnectSummary';
 import type { ProviderConnectionDraft } from '../types';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('zh-CN', key, params),
+}) }));
 
 const draft = (patch: Partial<ProviderConnectionDraft> = {}) => ({ busy: 'idle', error: '', ...patch }) as ProviderConnectionDraft;
 
@@ -19,10 +22,9 @@ it('reads connected only for a saved, unchanged connection; a passing test of un
 
 it('presents an idle connection as passive status and announces an unsaved successful test distinctly', () => {
   const view = document.createElement('footer');
-  const t = translate.bind(null, 'zh-CN');
   for (const phase of ['untested', 'testPassed'] as const) {
-    view.innerHTML = renderToStaticMarkup(createElement(ProviderConnectionStatusLine, { phase, t }));
-    expect(view.querySelector('[role="status"]')?.textContent).toBe(t(`settings.providers.connectionPhase.${phase}`));
+    view.innerHTML = renderToStaticMarkup(createElement(ProviderConnectionStatusLine, { phase }));
+    expect(view.querySelector('[role="status"]')?.textContent).toBe(translate('zh-CN', `settings.providers.connectionPhase.${phase}`));
     expect(view.querySelector('button, [tabindex]')).toBeNull();
   }
 });

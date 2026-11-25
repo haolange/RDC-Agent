@@ -3,8 +3,8 @@ import { Button } from '../../../../ui/Button';
 import { CheckPill } from '../../../../ui/CheckPill';
 import { EmptyState } from '../../../../ui/EmptyState';
 import { Input } from '../../../../ui/Input';
+import { useI18n } from '../../../../i18n';
 import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
-import type { useI18n } from '../../../../i18n';
 import type { AppSettings } from '@shared/types/settings';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
@@ -106,7 +106,6 @@ interface AgentCapabilityPickerProps {
   skills: AgentSkillCatalog;
   targetAgentId: string;
   groups: AgentCapabilityGroup[];
-  t: Translate;
 }
 
 const normalizeCapability = (value: string): string => value.trim();
@@ -124,7 +123,8 @@ function partition(group: AgentCapabilityGroup, options: string[]): Array<{ id: 
   return buckets.filter((bucket) => bucket.options.length > 0);
 }
 
-export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ groups, skills, targetAgentId, t }) => {
+export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ groups, skills, targetAgentId }) => {
+  const { t } = useI18n();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   const setDraft = (groupId: string, value: string) => {
@@ -153,7 +153,7 @@ export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ gr
       <p className="settings-capability-note">{t('settings.agentCapabilityNotGrantHint')}</p>
       {groups.map((group) => {
         if (group.id === 'skills') return <section key={group.id} className="settings-capability-group">
-          <AgentSkillPicker skills={skills} targetAgentId={targetAgentId} value={group.values} onChange={group.onChange} t={t} />
+          <AgentSkillPicker skills={skills} targetAgentId={targetAgentId} value={group.values} onChange={group.onChange} />
         </section>;
         const options = uniqueCapabilities([...group.options, ...group.values]);
         return (

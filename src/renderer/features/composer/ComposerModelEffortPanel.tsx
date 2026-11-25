@@ -5,12 +5,12 @@ import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { Chevron } from '../../ui/Chevron';
 import { Switch } from '../../ui/Switch';
+import { useI18n } from '../../i18n';
 import { EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import { EffortMaxField } from './EffortMaxField';
 import type { MaxVisualTimeline } from './maxVisual';
 import type { ExitingMaxPhase } from './useMaxVisualController';
-import type { TranslationKey } from '../../i18n';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 
 const EffortSliderStop: React.FC<{
@@ -60,7 +60,6 @@ export const ComposerModelEffortPanel: React.FC<{
   fastModelStatusLabel?: string;
   maxContextMode: boolean;
   fastModel: boolean;
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onTrackPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -102,7 +101,6 @@ export const ComposerModelEffortPanel: React.FC<{
   fastModelStatusLabel,
   maxContextMode,
   fastModel,
-  t,
   onTrackPointerDown,
   onTrackPointerMove,
   onTrackPointerUp,
@@ -113,6 +111,7 @@ export const ComposerModelEffortPanel: React.FC<{
   onToggleFastModel,
   onMaxTimelineComplete,
 }) => {
+  const { t } = useI18n();
   const popupDynStyle = useDynStyle({
     '--composer-effort-popup-shift-x': `${popupShiftPx}px`,
   });

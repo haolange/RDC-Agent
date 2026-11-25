@@ -2,12 +2,10 @@ import React from 'react';
 import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { PersonalizationSettings } from './PersonalizationSettings';
 import { ProfileSettings } from './ProfileSettings';
-import type { useI18n } from '../../../../i18n';
 import type { AppSettings } from '@shared/types/settings';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 function WorkProcessPreview({ latest }: { latest?: boolean }) {
   return (
@@ -27,7 +25,6 @@ interface GeneralSettingsProps {
   globalInstructionsDraft: string;
   onGlobalInstructionsDraftChange: (value: string) => void;
   onSavePersonalization: () => void | Promise<void>;
-  t: Translate;
 }
 
 export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
@@ -40,8 +37,8 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   globalInstructionsDraft,
   onGlobalInstructionsDraftChange,
   onSavePersonalization,
-  t,
 }) => {
+  const { t } = useI18n();
   const onWorkProcessExpansionChange = useAppSettingsStore((state) => state.setWorkProcessExpansion);
   return (
     <section className="settings-page settings-page-general" data-settings-search="general">
@@ -52,7 +49,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           onAccountDraftChange={onAccountDraftChange}
           onAvatarSelect={onAvatarSelect}
           onSave={onAccountSave}
-          t={t}
         />
 
         <SettingsSection variant="rows"
@@ -89,7 +85,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           savedGlobalInstructions={settings.agents.globalInstructions}
           onGlobalInstructionsDraftChange={onGlobalInstructionsDraftChange}
           onSavePersonalization={onSavePersonalization}
-          t={t}
         />
       </div>
     </section>

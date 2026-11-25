@@ -4,19 +4,17 @@ import { Input } from '../../../../ui/Input';
 import { Switch } from '../../../../ui/Switch';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { envToText, splitArgs, textToEnv } from './toolEnvText';
-import type { useI18n } from '../../../../i18n';
 import type { CodeInterpreterSettings } from '@shared/types/settings';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface CodeInterpreterSettingsFieldsProps {
   draft: CodeInterpreterSettings;
   onChange: (next: CodeInterpreterSettings) => void;
-  t: Translate;
 }
 
-export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFieldsProps> = ({ draft, onChange, t }) => {
+export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFieldsProps> = ({ draft, onChange }) => {
+  const { t } = useI18n();
   const [envText, setEnvText] = useState(() => envToText(draft.env));
   const [argsText, setArgsText] = useState(() => draft.argsPrefix.join(' '));
   const [timeoutText, setTimeoutText] = useState(() => String(draft.timeoutMs / 1000));

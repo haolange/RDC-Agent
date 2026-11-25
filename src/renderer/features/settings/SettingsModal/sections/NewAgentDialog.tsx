@@ -4,11 +4,9 @@ import { Input } from '../../../../ui/Input';
 import { isImeComposing } from '../../../../lib/ime';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { toSlug } from './agentDraftFactory';
 import { uniqueResourceId } from './uniqueResourceId';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 /** A new Agent is named before anything is written, so no placeholder file ever lands on disk. */
 export const NewAgentDialog: React.FC<{
@@ -16,8 +14,8 @@ export const NewAgentDialog: React.FC<{
   existingIds: string[];
   onCreate: (identity: { name: string; id: string }) => void;
   onClose: () => void;
-  t: Translate;
-}> = ({ scopeLabel, existingIds, onCreate, onClose, t }) => {
+}> = ({ scopeLabel, existingIds, onCreate, onClose }) => {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => {

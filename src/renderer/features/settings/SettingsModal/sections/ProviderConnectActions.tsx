@@ -1,10 +1,8 @@
 import React from 'react';
 import { Button } from '../../../../ui/Button';
+import { useI18n } from '../../../../i18n';
 import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderConnectActionsProps {
   draft: ProviderConnectionDraft;
@@ -17,7 +15,6 @@ interface ProviderConnectActionsProps {
   onClose: () => void;
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
-  t: Translate;
 }
 
 /**
@@ -35,8 +32,8 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
   onClose,
   onTest,
   onSave,
-  t,
 }) => {
+  const { t } = useI18n();
   const accountRequiresCode = provider.authMode === 'account' && draft.accountStatus?.requiresCodeInput;
   const accountSaveBlocked = provider.authMode === 'account'
     && !accountConnected

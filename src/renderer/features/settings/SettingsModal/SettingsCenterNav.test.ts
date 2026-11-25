@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { SettingsCenterNav } from './SettingsCenterNav';
+vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
 it('moves through results with the arrow keys and opens a provider found by name with Enter', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -13,7 +14,7 @@ it('moves through results with the arrow keys and opens a provider found by name
   try {
     await act(async () => root.render(createElement(SettingsCenterNav, {
       sections: [{ id: 'general', label: 'General' }, { id: 'models', label: 'Models' }], activeSection: 'general',
-      onSelectSection: () => {}, t: (key: string) => key,
+      onSelectSection: () => {},
       providers: [{ id: 'ollama', label: 'Ollama', open: openOllama }, { id: 'openai', label: 'OpenAI', open: vi.fn() }],
     })));
     const input = host.querySelector<HTMLInputElement>('[data-testid="settings-nav-search"] input, input[data-testid="settings-nav-search"]')!;

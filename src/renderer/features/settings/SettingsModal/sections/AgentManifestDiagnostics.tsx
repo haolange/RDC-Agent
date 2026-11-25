@@ -4,10 +4,8 @@ import { AGENT_PROJECT_CEILING_NARROWED, AGENT_PROJECT_UNTRUSTED, type AgentMani
 import { useClipboardBridge } from '../../../../hooks/useClipboardBridge';
 import { Button } from '../../../../ui/Button';
 import { TaskDialog } from '../../../../ui/TaskDialog';
-import type { useI18n } from '../../../../i18n';
+import { useI18n } from '../../../../i18n';
 import './AgentManifestDiagnostics.css';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 /** Main reports an override that still declares model fields with this code; it can be migrated. */
 const FIELD_MOVED = 'AGENT_MANIFEST_FIELD_MOVED';
@@ -19,13 +17,13 @@ const issueSummaryKey = (code: string) => {
   return 'settings.agentDiagnosticsInvalid';
 };
 
-export function AgentManifestDiagnostics({ open, onClose, diagnostics, onMigrate, onDeleteOverride, onReviewTrust, t }: {
+export function AgentManifestDiagnostics({ open, onClose, diagnostics, onMigrate, onDeleteOverride, onReviewTrust }: {
   open: boolean; onClose: () => void; diagnostics: AgentManifestDiagnostic[];
   onMigrate: (issue: AgentManifestDiagnostic) => void;
   onDeleteOverride: (issue: AgentManifestDiagnostic) => void;
   onReviewTrust: (issue: AgentManifestDiagnostic) => void;
-  t: Translate;
 }) {
+  const { t } = useI18n();
   const { copyText } = useClipboardBridge();
   const [copying, setCopying] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');

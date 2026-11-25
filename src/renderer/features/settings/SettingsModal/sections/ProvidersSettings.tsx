@@ -1,12 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../../../ui/Button';
 import { Icon } from '../../../../ui/Icon';
+import { useI18n } from '../../../../i18n';
 import { ProviderCard } from './ProviderCard';
 import { ProviderDirectory } from './ProviderDirectory';
 import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import type { ProviderCatalogCategory } from '../types';
 import type { LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 
 interface ProvidersSettingsProps {
   accountProviders: LlmProviderEntry[];
@@ -15,11 +15,11 @@ interface ProvidersSettingsProps {
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
   onDisconnectProvider: (provider: LlmProviderEntry) => void | Promise<void>;
   onOpenProviderConnection: (provider: LlmProviderEntry) => void;
-  t: ReturnType<typeof useI18n>['t'];
 }
 
 export function ProvidersSettings({ accountProviders, providerCatalog, providerCatalogCategories,
-  getResolvedProviderLabel, onDisconnectProvider, onOpenProviderConnection, t }: ProvidersSettingsProps) {
+  getResolvedProviderLabel, onDisconnectProvider, onOpenProviderConnection }: ProvidersSettingsProps) {
+  const { t } = useI18n();
   const [adding, setAdding] = useState(false);
   const cards = useRef<HTMLDivElement>(null);
   const search = useRef<HTMLInputElement>(null);
@@ -54,17 +54,17 @@ export function ProvidersSettings({ accountProviders, providerCatalog, providerC
             {t(browse ? 'settings.configuredServices' : 'settings.directory.add')}
           </Button>
         ) : null}
-        <ProviderProbeBatchPanel t={t} />
+        <ProviderProbeBatchPanel />
       </div>
     </div>
     {browse ? <ProviderDirectory searchRef={search} entries={entries.filter(entry => !entry.isConfigured)} categories={providerCatalogCategories}
-      onChoose={onOpenProviderConnection} t={t} /> : (
+      onChoose={onOpenProviderConnection} /> : (
       <div ref={cards} className="settings-provider-grid" data-testid="settings-configured-services">
         {configured.map((provider, index) => <ProviderCard key={provider.id} provider={provider} label={getResolvedProviderLabel(provider)}
           onOpenConnection={onOpenProviderConnection} onDisconnect={entry => {
             pendingDisconnect.current = { id: entry.id, index };
             return onDisconnectProvider(entry);
-          }} t={t} />)}
+          }} />)}
       </div>
     )}
   </>;

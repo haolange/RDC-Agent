@@ -4,10 +4,8 @@ import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { humanizeError } from '../../../../i18n/humanizeError';
-import type { useI18n } from '../../../../i18n';
+import { useI18n } from '../../../../i18n';
 import type { DiffLine } from '@shared/utils/lineDiff';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 export interface AgentBuiltinDiffState {
   agentId: string;
@@ -18,12 +16,12 @@ export interface AgentBuiltinDiffState {
 }
 
 /** Current builtin against the user's override; restoring removes the override. */
-export function AgentBuiltinDiffDialog({ state, onRestore, onClose, t }: {
+export function AgentBuiltinDiffDialog({ state, onRestore, onClose }: {
   state: AgentBuiltinDiffState;
   onRestore: () => void;
   onClose: () => void;
-  t: Translate;
 }) {
+  const { t } = useI18n();
   return (
     <TaskDialog
       open

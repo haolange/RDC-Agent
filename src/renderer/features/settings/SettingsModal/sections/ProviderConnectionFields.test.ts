@@ -5,6 +5,11 @@ import { translate } from '../../../../i18n/messages';
 import { createProviderConnectionDraft } from '../providerConnectionState';
 import { ProviderConnectionFields } from './ProviderConnectionFields';
 import type { LlmProviderEntry } from '@shared/types/settings';
+const locale = vi.hoisted(() => ({ language: 'en' as 'en' | 'zh-CN' | 'keys' }));
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => (
+    locale.language === 'keys' ? key : translate(locale.language, key, params)),
+}) }));
 
 const service: LlmProviderEntry = {
   id: 'test', label: 'Test', authMode: 'api-key', protocol: 'OpenAICompatibleChatCompletions',
@@ -34,10 +39,11 @@ describe('stored provider credential interaction', () => {
     };
     const draft = createProviderConnectionDraft(provider);
     const form = (address: string, language: 'en' | 'zh-CN') => {
+      locale.language = language;
       const view = document.createElement('div');
       view.innerHTML = renderToStaticMarkup(React.createElement(ProviderConnectionFields, {
         connectionProvider: provider, connectionDraft: { ...draft, baseUrl: address },
-        onUpdateConnectionDraft: vi.fn(), t: (key, args) => translate(language, key, args),
+        onUpdateConnectionDraft: vi.fn(),
       }));
       return view;
     };
@@ -68,9 +74,10 @@ describe('stored provider credential interaction', () => {
     };
     const draft = createProviderConnectionDraft(provider);
     const update = vi.fn();
+    locale.language = 'keys';
     const render = () => elements(ProviderConnectionFields({
       connectionProvider: provider, connectionDraft: draft,
-      onUpdateConnectionDraft: update, t: ((key: string) => key) as never,
+      onUpdateConnectionDraft: update,
     }));
     const input = render().find((element) => element.type === 'input' && element.props.type === 'password')!;
     expect(input.props.readOnly).toBe(true);

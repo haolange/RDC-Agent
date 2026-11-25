@@ -2,11 +2,10 @@ import { ProfileAvatar } from '../patterns/ProfileAvatar';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 import { Chevron } from '../ui/Chevron';
-import type { TranslationKey } from '../i18n';
+import { useI18n } from '../i18n';
 import type { MouseEvent } from 'react';
 
 export function SidebarFooter({
-  t,
   nickname,
   avatarPath,
   isUserMenuOpen,
@@ -14,7 +13,6 @@ export function SidebarFooter({
   onOpenKnowledgeCenter,
   onUserMenuToggle,
 }: {
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   nickname: string;
   avatarPath: string | undefined;
   isUserMenuOpen: boolean;
@@ -22,6 +20,7 @@ export function SidebarFooter({
   onOpenKnowledgeCenter: () => void;
   onUserMenuToggle: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="app-sidebar-footer" data-testid="sidebar-footer">
       <Button

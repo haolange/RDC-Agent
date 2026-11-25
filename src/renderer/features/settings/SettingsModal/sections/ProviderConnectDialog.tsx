@@ -8,6 +8,7 @@ import { SettingsField } from '../parts';
 import { shouldUseProviderDocsLink } from '../providerConnectionState';
 import { hasProviderConnectionDefinitionChanged } from '../providerConnectionRequest';
 import { getProviderProtocolLabel } from '../utils';
+import { useI18n } from '../../../../i18n';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderAuthModeField } from './ProviderAuthModeField';
 import { ProviderMark } from './ProviderMark';
@@ -19,9 +20,6 @@ import { ProviderConnectModelList } from './ProviderConnectModelList';
 import { ProviderProbeBatchPanel } from './ProviderProbeBatchPanel';
 import type { ProviderConnectionDraft } from '../types';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderConnectDialogProps {
   connectionDraft: ProviderConnectionDraft;
@@ -38,7 +36,6 @@ interface ProviderConnectDialogProps {
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
   onStartAccountLogin: () => void | Promise<void>;
-  t: Translate;
 }
 
 /**
@@ -60,8 +57,8 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   onTest,
   onSave,
   onStartAccountLogin,
-  t,
 }) => {
+  const { t } = useI18n();
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const [modelCount, setModelCount] = useState(0);
   const authMode = provider.authMode;
@@ -84,7 +81,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
       title={title}
       titleIcon={<ProviderMark id={provider.id} category={provider.category} />}
       headerActions={<>
-        {provider.isConfigured ? <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy} t={t} /> : null}
+        {provider.isConfigured ? <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy} /> : null}
         <CopyDiagnosticsMenu testId="settings-provider-diagnostics" label={t('settings.directory.more', { name: title })} facts={[
           { label: t('settings.providers.serviceId'), value: provider.id },
           { label: t('settings.providerProtocol'), value: routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel },
@@ -107,7 +104,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             <InlineError className="settings-provider-connection-status" detail={connectionDraft.modelSaveError}>
               {t('settings.providerSaveFailed')}
             </InlineError>
-          ) : <ProviderConnectionStatusLine phase={phase} t={t} />}
+          ) : <ProviderConnectionStatusLine phase={phase} />}
           <ProviderConnectActions
             draft={connectionDraft}
             provider={provider}
@@ -119,7 +116,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             onClose={onClose}
             onTest={onTest}
             onSave={onSave}
-            t={t}
           />
         </>
       )}
@@ -143,7 +139,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             testedConnectionSignature: '',
             models: [],
           })}
-          t={t}
         />
 
         {authMode === 'api-key' && (
@@ -151,7 +146,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             connectionDraft={connectionDraft}
             connectionProvider={provider}
             onUpdateConnectionDraft={onUpdateConnectionDraft}
-            t={t}
           />
         )}
 
@@ -191,7 +185,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             connectionDevicePending={connectionDevicePending}
             onUpdateConnectionDraft={onUpdateConnectionDraft}
             onStartAccountLogin={onStartAccountLogin}
-            t={t}
           />
         )}
 
@@ -221,7 +214,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
               <strong>{authMode === 'local' ? t('settings.localProviderModelsTitle') : t('settings.providers.discoveryTitle')}</strong>
               <p className="settings-section-description">{t('settings.localProviderModelsHint')}</p>
             </div>
-            <ProviderDiscoveryEmpty t={t} />
+            <ProviderDiscoveryEmpty />
           </section>
         ) : null}
 
@@ -242,7 +235,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             onToggleExpanded={(modelId) => setExpandedModelId((current) => (current === modelId ? null : modelId))}
             onModelChange={onModelChange}
             onModelCountChange={setModelCount}
-            t={t}
           />
         )}
 

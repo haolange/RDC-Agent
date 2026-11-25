@@ -5,8 +5,8 @@ import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { errorDetail } from '../../../../lib/errorDetail';
+import { useI18n } from '../../../../i18n';
 import { modelOptionLabel } from './agentConfigStatus';
-import type { useI18n } from '../../../../i18n';
 import type { AgentModelBinding } from '@shared/types/settings';
 import type { AgentModelMigrationPreview, AgentModelOption } from '@shared/types/agentManifest';
 
@@ -31,14 +31,14 @@ interface AgentModelMigrationDialogProps {
   options: AgentModelOption[];
   onConfirm: (preview: AgentModelMigrationPreview) => Promise<void>;
   onClose: () => void;
-  t: Translate;
 }
 
 /**
  * Migrate moves the model fields of an inactive override into Settings → Agents and keeps a backup;
  * delete removes the override so the builtin applies. Both show what changes before writing.
  */
-export function AgentModelMigrationDialog({ target, options, onConfirm, onClose, t }: AgentModelMigrationDialogProps) {
+export function AgentModelMigrationDialog({ target, options, onConfirm, onClose }: AgentModelMigrationDialogProps) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { preview } = target;

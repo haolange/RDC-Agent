@@ -5,6 +5,9 @@ import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults'
 import { translate } from '../../../../i18n/messages';
 import { detectRdcInstallations } from '../../../../platform/rdcInstallation';
 import { ToolsSettings } from './ToolsSettings';
+vi.mock('../../../../i18n', () => ({ useI18n: () => ({
+  t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate('en', key, params),
+}) }));
 
 vi.mock('../../../../platform/rdcInstallation', () => ({ detectRdcInstallations: vi.fn() }));
 
@@ -20,7 +23,7 @@ it('shows save for a changed draft and prevents installation operations from rac
   const render = (dirty: boolean) => act(async () => root.render(createElement(ToolsSettings, {
     rdcCliDraft: draft.rdcCli, codeInterpreterDraft: draft.codeInterpreter, shellDraft: draft.shell,
     onRdcCliDraftChange: vi.fn(), onCodeInterpreterDraftChange: vi.fn(), onShellDraftChange: vi.fn(),
-    onSaveToolsConfig: save, dirty, t: (key, args) => translate('en', key, args),
+    onSaveToolsConfig: save, dirty,
   })));
   try {
     await render(false);
