@@ -5,7 +5,9 @@
 //   node scripts/eval-investigation.mjs <session-directory> [--tasks <file>] [--min-score <0..1>]
 //   node scripts/eval-investigation.mjs --self-test
 // The answer text is the session's last completed assistant message plus any InvestigationReport records
-// under the session directory; each task reads its own `Q<n>:` line. Not part of CI.
+// under the session directory; each task reads its own `Q<n>:` line. Reports must also rest on recorded Evidence
+// (every observed source claim cites an EvidenceRecord in the session). CI runs --self-test; grading a real session
+// needs a model and a replayable capture.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +57,52 @@ export function grade(text, tasks = suite.tasks) {
   return { score: results.filter((result) => result.passed).length / results.length, results };
 }
 
+/**
+ * Evidence grading (S-EVIDENCE-01): every observed claim a report concludes from must cite Evidence the session
+ * actually recorded. `records` are the investigation record bodies found under the session directory.
+ */
+export function gradeEvidence(records) {
+  const evidence = new Set();
+  const claims = new Map();
+  const reports = [];
+  for (const record of records) {
+    for (const item of [record, ...(Array.isArray(record.items) ? record.items : [])]) {
+      if (typeof item.evidenceId === 'string') evidence.add(item.evidenceId);
+      if (typeof item.claimId === 'string') claims.set(item.claimId, item);
+    }
+    if (record.reportContract) reports.push(record);
+  }
+  const uncited = [];
+  for (const report of reports) {
+    for (const claim of report.claims ?? []) {
+      for (const entry of claim.compactProvenance ?? []) {
+        const source = claims.get(entry.sourceClaimId);
+        if (source?.epistemic !== 'observed') continue;
+        if (!(source.evidenceIds ?? []).some((id) => evidence.has(id))) uncited.push(source.claimId);
+      }
+    }
+  }
+  return { reports: reports.length, uncited: [...new Set(uncited)] };
+}
+
+function readSessionRecords(directory) {
+  const records = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.json')) {
+        try {
+          const record = JSON.parse(fs.readFileSync(full, 'utf8'));
+          if (record && typeof record === 'object' && !Array.isArray(record)) records.push(record);
+        } catch { /* not a JSON record */ }
+      }
+    }
+  };
+  walk(directory);
+  return records;
+}
+
 function readSessionText(directory) {
   const history = path.join(directory, 'conversation.jsonl');
   if (!fs.existsSync(history)) throw new Error(`no conversation.jsonl in ${directory}`);
@@ -100,11 +148,20 @@ if (args.includes('--print-prompt')) {
   if (right.score !== 1 || wrong.score !== 0 || grade(rebuilt?.content ?? '').score !== 1) {
     report(right); report(wrong); process.exit(1);
   }
+  const observed = (claimId, evidenceIds) => ({ claimId, epistemic: 'observed', evidenceIds });
+  const conclusion = (sourceClaimId) => ({ reportContract: {}, claims: [{ compactProvenance: [{ sourceClaimId }] }] });
+  const cited = gradeEvidence([{ evidenceId: 'ev-1' }, observed('c-1', ['ev-1']), conclusion('c-1')]);
+  const dangling = gradeEvidence([{ items: [{ evidenceId: 'ev-2' }] }, observed('c-2', ['ev-missing']), conclusion('c-2')]);
+  if (cited.uncited.length !== 0 || cited.reports !== 1 || dangling.uncited.join() !== 'c-2') {
+    console.error('[eval] evidence grading self-test failed', { cited, dangling }); process.exit(1);
+  }
   console.log('[eval] self-test OK');
 } else {
   const directory = args.find((arg) => !arg.startsWith('--') && arg !== option('--tasks') && arg !== option('--min-score'));
   if (!directory) throw new Error('usage: eval-investigation.mjs <session-directory> | --print-prompt | --self-test');
   const result = grade(readSessionText(directory));
   report(result);
-  process.exit(result.score >= Number(option('--min-score', '0')) ? 0 : 1);
+  const evidence = gradeEvidence(readSessionRecords(directory));
+  console.log(`[eval:${suite.id}] evidence: ${evidence.reports} report(s), ${evidence.uncited.length} observed source claim(s) without recorded evidence${evidence.uncited.length ? ` (${evidence.uncited.join(', ')})` : ''}`);
+  process.exit(result.score >= Number(option('--min-score', '0')) && evidence.uncited.length === 0 ? 0 : 1);
 }

@@ -67,6 +67,8 @@ jobs:
       # snapshot, skills, hooks, memory policy, contracts, catalog compiler) run inside
       # test:coverage above; only their non-vitest halves run here.
       - run: node scripts/check-agent-tool-capability.mjs
+      # The investigation eval's graders (answers and evidence); grading a real session needs a model and a capture.
+      - run: node scripts/eval-investigation.mjs --self-test
       - run: pnpm run check:request-cache-profile
       - name: Check git diff whitespace
         env:
