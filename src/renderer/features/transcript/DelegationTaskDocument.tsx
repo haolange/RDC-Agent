@@ -2,17 +2,15 @@ import React from 'react';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useI18n } from '../../i18n';
 import { WorkDisclosure } from './WorkDisclosure';
-import type { DelegationTaskBody } from '@shared/types/delegationTrace';
+import { parseDelegationTaskView } from './delegationTaskView';
 
 const TextList: React.FC<{ items: string[] }> = ({ items }) => <ul>{items.map((item, index) =>
   <li key={index}><MessageMarkdown content={item} /></li>)}</ul>;
 
 export const DelegationTaskDocument: React.FC<{ text: string; factsOpen: boolean; constraintsOpen: boolean; toggle: (fold: 'factsOpen' | 'constraintsOpen') => void }> = ({ text, factsOpen, constraintsOpen, toggle }) => {
   const { t } = useI18n();
-  let body: DelegationTaskBody;
-  try { body = JSON.parse(text) as DelegationTaskBody; }
-  catch { return <p role="status">{t('chat.subagentContentUnavailable')}</p>; }
-  if (!body.capsule) return <p role="status">{t('chat.subagentContentUnavailable')}</p>;
+  const body = parseDelegationTaskView(text);
+  if (!body) return <p role="status">{t('chat.subagentContentUnavailable')}</p>;
   const { capsule: task, completionRequirements } = body;
   const primary: [string, React.ReactNode][] = [
     [t('chat.subagentFieldGoal'), !!task.task && task.goal !== task.task && <MessageMarkdown content={task.goal} />],

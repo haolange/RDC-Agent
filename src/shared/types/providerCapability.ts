@@ -7,11 +7,9 @@ import type {
   ProviderSurfaceManifest,
 } from '../provider-catalog/catalogManifestSchema';
 import type { ProviderAdapterId } from '../provider-catalog/implementationRegistry';
+import type { JsonObject, JsonPrimitive, JsonValue } from '../utils/jsonValue';
 import type {
   BooleanControlDefinition,
-  CatalogJsonObject,
-  CatalogJsonPrimitive,
-  CatalogJsonValue,
   ExecutionBinding,
   ModelCost,
   ModelManifest,
@@ -23,10 +21,6 @@ import type {
   LlmProviderLifecycleStatus,
   LlmProviderProtocol,
 } from './settings';
-
-export type JsonPrimitive = CatalogJsonPrimitive;
-export type JsonValue = CatalogJsonValue;
-export type JsonObject = CatalogJsonObject;
 
 export type EntitlementState = 'granted' | 'denied' | 'unknown';
 export type EffectiveAvailability = 'available' | 'unavailable' | 'unknown';

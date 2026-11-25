@@ -1,9 +1,9 @@
 import { z } from 'zod';
+import { JsonPrimitiveSchema } from '../utils/jsonValue';
 import {
   BooleanControlDefinitionSchema,
   EffectiveAvailabilitySchema,
   ExecutionBindingSchema,
-  JsonPrimitiveSchema,
   ModelManifestPatchSchema,
   ModelManifestSchema,
   ProviderContractBundleSchema,

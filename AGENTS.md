@@ -27,7 +27,7 @@
 
 ### 2.1 Boundary Contract + Happy Path + Fail-Fast
 
-- **边界校验一次**。在系统入口、外部输入和跨模块边界做严格的契约校验（schema validation、type guard、assert）。本仓库的边界是：IPC handler、preload 暴露的 API、模型 tool 入参、RDC-Tool CLI 返回、磁盘读回的持久记录、Provider 响应。
+- **边界校验一次**。在系统入口、外部输入和跨模块边界做严格的契约校验（schema validation、type guard、assert）。本仓库的边界是：IPC handler、preload 暴露的 API、模型 tool 入参、RDC-Tool CLI 返回、磁盘读回的持久记录、Provider 响应。解析出的 JSON 用 zod schema 校验（或 `@shared/utils/jsonValue` 的 `parseJsonValue`），不写 `JSON.parse(...) as T`；ESLint 在生产代码里拒绝这种 cast，只放行 `as unknown`。
 - **内部信任契约**。边界之内的核心路径直接信任已校验的数据，不重复判空，不写推测性的防御分支。
 - **异常就失败或重置**。错误路径用 fail-fast、transaction rollback、generation／lease 失效或外层状态重置处理。本仓库已有的原语优先复用：调查记录的事务提交、Task execution 的 generation、RDC lease 的 quarantine 与受控恢复、capture 入口位置恢复。
 - **不写 silent fallback**。不为了"不报错"吞掉异常、返回空值或替换成默认值。数据无法解释时在返回里显式标注，不伪造。

@@ -323,7 +323,7 @@ export interface PreparedTurnContextSummary {
   };
   wirePatch: {
     headers: Record<string, string>;
-    body: import('./providerCapability').JsonObject;
+    body: import('../utils/jsonValue').JsonObject;
   };
   controls: import('./modelCapability').ConversationTurnControls;
   contextMode: 'normal' | 'one-million';

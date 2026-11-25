@@ -30,14 +30,13 @@ import type {
   ExecutionIdentity,
   ProviderStateMode,
   ToolLoopPhase,
-  JsonObject,
-  JsonValue,
   CatalogModelRoute,
   ModelSelection,
   RequestPlan,
   RequestPlanningErrorCode,
   RequestPlanningResult,
 } from '@shared/types/providerCapability';
+import type { JsonObject, JsonValue } from '@shared/utils/jsonValue';
 export interface RequestPlannerInput {
   model: EffectiveModel;
   /** Effective snapshot used to validate hidden internal model targets. */

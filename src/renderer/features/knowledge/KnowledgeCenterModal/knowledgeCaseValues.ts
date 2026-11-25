@@ -5,13 +5,15 @@
  * references (stored asset ids, session addresses) off the page. None of this knows a particular case.
  */
 
-export type CaseValue = null | boolean | number | string | CaseValue[] | { [key: string]: CaseValue };
-export type CaseRecord = { [key: string]: CaseValue };
+import { parseJsonValue, type JsonObject, type JsonValue } from '@shared/utils/jsonValue';
+
+export type CaseValue = JsonValue;
+export type CaseRecord = JsonObject;
 
 export function parseChapterValue(content: string): CaseValue | undefined {
   const text = content.trim();
   if (!text.startsWith('{') && !text.startsWith('[')) return undefined;
-  try { return JSON.parse(text) as CaseValue; } catch { return undefined; }
+  try { return parseJsonValue(text); } catch { return undefined; }
 }
 
 export function hasReadableCaseChapter(content: string | undefined): boolean {

@@ -9,8 +9,8 @@ import type {
   ContextTier,
   EffectiveModel,
   CatalogModelRoute,
-  JsonValue,
 } from '@shared/types/providerCapability';
+import type { JsonValue } from '@shared/utils/jsonValue';
 import type { LlmProviderCatalogOwnership, LlmProviderEntry } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
 import type {

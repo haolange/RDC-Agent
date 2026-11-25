@@ -1,23 +1,5 @@
 import { z } from 'zod';
-
-export type CatalogJsonPrimitive = string | number | boolean | null;
-export type CatalogJsonValue = CatalogJsonPrimitive | CatalogJsonValue[] | { [key: string]: CatalogJsonValue };
-export type CatalogJsonObject = { [key: string]: CatalogJsonValue };
-
-export const JsonPrimitiveSchema: z.ZodType<CatalogJsonPrimitive> = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-]);
-
-export const JsonValueSchema: z.ZodType<CatalogJsonValue> = z.lazy(() => z.union([
-  JsonPrimitiveSchema,
-  z.array(JsonValueSchema),
-  z.record(z.string(), JsonValueSchema),
-]));
-
-export const JsonObjectSchema: z.ZodType<CatalogJsonObject> = z.record(z.string(), JsonValueSchema);
+import { JsonObjectSchema } from '../utils/jsonValue';
 
 export const EntitlementStateSchema = z.enum(['granted', 'denied', 'unknown']);
 export const EffectiveAvailabilitySchema = z.enum(['available', 'unavailable', 'unknown']);

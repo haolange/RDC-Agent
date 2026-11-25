@@ -38,6 +38,15 @@ export const errorContractRestrictions = [
     message: 'A rethrow inside catch passes { cause } so the original failure stays inspectable.',
   },
 ];
+// Boundary parsing (ARCHITECTURE.md): parsed JSON is validated with a schema, never cast. `as unknown` stays allowed,
+// since it only replaces JSON.parse's `any` with a type that must be narrowed before use.
+const jsonParseCall = "CallExpression[callee.object.name='JSON'][callee.property.name='parse']";
+const boundaryParseMessage = 'Parse JSON through a zod schema (or parseJsonValue from @shared/utils/jsonValue) instead of casting it.';
+export const boundaryParseRestrictions = [
+  `TSAsExpression[typeAnnotation.type!='TSUnknownKeyword'] > ${jsonParseCall}.expression`,
+  `TSTypeAssertion[typeAnnotation.type!='TSUnknownKeyword'] > ${jsonParseCall}.expression`,
+  `TSAsExpression > TSAsExpression[typeAnnotation.type='TSUnknownKeyword'] > ${jsonParseCall}.expression`,
+].map((selector) => ({ selector, message: boundaryParseMessage }));
 // Storage primitives (src/main/runtime/atomicFile.ts): persisted files are written through writeFileAtomic and
 // renamed only by src/main/platform/fileRename.ts, which owns the host differences.
 export const storageRestrictions = [{
@@ -128,7 +137,7 @@ export default [
   {
     ...productionSources,
     rules: {
-      'no-restricted-syntax': ['error', ...errorContractRestrictions, ...inlineHexStyleRestrictions],
+      'no-restricted-syntax': ['error', ...errorContractRestrictions, ...boundaryParseRestrictions, ...inlineHexStyleRestrictions],
       'preserve-caught-error': ['error', { requireCatchParameter: false }],
     },
   },
@@ -145,7 +154,7 @@ export default [
   {
     files: ['src/main/**/*.ts', 'src/shared/**/*.ts', 'src/preload/**/*.ts'],
     ignores: [...productionSources.ignores, 'src/main/platform/**', 'src/preload/index.ts'],
-    rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions, ...errorContractRestrictions, ...storageRestrictions] },
+    rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions, ...errorContractRestrictions, ...boundaryParseRestrictions, ...storageRestrictions] },
   },
   {
     files: ['src/shared/**/*.ts'],
@@ -220,7 +229,7 @@ export default [
       'no-restricted-imports': ['error', {
         patterns: ['**/features/**', '**/platform/**', '**/app/**', '**/shell/**'],
       }],
-      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions, ...inlineHexStyleRestrictions],
+      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions, ...boundaryParseRestrictions, ...inlineHexStyleRestrictions],
     },
   },
   {
@@ -241,7 +250,7 @@ export default [
         ],
         patterns: ['**/features/**', '**/ui/**', '**/patterns/**', '**/stores/**', '**/platform/**', '**/app/**', '**/shell/**'],
       }],
-      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions],
+      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions, ...boundaryParseRestrictions],
     },
   },
   {
