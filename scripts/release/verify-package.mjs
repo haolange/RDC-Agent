@@ -24,7 +24,7 @@ for (const entry of ['out/main/index.js', 'out/preload/index.js', 'out/renderer/
   assert(files.includes(entry), `missing ${entry}`);
 }
 for (const entry of files) {
-  assert(!/^(?:src|scripts|\.git|\.qoder|\.check-tmp|coverage)\//.test(entry), `development payload: ${entry}`);
+  assert(!/^(?:src|scripts|\.git|\.check-tmp|coverage)\//.test(entry), `development payload: ${entry}`);
   assert(!/^(?:pnpm-lock\.yaml|pnpm-workspace\.yaml)$/.test(entry), `development config: ${entry}`);
   assert(!/^node_modules\/(?:pnpm|npm|yarn)(?:\/|$)/.test(entry), `package manager: ${entry}`);
 }
