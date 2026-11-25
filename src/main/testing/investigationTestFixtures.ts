@@ -19,10 +19,10 @@ import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
 import { formatInvestigationContentHash } from '@shared/types/renderdocInvestigation';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
+import { serializeInvestigationJson } from '../investigation/investigationHash';
+import { InvestigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { seedExecutionEvidence } from './investigationExecutionFixtures';
-import { serializeInvestigationJson } from './investigationHash';
-import { InvestigationArtifactService } from './InvestigationArtifactService';
-import type { InvestigationArtifactServiceDeps } from './investigationArtifactWrite';
+import type { InvestigationArtifactServiceDeps } from '../investigation/investigationArtifactWrite';
 
 const receiptStores = new WeakMap<InvestigationArtifactService, RdcExecutionReceipts>();
 export const SESSION_ID = 'inv-session';

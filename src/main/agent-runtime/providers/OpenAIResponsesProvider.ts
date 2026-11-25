@@ -148,10 +148,4 @@ export function buildOpenAIResponsesUrl(baseUrl: string): string {
   return trimmed.endsWith('/responses') ? trimmed : `${trimmed}/responses`;
 }
 
-export const __testing = {
-  buildRequestBody: buildResponsesRequestBody,
-  isDeepSeekResponsesPlan,
-  isReasoningEnabled,
-  readDeepSeekReasoningText,
-  toResponsesInput,
-};
+export { buildResponsesRequestBody as buildRequestBody, isDeepSeekResponsesPlan, isReasoningEnabled, readDeepSeekReasoningText, toResponsesInput };

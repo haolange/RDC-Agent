@@ -10,7 +10,7 @@ import {
   createInvestigationHarness,
   sampleCheckpoint,
   writeDraft,
-} from '../../investigation/investigationTestFixtures';
+} from '../../testing/investigationTestFixtures';
 
 describe('Mission turn completion gate', () => {
   it('does not affect General', () => {

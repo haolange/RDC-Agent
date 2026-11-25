@@ -8,7 +8,7 @@ import {
   createInvestigationHarness,
   overwriteInvestigationManifest,
   writeDraft,
-} from '../investigation/investigationTestFixtures';
+} from '../testing/investigationTestFixtures';
 import {
   mapRightRailInvestigationArtifacts,
   listInvestigationArtifacts,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { grantDelegatedArtifactAccess } from '../sessions/artifacts/DelegatedArtifactAccess';
+import { baselineWorld, createInvestigationHarness, observedClaim, sampleChallenge, writeDraft, reopenInvestigationHarness } from '../testing/investigationTestFixtures';
 import { createInvestigationTools } from './InvestigationTools';
-import { baselineWorld, createInvestigationHarness, observedClaim, sampleChallenge, writeDraft, reopenInvestigationHarness } from './investigationTestFixtures';
 describe('delegated investigation writes', () => {
   it('exposes authoritative version metadata without granting the predecessor or permitting a false hash', async () => {
     const { service, resolver, sessionId } = createInvestigationHarness();

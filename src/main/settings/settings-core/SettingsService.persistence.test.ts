@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isolateHome } from '../../testing/isolatedHome';
 
 const electronMock = vi.hoisted(() => ({
   userDataRoot: '',
@@ -32,14 +33,13 @@ vi.mock('electron', () => ({
 describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   let userDataRoot = '';
   let previousUserDataEnv: string | undefined;
-  let previousRdcHomeEnv: string | undefined;
+  let restoreHome: () => void = () => undefined;
 
   beforeEach(() => {
     previousUserDataEnv = process.env.RDC_AGENT_USER_DATA;
-    previousRdcHomeEnv = process.env.RDC_AGENT_HOME;
     userDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-settings-'));
     process.env.RDC_AGENT_USER_DATA = userDataRoot;
-    process.env.RDC_AGENT_HOME = path.join(userDataRoot, '.rdc-agent');
+    restoreHome = isolateHome(userDataRoot);
     electronMock.userDataRoot = userDataRoot;
     electronMock.encryptionAvailable = true;
     vi.resetModules();
@@ -51,11 +51,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     } else {
       process.env.RDC_AGENT_USER_DATA = previousUserDataEnv;
     }
-    if (previousRdcHomeEnv === undefined) {
-      delete process.env.RDC_AGENT_HOME;
-    } else {
-      process.env.RDC_AGENT_HOME = previousRdcHomeEnv;
-    }
+    restoreHome();
     fs.rmSync(userDataRoot, { recursive: true, force: true });
   });
 

@@ -5,7 +5,7 @@ import { isAdmittedDiscoveredModel } from '../../provider-catalog/DiscoveryAdmis
 import { getProviderModelDefinitions } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { accountDefaultRoute } from './accountRoute';
 import { GITHUB_COPILOT_CLIENT_ID } from './oauthConstants';
-import { fetchJson, isTestMode, wait } from './oauthHttp';
+import { fetchJson, wait } from './oauthHttp';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
@@ -45,11 +45,9 @@ export async function startGitHubCopilotLogin(
 async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
   if (!flow.deviceCode) throw new Error('GitHub device code is missing.');
   let intervalSeconds = flow.intervalSeconds ?? 5;
-  let delayBeforePoll = !isTestMode();
   for (;;) {
     if (Date.now() > flow.expiresAt) throw new Error('GitHub authorization code expired.');
-    if (delayBeforePoll) await wait(intervalSeconds * 1000);
-    delayBeforePoll = true;
+    await wait(intervalSeconds * 1000);
     const payload = await fetchJson('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },

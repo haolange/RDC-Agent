@@ -134,7 +134,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isDev = isDevelopmentRun({ isPackaged: app.isPackaged, env: process.env });
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
-const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
 const isBrowserQa = shouldStartBrowserAppBridge();
 const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1' || isBrowserQa;
 if (isHeadlessMode) {
@@ -212,7 +211,7 @@ fs.mkdirSync(userDataPath, { recursive: true });
 if (useDisposableBrowserQaUserData) {
   const isolatedHome = path.join(userDataPath, '.rdc-agent');
   fs.mkdirSync(isolatedHome, { recursive: true });
-  process.env.RDC_AGENT_HOME = isolatedHome;
+  appPathService.isolateUserRdcRoot(isolatedHome);
   console.log(`[RDC-Agent] Isolated Browser QA home: ${isolatedHome}`);
 }
 app.commandLine.appendSwitch('user-data-dir', userDataPath);
@@ -275,7 +274,7 @@ if (!hasSingleInstanceLock) {
   exitMainProcess(0);
 }
 
-if (isTestMode || isHeadlessMode) {
+if (isHeadlessMode) {
   app.disableHardwareAcceleration();
   app.commandLine.appendSwitch('disable-gpu');
   app.commandLine.appendSwitch('disable-gpu-compositing');
@@ -506,7 +505,7 @@ app.whenReady().then(async () => {
       devRendererUrl: isDev ? getDevRendererUrl() : null,
       rendererRoot: path.join(__dirname, '../renderer'),
       mainBundlePath: path.join(__dirname, 'index.js'),
-      appVersion: process.env.npm_package_version?.trim() || app.getVersion(),
+      appVersion: app.getVersion(),
     });
     runtimeLogService.log({
       scope: 'app',
@@ -571,9 +570,8 @@ app.on('before-quit', (event) => {
   }
 
   registerShutdownDisposables();
-  const timeoutMs = isTestMode ? 100 : SHUTDOWN_TIMEOUT_MS;
   const exitAfterShutdown = () => exitMainProcess(shutdownExitCode);
-  void shutdownCoordinator.shutdownAll(timeoutMs, exitAfterShutdown).then(exitAfterShutdown);
+  void shutdownCoordinator.shutdownAll(SHUTDOWN_TIMEOUT_MS, exitAfterShutdown).then(exitAfterShutdown);
 });
 
 // External QA/CLI launchers use process signals; route them through the same shutdown state machine.

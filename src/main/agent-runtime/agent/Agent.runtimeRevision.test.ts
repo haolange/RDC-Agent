@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { EventStream } from '../core/EventStream';
-import { __testing as responsesWire } from '../providers/OpenAIResponsesProvider';
+import * as responsesWire from '../providers/OpenAIResponsesProvider';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { Agent } from './Agent';
 import type { AssistantMessage, AssistantMessageEvent, Context, Message, Model, ToolDefinition } from '../core/types';

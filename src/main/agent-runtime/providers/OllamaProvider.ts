@@ -357,4 +357,4 @@ function mapDoneReason(reason: string | null | undefined, hadToolCall: boolean):
   }
 }
 
-export const __testing = { mapDoneReason, toOllamaMessages };
+export { mapDoneReason, toOllamaMessages };

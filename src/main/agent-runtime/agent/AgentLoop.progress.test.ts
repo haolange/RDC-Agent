@@ -8,7 +8,7 @@ import { RuntimePermissionStateService } from '../permissions/RuntimePermissionS
 import { EventStream } from '../core/EventStream';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { assertMissionTurnCompletion } from '../../investigation/missionCompletionContract';
-import { SESSION_ID, baselineWorld, createInvestigationHarness, observedClaim, projectClaim, sampleCheckpoint, writeDraft, writeReadyReport } from '../../investigation/investigationTestFixtures';
+import { SESSION_ID, baselineWorld, createInvestigationHarness, observedClaim, projectClaim, sampleCheckpoint, writeDraft, writeReadyReport } from '../../testing/investigationTestFixtures';
 import { createApprovedGoalContinuation } from '../orchestration/ApprovedGoalContinuation';
 import { TurnHandle } from '../orchestration/TurnCoordinator';
 import { FileTaskStore, TaskRegistry, resolveSessionTasksDir } from '../tasks';

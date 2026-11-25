@@ -1,13 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { InvestigationError } from './investigationErrors';
-import {
-  assertMissionTurnCompletion,
-  enforceMissionTurnReadiness,
-  enforceMissionTurnCompletion,
-  isAllowedMissionCompletionStatus,
-  MissionCompletionError,
-  reportStatusForbidsCompleted,
-} from './missionCompletionContract';
 import {
   SESSION_ID,
   baselineWorld,
@@ -26,7 +17,16 @@ import {
   seedNote,
   writeDraft,
   writeReadyReport,
-} from './investigationTestFixtures';
+} from '../testing/investigationTestFixtures';
+import { InvestigationError } from './investigationErrors';
+import {
+  assertMissionTurnCompletion,
+  enforceMissionTurnReadiness,
+  enforceMissionTurnCompletion,
+  isAllowedMissionCompletionStatus,
+  MissionCompletionError,
+  reportStatusForbidsCompleted,
+} from './missionCompletionContract';
 import type { InvestigationArtifactService } from './InvestigationArtifactService';
 
 const MISSIONS = ['debugger', 'analyzer', 'optimizer'] as const;

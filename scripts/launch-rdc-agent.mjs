@@ -393,17 +393,10 @@ function modeEnvironment(mode, rebuildSettingsOnly) {
     NODE_ENV: development ? 'development' : 'production',
     RDC_AGENT_HEADLESS: headless ? '1' : '0',
     RDC_AGENT_BROWSER_QA: headless ? '1' : '0',
-    RDC_AGENT_TEST_MODE: '0',
     RDC_AGENT_REBUILD_SETTINGS_ONLY: rebuildSettingsOnly ? '1' : '0',
   };
   delete env.ELECTRON_RENDERER_URL;
   if (env.RDC_AGENT_USER_DATA?.trim()) mkdirSync(path.resolve(env.RDC_AGENT_USER_DATA), { recursive: true });
-  const useDisposableBrowserHome = headless
-    && !env.RDC_AGENT_USER_DATA?.trim()
-    && env.RDC_AGENT_USE_CANONICAL_USERDATA !== '1';
-  if (useDisposableBrowserHome) {
-    delete env.RDC_AGENT_HOME;
-  }
   return env;
 }
 

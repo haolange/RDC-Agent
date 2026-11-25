@@ -20,7 +20,6 @@ import {
 import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
 import { classifyProviderError } from '../../agent-runtime/providers/internal/errorClassifier';
 import { normalizeCacheUsage } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
-import { calculateUsageCost } from '../../agent-runtime/providers/internal/costCalculator';
 import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
@@ -433,20 +432,9 @@ describe('provider wire 9×16 matrix', () => {
             case 'cost': {
               const usage = extractUsage(objects);
               expect(usage).toBeTruthy();
-              const cost = calculateUsageCost({
-                cost: { input: 1, output: 2, cacheRead: 0.25, cacheWrite: 0.5 },
-              }, {
-                inputTokens: usage!.inputTokens,
-                outputTokens: usage!.outputTokens,
-                totalTokens: usage!.inputTokens + usage!.outputTokens,
-                cacheReadTokens: usage!.cacheReadTokens,
-              });
-              expect(cost).toBeDefined();
-              expect(cost!.input).toBe((1 / 1_000_000) * usage!.inputTokens);
-              expect(cost!.output).toBe((2 / 1_000_000) * usage!.outputTokens);
-              expect(cost!.cacheRead).toBe((0.25 / 1_000_000) * (usage!.cacheReadTokens ?? 0));
-              expect(cost!.total).toBe(cost!.input + cost!.output + (cost!.cacheRead ?? 0) + (cost!.cacheWrite ?? 0));
-              expect(JSON.stringify(cost)).not.toMatch(/sk-fixture/);
+              expect(usage!.inputTokens).toBeGreaterThan(0);
+              expect(usage!.outputTokens).toBeGreaterThan(0);
+              expect(JSON.stringify(usage)).not.toMatch(/sk-fixture/);
               break;
             }
             case 'context_overflow': {

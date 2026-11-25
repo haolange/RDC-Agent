@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import { __testing as anthropicTesting } from './AnthropicProvider';
-import { __testing as geminiTesting } from './GeminiProvider';
-import { __testing as ollamaTesting } from './OllamaProvider';
-import { __testing as openAICompatibleTesting } from './OpenAICompatibleProvider';
-import { __testing as openAIResponsesTesting } from './OpenAIResponsesProvider';
+import * as anthropicTesting from './AnthropicProvider';
+import * as geminiTesting from './GeminiProvider';
+import * as ollamaTesting from './OllamaProvider';
+import * as openAICompatibleTesting from './OpenAICompatibleProvider';
+import * as openAIResponsesTesting from './OpenAIResponsesProvider';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type {
   ProviderContractBundle,

@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { createInvestigationHarness, SESSION_ID } from '../investigation/investigationTestFixtures';
+import { createInvestigationHarness, SESSION_ID } from '../testing/investigationTestFixtures';
 import { RdcLifecycleReceipts, type RdcLifecycleReceipt } from './RdcLifecycleReceipts';
 
 it('persists a main-signed lifecycle intent and rejects altered or foreign receipts', () => {

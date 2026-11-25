@@ -429,4 +429,4 @@ function mapFinishReason(reason: string | null | undefined): StopReason {
   }
 }
 
-export const __testing = { buildMistralChatCompletionsUrl, mapFinishReason, toMistralMessages };
+export { mapFinishReason, toMistralMessages };

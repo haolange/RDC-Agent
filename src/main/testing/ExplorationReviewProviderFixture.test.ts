@@ -15,7 +15,7 @@ import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactRe
 import { artifactizeToolResult } from '../agent-runtime/tools/ToolResultArtifactizer';
 import { artifactReadTool } from '../agent-runtime/tools/primitives/ArtifactReadTool';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
-import { createInvestigationHarness, writeDraft, baselineWorld, hypothesisClaim, sampleChallenge, sampleCheckpoint, SESSION_ID } from '../investigation/investigationTestFixtures';
+import { createInvestigationHarness, writeDraft, baselineWorld, hypothesisClaim, sampleChallenge, sampleCheckpoint, SESSION_ID } from './investigationTestFixtures';
 import { createTestRequestPlan } from './createTestRequestPlan';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';

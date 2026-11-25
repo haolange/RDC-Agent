@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { baselineWorld, createInvestigationHarness, sampleCheckpoint, writeDraft } from './investigationTestFixtures';
+import { baselineWorld, createInvestigationHarness, sampleCheckpoint, writeDraft } from '../testing/investigationTestFixtures';
 import { enforceMissionTurnCompletion } from './missionCompletionContract';
 
 it('requires current budget evidence and the exact Mission checkpoint for a General budget pause', () => {

@@ -4,23 +4,26 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
 import { HookEngine } from '../hooks/HookEngine';
+import { isolateHome } from '../testing/isolatedHome';
 import { ScopedRuntimeService } from './ScopedRuntimeService';
 import { appPathService } from './AppPathService';
 
 let home = '';
 let userData = '';
+let restoreHome: () => void = () => undefined;
 const service = new ScopedRuntimeService();
 
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-home-'));
+  home = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-home-')), '.rdc-agent');
+  fs.mkdirSync(home);
   userData = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-data-'));
-  process.env.RDC_AGENT_HOME = home;
+  restoreHome = isolateHome(path.dirname(home));
   process.env.RDC_AGENT_USER_DATA = userData;
 });
 afterEach(() => {
   vi.restoreAllMocks();
-  fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(userData, { recursive: true, force: true });
-  delete process.env.RDC_AGENT_HOME; delete process.env.RDC_AGENT_USER_DATA;
+  fs.rmSync(path.dirname(home), { recursive: true, force: true }); fs.rmSync(userData, { recursive: true, force: true });
+  restoreHome(); delete process.env.RDC_AGENT_USER_DATA;
 });
 
 describe('ScopedRuntimeService', () => {

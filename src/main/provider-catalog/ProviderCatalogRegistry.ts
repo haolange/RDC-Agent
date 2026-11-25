@@ -297,16 +297,3 @@ export function createProviderEntryFromCatalog(id: string): LlmProviderEntry {
 export function createProviderEntriesFromCatalog(): LlmProviderEntry[] {
   return listProviderSummaries().map((surface) => createProviderEntryFromCatalog(surface.id));
 }
-
-export const __testing = {
-  getLoadedSurfaceIds() {
-    return [...loadedSurfaces.keys()].sort();
-  },
-  getPendingSurfaceIds() {
-    return [...surfaceLoads.keys()].sort();
-  },
-  reset() {
-    loadedSurfaces.clear();
-    surfaceLoads.clear();
-  },
-};

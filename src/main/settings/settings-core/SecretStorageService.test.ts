@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isolateHome } from '../../testing/isolatedHome';
 
 const electronMock = vi.hoisted(() => ({
   userDataRoot: '',
@@ -28,14 +29,13 @@ vi.mock('electron', () => ({
 describe('SecretStorageService fail-closed', () => {
   let root = '';
   let previousUserData: string | undefined;
-  let previousHome: string | undefined;
+  let restoreHome: () => void = () => undefined;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-secrets-'));
     previousUserData = process.env.RDC_AGENT_USER_DATA;
-    previousHome = process.env.RDC_AGENT_HOME;
     process.env.RDC_AGENT_USER_DATA = path.join(root, 'app-data');
-    process.env.RDC_AGENT_HOME = path.join(root, '.rdc-agent');
+    restoreHome = isolateHome(root);
     electronMock.userDataRoot = process.env.RDC_AGENT_USER_DATA;
     electronMock.encryptionAvailable = true;
     fs.mkdirSync(process.env.RDC_AGENT_USER_DATA, { recursive: true });
@@ -46,8 +46,7 @@ describe('SecretStorageService fail-closed', () => {
     vi.restoreAllMocks();
     if (previousUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
     else process.env.RDC_AGENT_USER_DATA = previousUserData;
-    if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
-    else process.env.RDC_AGENT_HOME = previousHome;
+    restoreHome();
     fs.rmSync(root, { recursive: true, force: true });
   });
 

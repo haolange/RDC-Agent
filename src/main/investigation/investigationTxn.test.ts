@@ -2,8 +2,6 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
-import { InvestigationError } from './investigationErrors';
-import { sha256Prefixed } from './investigationHash';
 import {
   SESSION_B_ID,
   SESSION_ID,
@@ -15,7 +13,9 @@ import {
   reopenInvestigationHarness,
   seedNote,
   writeDraft,
-} from './investigationTestFixtures';
+} from '../testing/investigationTestFixtures';
+import { InvestigationError } from './investigationErrors';
+import { sha256Prefixed } from './investigationHash';
 import {
   INVESTIGATION_PERSIST_BOUNDARIES,
   INVESTIGATION_TXN_COMMIT,

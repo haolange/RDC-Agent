@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIFACT_READ_MAX_OUTPUT_BYTES } from '@shared/types/sessionArtifact';
-import { baselineWorld, createInvestigationHarness, SESSION_ID, writeDraft } from './investigationTestFixtures';
+import { baselineWorld, createInvestigationHarness, SESSION_ID, writeDraft } from '../testing/investigationTestFixtures';
 
 function withHarness(run: (harness: ReturnType<typeof createInvestigationHarness>) => void) {
   const harness = createInvestigationHarness('rdc-inv-pagination-');

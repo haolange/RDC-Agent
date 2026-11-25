@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { isAdmittedDiscoveredModel } from '../../provider-catalog/DiscoveryAdmission';
 import { NOUS_INFERENCE_BASE_URL, NOUS_OAUTH_CLIENT_ID, NOUS_OAUTH_SCOPE, NOUS_PORTAL_BASE_URL } from './oauthConstants';
-import { createFormBody, fetchJson, fetchOAuthJson, isTestMode, readString, wait } from './oauthHttp';
+import { createFormBody, fetchJson, fetchOAuthJson, readString, wait } from './oauthHttp';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
 
@@ -52,11 +52,9 @@ async function pollNousDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> 
     throw new Error('Nous Portal device authorization is missing client, device code, or token endpoint.');
   }
   let intervalSeconds = flow.intervalSeconds ?? 5;
-  let delayBeforePoll = !isTestMode();
   for (;;) {
     if (Date.now() > flow.expiresAt) throw new Error('Nous Portal authorization code expired.');
-    if (delayBeforePoll) await wait(intervalSeconds * 1000);
-    delayBeforePoll = true;
+    await wait(intervalSeconds * 1000);
     const payload = await fetchOAuthJson(flow.tokenEndpoint, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },

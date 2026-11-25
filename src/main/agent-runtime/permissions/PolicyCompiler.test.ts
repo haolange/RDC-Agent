@@ -2,6 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { isolateHome } from '../../testing/isolatedHome';
 import { compileFixturePolicy } from '../../testing/policyFixture';
 import { isToolDeniedByPolicy, resolvePolicyApprovalFloor, compileEffectivePolicy } from './PolicyCompiler';
 
@@ -13,11 +14,11 @@ describe('PolicyCompiler', () => {
   });
 
   it('takes the strictest explicit child depth across enabled policies', () => {
-    const previousHome = process.env.RDC_AGENT_HOME;
-    const userRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-depth-user-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-depth-user-'));
+    const userRoot = path.join(home, '.rdc-agent');
+    const restoreHome = isolateHome(home);
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-depth-project-'));
     try {
-      process.env.RDC_AGENT_HOME = userRoot;
       fs.mkdirSync(path.join(userRoot, 'policies'), { recursive: true });
       fs.mkdirSync(path.join(projectRoot, '.rdc-agent', 'policies'), { recursive: true });
       const userFile = path.join(userRoot, 'policies', 'user.policy.yml');
@@ -29,9 +30,8 @@ describe('PolicyCompiler', () => {
       fs.writeFileSync(projectFile, 'limits:\n  maxChildDepth: 3\n');
       expect(compileEffectivePolicy(projectRoot).maxChildDepth).toBe(2);
     } finally {
-      if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
-      else process.env.RDC_AGENT_HOME = previousHome;
-      fs.rmSync(userRoot, { recursive: true, force: true });
+      restoreHome();
+      fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(projectRoot, { recursive: true, force: true });
     }
   });
@@ -61,11 +61,11 @@ describe('PolicyCompiler', () => {
       limits: { contextCompactionPercent: 70 },
     }).contextCompactionPercent).toBe(70);
 
-    const previousHome = process.env.RDC_AGENT_HOME;
-    const userRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-user-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-user-'));
+    const userRoot = path.join(home, '.rdc-agent');
+    const restoreHome = isolateHome(home);
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-project-'));
     try {
-      process.env.RDC_AGENT_HOME = userRoot;
       fs.mkdirSync(path.join(userRoot, 'policies'), { recursive: true });
       fs.writeFileSync(
         path.join(userRoot, 'policies', 'user.policy.yml'),
@@ -87,27 +87,24 @@ describe('PolicyCompiler', () => {
       );
       expect(() => compileEffectivePolicy(projectRoot)).toThrow(/cannot raise contextCompactionPercent/);
     } finally {
-      if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
-      else process.env.RDC_AGENT_HOME = previousHome;
-      fs.rmSync(userRoot, { recursive: true, force: true });
+      restoreHome();
+      fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(projectRoot, { recursive: true, force: true });
     }
   });
 
 
   it('filters disabled policies before restrictive merge', () => {
-    const previousHome = process.env.RDC_AGENT_HOME;
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-'));
+    const restoreHome = isolateHome(root);
     try {
-      process.env.RDC_AGENT_HOME = root;
-      const policies = path.join(root, 'policies');
+      const policies = path.join(root, '.rdc-agent', 'policies');
       fs.mkdirSync(policies, { recursive: true });
       fs.writeFileSync(path.join(policies, '01-disabled.policy.yml'), 'enabled: false\nlimits:\n  maxTurns: 0\n', 'utf8');
       fs.writeFileSync(path.join(policies, '02-active.policy.yml'), 'limits:\n  maxTurns: 7\n', 'utf8');
       expect(compileEffectivePolicy(null).maxTurns).toBe(7);
     } finally {
-      if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
-      else process.env.RDC_AGENT_HOME = previousHome;
+      restoreHome();
       fs.rmSync(root, { recursive: true, force: true });
     }
   });

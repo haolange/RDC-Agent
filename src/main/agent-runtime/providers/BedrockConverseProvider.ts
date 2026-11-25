@@ -520,7 +520,7 @@ function mapBedrockStopReason(reason: string | undefined): StopReason {
   }
 }
 
-export const __testing = { mapBedrockStopReason, toBedrockMessages };
+export { mapBedrockStopReason, toBedrockMessages };
 
 /**
  * The ConverseStream operation URL: a configured base is the model's endpoint prefix; without one the

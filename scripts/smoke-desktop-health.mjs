@@ -141,11 +141,11 @@ async function main() {
       cwd: unpacked,
       env: {
         ...process.env,
-        RDC_AGENT_HOME: path.join(root, '.rdc-agent'),
+        HOME: root,
+        USERPROFILE: root,
         RDC_AGENT_USER_DATA: path.join(root, 'app-data'),
         RDC_AGENT_HEADLESS: '0',
         RDC_AGENT_BROWSER_QA: '0',
-        RDC_AGENT_TEST_MODE: '0',
         NODE_ENV: 'production',
       },
       windowsHide: true,

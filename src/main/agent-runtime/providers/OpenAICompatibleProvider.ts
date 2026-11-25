@@ -540,4 +540,4 @@ function mapFinishReason(reason: string | null | undefined): StopReason {
   }
 }
 
-export const __testing = { buildChatCompletionsUrl, mapFinishReason, toOpenAIMessages };
+export { mapFinishReason, toOpenAIMessages };

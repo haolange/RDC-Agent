@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { EventStream } from '../core/EventStream';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
-import { __testing as responses } from '../providers/OpenAIResponsesProvider';
+import * as responses from '../providers/OpenAIResponsesProvider';
 import { promptCacheHeaders } from '../providers/promptCacheWire';
 import { agentLoop, type AgentContext } from './AgentLoop';
 import type { AssistantMessage, AssistantMessageEvent, Context, Model, ToolResultMessage } from '../core/types';

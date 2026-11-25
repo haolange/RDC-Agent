@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { baselineWorld, createInvestigationHarness, writeDraft } from '../../investigation/investigationTestFixtures';
+import { baselineWorld, createInvestigationHarness, writeDraft } from '../../testing/investigationTestFixtures';
 import { verifyTaskReviewArtifact } from './TaskReviewArtifact';
 
 it('accepts the current content and rejects a superseded investigation record without altering it', () => {

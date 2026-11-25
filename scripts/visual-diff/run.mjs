@@ -78,7 +78,6 @@ async function startQaInstance(workDir) {
   // recording never reads or writes the machine's ~/.rdc-agent.
   const env = { ...process.env, RDC_AGENT_BROWSER_QA_FULL_ACCESS: '1' };
   delete env.RDC_AGENT_USER_DATA;
-  delete env.RDC_AGENT_HOME;
   const xvfb = process.platform === 'linux' && !process.env.DISPLAY;
   const child = spawn(xvfb ? 'xvfb-run' : process.execPath,
     xvfb ? ['-a', process.execPath, 'scripts/launch-rdc-agent.mjs', '--mode', 'browser'] : ['scripts/launch-rdc-agent.mjs', '--mode', 'browser'],

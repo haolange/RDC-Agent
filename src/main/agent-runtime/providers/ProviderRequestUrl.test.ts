@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { __testing as openAiWire } from './OpenAICompatibleProvider';
+import * as openAiWire from './OpenAICompatibleProvider';
 import { buildGeminiStreamUrl } from './GeminiProvider';
 import { buildGoogleInteractionsUrl } from './GoogleInteractionsProvider';
 import { buildAnthropicMessagesUrl } from './AnthropicProvider';

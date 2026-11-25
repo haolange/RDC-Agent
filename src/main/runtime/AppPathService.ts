@@ -74,8 +74,18 @@ export class AppPathService {
     return resolveCanonicalUserDataPath(process.env.RDC_AGENT_USER_DATA, appDataRoot);
   }
 
+  private isolatedUserRdcRoot: string | null = null;
+
+  /**
+   * The disposable Browser QA instance keeps its user resources inside its own temporary userData, so it never reads
+   * or writes the machine's ~/.rdc-agent. Set once at startup, before anything reads a path.
+   */
+  isolateUserRdcRoot(root: string): void {
+    this.isolatedUserRdcRoot = normalizePath(root);
+  }
+
   getUserRdcRoot(): string {
-    return normalizePath(process.env.RDC_AGENT_HOME?.trim() || path.join(os.homedir(), '.rdc-agent'));
+    return this.isolatedUserRdcRoot ?? normalizePath(path.join(os.homedir(), '.rdc-agent'));
   }
 
   /**

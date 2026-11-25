@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isolateHome } from '../../testing/isolatedHome';
 
 const electronMock = vi.hoisted(() => ({ userDataRoot: '', appRoot: '' }));
 vi.mock('electron', () => ({
@@ -13,14 +14,15 @@ vi.mock('electron', () => ({
 
 describe('AgentRuntimeConfigService scoped resources', () => {
   let root = '';
-  let previousHome: string | undefined;
+  let restoreHome: () => void = () => undefined;
+  let userRoot = '';
   let previousUserData: string | undefined;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-config-'));
-    previousHome = process.env.RDC_AGENT_HOME;
     previousUserData = process.env.RDC_AGENT_USER_DATA;
-    process.env.RDC_AGENT_HOME = path.join(root, 'user', '.rdc-agent');
+    restoreHome = isolateHome(path.join(root, 'user'));
+    userRoot = path.join(root, 'user', '.rdc-agent');
     process.env.RDC_AGENT_USER_DATA = path.join(root, 'app-data');
     electronMock.userDataRoot = process.env.RDC_AGENT_USER_DATA;
     electronMock.appRoot = process.cwd();
@@ -29,8 +31,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
-    else process.env.RDC_AGENT_HOME = previousHome;
+    restoreHome();
     if (previousUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
     else process.env.RDC_AGENT_USER_DATA = previousUserData;
     fs.rmSync(root, { recursive: true, force: true });
@@ -43,9 +44,9 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       fs.mkdirSync(directory, { recursive: true });
       fs.writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name} description\n---\nPrivate instructions`);
     };
-    writeSkill(process.env.RDC_AGENT_HOME!, 'debug', 'User Debug');
+    writeSkill(userRoot, 'debug', 'User Debug');
     writeSkill(path.join(project, '.rdc-agent'), 'debug', 'Project Debug');
-    writeSkill(process.env.RDC_AGENT_HOME!, 'user-only', 'User Only');
+    writeSkill(userRoot, 'user-only', 'User Only');
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
     const service = new AgentRuntimeConfigService();
     const projection = service.getSkillSelection(project);
@@ -125,7 +126,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     ['array frontmatter', '---\n- entry\n---\nBody', 'Body'],
     ['scalar frontmatter', '---\n42\n---\nBody', 'Body'],
   ])('preserves canonical parsing of %s without adding validation semantics', async (_label, content, instructions) => {
-    const directory = path.join(process.env.RDC_AGENT_HOME!, 'skills', 'parser-boundary');
+    const directory = path.join(userRoot, 'skills', 'parser-boundary');
     fs.mkdirSync(directory, { recursive: true });
     fs.writeFileSync(path.join(directory, 'SKILL.md'), content);
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
@@ -137,7 +138,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
   });
 
   it.each(['', 'null'])('preserves the canonical null access failure for matched YAML %j', async (yaml) => {
-    const directory = path.join(process.env.RDC_AGENT_HOME!, 'skills', 'parser-boundary');
+    const directory = path.join(userRoot, 'skills', 'parser-boundary');
     fs.mkdirSync(directory, { recursive: true });
     fs.writeFileSync(path.join(directory, 'SKILL.md'), `---\n${yaml}\n---\nBody`);
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
@@ -148,7 +149,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
   });
 
   it('does not invent enabled:false filtering unsupported by the canonical skill parser', async () => {
-    const directory = path.join(process.env.RDC_AGENT_HOME!, 'skills', 'debug');
+    const directory = path.join(userRoot, 'skills', 'debug');
     fs.mkdirSync(directory, { recursive: true });
     fs.writeFileSync(path.join(directory, 'SKILL.md'), '---\nname: User Debug\nenabled: false\n---\nUser body');
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
@@ -161,7 +162,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
   });
 
   it('rejects same-id project MCP executable overrides of user command/args/url/env', async () => {
-    const userMcp = path.join(process.env.RDC_AGENT_HOME!, 'mcp');
+    const userMcp = path.join(userRoot, 'mcp');
     const project = path.join(root, 'project');
     const projectMcp = path.join(project, '.rdc-agent', 'mcp');
     fs.mkdirSync(userMcp, { recursive: true });

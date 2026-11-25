@@ -692,4 +692,4 @@ function mergeAnthropicRequestHeaders(
   return merged;
 }
 
-export const __testing = { mapStopReason, mergeAnthropicRequestHeaders, toAnthropicMessages };
+export { mapStopReason, mergeAnthropicRequestHeaders, toAnthropicMessages };

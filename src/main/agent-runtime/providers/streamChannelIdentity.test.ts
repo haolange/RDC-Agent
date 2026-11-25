@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import { AzureOpenAIResponsesProvider, __testing as azureTesting } from './AzureOpenAIResponsesProvider';
+import { AzureOpenAIResponsesProvider } from './AzureOpenAIResponsesProvider';
+import * as azureTesting from './AzureOpenAIResponsesProvider';
 import { BedrockConverseProvider } from './BedrockConverseProvider';
 import { GeminiProvider } from './GeminiProvider';
 import { MistralProvider } from './MistralProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
-import { OpenAIResponsesProvider, __testing as openaiTesting } from './OpenAIResponsesProvider';
+import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
+import * as openaiTesting from './OpenAIResponsesProvider';
 import type { AssistantMessage, Context, Model } from '../core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';

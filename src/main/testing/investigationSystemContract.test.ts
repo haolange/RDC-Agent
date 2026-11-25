@@ -23,6 +23,13 @@ import {
 } from '@shared/constants/canonicalSkills';
 import { InvestigationError } from '../investigation/investigationErrors';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
+import { INVESTIGATION_TXN_COMMIT, INVESTIGATION_TXN_DIR, INVESTIGATION_TXN_JOURNAL } from '../investigation/investigationTxn';
+import {
+  assertMissionTurnCompletion,
+  enforceMissionTurnCompletion,
+  isAllowedMissionCompletionStatus,
+  MissionCompletionError,
+} from '../investigation/missionCompletionContract';
 import {
   SESSION_ID,
   baselineWorld,
@@ -45,14 +52,7 @@ import {
   seedNote,
   writeDraft,
   writeReadyReport,
-} from '../investigation/investigationTestFixtures';
-import { INVESTIGATION_TXN_COMMIT, INVESTIGATION_TXN_DIR, INVESTIGATION_TXN_JOURNAL } from '../investigation/investigationTxn';
-import {
-  assertMissionTurnCompletion,
-  enforceMissionTurnCompletion,
-  isAllowedMissionCompletionStatus,
-  MissionCompletionError,
-} from '../investigation/missionCompletionContract';
+} from './investigationTestFixtures';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 

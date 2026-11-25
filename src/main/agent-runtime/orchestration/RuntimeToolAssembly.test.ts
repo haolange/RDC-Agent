@@ -44,7 +44,8 @@ import { assertMissionTurnCompletion, enforceMissionTurnReadiness, MissionComple
 import {
   SESSION_ID, baselineWorld, createInvestigationHarness, hypothesisClaim, projectClaim,
   sampleChallenge, sampleCheckpoint, writeDraft, writeReadyReport,
-} from '../../investigation/investigationTestFixtures';
+} from '../../testing/investigationTestFixtures';
+import { isolateHome } from '../../testing/isolatedHome';
 import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
 import { TurnHandle } from './TurnCoordinator';
 import { ToolExecutorFactory } from './ToolExecutorFactory';
@@ -106,8 +107,7 @@ describe('RuntimeToolAssembly', () => {
   });
   it.each(['debugger', 'analyzer', 'optimizer'] as const)('lets %s read its operation knowledge without execution or workspace edit rights', async (mission) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-planning-knowledge-'));
-    const previousHome = process.env.RDC_AGENT_HOME;
-    process.env.RDC_AGENT_HOME = root;
+    const restoreHome = isolateHome(path.join(root, 'home'));
     const reads = new Set<string>();
     const context = { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', successfulFileReads: reads };
     try {
@@ -135,8 +135,7 @@ describe('RuntimeToolAssembly', () => {
         }
       }
     } finally {
-      if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
-      else process.env.RDC_AGENT_HOME = previousHome;
+      restoreHome();
       await rm(root, { recursive: true, force: true });
     }
   });

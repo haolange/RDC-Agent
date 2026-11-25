@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import { OpenAIResponsesProvider, __testing } from './OpenAIResponsesProvider';
+import { OpenAIResponsesProvider, buildRequestBody, toResponsesInput } from './OpenAIResponsesProvider';
 import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from './internal/http';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import type { ReasoningControl } from '@shared/types/modelCapability';
@@ -131,7 +131,7 @@ describe('OpenAIResponsesProvider DeepSeek dialect', () => {
     const base = deepSeekPlan();
     const contracts = dialect === 'DeepSeekResponses' ? base.contracts : createFailClosedProviderContracts('OpenAIResponses');
     const requestPlan = { ...base, contracts, route: { ...base.route, contracts } };
-    const body = __testing.buildRequestBody(model, {
+    const body = buildRequestBody(model, {
       messages: [],
       tools: [{ name: 'artifact_read', description: 'Read a hash-bound artifact.', parameters }],
     }, { requestPlan });
@@ -237,7 +237,7 @@ describe('OpenAIResponsesProvider DeepSeek dialect', () => {
       }),
     ]);
 
-    const replay = __testing.toResponsesInput({
+    const replay = toResponsesInput({
       messages: [
         { role: 'user', content: 'Look it up.', timestamp: 1 },
         message,

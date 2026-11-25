@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { crc32, deflateSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { convertAgentMessagesToLlm } from '../../agent/ContextManager';
-import { __testing as responses } from '../../providers/OpenAIResponsesProvider';
+import * as responses from '../../providers/OpenAIResponsesProvider';
 import { createTestRequestPlan } from '../../../testing/createTestRequestPlan';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 import { readImageTool } from './ReadImageTool';

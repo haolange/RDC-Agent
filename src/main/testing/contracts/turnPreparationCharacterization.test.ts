@@ -7,7 +7,8 @@ const roots = vi.hoisted(() => {
   const nodePath = require('node:path') as typeof import('node:path');
   const base = nodeFs.mkdtempSync(nodePath.join(require('node:os').tmpdir(), 'rdc-turn-char-'));
   process.env.RDC_AGENT_USER_DATA = nodePath.join(base, 'user-data');
-  process.env.RDC_AGENT_HOME = nodePath.join(base, 'home', '.rdc-agent');
+  const home = nodePath.join(base, 'home');
+  (require('node:os') as typeof import('node:os')).homedir = () => home;
   return { base, project: nodePath.join(base, 'project') };
 });
 const offer = vi.hoisted(() => ({ current: null as unknown }));

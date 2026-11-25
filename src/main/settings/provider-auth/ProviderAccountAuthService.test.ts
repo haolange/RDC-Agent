@@ -124,8 +124,8 @@ const httpGetText = (url: string): Promise<{ statusCode: number; body: string }>
 });
 
 describe('ProviderAccountAuthService Grok sign-in', () => {
-  beforeEach(() => {
-    process.env.RDC_AGENT_TEST_MODE = '1';
+  beforeEach(async () => {
+    vi.mocked((await import('electron')).shell.openExternal).mockClear();
     mocks.savedConnections.length = 0;
     mocks.disconnectedProviders.length = 0;
     mocks.disconnectedAuthModes.length = 0;
@@ -162,17 +162,15 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const service = new ProviderAccountAuthService();
     mockFetchJson(grokMetadata);
     process.env.RDC_AGENT_HEADLESS = '1';
-    delete process.env.RDC_AGENT_TEST_MODE;
     try {
       expect((await service.startLogin({ providerId: 'grok-account' })).state).toBe('pending');
       expect(shell.openExternal).not.toHaveBeenCalled();
-    } finally { service.dispose(); delete process.env.RDC_AGENT_HEADLESS; process.env.RDC_AGENT_TEST_MODE = '1'; }
+    } finally { service.dispose(); delete process.env.RDC_AGENT_HEADLESS; }
   });
 
   it('opens Grok in the system default browser and reports launch failures without leaving a callback', async () => {
     const { shell } = await import('electron');
     const service = new ProviderAccountAuthService();
-    delete process.env.RDC_AGENT_TEST_MODE;
     mockFetchJson(grokMetadata);
     try {
       const status = await service.startLogin({ providerId: 'grok-account' });
@@ -186,7 +184,7 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
       expect(failed.error).toContain('Default browser launch failed');
       const flows = (service as unknown as { pendingFlows: Map<string, { abortController: AbortController; server?: http.Server }> }).pendingFlows;
       expect([...flows.values()][0].abortController.signal.aborted).toBe(true);
-    } finally { service.dispose(); process.env.RDC_AGENT_TEST_MODE = '1'; }
+    } finally { service.dispose(); }
   });
 
   it('does not let a replaced login startup failure mark the new attempt failed', async () => {
@@ -579,7 +577,7 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
         verification_uri: 'https://portal.nousresearch.com/activate',
         verification_uri_complete: 'https://portal.nousresearch.com/activate?code=NOUS-CODE',
         expires_in: 600,
-        interval: 1,
+        interval: 0,
       },
       {
         access_token: 'nous-access-1',

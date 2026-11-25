@@ -14,7 +14,6 @@ describe('AppPathService', () => {
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-app-path-'));
     electronMock.root = root;
-    delete process.env.RDC_AGENT_HOME;
     delete process.env.RDC_AGENT_USER_DATA;
   });
 

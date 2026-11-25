@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RdcExecutionReceipts, rdcDigest } from '../rdc/RdcExecutionReceipts';
-import { createInvestigationHarness, recordedExperiment, SESSION_ID } from './investigationTestFixtures';
-import { seedExecutionEvidence } from './investigationExecutionFixtures';
+import { createInvestigationHarness, recordedExperiment, SESSION_ID } from '../testing/investigationTestFixtures';
+import { seedExecutionEvidence } from '../testing/investigationExecutionFixtures';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 
 function harness() {

@@ -13,7 +13,7 @@
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -145,13 +145,20 @@ async function assertQaSurface(baseUrl, qaUrl) {
   return true;
 }
 
-async function waitForBridgeFromChild(userDataPath) {
+/**
+ * Starts a disposable Browser QA instance: no RDC_AGENT_USER_DATA, so the launcher creates a temporary userData and
+ * the main process keeps the user resource root inside it. The machine's real userData and ~/.rdc-agent stay untouched.
+ */
+async function waitForBridgeFromChild() {
+  const env = { ...process.env };
+  delete env.RDC_AGENT_USER_DATA;
+  delete env.RDC_AGENT_USE_CANONICAL_USERDATA;
   const child = spawn(
     process.execPath,
     [path.join(repoRoot, 'scripts/launch-rdc-agent.mjs'), '--mode', 'browser'],
     {
       cwd: repoRoot,
-      env: { ...process.env, RDC_AGENT_USER_DATA: userDataPath, RDC_AGENT_HOME: path.join(userDataPath, '.rdc-agent') },
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       // On POSIX the launcher leads its own process group, so stopping it also reaps Electron.
       detached: process.platform !== 'win32',
@@ -159,6 +166,7 @@ async function waitForBridgeFromChild(userDataPath) {
   );
 
   let qaUrl = null;
+  let identity = null;
   const deadline = Date.now() + TIMEOUT_MS;
 
   const onLine = (line) => {
@@ -166,6 +174,8 @@ async function waitForBridgeFromChild(userDataPath) {
     if (match) {
       qaUrl = match[1];
     }
+    const startup = /Startup identity: (\{.*\})/.exec(line);
+    if (startup) identity = JSON.parse(startup[1]);
   };
 
   for (const stream of [child.stdout, child.stderr]) {
@@ -176,19 +186,19 @@ async function waitForBridgeFromChild(userDataPath) {
     });
   }
 
-  while (!qaUrl && Date.now() < deadline) {
+  while (!(qaUrl && identity) && Date.now() < deadline) {
     if (child.exitCode != null) {
       fail(`start:agent-browser exited early with code ${child.exitCode}`);
-      return { child, qaUrl: null };
+      return { child, qaUrl: null, identity };
     }
     await new Promise((r) => setTimeout(r, 250));
   }
 
-  if (!qaUrl) {
-    fail(`Timed out waiting for BrowserAppBridge bootstrap /qa log (${TIMEOUT_MS}ms)`);
-    return { child, qaUrl: null };
+  if (!qaUrl || !identity) {
+    fail(`Timed out waiting for BrowserAppBridge bootstrap /qa and startup identity logs (${TIMEOUT_MS}ms)`);
+    return { child, qaUrl: null, identity };
   }
-  return { child, qaUrl };
+  return { child, qaUrl, identity };
 }
 
 async function stopChildTree(child) {
@@ -228,10 +238,11 @@ async function stopChildTree(child) {
   if (groupAlive()) signalGroup('SIGKILL');
 }
 
+/** A killed instance cannot remove its own disposable userData; only that launcher-created directory is removed. */
 async function removeSmokeUserData(smokeUserData) {
   const resolvedTempRoot = path.resolve(tmpdir());
   const resolvedSmokeRoot = path.resolve(smokeUserData);
-  const safePrefix = `${resolvedTempRoot}${path.sep}rdc-agent-browser-smoke-`;
+  const safePrefix = `${resolvedTempRoot}${path.sep}rdc-agent${path.sep}qa-`;
   if (!resolvedSmokeRoot.startsWith(safePrefix)) {
     fail(`Refusing to clean unexpected smoke userData path: ${resolvedSmokeRoot}`);
     return;
@@ -258,23 +269,28 @@ async function main() {
 
   try {
     if (START) {
-      smokeUserData = mkdtempSync(path.join(tmpdir(), 'rdc-agent-browser-smoke-'));
-      const started = await waitForBridgeFromChild(smokeUserData);
+      const started = await waitForBridgeFromChild();
       child = started.child;
       if (!started.qaUrl) return;
       qaUrl = started.qaUrl;
       baseUrl = new URL(qaUrl).origin;
+      smokeUserData = started.identity.userData;
       const lockPath = path.join(smokeUserData, 'instance.lock');
       if (!existsSync(lockPath)) {
-        fail(`Explicit smoke userData was not activated: ${lockPath}`);
+        fail(`Disposable userData was not activated: ${lockPath}`);
         return;
       }
       const lockOwner = JSON.parse(readFileSync(lockPath, 'utf8'));
       if (lockOwner?.mode !== 'browser') {
-        fail(`Explicit smoke userData lock has unexpected owner mode: ${String(lockOwner?.mode)}`);
+        fail(`Disposable userData lock has unexpected owner mode: ${String(lockOwner?.mode)}`);
         return;
       }
-      ok('Explicit disposable RDC_AGENT_USER_DATA → active browser instance.lock');
+      const userResources = path.resolve(started.identity.userResources ?? '');
+      if (!userResources.startsWith(`${path.resolve(smokeUserData)}${path.sep}`)) {
+        fail(`User resources escaped the disposable userData: ${userResources}`);
+        return;
+      }
+      ok('Disposable Browser QA → own userData, user resources inside it, active browser instance.lock');
     } else {
       try {
         const probe = await fetch(qaUrl, { redirect: 'manual' });

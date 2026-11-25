@@ -31,14 +31,14 @@ import {
   applyOpenAiCompatibleReasoning,
   buildOpenAiResponsesReasoning,
 } from '../../agent-runtime/providers/reasoningWire';
-import { __testing as openAICompatibleTesting } from '../../agent-runtime/providers/OpenAICompatibleProvider';
-import { __testing as openAIResponsesTesting } from '../../agent-runtime/providers/OpenAIResponsesProvider';
-import { __testing as anthropicTesting } from '../../agent-runtime/providers/AnthropicProvider';
-import { __testing as geminiTesting } from '../../agent-runtime/providers/GeminiProvider';
-import { __testing as ollamaTesting } from '../../agent-runtime/providers/OllamaProvider';
-import { __testing as azureTesting } from '../../agent-runtime/providers/AzureOpenAIResponsesProvider';
-import { __testing as mistralTesting } from '../../agent-runtime/providers/MistralProvider';
-import { __testing as bedrockTesting } from '../../agent-runtime/providers/BedrockConverseProvider';
+import * as openAICompatibleTesting from '../../agent-runtime/providers/OpenAICompatibleProvider';
+import * as openAIResponsesTesting from '../../agent-runtime/providers/OpenAIResponsesProvider';
+import * as anthropicTesting from '../../agent-runtime/providers/AnthropicProvider';
+import * as geminiTesting from '../../agent-runtime/providers/GeminiProvider';
+import * as ollamaTesting from '../../agent-runtime/providers/OllamaProvider';
+import * as azureTesting from '../../agent-runtime/providers/AzureOpenAIResponsesProvider';
+import * as mistralTesting from '../../agent-runtime/providers/MistralProvider';
+import * as bedrockTesting from '../../agent-runtime/providers/BedrockConverseProvider';
 import { buildGoogleInteractionsRequest } from '../../agent-runtime/providers/GoogleInteractionsWire';
 import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import type { Context, Model } from '../../agent-runtime/core/types';

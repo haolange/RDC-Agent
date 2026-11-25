@@ -443,4 +443,4 @@ function mapFinishReason(reason: string | null | undefined, hadToolCall: boolean
   }
 }
 
-export const __testing = { mapFinishReason, toGeminiContents };
+export { mapFinishReason, toGeminiContents };

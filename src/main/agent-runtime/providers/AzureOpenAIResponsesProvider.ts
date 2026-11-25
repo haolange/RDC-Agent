@@ -129,8 +129,4 @@ export function buildAzureResponsesUrl(baseUrl: string, apiVersion: string): str
   return url.toString();
 }
 
-export const __testing = {
-  buildAzureResponsesUrl,
-  buildRequestBody: buildResponsesRequestBody,
-  toResponsesInput,
-};
+export { buildResponsesRequestBody as buildRequestBody, toResponsesInput };

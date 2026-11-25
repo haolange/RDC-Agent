@@ -2,8 +2,7 @@ import { createHash, randomBytes } from 'crypto';
 import { REQUEST_TIMEOUT_MS } from './oauthConstants';
 import type { LlmProviderAccountDiagnostic } from '@shared/types/settings';
 
-export const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
-export const shouldOpenSystemBrowser = (): boolean => !isTestMode() && process.env.RDC_AGENT_HEADLESS !== '1';
+export const shouldOpenSystemBrowser = (): boolean => process.env.RDC_AGENT_HEADLESS !== '1';
 
 export const base64Url = (buffer: Buffer): string =>
   buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

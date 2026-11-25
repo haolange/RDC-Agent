@@ -7,7 +7,7 @@ import { rdcInstallationFiles } from '../platform/rdcLayout';
 import { isolatedRdcTools } from '../testing/isolatedRdcTools';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { assertExecutionEvidence } from '../investigation/investigationExecutionEvidence';
-import { recordedExperiment } from '../investigation/investigationTestFixtures';
+import { recordedExperiment } from '../testing/investigationTestFixtures';
 import { RdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';

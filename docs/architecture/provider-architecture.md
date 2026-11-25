@@ -211,20 +211,9 @@ Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入
 - **Azure OpenAI Responses**（`AzureOpenAIResponsesProvider.ts`）：只保留 Azure URL（`api-version`）和 `api-key` 鉴权。Responses 请求体与 SSE 事件循环在 `providers/internal/responsesShared.ts`，与 OpenAI Responses 共用。
 - **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记，流式帧走共享 `parseSSE` / `StreamChannelRefs`。
 
-## 成本计算（Cost Calculation）
+## 成本（Cost）
 
-`Usage.cost` 由 `src/main/agent-runtime/providers/internal/costCalculator.ts` 的 `calculateUsageCost()` 在流结束时计算。定价来源为 `Model.cost`（manifest / models.json 声明的每百万 token 美元价格）：
-
-```text
-cost.input  = (model.cost.input  / 1M) × usage.inputTokens
-cost.output = (model.cost.output / 1M) × usage.outputTokens
-cost.cacheRead  = (model.cost.cacheRead / 1M) × cacheReadTokens
-cost.cacheWrite = (model.cost.cacheWrite / 1M) × shortWrite
-               + (model.cost.input × 2 / 1M) × longWrite   // Anthropic 1h TTL = 2× input
-cost.total  = input + output + cacheRead + cacheWrite
-```
-
-无定价信息时返回 `undefined`，UI 不显示成本字段。
+应用不按价格表估算费用。`Usage.cost` 只在 provider 的流里自带计费时出现：`normalizeCacheUsage` 保留它，`AssistantStreamBuilder` 原样透传；没有时为 `undefined`，UI 不显示成本字段。`Model.cost`（manifest / models.json 声明的每百万 token 价格）是目录事实，不参与运行时计算。
 
 ## 统一错误模型（Error Model）
 

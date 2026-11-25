@@ -5,8 +5,6 @@ import { formatInvestigationContentHash, type ClaimRecord } from '@shared/types/
 import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
 import { toolToDefinition } from '../agent-runtime/agent/AgentTool';
 import { toolValidator } from '../agent-runtime/core/ToolValidator';
-import { InvestigationError } from './investigationErrors';
-import { serializeInvestigationJson } from './investigationHash';
 import {
   SESSION_ID,
   baselineWorld,
@@ -27,7 +25,9 @@ import {
   seedNote,
   writeDraft,
   writeReadyReport,
-} from './investigationTestFixtures';
+} from '../testing/investigationTestFixtures';
+import { InvestigationError } from './investigationErrors';
+import { serializeInvestigationJson } from './investigationHash';
 import { createInvestigationTools } from './InvestigationTools';
 
 function indexPath(sessionPath: string): string {
