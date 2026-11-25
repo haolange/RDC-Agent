@@ -201,7 +201,7 @@ Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoo
 
 独立 Challenge 的目标引用与制品来源是两种关系：`record.targetRef` 指向被审查论断，`investigation_write.sourceRefs` 以已授权 Investigation `artifactId/expectedHash` 证明来源。`ready` 要求后者非空；`record.status=open` 不妨碍合格审查制品为 ready。子级可在原授权内容范围内读取 manifest/hash 并引用，未读取的元数据不是外部输入缺口；缺授权或预算不足时保持 Partial，不放宽来源检查或重置旧审查预算。
 
-Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。`/model` 参数为 `[provider:model|modelId|default]`；`default` 跟随当前 Agent 配置，与 Composer 底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集。裸 `default` 先于模型 id 解析，真名叫 `default` 的模型用 canonical `provider:model`。
+Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。`/model` 参数为 `[provider:model|modelId|default]`；`default` 跟随当前 Agent 配置，与 Composer 底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集。裸 `default` 先于模型 id 解析，真名叫 `default` 的模型用 canonical `provider:model`。`/permissions` 读 runtime 当前强制的档位（`RuntimePermissionStateService`），带参数时经 Composer 同一条档位切换路径。`/mcp` 列出当前项目已配置的 server 与连接池里的实时状态；连接归 runtime 的项目连接池按回合租用，命令不提供手动 connect / disconnect，`/mcp settings` 打开 MCP 设置。
 
 权限模式：`Default` / `Auto-review` / `Full access` / `Custom`；主进程权威。可读根、可写根和命令前缀只在 Custom 生效，并在 Settings 的 Custom 规则里保存，保存以主进程确认为准。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝（按平台分集）、公网出网（`web_*`、远程图片、favicon）只经 `fetchPublic`，SSRF fail-closed。agent `shell` 每次新进程，不提供 `run_in_background`。
 
