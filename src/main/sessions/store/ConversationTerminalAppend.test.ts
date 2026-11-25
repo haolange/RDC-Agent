@@ -87,10 +87,19 @@ describe('bounded terminal append transaction', () => {
     expect(fs.readFileSync(file('session-context.jsonl'), 'utf8')).toBe(wal.context.append);
   });
 
-  it('rejects mismatched terminal ownership and invalid newline prefixes', () => {
+  it('rejects mismatched terminal ownership', () => {
     const wal = prepare();
     expect(() => applyTerminalAppend(root, { ...wal, turnId: 'other' }, true)).toThrow(/ownership/);
+  });
+
+  it('journals a prefix that ends on a record boundary after an interrupted ordinary append', () => {
     fs.writeFileSync(file('session-context.jsonl'), '{"turnId":"old"}');
-    expect(prepare).toThrow(/newline-terminated/);
+    fs.writeFileSync(file('conversation.jsonl'), '{"id":"old"}\n{"id":"interrup');
+    const wal = prepare();
+    expect(fs.readFileSync(file('session-context.jsonl'), 'utf8')).toBe('{"turnId":"old"}\n');
+    expect(fs.readFileSync(file('conversation.jsonl'), 'utf8')).toBe('{"id":"old"}\n');
+    expect(fs.readdirSync(root).filter((name) => name.startsWith('conversation.jsonl.torn-'))).toHaveLength(1);
+    applyTerminalAppend(root, wal, true);
+    expect(fs.readFileSync(file('conversation.jsonl'), 'utf8')).toBe(`{"id":"old"}\n${wal.history.append}`);
   });
 });

@@ -24,6 +24,7 @@ import './rdc/registerConversationRdcHost';
 import { rdcCliInvokerService } from './rdc/RdcCliInvokerService';
 import { replayDeviceService } from './rdc/captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
+import { onJsonlTailRepair } from './runtime/jsonl';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import {
   shouldStartBrowserAppBridge,
@@ -473,6 +474,14 @@ app.whenReady().then(async () => {
   }
 
   await storageAdapter.initializeWorkspace();
+  onJsonlTailRepair((repair) => runtimeLogService.log({
+    scope: 'app',
+    namespace: 'system',
+    severity: 'warning',
+    title: 'Interrupted record set aside',
+    summary: `An incomplete final record (${repair.length} bytes) was moved out of ${repair.filePath}.`,
+    raw: { ...repair },
+  }));
   runtimeLogService.log({
     scope: 'app',
     namespace: 'system',

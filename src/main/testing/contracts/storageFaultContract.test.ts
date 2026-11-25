@@ -50,14 +50,14 @@ describe('storageFaultContract: corrupted JSONL', () => {
     expect(result.diagnostics).toEqual([]);
   });
 
-  it('reports a trailing truncated JSON line as integrity diagnostics', () => {
+  it('reports an interrupted final append as a torn tail and keeps the complete records readable', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-storage-trunc-'));
     const filePath = path.join(root, 'trunc.jsonl');
     fs.writeFileSync(filePath, '{"id":"ok"}\n{"id":', 'utf8');
     const result = readJsonl<{ id: string }>(filePath);
     expect(result.records.map((r) => r.id)).toEqual(['ok']);
-    expect(result.diagnostics).toHaveLength(1);
-    expect(result.diagnostics[0]?.line).toBe(2);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.tornTail).toEqual({ offset: 12, length: 6 });
   });
 });
 

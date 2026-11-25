@@ -64,6 +64,7 @@
 | RDC delegated lease 退出未确认 | Security + Integrity | 隔离 parent lease（`revokeDelegatedLease` 缺停止证明即 quarantine）；不得回退 parent 或并发第二 owner |
 | 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
+| JSONL 末尾残行（追加中断） | Integrity | 读取时作为 `tornTail` 返回，之前的完整记录照常可读，会话不因此打不开；下一次追加或回合终态提交前，残行字节原样移入同目录 `<file>.torn-<ts>`（fsync 后）再截断，并经运行日志报告 `JSONL_TORN_TAIL`；只缺换行的完整记录补换行保留 |
 | Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |

@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   appendJsonl,
   assertNoJsonlDiagnostics,
+  onJsonlTailRepair,
   readJsonl,
   writeJsonl,
+  type JsonlTailRepair,
 } from './jsonl';
 
 describe('jsonl fault handling', () => {
@@ -51,6 +53,34 @@ describe('jsonl fault handling', () => {
     const result = readJsonl<{ n: number }>(filePath);
     expect(result.diagnostics).toEqual([]);
     expect(result.records.map((entry) => entry.n)).toEqual([1, 2, 3]);
+  });
+
+  it('sets an interrupted append aside byte for byte before the next record and reports the repair', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
+    const filePath = path.join(root, 'torn.jsonl');
+    fs.writeFileSync(filePath, '{"n":1}\n{"n":2,"text":"interru', 'utf8');
+    const repairs: JsonlTailRepair[] = [];
+    const unsubscribe = onJsonlTailRepair((repair) => repairs.push(repair));
+    try {
+      appendJsonl(filePath, { n: 3 });
+    } finally {
+      unsubscribe();
+    }
+
+    expect(readJsonl<{ n: number }>(filePath)).toEqual({ records: [{ n: 1 }, { n: 3 }], diagnostics: [] });
+    expect(repairs).toHaveLength(1);
+    expect(repairs[0]).toMatchObject({ code: 'JSONL_TORN_TAIL', filePath, length: 22 });
+    expect(fs.readFileSync(repairs[0]!.quarantinePath, 'utf8')).toBe('{"n":2,"text":"interru');
+  });
+
+  it('keeps a complete last record that only lacks its newline', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
+    const filePath = path.join(root, 'unterminated.jsonl');
+    fs.writeFileSync(filePath, '{"n":1}\n{"n":2}', 'utf8');
+    expect(readJsonl<{ n: number }>(filePath).records.map((entry) => entry.n)).toEqual([1, 2]);
+    appendJsonl(filePath, { n: 3 });
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('{"n":1}\n{"n":2}\n{"n":3}\n');
+    expect(fs.readdirSync(root)).toEqual(['unterminated.jsonl']);
   });
 
   it('throws from writeJsonl on failure instead of returning false', () => {

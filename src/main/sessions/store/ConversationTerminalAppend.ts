@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { ensureJsonlRecordBoundary } from '../../runtime/jsonl';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
 import type { ConversationTerminalAppendJournal, TerminalAppendFile } from './storageCommitTypes';
@@ -8,6 +9,8 @@ import type { ConversationTerminalAppendJournal, TerminalAppendFile } from './st
 const CHUNK_BYTES = 64 * 1024;
 
 function fingerprint(filePath: string, append: string): TerminalAppendFile {
+  // An interrupted ordinary append is quarantined first, so the journaled prefix ends on a record boundary.
+  ensureJsonlRecordBoundary(filePath);
   const existed = fs.existsSync(filePath);
   const hash = createHash('sha256');
   let bytes = 0;
