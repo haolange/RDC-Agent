@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useUiLabels } from '../../lib/useUiLabels';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import { useDismissable } from '../../lib/useDismissable';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import { usePresence } from '../usePresence';
 import {
@@ -108,6 +109,15 @@ export const Select: React.FC<SelectProps> = ({
   }, [menuAlign, minMenuWidth]);
 
   const closeMenu = useCallback(() => setOpen(false), []);
+  useDismissable({
+    open,
+    layerId,
+    inside: () => [menuRef.current, triggerRef.current],
+    onDismiss: (reason) => {
+      closeMenu();
+      if (reason === 'escape') triggerRef.current?.focus();
+    },
+  });
 
   // A closing menu keeps its place while the exit plays; it is measured afresh after it unmounts.
   useLayoutEffect(() => {
@@ -125,25 +135,8 @@ export const Select: React.FC<SelectProps> = ({
       return;
     }
 
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) {
-        return;
-      }
-      closeMenu();
-    };
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopOverlayLayer(layerId)) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        closeMenu();
-        triggerRef.current?.focus();
-        return;
-      }
-
       if (event.key === 'Tab') {
         closeMenu();
         return;
@@ -176,12 +169,8 @@ export const Select: React.FC<SelectProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeIndex, closeMenu, commitSelection, layerId, open, options]);
 
   useEffect(() => {

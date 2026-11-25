@@ -19,10 +19,3 @@ export function reduceComposerMenu(
   }
   return current === action.id ? null : action.id;
 }
-
-export function isInsideComposerMenuRoot(
-  root: HTMLElement | null,
-  target: EventTarget | null,
-): boolean {
-  return Boolean(root && target instanceof Node && root.contains(target));
-}

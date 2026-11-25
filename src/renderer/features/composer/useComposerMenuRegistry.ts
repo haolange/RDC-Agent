@@ -7,9 +7,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useOverlayDismiss } from '../../lib/overlayStack';
+import { useOverlayLayer } from '../../lib/overlayStack';
+import { useDismissable } from '../../lib/useDismissable';
 import {
-  isInsideComposerMenuRoot,
   reduceComposerMenu,
   type ComposerMenuAction,
   type ComposerMenuId,
@@ -98,21 +98,15 @@ export function ComposerMenuRegistryProvider({ scope, children }: { scope: strin
     triggersRef.current.delete(id);
   }, []);
 
-  useEffect(() => {
-    if (!activeId || activeId === 'usage') return undefined;
-    const onPointerDown = (event: PointerEvent) => {
-      const current = activeIdRef.current;
-      if (!current || current === 'usage') return;
-      if (isInsideComposerMenuRoot(rootsRef.current.get(current) ?? null, event.target)) {
-        return;
-      }
-      close(current);
-    };
-    window.addEventListener('pointerdown', onPointerDown);
-    return () => window.removeEventListener('pointerdown', onPointerDown);
-  }, [activeId, close]);
-
-  useOverlayDismiss(activeId !== null && activeId !== 'usage', () => close(activeIdRef.current ?? undefined), 'layout');
+  // The usage sheet manages its own layer; every other menu closes on a press outside its root or on Escape.
+  const menuOpen = activeId !== null && activeId !== 'usage';
+  const { layerId } = useOverlayLayer(menuOpen, 'layout');
+  useDismissable({
+    open: menuOpen,
+    layerId,
+    inside: () => [activeIdRef.current ? rootsRef.current.get(activeIdRef.current) : null],
+    onDismiss: () => close(activeIdRef.current ?? undefined),
+  });
 
   const value = useMemo<ComposerMenuRegistryApi>(() => ({
     activeId,

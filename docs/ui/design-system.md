@@ -252,7 +252,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog.tsx`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
 
 - 结构固定 `title`（+可选 `description`）/ `body`（唯一滚动区）/ `footer`（右对齐动作，主要动作在最右）。尺寸档位 `sm 26rem` / `md 35rem` / `lg 47.5rem`，高度上限 `min(100dvh − 2 × --space-6, 60rem)`，`≤640px` 收紧内边距与高度上限。圆角 `--radius-sheet`，阴影 `--token-elevation-3`。
-- 层级 `--z-overlay`，背景 `--token-bg-overlay`，阴影 `--token-shadow-modal`。焦点经 `lib/useModalFocus` 捕获；每个弹层在 `lib/overlayStack` 注册，Escape 与 Tab trap **只**作用栈顶层，关闭后焦点回到触发控件。阅读面板和图片查看器在首帧可见前注册，键盘可在入场期间使用。
+- 层级 `--z-overlay`，背景 `--token-bg-overlay`，阴影 `--token-shadow-modal`。焦点经 `lib/useModalFocus` 捕获；每个弹层在 `lib/overlayStack` 注册，Escape 与 Tab trap **只**作用栈顶层，关闭后焦点回到触发控件。阅读面板和图片查看器在首帧可见前注册，键盘可在入场期间使用。锚定弹出面（`Popover` / `Menu`、`Select`、`ContextMenu`、Composer 菜单、侧栏改名浮层、用户菜单）的外部按下与 Escape 只经 `lib/useDismissable`：在捕获阶段由栈顶层处理，不再各写一套 document 监听。
 - `ConfirmationDialog` 是 TaskDialog 的 `alertdialog` 变体，承担删除等危险确认（`danger` 主按钮，默认焦点在取消）；`UnsavedChangesDialog` 承担手动保存表单的「继续编辑 / 放弃更改」。自动保存表单失败走自身重试语义，不套这个模板。
 - 禁止 feature 内再造第二套 overlay / backdrop / 焦点栈。
 

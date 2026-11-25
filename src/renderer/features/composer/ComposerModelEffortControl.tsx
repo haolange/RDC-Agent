@@ -5,7 +5,8 @@ import { Pill } from '../../ui/Pill';
 import { OverflowFade } from '../../ui/OverflowFade';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { useOverlayDismiss } from '../../lib/overlayStack';
+import { useOverlayLayer } from '../../lib/overlayStack';
+import { useDismissable } from '../../lib/useDismissable';
 import { Chevron } from '../../ui/Chevron';
 import { EFFORT_LABEL_KEYS } from '../../lib/reasoningLabels';
 import { useComposerMenu } from './useComposerMenuRegistry';
@@ -110,8 +111,17 @@ export const ComposerModelEffortControl: React.FC<{
     }
   }, [open, view]);
 
-  useOverlayDismiss(open && view === 'models', () => {
-    setView((current) => nextComposerModelEffortView(current, 'escape'));
+  // The model list is a layer over the effort panel: Escape steps back to the panel, a press outside closes the menu.
+  const modelsOpen = open && view === 'models';
+  const { layerId: modelsLayer } = useOverlayLayer(modelsOpen);
+  useDismissable({
+    open: modelsOpen,
+    layerId: modelsLayer,
+    inside: () => [menuRef.current],
+    onDismiss: (reason) => {
+      if (reason === 'outside') menu.close();
+      else setView((current) => nextComposerModelEffortView(current, 'escape'));
+    },
   });
 
   return (

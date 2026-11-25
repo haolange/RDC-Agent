@@ -66,23 +66,3 @@ export function useOverlayLayer(
 
   return { layerId, isTop };
 }
-
-/** Escape dismisses only the top overlay. Nested menus register later than their parent. */
-export function useOverlayDismiss(
-  open: boolean,
-  onDismiss: () => void,
-  timing: 'layout' | 'effect' = 'effect',
-): void {
-  const { isTop } = useOverlayLayer(open, timing);
-  useEffect(() => {
-    if (!open || !isTop) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      onDismiss();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isTop, onDismiss, open]);
-}

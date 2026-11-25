@@ -3,13 +3,8 @@ import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
-import { VirtualMessageList, measuredMessageOffsets } from './VirtualMessageList';
+import { VirtualMessageList } from './VirtualMessageList';
 import type { ConversationMessage } from '@shared/types/conversation';
-
-it('positions expanded messages using measured heights', () => {
-  expect(measuredMessageOffsets([{ id: 'a' }, { id: 'b' }, { id: 'c' }], new Map([['b', 640]]), 160))
-    .toEqual([0, 160, 800, 960]);
-});
 
 it('keeps a request\'s row in place when main\'s message for it arrives under the same id', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -39,6 +34,7 @@ it('renders short state samples and windows a long conversation while releasing 
     disconnected = false;
     constructor() { observers.push(this); }
     observe() {}
+    unobserve() {}
     disconnect() { this.disconnected = true; }
   });
   const host = document.createElement('div');

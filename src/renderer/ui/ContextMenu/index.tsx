@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import { useDismissable } from '../../lib/useDismissable';
 import { usePresence, type PresenceState } from '../usePresence';
 import type { ContextMenuCommandId } from '../../lib/contextMenuCommands';
 import type { ContextMenuItem } from '../../lib/contextMenuItems';
@@ -80,20 +81,11 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
     };
   }, [x, y, items, menuRef]);
 
+  useDismissable({ open, layerId, inside: () => [menuRef.current], onDismiss: onClose });
+
   useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      if (menuRef.current?.contains(event.target as Node)) return;
-      onClose();
-    };
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isTopOverlayLayer(layerId)) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-        return;
-      }
       if (event.key === 'Tab') { onClose(); return; }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
@@ -114,12 +106,8 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
         onSelect(item.id);
       }
     };
-    window.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown, true);
-    };
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [activeIndex, items, layerId, onClose, onSelect, menuRef]);
 
   useEffect(() => {

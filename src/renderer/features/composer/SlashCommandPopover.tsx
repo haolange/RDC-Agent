@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCommandCatalog } from '../../hooks/useCommandCatalog';
 import { useI18n } from '../../i18n';
-import { useOverlayDismiss } from '../../lib/overlayStack';
+import { useOverlayLayer } from '../../lib/overlayStack';
+import { useDismissable } from '../../lib/useDismissable';
 import { isImeComposing } from '../../lib/ime';
 import { InlineError } from '../../ui/InlineError';
 import { Skeleton } from '../../ui/Skeleton';
@@ -48,7 +49,9 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({ filter
     }
   }, [ordered, selectedIndex, onSelect]);
 
-  useOverlayDismiss(ordered.length > 0 && !loading && !error, onDismiss);
+  const listed = ordered.length > 0 && !loading && !error;
+  const { layerId } = useOverlayLayer(listed);
+  useDismissable({ open: listed, layerId, onDismiss });
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);

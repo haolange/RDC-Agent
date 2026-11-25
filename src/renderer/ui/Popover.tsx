@@ -17,6 +17,7 @@ import { cn } from '../lib/cn';
 import { placeAnchoredSurface } from '../lib/anchoredSurface';
 import { useDynStyle } from '../lib/useDynStyle';
 import { isTopOverlayLayer, useOverlayLayer } from '../lib/overlayStack';
+import { useDismissable } from '../lib/useDismissable';
 import { getModalFocusableElements } from '../lib/useModalFocus';
 import { usePresence } from './usePresence';
 import './Popover.css';
@@ -114,41 +115,32 @@ export function Popover({
     if (content && !content.contains(document.activeElement)) (getModalFocusableElements(content)[0] ?? content).focus();
   }, [coords.ready, isDialog, open]);
 
+  useDismissable({
+    open,
+    layerId,
+    inside: () => [contentRef.current, triggerRef.current],
+    onDismiss: (reason) => {
+      onOpenChange(false);
+      if (reason === 'escape') triggerRef.current?.focus();
+    },
+  });
+
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      const target = event.target as Node;
-      if (contentRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
-      onOpenChange(false);
-    };
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      onOpenChange(false);
-      triggerRef.current?.focus();
-    };
     const onReposition = () => updatePosition();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onReposition);
     if (contentRef.current) observer?.observe(contentRef.current);
     if (triggerRef.current) observer?.observe(triggerRef.current);
     document.fonts?.addEventListener('loadingdone', onReposition);
-    window.addEventListener('pointerdown', onPointerDown);
-    // Capture phase so the popover wins the key before any modal below it.
-    window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('resize', onReposition);
     window.addEventListener('scroll', onReposition, true);
     return () => {
       observer?.disconnect();
       document.fonts?.removeEventListener('loadingdone', onReposition);
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('resize', onReposition);
       window.removeEventListener('scroll', onReposition, true);
     };
-  }, [open, layerId, onOpenChange, updatePosition]);
+  }, [open, updatePosition]);
 
   const triggerNode = cloneElement(trigger, {
     ref: (node: HTMLElement | null) => {

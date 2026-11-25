@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from '../../i18n';
+import { useDismissable } from '../../lib/useDismissable';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ProfileAvatar } from '../../patterns/ProfileAvatar';
 import { Button } from '../../ui/Button';
@@ -48,30 +49,14 @@ export const UserMenu: React.FC<UserMenuProps> = ({
   }, [open]);
   const [position, setPosition] = useState({ left: VIEWPORT_MARGIN, top: VIEWPORT_MARGIN, ready: false });
 
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || anchorElement?.contains(target)) return;
+  useDismissable({
+    open,
+    inside: () => [menuRef.current, anchorElement],
+    onDismiss: (reason) => {
       onClose();
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-        if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open, onClose, anchorElement]);
+      if (reason === 'escape' && returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
+    },
+  });
 
   const updatePosition = useCallback(() => {
     const menuElement = menuRef.current;
