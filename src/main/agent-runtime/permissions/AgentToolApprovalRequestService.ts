@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
-import { auditLog } from '../../runtime/AuditLog';
+import { auditLog, AuditWriteFailedError } from '../../runtime/AuditLog';
 import { PermissionModeChangedError } from './RuntimePermissionStateService';
 import { PermissionReviewError } from './PermissionReviewRuntime';
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
@@ -144,12 +144,19 @@ export class AgentToolApprovalRequestService {
       verdict = { approved: false, reason: error instanceof PermissionReviewError && !reviewCancelled
         ? error.message : `${errorCode}: ${error instanceof Error ? error.message : String(error)}` };
     }
+    try {
+      auditLog.record({
+        kind: 'tool-decision', decidedBy: 'auto-review', approved: verdict.approved, tool: input.toolName, toolCallId: input.toolCallId,
+        argumentsSha256: input.argumentsSha256, risk: input.risk, sessionId: input.sessionId ?? null, turnId: input.turnId,
+        ...(errorCode ? { reason: errorCode } : {}),
+      });
+    } catch (error) {
+      if (!(error instanceof AuditWriteFailedError)) throw error;
+      // An unrecorded approval is no approval; the card settles as rejected with the audit failure as its reason.
+      errorCode = error.code;
+      verdict = { approved: false, reason: error.message };
+    }
     const { approved, reason } = verdict;
-    auditLog.record({
-      kind: 'tool-decision', decidedBy: 'auto-review', approved, tool: input.toolName, toolCallId: input.toolCallId,
-      argumentsSha256: input.argumentsSha256, risk: input.risk, sessionId: input.sessionId ?? null, turnId: input.turnId,
-      ...(errorCode ? { reason: errorCode } : {}),
-    });
     this.emit(synthetic, 'approval.answered', {
       approvalId,
       title: `Auto-review ${input.toolName}`,
@@ -182,11 +189,12 @@ export class AgentToolApprovalRequestService {
       return { success: false, error: 'Pending approval request belongs to a different session.' };
     }
 
-    this.deletePending(pending);
+    // Recorded before the request settles: if the record cannot be written the request stays pending and the answer fails.
     auditLog.record({
       kind: 'tool-decision', decidedBy: 'user', approved: input.approved, tool: pending.toolName, toolCallId: pending.toolCallId,
       argumentsSha256: pending.argumentsSha256, risk: pending.risk, sessionId: pending.sessionId, turnId: pending.turnId,
     });
+    this.deletePending(pending);
     this.emit(pending, 'approval.answered', {
       approvalId: pending.approvalId,
       title: `Approve ${pending.toolName}`,

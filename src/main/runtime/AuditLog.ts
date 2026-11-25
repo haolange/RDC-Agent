@@ -9,7 +9,7 @@ import type { AgentPermissionSettings } from '@shared/types/settings';
 export type AuditOrigin = 'desktop' | 'browser-qa' | 'runtime';
 
 export type AuditEvent =
-  | { kind: 'ipc'; channel: string; argumentsSha256: string; outcome: 'ok' | 'error'; errorCode?: string }
+  | { kind: 'ipc'; channel: string; argumentsSha256: string; outcome: 'requested' | 'ok' | 'error'; errorCode?: string }
   | {
     kind: 'tool-decision';
     decidedBy: 'user' | 'auto-review' | 'policy';
@@ -41,10 +41,20 @@ export function auditArgumentsHash(value: unknown): string {
   return hashScopedResource(value ?? null);
 }
 
+/** The decision was not recorded, so the action it describes must not happen. */
+export class AuditWriteFailedError extends Error {
+  readonly code = 'AUDIT_WRITE_FAILED';
+
+  constructor(cause: unknown) {
+    super(`AUDIT_WRITE_FAILED: the security audit log could not be written (${cause instanceof Error ? cause.message : String(cause)}); the action was not performed.`, { cause });
+  }
+}
+
 /**
  * Append-only record of security decisions under `<userData>/state/audit.jsonl`: permission changes,
  * tool approvals and denials, and every high-impact IPC call with its origin. Nothing rewrites or
- * trims it. A failed append is reported on stderr and never blocks the decision it describes.
+ * trims it. Recording comes before the effect: a failed append throws `AuditWriteFailedError`, and
+ * the caller does not perform the action the record would have described.
  */
 export class AuditLog {
   constructor(private readonly explicitPath?: string) {}
@@ -59,7 +69,7 @@ export class AuditLog {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
       fs.appendFileSync(this.filePath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', flag: 'a' });
     } catch (error) {
-      process.stderr.write(`[audit] append failed: ${error instanceof Error ? error.message : String(error)}\n`);
+      throw new AuditWriteFailedError(error);
     }
   }
 }

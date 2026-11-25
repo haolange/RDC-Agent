@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AuditLog, auditArgumentsHash, runWithAuditOrigin, type AuditRecord } from './AuditLog';
+import { AuditLog, AuditWriteFailedError, auditArgumentsHash, runWithAuditOrigin, type AuditRecord } from './AuditLog';
 
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
@@ -28,5 +28,17 @@ describe('audit log', () => {
       ['browser-qa', 'user'],
     ]);
     expect(fs.readFileSync(log.filePath, 'utf8')).not.toContain('git push');
+  });
+});
+
+describe('audit log failure', () => {
+  it('throws instead of letting an unrecorded decision proceed', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-audit-'));
+    roots.push(root);
+    fs.writeFileSync(path.join(root, 'state'), 'not a directory');
+    const log = new AuditLog(path.join(root, 'state', 'audit.jsonl'));
+
+    expect(() => log.record({ kind: 'ipc', channel: 'settings:set', argumentsSha256: 'x', outcome: 'requested' }))
+      .toThrow(AuditWriteFailedError);
   });
 });

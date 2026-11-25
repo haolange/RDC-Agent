@@ -374,12 +374,13 @@ export class SettingsService {
       },
     };
 
-    writeSettings(nextPersisted);
     const previousPermissions = sanitizeAgentPermissionSettings(currentPersisted.agentRuntime?.permissions);
     const nextPermissions = sanitizeAgentPermissionSettings(nextPersisted.agentRuntime?.permissions);
+    // A permission change is recorded before it is written, so an unrecorded change never takes effect.
     if (JSON.stringify(previousPermissions) !== JSON.stringify(nextPermissions)) {
       auditLog.record({ kind: 'permission-settings', from: previousPermissions, to: nextPermissions });
     }
+    writeSettings(nextPersisted);
     runtimePermissionStateService.commitMode(nextPermissions.mode);
     deleteSecretsAfterCommit(secretRefsToDelete, nextPaths.userRdcRoot);
     return this.getAll({

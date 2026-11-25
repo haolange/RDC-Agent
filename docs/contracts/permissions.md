@@ -8,7 +8,7 @@ Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进�
 
 - `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。没有打开项目时不存在 workspace，任何文件读取与 shell 都需审批。
 - `Auto-review`：先执行确定性规则；已验证的低风险操作记录规则批准，其余可审操作提交一次独立、无工具的模型审核。没有有效批准不执行；不自动切人工或 Full access。
-- `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。capture、Git 元数据和规范 Knowledge 在任何挡位都不是写入目标；写入受保护的配置或凭据路径在 Full access 下仍需用户确认。
+- `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。capture、Git 元数据、规范 Knowledge 与应用自有文件在任何挡位都不是写入目标；写入受保护的配置或凭据路径在 Full access 下仍需用户确认。
 - `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效；网络工具仍需审批。Full access 仍不能越过 profile 天花板。
 
 工具按 observe / record / mutate / execute 分类（`src/shared/constants/toolAccess.ts`）；`read-only` = observe + record，`workspace-write` 再加 mutate，`full` 再加 execute；未知工具与 MCP 按 execute；Full access 权限模式不能抬高 profile 天花板；原生 `shell.rdc` 要求 `full`。
@@ -18,7 +18,16 @@ Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进�
 - **子代理**：子代理以 `min(委派回合冻结的天花板, 目标 profile 天花板)` 运行；同步、后台执行都在委派时取父回合 `EffectiveRuntimePlan.accessCeiling` 并随执行携带，缺少冻结计划的委派以 `SUBAGENT_PARENT_PLAN_REQUIRED` 拒绝。
 - **项目 profile**：覆盖 user/builtin 同 id profile 时不得超过被覆盖者的天花板；项目新增的 profile 上限为 `workspace-write`。声明超出上限时按上限运行并给出 `AGENT_PROJECT_CEILING_NARROWED` 诊断。
 
-工具在定义处声明效果（`AgentTool.effects`：读路径参数、写路径参数、glob 前缀参数、是否联网），`AgentPermissionPolicy` 只读这些声明，不按工具名推断。写路径在任何挡位先经 `fileOperationBoundary`（工程内目标经 realpath 且拒绝 symlink）；只读目标拒绝，受保护目标需审批。未声明效果的工具按访问类别：observe / record 自动，mutate / execute 需审批。
+工具在定义处声明效果（`AgentTool.effects`：读路径参数、写路径参数、glob 前缀参数、是否联网），`AgentPermissionPolicy` 只读这些声明，不按工具名推断。写路径在任何挡位先经 `fileOperationBoundary`（工程内目标经 realpath 且拒绝 symlink）；只读目标拒绝，受保护目标需审批。
+
+应用自有文件对任何文件工具与 RDC 写入都只读，Full access 也不例外，因为写它们等于伪造历史或替自己扩权：
+
+- 凭据目录：`<userData>/secrets/**` 与 `~/.rdc-agent/secrets/**`。
+- 用户设置：`~/.rdc-agent/config.json`，只经 Settings 写入。
+- 应用根下的 `*-trust.json`：只由授予信任的人写入。
+- `<userData>/state/**`（审计日志、会话记录、trace 等）；唯一例外是 `sessions/**/artifacts/**`，那是工具产出运行制品的位置。
+
+这条边界约束的是声明了路径效果的工具。Shell 在 Full access 下按命令信任执行，命令内部的重定向或子进程写盘不经路径检查，这是 Full access 的系统性局限；需要硬边界时使用 Default、Auto-review 或 Custom。未声明效果的工具按访问类别：observe / record 自动，mutate / execute 需审批。
 
 Browser QA 代答 `conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 属于 high-impact，只在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时放行。桌面 IPC 不受该环境变量限制。
 
@@ -84,7 +93,11 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 ## 主进程确认与审计
 
 - **主进程确认**：知识写入/提升/导入、记忆写入/删除、计划写入/导出、hook / MCP / 项目 Agent 的 trust，都由主进程原生对话框确认（`src/main/window/mainConfirmation.ts`，默认按钮为取消）；renderer 请求本身不构成批准，没有聚焦窗口时一律不确认。唯一例外是未打包 Browser QA 显式 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 且无窗口，自动确认并写运行日志。取消 trust 返回未变化的状态。
-- **审计日志**：`<userData>/state/audit.jsonl` 只追加、不改写、不裁剪，每行带 `at` 与 `origin`（`desktop` / `browser-qa` / `runtime`）。记录：每次 high-impact IPC 调用（通道、参数 sha256、结果与错误码）；每个工具决定（用户、自动审查或策略拒绝，含工具名、调用 id、参数 sha256、风险）；权限设置的前后值。参数只记指纹不记内容；写入失败报 stderr，不阻断它所记录的决定。
+- **审计日志**：`<userData>/state/audit.jsonl` 只追加、不改写、不裁剪，每行带 `at` 与 `origin`（`desktop` / `browser-qa` / `runtime`）。参数只记指纹不记内容。记录内容：
+  - 每次 high-impact IPC 调用：执行前一条 `outcome: requested`，执行后一条 `ok` 或 `error`（带错误码）。
+  - 每个工具决定：策略放行与拒绝、用户批准与拒绝、自动审查结论，含工具名、调用 id、参数 sha256、风险。
+  - 权限设置的前后值。
+- **先记录后生效（fail-closed）**：决定记录写入失败时抛 `AUDIT_WRITE_FAILED`，它描述的动作不发生——IPC handler 不执行，工具不执行，用户的批准不生效（审批保持待答），自动审查按拒绝结算，权限设置不写盘。IPC 的结果记录写在动作之后，此时动作已经发生，写失败只报 stderr，不把成功的调用改报为失败。
 
 ## RDC Context Lease
 

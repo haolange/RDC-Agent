@@ -19,6 +19,7 @@ import { editFileTool as productionEditFile } from '../tools/primitives/EditFile
 import { webSearchTool as productionWebSearch } from '../tools/primitives/WebTools';
 import { deleteFileTool as productionDeleteFile } from '../tools/file/DeleteFileTool';
 import { moveFileTool as productionMoveFile } from '../tools/file/MoveFileTool';
+import { appPathService } from '../../runtime/AppPathService';
 import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolCall } from '../core/types';
@@ -912,6 +913,17 @@ describe('AgentPermissionPolicyService declared effects', () => {
     for (const mode of ['default', 'full-access'] as const) {
       const decision = service.evaluate({ ...permissionInput(settings(mode)), tool: moveFileTool,
         toolCall: call('move_file', { source: 'frame.rdc', destination: 'frame-old.rdc' }), projectRootPath: workspaceRoot });
+      expect(decision).toMatchObject({ action: 'deny', reason: expect.stringContaining('FILE_WRITE_PROTECTED') });
+    }
+  });
+
+  it('refuses forging the audit log or credentials in full access', () => {
+    const writeFileTool: AgentTool = { name: 'write_file', description: 'write', parameters: { type: 'object', properties: {} },
+      permissionHint: 'mutation', effects: productionWriteFile.effects, execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) };
+    const state = appPathService.getAppStatePaths();
+    for (const target of [path.join(state.appStateRoot, 'audit.jsonl'), path.join(state.secretsPath, 'provider.key')]) {
+      const decision = service.evaluate({ ...permissionInput(settings('full-access')), tool: writeFileTool,
+        toolCall: call('write_file', { path: target, content: '{}' }), projectRootPath: workspaceRoot });
       expect(decision).toMatchObject({ action: 'deny', reason: expect.stringContaining('FILE_WRITE_PROTECTED') });
     }
   });

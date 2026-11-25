@@ -21,14 +21,16 @@ export async function authorizeToolPermission(input: ToolPermissionAuthorization
   const decision = agentPermissionPolicyService.evaluate({ ...input.decision, permissionState });
   const toolCall = input.decision.toolCall;
   const argumentsSha256 = auditArgumentsHash(toolCall.arguments);
+  const recordPolicyDecision = (approved: boolean) => auditLog.record({
+    kind: 'tool-decision', decidedBy: 'policy', approved, tool: toolCall.name, toolCallId: toolCall.id,
+    argumentsSha256, risk: decision.risk, sessionId: input.approval?.sessionId ?? null, turnId: input.approval?.turnId,
+    ...(decision.reason ? { reason: decision.reason.slice(0, 200) } : {}),
+  });
   if (decision.action === 'deny') {
-    auditLog.record({
-      kind: 'tool-decision', decidedBy: 'policy', approved: false, tool: toolCall.name, toolCallId: toolCall.id,
-      argumentsSha256, risk: decision.risk, sessionId: input.approval?.sessionId ?? null, turnId: input.approval?.turnId,
-      ...(decision.reason ? { reason: decision.reason.slice(0, 200) } : {}),
-    });
+    recordPolicyDecision(false);
     throw new ToolPermissionDenied(decision.reason ?? 'Policy denied this tool call.');
   }
+  if (decision.action === 'allow') recordPolicyDecision(true);
   if (decision.action === 'ask_user') {
     if (!input.approval) throw new ToolPermissionDenied(decision.reason ?? 'Tool approval requires an active conversation turn.', true);
     const approved = await agentToolApprovalRequestService.request({ ...input.approval, argumentsSha256,
