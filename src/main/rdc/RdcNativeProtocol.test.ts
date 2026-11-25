@@ -49,6 +49,10 @@ describe('native failure projection', () => {
     expect(() => parseRdcNativeResult(result)).toThrow('RDC_CLI_FAILED');
     expect(() => parseRdcNativeResult(result)).not.toThrow('private process details');
   });
+  it('rejects a success envelope whose data is not an object', () => {
+    const result = { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.event.list', data: ['event'] }), stderr: '' } as CLIResult;
+    expect(() => parseRdcNativeResult(result)).toThrow(expect.objectContaining({ code: 'RDC_CLI_PROTOCOL' }));
+  });
   it('does not display arbitrary binary stdout', () => {
     expect(() => parseRdcNativeResult({ exitCode: 1, stdout: 'binary', stderr: '' } as CLIResult)).toThrow('RDC_CLI_PROTOCOL');
   });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { EventStream } from '../../core/EventStream';
 import {
   AssistantStreamBuilder,
@@ -160,7 +161,12 @@ describe('AssistantStreamBuilder terminal contract', () => {
   });
 
   it('treats a frame that is not JSON as a protocol violation', () => {
-    expect(() => parseProviderFrame('{"type":', 'test'))
+    expect(() => parseProviderFrame('{"type":', 'test', z.object({ type: z.string() })))
+      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' }) as ProviderStreamProtocolError);
+  });
+
+  it('treats a JSON frame that is not a frame of the protocol as a protocol violation', () => {
+    expect(() => parseProviderFrame('{"type":7}', 'test', z.object({ type: z.string() })))
       .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' }) as ProviderStreamProtocolError);
   });
 });

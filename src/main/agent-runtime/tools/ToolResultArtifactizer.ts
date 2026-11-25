@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { z } from 'zod';
 import {
   SessionArtifactError,
   TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES,
@@ -16,6 +17,9 @@ import type { AgentToolResult } from '../agent/AgentTool';
 const summarizer = new ToolResultSummarizer();
 
 const SAFE_TOOL_CALL_ID = /[^A-Za-z0-9._-]+/g;
+
+/** The stored payload is this module's own serialization; reading it back keeps exactly its JSON values. */
+const StoredPayloadSchema = z.object({ content: z.unknown().optional(), details: z.unknown().optional() });
 
 export interface ArtifactizeToolResultInput {
   sessionId: string | null | undefined;
@@ -45,7 +49,7 @@ function serializeEnvelope(
 ): { envelope: string; record: SessionArtifactizedEnvelope } {
   const payload = JSON.stringify({ content: storedContent, details: result.details ?? null });
   const payloadBytes = Buffer.from(payload, 'utf8');
-  const parsed = JSON.parse(payload) as { content: unknown; details: unknown };
+  const parsed = StoredPayloadSchema.parse(JSON.parse(payload));
   const record: SessionArtifactizedEnvelope = {
     owner: sessionId,
     ownerScope: 'product-session',

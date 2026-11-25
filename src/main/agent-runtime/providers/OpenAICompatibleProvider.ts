@@ -18,6 +18,7 @@ import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy'
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
 import { AssistantStreamBuilder, parseProviderFrame, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import { ChatCompletionsChunkSchema, type ChatCompletionsChoice } from './internal/chatCompletionsFrame';
 import {
   AlternatingTextThinkingChannels,
   StreamChannelRefs,
@@ -45,47 +46,7 @@ import type { ProviderStrategy } from '../core/ProviderRegistry';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-compatible';
 
-interface OpenAIToolCallChunk {
-  index?: number;
-  id?: string;
-  type?: string;
-  function?: {
-    name?: string;
-    arguments?: string;
-  };
-}
-
-interface OpenAIDelta {
-  role?: string;
-  content?: string | null;
-  tool_calls?: OpenAIToolCallChunk[];
-  reasoning?: string | null;
-  reasoning_content?: string | null;
-}
-
-interface OpenAIStreamChoice {
-  index?: number;
-  delta?: OpenAIDelta;
-  finish_reason?: string | null;
-}
-
-interface OpenAIStreamChunk {
-  model?: string;
-  service_tier?: string;
-  id?: string;
-  choices?: OpenAIStreamChoice[];
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-    prompt_cache_hit_tokens?: number;
-    prompt_cache_miss_tokens?: number;
-    prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
-    completion_tokens_details?: { reasoning_tokens?: number };
-  };
-}
-
-function hasSemanticChoice(choice: OpenAIStreamChoice): boolean {
+function hasSemanticChoice(choice: ChatCompletionsChoice): boolean {
   const delta = choice.delta;
   return Boolean(
     (typeof delta?.content === 'string' && delta.content.length > 0)
@@ -208,7 +169,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
       };
       for await (const data of parseSSE(response, composed.signal, sseOptions)) {
         if (composed.signal.aborted) break;
-        const chunk = parseProviderFrame<OpenAIStreamChunk>(data, PROVIDER_API);
+        const chunk = parseProviderFrame(data, PROVIDER_API, ChatCompletionsChunkSchema);
 
         builder.setExecution({
           ...(typeof chunk.model === 'string' ? { modelId: chunk.model } : {}),

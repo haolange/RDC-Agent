@@ -27,8 +27,10 @@ import {
   writeReadyReport,
 } from '../testing/investigationTestFixtures';
 import { InvestigationError } from './investigationErrors';
-import { serializeInvestigationJson } from './investigationHash';
+import { serializeInvestigationJson, sha256Prefixed } from './investigationHash';
+import { parseVerifiedRecordBody, parseVerifiedRecordBodyOf } from './investigationReadIntegrity';
 import { createInvestigationTools } from './InvestigationTools';
+import type { InvestigationIndexEntry } from './investigationRecordKeys';
 
 function indexPath(sessionPath: string): string {
   return path.join(sessionPath, SESSION_ARTIFACT_ROOT_DIR, 'investigation', 'index.json');
@@ -1699,5 +1701,16 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const lookup = service.createLookup(SESSION_ID);
     expect(() => lookup.getExperiment('exp-cycle-root')).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
     expect(() => lookup.getClaim('claim-cycle')).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+  });
+});
+
+describe('verified record bodies', () => {
+  const body = (text: string) => ({ text, hash: sha256Prefixed(text), truncated: false });
+  const entry = (text: string) => ({ artifactId: 'claims-1', kind: 'claim_set', recordType: 'ClaimSet', contentHash: sha256Prefixed(text) }) as InvestigationIndexEntry;
+
+  it('rejects a hash-bound body that is not a record of the type its index entry names', () => {
+    const text = JSON.stringify({ items: 'claims' });
+    expect(() => parseVerifiedRecordBody(entry(text), body(text))).toThrow(expect.objectContaining({ code: 'INVESTIGATION_SCHEMA_INVALID' }));
+    expect(() => parseVerifiedRecordBodyOf(entry(text), body(text), 'EvidencePack')).toThrow(expect.objectContaining({ code: 'INVESTIGATION_INDEX_CORRUPT' }));
   });
 });

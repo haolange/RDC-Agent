@@ -1,14 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { z, type ZodType } from 'zod';
 import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
 import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
-import { writeFileAtomicSync } from '../runtime/atomicFile';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../runtime/atomicFile';
 import { safeDelegationText as safeText } from './DelegationTraceText';
 import { finalizeTrace } from './ConversationWorkTrace';
 import { createDelegatedProjectionState, projectDelegatedEvent, type DelegatedProjectionState } from './DelegatedWorkProjection';
+import type { ConversationWorkBlock } from '@shared/types/conversation';
 import type { DelegationTaskBody } from '@shared/types/delegationTrace';
 import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
 import type { AgentAssistantDeltaPayload, AgentEvent } from '@shared/types/agentRuntime';
@@ -33,6 +35,62 @@ interface ParsedTrace {
   order: string[];
   blocks: Map<string, DelegationTraceStep>;
   invalid: boolean;
+}
+
+const DelegationTraceHeaderSchema: ZodType<DelegationTraceHeader> = z.object({
+  recordVersion: z.literal(2),
+  sentPromptAvailable: z.boolean().optional(),
+  parentToolCallId: z.string(),
+  task: z.string(),
+  taskLength: z.number(),
+  taskAvailable: z.boolean(),
+  invocationAvailable: z.boolean(),
+  profile: z.string(),
+  preparedRoute: z.object({ providerId: z.string(), modelId: z.string(), reasoningLevel: z.string() }).optional(),
+  mode: z.enum(['wait', 'background']),
+  executionId: z.string().optional(),
+  generation: z.number().optional(),
+  taskId: z.string().optional(),
+  childSessionId: z.string(),
+  status: z.enum(['running', 'complete', 'failed', 'cancelled', 'interrupted']),
+  executionStatus: z.enum(['queued', 'running', 'waiting', 'cancelling', 'completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted']).optional(),
+  startedAt: z.number(),
+  updatedAt: z.number(),
+  completedAt: z.number().optional(),
+  finalPreview: z.string().optional(),
+  finalLength: z.number().optional(),
+  finalAvailable: z.boolean().optional(),
+  finalUnavailableReason: z.string().optional(),
+  error: z.string().optional(),
+  configurationError: z.enum(['MODEL_UNAVAILABLE', 'NO_USABLE_CONTEXT_TIER', 'PLAN_CONFLICT', 'CONSTRAINT_REJECTED',
+    'AGENT_PROFILE_UNAVAILABLE', 'MODEL_ROUTE_REQUIRED', 'DELEGATION_REASONING_UNSUPPORTED']).optional(),
+  parentReceiptPreview: z.string().optional(),
+  parentReceiptAvailable: z.boolean().optional(),
+  latestAction: z.string().optional(),
+  latestActionStatus: z.enum(['pending', 'running', 'complete', 'error', 'skipped', 'cancelled']).optional(),
+  total: z.number(),
+  revision: z.number(),
+});
+
+/** A projected work block is written by this store from the delegated projection; its id keys the step. */
+const TraceEntrySchema: ZodType<TraceEntry> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('start'), header: DelegationTraceHeaderSchema }),
+  z.object({ kind: z.literal('header'), header: DelegationTraceHeaderSchema }),
+  z.object({
+    kind: z.literal('block'),
+    step: z.object({
+      id: z.string(),
+      block: z.custom<ConversationWorkBlock>((value) => typeof value === 'object' && value !== null && !Array.isArray(value)),
+      revision: z.number(),
+    }),
+  }),
+]);
+const HeadVersionSchema = z.object({ recordVersion: z.unknown().optional() });
+
+/** The head of a current record; a record from another version is left as it is. */
+function parseHead(value: unknown): DelegationTraceHeader {
+  if (HeadVersionSchema.parse(value).recordVersion !== 2) throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', 'delegation trace head is not recordVersion 2.');
+  return DelegationTraceHeaderSchema.parse(value);
 }
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
@@ -85,6 +143,13 @@ function parseEntry(trace: ParsedTrace, entry: TraceEntry, callId: string): void
     trace.blocks.set(entry.step.id, entry.step);
   }
 }
+/** One journal line, or null when it is not a valid entry; the trace is then marked invalid, never repaired. */
+function parseTraceEntry(line: string): TraceEntry | null {
+  let value: unknown;
+  try { value = JSON.parse(line); } catch { return null; }
+  const entry = TraceEntrySchema.safeParse(value);
+  return entry.success ? entry.data : null;
+}
 function readParsed(target: string, callId: string): ParsedTrace {
   const size = fs.statSync(target).size;
   let trace = parsed.get(target);
@@ -100,8 +165,9 @@ function readParsed(target: string, callId: string): ParsedTrace {
     finally { fs.closeSync(descriptor); }
     for (const line of bytes.toString('utf8').split('\n')) {
       if (!line) continue;
-      try { parseEntry(trace, JSON.parse(line) as TraceEntry, callId); }
-      catch { trace.invalid = true; }
+      const entry = parseTraceEntry(line);
+      if (entry) parseEntry(trace, entry, callId);
+      else trace.invalid = true;
     }
     trace.size = size;
   }
@@ -120,10 +186,8 @@ function currentHeader(sessionId: string, header: DelegationTraceHeader): Delega
       completedAt: header.updatedAt } : header;
 }
 function readHead(target: string, sessionId: string, callId: string): DelegationTraceHeader | null {
-  const head = headLocation(target);
-  if (!fs.existsSync(head)) return null;
-  const header = JSON.parse(fs.readFileSync(head, 'utf8')) as DelegationTraceHeader;
-  if (header.recordVersion !== 2) throw new AppError('DELEGATION_TRACE_UNAVAILABLE');
+  const header = readValidatedSync(headLocation(target), parseJsonWith(parseHead));
+  if (!header) return null;
   if (header.parentToolCallId !== callId) throw new AppError('DELEGATION_TRACE_ID_MISMATCH');
   return currentHeader(sessionId, header);
 }

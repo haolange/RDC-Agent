@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, openSync, closeSync, writeFileSync, unlinkSync, readFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { z, type ZodType } from 'zod';
 import { currentProcessIdentity, probeProcess } from '../../platform/process';
 import type { FileHandle } from 'node:fs/promises';
 
@@ -24,14 +25,19 @@ function ownerHasExited(owner: DirectoryFileLockOwner): boolean {
   return probeProcess({ pid: owner.pid, birth: owner.birth }) === 'exited';
 }
 
+/** A birth the owner did not record is the type's empty "not recorded" marker; such an owner is judged by pid. */
+const DirectoryFileLockOwnerSchema: ZodType<DirectoryFileLockOwner> = z.object({ pid: z.number(), birth: z.string().catch(''), createdAt: z.number() });
+
+/** The recorded owner, or null while the lock is not (yet) a complete owner record; such a lock stays held. */
 function parseLockOwner(raw: string): DirectoryFileLockOwner | null {
+  let value: unknown;
   try {
-    const parsed = JSON.parse(raw) as Partial<DirectoryFileLockOwner>;
-    if (typeof parsed.pid !== 'number' || typeof parsed.createdAt !== 'number') return null;
-    return { pid: parsed.pid, birth: typeof parsed.birth === 'string' ? parsed.birth : '', createdAt: parsed.createdAt };
+    value = JSON.parse(raw);
   } catch {
     return null;
   }
+  const owner = DirectoryFileLockOwnerSchema.safeParse(value);
+  return owner.success ? owner.data : null;
 }
 
 /** Built before the exclusive create so the owner identity is never read while holding an empty lock. */

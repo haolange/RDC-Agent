@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
 import { renameWithRetry } from '../../../platform/fileRename';
@@ -58,6 +59,21 @@ export async function atomicWrite(projectRoot: string, target: string, bytes: Bu
   } finally { await fs.rm(temporary, { force: true }); }
 }
 
+const ReplayLockOwnerSchema = z.object({ pid: z.number().int().positive().safe(), token: z.string() });
+
+/** The owner record `diskLock` publishes; anything else is a damaged lock that is never stolen. */
+function parseLockOwner(text: string): z.infer<typeof ReplayLockOwnerSchema> {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: error });
+  }
+  const owner = ReplayLockOwnerSchema.safeParse(value);
+  if (!owner.success) throw new AppError('REPLAY_LOCK_CORRUPT', z.prettifyError(owner.error));
+  return owner.data;
+}
+
 const queues = new Map<string, Promise<void>>();
 async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
   const directory = appPathService.getProjectRdcPaths(projectRoot).projectRdcRoot;
@@ -80,16 +96,16 @@ async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
       await fs.link(pending, target);
       return async () => {
         await safePath(projectRoot, target);
-        const owner = JSON.parse(await fs.readFile(target, 'utf8')) as { token: string };
+        const owner = parseLockOwner(await fs.readFile(target, 'utf8'));
         if (owner.token !== token) throw new AppError('REPLAY_LOCK_OWNERSHIP_LOST');
         await fs.unlink(target);
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const before = await fs.stat(target);
-      let owner: { pid: number };
-      try { owner = JSON.parse(await fs.readFile(target, 'utf8')) as { pid: number }; } catch (parseError) { throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: parseError }); }
-      if (!Number.isSafeInteger(owner.pid) || owner.pid < 1) throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: error });
+      let text: string;
+      try { text = await fs.readFile(target, 'utf8'); } catch (readError) { throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: readError }); }
+      const owner = parseLockOwner(text);
       try { process.kill(owner.pid, 0); throw new AppError('REPLAY_STORE_BUSY', undefined, { cause: error }); } catch (probeError) {
         if ((probeError as NodeJS.ErrnoException).code !== 'ESRCH') throw probeError;
       }

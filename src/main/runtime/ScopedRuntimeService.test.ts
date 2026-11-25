@@ -77,6 +77,12 @@ describe('ScopedRuntimeService', () => {
     } finally { fs.rmSync(project, { recursive: true, force: true }); }
   });
 
+  it('keeps the file-derived id when an imported document declares an id that is not a name', () => {
+    const source = path.join(userData, 'docs.mcp.json');
+    fs.writeFileSync(source, JSON.stringify({ id: 42, name: 'Docs', description: '', transport: 'stdio', command: 'docs' }));
+    expect(service.importFromFile({ kind: 'mcp', scope: 'user', filePath: source }).id).toBe('docs.mcp');
+  });
+
   it('rejects project policy attempts to loosen user limits', () => {
     const project = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-runtime-policy-'));
     try {

@@ -212,18 +212,7 @@ export class SessionContextJournal {
 
   readEntries(sessionId: string, turnIds?: readonly string[]): SessionContextTurnEntry[] {
     const selected = turnIds ? new Set(turnIds) : null;
-    return storageAdapter.readSessionContextJournal(sessionId, (entry) => {
-      if (
-        entry?.schemaVersion !== 2
-        || !entry.turnId?.trim()
-        || !entry.userMessageId?.trim()
-        || !entry.assistantMessageId?.trim()
-        || !entry.branchId?.trim()
-        || !entry.executionIdentity?.fingerprint?.trim()
-        || !Array.isArray(entry.messages)
-      ) throw new Error('Session context journal contains an invalid v2 entry. Clear the session before continuing.');
-      return !selected || selected.has(entry.turnId);
-    });
+    return storageAdapter.readSessionContextJournal(sessionId, (entry) => !selected || selected.has(entry.turnId));
   }
 }
 

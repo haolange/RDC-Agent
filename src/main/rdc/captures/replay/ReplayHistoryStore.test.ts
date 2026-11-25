@@ -138,6 +138,24 @@ describe('ReplayHistoryStore', () => {
     expect(await fs.readFile(path.join(scope.projectRoot, 'capture.rdc'), 'utf8')).toBe('original');
   });
 
+  it('rejects a stored manifest entry that this store did not write', async () => {
+    const scope = await setup();
+    const store = new ReplayHistoryStore({ codec });
+    await store.append(scope, fact);
+    const manifest = path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash, 'manifest.json');
+    const stored = JSON.parse(await fs.readFile(manifest, 'utf8'));
+    stored.entries[0].operationId = 7;
+    await fs.writeFile(manifest, JSON.stringify(stored));
+    await expect(store.list(scope)).rejects.toMatchObject({ code: 'REPLAY_MANIFEST_CORRUPT' });
+  });
+
+  it('never steals a lock whose owner record is not one this store writes', async () => {
+    const scope = await setup();
+    await fs.mkdir(path.join(scope.projectRoot, '.rdc-agent'));
+    await fs.writeFile(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'), JSON.stringify({ pid: 'self', token: 'another-owner' }));
+    await expect(new ReplayHistoryStore({ codec }).append(scope, fact)).rejects.toMatchObject({ code: 'REPLAY_LOCK_CORRUPT' });
+  });
+
   it('never steals a live process lock', async () => {
     const scope = await setup();
     await fs.mkdir(path.join(scope.projectRoot, '.rdc-agent'));

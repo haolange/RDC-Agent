@@ -1,6 +1,8 @@
 ﻿import * as fs from 'fs';
 import * as path from 'path';
+import { z, type ZodType } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
+import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { runScopedStore } from './RunScopedStore';
 import type {
@@ -21,6 +23,44 @@ export interface TracePersistedState {
   updatedAt: string;
 }
 
+const UserRequestRevisionSchema = z.object({
+  id: z.string(),
+  requestId: z.string(),
+  branchId: z.string(),
+  parentRevisionId: z.string().optional(),
+  prompt: z.string(),
+  createdAt: z.string(),
+  resultingTraceLaneIds: z.array(z.string()),
+}).strict();
+
+const RequestBranchSchema = z.object({
+  id: z.string(),
+  parentBranchId: z.string().optional(),
+  revisionId: z.string(),
+  status: z.enum(['active', 'inactive', 'abandoned', 'completed']),
+  traceLaneIds: z.array(z.string()),
+}).strict();
+
+const TracePersistedStateSchema: ZodType<TracePersistedState> = z.object({
+  schemaVersion: z.literal('1'),
+  sessionId: z.string(),
+  activeBranchId: z.string(),
+  userRequests: z.array(z.object({
+    id: z.string(),
+    sessionId: z.string(),
+    rootRevisionId: z.string(),
+    activeRevisionId: z.string(),
+    revisions: z.array(UserRequestRevisionSchema),
+  }).strict()),
+  branches: z.array(z.object({
+    id: z.string(),
+    rootRequestId: z.string(),
+    activeBranchId: z.string(),
+    branches: z.array(RequestBranchSchema),
+  }).strict()),
+  updatedAt: z.string(),
+}).strict();
+
 const defaultState = (sessionId: string): TracePersistedState => ({
   schemaVersion: '1',
   sessionId,
@@ -31,25 +71,16 @@ const defaultState = (sessionId: string): TracePersistedState => ({
 });
 
 export class TraceStateStore {
+  /** The stored request tree, or the initial state when none was written; a damaged file throws `STORAGE_CORRUPT`. */
   read(sessionId: string): TracePersistedState {
-    const filePath = this.resolvePath(sessionId);
-    if (!fs.existsSync(filePath)) {
-      return defaultState(sessionId);
-    }
-
-    try {
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Partial<TracePersistedState> & Record<string, unknown>;
-      return {
-        ...defaultState(sessionId),
-        sessionId,
-        activeBranchId: typeof parsed.activeBranchId === 'string' ? parsed.activeBranchId : 'branch-main',
-        userRequests: parsed.userRequests ?? [],
-        branches: parsed.branches ?? [],
-      };
-    } catch (error) {
-      console.error(`[TraceStateStore] Failed to read ${filePath}`, error);
-      return defaultState(sessionId);
-    }
+    const stored = readValidatedSync(this.resolvePath(sessionId), parseJsonWith(TracePersistedStateSchema.parse));
+    if (!stored) return defaultState(sessionId);
+    return {
+      ...defaultState(sessionId),
+      activeBranchId: stored.activeBranchId,
+      userRequests: stored.userRequests,
+      branches: stored.branches,
+    };
   }
 
   write(state: TracePersistedState): TracePersistedState {

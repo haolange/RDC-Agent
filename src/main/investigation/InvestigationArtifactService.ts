@@ -29,7 +29,7 @@ import {
   collectSupersede,
   retiredRecordKeysForReplacement,
   upsertIndexEntry,
-  withPendingInvestigationMutations,
+  withPendingInvestigationMutations, type InvestigationMutationReader,
 } from './investigationArtifactMutations';
 import {
   commitInvestigationTxn,
@@ -62,7 +62,7 @@ import {
   assertInvestigationIndexIntegrity,
   assertReadySourcesUnchanged,
   assertTripleContentHash,
-  parseVerifiedRecordBody,
+  parseVerifiedRecordBody, parseVerifiedRecordBodyOf,
 } from './investigationReadIntegrity';
 import { InvestigationReadRepair } from './investigationReadRepair';
 import {
@@ -124,8 +124,9 @@ export class InvestigationArtifactService {
     this.readRepair = new InvestigationReadRepair({
       readIndex: (sessionId) => this.readIndex(sessionId),
       readIndexSnapshot: (sessionId) => this.readIndexSnapshot(sessionId),
-      readRecordBody: <T>(sessionId: string, entry: InvestigationIndexEntry) => this.readRecordBody<T>(sessionId, entry),
-      readJson: <T>(sessionId: string, uri: string) => this.readJson<T>(sessionId, uri),
+      readRecordBody: (sessionId, entry) => this.recordReader(sessionId).readRecordBody(entry),
+      readRecordBodyOf: (sessionId, entry, recordType) => this.recordReader(sessionId).readRecordBodyOf(entry, recordType),
+      readJson: (sessionId: string, uri: string) => this.readJson(sessionId, uri),
       parseManifest: (value) => this.parseManifest(value),
       assertReady: (sessionId, manifest, contentText) => this.assertReady(sessionId, manifest, contentText),
       commitMutations: (sessionId, mutations) => this.commitMutations(sessionId, mutations),
@@ -142,7 +143,7 @@ export class InvestigationArtifactService {
     const kindEntry = requireInvestigationKind(input.kind);
     let parsed: InvestigationRecord;
     try {
-      parsed = parseInvestigationWriteRecord(kindEntry.recordType, input.record) as InvestigationRecord;
+      parsed = parseInvestigationWriteRecord(kindEntry.recordType, input.record);
     } catch (error) {
       throw new InvestigationError(
         'INVESTIGATION_SCHEMA_INVALID',
@@ -205,7 +206,7 @@ export class InvestigationArtifactService {
       this.parseManifest(manifest);
     }
     const mutations: InvestigationTxnMutation[] = [];
-    const mutationReader = withPendingInvestigationMutations(this.mutationReader(sessionId), mutations);
+    const mutationReader = withPendingInvestigationMutations(this.recordReader(sessionId), mutations);
     let workingIndex = this.readIndexSnapshot(sessionId);
     if (isolation.markEvidenceStaleFor) {
       const stale = collectStalePropagation(mutationReader, isolation.markEvidenceStaleFor, workingIndex);
@@ -268,7 +269,7 @@ export class InvestigationArtifactService {
     if (!entry) {
       throw new InvestigationError('INVESTIGATION_NOT_FOUND', artifactId);
     }
-    let manifest = this.parseManifest(this.readJson<InvestigationArtifactManifest>(sessionId, entry.manifestUri));
+    let manifest = this.parseManifest(this.readJson(sessionId, entry.manifestUri));
     const content = this.readArtifact(sessionId, entry.contentUri, {
       expectedHash: expectedHash ? expectedHash.replace(/^sha256:/i, '') : undefined,
     });
@@ -282,7 +283,7 @@ export class InvestigationArtifactService {
     assertTripleContentHash(entry.contentHash, manifest.contentHash, contentText, content.hash);
     let record: InvestigationRecord;
     try {
-      record = parseInvestigationRecord(entry.recordType, JSON.parse(contentText || '{}')) as InvestigationRecord;
+      record = parseInvestigationRecord(entry.recordType, JSON.parse(contentText || '{}'));
     } catch (error) {
       throw toInvestigationError(error);
     }
@@ -313,7 +314,7 @@ export class InvestigationArtifactService {
     const lookup = this.createLookup(sessionId);
     for (const entry of entries) {
       if (entry.status !== 'ready' && entry.status !== 'draft') continue;
-      this.assertRecordInvariants(sessionId, entry.kind, this.readRecordBody<InvestigationRecord>(sessionId, entry), lookup);
+      this.assertRecordInvariants(sessionId, entry.kind, this.recordReader(sessionId).readRecordBody(entry), lookup);
     }
     return entries;
     });
@@ -374,7 +375,7 @@ export class InvestigationArtifactService {
     }
     let record: InvestigationRecord;
     try {
-      record = parseInvestigationRecord(kindEntry.recordType, JSON.parse(contentText)) as InvestigationRecord;
+      record = parseInvestigationRecord(kindEntry.recordType, JSON.parse(contentText));
     } catch (error) {
       throw new InvestigationError(
         'INVESTIGATION_READY_DENIED',
@@ -401,7 +402,7 @@ export class InvestigationArtifactService {
     const memo = new Map<string, InvestigationRecord | null>();
     const visiting = new Set<string>();
     const lookup = {} as InvestigationLookup;
-    const take = <T>(kind: InvestigationArtifactKind, id: string): T | null => {
+    const take = <T extends InvestigationRecord>(kind: InvestigationArtifactKind, id: string): T | null => {
       if (!verify) return this.findRecord<T>(sessionId, kind, id);
       const key = `${kind}:${id}`;
       if (memo.has(key)) return memo.get(key) as T | null;
@@ -413,8 +414,8 @@ export class InvestigationArtifactService {
       if (visiting.has(key)) return record;
       visiting.add(key);
       try {
-        this.assertRecordInvariants(sessionId, kind, record as unknown as InvestigationRecord, lookup);
-        memo.set(key, record as unknown as InvestigationRecord);
+        this.assertRecordInvariants(sessionId, kind, record, lookup);
+        memo.set(key, record);
         return record;
       } catch (error) {
         memo.clear();
@@ -427,7 +428,7 @@ export class InvestigationArtifactService {
     lookup.getClaim = (id) => take<ClaimRecord>('claim', id);
     lookup.getEvidence = (id) => take<EvidenceRecord>('evidence', id);
     lookup.getExperiment = (id) => take<ExperimentRecord>('experiment', id);
-    lookup.getChallenge = (id) => take<{ challengeId: string }>('challenge', id);
+    lookup.getChallenge = (id) => take<ChallengeRecord>('challenge', id);
     lookup.getArtifact = (id) => this.findIndexEntry(sessionId, id) ?? null;
     return lookup;
   }
@@ -666,7 +667,7 @@ export class InvestigationArtifactService {
   private findExperimentForWorldState(sessionId: string, worldStateId: string): ExperimentRecord | null {
     const entries = this.readIndex(sessionId).artifacts.filter((entry) => entry.kind === 'experiment' && entry.status !== 'superseded');
     for (const entry of entries) {
-      const experiment = this.readRecordBody<ExperimentRecord>(sessionId, entry);
+      const experiment = this.recordReader(sessionId).readRecordBodyOf(entry, 'ExperimentRecord');
       if (
         experiment.baselineWorldStateId === worldStateId
         || experiment.variantWorldStateId === worldStateId
@@ -678,35 +679,34 @@ export class InvestigationArtifactService {
     return null;
   }
 
-  private mutationReader(sessionId: string) {
+  /** Record bodies verified against the index and validated against their record type's schema. */
+  private recordReader(sessionId: string): InvestigationMutationReader {
+    const content = (entry: InvestigationIndexEntry) => {
+      const read = this.readArtifact(sessionId, entry.contentUri);
+      return { ...read, text: read.text ?? '' };
+    };
     return {
-      readRecordBody: <T>(entry: InvestigationIndexEntry) => this.readRecordBody<T>(sessionId, entry),
-      readJson: <T>(uri: string) => this.readJson<T>(sessionId, uri),
-      parseManifest: (value: unknown) => this.parseManifest(value),
+      readRecordBody: (entry) => parseVerifiedRecordBody(entry, content(entry)),
+      readRecordBodyOf: (entry, recordType) => parseVerifiedRecordBodyOf(entry, content(entry), recordType),
+      readJson: (uri) => this.readJson(sessionId, uri),
+      parseManifest: (value) => this.parseManifest(value),
     };
   }
 
-  private findRecord<T>(sessionId: string, kind: InvestigationArtifactKind, recordKey: string): T | null {
+  private findRecord<T extends InvestigationRecord>(sessionId: string, kind: InvestigationArtifactKind, recordKey: string): T | null {
     const live = this.readIndex(sessionId).artifacts.filter((entry) => entry.status !== 'superseded');
     const standalone = live.filter((entry) => entry.kind === kind && entry.recordKey === recordKey).at(-1);
     // Historical lifecycle records stay readable by artifact ID, not as current semantic refs.
     if (standalone?.status === 'stale' && (kind === 'challenge' || kind === 'experiment')) return null;
-    if (standalone) return this.readRecordBody<T>(sessionId, standalone);
-    const packKind = kind === 'claim' ? 'claim_set' : kind === 'evidence' ? 'evidence_pack' : undefined;
-    if (!packKind) return null;
-    type Member = { claimId?: string; evidenceId?: string; cardId?: string };
-    for (const entry of live.filter((item) => item.kind === packKind).reverse()) {
-      const match = this.readRecordBody<{ items?: Member[] }>(sessionId, entry).items?.find((item) => (
-        item.claimId === recordKey || item.evidenceId === recordKey || item.cardId === recordKey
-      ));
+    const reader = this.recordReader(sessionId);
+    if (standalone) return reader.readRecordBody(standalone) as T;
+    if (kind !== 'claim' && kind !== 'evidence') return null;
+    for (const entry of live.filter((item) => item.kind === (kind === 'claim' ? 'claim_set' : 'evidence_pack')).reverse()) {
+      const match = kind === 'claim' ? reader.readRecordBodyOf(entry, 'ClaimSet').items.find((item) => item.claimId === recordKey)
+        : reader.readRecordBodyOf(entry, 'EvidencePack').items.find((item) => item.evidenceId === recordKey);
       if (match) return match as T;
     }
     return null;
-  }
-
-  private readRecordBody<T>(sessionId: string, entry: InvestigationIndexEntry): T {
-    const read = this.readArtifact(sessionId, entry.contentUri);
-    return parseVerifiedRecordBody<T>(entry, { ...read, text: read.text ?? '' });
   }
 
   private findIndexEntry(sessionId: string, artifactId: string): InvestigationIndexEntry | undefined {
@@ -812,7 +812,7 @@ export class InvestigationArtifactService {
     const reuseChain = collectSupersedeChain(index.artifacts, input.supersedes);
     for (const entry of index.artifacts) {
       if (reuseChain.has(entry.artifactId)) continue;
-      const existing = collectRecordKeys(entry.kind, this.readRecordBody<InvestigationRecord>(sessionId, entry));
+      const existing = collectRecordKeys(entry.kind, this.recordReader(sessionId).readRecordBody(entry));
       const clash = existing.find((key) => incomingSet.has(recordKeyToken(key)));
       if (clash) {
         const claimSetHint = input.kind === 'claim_set' && clash.space === 'claim'
@@ -868,10 +868,10 @@ export class InvestigationArtifactService {
     }
   }
 
-  private readJson<T>(sessionId: string, uri: string): T {
+  private readJson(sessionId: string, uri: string): unknown {
     const read = this.readArtifact(sessionId, uri);
     try {
-      return JSON.parse(read.text ?? '{}') as T;
+      return JSON.parse(read.text ?? '{}');
     } catch (error) {
       throw toInvestigationError(error);
     }

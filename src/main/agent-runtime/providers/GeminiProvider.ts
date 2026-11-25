@@ -11,6 +11,7 @@
  * - functionCall 不做增量流式，每个 chunk 中的 functionCall 都是完整对象。
  */
 
+import { z } from 'zod';
 import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
@@ -47,39 +48,28 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const PROVIDER_API = 'google-gemini';
 
-interface GeminiTextPart {
-  text: string;
-  thought?: boolean;
-}
-
-interface GeminiFunctionCallPart {
-  functionCall: {
-    name: string;
-    args?: Record<string, unknown>;
-  };
-}
-
-interface GeminiInlineDataPart {
-  inlineData: { mimeType: string; data: string };
-}
-
-type GeminiPart = GeminiTextPart | GeminiFunctionCallPart | GeminiInlineDataPart | Record<string, unknown>;
-
-interface GeminiCandidate {
-  content?: { parts?: GeminiPart[]; role?: string };
-  finishReason?: string;
-  index?: number;
-}
-
-interface GeminiStreamChunk {
-  candidates?: GeminiCandidate[];
-  usageMetadata?: {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-    totalTokenCount?: number;
-    thoughtsTokenCount?: number;
-  };
-}
+/** One streamGenerateContent chunk; part kinds this adapter does not read (inline data, ...) pass through. */
+const GeminiStreamChunkSchema = z.object({
+  candidates: z.array(z.object({
+    content: z.object({
+      parts: z.array(z.object({
+        text: z.string().optional(),
+        thought: z.boolean().optional(),
+        thoughtSignature: z.string().optional(),
+        functionCall: z.object({ name: z.string(), args: z.record(z.string(), z.unknown()).optional() }).passthrough().optional(),
+      }).passthrough()).optional(),
+      role: z.string().optional(),
+    }).passthrough().optional(),
+    finishReason: z.string().optional(),
+    index: z.number().optional(),
+  }).passthrough()).optional(),
+  usageMetadata: z.object({
+    promptTokenCount: z.number().optional(),
+    candidatesTokenCount: z.number().optional(),
+    totalTokenCount: z.number().optional(),
+    thoughtsTokenCount: z.number().optional(),
+  }).passthrough().optional(),
+}).passthrough();
 
 export interface GeminiProviderOptions {
   baseUrl?: string;
@@ -165,7 +155,7 @@ export class GeminiProvider implements ProviderStrategy {
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
-        const chunk = parseProviderFrame<GeminiStreamChunk>(data, PROVIDER_API);
+        const chunk = parseProviderFrame(data, PROVIDER_API, GeminiStreamChunkSchema);
 
         if (chunk.usageMetadata) {
           builder.setUsage({
@@ -183,14 +173,10 @@ export class GeminiProvider implements ProviderStrategy {
 
         const parts = candidate.content?.parts ?? [];
         for (const [partIndex, part] of parts.entries()) {
-          const partRecord = part as Record<string, unknown>;
-          const thoughtSignature = typeof partRecord.thoughtSignature === 'string'
-            ? partRecord.thoughtSignature
-            : undefined;
+          const thoughtSignature = part.thoughtSignature;
           const partBindingKey = 'candidate:' + (candidate.index ?? 0) + ':part:' + partIndex;
-          if ('text' in part && typeof (part as GeminiTextPart).text === 'string') {
-            const textPart = part as GeminiTextPart;
-            if (textPart.thought) {
+          if (typeof part.text === 'string') {
+            if (part.thought) {
               sawOutput = true;
               const continuation = thoughtSignature
                 ? createContinuationArtifact(options.requestPlan, {
@@ -209,7 +195,7 @@ export class GeminiProvider implements ProviderStrategy {
                   continuation,
                 });
               }
-              builder.appendThinking(switched.ref, textPart.text, {
+              builder.appendThinking(switched.ref, part.text, {
                 kind: 'summary',
                 source: summarySource,
                 visibility: 'summary',
@@ -220,12 +206,12 @@ export class GeminiProvider implements ProviderStrategy {
               const switched = alternating.ensure('text');
               closeSwitchedChannel(builder, switched.close);
               if (switched.started) builder.startText(switched.ref);
-              builder.appendText(switched.ref, textPart.text);
+              builder.appendText(switched.ref, part.text);
             }
             continue;
           }
-          if ('functionCall' in part) {
-            const fc = (part as GeminiFunctionCallPart).functionCall;
+          if (part.functionCall) {
+            const fc = part.functionCall;
             toolCallCounter += 1;
             const callId = 'gemini-call-' + Date.now() + '-' + toolCallCounter;
             sawOutput = true;

@@ -1,49 +1,21 @@
-import * as fs from 'fs';
 import * as path from 'path';
-import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../../runtime/jsonl';
+import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import type { ZodType } from 'zod';
 
 export class RunScopedStore {
   getRunRoot(sessionId: string, runId: string): string {
     return storageAdapter.getRunPath(sessionId, runId);
   }
 
-  readJson<T>(sessionId: string, runId: string, relativePath: string, fallback: T): T {
-    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    if (!fs.existsSync(filePath)) {
-      return fallback;
-    }
-
-    try {
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
-    } catch (error) {
-      console.error(`[RunScopedStore] Failed to read ${filePath}`, error);
-      return fallback;
-    }
+  /** The run-scoped document, or null when it was never written; a damaged document throws `STORAGE_CORRUPT`. */
+  readJson<T>(sessionId: string, runId: string, relativePath: string, schema: ZodType<T>): T | null {
+    return readValidatedSync(this.resolveRunPath(sessionId, runId, relativePath), parseJsonWith(schema.parse));
   }
 
   writeJson(sessionId: string, runId: string, relativePath: string, data: unknown): string {
     const filePath = this.resolveRunPath(sessionId, runId, relativePath);
     storageAdapter.io.writeJsonAtomic(filePath, data);
-    return filePath;
-  }
-
-  readJsonl<T>(sessionId: string, runId: string, relativePath: string): T[] {
-    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    const result = readJsonl<T>(filePath);
-    assertNoJsonlDiagnostics(filePath, result.diagnostics);
-    return result.records;
-  }
-
-  writeJsonl<T>(sessionId: string, runId: string, relativePath: string, items: T[]): string {
-    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    writeJsonl(filePath, items);
-    return filePath;
-  }
-
-  appendJsonl<T>(sessionId: string, runId: string, relativePath: string, item: T): string {
-    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    appendJsonl(filePath, item);
     return filePath;
   }
 

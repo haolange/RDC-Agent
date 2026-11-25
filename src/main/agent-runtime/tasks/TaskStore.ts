@@ -1,11 +1,16 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { z } from 'zod';
 import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
 import { writeFileAtomic } from '../../runtime/atomicFile';
 import { orderTasks } from './taskProjection';
 import {
   TASK_SCHEMA_VERSION,
+  TaskExecutionMessageSchema,
+  TaskExecutionRecordSchema,
+  TaskRecordSchema,
+  TaskRootBudgetRecordSchema,
   type TaskExecutionMessage,
   type TaskExecutionRecord,
   type TaskRecord,
@@ -18,6 +23,34 @@ interface TaskStateDocument {
   executions: Record<string, TaskExecutionRecord>;
   messages: Record<string, TaskExecutionMessage[]>;
   rootBudgets: Record<string, TaskRootBudgetRecord>;
+}
+
+const TaskStateDocumentSchema = z.object({
+  schemaVersion: z.literal(TASK_SCHEMA_VERSION),
+  tasks: z.record(z.string(), TaskRecordSchema),
+  executions: z.record(z.string(), TaskExecutionRecordSchema),
+  messages: z.record(z.string(), z.array(TaskExecutionMessageSchema)),
+  rootBudgets: z.record(z.string(), TaskRootBudgetRecordSchema),
+}).strict();
+
+const TaskStateVersionSchema = z.object({ schemaVersion: z.unknown().optional() });
+
+/** task-state.json as written by this build; another schema version is left untouched for the build that wrote it. */
+function parseTaskState(raw: string, statePath: string): TaskStateDocument {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    throw new AppError('STORAGE_CORRUPT', `${statePath} is not JSON.`, { cause: error });
+  }
+  const versioned = TaskStateVersionSchema.safeParse(value);
+  if (versioned.success && versioned.data.schemaVersion !== TASK_SCHEMA_VERSION) {
+    throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', `Unsupported task state schema version: ${String(versioned.data.schemaVersion)}.`);
+  }
+  const state = TaskStateDocumentSchema.safeParse(value);
+  if (!state.success) throw new AppError('STORAGE_CORRUPT', `Malformed canonical task state in ${statePath}: ${z.prettifyError(state.error)}`);
+  validateState(state.data);
+  return state.data;
 }
 
 export interface TaskStoreCommit {
@@ -192,17 +225,9 @@ export class FileTaskStore implements TaskStore {
     await this.writeState(emptyState());
   }
 
+  /** A missing task-state.json rejects with ENOENT; a damaged one with `STORAGE_CORRUPT`. */
   private async readStateFile(): Promise<TaskStateDocument> {
-    const parsed = JSON.parse(await fs.readFile(this.statePath, 'utf8')) as Partial<TaskStateDocument>;
-    if (parsed.schemaVersion !== TASK_SCHEMA_VERSION) {
-      throw new Error(`Unsupported task state schema version: ${String(parsed.schemaVersion)}.`);
-    }
-    if (!isRecord(parsed.tasks) || !isRecord(parsed.executions) || !isRecord(parsed.messages) || !isRecord(parsed.rootBudgets)) {
-      throw new Error('Task state document is malformed.');
-    }
-    const state = parsed as TaskStateDocument;
-    validateState(state);
-    return state;
+    return parseTaskState(await fs.readFile(this.statePath, 'utf8'), this.statePath);
   }
 
   private async writeState(state: TaskStateDocument): Promise<void> {
@@ -359,5 +384,5 @@ function validBudget(value: TaskExecutionRecord['budget']): boolean {
 }
 
 function clone<T>(value: T): T {
-  return value === null ? value : JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }

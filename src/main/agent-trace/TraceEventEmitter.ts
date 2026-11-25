@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
 import { toolResultNormalizer } from './ToolResultNormalizer';
@@ -29,16 +30,28 @@ const traceStatusFromAction = (event: ActionEvent): TraceStatus => {
   return 'succeeded';
 };
 
-const parseReasoningPacket = (text: string): VisibleReasoningPacket | null => {
+/** The packet fields this emitter reads; a model may add others. */
+const VisibleReasoningPacketSchema = z.object({
+  mode: z.enum(['task_understanding', 'planning', 'intent', 'hypothesis', 'evidence_need', 'observation_summary',
+    'decision_update', 'next_action', 'risk_note', 'summary']),
+  content: z.string().min(1),
+  hypothesis: z.string().optional(),
+  nextAction: z.string().optional(),
+  confidence: z.enum(['low', 'medium', 'high']).optional(),
+}).passthrough();
+
+/** Model thinking text that is a structured packet; any other text is shown as written. */
+const parseReasoningPacket = (text: string): Pick<VisibleReasoningPacket, 'mode' | 'content' | 'hypothesis' | 'nextAction' | 'confidence'> | null => {
   const trimmed = text.trim();
   if (!trimmed.startsWith('{')) return null;
+  let value: unknown;
   try {
-    const parsed = JSON.parse(trimmed) as VisibleReasoningPacket;
-    if (parsed.content) return parsed;
+    value = JSON.parse(trimmed);
   } catch {
     return null;
   }
-  return null;
+  const packet = VisibleReasoningPacketSchema.safeParse(value);
+  return packet.success ? packet.data : null;
 };
 
 export class TraceEventEmitter {

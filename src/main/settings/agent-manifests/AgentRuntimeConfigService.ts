@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import { MCP_TRANSPORTS as MCP_TRANSPORT_LIST, type MCPTransport } from '@shared/types/mcp';
+import { z } from 'zod';
+import { MCP_TRANSPORTS, type MCPTransport } from '@shared/types/mcp';
 import { TOP_LEVEL_AGENT_IDS } from '@shared/types/agent';
 import { isSkillVisibleToProfile } from '@shared/constants/canonicalSkills';
 import { appPathService } from '../../runtime/AppPathService';
@@ -18,17 +19,34 @@ import type {
   AgentRuntimeSkillDescriptor,
 } from '@shared/types/agentRuntime';
 
-const MCP_TRANSPORTS = new Set<MCPTransport>(MCP_TRANSPORT_LIST);
 
 const toRuntimeId = (value: string, fallback = 'custom'): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
 
-const readJsonFile = <T>(filePath: string): T | null => {
+/** A user or project MCP descriptor file; fields this app does not read pass through as written. */
+const McpDescriptorFileSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  description: z.string(),
+  // Checked against the supported transports when the descriptor is loaded; an unsupported one is listed as blocked.
+  transport: z.unknown().optional(),
+  enabledByDefault: z.boolean().optional(),
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
+  url: z.string().optional(),
+  env: z.record(z.string(), z.string()).optional(),
+}).passthrough();
+
+/** A file that is not JSON or not a descriptor names no server, so it is not loaded as one. */
+const readMcpDescriptorFile = (filePath: string): z.infer<typeof McpDescriptorFileSchema> | null => {
+  let value: unknown;
   try {
-    return fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf8')) as T : null;
+    value = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch {
     return null;
   }
+  const descriptor = McpDescriptorFileSchema.safeParse(value);
+  return descriptor.success ? descriptor.data : null;
 };
 
 const parseSkill = (skillDir: string, scope: 'builtin' | 'user' | 'project'): SkillLoadResult | null => {
@@ -161,22 +179,23 @@ export class AgentRuntimeConfigService {
       if (!fs.existsSync(root)) return;
       fs.readdirSync(root).filter((entry) => entry.endsWith('.mcp.json')).forEach((entry) => {
         const sourcePath = path.join(root, entry);
-        const value = readJsonFile<AgentRuntimeMcpDescriptor & { transport?: string }>(sourcePath);
-        if (!value?.id) return;
-        if (!MCP_TRANSPORTS.has(value.transport as MCPTransport)) {
-          const transportLabel = typeof value.transport === 'string' ? value.transport : String(value.transport);
+        const value = readMcpDescriptorFile(sourcePath);
+        if (!value) return;
+        const transport = MCP_TRANSPORTS.find((candidate) => candidate === value.transport);
+        if (!transport) {
           target.set(value.id, {
             ...value,
             transport: value.transport as MCPTransport,
             scope,
             sourcePath,
             enabledByDefault: false,
-            blockedReason: 'MCP_TRANSPORT_UNSUPPORTED: ' + transportLabel,
+            blockedReason: 'MCP_TRANSPORT_UNSUPPORTED: ' + String(value.transport),
           });
           return;
         }
         target.set(value.id, {
           ...value,
+          transport,
           scope,
           sourcePath,
           enabledByDefault: value.enabledByDefault !== false,

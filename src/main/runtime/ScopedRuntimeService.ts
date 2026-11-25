@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
+import { z } from 'zod';
 import { hookEngine } from '../hooks/HookEngine';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
 import { projectAgentTrust } from '../settings/agent-manifests/ProjectAgentTrust';
@@ -21,6 +22,23 @@ const assertInside = (root: string, target: string): void => {
   const relative = path.relative(path.resolve(root), path.resolve(target));
   if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Resource path escaped its scope root.');
 };
+
+const DeclaredResourceIdSchema = z.object({ id: z.string().min(1) });
+
+/**
+ * The id an imported document declares. A document that does not parse or declares no id keeps its file-derived id;
+ * `upsert` then validates the content and refuses a document that is not valid for its kind.
+ */
+function declaredResourceId(parse: () => unknown): string | undefined {
+  let value: unknown;
+  try {
+    value = parse();
+  } catch {
+    return undefined;
+  }
+  const declared = DeclaredResourceIdSchema.safeParse(value);
+  return declared.success ? declared.data.id : undefined;
+}
 
 /** File types each resource kind can be imported from; knowledge and memory are not file-imported. */
 export const SCOPED_IMPORT_EXTENSIONS: Partial<Record<ScopedResourceKind, readonly string[]>> = {
@@ -233,17 +251,9 @@ export class ScopedRuntimeService {
     let id = path.basename(filePath, path.extname(filePath));
     if (request.kind === 'skill' && lower === 'skill.md') id = path.basename(path.dirname(filePath));
     if (request.kind === 'agent' && lower.endsWith('.agent.md')) id = basename.slice(0, -'.agent.md'.length);
-    try {
-      if (request.kind === 'mcp') {
-        const parsed = JSON.parse(content) as { id?: string };
-        if (parsed.id) id = String(parsed.id);
-      } else if (request.kind === 'hook' || request.kind === 'policy') {
-        const parsed = YAML.parse(content) as { id?: string };
-        if (parsed?.id) id = String(parsed.id);
-      }
-    } catch {
-      // keep filename-derived id
-    }
+    const declaredId = request.kind === 'mcp' ? declaredResourceId(() => JSON.parse(content))
+      : request.kind === 'hook' || request.kind === 'policy' ? declaredResourceId(() => YAML.parse(content)) : undefined;
+    if (declaredId) id = declaredId;
     return this.upsert({
       kind: request.kind,
       scope: request.scope,

@@ -1,12 +1,28 @@
 import fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import { ensureJsonlRecordBoundary } from '../../runtime/jsonl';
+import { ConversationHistoryRecordSchema, SessionContextTurnEntrySchema } from './storageSchema';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
 import type { ConversationTerminalAppendJournal, TerminalAppendFile } from './storageCommitTypes';
 
 const CHUNK_BYTES = 64 * 1024;
+
+/** One journaled record line; a line that is not the record this module wrote is a damaged WAL. */
+function parseJournaledRecord<T>(schema: z.ZodType<T>, line: string, file: string): T {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch (error) {
+    throw new AppError('STORAGE_CORRUPT', `Terminal append ${file} record is not JSON.`, { cause: error });
+  }
+  const record = schema.safeParse(value);
+  if (!record.success) throw new AppError('STORAGE_CORRUPT', `Terminal append ${file} record is malformed: ${z.prettifyError(record.error)}`);
+  return record.data;
+}
 
 function fingerprint(filePath: string, append: string): TerminalAppendFile {
   // An interrupted ordinary append is quarantined first, so the journaled prefix ends on a record boundary.
@@ -113,15 +129,15 @@ function applyFile(filePath: string, expected: TerminalAppendFile, forward: bool
 }
 
 export function applyTerminalAppend(sessionPath: string, journal: ConversationTerminalAppendJournal, forward: boolean): ConversationMessage {
-  const record = JSON.parse(journal.history.append) as Partial<ConversationMessage> & { op?: unknown; patch?: Partial<ConversationMessage> };
-  const assistant = record.op === 'delta' ? record.patch : record;
-  if (!assistant || (record.op === 'delta' && record.id !== assistant.id)) throw new Error('Terminal append delta ownership mismatch.');
+  const record = parseJournaledRecord(ConversationHistoryRecordSchema, journal.history.append, 'history');
+  const assistant = 'op' in record ? record.patch : record;
+  if ('op' in record && record.id !== assistant.id) throw new Error('Terminal append delta ownership mismatch.');
   if (assistant.role !== 'assistant' || assistant.turnId !== journal.turnId || assistant.requestId !== journal.requestId) {
     throw new Error('Terminal append message ownership mismatch.');
   }
   if (journal.context.append) {
-    const context = JSON.parse(journal.context.append) as Partial<SessionContextTurnEntry>;
-    if (context.schemaVersion !== 2 || context.turnId !== journal.turnId || context.assistantMessageId !== assistant.id) {
+    const context = parseJournaledRecord(SessionContextTurnEntrySchema, journal.context.append, 'context');
+    if (context.turnId !== journal.turnId || context.assistantMessageId !== assistant.id) {
       throw new Error('Terminal append context ownership mismatch.');
     }
   }
@@ -132,5 +148,6 @@ export function applyTerminalAppend(sessionPath: string, journal: ConversationTe
   validateFile(contextPath, journal.context);
   applyFile(historyPath, journal.history, forward);
   applyFile(contextPath, journal.context, forward);
+  // A delta carries the whole message prepareTerminalAppend serialized as its patch; its ownership was checked above.
   return assistant as ConversationMessage;
 }

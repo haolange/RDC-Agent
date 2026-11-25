@@ -23,4 +23,9 @@ describe('Grok signed identity', () => {
     if (caseName === 'valid') await expect(verifyGrokIdentity(token, flow)).resolves.toBeUndefined();
     else await expect(verifyGrokIdentity(token, flow)).rejects.toThrow();
   });
+  it('rejects a key set that is not a JWK Set before verifying any signature', async () => {
+    const header = Buffer.from(JSON.stringify({ alg: 'ES256', kid: 'key' })).toString('base64url');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ keys: { kid: 'key' } }) }));
+    await expect(verifyGrokIdentity(`${header}.e30.c2ln`, flow)).rejects.toThrow('Grok identity signing keys are malformed.');
+  });
 });

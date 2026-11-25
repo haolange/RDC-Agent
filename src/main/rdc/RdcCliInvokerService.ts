@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { z, type ZodType } from 'zod';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
@@ -14,6 +15,7 @@ import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostR
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type {
   CLIResult,
+  ToolArtifact,
   ToolCallRequest,
   ToolCallResult,
   ToolCatalog,
@@ -21,6 +23,19 @@ import type {
   ToolRuntimeSummary,
   ToolTraceEntry,
 } from '@shared/types/tool';
+
+/** Artifacts RDC-Tool reports beside its data; fields this app does not read pass through. */
+const ToolArtifactsSchema: ZodType<ToolArtifact[] | undefined> = z.array(z.object({
+  artifact_id: z.string(),
+  type: z.string(),
+  mime: z.string(),
+  size_bytes: z.number(),
+  sha256: z.string(),
+  path: z.string(),
+  url: z.string().optional(),
+  storage_backend: z.string(),
+  metadata: z.record(z.string(), z.unknown()),
+}).passthrough()).optional();
 
 export class RdcCliInvokerService {
   private catalogs = new Map<string, Promise<ToolCatalog>>();
@@ -287,56 +302,13 @@ export class RdcCliInvokerService {
       });
 
       request.abortSignal?.throwIfAborted();
-      parseRdcNativeResult(result);
-      if (result.stdout.trim()) {
-        const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
-
-        if (parsed) {
-          if (parsed.ok === false) {
-            const errObj = (parsed.error ?? {}) as Record<string, unknown>;
-            response = {
-              ok: false,
-              data: null as unknown as Record<string, unknown>,
-              artifacts: [],
-              error: {
-                code: (errObj.code as string) ?? 'TOOL_ERROR',
-                message: (errObj.message as string) ?? 'RDC-Tool CLI returned ok:false',
-                category: (errObj.category as string) ?? 'execution',
-                details: (errObj.details as Record<string, unknown>) ?? undefined,
-              },
-              duration_ms: nowMs() - startTime,
-              trace_id: generateEventId('tool'),
-            };
-            this.emitInvocationTrace(request, response);
-            return response;
-          }
-
-          response = {
-            ok: true,
-            data: (parsed.data as Record<string, unknown>) ?? parsed,
-            artifacts: parsed.artifacts as ToolCallResult['artifacts'],
-            duration_ms: nowMs() - startTime,
-            trace_id: generateEventId('tool'),
-          };
-          this.emitInvocationTrace(request, response);
-          return response;
-        }
-      }
-
+      const envelope = parseRdcNativeResult(result);
+      const artifacts = ToolArtifactsSchema.safeParse(envelope.artifacts);
+      if (!artifacts.success) throw new AppError('RDC_CLI_PROTOCOL', `invalid artifacts: ${z.prettifyError(artifacts.error)}`);
       response = {
-        ok: false,
-        data: null as unknown as Record<string, unknown>,
-        artifacts: [],
-        error: {
-          code: 'CLI_ERROR',
-          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
-          category: 'execution',
-          details: {
-            stdout: result.stdout,
-            stderr: result.stderr,
-            exitCode: result.exitCode,
-          },
-        },
+        ok: true,
+        data: envelope.data,
+        artifacts: artifacts.data,
         duration_ms: nowMs() - startTime,
         trace_id: generateEventId('tool'),
       };

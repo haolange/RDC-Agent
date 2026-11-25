@@ -17,6 +17,7 @@ import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy'
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
 import { AssistantStreamBuilder, parseProviderFrame, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import { ChatCompletionsChunkSchema } from './internal/chatCompletionsFrame';
 import {
   AlternatingTextThinkingChannels,
   StreamChannelRefs,
@@ -41,42 +42,6 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 
 const DEFAULT_BASE_URL = 'https://api.mistral.ai/v1';
 const PROVIDER_API = 'mistral-conversations';
-
-interface MistralToolCallChunk {
-  index?: number;
-  id?: string;
-  type?: string;
-  function?: {
-    name?: string;
-    arguments?: string;
-  };
-}
-
-interface MistralDelta {
-  role?: string;
-  content?: string | null;
-  tool_calls?: MistralToolCallChunk[];
-  reasoning?: string | null;
-  reasoning_content?: string | null;
-}
-
-interface MistralStreamChoice {
-  index?: number;
-  delta?: MistralDelta;
-  finish_reason?: string | null;
-}
-
-interface MistralStreamChunk {
-  id?: string;
-  choices?: MistralStreamChoice[];
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-    prompt_tokens_details?: { cached_tokens?: number };
-    completion_tokens_details?: { reasoning_tokens?: number };
-  };
-}
 
 export interface MistralProviderOptions {
   /** 默认 baseUrl，可被 `StreamOptions.baseUrl` 覆盖。 */
@@ -173,7 +138,7 @@ export class MistralProvider implements ProviderStrategy {
       };
       for await (const data of parseSSE(response, composed.signal, sseOptions)) {
         if (composed.signal.aborted) break;
-        const chunk = parseProviderFrame<MistralStreamChunk>(data, PROVIDER_API);
+        const chunk = parseProviderFrame(data, PROVIDER_API, ChatCompletionsChunkSchema);
 
         if (chunk.usage) {
           const cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens;

@@ -10,6 +10,7 @@ import {
   type AccountFlowHost,
 } from './oauth/accountAuthFlows';
 import { parseProviderError, renderAccountDiagnosticMessage, shouldOpenSystemBrowser } from './oauth/oauthHttp';
+import { OAuthSecretBundleSchema, type OAuthFlowState, type OAuthSecretBundle } from './oauth/oauthTypes';
 import type {
   LlmProviderAccountDiagnostic,
   LlmProviderAccountLoginFinishRequest,
@@ -18,7 +19,6 @@ import type {
   LlmProviderId,
 } from '@shared/types/settings';
 import type { ProviderAccountAuth } from '@shared/provider-catalog/catalogManifestSchema';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauth/oauthTypes';
 
 export type { AccountCatalogDiscovery } from './oauth/accountAuthFlows';
 
@@ -327,12 +327,15 @@ export class ProviderAccountAuthService {
     if (!raw) {
       return null;
     }
+    // A credential that is not this provider's bundle is not a connected account.
+    let value: unknown;
     try {
-      const parsed = JSON.parse(raw) as OAuthSecretBundle;
-      return parsed.providerId === providerId ? parsed : null;
+      value = JSON.parse(raw);
     } catch {
       return null;
     }
+    const bundle = OAuthSecretBundleSchema.safeParse(value);
+    return bundle.success && bundle.data.providerId === providerId ? bundle.data : null;
   }
 
   private findFlow(providerId: LlmProviderId, flowId?: string): OAuthFlowState | null {

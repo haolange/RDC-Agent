@@ -150,6 +150,18 @@ describe('StorageAdapter conversation streaming I/O', () => {
     expect(JSON.parse(compacted[0]!).content).toBe('Hello!!!!!!!!');
   });
 
+  it('reports a conversation record that is not a message or delta as corruption instead of skipping it', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    await storageAdapter.initializeWorkspace();
+    const projectRoot = path.join(tempRoot, 'project-root-corrupt');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'corrupt-io');
+    storageAdapter.appendConversationMessage(session.sessionId, makeMessage({ id: 'user-1', content: 'Inspect', sessionId: session.sessionId, projectId: project.projectId }));
+    fs.appendFileSync(storageAdapter.getConversationPath(session.sessionId), `${JSON.stringify({ id: 'assistant-1', content: 'no owner' })}\n`);
+    expect(() => storageAdapter.readConversationHistory(session.sessionId)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+  });
+
   it('keeps a streamed delta durable when a reader blocks journal compaction', async () => {
     const { storageAdapter } = await import('./StorageAdapter');
     await storageAdapter.initializeWorkspace();

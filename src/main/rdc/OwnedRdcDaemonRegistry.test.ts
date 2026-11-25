@@ -107,6 +107,15 @@ describe('OwnedRdcDaemonRegistry', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('rejects a registry record that is not one this app writes instead of treating it as ours', () => {
+    const root = makeRoot();
+    const registryPath = path.join(root, 'owned-rdc-daemons.json');
+    fs.writeFileSync(registryPath, JSON.stringify({ schemaVersion: 1, records: { [contextId]: {
+      contextId, command: 'rdc', intermediateRoot: root, ownerPid: 91, daemonPid: 92, daemonBirth: '', workerPid: 0, workerBirth: '', startedAt: 1,
+    } } }));
+    expect(() => listOwnedRdcDaemons({ registryPath })).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+  });
+
   it('retires a proven dead registration without invoking an obsolete installation', async () => {
     const root = makeRoot(); const registryPath = path.join(root, 'owned-rdc-daemons.json');
     rememberOwnedRdcDaemon({ contextId, command: 'retired', intermediateRoot: root, ownerPid: 91, ownerBirth: 'owner-birth', daemonPid: 92, daemonBirth: 'daemon-birth', workerPid: 0, workerBirth: '', startedAt: 1 }, { registryPath });

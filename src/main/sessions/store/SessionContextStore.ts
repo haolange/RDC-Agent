@@ -5,6 +5,7 @@ import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/
 import {
   SESSION_SHELL_STATE_MIGRATIONS,
   CURRENT_USAGE_SCHEMA_VERSION,
+  SessionContextTurnEntrySchema,
   SessionUsageV2Schema,
   readCurrentStoredJson,
   toSessionShellStateManifest,
@@ -86,7 +87,7 @@ export class SessionContextStore {
   readSessionContextJournal(sessionId: string, select?: (entry: SessionContextTurnEntry) => boolean): SessionContextTurnEntry[] {
     const journalPath = this.getSessionContextJournalPath(sessionId);
     if (!fs.existsSync(journalPath)) return [];
-    const result = readJsonl<SessionContextTurnEntry>(journalPath, select);
+    const result = readJsonl(journalPath, SessionContextTurnEntrySchema.parse, select);
     assertNoJsonlDiagnostics(journalPath, result.diagnostics);
     return result.records;
   }

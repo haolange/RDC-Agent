@@ -1,8 +1,9 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
+import { openSignedRdcReceipt } from './RdcExecutionReceipts';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
@@ -75,13 +76,9 @@ export class RdcLifecycleReceipts {
     reference.parse(ref);
     const source = this.resolver.read(sessionId, ref.uri, { expectedHash: ref.expectedHash.slice(7) });
     if (source.category !== 'tool-outputs' || source.truncated || !source.text) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'incomplete receipt.');
-    const signed = JSON.parse(source.text) as { body?: unknown; signature?: unknown };
-    if (typeof signed.body !== 'string' || typeof signed.signature !== 'string' || !/^[a-f0-9]{64}$/.test(signed.signature)) {
-      throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'unsigned content.');
-    }
-    const expected = createHmac('sha256', this.key()).update(signed.body).digest();
-    if (!timingSafeEqual(expected, Buffer.from(signed.signature, 'hex'))) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'signature mismatch.');
-    const receipt = receiptSchema.parse(JSON.parse(signed.body));
+    const parsed = receiptSchema.safeParse(openSignedRdcReceipt(source.text, this.key, 'RDC_LIFECYCLE_RECEIPT_INVALID'));
+    if (!parsed.success) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', `malformed receipt: ${z.prettifyError(parsed.error)}`);
+    const receipt = parsed.data;
     if (receipt.sessionId !== sessionId) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'foreign session.');
     for (const value of receipt.event === 'baseline' ? [receipt.original] : receipt.event === 'resolved' ? [receipt.observed]
       : receipt.event === 'intent' ? [receipt.original, receipt.from]

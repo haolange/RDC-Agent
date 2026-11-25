@@ -130,6 +130,18 @@ describe('FileTaskStore', () => {
     await expect(new FileTaskStore(dir).listTasks()).rejects.toThrow(/missing current execution|Malformed canonical task/);
   });
 
+  it('reports a task record that is not one this store writes as damaged storage', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-'));
+    roots.push(dir);
+    const registry = new TaskRegistry(dir);
+    await registry.createTask('Stored');
+    const statePath = path.join(dir, 'task-state.json');
+    const state = JSON.parse(await readFile(statePath, 'utf8'));
+    (Object.values(state.tasks)[0] as { revision: unknown }).revision = 'first';
+    await writeFile(statePath, JSON.stringify(state));
+    await expect(new FileTaskStore(dir).listTasks()).rejects.toMatchObject({ code: 'STORAGE_CORRUPT' });
+  });
+
   it('rejects canonical ownership, graph, execution enum, and message corruption', async () => {
     const corruptions: Array<(state: any) => void> = [
       (state) => { const ids = Object.keys(state.tasks); state.tasks[ids[0]].blocks = []; },

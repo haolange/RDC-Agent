@@ -1,9 +1,16 @@
 import { MaterialContextSchema } from '@shared/types/materialContext';
 import { z, type ZodIssue, type ZodType } from 'zod';
 import { AppError } from '@shared/errors/appError';
+import { REASONING_SELECTIONS } from '@shared/types/modelCapability';
 import type { StorageIo } from './StorageIo';
+import type { ConversationMessage } from '@shared/types/conversation';
+import type { ActionEvent } from '@shared/types/evidence';
+import type { ExecutionIdentity } from '@shared/types/providerCapability';
 import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
+import type { Message } from '../../agent-runtime/core/types';
+import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
 import type {
+  ConversationDeltaRecord,
   ConversationTerminalCommitJournal,
   ConversationTerminalAppendJournal,
   ConversationTurnCommitJournal,
@@ -389,3 +396,72 @@ export const SESSION_SHELL_STATE_MIGRATIONS: StorageMigration<SessionShellStateD
     schema: SessionShellStateV1Schema as ZodType<SessionShellStateDocument>,
   },
 ];
+
+const isObjectValue = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
+const nonBlank = z.string().refine((value) => value.trim().length > 0, 'must not be blank');
+
+export const ActionEventSchema: ZodType<ActionEvent> = z.object({
+  schema_version: z.string(),
+  event_id: z.string(),
+  turn_id: z.string().optional(),
+  ts_ms: z.number(),
+  run_id: z.string(),
+  session_id: z.string(),
+  agent_id: z.string(),
+  event_type: z.string(),
+  status: z.enum(['ok', 'error', 'sent', 'pass', 'fail', 'blocked', 'entered', 'warning', 'timeout', 'completed']),
+  duration_ms: z.number(),
+  refs: z.array(z.string()),
+  payload: z.record(z.string(), z.unknown()),
+});
+
+/**
+ * The top-level fields of a stored conversation message. Its work trace is read back through `readStoredWorkTrace`;
+ * attachments, diagnostics and plan references are passed through as this store wrote them.
+ */
+const ConversationMessageEnvelopeSchema = z.object({
+  id: z.string(),
+  turnId: z.string(),
+  sessionId: z.string().nullable(),
+  projectId: z.string().nullable(),
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+  status: z.enum(['draft', 'streaming', 'complete', 'error', 'stopped']).optional(),
+  createdAt: z.number(),
+  updatedAt: z.number().optional(),
+}).passthrough();
+const ConversationDeltaEnvelopeSchema = z.object({
+  op: z.literal('delta'),
+  id: z.string(),
+  patch: z.record(z.string(), z.unknown()),
+  traceBlocks: z.record(z.string(), z.unknown()).optional(),
+  updatedAt: z.number(),
+}).passthrough();
+
+/** One conversation.jsonl line: a full message snapshot or a delta patch over one. */
+export const ConversationHistoryRecordSchema = z.union([
+  z.custom<ConversationDeltaRecord>((value) => ConversationDeltaEnvelopeSchema.safeParse(value).success, 'invalid conversation delta record'),
+  z.custom<ConversationMessage>((value) => ConversationMessageEnvelopeSchema.safeParse(value).success, 'invalid conversation message record'),
+]);
+
+const ExecutionFingerprintSchema = z.object({ fingerprint: nonBlank });
+
+/**
+ * One session-context.jsonl line. Its messages and execution identity are the ones the turn committed; they are
+ * checked to be the records this store wrote, and every field the journal readers use is validated.
+ */
+export const SessionContextTurnEntrySchema: ZodType<SessionContextTurnEntry> = z.object({
+  schemaVersion: z.literal(2),
+  turnId: nonBlank,
+  userMessageId: nonBlank,
+  assistantMessageId: nonBlank,
+  branchId: nonBlank,
+  agentId: z.string(),
+  executionIdentity: z.custom<ExecutionIdentity>((value) => ExecutionFingerprintSchema.safeParse(value).success, 'execution identity requires a fingerprint'),
+  controls: z.object({ reasoningLevel: z.enum(REASONING_SELECTIONS), maxContextMode: z.boolean(), fastModel: z.boolean() }),
+  status: z.enum(['complete', 'stopped', 'error']),
+  messages: z.array(z.custom<Message>(isObjectValue, 'context message must be an object')),
+  createdAt: z.number(),
+  completedAt: z.number(),
+  approvedExecutionCompletion: z.object({ offerId: z.string().optional(), planUri: z.string(), planHash: z.string() }).optional(),
+});

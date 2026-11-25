@@ -1,9 +1,13 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { createContinuationArtifact } from '../agent-runtime/reasoning/ContinuationArtifacts';
 import { createProviderStateRef } from '../agent-runtime/reasoning/ProviderStateRefs';
 import { createTestRequestPlan } from '../testing/createTestRequestPlan';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { SessionContextStore } from '../sessions/store/SessionContextStore';
 import {
   canonicalizeTerminalContextMessages,
   filterSessionContextMessageArtifacts,
@@ -14,6 +18,7 @@ import type { AssistantMessage, Message } from '../agent-runtime/core/types';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
+import type { StorageHost } from '../sessions/store/storageHost';
 
 
 afterEach(() => vi.restoreAllMocks());
@@ -534,16 +539,15 @@ describe('SessionContextJournal v2', () => {
   });
 
   it('fails closed on legacy v1 entries instead of performing a hot migration', () => {
-    const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockImplementation((_sessionId, select) => [{
-      schemaVersion: 1,
-      turnId: 'turn-1',
-    } as unknown as SessionContextTurnEntry].filter((value) => !select || select(value)));
-
-    expect(() => journal.readEntries('session-1'))
-      .toThrow('invalid v2 entry');
-    expect(() => journal.readEntries('session-1', []))
-      .toThrow('invalid v2 entry');
+    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-context-'));
+    try {
+      fs.writeFileSync(path.join(sessionPath, 'session-context.jsonl'), `${JSON.stringify({ schemaVersion: 1, turnId: 'turn-1' })}\n`);
+      const store = new SessionContextStore({ sessions: { findSessionLocation: () => ({ sessionPath }) } } as unknown as StorageHost);
+      expect(() => store.readSessionContextJournal('session-1')).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+      expect(() => store.readSessionContextJournal('session-1', () => false)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+    } finally {
+      fs.rmSync(sessionPath, { recursive: true, force: true });
+    }
   });
 
   it('fails closed when a visible turn is missing from the journal', () => {

@@ -1,16 +1,39 @@
-import { createPublicKey, verify, type JsonWebKey } from 'crypto';
+import { createPublicKey, verify } from 'crypto';
+import { z } from 'zod';
 import { fetchJson, parseJwtPayload } from './oauthHttp';
 import type { OAuthFlowState } from './oauthTypes';
+
+/** The JOSE header fields this check reads; other header fields are allowed. */
+const IdentityHeaderSchema = z.object({ alg: z.literal('ES256'), kid: z.string().min(1) }).passthrough();
+/** The JWK Set fields this check reads; the key itself is handed to `createPublicKey` as published. */
+const JwksSchema = z.object({
+  keys: z.array(z.object({
+    kid: z.string().optional(), kty: z.string().optional(), crv: z.string().optional(),
+    use: z.string().optional(), alg: z.string().optional(),
+  }).passthrough()),
+}).passthrough();
+
+function parseIdentityHeader(segment: string): z.infer<typeof IdentityHeaderSchema> {
+  let value: unknown;
+  try {
+    value = JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
+  } catch (error) {
+    throw new Error('Grok identity token is malformed.', { cause: error });
+  }
+  const header = IdentityHeaderSchema.safeParse(value);
+  if (!header.success) throw new Error('Grok identity signing algorithm is unsupported.');
+  return header.data;
+}
 
 /** Verify the provider's signed identity, not just a decoded JWT payload. */
 export async function verifyGrokIdentity(token: string | undefined, flow: OAuthFlowState): Promise<void> {
   if (!token || !flow.jwksUri || !flow.issuer || !flow.nonce) throw new Error('Grok did not return a verifiable identity token.');
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Grok identity token is malformed.');
-  const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')) as { alg?: string; kid?: string };
-  if (header.alg !== 'ES256' || !header.kid) throw new Error('Grok identity signing algorithm is unsupported.');
-  const payload = await fetchJson(flow.jwksUri, { method: 'GET', signal: flow.abortController?.signal }) as { keys?: (JsonWebKey & { kid?: string; use?: string; alg?: string })[] };
-  const jwk = payload.keys?.find((key) => key.kid === header.kid && key.kty === 'EC' && key.crv === 'P-256'
+  const header = parseIdentityHeader(parts[0]);
+  const jwks = JwksSchema.safeParse(await fetchJson(flow.jwksUri, { method: 'GET', signal: flow.abortController?.signal }));
+  if (!jwks.success) throw new Error('Grok identity signing keys are malformed.');
+  const jwk = jwks.data.keys.find((key) => key.kid === header.kid && key.kty === 'EC' && key.crv === 'P-256'
     && (!key.use || key.use === 'sig') && (!key.alg || key.alg === 'ES256'));
   if (!jwk || !verify('sha256', Buffer.from(`${parts[0]}.${parts[1]}`), {
     key: createPublicKey({ key: jwk, format: 'jwk' }), dsaEncoding: 'ieee-p1363',

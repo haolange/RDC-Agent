@@ -275,3 +275,17 @@ it('recovers a prior portable-hash mismatch only by matching the archived prefix
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+it('rejects an installed view of this route that is not the record this module wrote', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-window-state-'));
+  try {
+    const file = path.join(directory, 'window-state.json');
+    fs.writeFileSync(file, JSON.stringify({ schemaVersion: 1, sessionId: 'child', routeFingerprint: hashScopedResource({ providerId: 'provider', modelId: 'model' }),
+      source: 'session://tool-outputs/source.json', sourceHash: 'source-hash', count: 'all', hash: 'h', portableHash: 'p', window: [] }));
+    mocks.list.mockReturnValue(['session://tool-outputs/source-window-state.json']);
+    mocks.resolve.mockReturnValue({ absolutePath: file });
+    mocks.read.mockReturnValue({ hash: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') });
+    const window = createExecutionContextWindow({ sessionId: 'child', provider: { id: 'provider' } as never, model: { modelId: 'model' } as never,
+      plan: {} as never, credentialHandle: 'opaque', tokenLimit: 650, estimate: values => values.length });
+    await expect(window.prepare([{ role: 'user', content: 'small input', timestamp: 1 }])).rejects.toMatchObject({ code: 'CONTEXT_WINDOW_INVALID' });
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});

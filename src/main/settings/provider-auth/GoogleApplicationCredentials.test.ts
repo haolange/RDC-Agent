@@ -52,4 +52,17 @@ describe('GoogleApplicationCredentials', () => {
       await fs.rm(root, { recursive: true, force: true });
     }
   });
+
+  it('rejects a credential document whose required fields are not strings without exchanging it', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-google-adc-'));
+    const credentialPath = path.join(root, 'adc.json');
+    await fs.writeFile(credentialPath, JSON.stringify({ type: 'authorized_user', client_id: 'client-id', client_secret: 7, refresh_token: 'refresh-value' }), 'utf8');
+    const fetchMock = vi.fn(async () => tokenResponse()) as unknown as typeof fetch;
+    try {
+      await expect(resolveGoogleVertexAccessToken(credentialPath, fetchMock)).rejects.toThrow('Unsupported Google application credential document type.');
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
 });

@@ -173,6 +173,14 @@ describe('RequestSnapshotStore', () => {
     expect(store.get('session-a', 'turn-1', 'snap-1')?.usage).toEqual({ inputTokens: 12, outputTokens: 3 });
   });
 
+  it('reports a stored snapshot that is not a request snapshot as damaged', () => {
+    store.write(sampleSnapshot());
+    const turnDir = path.join(rootPath, 'session-a', 'turn-1');
+    const file = path.join(turnDir, fs.readdirSync(turnDir).find((name) => name.endsWith('.json'))!);
+    fs.writeFileSync(file, JSON.stringify({ ...sampleSnapshot(), callIndex: 'first' }));
+    expect(() => store.get('session-a', 'turn-1', 'snap-1')).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+  });
+
   it('projects prompt resources and mailbox commits without parsing full current requests', () => {
     const segment = {
       id: 'project-instruction', kind: 'scoped-instruction' as const, scope: 'project' as const,

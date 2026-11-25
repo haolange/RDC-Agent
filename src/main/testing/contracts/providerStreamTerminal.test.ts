@@ -28,6 +28,8 @@ interface WireFamily {
   complete: string[];
   truncated: string[];
   malformed: string[];
+  /** A JSON frame whose fields are not the protocol's: a handled event of the wrong shape. */
+  mismatched: string[];
 }
 
 const chat = (delta: Record<string, unknown>, finishReason: string | null = null) =>
@@ -55,6 +57,7 @@ const FAMILIES: WireFamily[] = [
     complete: [chat({ content: 'Hello' }), chat({}, 'stop'), 'data: [DONE]\n\n'],
     truncated: [chat({ content: 'Hello wor' })],
     malformed: [chat({ content: 'A' }), sse('{"choices":[{"delta":{"content":"B'), chat({ content: 'C' }), chat({}, 'stop')],
+    mismatched: [chat({ content: 'A' }), chat({ tool_calls: { index: 0 } }), chat({}, 'stop')],
   },
   {
     name: 'anthropic messages',
@@ -72,6 +75,8 @@ const FAMILIES: WireFamily[] = [
     ],
     truncated: [anthropicStart, ...anthropicText],
     malformed: [anthropicStart, ...anthropicText, sse('{garbled'), sse({ type: 'message_stop' }, 'message_stop')],
+    mismatched: [anthropicStart, sse({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', name: 'read' } }, 'content_block_start'),
+      sse({ type: 'message_stop' }, 'message_stop')],
   },
   {
     name: 'ollama json lines',
@@ -90,6 +95,10 @@ const FAMILIES: WireFamily[] = [
       jsonLine('{garbled'),
       jsonLine({ message: { role: 'assistant', content: '' }, done: true, done_reason: 'stop' }),
     ],
+    mismatched: [
+      jsonLine({ message: { role: 'assistant', content: ['A'] }, done: false }),
+      jsonLine({ message: { role: 'assistant', content: '' }, done: true, done_reason: 'stop' }),
+    ],
   },
   {
     name: 'gemini generate content',
@@ -101,6 +110,7 @@ const FAMILIES: WireFamily[] = [
     complete: [gemini('Hello'), gemini('', 'STOP')],
     truncated: [gemini('Hello wor')],
     malformed: [gemini('A'), sse('{"candidates":[{'), gemini('', 'STOP')],
+    mismatched: [gemini('A'), sse({ candidates: [{ content: { parts: [{ functionCall: { args: {} } }] } }] }), gemini('', 'STOP')],
   },
   {
     name: 'openai responses',
@@ -117,6 +127,7 @@ const FAMILIES: WireFamily[] = [
     ],
     truncated: responsesText,
     malformed: [...responsesText, sse('{not json'), sse({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [] } })],
+    mismatched: [...responsesText, sse(['response.completed']), sse({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [] } })],
   },
 ];
 
@@ -181,6 +192,11 @@ describe('provider stream terminal contract', () => {
 
       it('reports a frame that is not JSON as a protocol violation instead of skipping it', async () => {
         const outcome = await run(family, family.malformed);
+        expect(outcome.error?.code).toBe('PROVIDER_STREAM_MALFORMED_FRAME');
+      });
+
+      it('reports a JSON frame that is not a frame of the protocol as a protocol violation', async () => {
+        const outcome = await run(family, family.mismatched);
         expect(outcome.error?.code).toBe('PROVIDER_STREAM_MALFORMED_FRAME');
       });
     });

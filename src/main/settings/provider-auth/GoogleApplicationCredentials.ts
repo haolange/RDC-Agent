@@ -2,6 +2,7 @@ import { createSign } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { z } from 'zod';
 import { roamingAppDataDir } from '../../platform/paths';
 
 const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
@@ -29,6 +30,14 @@ interface GoogleAuthorizedUserCredential {
 }
 
 type GoogleCredentialDocument = GoogleServiceAccountCredential | GoogleAuthorizedUserCredential;
+
+/** The fields of a gcloud credential file this module uses; gcloud writes others, which are ignored. */
+const GoogleCredentialDocumentSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('service_account'), client_email: z.string(), private_key: z.string(), token_uri: z.string().optional() }),
+  z.object({
+    type: z.literal('authorized_user'), client_id: z.string(), client_secret: z.string(), refresh_token: z.string(), token_uri: z.string().optional(),
+  }),
+]);
 
 interface CachedToken {
   accessToken: string;
@@ -105,24 +114,16 @@ function defaultCredentialPaths(): string[] {
 }
 
 async function readCredential(pathname: string): Promise<GoogleCredentialDocument | null> {
+  let text: string;
   try {
-    const parsed = JSON.parse(await fs.readFile(pathname, 'utf8')) as Partial<GoogleCredentialDocument>;
-    if (parsed.type === 'service_account'
-      && typeof parsed.client_email === 'string'
-      && typeof parsed.private_key === 'string') {
-      return parsed as GoogleServiceAccountCredential;
-    }
-    if (parsed.type === 'authorized_user'
-      && typeof parsed.client_id === 'string'
-      && typeof parsed.client_secret === 'string'
-      && typeof parsed.refresh_token === 'string') {
-      return parsed as GoogleAuthorizedUserCredential;
-    }
-    throw new Error('Unsupported Google application credential document type.');
+    text = await fs.readFile(pathname, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
   }
+  const credential = GoogleCredentialDocumentSchema.safeParse(JSON.parse(text));
+  if (!credential.success) throw new Error('Unsupported Google application credential document type.');
+  return credential.data;
 }
 
 async function metadataAccessToken(fetchImpl: typeof fetch): Promise<CachedToken> {

@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { StringDecoder } from 'node:string_decoder';
+import { AppError } from '@shared/errors/appError';
 
 export interface JsonlDiagnostic {
   line: number;
@@ -39,12 +40,16 @@ export function onJsonlTailRepair(listener: (repair: JsonlTailRepair) => void): 
 }
 
 /**
- * Read all JSON records from a JSONL file.
- * Mid-file parse failures are reported in diagnostics (not silently skipped).
- * A final unterminated segment that does not parse is an interrupted append: it is returned as `tornTail`, not as
- * corruption, so the complete records before it stay readable. File-level I/O errors throw.
+ * Read all records from a JSONL file. Each line is parsed as JSON and handed to `parse`, which throws when the value
+ * is not a valid record. Mid-file lines that are not JSON or not a valid record are reported in diagnostics (not
+ * silently skipped). A final unterminated segment that is not JSON is an interrupted append: it is returned as
+ * `tornTail`, not as corruption, so the complete records before it stay readable. File-level I/O errors throw.
  */
-export function readJsonl<T = unknown>(filePath: string, select?: (record: T) => boolean): JsonlReadResult<T> {
+export function readJsonl<T>(
+  filePath: string,
+  parse: (value: unknown) => T,
+  select?: (record: T) => boolean,
+): JsonlReadResult<T> {
   if (!fs.existsSync(filePath)) {
     return { records: [], diagnostics: [] };
   }
@@ -52,19 +57,23 @@ export function readJsonl<T = unknown>(filePath: string, select?: (record: T) =>
   const records: T[] = [];
   const diagnostics: JsonlDiagnostic[] = [];
   let lineNumber = 0;
+  const accept = (value: unknown) => {
+    let record: T;
+    try {
+      record = parse(value);
+    } catch (error) {
+      diagnostics.push({ line: lineNumber, error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    if (!select || select(record)) records.push(record);
+  };
   const consume = (line: string) => {
     lineNumber += 1;
     const trimmed = line.trim();
     if (!trimmed) return;
-    let record: T;
-    try {
-      record = JSON.parse(trimmed) as T;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      diagnostics.push({ line: lineNumber, error: message });
-      return;
-    }
-    if (!select || select(record)) records.push(record);
+    const value = parseJsonValue(trimmed);
+    if (value.ok) accept(value.value);
+    else diagnostics.push({ line: lineNumber, error: value.error });
   };
   const ioError = (error: unknown) => new Error(`Failed to read JSONL file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
   let fd: number;
@@ -90,10 +99,10 @@ export function readJsonl<T = unknown>(filePath: string, select?: (record: T) =>
     }
     pending += decoder.end();
     if (pending.trim()) {
-      const tail = parseRecord<T>(pending);
+      const tail = parseJsonValue(pending.trim());
       if (tail.ok) {
         lineNumber += 1;
-        if (!select || select(tail.record)) records.push(tail.record);
+        accept(tail.value);
       } else {
         const length = Buffer.byteLength(pending, 'utf8');
         tornTail = { offset: total - length, length };
@@ -106,11 +115,11 @@ export function readJsonl<T = unknown>(filePath: string, select?: (record: T) =>
   return tornTail ? { records, diagnostics, tornTail } : { records, diagnostics };
 }
 
-function parseRecord<T>(text: string): { ok: true; record: T } | { ok: false } {
+function parseJsonValue(text: string): { ok: true; value: unknown } | { ok: false; error: string } {
   try {
-    return { ok: true, record: JSON.parse(text.trim()) as T };
-  } catch {
-    return { ok: false };
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -135,7 +144,7 @@ export function ensureJsonlRecordBoundary(filePath: string): void {
     const boundary = lastNewlineBefore(fd, size);
     const tail = Buffer.alloc(size - boundary);
     fs.readSync(fd, tail, 0, tail.length, boundary);
-    if (parseRecord(tail.toString('utf8')).ok) {
+    if (parseJsonValue(tail.toString('utf8').trim()).ok) {
       fs.writeSync(fd, '\n', size);
       fs.fsyncSync(fd);
       return;
@@ -203,34 +212,11 @@ export function writeJsonl(filePath: string, items: unknown[]): void {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-/**
- * Filter JSONL records using a predicate.
- * Throws when the file contains unparsable lines.
- */
-export function filterJsonl<T = unknown>(
-  filePath: string,
-  predicate: (item: T) => boolean,
-): T[] {
-  const { records, diagnostics } = readJsonl<T>(filePath);
-  assertNoJsonlDiagnostics(filePath, diagnostics);
-  return records.filter(predicate);
-}
-
-/**
- * Count JSONL records.
- * Throws when the file contains unparsable lines.
- */
-export function countJsonl(filePath: string): number {
-  const { records, diagnostics } = readJsonl(filePath);
-  assertNoJsonlDiagnostics(filePath, diagnostics);
-  return records.length;
-}
-
 export function assertNoJsonlDiagnostics(filePath: string, diagnostics: JsonlDiagnostic[]): void {
   if (diagnostics.length === 0) return;
   const preview = diagnostics
     .slice(0, 3)
     .map((entry) => `line ${entry.line}: ${entry.error}`)
     .join('; ');
-  throw new Error(`JSONL corruption in ${filePath}: ${preview}`);
+  throw new AppError('STORAGE_CORRUPT', `JSONL corruption in ${filePath}: ${preview}`, { params: { file: path.basename(filePath) } });
 }

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import crypto from 'crypto';
+import { z } from 'zod';
 import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { AppError } from '@shared/errors/appError';
 import { ContextManager, type ContextManagerConfig } from '../agent/ContextManager';
@@ -33,6 +34,26 @@ const portableContextMessages = (messages: AgentMessage[]): AgentMessage[] => me
 });
 const portableContextHash = (messages: AgentMessage[]): string => hashScopedResource(portableContextMessages(messages));
 type WindowMedia = { messageIndex: number; blockIndex: number; uri: string; hash: string; mimeType: string };
+const index = z.number().int().nonnegative().safe();
+/** Which execution installed a persisted view; a view of another session, version or route is not a candidate. */
+const WindowStateOwnerSchema = z.object({ schemaVersion: z.literal(1), sessionId: z.string(), routeFingerprint: z.string() });
+/** The installed view; its messages are the portable projection this module wrote and hashed. */
+const WindowStateSchema = z.object({
+  source: z.string().min(1),
+  sourceHash: z.string().min(1),
+  count: z.number().int().safe(),
+  hash: z.string().min(1),
+  portableHash: z.string().min(1),
+  window: z.array(z.custom<AgentMessage>((value) => typeof value === 'object' && value !== null && !Array.isArray(value))),
+  media: z.array(z.object({ messageIndex: index, blockIndex: index, uri: z.string(), hash: z.string(), mimeType: z.string() })).optional(),
+});
+function parseWindowState(bytes: Buffer): unknown {
+  try {
+    return JSON.parse(bytes.toString('utf8'));
+  } catch (error) {
+    throw new AppError('CONTEXT_WINDOW_INVALID', 'persisted view is not JSON.', { cause: error });
+  }
+}
 function restoreWindowMedia(owner: string, window: AgentMessage[], media: WindowMedia[]): AgentMessage[] {
   const restored = structuredClone(window);
   const seen = new Set<string>();
@@ -40,9 +61,7 @@ function restoreWindowMedia(owner: string, window: AgentMessage[], media: Window
     const key = `${entry.messageIndex}:${entry.blockIndex}`;
     const message = restored[entry.messageIndex];
     const block = message && Array.isArray(message.content) ? message.content[entry.blockIndex] : undefined;
-    if (!Number.isSafeInteger(entry.messageIndex) || entry.messageIndex < 0
-      || !Number.isSafeInteger(entry.blockIndex) || entry.blockIndex < 0 || seen.has(key)
-      || block?.type !== 'text' || !block.text.includes(entry.uri) || !block.text.includes(entry.hash)) {
+    if (seen.has(key) || block?.type !== 'text' || !block.text.includes(entry.uri) || !block.text.includes(entry.hash)) {
       throw new AppError('CONTEXT_WINDOW_INVALID', 'malformed retained media reference.');
     }
     const image = sessionArtifactResolver.read(owner, entry.uri, { expectedHash: entry.hash, includeImageData: true });
@@ -105,24 +124,20 @@ export function createExecutionContextWindow(input: {
         const checked = sessionArtifactResolver.read(owner, uri, { limit: 1 });
         const bytes = fs.readFileSync(sessionArtifactResolver.resolve(owner, uri).absolutePath);
         if (crypto.createHash('sha256').update(bytes).digest('hex') !== checked.hash) throw new AppError('CONTEXT_WINDOW_CHANGED', 'persisted view changed during read.');
-        const record = JSON.parse(bytes.toString('utf8')) as {
-          schemaVersion?: number; sessionId?: string; routeFingerprint?: string;
-          source?: string; sourceHash?: string; count?: number; hash?: string; portableHash?: string; window?: AgentMessage[]; media?: WindowMedia[];
-        };
-        if (record.schemaVersion !== 1 || record.sessionId !== input.sessionId) continue;
+        const value = parseWindowState(bytes);
+        const installedBy = WindowStateOwnerSchema.safeParse(value);
+        if (!installedBy.success || installedBy.data.sessionId !== input.sessionId) continue;
         // The persisted fingerprint names the exact execution that installed
         // this view. Check its committed route against the current route;
         // model provenance may advance after a successful request without
         // changing the provider, credential scope or execution contract.
         if (routeIdentity) {
-          const prior = priorRoutes?.get(record.routeFingerprint ?? '');
+          const prior = priorRoutes?.get(installedBy.data.routeFingerprint);
           if (!prior || stableRouteHash(prior) !== stableRouteHash(routeIdentity)) continue;
-        } else if (record.routeFingerprint !== routeFingerprint) continue;
-        if (!record.source || !record.sourceHash || typeof record.count !== 'number' || !Number.isSafeInteger(record.count) || !record.hash || !record.portableHash || !Array.isArray(record.window)) {
-          throw new AppError('CONTEXT_WINDOW_INVALID', 'persisted view is incomplete.');
-        }
-        if (record.media !== undefined && !Array.isArray(record.media)) throw new AppError('CONTEXT_WINDOW_INVALID', 'malformed retained media index.');
-        record.window = portableContextMessages(restoreWindowMedia(owner, record.window, record.media ?? []));
+        } else if (installedBy.data.routeFingerprint !== routeFingerprint) continue;
+        const stored = WindowStateSchema.safeParse(value);
+        if (!stored.success) throw new AppError('CONTEXT_WINDOW_INVALID', `persisted view is incomplete: ${z.prettifyError(stored.error)}`);
+        const record = { ...stored.data, window: portableContextMessages(restoreWindowMedia(owner, stored.data.window, stored.data.media ?? [])) };
         if (record.count > messages.length) continue;
         const prefix = messages.slice(0, record.count);
         if (portableContextHash(prefix) !== record.portableHash) {

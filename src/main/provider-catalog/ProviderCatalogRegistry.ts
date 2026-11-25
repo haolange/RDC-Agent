@@ -28,7 +28,7 @@ const loadedSurfaces = new Map<string, ProviderSurfaceManifest>();
 const surfaceLoads = new Map<string, Promise<ProviderSurfaceManifest>>();
 
 function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function isCompiledIndex(value: unknown): value is CompiledProviderCatalogIndex {

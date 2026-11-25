@@ -1,7 +1,9 @@
-import { InvestigationError } from './investigationErrors';
+import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { collectProjectedClaims } from './investigationInvariants';
 import { hashesEqual, serializeInvestigationJson, sha256Prefixed } from './investigationHash';
+import { parseRecordText, parseRecordTextOf } from './investigationReadIntegrity';
 import { collectRecordKeys, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
+import type { InvestigationRecordByType } from './investigationRecordSchemas';
 import type {
   ChallengeRecord,
   ClaimRecord,
@@ -12,14 +14,17 @@ import type {
   InvestigationArtifactKind,
   InvestigationArtifactManifest,
   InvestigationRecord,
+  InvestigationRecordType,
   InvestigationReport,
   MissionCheckpoint,
 } from '@shared/types/renderdocInvestigation';
 import type { InvestigationTxnMutation } from './investigationTxn';
 
 export interface InvestigationMutationReader {
-  readRecordBody<T>(entry: InvestigationIndexEntry): T;
-  readJson<T>(uri: string): T;
+  readRecordBody(entry: InvestigationIndexEntry): InvestigationRecord;
+  readRecordBodyOf<Type extends InvestigationRecordType>(entry: InvestigationIndexEntry, recordType: Type): InvestigationRecordByType[Type];
+  /** A stored JSON document; the caller validates the shape it expects. */
+  readJson(uri: string): unknown;
   parseManifest(value: unknown): InvestigationArtifactManifest;
 }
 
@@ -34,18 +39,30 @@ export function withPendingInvestigationMutations(
     }
     return undefined;
   };
+  const staged = (entry: InvestigationIndexEntry): string | undefined => {
+    const text = pending(entry.contentUri);
+    if (text !== undefined && !hashesEqual(entry.contentHash, sha256Prefixed(text))) {
+      throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'staged record does not match staged index');
+    }
+    return text;
+  };
   return {
-    readRecordBody<T>(entry: InvestigationIndexEntry): T {
-      const text = pending(entry.contentUri);
-      if (text === undefined) return reader.readRecordBody<T>(entry);
-      if (!hashesEqual(entry.contentHash, sha256Prefixed(text))) {
-        throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'staged record does not match staged index');
-      }
-      return JSON.parse(text) as T;
+    readRecordBody(entry) {
+      const text = staged(entry);
+      return text === undefined ? reader.readRecordBody(entry) : parseRecordText(entry, text);
     },
-    readJson<T>(uri: string): T {
+    readRecordBodyOf(entry, recordType) {
+      const text = staged(entry);
+      return text === undefined ? reader.readRecordBodyOf(entry, recordType) : parseRecordTextOf(entry, text, recordType);
+    },
+    readJson(uri) {
       const text = pending(uri);
-      return text === undefined ? reader.readJson<T>(uri) : JSON.parse(text) as T;
+      if (text === undefined) return reader.readJson(uri);
+      try {
+        return JSON.parse(text);
+      } catch (error) {
+        throw toInvestigationError(error);
+      }
     },
     parseManifest: value => reader.parseManifest(value),
   };
@@ -69,7 +86,7 @@ export function retiredRecordKeysForReplacement(
 ): Set<string> {
   if (!replaced) return new Set();
   const incomingIds = new Set(collectRecordKeys(incomingKind, incoming).map(recordKeyToken));
-  const retired = new Set(collectRecordKeys(replaced.kind, reader.readRecordBody<InvestigationRecord>(replaced))
+  const retired = new Set(collectRecordKeys(replaced.kind, reader.readRecordBody(replaced))
     .filter(key => (key.space === 'claim' || key.space === 'evidence') && !incomingIds.has(recordKeyToken(key)))
     .map(recordKeyToken));
   if (collectProjectedClaims(incoming).some(claim => [...(claim.supports ?? []), ...(claim.contradicts ?? [])]
@@ -88,7 +105,7 @@ export function collectStalePropagation(
   let working = index;
   for (const entry of working.artifacts.filter((item) => item.status !== 'superseded')) {
     if (entry.kind === 'evidence') {
-      const evidence = reader.readRecordBody<EvidenceRecord>(entry);
+      const evidence = reader.readRecordBodyOf(entry, 'EvidenceRecord');
       if (evidence.worldStateId !== worldStateId || evidence.stale) continue;
       const rewritten = collectStaleArtifact(reader, entry, { ...evidence, stale: true }, working);
       mutations.push(...rewritten.mutations);
@@ -96,7 +113,7 @@ export function collectStalePropagation(
       continue;
     }
     if (entry.kind !== 'evidence_pack') continue;
-    const pack = reader.readRecordBody<EvidencePack>(entry);
+    const pack = reader.readRecordBodyOf(entry, 'EvidencePack');
     let changed = false;
     const items = pack.items.map((evidence) => {
       if (evidence.worldStateId !== worldStateId || evidence.stale) return evidence;
@@ -124,7 +141,7 @@ export function collectSupersededWorldStateDependents(
     changed = false;
     for (const entry of working.artifacts) {
       if (entry.status !== 'ready' && entry.status !== 'draft') continue;
-      const manifest = reader.parseManifest(reader.readJson<InvestigationArtifactManifest>(entry.manifestUri));
+      const manifest = reader.parseManifest(reader.readJson(entry.manifestUri));
       const boundToRetiredState = entry.kind !== 'world_state' && manifest.worldStateId === worldStateId;
       const citesStaleSource = manifest.sourceRefs.some((ref) => (
         working.artifacts.some((source) => source.artifactId === ref.artifactId && source.status === 'stale')
@@ -155,7 +172,7 @@ export function collectRetiredRecordDependents(
   // checkpoint left live by an earlier, incomplete supersede transaction.
   const unavailable = new Set([...retiredRecordKeys, ...index.artifacts
     .filter(entry => entry.status === 'stale')
-    .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody<InvestigationRecord>(entry)).map(recordKeyToken))]);
+    .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody(entry)).map(recordKeyToken))]);
   let working = index;
   let changed = true;
   const citesRecord = (space: 'claim' | 'evidence' | 'experiment' | 'challenge', id: string | null | undefined): boolean => (
@@ -166,7 +183,7 @@ export function collectRetiredRecordDependents(
     changed = false;
     for (const entry of working.artifacts) {
       if (entry.status !== 'ready' && entry.status !== 'draft') continue;
-      const record = reader.readRecordBody<InvestigationRecord>(entry);
+      const record = reader.readRecordBody(entry);
       const citesExperiment = (id: string | null | undefined): boolean => citesRecord('experiment', id);
       let dependent = false;
       switch (entry.kind) {
@@ -232,7 +249,7 @@ export function collectRetiredRecordDependents(
         mutations.push(...stale.mutations);
         working = stale.index;
       } else {
-        const manifest = reader.parseManifest(reader.readJson<InvestigationArtifactManifest>(entry.manifestUri));
+        const manifest = reader.parseManifest(reader.readJson(entry.manifestUri));
         manifest.status = 'stale';
         mutations.push({ uri: entry.manifestUri, text: serializeInvestigationJson(manifest), role: 'stale' });
         working = upsertIndexEntry(working, { ...entry, status: 'stale' });
@@ -253,7 +270,7 @@ export function collectSupersede(
   if (!entry) {
     throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `supersedes ${artifactId}`);
   }
-  const manifest = reader.readJson<InvestigationArtifactManifest>(entry.manifestUri);
+  const manifest = reader.parseManifest(reader.readJson(entry.manifestUri));
   manifest.status = 'superseded';
   const stale = collectRetiredRecordDependents(reader, retiredRecordKeys,
     upsertIndexEntry(index, { ...entry, status: 'superseded' }));
@@ -272,7 +289,7 @@ function collectStaleArtifact(
 ): { mutations: InvestigationTxnMutation[]; index: InvestigationIndexDocument } {
   const contentText = serializeInvestigationJson(record);
   const contentHash = sha256Prefixed(contentText);
-  const manifest = reader.parseManifest(reader.readJson<InvestigationArtifactManifest>(entry.manifestUri));
+  const manifest = reader.parseManifest(reader.readJson(entry.manifestUri));
   manifest.contentHash = contentHash;
   manifest.status = 'stale';
   let working = upsertIndexEntry(index, { ...entry, contentHash, status: 'stale' });
@@ -296,7 +313,7 @@ function collectReadyDependentsStale(
   const currentHash = working.artifacts.find((entry) => entry.artifactId === sourceArtifactId)?.contentHash;
   for (const entry of working.artifacts.filter((item) => item.artifactId !== sourceArtifactId)) {
     if (entry.status !== 'ready') continue;
-    const manifest = reader.parseManifest(reader.readJson<InvestigationArtifactManifest>(entry.manifestUri));
+    const manifest = reader.parseManifest(reader.readJson(entry.manifestUri));
     if (manifest.status !== 'ready') continue;
     const drifted = manifest.sourceRefs.some((ref) => (
       ref.artifactId === sourceArtifactId

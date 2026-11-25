@@ -222,3 +222,16 @@ it('recovers a split source only after checking each current part hash', async (
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it('rejects an archived source whose journal is not the projection this module wrote', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-compaction-source-'));
+  try {
+    const target = path.join(directory, 'source.json');
+    fs.writeFileSync(target, JSON.stringify({ encoding: 'json-chunks', chunks: [JSON.stringify({ journalMessages: 'not a journal', media: [] })] }));
+    io.resolve.mockReturnValue({ absolutePath: target });
+    expect(() => readCompactionAuthorityJournal('session', 'session://tool-outputs/compaction-authority/source.json', 'a'.repeat(64)))
+      .toThrow(expect.objectContaining({ code: 'CONTEXT_WINDOW_INVALID' }));
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});

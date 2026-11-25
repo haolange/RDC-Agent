@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { z, type ZodType } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
 import { assertHash, assertSession, atomicWrite, missing, projectLock, safePath, treeBytes } from './replayFileSafety';
@@ -8,6 +9,51 @@ import { replayPngCodec } from './replayPngCodec';
 import type { ReplayHistoryEntry, ReplayHistoryOptions, ReplayHistoryScope, ReplayManifest, ReplayObservation, ReplaySelection } from './replayStorageTypes';
 
 export type { ReplayHistoryEntry, ReplayHistoryScope, ReplayObservation, ReplaySelection } from './replayStorageTypes';
+
+const optionalNumber = z.number().optional();
+const ReplayHistoryEntrySchema: ZodType<ReplayHistoryEntry> = z.object({
+  eventId: z.number().int().nonnegative().safe().nullable(),
+  resourceId: z.string().optional(),
+  operationId: z.string(),
+  toolCallId: z.string().optional(),
+  summary: z.string(),
+  modificationState: z.string().optional(),
+  timestamp: z.number(),
+  nativeRevision: optionalNumber,
+  bindingGeneration: optionalNumber,
+  displayParameters: z.object({ mip: optionalNumber, slice: optionalNumber, sample: optionalNumber, rangeMin: optionalNumber, rangeMax: optionalNumber }).optional(),
+  sourceWidth: optionalNumber,
+  sourceHeight: optionalNumber,
+  failure: z.string().optional(),
+  sequence: z.number(),
+  imageSha256: z.string().optional(),
+  width: optionalNumber,
+  height: optionalNumber,
+  saved: z.literal(true),
+}).refine((entry) => entry.eventId !== null || (Boolean(entry.failure) && !entry.imageSha256), 'a failed observation has a failure and no image');
+const ReplayManifestSchema: ZodType<ReplayManifest> = z.object({
+  captureSha256: z.string(),
+  sessionId: z.string(),
+  entries: z.array(ReplayHistoryEntrySchema),
+});
+const ReplaySelectionSchema: ZodType<ReplaySelection> = z.object({
+  inputId: z.string().min(1),
+  captureSha256: z.string().optional(),
+  deviceId: z.string().optional(),
+});
+
+/** A replay document this store wrote; anything else is reported with `code`, never repaired. */
+function parseReplayDocument<T>(schema: ZodType<T>, text: string, code: 'REPLAY_MANIFEST_CORRUPT' | 'REPLAY_SELECTION_CORRUPT'): T {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    throw new AppError(code, undefined, { cause: error });
+  }
+  const document = schema.safeParse(value);
+  if (!document.success) throw new AppError(code, z.prettifyError(document.error));
+  return document.data;
+}
 
 /** Main-owned history; callers supply an authorized project/session scope, never renderer paths. */
 export class ReplayHistoryStore {
@@ -31,15 +77,12 @@ export class ReplayHistoryStore {
       if (missing(error)) return { sessionId: scope.sessionId, captureSha256: scope.captureSha256, entries: [] };
       throw error;
     }
-    let data: ReplayManifest;
-    try { data = JSON.parse(text) as ReplayManifest; } catch { throw new AppError('REPLAY_MANIFEST_CORRUPT'); }
-    if (data.sessionId !== scope.sessionId || data.captureSha256 !== scope.captureSha256 || !Array.isArray(data.entries)) {
+    const data = parseReplayDocument(ReplayManifestSchema, text, 'REPLAY_MANIFEST_CORRUPT');
+    if (data.sessionId !== scope.sessionId || data.captureSha256 !== scope.captureSha256) {
       throw new AppError('REPLAY_MANIFEST_CORRUPT');
     }
     data.entries.forEach((entry, index) => {
-      if (entry.sequence !== index + 1 || !(entry.eventId === null ? Boolean(entry.failure) : Number.isSafeInteger(entry.eventId) && entry.eventId >= 0)
-        || !Number.isFinite(entry.timestamp) || typeof entry.summary !== 'string' || typeof entry.operationId !== 'string'
-        || entry.saved !== true || (entry.eventId === null && entry.imageSha256)) throw new AppError('REPLAY_MANIFEST_CORRUPT');
+      if (entry.sequence !== index + 1) throw new AppError('REPLAY_MANIFEST_CORRUPT');
       if (entry.imageSha256) assertHash(entry.imageSha256);
     });
     return data;
@@ -120,10 +163,7 @@ export class ReplayHistoryStore {
     const target = path.join(this.session(projectRoot, sessionId), 'selection.json');
     await safePath(projectRoot, target);
     try {
-      const value = JSON.parse(await fs.readFile(target, 'utf8')) as ReplaySelection;
-      if (typeof value.inputId !== 'string' || !value.inputId || (value.deviceId !== undefined && typeof value.deviceId !== 'string')) {
-        throw new AppError('REPLAY_SELECTION_CORRUPT');
-      }
+      const value = parseReplayDocument(ReplaySelectionSchema, await fs.readFile(target, 'utf8'), 'REPLAY_SELECTION_CORRUPT');
       if (value.captureSha256) assertHash(value.captureSha256);
       return value;
     } catch (error) { if (missing(error)) return null; throw error; }

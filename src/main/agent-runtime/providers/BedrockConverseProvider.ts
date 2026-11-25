@@ -11,6 +11,7 @@
  * 使用原生 fetch。流式帧走共享 parseSSE，不引入第三方 SDK。
  */
 
+import { z } from 'zod';
 import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
@@ -100,53 +101,37 @@ interface BedrockConverseRequest {
   additionalModelRequestFields?: Record<string, unknown>;
 }
 
-// Stream event types
-interface BedrockMessageStartEvent {
-  role?: string;
-}
-
-interface BedrockContentBlockStartEvent {
-  contentBlockIndex?: number;
-  start?: {
-    toolUse?: { toolUseId?: string; name?: string };
-  };
-}
-
-interface BedrockContentBlockDeltaEvent {
-  contentBlockIndex?: number;
-  delta?: {
-    text?: string;
-    toolUse?: { input?: string };
-    reasoningContent?: { text?: string };
-  };
-}
-
-interface BedrockContentBlockStopEvent {
-  contentBlockIndex?: number;
-}
-
-interface BedrockMessageStopEvent {
-  stopReason?: string;
-}
-
-interface BedrockMetadataEvent {
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    totalTokens?: number;
-    cacheReadInputTokens?: number;
-    cacheWriteInputTokens?: number;
-  };
-}
-
-interface BedrockStreamEvent {
-  messageStart?: BedrockMessageStartEvent;
-  contentBlockStart?: BedrockContentBlockStartEvent;
-  contentBlockDelta?: BedrockContentBlockDeltaEvent;
-  contentBlockStop?: BedrockContentBlockStopEvent;
-  messageStop?: BedrockMessageStopEvent;
-  metadata?: BedrockMetadataEvent;
-}
+/** One Converse stream event; event kinds and fields this adapter does not read pass through. */
+const optionalIndex = z.number().optional();
+const BedrockStreamEventSchema = z.object({
+  messageStart: z.object({ role: z.string().optional() }).passthrough().optional(),
+  contentBlockStart: z.object({
+    contentBlockIndex: optionalIndex,
+    start: z.object({
+      toolUse: z.object({ toolUseId: z.string().optional(), name: z.string().optional() }).passthrough().optional(),
+    }).passthrough().optional(),
+  }).passthrough().optional(),
+  contentBlockDelta: z.object({
+    contentBlockIndex: optionalIndex,
+    delta: z.object({
+      text: z.string().optional(),
+      toolUse: z.object({ input: z.string().optional() }).passthrough().optional(),
+      reasoningContent: z.object({ text: z.string().optional() }).passthrough().optional(),
+    }).passthrough().optional(),
+  }).passthrough().optional(),
+  contentBlockStop: z.object({ contentBlockIndex: optionalIndex }).passthrough().optional(),
+  messageStop: z.object({ stopReason: z.string().optional() }).passthrough().optional(),
+  metadata: z.object({
+    usage: z.object({
+      inputTokens: z.number().optional(),
+      outputTokens: z.number().optional(),
+      totalTokens: z.number().optional(),
+      cacheReadInputTokens: z.number().optional(),
+      cacheWriteInputTokens: z.number().optional(),
+    }).passthrough().optional(),
+  }).passthrough().optional(),
+}).passthrough();
+type BedrockStreamEvent = z.infer<typeof BedrockStreamEventSchema>;
 
 export class BedrockConverseProvider implements ProviderStrategy {
   readonly api = PROVIDER_API;
@@ -407,7 +392,7 @@ async function* parseBedrockSSE(
   options: ProviderStreamReadOptions,
 ): AsyncGenerator<BedrockStreamEvent> {
   for await (const data of parseSSE(response, signal, options)) {
-    yield parseProviderFrame<BedrockStreamEvent>(data, options.providerApi);
+    yield parseProviderFrame(data, options.providerApi, BedrockStreamEventSchema);
   }
 }
 

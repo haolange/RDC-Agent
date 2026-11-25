@@ -33,6 +33,8 @@ import {
   type EvidenceRecord,
   type ExperimentRecord,
   type InvestigationArtifactManifest,
+  type InvestigationRecord,
+  type InvestigationRecordType,
   type InvestigationReport,
   type MissionCheckpoint,
   type WorldState,
@@ -339,7 +341,19 @@ export const InvestigationArtifactManifestSchema: ZodType<InvestigationArtifactM
   createdAt: nonEmpty,
 }).strict();
 
-const RECORD_SCHEMAS: Record<string, ZodType<unknown>> = {
+export interface InvestigationRecordByType {
+  WorldState: WorldState;
+  EvidenceRecord: EvidenceRecord;
+  EvidencePack: EvidencePack;
+  ClaimRecord: ClaimRecord;
+  ClaimSet: ClaimSet;
+  ExperimentRecord: ExperimentRecord;
+  ChallengeRecord: ChallengeRecord;
+  MissionCheckpoint: MissionCheckpoint;
+  InvestigationReport: InvestigationReport;
+}
+
+const RECORD_SCHEMAS: { [Type in InvestigationRecordType]: ZodType<InvestigationRecordByType[Type]> } = {
   WorldState: WorldStateSchema,
   EvidenceRecord: EvidenceRecordSchema,
   EvidencePack: EvidencePackSchema,
@@ -354,13 +368,12 @@ const RECORD_SCHEMAS: Record<string, ZodType<unknown>> = {
 /** The write shape exposed to callers; persisted records retain their canonical read shape. */
 export function getInvestigationRecordJsonSchema(recordType: string): Record<string, unknown> {
   const schema = recordType === 'EvidenceRecord' ? EvidenceWriteShape
-    : recordType === 'EvidencePack' ? EvidencePackWriteShape : RECORD_SCHEMAS[recordType];
-  if (!schema) throw new Error(`unknown recordType ${recordType}`);
+    : recordType === 'EvidencePack' ? EvidencePackWriteShape : RECORD_SCHEMAS[requireRecordType(recordType)];
   return z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as Record<string, unknown>;
 }
 
 /** Derive the stored duplicate from the caller's single set of hash-bound references. */
-export function parseInvestigationWriteRecord(recordType: string, value: unknown): unknown {
+export function parseInvestigationWriteRecord(recordType: string, value: unknown): InvestigationRecord {
   if (recordType === 'EvidenceRecord') {
     const input = EvidenceWriteShape.parse(value);
     return EvidenceRecordSchema.parse({ ...input, contentHashes: input.artifactRefs.map(ref => ref.expectedHash) });
@@ -374,12 +387,22 @@ export function parseInvestigationWriteRecord(recordType: string, value: unknown
   return parseInvestigationRecord(recordType, value);
 }
 
-export function parseInvestigationRecord(recordType: string, value: unknown): unknown {
-  const schema = RECORD_SCHEMAS[recordType];
-  if (!schema) {
-    throw new Error(`unknown recordType ${recordType}`);
-  }
-  return schema.parse(value);
+function requireRecordType(recordType: string): InvestigationRecordType {
+  const known = INVESTIGATION_RECORD_TYPES.find((candidate) => candidate === recordType);
+  if (!known) throw new Error(`unknown recordType ${recordType}`);
+  return known;
+}
+
+export function parseInvestigationRecord(recordType: string, value: unknown): InvestigationRecord {
+  return RECORD_SCHEMAS[requireRecordType(recordType)].parse(value);
+}
+
+/** A record of one known type; callers that need the specific shape name the type they expect. */
+export function parseInvestigationRecordOf<Type extends InvestigationRecordType>(
+  recordType: Type,
+  value: unknown,
+): InvestigationRecordByType[Type] {
+  return RECORD_SCHEMAS[recordType].parse(value);
 }
 
 const OPAQUE_KEYS = new Set([

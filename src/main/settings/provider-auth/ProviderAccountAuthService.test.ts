@@ -336,6 +336,16 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     expect(bundle.authorizationMode).toBe('browser');
   });
 
+  it('does not treat a stored credential that is not an account bundle as a connected account', async () => {
+    const service = new ProviderAccountAuthService();
+    mocks.oauthSecret = JSON.stringify({ providerId: 'grok-account', accessToken: 42, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(service.test('grok-account')).resolves.toMatchObject({ connected: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('does not report a failed live catalog refresh as connected', async () => {
     const service = new ProviderAccountAuthService();
     mocks.provider = {

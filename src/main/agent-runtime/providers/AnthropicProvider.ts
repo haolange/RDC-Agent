@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
@@ -5,7 +6,7 @@ import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, parseProviderFrame, unhandledProviderEvent } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import {
@@ -38,65 +39,48 @@ const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
 const PROVIDER_API = 'anthropic-messages';
 
-interface AnthropicEventBase {
-  type: string;
-}
+const AnthropicUsageSchema = z.object({
+  input_tokens: z.number().nullish(),
+  output_tokens: z.number().nullish(),
+  cache_read_input_tokens: z.number().nullish(),
+  cache_creation_input_tokens: z.number().nullish(),
+  speed: z.string().nullish(),
+}).passthrough();
 
-interface AnthropicContentBlockStart extends AnthropicEventBase {
-  type: 'content_block_start';
-  index: number;
-  content_block:
-    | { type: 'text'; text?: string }
-    | { type: 'thinking'; thinking?: string; signature?: string }
-    | { type: 'redacted_thinking'; data: string }
-    | { type: 'tool_use'; id: string; name: string; input?: unknown };
-}
+const AnthropicContentBlockSchema = z.union([
+  z.object({ type: z.literal('text'), text: z.string().optional() }).passthrough(),
+  z.object({ type: z.literal('thinking'), thinking: z.string().optional(), signature: z.string().optional() }).passthrough(),
+  z.object({ type: z.literal('redacted_thinking'), data: z.string() }).passthrough(),
+  z.object({ type: z.literal('tool_use'), id: z.string(), name: z.string(), input: z.unknown().optional() }).passthrough(),
+  unhandledProviderEvent(['text', 'thinking', 'redacted_thinking', 'tool_use']),
+]);
 
-interface AnthropicContentBlockDelta extends AnthropicEventBase {
-  type: 'content_block_delta';
-  index: number;
-  delta:
-    | { type: 'text_delta'; text: string }
-    | { type: 'thinking_delta'; thinking: string }
-    | { type: 'signature_delta'; signature: string }
-    | { type: 'input_json_delta'; partial_json: string };
-}
+const AnthropicDeltaSchema = z.union([
+  z.object({ type: z.literal('text_delta'), text: z.string() }).passthrough(),
+  z.object({ type: z.literal('thinking_delta'), thinking: z.string() }).passthrough(),
+  z.object({ type: z.literal('signature_delta'), signature: z.string() }).passthrough(),
+  z.object({ type: z.literal('input_json_delta'), partial_json: z.string() }).passthrough(),
+  unhandledProviderEvent(['text_delta', 'thinking_delta', 'signature_delta', 'input_json_delta']),
+]);
 
-interface AnthropicContentBlockStop extends AnthropicEventBase {
-  type: 'content_block_stop';
-  index: number;
-}
-
-interface AnthropicMessageDelta extends AnthropicEventBase {
-  type: 'message_delta';
-  delta: { stop_reason?: string | null };
-  usage?: {
-    output_tokens?: number;
-    cache_read_input_tokens?: number;
-    cache_creation_input_tokens?: number;
-    speed?: 'standard' | 'fast';
-  };
-}
-
-interface AnthropicMessageStart extends AnthropicEventBase {
-  type: 'message_start';
-  message: {
-    model?: string;
-    id?: string;
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_read_input_tokens?: number;
-      cache_creation_input_tokens?: number;
-      speed?: 'standard' | 'fast';
-    };
-  };
-}
-
-interface AnthropicErrorEvent extends AnthropicEventBase {
-  type: 'error';
-  error: { type: string; message: string };
-}
+/** One Messages stream event; event types this adapter does not handle (ping, ...) are ignored. */
+const AnthropicEventSchema = z.union([
+  z.object({
+    type: z.literal('message_start'),
+    message: z.object({ model: z.string().nullish(), id: z.string().nullish(), usage: AnthropicUsageSchema.nullish() }).passthrough(),
+  }).passthrough(),
+  z.object({ type: z.literal('content_block_start'), index: z.number(), content_block: AnthropicContentBlockSchema }).passthrough(),
+  z.object({ type: z.literal('content_block_delta'), index: z.number(), delta: AnthropicDeltaSchema }).passthrough(),
+  z.object({ type: z.literal('content_block_stop'), index: z.number() }).passthrough(),
+  z.object({
+    type: z.literal('message_delta'),
+    delta: z.object({ stop_reason: z.string().nullish() }).passthrough(),
+    usage: AnthropicUsageSchema.nullish(),
+  }).passthrough(),
+  z.object({ type: z.literal('message_stop') }).passthrough(),
+  z.object({ type: z.literal('error'), error: z.object({ type: z.string(), message: z.string() }).passthrough() }).passthrough(),
+  unhandledProviderEvent(['message_start', 'content_block_start', 'content_block_delta', 'content_block_stop', 'message_delta', 'message_stop', 'error']),
+]);
 
 export interface AnthropicProviderOptions {
   baseUrl?: string;
@@ -209,11 +193,11 @@ export class AnthropicProvider implements ProviderStrategy {
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
-        const event = parseProviderFrame<AnthropicEventBase>(data, PROVIDER_API);
+        const event = parseProviderFrame(data, PROVIDER_API, AnthropicEventSchema);
 
         switch (event.type) {
           case 'message_start': {
-            const evt = event as AnthropicMessageStart;
+            const evt = event;
             responseId = evt.message.id?.trim() || responseId;
             if (typeof evt.message.model === 'string') builder.setExecution({ modelId: evt.message.model });
             inputTokens = evt.message.usage?.input_tokens ?? inputTokens;
@@ -239,7 +223,7 @@ export class AnthropicProvider implements ProviderStrategy {
             break;
           }
           case 'content_block_start': {
-            const evt = event as AnthropicContentBlockStart;
+            const evt = event;
             const block = evt.content_block;
             const blockRef = refFor(evt.index);
             if (block.type === 'text') {
@@ -290,7 +274,7 @@ export class AnthropicProvider implements ProviderStrategy {
             break;
           }
           case 'content_block_delta': {
-            const evt = event as AnthropicContentBlockDelta;
+            const evt = event;
             if (evt.delta.type === 'text_delta') {
               sawOutput = true;
               builder.appendText(refFor(evt.index), evt.delta.text);
@@ -322,7 +306,7 @@ export class AnthropicProvider implements ProviderStrategy {
             break;
           }
           case 'content_block_stop': {
-            const evt = event as AnthropicContentBlockStop;
+            const evt = event;
             const ref = refFor(evt.index);
             const kind = blockKinds.get(evt.index);
             if (kind === 'text') builder.endText(ref);
@@ -332,7 +316,7 @@ export class AnthropicProvider implements ProviderStrategy {
             break;
           }
           case 'message_delta': {
-            const evt = event as AnthropicMessageDelta;
+            const evt = event;
             if (evt.delta.stop_reason) stopReason = evt.delta.stop_reason;
             if (typeof evt.usage?.output_tokens === 'number') {
               outputTokens = evt.usage.output_tokens;
@@ -361,7 +345,7 @@ export class AnthropicProvider implements ProviderStrategy {
             builder.markTerminal(mapStopReason(stopReason));
             break;
           case 'error': {
-            const evt = event as AnthropicErrorEvent;
+            const evt = event;
             throw new Error(`anthropic ${evt.error.type}: ${evt.error.message}`);
           }
           default:

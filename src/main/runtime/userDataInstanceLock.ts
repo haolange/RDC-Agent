@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { z, type ZodType } from 'zod';
 import { probeProcess, type ProcessIdentity, type ProcessLiveness } from '../platform/process';
 
 /** The owner's process identity plus the acquisition stamp; an empty birth was not recorded. */
@@ -12,19 +13,27 @@ export type UserDataInstanceLockResult =
   | { acquired: true; lockPath: string; release: () => void }
   | { acquired: false; lockPath: string; owner: UserDataInstanceLockOwner | null };
 
+/**
+ * The lock is judged by its pid. A birth, mode or start stamp the owner did not record (or recorded in a form this
+ * build does not know) is read as the type's "not recorded" marker, so such a lock still stays held while its pid lives.
+ */
+const UserDataInstanceLockOwnerSchema: ZodType<UserDataInstanceLockOwner> = z.object({
+  pid: z.number(),
+  birth: z.string().catch(''),
+  mode: z.enum(['browser', 'desktop', 'unknown']).catch('unknown'),
+  startTs: z.string().catch('unknown'),
+});
+
+/** The recorded owner, or null when the lock is not JSON or records no pid. */
 function readLockOwner(lockPath: string): UserDataInstanceLockOwner | null {
+  let value: unknown;
   try {
-    const value = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as Partial<UserDataInstanceLockOwner>;
-    if (typeof value.pid !== 'number') return null;
-    return {
-      pid: value.pid,
-      birth: typeof value.birth === 'string' ? value.birth : '',
-      mode: value.mode === 'browser' || value.mode === 'desktop' ? value.mode : 'unknown',
-      startTs: typeof value.startTs === 'string' ? value.startTs : 'unknown',
-    };
+    value = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
   } catch {
     return null;
   }
+  const owner = UserDataInstanceLockOwnerSchema.safeParse(value);
+  return owner.success ? owner.data : null;
 }
 
 export function acquireUserDataInstanceLock(

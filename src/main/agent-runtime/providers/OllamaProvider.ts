@@ -10,6 +10,7 @@
  * - 不需要 API key，但允许通过自定义 baseUrl 指向远端实例。
  */
 
+import { z } from 'zod';
 import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
@@ -45,27 +46,26 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 const DEFAULT_BASE_URL = 'http://localhost:11434';
 const PROVIDER_API = 'ollama';
 
-interface OllamaToolCall {
-  function?: {
-    name?: string;
-    arguments?: Record<string, unknown> | string;
-  };
-}
-
-interface OllamaChunk {
-  model?: string;
-  message?: {
-    role?: string;
-    content?: string;
-    thinking?: string;
-    tool_calls?: OllamaToolCall[];
-  };
-  done?: boolean;
-  done_reason?: string;
-  prompt_eval_count?: number;
-  eval_count?: number;
-  total_duration?: number;
-}
+/** One Ollama /api/chat stream line; fields this adapter does not read pass through. */
+const OllamaChunkSchema = z.object({
+  model: z.string().nullish(),
+  message: z.object({
+    role: z.string().nullish(),
+    content: z.string().nullish(),
+    thinking: z.string().nullish(),
+    tool_calls: z.array(z.object({
+      function: z.object({
+        name: z.string().nullish(),
+        arguments: z.union([z.record(z.string(), z.unknown()), z.string()]).nullish(),
+      }).passthrough().nullish(),
+    }).passthrough()).nullish(),
+  }).passthrough().nullish(),
+  done: z.boolean().nullish(),
+  done_reason: z.string().nullish(),
+  prompt_eval_count: z.number().nullish(),
+  eval_count: z.number().nullish(),
+  total_duration: z.number().nullish(),
+}).passthrough();
 
 export interface OllamaProviderOptions {
   baseUrl?: string;
@@ -147,7 +147,7 @@ export class OllamaProvider implements ProviderStrategy {
 
       for await (const line of parseJsonLines(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
-        const chunk = parseProviderFrame<OllamaChunk>(line, PROVIDER_API);
+        const chunk = parseProviderFrame(line, PROVIDER_API, OllamaChunkSchema);
 
         const message = chunk.message;
         if (message) {

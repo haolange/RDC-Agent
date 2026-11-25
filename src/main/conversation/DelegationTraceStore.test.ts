@@ -212,3 +212,18 @@ it('does not offer an empty final body or misreport a resource limit', () => {
   expect(header?.finalAvailable).toBe(false);
   expect(header?.finalUnavailableReason).toBeUndefined();
 });
+
+it('refuses a head from another record version instead of reading it as current', () => {
+  fixture.root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delegation-trace-'));
+  delegationTraceStore.start('owner', {
+    parentToolCallId: 'versioned', task: 'Inspect', profile: 'general', mode: 'wait',
+    childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1,
+  });
+  const directory = path.join(fixture.root, 'delegations');
+  const head = path.join(directory, fs.readdirSync(directory).find((name) => name.endsWith('.head.json'))!);
+  fs.writeFileSync(head, JSON.stringify({ ...JSON.parse(fs.readFileSync(head, 'utf8')), recordVersion: 1 }));
+  expect(() => delegationTraceStore.start('owner', {
+    parentToolCallId: 'versioned', task: 'Inspect', profile: 'general', mode: 'wait',
+    childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1,
+  })).toThrow(expect.objectContaining({ code: 'STORAGE_SCHEMA_UNSUPPORTED' }));
+});

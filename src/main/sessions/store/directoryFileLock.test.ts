@@ -18,6 +18,16 @@ it('does not remove a lock whose owner is still being written', async () => {
   expect(existsSync(lockPath)).toBe(true);
 });
 
+it('does not remove a lock whose owner record names no pid', async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'rdc-lock-invalid-owner-'));
+  roots.push(root);
+  const lockPath = path.join(root, '.lock');
+  writeFileSync(lockPath, JSON.stringify({ pid: 'dead', birth: '', createdAt: 1 }));
+  await expect(acquireDirectoryFileLock(root, { lockFileName: '.lock', maxAttempts: 2 }))
+    .rejects.toThrow('DIRECTORY_LOCK_TIMEOUT');
+  expect(existsSync(lockPath)).toBe(true);
+});
+
 it('does not remove an initializing lock in the synchronous path', () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'rdc-lock-initializing-sync-'));
   roots.push(root);

@@ -15,7 +15,7 @@ import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runReco
 import { appPathService } from '../../runtime/AppPathService';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
 import { renameWithRetrySync } from '../../platform/fileRename';
-import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
+import { ActionEventSchema, SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
@@ -580,7 +580,7 @@ export class SessionRecordStore {
 
   async readActionChain(sessionId: string): Promise<ActionEvent[]> {
     const actionChainPath = this.getActionChainPath(sessionId);
-    const result = readJsonl<ActionEvent>(actionChainPath);
+    const result = readJsonl(actionChainPath, ActionEventSchema.parse);
     assertNoJsonlDiagnostics(actionChainPath, result.diagnostics);
     return result.records;
   }

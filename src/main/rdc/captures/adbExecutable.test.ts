@@ -33,7 +33,12 @@ it('does not fall back when an explicit override is missing', async () => {
 });
 it('rejects missing metadata and path traversal', async () => {
   const { binary, cli } = await setup(); const manifest = path.join(binary, 'manifest.runtime.json');
-  await fs.writeFile(manifest, '{}'); await expect(new AdbExecutableCache().resolveAdbExecutableAsync(cli)).rejects.toThrow('metadata');
-  await fs.writeFile(manifest, JSON.stringify({ bundled_tools: { adb: { path: '../../../../outside.exe' } } }));
+  await fs.writeFile(manifest, '{"files":[]}'); await expect(new AdbExecutableCache().resolveAdbExecutableAsync(cli)).rejects.toThrow('metadata');
+  await fs.writeFile(manifest, JSON.stringify({ bundled_tools: { adb: { path: '../../../../outside.exe' } }, files: [] }));
   await expect(new AdbExecutableCache().resolveAdbExecutableAsync(cli)).rejects.toThrow('escapes');
+});
+it('rejects a runtime manifest that does not list its files', async () => {
+  const { binary, cli } = await setup();
+  await fs.writeFile(path.join(binary, 'manifest.runtime.json'), JSON.stringify({ bundled_tools: { adb: { path: 'adb/adb.exe' } }, files: 'adb/adb.exe' }));
+  await expect(new AdbExecutableCache().resolveAdbExecutableAsync(cli)).rejects.toMatchObject({ code: 'RDC_INSTALLATION_INVALID' });
 });

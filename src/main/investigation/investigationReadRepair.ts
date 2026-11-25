@@ -9,15 +9,16 @@ import { serializeInvestigationJson, sha256Prefixed } from './investigationHash'
 import { collectRecordKeys, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
 import { INDEX_URI } from './investigationRecordKeys';
 import { isReadySourceDriftError } from './investigationReadIntegrity';
-import type { InvestigationRecord } from '@shared/types/renderdocInvestigation';
-import type { InvestigationArtifactManifest } from '@shared/types/renderdocInvestigation';
+import type { InvestigationRecordByType } from './investigationRecordSchemas';
+import type { InvestigationArtifactManifest, InvestigationRecord, InvestigationRecordType } from '@shared/types/renderdocInvestigation';
 import type { InvestigationTxnMutation } from './investigationTxn';
 
 interface ReadRepairAccess {
   readIndex(sessionId: string): InvestigationIndexDocument;
   readIndexSnapshot(sessionId: string): InvestigationIndexDocument;
-  readRecordBody<T>(sessionId: string, entry: InvestigationIndexEntry): T;
-  readJson<T>(sessionId: string, uri: string): T;
+  readRecordBody(sessionId: string, entry: InvestigationIndexEntry): InvestigationRecord;
+  readRecordBodyOf<Type extends InvestigationRecordType>(sessionId: string, entry: InvestigationIndexEntry, recordType: Type): InvestigationRecordByType[Type];
+  readJson(sessionId: string, uri: string): unknown;
   parseManifest(value: unknown): InvestigationArtifactManifest;
   assertReady(sessionId: string, manifest: InvestigationArtifactManifest, contentText: string): void;
   commitMutations(sessionId: string, mutations: InvestigationTxnMutation[]): void;
@@ -67,8 +68,9 @@ export class InvestigationReadRepair {
       .map((entry) => entry.recordKey));
     const mutations: InvestigationTxnMutation[] = [];
     const reader = withPendingInvestigationMutations({
-      readRecordBody: <T>(entry: InvestigationIndexEntry) => this.access.readRecordBody<T>(sessionId, entry),
-      readJson: <T>(uri: string) => this.access.readJson<T>(sessionId, uri),
+      readRecordBody: (entry: InvestigationIndexEntry) => this.access.readRecordBody(sessionId, entry),
+      readRecordBodyOf: <Type extends InvestigationRecordType>(entry: InvestigationIndexEntry, recordType: Type) => this.access.readRecordBodyOf(sessionId, entry, recordType),
+      readJson: (uri: string) => this.access.readJson(sessionId, uri),
       parseManifest: (value: unknown) => this.access.parseManifest(value),
     }, mutations);
     for (const worldStateId of orphanedIds) {
@@ -78,11 +80,11 @@ export class InvestigationReadRepair {
     }
     const currentRecordKeys = new Set(index.artifacts
       .filter(entry => entry.status !== 'superseded')
-      .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody<InvestigationRecord>(entry))
+      .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody(entry))
         .map(recordKeyToken)));
     const retiredRecordKeys = new Set(index.artifacts
       .filter(entry => entry.status === 'superseded')
-      .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody<InvestigationRecord>(entry))
+      .flatMap(entry => collectRecordKeys(entry.kind, reader.readRecordBody(entry))
         .filter(key => (key.space === 'claim' || key.space === 'evidence') && !currentRecordKeys.has(recordKeyToken(key)))
         .map(recordKeyToken)));
     const staleDependents = collectRetiredRecordDependents(reader, retiredRecordKeys, index);

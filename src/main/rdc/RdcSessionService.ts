@@ -78,7 +78,8 @@ export class RdcSessionService {
   getDeviceOwner(deviceId: string): SessionScope | null {
     const key = this.devices.get(deviceId);
     if (!key) return null;
-    const [projectId, sessionId] = JSON.parse(key) as [string, string];
+    // A device is reserved only under the key of a binding, and bindings are never removed.
+    const { projectId, sessionId } = this.bindings.get(key)!.state;
     return { projectId, sessionId };
   }
   private binding(scope: SessionScope): Binding {

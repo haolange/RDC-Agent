@@ -13,7 +13,11 @@ describe('bounded terminal append transaction', () => {
     sessionId: 'session', projectId: 'project', createdAt: 1, updatedAt: 2, status: 'complete',
   } satisfies ConversationMessage;
   // This layer serializes the already-validated context entry, not its provider contract.
-  const context = { schemaVersion: 2, turnId: 'turn', assistantMessageId: 'assistant', messages: [] } as unknown as SessionContextTurnEntry;
+  const context = {
+    schemaVersion: 2, turnId: 'turn', userMessageId: 'user', assistantMessageId: 'assistant', branchId: 'root', agentId: 'general',
+    executionIdentity: { fingerprint: 'route' }, controls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+    status: 'complete', messages: [], createdAt: 1, completedAt: 2,
+  } as unknown as SessionContextTurnEntry;
   const file = (name: string) => path.join(root, name);
   const prepare = () => prepareTerminalAppend(root, 'request', 'turn', assistant, context, true, false);
 
@@ -90,6 +94,14 @@ describe('bounded terminal append transaction', () => {
   it('rejects mismatched terminal ownership', () => {
     const wal = prepare();
     expect(() => applyTerminalAppend(root, { ...wal, turnId: 'other' }, true)).toThrow(/ownership/);
+  });
+
+  it('rejects a journaled record that is not the message it serialized before changing either file', () => {
+    const wal = prepare();
+    const before = fs.readFileSync(file('conversation.jsonl'));
+    const damaged = { ...wal, history: { ...wal.history, append: `${JSON.stringify({ id: 'assistant', role: 'assistant' })}\n` } };
+    expect(() => applyTerminalAppend(root, damaged, true)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+    expect(fs.readFileSync(file('conversation.jsonl'))).toEqual(before);
   });
 
   it('journals a prefix that ends on a record boundary after an interrupted ordinary append', () => {

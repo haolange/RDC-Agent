@@ -42,6 +42,13 @@ describe('RdcCliInvokerService.getRuntimeSummary', () => {
   });
 });
 
+it('reports RDC-Tool artifacts that are not artifact records as a protocol failure', async () => {
+  const service = new RdcCliInvokerService();
+  vi.spyOn(service, 'executeCLI').mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.event.list', data: {}, artifacts: [{ path: 3 }] }), stderr: '', duration_ms: 1 });
+  const response = await service.call({ toolName: 'rd.event.list', args: {}, runId: 'run' });
+  expect(response).toMatchObject({ ok: false, error: { code: 'EXECUTION_ERROR', message: expect.stringContaining('RDC_CLI_PROTOCOL') } });
+});
+
 it('tags context-scoped action invocation ownership separately from native argv', async () => {
   const service = new RdcCliInvokerService();
   const invoke = vi.spyOn(service, 'executeCLI').mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'orphan', duration_ms: 1, processExitReason: 'unconfirmed_orphan' });

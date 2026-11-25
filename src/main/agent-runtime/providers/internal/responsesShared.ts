@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { createContinuationArtifact } from '../../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../../reasoning/ContinuationReplayPolicy';
@@ -87,7 +88,7 @@ export async function consumeResponsesEventStream(input: {
   const reasoningEventCounts: Record<string, number> = {};
   for await (const data of parseSSE(response, signal, { providerApi: protocol, ...options })) {
     if (signal.aborted) break;
-    const event = readFrameRecord(data, protocol);
+    const event = parseProviderFrame(data, protocol, ResponsesFrameSchema);
 
     const eventType = readString(event.type);
     if (eventType.startsWith('response.reasoning')) reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
@@ -532,16 +533,8 @@ function createResponsesReasoningArtifact(
   });
 }
 
-/** One Responses stream frame; anything other than a JSON object is a protocol violation. */
-function readFrameRecord(raw: string, protocol: string): Record<string, unknown> {
-  const record = readRecord(parseProviderFrame<unknown>(raw, protocol));
-  if (record) return record;
-  throw new ProviderStreamProtocolError(
-    'PROVIDER_STREAM_MALFORMED_FRAME',
-    { protocol, providerBlockKey: 'frame', contentIndex: 0 },
-    `${protocol} sent a stream frame that is not a JSON object.`,
-  );
-}
+/** One Responses stream frame is a JSON object; its fields are read through the typed readers below. */
+const ResponsesFrameSchema = z.record(z.string(), z.unknown());
 
 function readRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)

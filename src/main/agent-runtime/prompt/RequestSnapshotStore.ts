@@ -1,16 +1,116 @@
 import fs from 'fs';
 import path from 'path';
+import { z, type ZodType } from 'zod';
 import { childScopePrefix } from '@shared/utils/executionScope';
 import { AppError } from '@shared/errors/appError';
+import { ProviderCacheContractSchema, ProviderReasoningContractSchema } from '@shared/provider-catalog/modelManifestSchema';
+import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { appPathService } from '../../runtime/AppPathService';
 import { readRequestUsage } from './RequestUsageSnapshot';
-import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import type { PromptPlan, PromptSegment, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 
 const safeSegment = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');
 
+type MailboxDeliveries = NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']>;
+
+const PromptSegmentsSchema: ZodType<PromptSegment[]> = z.array(z.object({
+  id: z.string(),
+  kind: z.enum(['core-contract', 'agent-profile', 'scoped-instruction', 'preloaded-skill', 'skill-catalog',
+    'tool-capability', 'runtime-fact', 'plan-revision', 'delegation-capsule']),
+  scope: z.enum(['builtin', 'user', 'project', 'runtime']),
+  sourcePath: z.string(),
+  sourceHash: z.string(),
+  precedence: z.number(),
+  content: z.string(),
+  stability: z.enum(['stable', 'volatile']),
+  tokenEstimate: z.number(),
+}));
+
+const MailboxDeliveriesSchema: ZodType<MailboxDeliveries> = z.array(z.object({
+  executionId: z.string(),
+  generation: z.number(),
+  direction: z.enum(['to_parent', 'to_child']),
+  throughSequence: z.number(),
+  messageIds: z.array(z.string()),
+}));
+
+/**
+ * A stored request snapshot. The frozen RequestPlan was validated when the request was planned; on read it is checked
+ * to be the object this store wrote, and every field the store and the inspector read is validated here.
+ */
+const RequestEnvelopeSnapshotSchema: ZodType<RequestEnvelopeSnapshot> = z.object({
+  id: z.string(),
+  createdAt: z.string(),
+  reasoningEvents: z.object({
+    events: z.record(z.string(), z.number()),
+    summaryParts: z.array(z.object({
+      itemKey: z.string(), index: z.number(), streamedChars: z.number(), completedChars: z.number().optional(), recovered: z.boolean(),
+    })),
+  }).optional(),
+  completedAt: z.string().optional(),
+  sessionId: z.string().optional(),
+  turnId: z.string().optional(),
+  callIndex: z.number(),
+  route: z.object({ providerId: z.string(), modelId: z.string(), protocol: z.string() }),
+  requestPlan: z.custom<RequestPlan>((value) => typeof value === 'object' && value !== null && !Array.isArray(value)),
+  promptPlan: z.object({
+    id: z.string(),
+    segments: PromptSegmentsSchema,
+    systemPrompt: z.string(),
+    totalTokenEstimate: z.number(),
+    stablePrefix: z.object({
+      fingerprint: z.string(),
+      segmentIds: z.array(z.string()),
+      sourceHashes: z.array(z.string()),
+      tokenEstimate: z.number(),
+      volatileSegmentIds: z.array(z.string()),
+    }),
+    metrics: z.object({ systemPrompt: z.number(), scopedInstructions: z.number(), skills: z.number() }),
+    diagnostics: z.array(z.object({
+      code: z.string(), severity: z.enum(['warning', 'error']), message: z.string(), sourcePath: z.string().optional(),
+    })),
+  }),
+  messages: z.array(z.unknown()),
+  mailboxDeliveries: MailboxDeliveriesSchema.optional(),
+  tools: z.array(z.unknown()),
+  controls: z.record(z.string(), z.unknown()),
+  reasoning: ProviderReasoningContractSchema,
+  cache: z.object({
+    enabled: z.boolean(),
+    mode: ProviderCacheContractSchema.shape.mode,
+    keyCarrier: ProviderCacheContractSchema.shape.keyCarrier,
+    breakpointCarrier: ProviderCacheContractSchema.shape.breakpointCarrier,
+    ttl: ProviderCacheContractSchema.shape.ttl,
+    prefixFingerprint: z.string().optional(),
+    requestKey: z.string().optional(),
+    breakpoint: z.enum(['none', 'implicit', 'automatic', 'explicit', 'automatic-and-explicit']),
+    stableSegmentIds: z.array(z.string()),
+    stableTokenEstimate: z.number(),
+    providerReported: z.boolean(),
+    reason: z.string(),
+  }),
+  usage: z.object({
+    inputTokens: z.number().optional(),
+    outputTokens: z.number().optional(),
+    reasoningTokens: z.number().optional(),
+    cacheReadTokens: z.number().optional(),
+    cacheWriteTokens: z.number().optional(),
+    cacheHitTokens: z.number().optional(),
+    cacheMissTokens: z.number().optional(),
+    estimated: z.boolean().optional(),
+  }).optional(),
+  redactions: z.array(z.object({ path: z.string(), reason: z.string(), hash: z.string().optional() })),
+}).strict();
+
+/** A snapshot file listed in this store; a damaged file throws `STORAGE_CORRUPT`. */
+function readSnapshot(file: string): RequestEnvelopeSnapshot | null {
+  return readValidatedSync(file, parseJsonWith(RequestEnvelopeSnapshotSchema.parse));
+}
+
 export class RequestSnapshotStore {
   private readonly promptSegmentsCache = new Map<string, { stamp: string; segments: PromptPlan['segments'] }>();
-  private readonly mailboxDeliveriesCache = new Map<string, { stamp: string; deliveries: NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> }>();
+  private readonly mailboxDeliveriesCache = new Map<string, { stamp: string; deliveries: MailboxDeliveries }>();
 
   constructor(private readonly explicitRootPath?: string) {}
 
@@ -71,9 +171,9 @@ export class RequestSnapshotStore {
       const stamp = `${stat.size}:${stat.mtimeMs}`;
       let cached = this.promptSegmentsCache.get(file);
       if (!cached || cached.stamp !== stamp) {
-        const values = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
-        if (!Array.isArray(values)) throw new Error(`Request snapshot lacks PromptPlan segments: ${file}`);
-        cached = { stamp, segments: values as PromptPlan['segments'] };
+        const segments = readValidatedSync(file, parseJsonWith(PromptSegmentsSchema.parse));
+        if (!segments) continue;
+        cached = { stamp, segments };
         this.promptSegmentsCache.set(file, cached);
       }
       segments.push(...cached.segments);
@@ -81,10 +181,10 @@ export class RequestSnapshotStore {
     return segments;
   }
 
-  listMailboxDeliveries(sessionId: string): NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> {
+  listMailboxDeliveries(sessionId: string): MailboxDeliveries {
     const base = path.join(this.rootPath, safeSegment(sessionId));
     if (!fs.existsSync(base)) return [];
-    const deliveries: NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> = [];
+    const deliveries: MailboxDeliveries = [];
     for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const dir = path.join(base, entry.name);
@@ -94,9 +194,9 @@ export class RequestSnapshotStore {
         const stamp = `${stat.size}:${stat.mtimeMs}`;
         let cached = this.mailboxDeliveriesCache.get(file);
         if (!cached || cached.stamp !== stamp) {
-          const values = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
-          if (!Array.isArray(values)) throw new Error(`Request snapshot lacks mailbox deliveries: ${file}`);
-          cached = { stamp, deliveries: values as NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> };
+          const values = readValidatedSync(file, parseJsonWith(MailboxDeliveriesSchema.parse));
+          if (!values) continue;
+          cached = { stamp, deliveries: values };
           this.mailboxDeliveriesCache.set(file, cached);
         }
         deliveries.push(...cached.deliveries);
@@ -108,8 +208,8 @@ export class RequestSnapshotStore {
   complete(snapshotId: string, sessionId: string | undefined, turnId: string | undefined, usage: RequestEnvelopeSnapshot['usage'],
     reasoningEvents?: RequestEnvelopeSnapshot['reasoningEvents']): void {
     const snapshotPath = this.findSnapshotPath(snapshotId, sessionId, turnId);
-    if (!snapshotPath) return;
-    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8')) as RequestEnvelopeSnapshot;
+    const snapshot = snapshotPath ? readSnapshot(snapshotPath) : null;
+    if (!snapshotPath || !snapshot) return;
     snapshot.completedAt = new Date().toISOString();
     snapshot.usage = usage;
     if (reasoningEvents) snapshot.reasoningEvents = reasoningEvents;
@@ -126,13 +226,13 @@ export class RequestSnapshotStore {
       else if (entry.isFile() && entry.name.endsWith('.json')) files.push(target);
     });
     walk(base);
-    return files.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')) as RequestEnvelopeSnapshot)
+    return files.flatMap((file) => readSnapshot(file) ?? [])
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.callIndex - right.callIndex);
   }
 
   get(sessionId: string, turnId: string, snapshotId: string): RequestEnvelopeSnapshot | null {
     const snapshotPath = this.findSnapshotPath(snapshotId, sessionId, turnId);
-    return snapshotPath ? JSON.parse(fs.readFileSync(snapshotPath, 'utf8')) as RequestEnvelopeSnapshot : null;
+    return snapshotPath ? readSnapshot(snapshotPath) : null;
   }
 
   private turnPath(sessionId?: string, turnId?: string): string {

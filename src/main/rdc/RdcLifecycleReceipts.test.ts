@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { rmSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { createInvestigationHarness, SESSION_ID } from '../testing/investigationTestFixtures';
@@ -37,5 +38,16 @@ it('finds an unresolved signed baseline after restart and closes only the matchi
       observed: { ...original, native: { ...original.native, contextId: 'new', leaseVersion: 2 } } });
     expect(receipts.pending(SESSION_ID, 'p')).toBeNull();
     expect(() => new RdcLifecycleReceipts(resolver, () => 'wrong-key').pending(SESSION_ID, 'p')).toThrow('signature mismatch');
+  } finally { rmSync(sessionPath, { recursive: true, force: true }); }
+});
+
+it('rejects a signed lifecycle body that is not a lifecycle receipt', () => {
+  const { resolver, sessionPath } = createInvestigationHarness();
+  const body = JSON.stringify({ schemaVersion: 1, event: 'intent', sessionId: SESSION_ID });
+  const signature = createHmac('sha256', 'test-key').update(body).digest('hex');
+  try {
+    const written = resolver.write(SESSION_ID, 'session://tool-outputs/rdc-lifecycle-forged.json', JSON.stringify({ body, signature }), { mimeType: 'application/json' });
+    expect(() => new RdcLifecycleReceipts(resolver, () => 'test-key').read(SESSION_ID, { uri: written.uri, expectedHash: `sha256:${written.hash}` }))
+      .toThrow(expect.objectContaining({ code: 'RDC_LIFECYCLE_RECEIPT_INVALID' }));
   } finally { rmSync(sessionPath, { recursive: true, force: true }); }
 });

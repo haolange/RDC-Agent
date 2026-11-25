@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { RdcExecutionReceipts, rdcDigest } from '../rdc/RdcExecutionReceipts';
 import { createInvestigationHarness, recordedExperiment, SESSION_ID } from '../testing/investigationTestFixtures';
@@ -26,6 +27,14 @@ describe('native execution evidence', () => {
       expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/process|PROCESS_IDENTITY/);
     },
   );
+  it('rejects a signed receipt body that is not an execution receipt', () => {
+    const { resolver, store } = harness();
+    const body = JSON.stringify({ schemaVersion: 1, sessionId: SESSION_ID, evidence: { kind: 'guess' }, exitCode: 0 });
+    const signature = createHmac('sha256', 'test-evidence-signing-key').update(body).digest('hex');
+    const written = resolver.write(SESSION_ID, 'session://tool-outputs/rdc-receipt-forged.json', JSON.stringify({ body, signature }), { mimeType: 'application/json' });
+    expect(() => store.read(SESSION_ID, { uri: written.uri, expectedHash: `sha256:${written.hash}` }))
+      .toThrow(expect.objectContaining({ code: 'RDC_RECEIPT_INVALID' }));
+  });
   it('accepts a signed ordered same-context experiment, including after store recreation', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);

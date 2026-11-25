@@ -10,11 +10,12 @@ import {
   type InvestigationIndexDocument,
   type InvestigationIndexEntry,
 } from './investigationRecordKeys';
-import { parseInvestigationRecord } from './investigationRecordSchemas';
+import { parseInvestigationRecord, parseInvestigationRecordOf, type InvestigationRecordByType } from './investigationRecordSchemas';
 import type {
   ArtifactSourceRef,
   InvestigationArtifactManifest,
   InvestigationRecord,
+  InvestigationRecordType,
   WorldState,
 } from '@shared/types/renderdocInvestigation';
 
@@ -32,16 +33,50 @@ export interface VerifiedIndexArtifact {
   contentText: string;
 }
 
-export function parseVerifiedRecordBody<T>(entry: InvestigationIndexEntry, read: InvestigationContentRead): T {
+/** A record body that matches its index hash and the schema of the record type its entry names. */
+export function parseVerifiedRecordBody(entry: InvestigationIndexEntry, read: InvestigationContentRead): InvestigationRecord {
+  return parseRecordText(entry, verifiedRecordBody(entry, read));
+}
+
+/** As `parseVerifiedRecordBody`, for a caller that needs one record type; an entry of another type is corrupt. */
+export function parseVerifiedRecordBodyOf<Type extends InvestigationRecordType>(
+  entry: InvestigationIndexEntry,
+  read: InvestigationContentRead,
+  recordType: Type,
+): InvestigationRecordByType[Type] {
+  return parseRecordTextOf(entry, verifiedRecordBody(entry, read), recordType);
+}
+
+/** A record body already bound to `entry` by hash, validated against the schema of the entry's record type. */
+export function parseRecordText(entry: InvestigationIndexEntry, text: string): InvestigationRecord {
+  try {
+    return parseInvestigationRecord(entry.recordType, JSON.parse(text));
+  } catch (error) {
+    throw toInvestigationError(error);
+  }
+}
+
+export function parseRecordTextOf<Type extends InvestigationRecordType>(
+  entry: InvestigationIndexEntry,
+  text: string,
+  recordType: Type,
+): InvestigationRecordByType[Type] {
+  if (entry.recordType !== recordType) {
+    throw new InvestigationError('INVESTIGATION_INDEX_CORRUPT', `index entry ${entry.artifactId} is not a ${recordType}`);
+  }
+  try {
+    return parseInvestigationRecordOf(recordType, JSON.parse(text));
+  } catch (error) {
+    throw toInvestigationError(error);
+  }
+}
+
+function verifiedRecordBody(entry: InvestigationIndexEntry, read: InvestigationContentRead): string {
   if (read.truncated) {
     throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'contentRef read was truncated');
   }
   assertTripleContentHash(entry.contentHash, entry.contentHash, read.text, read.hash);
-  try {
-    return JSON.parse(read.text || '{}') as T;
-  } catch (error) {
-    throw toInvestigationError(error);
-  }
+  return read.text || '{}';
 }
 
 export function assertTripleContentHash(
@@ -202,7 +237,7 @@ function verifyIndexEntry(
     throw new InvestigationError('INVESTIGATION_INDEX_CORRUPT', `contentRef for ${entry.artifactId} was truncated`);
   }
   const bodyHash = assertTripleContentHash(entry.contentHash, manifest.contentHash, content.text, content.hash);
-  const record = parseInvestigationRecord(entry.recordType, JSON.parse(content.text || '{}')) as InvestigationRecord;
+  const record = parseInvestigationRecord(entry.recordType, JSON.parse(content.text || '{}'));
   if (recordKeyOf(entry.kind, record) !== entry.recordKey) {
     throw new InvestigationError(
       'INVESTIGATION_INDEX_CORRUPT',

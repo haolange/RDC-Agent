@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { z, type ZodType } from 'zod';
 import { nowIso } from '@shared/utils/id';
 import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
 import type { ArtifactRecord } from '@shared/types/harness';
@@ -12,22 +13,42 @@ export interface ArtifactStoreSnapshot {
   updatedAt: string;
 }
 
+const ArtifactRecordSchema: ZodType<ArtifactRecord> = z.object({
+  artifactId: z.string(),
+  runId: z.string(),
+  sessionId: z.string(),
+  kind: z.enum(['capture', 'screenshot', 'shader', 'trace', 'report', 'log', 'data', 'note']),
+  title: z.string(),
+  filePath: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number(),
+  sha256: z.string().optional(),
+  taskId: z.string().optional(),
+  evidenceIds: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).strict();
+
+const ArtifactStoreSnapshotSchema: ZodType<ArtifactStoreSnapshot> = z.object({
+  schemaVersion: z.literal('1'),
+  runId: z.string(),
+  sessionId: z.string(),
+  artifacts: z.array(ArtifactRecordSchema),
+  updatedAt: z.string(),
+}).strict();
+
 const STORE_PATH = 'artifact_store.json';
 
 export class ArtifactStore {
   read(sessionId: string, runId: string): ArtifactStoreSnapshot {
-    return runScopedStore.readJson<ArtifactStoreSnapshot>(
-      sessionId,
+    return runScopedStore.readJson(sessionId, runId, STORE_PATH, ArtifactStoreSnapshotSchema) ?? {
+      schemaVersion: '1',
       runId,
-      STORE_PATH,
-      {
-        schemaVersion: '1',
-        runId,
-        sessionId,
-        artifacts: [],
-        updatedAt: nowIso(),
-      },
-    );
+      sessionId,
+      artifacts: [],
+      updatedAt: nowIso(),
+    };
   }
 
   list(sessionId: string, runId: string): ArtifactRecord[] {

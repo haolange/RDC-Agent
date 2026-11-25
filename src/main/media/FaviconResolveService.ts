@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { z, type ZodType } from 'zod';
 import { fetchPublic } from '../runtime/net/publicEgress';
 import { appPathService } from '../runtime/AppPathService';
 import { readLimitedBytes, sniffRasterImageMime } from './mediaBytes';
@@ -31,6 +32,14 @@ interface CacheMeta {
   savedAt: number;
   fileName: string;
 }
+
+/** The sidecar `writeDiskCache` writes; its file name stays inside the cache root. */
+const CacheMetaSchema: ZodType<CacheMeta> = z.object({
+  domain: z.string(),
+  mime: z.string().min(1),
+  savedAt: z.number(),
+  fileName: z.string().regex(/^[a-f0-9]{24}\.(?:svg|png|webp|gif|jpg|ico)$/),
+});
 
 export interface FaviconResolveResult {
   dataUrl: string | null;
@@ -159,9 +168,10 @@ function readDiskCache(domain: string): string | null {
   const key = hashDomain(domain);
   const metaPath = path.join(root, `${key}.json`);
   if (!fs.existsSync(metaPath)) return null;
+  // A damaged or expired entry is a cache miss; the next fetch rewrites it.
   try {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as CacheMeta;
-    if (!meta?.fileName || !meta.mime || Date.now() - meta.savedAt > CACHE_TTL_MS) return null;
+    const meta = CacheMetaSchema.parse(JSON.parse(fs.readFileSync(metaPath, 'utf8')));
+    if (Date.now() - meta.savedAt > CACHE_TTL_MS) return null;
     const filePath = path.join(root, meta.fileName);
     if (!fs.existsSync(filePath)) return null;
     const bytes = fs.readFileSync(filePath);

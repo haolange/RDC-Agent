@@ -1,3 +1,4 @@
+import { z, type ZodType } from 'zod';
 import {
   appendThinkingText,
   createThinkingContent,
@@ -58,17 +59,36 @@ const EMPTY_USAGE: Usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
 const TERMINAL_REF = Object.freeze({ protocol: 'provider-terminal', providerBlockKey: 'done', contentIndex: 0 });
 
-/** Parses one wire frame. A frame that is not JSON is a protocol violation, never a frame to skip. */
-export function parseProviderFrame<T>(data: string, providerApi: string): T {
+/**
+ * Parses one wire frame against the adapter's frame schema. A frame that is not JSON, or not a frame of the
+ * adapter's protocol, is a protocol violation, never a frame to skip.
+ */
+export function parseProviderFrame<T>(data: string, providerApi: string, schema: ZodType<T>): T {
+  const ref = { protocol: providerApi, providerBlockKey: 'frame', contentIndex: 0 };
+  let value: unknown;
   try {
-    return JSON.parse(data) as T;
+    value = JSON.parse(data);
   } catch {
+    throw new ProviderStreamProtocolError('PROVIDER_STREAM_MALFORMED_FRAME', ref, `${providerApi} sent a stream frame that is not valid JSON.`);
+  }
+  const frame = schema.safeParse(value);
+  if (!frame.success) {
     throw new ProviderStreamProtocolError(
       'PROVIDER_STREAM_MALFORMED_FRAME',
-      { protocol: providerApi, providerBlockKey: 'frame', contentIndex: 0 },
-      `${providerApi} sent a stream frame that is not valid JSON.`,
+      ref,
+      `${providerApi} sent a stream frame that does not match its protocol: ${z.prettifyError(frame.error)}`,
     );
   }
+  return frame.data;
+}
+
+/**
+ * The frame of an event type an adapter does not handle. Such frames are ignored, as the adapter's switch always
+ * did; a frame of a handled type that does not match its schema is still a protocol violation.
+ */
+export function unhandledProviderEvent(handledTypes: readonly string[]) {
+  return z.object({ type: z.string().refine((type) => !handledTypes.includes(type)) })
+    .transform(() => ({ type: 'unhandled' as const }));
 }
 
 export function createProviderOutputRef(input: ProviderOutputRef): ProviderOutputRef {

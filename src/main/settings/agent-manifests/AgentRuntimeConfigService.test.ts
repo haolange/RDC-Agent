@@ -161,6 +161,15 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     expect(projection.options.find((skill) => skill.id === 'debug')).toMatchObject({ name: 'User Debug', scope: 'user', effectiveStatus: 'overridden' });
   });
 
+  it('does not load a descriptor file whose fields are not a descriptor', async () => {
+    const userMcp = path.join(userRoot, 'mcp');
+    fs.mkdirSync(userMcp, { recursive: true });
+    fs.writeFileSync(path.join(userMcp, 'docs.mcp.json'), JSON.stringify({ id: 'docs', name: 'Docs', description: '', transport: 'stdio', command: 'docs', args: '--serve' }));
+
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    expect(new AgentRuntimeConfigService().listMcpServers().find((server) => server.id === 'docs')).toBeUndefined();
+  });
+
   it('rejects same-id project MCP executable overrides of user command/args/url/env', async () => {
     const userMcp = path.join(userRoot, 'mcp');
     const project = path.join(root, 'project');

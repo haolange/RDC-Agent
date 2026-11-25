@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -12,7 +13,7 @@ import {
   type ProcessLiveness,
   type ProcessTermination,
 } from '../platform/process';
-import { writeFileAtomicSync } from '../runtime/atomicFile';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../runtime/atomicFile';
 import { installationRootOfPython, resolveRdcInstallation } from './RdcInstallationService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
@@ -57,6 +58,37 @@ export interface OwnedRdcDaemonStoreOptions {
 interface RegistryDocument {
   schemaVersion: number;
   records: Record<string, OwnedRdcDaemonRecord>;
+}
+
+const pid = z.number().int().nonnegative();
+const RegistryDocumentSchema = z.object({
+  schemaVersion: z.literal(REGISTRY_SCHEMA),
+  records: z.record(z.string(), z.object({
+    contextId: z.string().regex(APP_RDC_CONTEXT_ID),
+    command: z.string(),
+    intermediateRoot: z.string(),
+    ownerPid: pid,
+    ownerBirth: z.string(),
+    daemonPid: pid,
+    daemonBirth: z.string(),
+    workerPid: pid,
+    workerBirth: z.string(),
+    startedAt: z.number(),
+  }).strict()),
+}).strict().superRefine((document, context) => {
+  for (const [contextId, record] of Object.entries(document.records)) {
+    if (record.contextId !== contextId) context.addIssue({ code: 'custom', message: `record ${contextId} names ${record.contextId}` });
+  }
+});
+const RegistryVersionSchema = z.object({ schemaVersion: z.unknown().optional() });
+
+/** The registry as this build writes it; another schema version is left for the build that wrote it. */
+function parseRegistry(value: unknown): RegistryDocument {
+  const { schemaVersion } = RegistryVersionSchema.parse(value);
+  if (schemaVersion !== REGISTRY_SCHEMA) {
+    throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', `owned-rdc-daemons schema ${String(schemaVersion)}`);
+  }
+  return RegistryDocumentSchema.parse(value);
 }
 
 export function isAppRdcContextId(contextId: string): boolean {
@@ -134,7 +166,6 @@ export async function harvestOwnedRdcDaemons(
   const released: string[] = [];
   const failed: OwnedRdcDaemonHarvestFailure[] = [];
   for (const record of records.values()) {
-    if (!isAppRdcContextId(record.contextId)) continue;
     try {
       options.signal?.throwIfAborted();
       const probe = options.probeProcess ?? probeProcess;
@@ -237,28 +268,10 @@ function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {
   return withRdcHostRuntimeEnv(settings ?? settingsService.getAll().tooling.rdcCli).env[RDC_INTERMEDIATE_ROOT_ENV] ?? '';
 }
 
+/** A missing registry is empty; a damaged one throws `STORAGE_CORRUPT`, so no daemon is treated as ours. */
 function readRegistry(registryPath?: string): RegistryDocument {
-  const filePath = registryPath ?? ownedRdcDaemonRegistryPath();
-  if (!fs.existsSync(filePath)) return { schemaVersion: REGISTRY_SCHEMA, records: {} };
-  const payload = JSON.parse(fs.readFileSync(filePath, 'utf8')) as RegistryDocument;
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new AppError('RDC_OWNERSHIP_CORRUPT', 'owned daemon registry is not an object.');
-  }
-  if (payload.schemaVersion !== REGISTRY_SCHEMA) {
-    throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', `owned-rdc-daemons schema ${String(payload.schemaVersion)}`);
-  }
-  const records: Record<string, OwnedRdcDaemonRecord> = {};
-  const birth = (value: unknown): string => (typeof value === 'string' ? value : '');
-  for (const [contextId, record] of Object.entries(payload.records ?? {})) {
-    if (!record || !isAppRdcContextId(contextId) || record.contextId !== contextId) continue;
-    records[contextId] = {
-      ...record,
-      ownerBirth: birth(record.ownerBirth),
-      daemonBirth: birth(record.daemonBirth),
-      workerBirth: birth(record.workerBirth),
-    };
-  }
-  return { schemaVersion: REGISTRY_SCHEMA, records };
+  return readValidatedSync(registryPath ?? ownedRdcDaemonRegistryPath(), parseJsonWith(parseRegistry))
+    ?? { schemaVersion: REGISTRY_SCHEMA, records: {} };
 }
 
 function writeRegistry(document: RegistryDocument, registryPath?: string): void {

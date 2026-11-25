@@ -18,6 +18,7 @@ import {
 import {
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
+  ConversationHistoryRecordSchema,
   SessionAttachmentManifestSchema,
   readCurrentStoredJson,
   CURRENT_STORE_SCHEMA_VERSION,
@@ -418,16 +419,6 @@ export class ConversationHistoryStore {
     this.writeSessionAttachments(sessionId, remaining);
   }
 
-  private isConversationDeltaRecord(value: unknown): value is ConversationDeltaRecord {
-    if (!value || typeof value !== 'object') return false;
-    const record = value as Record<string, unknown>;
-    return record.op === 'delta'
-      && typeof record.id === 'string'
-      && !!record.patch
-      && typeof record.patch === 'object'
-      && typeof record.updatedAt === 'number';
-  }
-
   private rebuildConversationHistory(filePath: string): {
     messages: ConversationMessage[];
     rawRecordCount: number;
@@ -435,12 +426,12 @@ export class ConversationHistoryStore {
     if (!fs.existsSync(filePath)) {
       return { messages: [], rawRecordCount: 0 };
     }
-    const result = readJsonl<ConversationMessage | ConversationDeltaRecord>(filePath);
+    const result = readJsonl(filePath, ConversationHistoryRecordSchema.parse);
     assertNoJsonlDiagnostics(filePath, result.diagnostics);
     const latestById = new Map<string, ConversationMessage>();
 
     for (const record of result.records) {
-      if (this.isConversationDeltaRecord(record)) {
+      if ('op' in record) {
         const existing = latestById.get(record.id);
         if (!existing) continue;
         latestById.set(record.id, {
@@ -455,15 +446,11 @@ export class ConversationHistoryStore {
         continue;
       }
 
-      if (!record || typeof record !== 'object' || typeof (record as ConversationMessage).id !== 'string') {
-        continue;
-      }
-      const snapshot = record as ConversationMessage;
-      const existing = latestById.get(snapshot.id);
+      const existing = latestById.get(record.id);
       const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
-      const nextUpdatedAt = snapshot.updatedAt ?? snapshot.createdAt;
+      const nextUpdatedAt = record.updatedAt ?? record.createdAt;
       if (!existing || nextUpdatedAt >= existingUpdatedAt) {
-        latestById.set(snapshot.id, snapshot);
+        latestById.set(record.id, record);
       }
     }
 
