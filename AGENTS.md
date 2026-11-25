@@ -114,7 +114,7 @@
 
 行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
 
-完整 gates 的历史比较需要基线：`RDC_SYSTEM_DEBT_BASE_REF=<本轮起点提交>`，secrets 与 diff 检查用 `RDC_DIFF_BASE` 指向同一提交；不指定时历史比较被跳过。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
+secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不指定时只检查最近一次提交。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
 
 **Browser QA**：用 disposable `pnpm run start:agent-browser`，只消费一次 `/qa?qaBootstrap=...`，进入同源 `/app`。不直开 Vite，不把 token 留在 URL。high-impact 需要 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。没有设备的 Remote／Android 验证记为阻塞，不以本地成功代替。
 

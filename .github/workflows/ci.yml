@@ -48,7 +48,6 @@ jobs:
           echo "sha=$base" >> "$GITHUB_OUTPUT"
       - name: Check gates
         env:
-          RDC_SYSTEM_DEBT_BASE_REF: ${{ steps.base.outputs.sha }}
           RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:gates
       # The focused check:* vitest scripts (scoped resources, project instructions, prompt plan
