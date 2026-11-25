@@ -294,8 +294,7 @@ for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail
 }
 forbidText(channels, 'session:outputs:list', 'IPC channel registry must not retain session:outputs:list');
 forbidText(channels, 'session:investigation:', 'IPC channel registry must not add session:investigation channels');
-requireText(channels, "read: 'investigation:read'", 'IPC channel registry must expose investigation:read');
-requireText(read('src/shared/renderer-api/channelCapabilities.ts'), "'investigation:read': 'read'", 'investigation:read must be classified as read');
+requireText(channels, "'investigation:read': 'read'", 'IPC channel registry must expose investigation:read classified as read');
 
 const docs = {
   design: read('ARCHITECTURE.md'),

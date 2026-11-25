@@ -3,8 +3,7 @@
  * Phase 7 matrix entry; deeper cases live beside bridgeSecurity / McpTrustService.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
-import { resolveBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
+import { RENDERER_INVOKE_CHANNELS, resolveBridgeChannelCapability } from '@shared/renderer-api';
 import {
   createBridgeBearerToken,
   isBridgeChannelAllowed,

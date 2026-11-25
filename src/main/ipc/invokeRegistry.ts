@@ -1,14 +1,14 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { AppError, IPC_ERROR_KEY, toIpcErrorPayload, type IpcErrorResult } from '@shared/errors/appError';
-import { isHighImpactChannel, RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
+import { isHighImpactChannel, RENDERER_INVOKE_CHANNELS, type RendererInvokeChannel } from '@shared/renderer-api';
 import { auditArgumentsHash, auditLog, runWithAuditOrigin, type AuditEvent, type AuditOrigin } from '../runtime/AuditLog';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
 import { isTrustedRendererUrl } from '../runtime/rendererTrust';
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown | Promise<unknown>;
 
-/** Renderer invoke channels of one domain keyed by channel name; each handler parses its raw arguments itself. */
-export type IpcChannelTable = Record<string, InvokeHandler>;
+/** Handlers of one domain keyed by their channel in the renderer channel table; each handler parses its raw arguments itself. */
+export type IpcChannelTable = { readonly [Channel in RendererInvokeChannel]?: InvokeHandler };
 
 const invokeHandlers = new Map<string, InvokeHandler>();
 let registryInstalled = false;

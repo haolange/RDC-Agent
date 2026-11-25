@@ -176,7 +176,6 @@
     "i18n.index": "src/renderer/i18n.ts",
     "shared.layoutConstants": "src/shared/constants/layout.ts",
     "shared.channels": "src/shared/renderer-api/channels.ts",
-    "shared.channelCapabilities": "src/shared/renderer-api/channelCapabilities.ts",
     "shared.traceTypes": "src/shared/types/trace.ts",
     "shared.workbenchApi": "src/shared/renderer-api/workbench.ts",
     "shared.executionOffer": "src/shared/types/executionOffer.ts",

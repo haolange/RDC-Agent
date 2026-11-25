@@ -1,282 +1,269 @@
-export const RENDERER_INVOKE_CHANNEL = {
-  shell: {
-    getAppMeta: 'app:getMeta',
-    selectAvatar: 'app:selectAvatar',
-    getAvatarDataUrl: 'app:getAvatarDataUrl',
-    openPath: 'app:openPath',
-    copyText: 'app:copyText',
-    readClipboardText: 'app:readClipboardText',
-    resolveFavicon: 'web:resolveFavicon',
-    fetchImage: 'web:fetchImage',
-    selectFiles: 'dialog:selectFiles',
-    selectRdcFiles: 'dialog:selectRdcFiles',
-    selectKnowledgeImport: 'dialog:selectKnowledgeImport',
-    selectDirectory: 'dialog:selectDirectory',
-    minimizeWindow: 'window:minimize',
-    toggleMaximizeWindow: 'window:toggleMaximize',
-    closeWindow: 'window:close',
-    isWindowMaximized: 'window:isMaximized',
-  },
-  conversation: {
-    sendMessage: 'conversation:sendMessage',
-    rewriteFromMessage: 'conversation:rewriteFromMessage',
-    cancelActiveTurn: 'conversation:cancelActiveTurn',
-    answerUserInput: 'conversation:answerUserInput',
-    answerToolApproval: 'conversation:answerToolApproval',
-    answerPlanReview: 'conversation:answerPlanReview',
-    getHistory: 'conversation:getHistory',
-    getMessageSnapshot: 'conversation:getMessageSnapshot',
-    getDelegationTrace: 'conversation:getDelegationTrace',
-    getDelegationContent: 'conversation:getDelegationContent',
-    switchBranch: 'conversation:switchBranch',
-    clearHistory: 'conversation:clearHistory',
-    undoLastTurn: 'conversation:undoLastTurn',
-    getToolImagePreview: 'conversation:getToolImagePreview',
-    stageAttachments: 'conversation:stageAttachments',
-    releaseAttachments: 'conversation:releaseAttachments',
-    getAttachmentPreview: 'conversation:getAttachmentPreview',
-    accessAttachment: 'conversation:accessAttachment',
-    resolveMedia: 'conversation:resolveMedia',
-  },
-  workflow: {
-    getState: 'workflow:getState',
-    resume: 'workflow:resume',
-    stop: 'workflow:stop',
-    getRunUsage: 'workflow:getRunUsage',
-  },
-  memory: {
-    issueApprovalToken: 'memory:issueApprovalToken',
-    list: 'memory:list',
-    get: 'memory:get',
-    write: 'memory:write',
-    delete: 'memory:delete',
-  },
-  investigation: {
-    read: 'investigation:read',
-    list: 'investigation:list',
-  },
-  plan: {
-    reopenReview: 'plan:reopenReview',
-    cancelReview: 'plan:cancelReview',
-    read: 'plan:read',
-    issueApprovalToken: 'plan:issueApprovalToken',
-    saveToProject: 'plan:saveToProject',
-    export: 'plan:export',
-  },
-  knowledge: {
-    overview: 'knowledge:overview',
-    topicSuggest: 'knowledge:topics:suggest',
-    topicPreview: 'knowledge:topics:preview',
-    topicApply: 'knowledge:topics:apply',
-    query: 'knowledge:query',
-    card: 'knowledge:card',
-    compile: 'knowledge:compile',
-    indexRebuild: 'knowledge:index:rebuild',
-    candidates: 'knowledge:candidates',
-    candidateCreate: 'knowledge:candidateCreate',
-    previewImport: 'knowledge:previewImport',
-    import: 'knowledge:import',
-    image: 'knowledge:image',
-    issueApprovalToken: 'knowledge:issueApprovalToken',
-    write: 'knowledge:write',
-    promote: 'knowledge:promote',
-    export: 'knowledge:export',
-    cancel: 'knowledge:cancel',
-  },
-  rdcRuntime: {
-    getOverview: 'rdc-runtime:overview',
-    validateResource: 'rdc-runtime:validate',
-    upsertResource: 'rdc-runtime:upsert',
-    importResource: 'rdc-runtime:import',
-    deleteResource: 'rdc-runtime:delete',
-    revealResource: 'rdc-runtime:reveal',
-    trustHook: 'rdc-runtime:trustHook',
-    revokeHook: 'rdc-runtime:revokeHook',
-    trustMcp: 'rdc-runtime:trustMcp',
-    revokeMcp: 'rdc-runtime:revokeMcp',
-    testHook: 'rdc-runtime:testHook',
-    listRequestSnapshots: 'rdc-runtime:listSnapshots',
-    getRequestSnapshot: 'rdc-runtime:getSnapshot',
-  },
-  command: {
-    list: 'command:list',
-    execute: 'command:execute',
-  },
-  tools: {
-    detectInstallations: 'tool:detectInstallations',
-    resolveInstallation: 'tool:resolveInstallation',
-    verifyInstallation: 'tool:verifyInstallation',
-    getMcpStatusSummary: 'mcp:getStatusSummary',
-    getEvidenceChain: 'evidence:getChain',
-  },
-  llm: {
-    testProviderDraft: 'llm:testProviderDraft',
-    testModelCapability: 'llm:testModelCapability',
-    prepareProbeBatch: 'llm:prepareProbeBatch',
-    startProbeBatch: 'llm:startProbeBatch',
-    cancelProbeBatch: 'llm:cancelProbeBatch',
-    getProbeBatch: 'llm:getProbeBatch',
-    connectProvider: 'llm:connectProvider',
-    refreshProviderModels: 'llm:refreshProviderModels',
-    disconnectProvider: 'llm:disconnectProvider',
-    startProviderAccountLogin: 'llm:startProviderAccountLogin',
-    getProviderAccountStatus: 'llm:getProviderAccountStatus',
-    finishProviderAccountLogin: 'llm:finishProviderAccountLogin',
-    cancelProviderAccountLogin: 'llm:cancelProviderAccountLogin',
-    logoutProviderAccount: 'llm:logoutProviderAccount',
-  },
-  settings: {
-    get: 'settings:get',
-    getProviderCatalog: 'settings:getProviderCatalog',
-    getEffectiveModel: 'settings:getEffectiveModel',
-    getEffectiveCatalog: 'settings:getEffectiveCatalog',
-    hasProviderSecret: 'settings:hasProviderSecret',
-    importAgentManifest: 'settings:importAgentManifest',
-    saveAgentDefinition: 'settings:saveAgentDefinition',
-    getAgentDefinitionCommit: 'settings:getAgentDefinitionCommit',
-    previewAgentModelMigration: 'settings:previewAgentModelMigration',
-    applyAgentModelMigration: 'settings:applyAgentModelMigration',
-    deleteAgentOverrideFile: 'settings:deleteAgentOverrideFile',
-    previewProjectAgentTrust: 'settings:previewProjectAgentTrust',
-    trustProjectAgent: 'settings:trustProjectAgent',
-    getAgentBuiltinComparison: 'settings:getAgentBuiltinComparison',
-    saveProviderDefinition: 'settings:saveProviderDefinition',
-    getProviderDefinitionCommit: 'settings:getProviderDefinitionCommit',
-    getModelsOverride: 'settings:getModelsOverride',
-    setModelsOverride: 'settings:setModelsOverride',
-    getResolvedShell: 'settings:getResolvedShell',
-    patch: 'settings:patch',
-  },
-  project: {
-    list: 'project:list',
-    add: 'project:add',
-    select: 'project:select',
-    rename: 'project:rename',
-    remove: 'project:remove',
-    listInputs: 'project:inputs:list',
-    refreshInputs: 'project:inputs:refresh',
-    importInput: 'project:inputs:import',
-    importInputPaths: 'project:inputs:importPaths',
-    referenceInput: 'project:inputs:reference',
-    prepareRemoveInput: 'project:inputs:prepareRemove',
-    removeInput: 'project:inputs:remove',
-  },
-  device: {
-    prepare: 'device:prepare',
-    cancelPreparation: 'device:cancelPreparation',
-    list: 'device:list',
-    refresh: 'device:refresh',
-    watchStart: 'device:watch:start',
-    watchRenew: 'device:watch:renew',
-    watchStop: 'device:watch:stop',
-  },
-  session: {
-    list: 'session:list',
-    create: 'session:create',
-    rename: 'session:rename',
-    remove: 'session:remove',
-    open: 'session:open',
-    setModelOverride: 'session:setModelOverride',
-    setAgentId: 'session:setAgentId',
-    applyDeclaredHandoff: 'session:applyDeclaredHandoff',
-  },
-  runtime: {
-    listLogs: 'runtimeLog:list',
-    getPermissionState: 'runtime:getPermissionState',
-  },
-  capture: {
-    list: 'capture:list',
-    select: 'capture:select',
-    openProjectInput: 'capture:openProjectInput',
-    getOpenedState: 'capture:getOpenedState',
-    clearOpenedState: 'capture:clearOpenedState',
-    getReplaySelection: 'capture:getReplaySelection',
-    readLivePreview: 'capture:readLivePreview',
-    getReplayState: 'capture:getReplayState',
-    getRecovery: 'capture:getRecovery',
-    restorePrevious: 'capture:restorePrevious',
-    applyReplayEvent: 'capture:applyReplayEvent',
-    refreshFrame: 'capture:refreshFrame',
-  },
-  context: {
-    get: 'context:get',
-  },
-  trace: {
-    getProjection: 'trace:getProjection',
-  },
-} as const;
+import { AppError } from '../errors/appError';
 
-export const RENDERER_EVENT_CHANNEL = {
-  shell: {
-    fileOpen: 'file:open',
-    caseNew: 'case:new',
-    settingsOpen: 'settings:open',
-    themeChanged: 'app:themeChanged',
-    windowMaximizedChanged: 'window:maximized-changed',
-  },
-  conversation: {
-    event: 'conversation:event',
-    planReviewChanged: 'plan:reviewChanged',
-    delegationChanged: 'conversation:delegationChanged',
-  },
-  session: {
-    recordChanged: 'session:recordChanged',
-  },
-  workflow: {
-    runStatusChanged: 'workflow:runStatusChanged',
-    runUsageChanged: 'workflow:runUsageChanged',
-    traceProjectionChanged: 'trace:projectionChanged',
-  },
-  llm: {
-    effectiveCatalogChanged: 'llm:effectiveCatalogChanged',
-    probeBatchChanged: 'llm:probeBatchChanged',
-  },
-  knowledge: {
-    progress: 'knowledge:progress',
-  },
-  tools: {
-    executionComplete: 'tool:executionComplete',
-    evidenceAdded: 'evidence:eventAdded',
-  },
-  workbench: {
-    deviceStatusChanged: 'device:statusChanged',
-    captureStatusChanged: 'capture:statusChanged',
-    contextChanged: 'context:changed',
-    projectInputsChanged: 'project:inputsChanged',
-    projectInputsError: 'project:inputsError',
-    openedCaptureStateChanged: 'capture:openedStateChanged',
-    captureReplayChanged: 'capture:replayChanged',
-  },
-  runtime: {
-    logAppended: 'runtime:logAppended',
-    permissionStateChanged: 'runtime:permissionStateChanged',
-  },
-  settings: {
-    changed: 'settings:changed',
-  },
-} as const;
+/**
+ * How the Browser QA bridge treats an invoke channel: `read` and `mutation` are allowed, `high-impact` needs
+ * `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` (and is audited on every transport), `desktop-only` is always refused.
+ */
+export type BridgeChannelCapability = 'read' | 'mutation' | 'high-impact' | 'desktop-only';
 
-type Values<T> = T[keyof T];
-type NestedValues<T> = Values<{ [K in keyof T]: Values<T[K]> }>;
+/**
+ * Every renderer invoke channel, one row each: its name and its Browser QA capability. The channel name type, the
+ * preload allow-list, the main handler parity check and the bridge capability check all derive from this table.
+ */
+export const RENDERER_INVOKE_CHANNEL_TABLE = {
+  'app:getMeta': 'read',
+  'app:selectAvatar': 'desktop-only',
+  'app:getAvatarDataUrl': 'desktop-only',
+  'app:openPath': 'mutation',
+  'app:copyText': 'mutation',
+  'app:readClipboardText': 'read',
+  'web:resolveFavicon': 'desktop-only',
+  'web:fetchImage': 'desktop-only',
+  'dialog:selectFiles': 'mutation',
+  'dialog:selectRdcFiles': 'mutation',
+  'dialog:selectKnowledgeImport': 'mutation',
+  'dialog:selectDirectory': 'mutation',
+  'window:minimize': 'desktop-only',
+  'window:toggleMaximize': 'desktop-only',
+  'window:close': 'desktop-only',
+  'window:isMaximized': 'desktop-only',
 
-export type RendererInvokeChannel = NestedValues<typeof RENDERER_INVOKE_CHANNEL>;
-export type RendererEventChannel = NestedValues<typeof RENDERER_EVENT_CHANNEL>;
+  'conversation:sendMessage': 'mutation',
+  'conversation:rewriteFromMessage': 'mutation',
+  'conversation:cancelActiveTurn': 'mutation',
+  'conversation:answerUserInput': 'high-impact',
+  'conversation:answerToolApproval': 'high-impact',
+  'conversation:answerPlanReview': 'high-impact',
+  'conversation:getHistory': 'read',
+  'conversation:getMessageSnapshot': 'read',
+  'conversation:getDelegationTrace': 'read',
+  'conversation:getDelegationContent': 'read',
+  'conversation:switchBranch': 'mutation',
+  'conversation:clearHistory': 'mutation',
+  'conversation:undoLastTurn': 'mutation',
+  'conversation:getToolImagePreview': 'read',
+  'conversation:stageAttachments': 'mutation',
+  'conversation:releaseAttachments': 'mutation',
+  'conversation:getAttachmentPreview': 'read',
+  // The scoped channel also opens and reveals local attachments after explicit renderer actions.
+  'conversation:accessAttachment': 'mutation',
+  'conversation:resolveMedia': 'read',
+
+  'workflow:getState': 'read',
+  'workflow:resume': 'mutation',
+  'workflow:stop': 'mutation',
+  'workflow:getRunUsage': 'read',
+
+  'memory:issueApprovalToken': 'high-impact',
+  'memory:list': 'read',
+  'memory:get': 'read',
+  'memory:write': 'mutation',
+  'memory:delete': 'mutation',
+
+  'investigation:read': 'read',
+  'investigation:list': 'read',
+
+  'plan:reopenReview': 'mutation',
+  'plan:cancelReview': 'mutation',
+  'plan:read': 'read',
+  'plan:issueApprovalToken': 'high-impact',
+  'plan:saveToProject': 'mutation',
+  'plan:export': 'mutation',
+
+  'knowledge:overview': 'read',
+  'knowledge:topics:suggest': 'read',
+  'knowledge:topics:preview': 'read',
+  'knowledge:topics:apply': 'high-impact',
+  'knowledge:query': 'read',
+  'knowledge:card': 'read',
+  'knowledge:compile': 'read',
+  'knowledge:index:rebuild': 'mutation',
+  'knowledge:candidates': 'read',
+  'knowledge:candidateCreate': 'high-impact',
+  // A preview reads a file the renderer names; from a browser that is as sensitive as importing it.
+  'knowledge:previewImport': 'high-impact',
+  'knowledge:import': 'high-impact',
+  'knowledge:image': 'read',
+  'knowledge:issueApprovalToken': 'high-impact',
+  'knowledge:write': 'high-impact',
+  'knowledge:promote': 'high-impact',
+  'knowledge:export': 'high-impact',
+  'knowledge:cancel': 'mutation',
+
+  'rdc-runtime:overview': 'read',
+  'rdc-runtime:validate': 'read',
+  'rdc-runtime:upsert': 'high-impact',
+  'rdc-runtime:import': 'high-impact',
+  'rdc-runtime:delete': 'high-impact',
+  'rdc-runtime:reveal': 'desktop-only',
+  'rdc-runtime:trustHook': 'high-impact',
+  'rdc-runtime:revokeHook': 'high-impact',
+  'rdc-runtime:trustMcp': 'high-impact',
+  'rdc-runtime:revokeMcp': 'high-impact',
+  'rdc-runtime:testHook': 'high-impact',
+  'rdc-runtime:listSnapshots': 'read',
+  'rdc-runtime:getSnapshot': 'read',
+
+  'command:list': 'read',
+  'command:execute': 'high-impact',
+
+  'tool:detectInstallations': 'read',
+  'tool:resolveInstallation': 'read',
+  'tool:verifyInstallation': 'high-impact',
+  'mcp:getStatusSummary': 'read',
+  'evidence:getChain': 'read',
+
+  'llm:testProviderDraft': 'read',
+  'llm:testModelCapability': 'read',
+  'llm:prepareProbeBatch': 'read',
+  'llm:startProbeBatch': 'read',
+  'llm:cancelProbeBatch': 'mutation',
+  'llm:getProbeBatch': 'read',
+  'llm:connectProvider': 'high-impact',
+  'llm:refreshProviderModels': 'read',
+  'llm:disconnectProvider': 'high-impact',
+  'llm:startProviderAccountLogin': 'high-impact',
+  'llm:getProviderAccountStatus': 'read',
+  'llm:finishProviderAccountLogin': 'high-impact',
+  'llm:cancelProviderAccountLogin': 'mutation',
+  'llm:logoutProviderAccount': 'high-impact',
+
+  'settings:get': 'read',
+  'settings:getProviderCatalog': 'read',
+  'settings:getEffectiveModel': 'read',
+  'settings:getEffectiveCatalog': 'read',
+  'settings:hasProviderSecret': 'read',
+  'settings:importAgentManifest': 'high-impact',
+  'settings:saveAgentDefinition': 'high-impact',
+  'settings:getAgentDefinitionCommit': 'read',
+  'settings:previewAgentModelMigration': 'read',
+  'settings:applyAgentModelMigration': 'high-impact',
+  'settings:deleteAgentOverrideFile': 'high-impact',
+  'settings:previewProjectAgentTrust': 'read',
+  'settings:trustProjectAgent': 'high-impact',
+  'settings:getAgentBuiltinComparison': 'read',
+  'settings:saveProviderDefinition': 'high-impact',
+  'settings:getProviderDefinitionCommit': 'read',
+  'settings:getModelsOverride': 'read',
+  'settings:setModelsOverride': 'high-impact',
+  'settings:getResolvedShell': 'read',
+  'settings:patch': 'high-impact',
+
+  'project:list': 'read',
+  'project:add': 'mutation',
+  'project:select': 'mutation',
+  'project:rename': 'mutation',
+  'project:remove': 'mutation',
+  'project:inputs:list': 'read',
+  'project:inputs:refresh': 'mutation',
+  'project:inputs:import': 'mutation',
+  'project:inputs:importPaths': 'mutation',
+  'project:inputs:reference': 'high-impact',
+  'project:inputs:prepareRemove': 'high-impact',
+  'project:inputs:remove': 'high-impact',
+
+  'device:prepare': 'high-impact',
+  'device:cancelPreparation': 'mutation',
+  'device:list': 'read',
+  'device:refresh': 'mutation',
+  'device:watch:start': 'mutation',
+  'device:watch:renew': 'mutation',
+  'device:watch:stop': 'mutation',
+
+  'session:list': 'read',
+  'session:create': 'mutation',
+  'session:rename': 'mutation',
+  'session:remove': 'mutation',
+  'session:open': 'mutation',
+  'session:setModelOverride': 'mutation',
+  'session:setAgentId': 'mutation',
+  'session:applyDeclaredHandoff': 'mutation',
+
+  'runtimeLog:list': 'read',
+  'runtime:getPermissionState': 'read',
+
+  'capture:list': 'read',
+  'capture:select': 'mutation',
+  'capture:openProjectInput': 'mutation',
+  'capture:getOpenedState': 'read',
+  'capture:clearOpenedState': 'mutation',
+  'capture:getReplaySelection': 'read',
+  'capture:readLivePreview': 'read',
+  'capture:getReplayState': 'read',
+  'capture:getRecovery': 'read',
+  'capture:restorePrevious': 'high-impact',
+  'capture:applyReplayEvent': 'mutation',
+  'capture:refreshFrame': 'mutation',
+
+  'context:get': 'read',
+
+  'trace:getProjection': 'read',
+} as const satisfies Record<string, BridgeChannelCapability>;
+
+/** Every channel main pushes to the renderer. */
+export const RENDERER_EVENT_CHANNELS = Object.freeze([
+  'file:open',
+  'case:new',
+  'settings:open',
+  'app:themeChanged',
+  'window:maximized-changed',
+
+  'conversation:event',
+  'plan:reviewChanged',
+  'conversation:delegationChanged',
+
+  'session:recordChanged',
+
+  'workflow:runStatusChanged',
+  'workflow:runUsageChanged',
+  'trace:projectionChanged',
+
+  'llm:effectiveCatalogChanged',
+  'llm:probeBatchChanged',
+
+  'knowledge:progress',
+
+  'tool:executionComplete',
+  'evidence:eventAdded',
+
+  'device:statusChanged',
+  'capture:statusChanged',
+  'context:changed',
+  'project:inputsChanged',
+  'project:inputsError',
+  'capture:openedStateChanged',
+  'capture:replayChanged',
+
+  'runtime:logAppended',
+  'runtime:permissionStateChanged',
+
+  'settings:changed',
+] as const);
+
+export type RendererInvokeChannel = keyof typeof RENDERER_INVOKE_CHANNEL_TABLE;
+export type RendererEventChannel = (typeof RENDERER_EVENT_CHANNELS)[number];
 
 export const RENDERER_INVOKE_CHANNELS = Object.freeze(
-  Object.values(RENDERER_INVOKE_CHANNEL).flatMap((domain) => Object.values(domain)),
+  Object.keys(RENDERER_INVOKE_CHANNEL_TABLE),
 ) as readonly RendererInvokeChannel[];
 
-export const RENDERER_EVENT_CHANNELS = Object.freeze(
-  Object.values(RENDERER_EVENT_CHANNEL).flatMap((domain) => Object.values(domain)),
-) as readonly RendererEventChannel[];
-
-const rendererInvokeChannelSet = new Set<string>(RENDERER_INVOKE_CHANNELS);
 const rendererEventChannelSet = new Set<string>(RENDERER_EVENT_CHANNELS);
 
 export function isRendererInvokeChannel(channel: string): channel is RendererInvokeChannel {
-  return rendererInvokeChannelSet.has(channel);
+  return Object.prototype.hasOwnProperty.call(RENDERER_INVOKE_CHANNEL_TABLE, channel);
 }
 
 export function isRendererEventChannel(channel: string): channel is RendererEventChannel {
   return rendererEventChannelSet.has(channel);
+}
+
+/** The capability of a declared channel; an undeclared channel fails closed. */
+export function resolveBridgeChannelCapability(channel: string): BridgeChannelCapability {
+  if (!isRendererInvokeChannel(channel)) throw new AppError('BRIDGE_CAPABILITY_MISSING', channel);
+  return RENDERER_INVOKE_CHANNEL_TABLE[channel];
+}
+
+/** High-impact channels are confirmed and audited on every transport. */
+export function isHighImpactChannel(channel: string): boolean {
+  return isRendererInvokeChannel(channel) && RENDERER_INVOKE_CHANNEL_TABLE[channel] === 'high-impact';
 }

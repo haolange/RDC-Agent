@@ -195,7 +195,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 每个请求都必须带 bridge 自己的 `Host`。权威入口是 launcher 打印的一次性 `/qa?qaBootstrap=...` URL；bootstrap 成功后签发 HttpOnly、`SameSite=Strict` 的 cookie（HTTPS 时加 `Secure`），并重定向到**同一 bridge origin** 上干净的 `/app`。
   - `browser-dev` 下 Vite 经 bridge 反向代理（含 HMR WebSocket）；浏览器从不直开 Vite 端口，URL query 里从不携带 bridge 凭证或 challenge。反代转发前剥离 `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*`。
   - Cookie 认证的 `/invoke`、`/events`、`/api/*` 要求 `Origin` 等于 bridge origin；程序化客户端可用显式 Bearer header。
-  - 通道能力是 `src/shared/renderer-api/channelCapabilities.ts` 中闭合的 `Record<RendererInvokeChannel, BridgeChannelCapability>`：TypeScript 强制每个新通道归类，未知通道 fail-closed；`high-impact` 另需 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`，`desktop-only` 永远拒绝。
+  - 通道能力写在唯一的通道表 `src/shared/renderer-api/channels.ts`（`RENDERER_INVOKE_CHANNEL_TABLE`）：每个 invoke 通道一行，同时声明名字与 `BridgeChannelCapability`，`RendererInvokeChannel` 由表派生，没有归类就不存在通道；未知通道 fail-closed；`high-impact` 另需 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`，`desktop-only` 永远拒绝。
   - Browser 与 Desktop 共用 `src/shared/renderer-api` 唯一的 ElectronAPI 工厂与 channel manifest。细节见 `docs/contracts/permissions.md` 与 `docs/architecture/browser-qa-surface.md`。
 - **项目自带资源**：项目 Agent profile、hook、MCP 都要显式 trust 才生效；trust 绑定文件/可执行 bytes，变化即失效。项目 profile 与子代理只能收紧天花板（子代理取父回合与自身的较严者）。
 - **MCP project**：同 ID 不覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust。运行时连接按 `projectRoot + descriptorHash` 建立独立 ref-counted pool，handoff 只属于当前 Turn terminal result。

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
-import { resolveBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
+import { RENDERER_INVOKE_CHANNELS, resolveBridgeChannelCapability } from '@shared/renderer-api';
 import {
   buildBridgeAuthCookie,
   createBridgeBearerToken,

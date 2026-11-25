@@ -1,18 +1,12 @@
 export {
-  RENDERER_EVENT_CHANNEL,
   RENDERER_EVENT_CHANNELS,
-  RENDERER_INVOKE_CHANNEL,
+  RENDERER_INVOKE_CHANNEL_TABLE,
   RENDERER_INVOKE_CHANNELS,
+  isHighImpactChannel,
   isRendererEventChannel,
   isRendererInvokeChannel,
-} from './channels';
-export type { RendererEventChannel, RendererInvokeChannel } from './channels';
-export {
-  assertChannelCapabilityCoverage,
-  isHighImpactChannel,
-  listUnclassifiedInvokeChannels,
   resolveBridgeChannelCapability,
-} from './channelCapabilities';
-export type { BridgeChannelCapability } from './channelCapabilities';
+} from './channels';
+export type { BridgeChannelCapability, RendererEventChannel, RendererInvokeChannel } from './channels';
 export { createRendererApi } from './createRendererApi';
 export type { RendererApiTransport, RendererEventCallback } from './transport';

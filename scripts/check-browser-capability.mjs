@@ -1,5 +1,4 @@
 import { createRequire } from 'module';
-import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
@@ -10,22 +9,11 @@ function fail(message) {
 };
 
 function main() {
-  const { RENDERER_INVOKE_CHANNELS } = require('../src/shared/renderer-api/channels.ts');
-  const {
-    resolveBridgeChannelCapability,
-    assertChannelCapabilityCoverage,
-    listUnclassifiedInvokeChannels,
-  } = require('../src/shared/renderer-api/channelCapabilities.ts');
-
-  const missing = listUnclassifiedInvokeChannels();
-  if (missing.length > 0) {
-    fail(`Unclassified invoke channels: ${missing.join(', ')}`);
-  }
-  assertChannelCapabilityCoverage();
+  const { RENDERER_INVOKE_CHANNEL_TABLE } = require('../src/shared/renderer-api/channels.ts');
 
   const counts = { read: 0, mutation: 0, 'high-impact': 0, 'desktop-only': 0 };
-  for (const channel of RENDERER_INVOKE_CHANNELS) {
-    const capability = resolveBridgeChannelCapability(channel);
+  const channels = Object.entries(RENDERER_INVOKE_CHANNEL_TABLE);
+  for (const [channel, capability] of channels) {
     if (!(capability in counts)) {
       fail(`Unknown capability "${capability}" for ${channel}`);
     }
@@ -33,7 +21,7 @@ function main() {
   }
 
   console.log(
-    `[browser-capability] OK read=${counts.read} mutation=${counts.mutation} high-impact=${counts['high-impact']} desktop-only=${counts['desktop-only']} total=${RENDERER_INVOKE_CHANNELS.length}`,
+    `[browser-capability] OK read=${counts.read} mutation=${counts.mutation} high-impact=${counts['high-impact']} desktop-only=${counts['desktop-only']} total=${channels.length}`,
   );
 }
 
