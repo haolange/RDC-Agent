@@ -73,7 +73,7 @@ export interface AgentEventHandlerDeps {
   agentLabel: string;
   turnStreamState: TurnStreamState;
   commitAssistantMessage: (
-    type: import('@shared/types/conversation').ConversationStreamEvent['type'],
+    type: import('@shared/conversation/messageUpdateEvent').MessageUpdateType,
     patch: Partial<ConversationMessage>,
     options?: Partial<import('./ConversationStreamPatchScheduler').ConversationStreamPatchCommitOptions>,
   ) => void;

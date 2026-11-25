@@ -1,4 +1,5 @@
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+import { buildMessageUpdateEvent, type MessageUpdateType } from '@shared/conversation/messageUpdateEvent';
 import { nowMs } from '@shared/utils/id';
 import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
@@ -112,7 +113,7 @@ export async function completeProfileTurn(
 
   let streamScheduler: ConversationStreamPatchScheduler | null = null;
   let conversationPersistenceError: Error | null = null;
-  let deferredTerminalEventType: ConversationStreamEvent['type'] | null = null;
+  let deferredTerminalEventType: MessageUpdateType | null = null;
   let lastTracePublishedAt = 0;
   const TRACE_PUBLISH_MIN_INTERVAL_MS = 160;
   const terminalContext: { value: {
@@ -127,7 +128,7 @@ export async function completeProfileTurn(
   let runWasCancelled = false;
 
   const applyAssistantMessagePatch = (
-    type: ConversationStreamEvent['type'],
+    type: MessageUpdateType,
     patch: Partial<ConversationMessage>,
     options: ConversationStreamPatchCommitOptions = { persist: true, publishTrace: true, emit: true },
   ) => {
@@ -167,12 +168,7 @@ export async function completeProfileTurn(
       }
     }
     if (options.emit) {
-      host.emitConversationEvent({
-        type,
-        sessionId: sessionId ?? '',
-        turnId: assistantMessage.turnId,
-        message: assistantMessage,
-      } as ConversationStreamEvent);
+      host.emitConversationEvent(buildMessageUpdateEvent(type, sessionId, assistantMessage));
     }
     if (options.publishTrace) {
       const now = nowMs();
@@ -192,7 +188,7 @@ export async function completeProfileTurn(
   });
 
   const commitAssistantMessage = (
-    type: ConversationStreamEvent['type'],
+    type: MessageUpdateType,
     patch: Partial<ConversationMessage>,
     options: Partial<ConversationStreamPatchCommitOptions> = {},
   ) => {
@@ -200,7 +196,7 @@ export async function completeProfileTurn(
   };
 
   const commitTerminalAssistantMessage = (
-    type: ConversationStreamEvent['type'],
+    type: MessageUpdateType,
     patch: Partial<ConversationMessage>,
   ) => {
     if (sessionId) deferredTerminalEventType = type;

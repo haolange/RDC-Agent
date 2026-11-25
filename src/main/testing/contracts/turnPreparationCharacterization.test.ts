@@ -189,3 +189,22 @@ describe('turn preparation characterization', () => {
   );
 });
 
+
+describe('turn preparation budget', () => {
+  /**
+   * Preparing one turn may read the committed settings at most once; every further read re-parses and rebuilds the
+   * whole configuration on the turn's critical path. Today preparation re-reads it several times. Turns green with
+   * the settings snapshot; `it.fails` reports it then.
+   */
+  it.fails('reads the settings file at most once while preparing a turn', async () => {
+    const settingsPath = appPathService.getRuntimePaths().settingsPath;
+    const read = vi.spyOn(fs, 'readFileSync');
+    try {
+      await prepare('general', 'session');
+      const settingsReads = read.mock.calls.filter(([file]) => typeof file === 'string' && file === settingsPath).length;
+      expect(settingsReads).toBeLessThanOrEqual(1);
+    } finally {
+      read.mockRestore();
+    }
+  });
+});
