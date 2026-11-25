@@ -5,6 +5,7 @@ import { applyBootTheme } from './app/theme/bootTheme';
 import { enablePseudoLocale } from './i18n/pseudoLocale';
 import { browserAppBridgeInstalled, installRendererApi } from './platform/rendererApi';
 import { installInteractionPerformanceProbe } from './platform/performance/InteractionPerformanceProbe';
+import { prefetchMarkdownEnhancers } from './patterns/Markdown/markdownEnhancers';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import './styles/global.css';
@@ -20,3 +21,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>
 );
+
+// Code highlighting and math rendering are not needed for the first paint; fetch them once the app is idle.
+prefetchMarkdownEnhancers();
