@@ -402,8 +402,8 @@ export class BackgroundSubagentService {
       return id;
     };
     const executeId = (args: Record<string, unknown>) => String(args.executionId ?? '').trim();
-    const common = { permissionHint: 'readonly' as const, spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'session' as const, category: 'task' as const, requiresApproval: false } };
-    const orchestration = { ...common, spec: { ...common.spec, orchestration: true } };
+    const common = { permissionHint: 'readonly' as const, spec: { isReadOnly: true, concurrency: 'shared' as const, isDestructive: false, sideEffect: 'session' as const, category: 'task' as const, requiresApproval: false } };
+    const orchestration = { ...common, spec: { ...common.spec, concurrency: 'orchestration-parallel' as const } };
     return [{
       name: 'background_query', label: 'Query Background Task', description: 'Read durable execution status once. Do not repeatedly poll; use background_wait when awaiting a live execution.', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' } } }, ...common,
       execute: async (_id, args) => { const execution = await this.query(requireSession(), await requireOwned(args)); const projection = projectSubagentExecution(execution); return { content: [{ type: 'text', text: JSON.stringify(projection) }], details: projection }; },

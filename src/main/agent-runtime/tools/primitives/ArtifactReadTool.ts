@@ -83,7 +83,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
   },
   spec: {
     isReadOnly: true,
-    isConcurrencySafe: true,
+    concurrency: 'shared',
     isDestructive: false,
     sideEffect: 'none',
     category: 'file',

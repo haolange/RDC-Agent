@@ -20,7 +20,7 @@ import {
   processSupervisor,
   type SupervisedProcess,
 } from '../../runtime/ProcessSupervisor';
-import { type AgentTool, type AgentToolResult } from './AgentTool';
+import { type AgentTool, type AgentToolResult, type AgentToolSpec } from './AgentTool';
 import {
   postJsonRpc,
   postStreamableJsonRpc,
@@ -134,19 +134,22 @@ interface MCPConnection {
 // AgentTool 适配
 // =====================================================================
 
+/** Declared default for every MCP tool: an external effect of unknown scope, run alone and approved. */
+export const MCP_TOOL_SPEC: AgentToolSpec = {
+  isReadOnly: false,
+  concurrency: 'exclusive',
+  isDestructive: false,
+  sideEffect: 'network',
+  category: 'web',
+  requiresApproval: true,
+};
+
 class MCPAgentTool implements AgentTool {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
   readonly permissionHint = 'mutation' as const;
-  readonly spec = {
-    isReadOnly: false,
-    isConcurrencySafe: false,
-    isDestructive: false,
-    sideEffect: 'network' as const,
-    category: 'web' as const,
-    requiresApproval: true,
-  };
+  readonly spec = MCP_TOOL_SPEC;
 
   constructor(
     private readonly manager: MCPManager,

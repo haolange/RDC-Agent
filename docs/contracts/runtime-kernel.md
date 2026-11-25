@@ -185,7 +185,20 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 
 执行前先经 `toolValidator.validate` 和工具自身的语义参数校验，再进入 Permission/人工审批；两类校验失败都返回 `TOOL_SCHEMA_VIOLATION`，无效请求不展示审批。`shell` 的 provider 参数根保持普通 object，但只能提供非空 `command` 或 `rdc` 其中之一；同一规则在执行入口再次校验。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
 
-同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`ALWAYS_SERIAL_TOOL_NAMES`（`toolConcurrency.ts`）与 `mcp__*` 恒串行；其余仅 `isConcurrencySafe===true` 可并行；需 RDC lease 的 `subagent` 由 lease 独占串行。offline `subagent` 不请求 `domainExtensions.rdc`，allowlist 编译期只剥离 `rdc_probe`，`shell.rdc` 在执行入口被拒绝；`runtime_context` 保留，但不返回 `rdc` 载荷。`domainExtensions.rdc.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDC 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
+工具行为只读工具自己声明的 `AgentTool.spec`（`src/main/agent-runtime/agent/AgentTool.ts`），执行器不按工具名分支；每个内置工具都声明 spec，MCP 工具共用声明的默认 `MCP_TOOL_SPEC`（`exclusive`）。spec 特征：
+
+| 特征 | 含义 |
+|---|---|
+| `concurrency`（必填） | 并发类：`shared` 可与同组并行调用并发、取共享资源锁；`exclusive` 独占执行与资源锁；`orchestration-parallel` / `orchestration-serial` 只派发或等待，前者可并行、后者独占调度，二者都不取资源锁（委派出的效果自行取锁） |
+| `interaction` | 宿主代为发起的人工提问：`user-input`（`ask_user`）或 `plan-review`（`plan_artifact`，用户批准的结果结束规划回合） |
+| `presentation` | 结果呈现：`pinEvidence` 小于卸货阈值也保留证据 URI/hash；`keepErrorResults` 错误结果同样制品化；`deliversNativeFailure` 原生 RDC 失败的交付结果以证据制品返回 |
+| `capture` | 由已校验参数判定：`live` 触及实时回放、`requiresApprovedScope` 需要计划冻结的 capture scope、`recovers` 授权后取锁前 join 受影响子执行 |
+| `knowledgeRoots` | `read-access` 把冻结 Knowledge 根并入本次临时可读根；`reference` 只在执行上下文传入供引用格式化 |
+| `dispatchesSubagent` / `activatesDeferredTools` | 每次调用预留一个 subagent 预算 / 成功结果激活其列出的 deferred 工具 |
+
+`category` 与 `requiresApproval` 是 `tool_search` 列出的发现信息，未声明时按无分类、不需审批列出。
+
+同轮工具并发：只有 `concurrency` 为 `shared` 或 `orchestration-parallel` 的调用才安全，未解析到工具的调用不安全。`ConcurrentToolScheduler` 只并发**连续**安全组（`toolConcurrency.ts`）；需 RDC lease 的 `subagent` 由 lease 独占串行。offline `subagent` 不请求 `domainExtensions.rdc`，allowlist 编译期只剥离 `rdc_probe`，`shell.rdc` 在执行入口被拒绝；`runtime_context` 保留，但不返回 `rdc` 载荷。`domainExtensions.rdc.requiresLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDC 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
 
 `subagent` 只接受有界 Delegation Capsule：goal/task/scope、带 sourceRefs/qualification 的 acceptedFacts、hypotheses、challengeRefs、带理由/适用/重验条件的 negativePaths、inputArtifactRefs、outputRequirements、stopConditions、requiredSkillIds 和 budget；可选 domainExtensions 仅申请能力。缺字段、超限或非法引用 fail-closed。父级需把子级实际要读的精确 `session://` contentUri 放入冻结引用；调查记录 ID 或 scope 正文不是读取授权，缺引用的子级读取继续拒绝。局部预算须覆盖计划内的读、写与完成调用。compiler 只向 system PromptPlan 加入 runtime 编写的解释规则，完整 Capsule 数据进入隔离子执行的 user 输入，不复制父历史。必需 Skill 在 prepareTurn 预载并冻结。
 

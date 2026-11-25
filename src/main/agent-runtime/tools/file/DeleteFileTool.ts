@@ -26,7 +26,7 @@ export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
     },
     required: ['path'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'destructive',
   effects: { writes: ['path'] },
 

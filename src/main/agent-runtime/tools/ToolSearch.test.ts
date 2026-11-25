@@ -28,7 +28,7 @@ function fakeTool(partial: {
     },
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: partial.category ?? 'search',

@@ -95,7 +95,7 @@ function createInvestigationSchemaTool(): AgentTool {
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -140,7 +140,7 @@ function createInvestigationReadTool(
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -201,7 +201,7 @@ function createInvestigationWriteTool(
     permissionHint: 'session_mutation',
     spec: {
       isReadOnly: false,
-      isConcurrencySafe: false,
+      concurrency: 'exclusive',
       isDestructive: false,
       sideEffect: 'session',
       category: 'system',
@@ -273,7 +273,7 @@ function createInvestigationListTool(
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',

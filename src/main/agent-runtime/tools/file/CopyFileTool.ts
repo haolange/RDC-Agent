@@ -34,7 +34,7 @@ export const copyFileTool: AgentTool<CopyFileParams, CopyFileDetails> = {
     },
     required: ['source', 'destination'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
   effects: { reads: ['source'], writes: ['destination'] },
 

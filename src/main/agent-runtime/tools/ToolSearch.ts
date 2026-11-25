@@ -171,7 +171,7 @@ export function createToolSearchTool(getAllTools: () => ToolSearchToolInfo[]): A
       },
       required: [],
     },
-    spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
+    spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false, activatesDeferredTools: true },
     permissionHint: 'readonly',
     async execute(_id, params) {
       const p = (params ?? {}) as ToolSearchParams;

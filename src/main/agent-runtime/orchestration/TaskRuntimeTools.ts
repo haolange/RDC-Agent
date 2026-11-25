@@ -91,7 +91,7 @@ export function createTaskRuntimeTools(input: {
       description: 'Report meaningful progress, a blocker, or a decision request to the owning Task execution.',
       parameters: { type: 'object', required: ['kind', 'body'], properties: { kind: { type: 'string', enum: ['progress', 'blocked', 'decision_required'] }, body: { type: 'string', maxLength: 8000 } } },
       permissionHint: 'readonly',
-      spec: { isReadOnly: false, isConcurrencySafe: true, orchestration: true, isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+      spec: { isReadOnly: false, concurrency: 'orchestration-parallel', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
       execute: async (_id, args) => {
         const kind = String(args.kind ?? '');
         const body = String(args.body ?? '').trim();

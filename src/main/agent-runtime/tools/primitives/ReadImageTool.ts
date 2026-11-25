@@ -54,11 +54,12 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
   },
   spec: {
     isReadOnly: true,
-    isConcurrencySafe: true,
+    concurrency: 'shared',
     isDestructive: false,
     sideEffect: 'none',
     category: 'file',
     requiresApproval: false,
+    knowledgeRoots: 'read-access',
   },
   permissionHint: 'readonly',
   effects: { reads: ['path'] },

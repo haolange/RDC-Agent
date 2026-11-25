@@ -126,7 +126,7 @@ export function createTaskCreateTool(
       required: ['tasks'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: false, isConcurrencySafe: false, orchestration: true, isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+    spec: { isReadOnly: false, concurrency: 'orchestration-serial', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
@@ -222,7 +222,7 @@ export function createTaskUpdateTool(
       required: ['taskId'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: false, isConcurrencySafe: false, orchestration: true, isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+    spec: { isReadOnly: false, concurrency: 'orchestration-serial', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
@@ -351,7 +351,7 @@ export function createTaskGetTool(
       required: ['taskId'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'task', requiresApproval: false },
+    spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'task', requiresApproval: false },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
@@ -392,7 +392,7 @@ export function createTaskListTool(
       properties: {},
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'task', requiresApproval: false },
+    spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'task', requiresApproval: false },
 
     async execute(_toolCallId, _params, signal) {
       throwIfAborted(signal);
@@ -441,7 +441,7 @@ export function createTaskStopTool(
       required: ['taskId'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: false, isConcurrencySafe: false, orchestration: true, isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+    spec: { isReadOnly: false, concurrency: 'orchestration-serial', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);

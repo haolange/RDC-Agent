@@ -153,7 +153,7 @@ export const gitStatusTool: AgentTool<GitStatusParams, GitDetails> = {
       short: { type: 'boolean', description: 'Use concise porcelain output. Defaults to true.' },
     },
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
+  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -177,7 +177,7 @@ export const gitDiffTool: AgentTool<GitDiffParams, GitDetails> = {
       stat: { type: 'boolean', description: 'Show diff stat instead of patch.' },
     },
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
+  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -200,7 +200,7 @@ export const gitLogTool: AgentTool<GitLogParams, GitDetails> = {
       limit: { type: 'integer', description: 'Maximum commits to show, 1-50. Defaults to 10.' },
     },
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
+  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -221,7 +221,7 @@ export const gitAddTool: AgentTool<GitPathParams, GitDetails> = {
     },
     required: ['path'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -241,7 +241,7 @@ export const gitUnstageTool: AgentTool<GitPathParams, GitDetails> = {
     },
     required: ['path'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -261,7 +261,7 @@ export const gitCommitTool: AgentTool<GitCommitParams, GitDetails> = {
     },
     required: ['message'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {

@@ -464,8 +464,8 @@ export class SubagentRunner {
       permissionHint: 'readonly',
       spec: {
         isReadOnly: true,
-        isConcurrencySafe: true,
-        orchestration: true,
+        concurrency: 'orchestration-parallel',
+        dispatchesSubagent: true,
         isDestructive: false,
         sideEffect: 'session',
         category: 'task',

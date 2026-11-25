@@ -94,7 +94,7 @@ export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
     },
     required: ['url'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
+  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
   effects: { network: true },
 
@@ -121,7 +121,7 @@ export const webSearchTool: AgentTool<WebSearchParams, WebSearchDetails> = {
     },
     required: ['query'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
+  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
   effects: { network: true },
 

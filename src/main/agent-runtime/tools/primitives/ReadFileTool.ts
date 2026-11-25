@@ -71,7 +71,11 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
     },
     required: ['path'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'file', requiresApproval: false },
+  spec: {
+    isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'file', requiresApproval: false,
+    knowledgeRoots: 'read-access',
+    presentation: { pinEvidence: (args) => args.mode === 'audit' || args.pinEvidence === true },
+  },
   permissionHint: 'readonly',
   effects: { reads: ['path', 'compareWith.path'] },
 

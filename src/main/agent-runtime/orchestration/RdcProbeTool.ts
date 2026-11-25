@@ -9,7 +9,7 @@ import { quarantineFatalReplayFailure } from '../../rdc/RdcReplayFailure';
 import type { CLIResult } from '@shared/types/tool';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { JsonSchema } from '../core/types';
-import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
+import type { AgentTool, AgentToolResult, AgentToolSpec } from '../agent/AgentTool';
 
 const probeQueryParameters: JsonSchema = {
   type: 'object',
@@ -103,6 +103,21 @@ export interface RdcProbeToolDeps {
   executeCli?: (command: string, args?: string[], options?: { abortSignal?: AbortSignal; settings?: RdcCliInvokerSettings; contextId?: string }) => Promise<CLIResult>;
   getLease?: (sessionId: string | null | undefined) => RdcContextLease | null;
 }
+/** Installation queries that never reach a capture; every other action reads or drives the owning replay. */
+const OFFLINE_PROBE_ACTIONS = new Set(['enumerate', 'doctor', 'version']);
+const reachesLiveCapture = (args: Record<string, unknown>) => !OFFLINE_PROBE_ACTIONS.has(String(args.action));
+
+export const RDC_PROBE_TOOL_SPEC: AgentToolSpec = {
+  isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false,
+  capture: {
+    live: reachesLiveCapture,
+    requiresApprovedScope: reachesLiveCapture,
+    recovers: (args) => args.action === 'capture_recover',
+  },
+  // A successful query keeps its URI/hash so it can be delegated as evidence.
+  presentation: { pinEvidence: (args) => args.action === 'probe' },
+};
+
 function fail(error: unknown): AgentToolResult<Record<string, unknown>> {
   const message = error instanceof Error ? error.message : String(error);
   return { content: [{ type: 'text', text: message }], isError: true, details: { code: message.split(':')[0] } };
@@ -118,7 +133,7 @@ export function createRdcProbeTool(
     description: 'Read native RDC JSON through the frozen session binding. Successful probe queries expose a session evidence URI/hash for explicit delegation; the full native result is kept, and a large one is stored as an artifact you can page and search with artifact_read. Native results report their own pagination: page event_list with offset/limit (or narrow it with eventId, maxDepth, nameContains) until pagination.truncated is false, and use event_search for name, ActionFlags or event-id-range queries. For an approved capture plan, the owning General may select a frozen inputId, recover a quarantined same-input failure, or restore the original capture and position. A capture_restore result includes the host-observed comparison with the signed entry baseline, even when changed is false; this is a current observation, not the terminal restoration receipt. While the turn is active, terminalReceiptPending is expected and is not by itself a blocker when restored is true: continue other permitted work and declare the actual outcome without inventing a terminal receipt. The runtime reobserves and signs during terminalization, and a completed outcome cannot commit if restoration is unconfirmed. Join relevant child executions and close interrupted experiments before recovery; repeated identical failures stop. The runtime checks the owning device, permissions, identity and receipts; never supply filesystem paths or context IDs. Event list: {"action":"probe","args":{"action":"event_list","limit":100}}; draws in a range: {"action":"probe","args":{"action":"event_search","eventIdMin":300,"eventIdMax":500,"flagsInclude":["Drawcall"]}}.',
     parameters: probeParameters,
     permissionHint: 'readonly',
-    spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
+    spec: RDC_PROBE_TOOL_SPEC,
     async execute(_toolCallId, rawArgs, signal, _onUpdate, context) {
       try {
         const parsed = RdcProbeInputSchema.safeParse(rawArgs);

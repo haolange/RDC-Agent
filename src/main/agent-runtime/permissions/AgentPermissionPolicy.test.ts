@@ -23,7 +23,7 @@ import { appPathService } from '../../runtime/AppPathService';
 import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolCall } from '../core/types';
-import type { AgentTool } from '../agent/AgentTool';
+import type { AgentTool, AgentToolSpec } from '../agent/AgentTool';
 import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
 
 const ownership = vi.hoisted(() => ({ lease: vi.fn() }));
@@ -59,6 +59,9 @@ vi.mock('../../runtime/resolveConfiguredShell', () => ({
   }),
 }));
 
+/** The policy never reads the spec; fixtures declare the default class only to satisfy the tool contract. */
+const FIXTURE_SPEC = { concurrency: 'exclusive', isReadOnly: false, isDestructive: false } as const satisfies AgentToolSpec;
+
 /** Fixtures keep the production effect declarations; the policy reads effects, never names. */
 const PRODUCTION_EFFECTS: Record<string, AgentTool['effects']> = {
   read_file: productionReadFile.effects,
@@ -75,6 +78,7 @@ const readFileTool: AgentTool = {
   name: 'read_file',
   description: 'read file',
   parameters: { type: 'object', properties: {} },
+  spec: FIXTURE_SPEC,
   permissionHint: 'readonly',
   effects: PRODUCTION_EFFECTS.read_file,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -86,7 +90,7 @@ const webSearchTool: AgentTool = {
   parameters: { type: 'object', properties: {} },
   permissionHint: 'readonly',
   effects: PRODUCTION_EFFECTS.web_search,
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
+  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
@@ -95,7 +99,7 @@ const shellTool: AgentTool = {
   description: 'shell',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'mutation',
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'process', category: 'system', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'process', category: 'system', requiresApproval: true },
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
@@ -103,6 +107,7 @@ const deleteFileTool: AgentTool = {
   name: 'delete_file',
   description: 'delete',
   parameters: { type: 'object', properties: {} },
+  spec: FIXTURE_SPEC,
   permissionHint: 'destructive',
   effects: PRODUCTION_EFFECTS.delete_file,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -475,6 +480,7 @@ describe('AgentPermissionPolicyService floor × mode lattice', () => {
     name: 'write_file',
     description: 'write file',
     parameters: { type: 'object', properties: {} },
+    spec: FIXTURE_SPEC,
     permissionHint: 'mutation',
     effects: PRODUCTION_EFFECTS.write_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -669,6 +675,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     name: 'write_file',
     description: 'write',
     parameters: { type: 'object', properties: {} },
+    spec: FIXTURE_SPEC,
     permissionHint: 'mutation',
     effects: PRODUCTION_EFFECTS.write_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -677,6 +684,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     name: 'edit_file',
     description: 'edit',
     parameters: { type: 'object', properties: {} },
+    spec: FIXTURE_SPEC,
     permissionHint: 'mutation',
     effects: PRODUCTION_EFFECTS.edit_file,
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -685,6 +693,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     name: 'code_interpreter',
     description: 'interpreter',
     parameters: { type: 'object', properties: {} },
+    spec: FIXTURE_SPEC,
     permissionHint: 'mutation',
     execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   };
@@ -699,6 +708,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
       name,
       description: name,
       parameters: { type: 'object', properties: {} },
+      spec: FIXTURE_SPEC,
       permissionHint: 'readonly',
       effects: PRODUCTION_EFFECTS[name],
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -907,6 +917,7 @@ describe('AgentPermissionPolicyService declared effects', () => {
   const settings = (mode: AgentPermissionMode): AgentPermissionSettings => ({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] });
   const call = (name: string, args: Record<string, unknown>): ToolCall => ({ type: 'toolCall', id: `tc-${name}`, name, arguments: args });
   const moveFileTool: AgentTool = { name: 'move_file', description: 'move', parameters: { type: 'object', properties: {} },
+  spec: FIXTURE_SPEC,
     permissionHint: 'mutation', effects: productionMoveFile.effects, execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) };
 
   it('refuses moving a capture in every mode, including full access', () => {
@@ -919,6 +930,7 @@ describe('AgentPermissionPolicyService declared effects', () => {
 
   it('refuses forging the audit log or credentials in full access', () => {
     const writeFileTool: AgentTool = { name: 'write_file', description: 'write', parameters: { type: 'object', properties: {} },
+    spec: FIXTURE_SPEC,
       permissionHint: 'mutation', effects: productionWriteFile.effects, execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) };
     const state = appPathService.getAppStatePaths();
     for (const target of [path.join(state.appStateRoot, 'audit.jsonl'), path.join(state.secretsPath, 'provider.key')]) {
@@ -958,6 +970,7 @@ describe('AgentPermissionPolicyService declared effects', () => {
 
   it('reviews a tool that declares no effects by its access level', () => {
     const undeclared = (name: string): AgentTool => ({ name, description: name, parameters: { type: 'object', properties: {} },
+    spec: FIXTURE_SPEC,
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }) });
     const evaluate = (name: string) => service.evaluate({ ...permissionInput(settings('default')), tool: undeclared(name),
       toolCall: call(name, {}), projectRootPath: workspaceRoot }).action;

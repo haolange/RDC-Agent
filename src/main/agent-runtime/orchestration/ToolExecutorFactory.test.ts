@@ -15,14 +15,27 @@ import { StorageIo } from '../../sessions/store/StorageIo';
 import { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import * as toolResultArtifacts from '../tools/ToolResultArtifactizer';
 import { shellTool } from '../tools/primitives/ShellTool';
+import { readFileTool } from '../tools/primitives/ReadFileTool';
+import { readImageTool } from '../tools/primitives/ReadImageTool';
+import { globTool } from '../tools/primitives/GlobTool';
+import { grepTool } from '../tools/primitives/GrepTool';
+import { writeFileTool } from '../tools/primitives/WriteFileTool';
+import { editFileTool } from '../tools/primitives/EditFileTool';
+import { codeInterpreterTool } from '../tools/primitives/CodeInterpreterTool';
+import { deleteFileTool } from '../tools/file/DeleteFileTool';
 import { parseRdcNativeResult } from '../../rdc/RdcNativeProtocol';
 import { directoryLinkType } from '../../platform/paths';
 import { registerPolicyBudgetObserver } from './DelegationBudget';
 import { ToolExecutorFactory } from './ToolExecutorFactory';
+import { RDC_PROBE_TOOL_SPEC } from './RdcProbeTool';
 import { createPolicyBudgetState, type TurnHandle } from './TurnCoordinator';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+import type { AgentToolSpec } from '../agent/AgentTool';
+
+/** Fakes that stand in for no particular tool declare the default class; others declare the production spec. */
+const EXCLUSIVE_SPEC = { concurrency: 'exclusive', isReadOnly: false, isDestructive: false } as const satisfies AgentToolSpec;
 
 beforeEach(() => { runtimePermissionStateService.initialize('default'); runtimePermissionStateService.commitMode('default'); });
 const handoffPreflight = vi.hoisted(() => vi.fn());
@@ -117,7 +130,7 @@ describe('ToolExecutorFactory', () => {
     const turn = { requiresApprovedCaptureScope: true, captureControl: null, runtimePlan: null, generation: 1, isLive: () => true };
     const toolMap = new Map([
       ['shell', { ...shellTool, execute: shell }],
-      ['rdc_probe', { name: 'rdc_probe', description: 'probe', parameters: { type: 'object', properties: {} }, execute: probe }],
+      ['rdc_probe', { name: 'rdc_probe', description: 'probe', parameters: { type: 'object', properties: {} }, spec: RDC_PROBE_TOOL_SPEC, execute: probe }],
     ]);
     const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
       getActiveTurn: () => turn as never, resolveRuntimeTools: () => ({ toolMap: toolMap as never, definitions: [], deferredDefinitions: [] }),
@@ -162,7 +175,7 @@ describe('ToolExecutorFactory', () => {
     const prepareRecovery = vi.fn(async () => {}); const effect = vi.fn(async () => ({ content: [] }));
     const turn = { generation: 1, isLive: () => true, captureControl: { prepareRecovery, assertLiveAccess: vi.fn() }, runtimePlan: null };
     const tool = { name: 'rdc_probe', description: 'probe', parameters: { type: 'object', properties: {} },
-      spec: { isReadOnly: true, isConcurrencySafe: false }, execute: effect };
+      spec: RDC_PROBE_TOOL_SPEC, execute: effect };
     const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
       getActiveTurn: () => turn as never, resolveRuntimeTools: () => ({ toolMap: new Map([['rdc_probe', tool]]) as never, definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
@@ -270,7 +283,7 @@ describe('ToolExecutorFactory', () => {
       details: { mode: 'audit', path: 'source.bin', bytes: 4, sha256: 'a'.repeat(64), comparison: { bytesEqual: true } } };
     try {
       const toolMap = new Map([['read_file', { name: 'read_file', description: 'reader',
-        parameters: { type: 'object', properties: {} }, execute: vi.fn(async () => original) }]]);
+        parameters: { type: 'object', properties: {} }, spec: readFileTool.spec, execute: vi.fn(async () => original) }]]);
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
@@ -311,7 +324,7 @@ describe('ToolExecutorFactory', () => {
     const execute = vi.fn(async () => original);
     try {
       const toolMap = new Map([['rdc_probe', { name: 'rdc_probe', description: 'probe',
-        parameters: { type: 'object', properties: {} }, execute }]]);
+        parameters: { type: 'object', properties: {} }, spec: RDC_PROBE_TOOL_SPEC, execute }]]);
       const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
         getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
         isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
@@ -345,7 +358,7 @@ describe('ToolExecutorFactory', () => {
     const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation(input => input.result);
     try {
       const toolMap = new Map([['rdc_probe', { name: 'rdc_probe', description: 'probe',
-        parameters: { type: 'object', properties: {} }, execute }]]);
+        parameters: { type: 'object', properties: {} }, spec: RDC_PROBE_TOOL_SPEC, execute }]]);
       const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
         getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
         isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
@@ -378,7 +391,7 @@ describe('ToolExecutorFactory', () => {
     const execute = vi.fn(async () => original);
     try {
       const toolMap = new Map([['shell', { name: 'shell', description: 'shell', parameters: shellTool.parameters,
-        validateArgs: shellTool.validateArgs, execute }]]);
+        spec: shellTool.spec, validateArgs: shellTool.validateArgs, execute }]]);
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
@@ -423,7 +436,7 @@ describe('ToolExecutorFactory', () => {
     const execute = vi.fn(async () => original);
     try {
       const toolMap = new Map([['shell', { name: 'shell', description: 'shell', parameters: shellTool.parameters,
-        validateArgs: shellTool.validateArgs, execute }]]);
+        spec: shellTool.spec, validateArgs: shellTool.validateArgs, execute }]]);
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
@@ -455,7 +468,7 @@ describe('ToolExecutorFactory', () => {
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
       getActiveTurn: () => null,
       resolveRuntimeTools: () => ({ toolMap: new Map([['read_file', { name: 'read_file', description: 'read text',
-        parameters: { type: 'object', properties: { path: { type: 'string' }, pinEvidence: { type: 'boolean' } } }, execute }]]),
+        parameters: { type: 'object', properties: { path: { type: 'string' }, pinEvidence: { type: 'boolean' } } }, spec: readFileTool.spec, execute }]]),
       definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
@@ -479,7 +492,8 @@ describe('ToolExecutorFactory', () => {
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null,
       resolveRuntimeTools: () => ({ toolMap: new Map([['runtime_context', { name: 'runtime_context', description: 'owning context',
-        parameters: { type: 'object', properties: {} }, execute }]]), definitions: [], deferredDefinitions: [] }),
+        parameters: { type: 'object', properties: {} }, spec: { ...EXCLUSIVE_SPEC, presentation: { pinEvidence: () => true } }, execute }]]),
+      definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
     try {
@@ -494,7 +508,7 @@ describe('ToolExecutorFactory', () => {
     const original = { content: [{ type: 'text' as const, text: 'bounded output' }], details: { exitCode: 0 } };
     const execute = vi.fn(async () => original);
     const toolMap = new Map([['shell', { name: 'shell', description: 'shell', parameters: shellTool.parameters,
-      validateArgs: shellTool.validateArgs, execute }]]);
+      spec: shellTool.spec, validateArgs: shellTool.validateArgs, execute }]]);
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
@@ -534,7 +548,8 @@ describe('ToolExecutorFactory', () => {
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
       getActiveTurn: () => null,
       resolveRuntimeTools: () => ({ toolMap: new Map([[name, { name, description: name,
-        parameters: { type: 'object', properties: {} }, execute }]]), definitions: [], deferredDefinitions: [] }),
+        parameters: { type: 'object', properties: {} }, spec: shell ? shellTool.spec : readFileTool.spec, execute }]]),
+      definitions: [], deferredDefinitions: [] }),
       isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
     });
     try {
@@ -559,7 +574,7 @@ describe('ToolExecutorFactory', () => {
     const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation((input) => input.result);
     try {
       const toolMap = new Map([['code_interpreter', { name: 'code_interpreter', description: 'interpreter',
-        parameters: { type: 'object', properties: {} }, execute: vi.fn(async () => original) }]]);
+        parameters: { type: 'object', properties: {} }, spec: codeInterpreterTool.spec, execute: vi.fn(async () => original) }]]);
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
@@ -583,7 +598,7 @@ describe('ToolExecutorFactory', () => {
     const execute = vi.fn(async () => ({ content: [] }));
     const toolMap = new Map([['shell', {
       name: 'shell', description: 'shell', parameters: shellTool.parameters,
-      validateArgs: shellTool.validateArgs, execute,
+      spec: shellTool.spec, validateArgs: shellTool.validateArgs, execute,
     }]]);
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
@@ -723,6 +738,7 @@ describe('ToolExecutorFactory', () => {
         name: 'shell',
         description: 'shell',
         parameters: { type: 'object', properties: {} },
+        spec: shellTool.spec,
         execute: vi.fn(async () => ({ content: [] })),
       }],
     ]);
@@ -774,6 +790,7 @@ describe('ToolExecutorFactory', () => {
         name: 'shell',
         description: 'shell',
         parameters: { type: 'object', properties: {} },
+        spec: shellTool.spec,
         execute: vi.fn(async () => ({ content: [] })),
       }],
     ]);
@@ -816,6 +833,7 @@ describe('ToolExecutorFactory', () => {
         name: 'mcp__x__y',
         description: 'mcp',
         parameters: { type: 'object', properties: {} },
+        spec: EXCLUSIVE_SPEC,
         execute: vi.fn(async () => ({ content: [] })),
       }],
     ]);
@@ -853,6 +871,7 @@ describe('ToolExecutorFactory', () => {
       name: 'task_create',
       description: 'create task',
       parameters: { type: 'object', properties: {} },
+      spec: EXCLUSIVE_SPEC,
       execute,
     }]]);
     const factory = new ToolExecutorFactory({
@@ -893,7 +912,7 @@ describe('ToolExecutorFactory', () => {
   it('enforces the frozen maxToolCalls and wall-clock policy budget before execution', async () => {
     const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
     const toolMap = new Map([['read_file', {
-      name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, execute,
+      name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, spec: readFileTool.spec, execute,
     }]]);
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
@@ -934,6 +953,7 @@ describe('ToolExecutorFactory', () => {
         name: 'read_file',
         description: 'read',
         parameters: { type: 'object', properties: {} },
+        spec: readFileTool.spec,
         execute,
       }],
     ]);
@@ -976,14 +996,14 @@ describe('ToolExecutorFactory', () => {
       name: 'read_file',
       description: 'read',
       parameters: { type: 'object', properties: {} },
-      spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none' as const, category: 'file' as const, requiresApproval: false },
+      spec: { isReadOnly: true, concurrency: 'shared' as const, isDestructive: false, sideEffect: 'none' as const, category: 'file' as const, requiresApproval: false },
       execute: vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] })),
     };
     const shell = {
       name: 'shell',
       description: 'shell',
       parameters: { type: 'object', properties: {} },
-      spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'process' as const, category: 'system' as const, requiresApproval: true },
+      spec: { isReadOnly: false, concurrency: 'exclusive' as const, isDestructive: true, sideEffect: 'process' as const, category: 'system' as const, requiresApproval: true },
       execute: vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] })),
     };
     const factory = new ToolExecutorFactory({
@@ -1046,6 +1066,7 @@ describe('ToolExecutorFactory', () => {
             name: 'shell',
             description: 'shell',
             parameters: { type: 'object', properties: { command: { type: 'string' } } },
+            spec: shellTool.spec,
             execute,
           } as never],
         ]),
@@ -1070,10 +1091,17 @@ describe('ToolExecutorFactory', () => {
     const knowledgeRoot = 'D:/Users/me/.rdc-agent/knowledge';
     const seen = new Map<string, readonly string[] | undefined>();
     const metadataRoots = new Map<string, readonly string[] | undefined>();
+    const productionSpecs: Record<string, AgentToolSpec> = {
+      read_file: readFileTool.spec, read_image: readImageTool.spec, glob: globTool.spec, grep: grepTool.spec,
+      write_file: writeFileTool.spec, edit_file: editFileTool.spec, delete_file: deleteFileTool.spec,
+      shell: shellTool.spec, code_interpreter: codeInterpreterTool.spec,
+      knowledge_read: { concurrency: 'shared', isReadOnly: true, isDestructive: false, knowledgeRoots: 'reference' },
+    };
     const makeTool = (name: string) => ({
       name,
       description: name,
       parameters: { type: 'object', properties: {} },
+      spec: productionSpecs[name]!,
       execute: vi.fn(async (_id: string, _args: unknown, _signal?: AbortSignal, _onUpdate?: unknown, context?: { temporaryAllowedPathRoots?: readonly string[]; knowledgeReadRoots?: readonly string[] }) => {
         seen.set(name, context?.temporaryAllowedPathRoots);
         metadataRoots.set(name, context?.knowledgeReadRoots);
@@ -1224,7 +1252,7 @@ describe('ToolExecutorFactory', () => {
 
 it('passes the frozen native vision capability into the production tool context', async () => {
  const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
- const toolMap = new Map([['artifact_read', { name: 'artifact_read', description: 'read', parameters: { type: 'object', properties: {} }, execute }]]);
+ const toolMap = new Map([['artifact_read', { name: 'artifact_read', description: 'read', parameters: { type: 'object', properties: {} }, spec: EXCLUSIVE_SPEC, execute }]]);
  const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }), isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
  for (const visionInputMode of ['native', 'disabled'] as const) {
   const executor = preparedExecutor(factory, 'general', ['artifact_read'], 'vision-session', { effectivePlan: { toolAllowlist: ['artifact_read'], skillIntersection: null, projectId: null, projectRootPath: null, routeCapability: { visionInputMode } } as never });
@@ -1235,7 +1263,7 @@ it('passes the frozen native vision capability into the production tool context'
 
 it('durably saves reserved cost before effects and rejects effects when durable accounting fails', async () => {
  const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
- const toolMap = new Map([['read_file', { name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, execute }]]);
+ const toolMap = new Map([['read_file', { name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, spec: readFileTool.spec, execute }]]);
  const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }), isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
  const ledger = createPolicyBudgetState(); let release!: () => void; const persisted: number[] = [];
  const gate = new Promise<void>((resolve) => { release = resolve; });
@@ -1391,6 +1419,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     name: 'plan_artifact',
     description: 'plan',
     parameters: { type: 'object', properties: {} },
+    spec: { ...EXCLUSIVE_SPEC, interaction: 'plan-review' as const },
     execute: async () => ({ content: [{ type: 'text' as const, text: 'stub' }] }),
   };
 
@@ -1436,7 +1465,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
 
 it('keeps private file-read state across turns and agent switches, isolates and releases scopes', async () => {
   const seen: Set<string>[] = [];
-  const tool = { name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} },
+  const tool = { name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, spec: readFileTool.spec,
     execute: async (_id: string, _args: unknown, _signal: unknown, _update: unknown, context?: import('../agent/AgentTool').ToolExecutionContext) => {
       seen.push(context!.successfulFileReads!);
       return { content: [{ type: 'text' as const, text: 'ok' }] };

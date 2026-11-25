@@ -36,10 +36,16 @@ import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import type { ToolDefinition } from '../core/types';
-import type { AgentTool } from '../agent/AgentTool';
+import type { AgentTool, AgentToolSpec } from '../agent/AgentTool';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { AgentRole } from '@shared/types/agent';
+
+/** Main-owned context controls: small results still keep a durable URI/hash as evidence. */
+export const RUNTIME_CONTEXT_TOOL_SPEC: AgentToolSpec = {
+  isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false,
+  presentation: { pinEvidence: () => true },
+};
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
@@ -123,7 +129,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'readonly',
-      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
       async execute(_toolCallId, args) {
         const disposition = args.disposition;
         if (!['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'].includes(String(disposition))) {
@@ -163,7 +169,7 @@ export class RuntimeToolAssembly {
         properties: {},
       },
       permissionHint: 'readonly',
-      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
+      spec: RUNTIME_CONTEXT_TOOL_SPEC,
       async execute(_toolCallId, _args, _signal, _onUpdate, executionContext) {
         const permission = runtimePermissionStateService.getSnapshot();
         const scopeId = sessionId ?? null;
@@ -279,7 +285,8 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'readonly',
-      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false },
+      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false,
+        interaction: 'user-input' },
       async execute(_toolCallId, args) {
         const questions = normalizeAskUserQuestions(args);
         return {
@@ -333,7 +340,8 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'session_mutation',
-      spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false },
+      spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false,
+        interaction: 'plan-review' },
       async execute() {
         return {
           content: [{
@@ -362,6 +370,7 @@ export class RuntimeToolAssembly {
         limit: { type: 'number' },
       } },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
       async execute(_id, args, _signal, _update, context) {
         const records = await resolveStore(args.scope, context?.projectRootPath).searchMemories(args.query ?? '', args.limit ?? 20);
         return { content: [{ type: 'text', text: records.length ? records.map((record) => `- ${record.displayName}: ${record.description}`).join('\n') : 'No matching memories were found.' }], details: { sessionId: sessionId ?? null, scope: args.scope, count: records.length } };
@@ -383,6 +392,7 @@ export class RuntimeToolAssembly {
         name: { type: 'string' },
       } },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
       async execute(_id, args, _signal, _update, context) {
         const record = await resolveStore(args.scope, context?.projectRootPath).getMemory(args.name);
         return { content: [{ type: 'text', text: record ? `# ${record.displayName}\n\n${record.description}\n\n${record.content}` : `No memory named "${args.name}" was found.` }], details: { sessionId: sessionId ?? null, scope: args.scope, count: record ? 1 : 0 } };
@@ -414,6 +424,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'mutation',
+      spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem' },
       async execute(_toolCallId, args, _signal, _update, context) {
         if (args.approved !== true) {
           return { content: [{ type: 'text', text: 'Memory write requires explicit user approval.' }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
@@ -456,6 +467,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'mutation',
+      spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem' },
       async execute(_toolCallId, args, _signal, _update, context) {
         if (args.confirmed !== true) {
           return { content: [{ type: 'text', text: 'Memory deletion requires explicit confirmation.' }], isError: true, details: { scope: args.scope, name: args.name, deleted: false } };
@@ -487,6 +499,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
       async execute(_toolCallId, args, _signal, _onUpdate, context) {
         const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
         const skills = agentRuntimeConfigService.listSkills(context?.projectRootPath ?? undefined, agentId)
@@ -521,6 +534,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
       async execute(_toolCallId, args, signal, _onUpdate, context) {
         const skillKey = typeof args.skill_id === 'string' ? args.skill_id.trim() : '';
         if (!skillKey) {
@@ -594,6 +608,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
       async execute(_toolCallId, args, _signal, _onUpdate, context) {
         const query = typeof args.query === 'string' ? args.query : undefined;
         const servers = getMcpServerStatusSummary(context?.projectRootPath ?? null, query);

@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import { executeConcurrentToolGroups } from '../../agent-runtime/agent/ConcurrentToolScheduler';
-import { isToolCallConcurrencySafe, partitionConsecutiveSafeGroups } from '../../agent-runtime/agent/toolConcurrency';
+import { isConcurrencySafeSpec, partitionConsecutiveSafeGroups } from '../../agent-runtime/agent/toolConcurrency';
+import { readFileTool } from '../../agent-runtime/tools/primitives/ReadFileTool';
+import { RDC_PROBE_TOOL_SPEC } from '../../agent-runtime/orchestration/RdcProbeTool';
+import { RUNTIME_CONTEXT_TOOL_SPEC } from '../../agent-runtime/orchestration/RuntimeToolAssembly';
 import { buildEffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 import { compileFixturePolicy } from '../policyFixture';
 import {
@@ -177,9 +180,9 @@ describe('delegatedRdcLeaseContract: stable order', () => {
     });
     expect(results.map((entry) => entry.id)).toEqual(['second', 'first']);
     expect(partitionConsecutiveSafeGroups([
-      isToolCallConcurrencySafe({ name: 'read_file', spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, category: 'file', requiresApproval: false } }),
-      isToolCallConcurrencySafe({ name: 'runtime_context' }),
-      isToolCallConcurrencySafe({ name: 'rdc_probe' }),
+      isConcurrencySafeSpec(readFileTool.spec),
+      isConcurrencySafeSpec(RUNTIME_CONTEXT_TOOL_SPEC),
+      isConcurrencySafeSpec(RDC_PROBE_TOOL_SPEC),
     ])).toEqual([
       { callIndexes: [0], parallel: true },
       { callIndexes: [1], parallel: false },

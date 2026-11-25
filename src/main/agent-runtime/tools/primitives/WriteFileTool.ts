@@ -45,7 +45,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
     },
     required: ['path', 'content'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
   effects: { writes: ['path'] },
 

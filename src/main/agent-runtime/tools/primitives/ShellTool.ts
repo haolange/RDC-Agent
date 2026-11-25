@@ -85,6 +85,20 @@ function resolveReportedExitCode(trailerExit: number | undefined, processCode: n
   return processCode;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Native RDC operations and catalog discovery keep their URI/hash as evidence even when small. */
+function isNativeRdcEvidence(result: AgentToolResult): boolean {
+  const details = result.details;
+  if (typeof details !== 'object' || details === null || !('operation' in details) || typeof details.operation !== 'string') return false;
+  return details.operation.startsWith('rd.')
+    || details.operation === 'rdc_tool.tools.search'
+    || details.operation === 'rdc_tool.tools.describe'
+    || details.operation === 'rdc_tool.tools.list';
+}
+
 export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operation?: string; receipt?: import("@shared/types/renderdocInvestigation").InvestigationContentRef }> = {
   name: 'shell',
   label: '终端命令',
@@ -140,11 +154,16 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
   },
   spec: {
     isReadOnly: false,
-    isConcurrencySafe: false,
+    concurrency: 'exclusive',
     isDestructive: true,
     sideEffect: 'process',
     category: 'system',
     requiresApproval: true,
+    capture: {
+      live: (args) => args.rdc !== undefined,
+      requiresApprovedScope: (args) => isRecord(args.rdc) && 'operation' in args.rdc,
+    },
+    presentation: { pinEvidence: (_args, result) => isNativeRdcEvidence(result), deliversNativeFailure: true },
   },
   permissionHint: 'mutation',
   validateArgs: validateShellInputMode,

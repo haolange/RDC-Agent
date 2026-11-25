@@ -65,11 +65,13 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
   },
   spec: {
     isReadOnly: false,
-    isConcurrencySafe: false,
+    concurrency: 'exclusive',
     isDestructive: false,
     sideEffect: 'process',
     category: 'system',
     requiresApproval: true,
+    // An executed run is evidence whatever its exit status.
+    presentation: { pinEvidence: () => true, keepErrorResults: true },
   },
   permissionHint: 'mutation',
 

@@ -92,7 +92,7 @@ function createKnowledgeBrowseTool(deps: KnowledgeToolDependencies): AgentTool {
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -135,7 +135,7 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -208,11 +208,12 @@ function createKnowledgeReadTool(deps: KnowledgeToolDependencies): AgentTool {
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
       requiresApproval: false,
+      knowledgeRoots: 'reference',
     },
     async execute(_id, args, _signal, _onUpdate, context) {
       const spaceId = asString(args.spaceId);
@@ -259,7 +260,7 @@ function createKnowledgeCompileTool(deps: KnowledgeToolDependencies): AgentTool 
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -313,7 +314,7 @@ function createKnowledgeCandidateCreateTool(
     permissionHint: 'session_mutation',
     spec: {
       isReadOnly: false,
-      isConcurrencySafe: false,
+      concurrency: 'exclusive',
       isDestructive: false,
       sideEffect: 'session',
       category: 'system',

@@ -36,7 +36,7 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
     },
     required: ['notebook_path', 'cell_index', 'new_source'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
   effects: { writes: ['notebook_path'] },
 

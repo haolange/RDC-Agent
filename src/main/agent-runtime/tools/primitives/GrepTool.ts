@@ -64,7 +64,7 @@ export const grepTool: AgentTool<GrepParams, GrepDetails> = {
     },
     required: ['pattern'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
+  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false, knowledgeRoots: 'read-access' },
   permissionHint: 'readonly',
   effects: { reads: ['cwd', 'path'] },
 
