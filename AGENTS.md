@@ -93,13 +93,23 @@
 - **验收交互过程**。涉及保存、刷新或动效时，核对点击前、等待中、完成后的位置、焦点和滚动。加入一次迟到响应或失败的代表场景，确认最新意图及回退行为。
 - **Zero Fake-Pass**。不用 mock、硬编码打桩、跳过编译、注释报错代码或旧缓存结果冒充当前代码路径通过。受控 fixture、真实模型请求、真实 RDC 回放是三种不同的证据，互不替代。改动使原有验证失效后重新跑通。
 - **失败先判对错**。测试失败时对照权威合同判断代码、测试或环境哪一方有误。不为通过测试恢复已撤回的行为，不删除仍有效的负向约束。
-- **文档引用**。`check:gates` 含 `check-doc-references`：文档里反引号中的仓库路径、相对链接与 IPC 通道名都必须仍然存在；改名、删文件或改通道时同步改文档。代码位置写文件与符号名，不写行号（`文件.ts:行号` 会随编辑和格式化漂移，门禁直接拒绝）。写「禁止恢复 / 已删除」的行可以点名已退役路径。两份 README 写的源码版本由 `check:readme-version`（在 `check:gates` 内）对照 `package.json`。
-- **覆盖率底线**。`check:coverage-ratchet` 是固定底线，设在实际覆盖率下方几个百分点，只在大幅回退（删掉测试、大块代码无测试）时失败。覆盖率配置只在 `vitest.config.ts` 根级生效（Vitest 不读项目内的 coverage），`test:coverage` / `test:coverage:renderer` 用 `--coverage.include` 指定各自源码集，没有测试导入的文件也计入分母。不为它补测试，也不把底线上调去追当前数字。它失败时说明出了大问题：查原因并报告，不靠补测试过关。
+- **文档引用**。`check:gates` 含 `check-doc-references`：
+  - 文档里反引号中的仓库路径、相对链接与 IPC 通道名都必须仍然存在；改名、删文件或改通道时同步改文档。
+  - 代码位置写文件与符号名，不写行号：`文件.ts:行号` 会随编辑和格式化漂移，门禁直接拒绝。
+  - 含否定措辞（禁止、不存在、已删除、已移除、不再等）的行可以点名已退役的路径。
+  - 两份 README 写的源码版本由 `check:readme-version`（在 `check:gates` 内）对照 `package.json`。
+- **覆盖率底线**。`check:coverage-ratchet` 是固定底线，设在实际覆盖率下方几个百分点，只在大幅回退（删掉测试、大块代码无测试）时失败。
+  - 基线有两份：`scripts/fidelity/coverage-ratchet.json`（main / shared / preload）与 `scripts/fidelity/coverage-ratchet-renderer.json`（renderer），CI `build` 分别对照。
+  - 覆盖率配置只在 `vitest.config.ts` 根级生效（Vitest 不读项目内的 coverage）；`test:coverage` / `test:coverage:renderer` 用 `--coverage.include` 指定各自的源码集，没有测试导入的文件也计入分母。
+  - 不为它补测试，也不把底线上调去追当前数字。它失败说明出了大问题：查原因并报告，不靠补测试过关。
+- **只减不增的清单**。以下门禁的清单或预算只允许收紧：
+  - `check:indexed-access`：生产代码按目录收紧 `noUncheckedIndexedAccess`，清单外的目录必须零错误。清单只减不增，已清零或已不存在的目录留在清单里会让门禁失败，所以清零的目录在同一次改动里移出。
+  - `check:orchestrator-facade`：`AgentOrchestrator.ts` 的 fan-out 与最长函数预算取实测最大值，façade 缩小时下调，不为新工作上调。
 - **停止扩查**。适用的验证通过后停止；只有新的直接失败才补充修复与验证。
 
 ### 验证命令
 
-依赖唯一 `pnpm@11.7.0`。
+依赖唯一 `pnpm@11.7.0`。按改动范围运行：
 
 | 改动范围 | 运行 |
 |---|---|
@@ -108,14 +118,40 @@
 | 右栏 | 另加 `pnpm run check:right-rail` |
 | 跨层（main / preload / renderer / shared） | 另加 `pnpm test`、`pnpm run check:contracts`、`pnpm run test:coverage`、`pnpm run check:coverage-ratchet`、`pnpm run check:gates`、`pnpm run build` |
 | 提交前 | `pnpm run check:git-diff`（需 `RDC_DIFF_BASE`） |
-| 发布配置 | 才执行 pack |
+| 发布配置 | 只有改动发布配置时才执行 `pnpm run pack` |
 | 宿主相关行为（`src/main/platform`） | 另加 `pnpm run check:host-platform`；Linux 单元测试由 CI `build` 运行，Windows 由 CI `windows-unit` 运行 |
-| 渲染结果（renderer 样式、组件、布局） | 另加差分渲染：`node scripts/visual-diff/run.mjs capture <head>`、对本轮起点构建 `capture <base> --build <base 检出>`、`compare <base> <head>`；有意的可见变化在提交 trailer 写 `Visual-Diff-Allow: <场景 id,…>`。IPC 契约变化时用 `run.mjs record` 重录场景（启动一次性 Browser QA 实例，从真实后端取响应） |
+| 渲染结果（renderer 样式、组件、布局） | 另加差分渲染，见下文「差分渲染」 |
 | 内置方法文本（`resources/agent-runtime`） | 另加 `src/main/testing/investigationSystemContract.test.ts`、`src/main/testing/InstructionCost.offline.test.ts`、`pnpm run check:investigation-system` |
 
-行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。生产代码按目录收紧 `noUncheckedIndexedAccess`：`check:indexed-access`（在 `check:gates` 内）要求清单外的目录零错误，清单只减不增，清零的目录在同一次改动里移出。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
+**差分渲染**：依次运行 `node scripts/visual-diff/run.mjs capture <head>`、对本轮起点构建运行 `capture <base> --build <base 检出>`、`compare <base> <head>`。有意的可见变化在提交 trailer 写 `Visual-Diff-Allow: <场景 id,…>`。IPC 契约变化时用 `run.mjs record` 重录场景（启动一次性 Browser QA 实例，从真实后端取响应）。
 
-secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不指定时只检查最近一次提交。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
+**脚本清单**：`package.json` 的全部脚本按用途分组如下，增删脚本时同步本表。
+
+| 用途 | 脚本 |
+|---|---|
+| 运行（经共享 launcher） | `dev`、`start`、`start:human`、`start:human:dev`、`start:agent-browser`、`start:agent-browser:dev`、`start:prepare` |
+| 开发辅助 | `dev:renderer`、`design:dev`、`design:build`、`brand:icons` |
+| 构建与打包 | `build`、`pack`、`dist` |
+| 测试 | `test`、`test:watch`、`test:coverage`、`test:coverage:renderer` |
+| 类型与 lint | `typecheck`、`lint` |
+| 门禁总线 | `check:gates` |
+| `check:gates` 串联的仓库与架构门禁 | `check:readme-version`、`check:bundle-deps`、`check:indexed-access`、`check:repository-hygiene`、`check:architecture`、`check:orchestrator-facade`、`check:qa-ids`、`check:legacy-residue`、`check:acceptance-ledger`、`check:release-config`、`check:identity`、`check:secrets` |
+| `check:gates` 串联的领域与 UI 门禁 | `check:work-process-tool-coverage`、`check:agent-runtime`、`check:tool-system`、`check:session-projection`、`check:right-rail`、`check:knowledge-system`、`check:investigation-system`、`check:provider-system`、`check:design-tokens`、`check:ui-contract`、`check:renderer-structure`、`check:rdc-tool-guides` |
+| 行为门禁（`behaviorChecks.test.ts` 的子集） | `check:work-process`、`check:conversation-branch`、`check:reasoning-delivery`、`check:browser-capability`、`check:settings-agents`、`check:i18n`、`check:appearance`、`check:host-platform` |
+| 聚焦 vitest（随 `test` / `test:coverage` 运行） | `check:contracts`、`check:scoped-resources`、`check:project-instructions`、`check:prompt-plan-snapshot`、`check:skills`、`check:hooks`、`check:memory-policy`、`check:provider-catalog` |
+| CI `build` 单独运行 | `check:coverage-ratchet`、`check:git-diff`、`check:request-cache-profile`、`check:agent-tool-capability` |
+| 发布 | `release:checksums`、`release:sbom`、`check:release-package` |
+| Smoke | `smoke:agent-browser`、`smoke:desktop` |
+
+`check:gates` 的精确组成以 `package.json` 为准：
+
+- 它运行整个 `src/main/testing/gates/behaviorChecks.test.ts`，所以行为门禁的各子集都在其中。
+- 它另含没有脚本别名的 `check-doc-references`。
+- `check:renderer-structure` 在 `check:gates` 里只运行 `check-renderer-structure.mjs`，不含脚本前半段的 `node --test`。
+
+**依赖方向与宿主**：行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` / `main-domains/direction` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）。宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
+
+**基线**：secrets 与 diff 检查需要基线 `RDC_DIFF_BASE=<本轮起点提交>`；不指定时只检查最近一次提交。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
 
 **Browser QA**：用 disposable `pnpm run start:agent-browser`，只消费一次 `/qa?qaBootstrap=...`，进入同源 `/app`。不直开 Vite，不把 token 留在 URL。high-impact 需要 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。没有设备的 Remote／Android 验证记为阻塞，不以本地成功代替。
 
@@ -131,7 +167,10 @@ secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不
 
 - **结论先行**。第一句给出完成状态、核心根因或最终决断。简单任务几句话说清；复杂任务用清晰的层级和紧凑表格呈现改动与验证结果。
 - **说具体行为**。汇报聚焦于改了哪里的什么契约、解决了什么根因、验证结果如何。不只报 Task 编号或术语，不倾倒搜索过程和终端输出。
-- **验收账本**。现场证据只写入 `docs/product/acceptance-ledger.md`，每次真实运行（一次调查或一次实机验证）一条，不超过 10 行：做了什么、结果、证据位置、人工介入。不写清理流水账、字节数和进程号。每条都要有 `- 提交：` 加反引号中的提交 SHA（须在当前历史中）和 `- 证据：` 行（CI 运行链接、反引号中的产物路径，或 `本地：` 加反引号中实际执行的命令），`check:acceptance-ledger` 校验；本地结果不写成 CI 通过。账本只保留当前有效的记录，被后续运行取代的记录直接删除，历史从 Git 查阅。
+- **验收账本**。现场证据只写入 `docs/product/acceptance-ledger.md`，每次真实运行（一次调查或一次实机验证）一条，不超过 10 行：做了什么、结果、证据位置、人工介入。不写清理流水账、字节数和进程号。
+  - 每条记录以 `## YYYY-MM-DD：标题` 开头，带 `- 提交：` 加反引号中的提交 SHA（须在当前历史中），以及 `- 证据：` 行：CI 运行链接、反引号中的产物路径（`.json` / `.png` / `.log` / `.txt` / `.md` / `.zip`），或 `本地：` 加反引号中实际执行的命令。`check:acceptance-ledger` 校验这三项。
+  - 本地结果不写成 CI 通过。
+  - 账本只保留当前有效的记录，被后续运行取代的记录直接删除，历史从 Git 查阅。
 
 ## 7. 仓库结构与权威
 
@@ -155,25 +194,32 @@ secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不
 | Agent、Skill、Hook、Memory；内置方法文本的撰写规则 | `docs/product/scoped-runtime-resources.md` |
 | RDC 操作契约、lease、回放身份、Android 回执 | `docs/architecture/rdc-runtime.md` 与 `ARCHITECTURE.md` 的 Session Capture 节 |
 | UI/UX | `DESIGN.md`（原则），`docs/ui/design-system.md`（token 与组件） |
-| 右栏投影 | `docs/contracts/session-projection.md` |
+| 右栏投影 | `ARCHITECTURE.md`「Right Rail Authority」与 `docs/contracts/session-projection.md` |
 
 文档约定：
 
 - 根目录只放入口和长期跨层约定；领域规则归稳定的主题文档。临时禁令、机器路径、PID、某轮进度不写成永久规则。
 - 路径相对本库。文档中文为主，保留必要技术术语。上游仓库概念只作标记明确的对照，不成为运行前提。
 - 标准 Electron 布局，不恢复顶层 Config／Saved／Intermediate／Binaries。
-- 关键边界以 `ARCHITECTURE.md` 的核心 Invariant 为准。动手前记住这几条：
-  - IPC 入参经 `parseIpcArgs` 校验；组件不直调 `window.electronAPI`。
-  - 跨边界的失败抛 `AppError`（码登记在 `src/shared/errors/errorCodes.ts`）；界面文案经 `humanizeError`，技术文本只进「复制详情」。
-  - 审批 token 单次使用；凭据经 safeStorage，不可用时 fail-closed。
-  - Provider 与模型事实只在 JSON manifest 里，不写进代码或文档。
-  - 实验的五份签名回执（baseline、intervention、variant、rollback、restored）缺一不成立。
-  - RDC 现场没有全局镜像，只经 owning session 的 lease 访问；只有 General 操作 live 回放。
-  - Mission 只规划，不执行；没有自动回 Mission 的路径。
-  - CSP 不放行 inline style。
-  - 文件行数上限由 ESLint `max-lines` 执行。
-- Plan 与 generation：Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具或自动回 Mission。
+
+### 动手前记住的关键边界
+
+完整清单以 `ARCHITECTURE.md` 的核心 Invariant 为准，下面是最常碰到的几条：
+
+- IPC 入参经 `parseIpcArgs` 校验；组件不直调 `window.electronAPI`。
+- 跨边界的失败抛 `AppError`（码登记在 `src/shared/errors/errorCodes.ts`）；界面文案经 `humanizeError`，技术文本只进「复制详情」。
+- 审批 token 单次使用；凭据经 safeStorage，不可用时 fail-closed。
+- Provider 与模型事实只在 JSON manifest 里，不写进代码或文档。
+- 实验的五份签名回执（baseline、intervention、variant、rollback、restored）缺一不成立。
+- RDC 现场没有全局镜像，只经 owning session 的 lease 访问；只有 General 操作 live 回放。
+- Mission 只规划，不执行；没有自动回 Mission 的路径。Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具。
 - Prompt 调用经 PromptPlan。
+- CSP 不放行 inline style。
+- 文件行数上限由 ESLint `max-lines` 执行。
+
+### Right Rail single-track gate
+
+Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投影契约见 `ARCHITECTURE.md`「Right Rail Authority」与 `docs/contracts/session-projection.md`。改动右栏后运行 `pnpm run check:right-rail`。
 
 ## 8. 设计系统约束（写 CSS 必读）
 
@@ -181,7 +227,10 @@ secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不
 
 - **Appearance**：规则见 `docs/ui/design-system.md` 的「双体系」，验收见 `docs/ui/appearance-checklist.md`；禁止恢复 translucent / semi-transparent sidebar。
 - **Token**：引用语义 token（`--token-*`），不直接用 primitive token，不写字面颜色；字号只用四个排版角色 `var(--type-title|reading|body|meta-size)`，间距、圆角、控件高度分别用 `var(--space-*)`、`var(--radius-*)`、`var(--control-height-*)`。门禁：`pnpm run check:design-tokens`。
-- **信息克制**：默认画面只放动词加对象的标题、状态、耗时与主要动作；ID、哈希、`session://`、协议、状态码、字节数与原始枚举不上任何界面，只经「⋯ › 复制诊断信息」或错误旁的「复制详情」进剪贴板（`patterns/CopyDiagnostics`），不做「诊断」折叠块。需要解释的用次级正文写在标签下，悬停提示（`data-tooltip`，`ui/TooltipHost`）只补充信息或显示被截断的全文；不用原生 `title`。视觉原则见 `DESIGN.md`，审美契约见 `docs/ui/design-system.md`。
+- **信息克制**：默认画面只放动词加对象的标题、状态、耗时与主要动作。
+  - ID、哈希、`session://`、协议、状态码、字节数与原始枚举不上任何界面，只经「⋯ › 复制诊断信息」或错误旁的「复制详情」进剪贴板（`patterns/CopyDiagnostics`），不做「诊断」折叠块。
+  - 需要解释的用次级正文写在标签下；悬停提示（`data-tooltip`，`ui/TooltipHost`）只补充信息或显示被截断的全文，不用原生 `title`。
+  - 视觉原则见 `DESIGN.md`，审美契约见 `docs/ui/design-system.md`。
 - **图标与动效**：图标只来自 `ui/Icon`（展开箭头用 `ui/Chevron`），不内联 SVG、不用文字当图标；一条 transition 只写一条缓动，进场必有退场。门禁：`pnpm run check:ui-contract`。
 - **按钮**：动作按钮用 `<Button>`（`.button` + variant）。
 - **状态类**：一律 `is-*` 并配对应 `aria-*`。
@@ -190,16 +239,14 @@ secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不
 - **渲染层分层**由 `pnpm run check:renderer-structure` 与 ESLint `no-restricted-imports` 强制：`ui → lib`；`patterns → ui / lib / stores / hooks / services / i18n`（可读 store，不写 store、不直调 IPC）；`features` 不横向 import 其他 feature，也不 import `app` / `shell`；`stores` / `services` / `hooks` 不 import `features` / `ui` / `patterns`；组件（`.tsx`）不直调 `window.electronAPI` / `getElectronApi`。
 - 视觉参考：`designs/rdc-agent-design-system/index.html`。
 
-## Right Rail single-track gate
-
-Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投影契约见 `docs/contracts/session-projection.md`。改动右栏后运行 `pnpm run check:right-rail`。
-
 ## 9. 产物、依赖与命名
 
 - 构建与测试输出、日志、缓存、workspace 数据和临时文件不入库；根文件受 `check:repository-hygiene` 允许名单约束。
 - 依赖唯一 `pnpm@11.7.0`，保留 `pnpm-lock.yaml`；`pnpm-workspace.yaml` 固定 store。禁止 npm／Yarn fallback、根盘 store、第二 launcher。`node_modules`、`out`、`release`、下载缓存和 prepare state 仅本机；发布包不带包管理器、lockfile、源码 launcher 或开发缓存。
-- `dependencies` 只放 main / preload 在运行时 `require` 的包（electron-vite 把它们外置，electron-builder 随包发出）；只被 renderer 使用的包由 Vite 打进 bundle，放 `devDependencies`，不重复进安装包。同一个包在锁文件里只留一个版本，传递依赖的分叉与已知漏洞用 `pnpm-workspace.yaml` 的 `overrides` 收敛并写明原因。`check:bundle-deps`（在 `check:gates` 内）按实际 import 校验这条归属（运行时依赖的必需 peer 算作被使用），CI `build` 另以 `--entry-chunk` 校验 renderer 入口 chunk 预算。
-- 禁止恢复独立 `cli/`、Playwright `e2e/`、`docs/handover/`。`designs` 只保留 `rdc-agent-design-system`。
+- `dependencies` 只放 main / preload 在运行时 `require` 的包（electron-vite 把它们外置，electron-builder 随包发出）；只被 renderer 使用的包由 Vite 打进 bundle，放 `devDependencies`，不重复进安装包。
+  - 同一个包在锁文件里只留一个版本；传递依赖的分叉与已知漏洞用 `pnpm-workspace.yaml` 的 `overrides` 收敛，并写明原因。
+  - `check:bundle-deps`（在 `check:gates` 内）按实际 import 校验这条归属（运行时依赖的必需 peer 算作被使用）；CI `build` 另以 `--entry-chunk` 校验 renderer 入口 chunk 预算。
+- 禁止恢复独立 `cli/`、Playwright `e2e/`、顶层 `test/`、`docs/handover/`（`check:repository-hygiene` 拒绝）。`designs` 只保留 `rdc-agent-design-system`。
 - 目录与文件按稳定职责命名，不用 v1/v2、new/old、final 等迭代标签建立并行路径；协议或存储版本只在确有语义需要的边界表达。已有带版本名且仍被引用的实现，先核对调用与契约再收敛。不提交乱码。
 - 用户资源根固定 `~/.rdc-agent`，项目资源根固定 `<project-root>/.rdc-agent`；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents／skills／MCP／hooks／policies／knowledge／memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时和 secret 是本机边界，project 不得覆盖。
 
