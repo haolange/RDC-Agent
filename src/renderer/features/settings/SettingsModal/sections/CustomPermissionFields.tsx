@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
 import { useI18n } from '../../../../i18n';
 import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { Button } from '../../../../ui/Button';
@@ -19,7 +18,7 @@ function lines(value: string): string[] {
 
 export const CustomPermissionFields: React.FC = () => {
   const { t } = useI18n();
-  const saved = useAppSettingsStore((state) => state.settings.agentRuntime?.permissions ?? DEFAULT_AGENT_RUNTIME.permissions);
+  const saved = useAppSettingsStore((state) => state.settings.agentRuntime.permissions);
   const save = useAppSettingsStore((state) => state.setCustomPermissionRules);
   const [draft, setDraft] = useState(() => ({
     readableRoots: saved.readableRoots.join('\n'),

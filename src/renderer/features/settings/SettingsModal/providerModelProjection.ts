@@ -45,19 +45,23 @@ export function updateProviderModelPreference(
     || (model.aliases ?? []).some((alias) => incomingKeys.has(alias))
   );
   let updated = false;
-  const next = models.flatMap((model) => {
+  const next: LlmProviderModel[] = [];
+  for (const model of models) {
     const matchesModel = catalogOwnership !== 'user-managed' ? matches(model) : model.id === modelId;
-    if (!matchesModel) return [model];
-    if (updated) return [];
+    if (!matchesModel) {
+      next.push(model);
+      continue;
+    }
+    if (updated) continue;
     updated = true;
-    return [{
+    next.push({
       ...model,
       ...patch,
       id: modelId,
       label: patch.label ?? model.label,
       enabled: patch.enabled ?? model.enabled,
-    }];
-  });
+    });
+  }
   if (updated) return next;
   return [...next, {
     ...patch,
@@ -113,7 +117,7 @@ export function projectProviderModels(
       },
     };
     });
-  const projectedIds = new Set(projected.flatMap(({ model }) => [model.id, ...(model.aliases ?? [])]));
+  const projectedIds = new Set(projected.flatMap(({ model }) => [model.id, ...model.aliases]));
   return [
     ...projected,
     ...models

@@ -70,7 +70,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
       <div className="settings-manifest-editor-head">
         <div className="settings-agent-editor-title">
           <span className="settings-agent-editor-icon" aria-hidden="true" {...agentAccentStyle}>
-            <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon ?? 'message-orbit'} size={20} strokeWidth={1.9} />
+            <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon} size={20} strokeWidth={1.9} />
           </span>
           <div className="settings-agent-editor-copy">
             <div className="settings-agent-editor-name-row">

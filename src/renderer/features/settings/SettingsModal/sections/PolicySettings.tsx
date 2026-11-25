@@ -4,7 +4,6 @@ import {
   CONTEXT_COMPACTION_PERCENT_MIN,
   CONTEXT_COMPACTION_PERCENT_STEP,
 } from '@shared/types/modelCapability';
-import { DEFAULT_AGENT_RUNTIME } from '@shared/constants/appSettingsDefaults';
 import { useI18n } from '../../../../i18n';
 import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { Select } from '../../../../ui/Select';
@@ -33,8 +32,7 @@ export const PolicySettings: React.FC<{
 }> = ({ overview, scope, onScopeChange, onChanged }) => {
   const { t } = useI18n();
   const percent = useAppSettingsStore(
-    (state) => state.settings.agentRuntime.context?.compactionThresholdPercent
-      ?? DEFAULT_AGENT_RUNTIME.context.compactionThresholdPercent,
+    (state) => state.settings.agentRuntime.context.compactionThresholdPercent,
   );
   const setCompactionThresholdPercent = useAppSettingsStore(
     (state) => state.setCompactionThresholdPercent,

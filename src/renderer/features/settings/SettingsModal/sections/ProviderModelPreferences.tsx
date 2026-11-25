@@ -12,15 +12,15 @@ type Props = Pick<ProviderModelCapabilitySummaryProps, 'model' | 'effectiveModel
 export function ProviderModelPreferences({ model, effectiveModel, snapshot, loading, onModelChange }: Props) {
   const { t } = useI18n();
   if (!effectiveModel) return null;
-  const reasoning = effectiveModel?.controls.reasoning;
-  const reasoningUnverified = reasoning?.kind === 'unknown';
-  const reasoningDefaultUnverified = reasoningUnverified || reasoning?.defaultState === 'unknown' || reasoning?.defaultState === 'provider-managed';
+  const reasoning = effectiveModel.controls.reasoning;
+  const reasoningUnverified = reasoning.kind === 'unknown';
+  const reasoningDefaultUnverified = reasoningUnverified || reasoning.defaultState === 'unknown' || reasoning.defaultState === 'provider-managed';
   const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(reasoning);
-  const routeOptions = effectiveModel?.routeOptions ?? [];
-  const effectiveRouteOption = routeOptions.find((option) => option.routeRevision === effectiveModel?.routeRevision)
-    ?? routeOptions.find((option) => option.route.protocol === effectiveModel?.route.protocol);
+  const routeOptions = effectiveModel.routeOptions ?? [];
+  const effectiveRouteOption = routeOptions.find((option) => option.routeRevision === effectiveModel.routeRevision)
+    ?? routeOptions.find((option) => option.route.protocol === effectiveModel.route.protocol);
   const selectedRouteOptionId = model.preferredRouteOptionId
-    ?? effectiveModel?.preferredRouteOptionId
+    ?? effectiveModel.preferredRouteOptionId
     ?? effectiveRouteOption?.id
     ?? routeOptions[0]?.id
     ?? '';
@@ -50,7 +50,7 @@ export function ProviderModelPreferences({ model, effectiveModel, snapshot, load
         <Select dataTestId={`settings-model-reasoning-${model.id}`} ariaLabel={t('settings.providers.capability.defaultReasoning')}
           value={reasoningDefaultUnverified ? '' : model.defaultReasoningSelection ?? ''} disabled={reasoningOptions.length <= 1}
           onChange={(value) => onModelChange({ defaultReasoningSelection: value ? value as ReasoningSelection : undefined })}
-          options={[{ value: '', label: formatReasoningDefault(reasoning ?? null, t) },
+          options={[{ value: '', label: formatReasoningDefault(reasoning, t) },
             ...reasoningOptions.map((selection) => ({ value: selection, label: t(getReasoningLabelKey(selection)) }))]} />
       </SettingsField>
       <SettingsField label={t('settings.providers.capability.clientBudget')} description={t('settings.providers.capability.clientBudgetHint', { value: effectiveModel.defaultBudgetTokens })}>

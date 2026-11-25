@@ -45,7 +45,6 @@ export function collectCardContradicts(
     conflicts.push({ leftCardId, rightCardId, kind: 'contradicts' });
   };
   for (const entry of pack?.conflicts ?? []) {
-    if (entry.kind !== 'contradicts') continue;
     if (entry.leftCardId === card.cardId || entry.rightCardId === card.cardId) {
       push(entry.leftCardId, entry.rightCardId);
     }

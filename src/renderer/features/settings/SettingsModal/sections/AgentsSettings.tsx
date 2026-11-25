@@ -82,7 +82,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   const selectedAgent = missingAgentId ? null : scopedDrafts.find((agent) => agent.id === selectedAgentId) ?? scopedDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
   const displayDescription = (agent: AgentManifestDraft) => draftDescription(agent, settings);
-  const diagnostics = settings.agents.diagnostics ?? [];
+  const diagnostics = settings.agents.diagnostics;
   useEffect(() => {
     if (!agentRequest || !agentManifestContextReady) return;
     const target = activeDrafts.find((draft) => draft.id === agentRequest.agentId);

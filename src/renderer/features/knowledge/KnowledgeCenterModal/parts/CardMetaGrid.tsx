@@ -57,7 +57,7 @@ export function CardMetaGrid({ card, spaceLabel, resolveRelation, onOpenRelation
                       {card.scope[axis]?.trim().toLowerCase() === 'unknown' ? t('knowledgeCenter.valueUnknown') : card.scope[axis] ?? '—'}
                       {exclusions[axis]?.length ? (
                         <span className="knowledge-center-scope-chip">
-                          {t('knowledgeCenter.metaExclusions')}: {exclusions[axis]?.join(', ')}
+                          {t('knowledgeCenter.metaExclusions')}: {exclusions[axis].join(', ')}
                         </span>
                       ) : null}
                     </dd>

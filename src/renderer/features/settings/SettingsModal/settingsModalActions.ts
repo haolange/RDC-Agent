@@ -65,7 +65,7 @@ export function createSettingsModalActions({
   };
 
   const handleAvatarSelect = async () => {
-    const avatarPath = await window.electronAPI?.appShell.selectAvatar();
+    const avatarPath = await window.electronAPI.appShell.selectAvatar();
     if (!avatarPath) return;
     modalState.setAccountDraft((current) => ({ ...current, avatarPath }));
   };
@@ -126,7 +126,7 @@ export function createSettingsModalActions({
   };
 
   const handleImportAgentManifest = async () => {
-    const filePaths = await window.electronAPI?.selectFiles();
+    const filePaths = await window.electronAPI.selectFiles();
     const filePath = filePaths?.find((entry) => entry.endsWith('.agent.md'));
     if (!filePath) {
       modalState.setAgentManifestSaveState('error');

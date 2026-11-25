@@ -83,7 +83,7 @@ export const RuntimeScopePanel: React.FC<{
 
   const locationPath = scope === 'project'
     ? overview?.projectPaths?.[`${kind}sPath`] ?? overview?.projectRoot
-    : overview?.userPaths?.[`${kind}sPath`] ?? overview?.userRoot;
+    : overview?.userPaths[`${kind}sPath`] ?? overview?.userRoot;
 
   const editor = (
     <ScopedResourceEditor

@@ -22,7 +22,7 @@ export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, o
       <SettingsField label={t('settings.agentIcon')} layout="row">
         <div className="settings-agent-look-row" {...accentStyle}>
           <AgentIconPresetPicker
-            value={agent.icon ?? 'message-orbit'}
+            value={agent.icon}
             onChange={(icon) => onUpdateAgent({ icon })}
           />
         </div>
@@ -37,7 +37,7 @@ export const AgentIdentityPanel: React.FC<AgentIdentityPanelProps> = ({ agent, o
           hueLabel={t('settings.colorPickerHue')}
           pickerTitle={t('settings.colorPickerTitle')}
           currentLabel={t('settings.colorPickerCurrent')}
-          value={agent.accent ?? '#33d1ff'}
+          value={agent.accent}
           testId="settings-agent-accent"
           onChange={(accent) => onUpdateAgent({ accent })}
         />

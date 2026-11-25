@@ -185,7 +185,7 @@ export function ListColumn({ state, inbox, inboxError, onImport, onRebuildIndex 
             key={`${conflict.leftCardId}:${conflict.rightCardId}`}
             left={hitById.get(conflict.leftCardId)}
             right={hitById.get(conflict.rightCardId)}
-            selected={state.selectedConflict?.leftCardId === conflict.leftCardId && state.selectedConflict?.rightCardId === conflict.rightCardId}
+            selected={state.selectedConflict?.leftCardId === conflict.leftCardId && state.selectedConflict.rightCardId === conflict.rightCardId}
             onSelect={() => void state.selectConflict(conflict)}
           />
         ))}

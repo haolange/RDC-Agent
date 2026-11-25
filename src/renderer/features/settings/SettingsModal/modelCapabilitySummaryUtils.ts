@@ -133,7 +133,7 @@ export function formatReasoningDefault(control: ReasoningControl | null, t: Tran
   }
   if (control.defaultState === 'provider-managed') return t('composer.effort.providerManaged');
   return t('settings.providers.capability.providerDefault', {
-    value: t(getReasoningLabelKey(control.defaultSelection ?? 'off')),
+    value: t(getReasoningLabelKey(control.defaultSelection)),
   });
 }
 
@@ -148,7 +148,7 @@ export function formatFastControl(model: EffectiveModel | null, t: Translate): s
   if (model.controls.fast.state === 'provider-managed') return t('composer.effort.providerManaged');
   if (model.controls.fast.state === 'fixed') return t('settings.providers.capability.alwaysOn');
   const entitlement = model.controls.fast.entitlement;
-  return !entitlement || entitlement === 'granted'
+  return entitlement === 'granted'
     ? t('settings.providers.capability.supported')
     : formatEntitlement(entitlement, t);
 }

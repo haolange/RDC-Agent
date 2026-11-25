@@ -18,7 +18,7 @@ interface ProviderAccountOAuthPanelProps {
 
 const copyText = (value?: string) => {
   if (!value) return;
-  void navigator.clipboard?.writeText(value);
+  void navigator.clipboard.writeText(value);
 };
 
 type StepState = 'pending' | 'active' | 'done';
