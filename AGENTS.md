@@ -6,6 +6,8 @@
 
 本仓库是面向 RenderDoc `.rdc` capture 的 Electron 桌面应用，代码分布在 `src/main`、`src/preload`、`src/renderer`、`src/shared`。本文件与系统、平台安全规则或用户本轮明确指令冲突时，以更高优先级指令为准。仓库内部文档冲突时，产品边界、架构边界和验证门禁以 `ARCHITECTURE.md` 为准，再同步修正其他文档。
 
+本仓库里有两种 Agent，不要混用规则。**编码 Agent**（本文件的读者）修改本库的代码和文档；**产品内 Agent** 由 `resources/agent-runtime/` 下的 Profile、Skill 和 prompt 定义，运行时注入模型，不读取本文件。这些文本是产品数据，既不是给编码 Agent 的指令，也不是本库源代码；修改它们按 `docs/product/scoped-runtime-resources.md` 的「内置方法文本的撰写规则」，第 2 节的代码纪律不适用于它们的措辞。
+
 ## 1. 目标对齐与完整交付
 
 以代码事实与真实运行证据为依据，在授权范围内端到端完成用户需求。
@@ -57,7 +59,7 @@
 - **实锤支撑**。架构判断、性能归因和 bug 定位须有源码行、日志、测试输出、真实运行记录或文档直接支撑。不编造 API，不捏造执行结果。
 - **冲突查真相**。代码行为、文档、测试结果或用户描述互相冲突时，去查源码与运行态，以当前实际运行的代码为第一基准，再修正错误的一方。不凭名称或设计意图推断行为。
 - **直接决断**。做代码审查、架构评估或方案对比时，给出明确的优劣判断、问题排序和具体改法。
-- **用标签标注证据属性，不写免责段落**。在关键结论旁用一个短标签说明它的依据，正文不再重复限定：
+- **汇报时用标签标注证据属性，不写免责段落**。在关键结论旁用一个短标签说明它的依据，正文不再重复限定（这是编码 Agent 的汇报标签，产品内 Agent 用设计书 7.3 的验证等级）：
 
   | 标签 | 含义 |
   |---|---|
@@ -108,6 +110,7 @@
 | 提交前 | `pnpm run check:git-diff`（需 `RDC_DIFF_BASE`） |
 | 发布配置 | 才执行 pack |
 | 宿主相关行为（`src/main/platform`） | 另加 `pnpm run check:host-platform`；Linux 单元测试由 CI `build` 运行，Windows 由 CI `windows-unit` 运行 |
+| 内置方法文本（`resources/agent-runtime`） | 另加 `src/main/testing/investigationSystemContract.test.ts`、`src/main/testing/InstructionCost.offline.test.ts`、`pnpm run check:investigation-system` |
 
 行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
 
@@ -148,7 +151,7 @@
 | 产品、工程架构、跨层契约、feature 拆分、验证策略 | `ARCHITECTURE.md` 的 Architecture Principles 与 Authority Map，再读相关 `docs/contracts/*`、`docs/architecture/*` |
 | 运行时、权限、失败模型、投影 | `ARCHITECTURE.md` 与 `docs/contracts/` |
 | RenderDoc 领域目标与三种 Mission 的设计 | `docs/product/RenderDoc Agent 完整设计书.md`（第 0 章为产品裁决） |
-| Agent、Skill、Hook、Memory | `docs/product/scoped-runtime-resources.md` |
+| Agent、Skill、Hook、Memory；内置方法文本的撰写规则 | `docs/product/scoped-runtime-resources.md` |
 | RDC 操作契约、lease、回放身份、Android 回执 | `docs/architecture/rdc-runtime.md` 与 `ARCHITECTURE.md` 的 Session Capture 节 |
 | UI/UX | `DESIGN.md`（原则），`docs/ui/design-system.md`（token 与组件） |
 | 右栏投影 | `docs/contracts/session-projection.md` |
@@ -216,12 +219,3 @@ Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投�
 - Skill 只提供方法，不授予权限。
 - 空项目保持原空态。`unsupported` 不标成设备已呈现。
 - 不自动修改 Unity／Unreal 工程或原始 capture。
-
-## 12. 修改产品内 Agent 的方法文本
-
-`resources/agent-runtime/` 下的 Profile、Skill 和 prompt 决定产品里的 Agent 怎样调查，改它们时：
-
-- **证据等级用短标签表达**。产品内 Agent 用设计书 7.3 的验证等级（Observed、Reconstructed、Differential-Supported、Replay-Counterfactual）和未验证的 Inferred、Unresolved 标注结论，不把推测写成事实；报告第一句给出证据支持的最强结论并带一个标签，未知项单独成段，不在正文里反复写限定语。
-- **写正向主线，不堆禁令**。说明下一步怎样判断和行动。权限、身份、消费和来源已由代码强制的约束，不在方法文本里复述。
-- **只减不增**。改动后净字节数不增加；要加一句，先删掉等量的旧内容。
-- **不写案例**。方法文本、代码和知识里不出现具体案例的对象、事件、资源编号或原因。

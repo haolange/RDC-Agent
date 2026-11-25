@@ -121,3 +121,14 @@ Mission 必须先经 `plan_artifact` 计划门：用户点声明的 continue han
 专业参数参考由 `scripts/generate-rdc-tool-guides.mjs` 生成并记录 catalog fingerprint。默认生成与 `pnpm run check:rdc-tool-guides` 使用本库 `scripts/fidelity/rdc-tool-guide-catalog.json` 源快照，独立检出不依赖相邻仓库。更新时显式执行 `node scripts/generate-rdc-tool-guides.mjs --catalog <RDC-Tool>/spec/tool_catalog.json`，同次刷新参考与源快照；`--check --catalog <path>` 只读核对指定来源。快照仅供开发生成校验，不随应用分发，不作为运行时 catalog；产品执行仍读取 prepareTurn 冻结的同一配置 CLI。
 
 Plan、声明交接、显式预算与领域完成校验见 [runtime-kernel.md](../contracts/runtime-kernel.md#通用-harness-与声明续跑)。
+
+## 内置方法文本的撰写规则
+
+`resources/agent-runtime/agents/`、`resources/agent-runtime/skills/`、`resources/agent-runtime/prompts/` 下的 Profile、Skill 和 prompt 决定产品里的 Agent 怎样调查。它们是产品数据，由 PromptPlan 在运行时注入模型：不是本库源代码，也不是写给编码 Agent 的指令。根目录 `AGENTS.md` 只约束修改本库的编码 Agent，产品运行时不读取它（见上文 Project Instructions）。部分文本被测试钉住，修改它们是在修改一个受测的产品制品，按下面的规则做：
+
+- **证据等级用短标签表达**。产品内 Agent 用设计书 7.3 的验证等级（Observed、Reconstructed、Differential-Supported、Replay-Counterfactual）和未验证的 Inferred、Unresolved 标注结论，不把推测写成事实；报告第一句给出证据支持的最强结论并带一个标签，未知项单独成段，不在正文里反复写限定语。
+- **写正向主线，不堆禁令**。说明下一步怎样判断和行动。权限、身份、消费、来源和 schema 已由代码强制的约束，不在方法文本里复述。
+- **一条标准一个出处**。同一条判据只在一个 Skill 里定义，其他 Skill 用 `$skill-id` 引用，不各写一份；生成方和审查方依据同一份定义。
+- **只减不增**。改动后每个文件的净字节数不增加；要加一句，先删掉等量的旧内容。用 `src/main/testing/InstructionCost.offline.test.ts` 对比各 Agent 的 PromptPlan 前后字节，基线用 `RDC_AGENT_OFFLINE_COST_BASE` 指定。
+- **不写案例**。方法文本、代码和知识里不出现具体案例的对象、事件、资源编号或原因。
+- **改完核对**。运行 `src/main/testing/investigationSystemContract.test.ts`、`pnpm run check:investigation-system` 和上面的字节对比；被测试钉住的字符串需要改动时，同步更新测试。

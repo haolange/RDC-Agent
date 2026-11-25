@@ -21,4 +21,4 @@
 7. `docs/contracts/failure-model.md`
 8. `docs/architecture/overview.md` / `module-map.md`
 
-涉及 UI 时读 `docs/ui/*`；涉及 Skills/Memory/Hooks 时读 `docs/product/scoped-runtime-resources.md`。
+涉及 UI 时读 `docs/ui/*`；涉及 Skills/Memory/Hooks，或修改 `resources/agent-runtime` 下的方法文本时，读 `docs/product/scoped-runtime-resources.md`。

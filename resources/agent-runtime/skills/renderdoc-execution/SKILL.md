@@ -35,14 +35,14 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 
 ## 委派与独立审查
 
-单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离时按职责委派：知识综合用 knowledge-scout，机制与候选检查用 generator，Shader、Pass、Resource、Pixel 分析用对应的 analyst，独立审查用 verifier，报告组织按需用 report-writer。General 负责实时回放操作和整合，子级只处理获授的材料。每次 `subagent` 委派写明问题、范围、已确认的事实及来源、竞争解释、相关 Challenge、否定路径的适用与重验条件和输出要求。
+单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离时按职责委派：知识综合用 knowledge-scout，机制与候选检查用 generator，Shader、Pass、Resource、Pixel 分析用对应的 analyst，独立审查用 verifier，报告组织按需用 report-writer。General 负责实时回放操作和整合，子级只处理获授的材料；每次 `subagent` 委派的 Capsule 写什么见 execution-orchestrator。
 
 计划要求的工作在所属 Task 的 `executionRequirements` 里声明执行方式；义务需要变更时，停止并 join 受影响的执行，经 `plan_artifact.taskRevisions` 修订同一 Task。
 
 独立审查（委派与续审的通用做法见 execution-orchestrator）：
 
 - 审查 Task 绑定 `profileId=verifier` 和独立的来源 Task；Capsule 的 `inputArtifactRefs` 授予被审记录的 URI/hash，运行时会补授它们依赖的证据和实验回执。General 自己读取 skeptic-review 不等于独立审查。
-- 审查返回两类意见。Challenge 是"不处理，结论就不能按现在的措辞成立"的缺口，在最终接受前要有真实补证、范围修订或其他有依据的处理。审查结果 `unresolved` 里标 `not_required` 的是备注，写进交付的未知项，不改结论措辞。计划要求 typed Challenge 而审查只返回文字时，由 General 核对目标与来源后用 `investigation_write` 保存。
+- 审查返回两类意见。Challenge 是"不处理，结论就不能按现在的措辞成立"的缺口，在最终接受前要有真实补证，或范围修订：把主张收窄到证据能支撑的范围，用收窄后的 Claim 作 `resolutionClaimId` 收口。审查结果 `unresolved` 里标 `not_required` 的是备注，写进交付的未知项，不改结论措辞。计划要求 typed Challenge 而审查只返回文字时，由 General 核对目标与来源后用 `investigation_write` 保存。
 - 交付审查的范围要兑现冻结计划的必要目标，不能只审一个较弱的局部主张就结束。
 
 ## 材料
@@ -54,7 +54,7 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 
 General 的终答就是交付，按这个顺序写：
 
-1. **结论**：第一句写证据支持的最强结论，后面跟一个等级标签，取自结论所依 Claim 的 `verification`：`[Observed]`、`[Reconstructed]`、`[Differential-Supported]`、`[Replay-Counterfactual]`；没有经过验证的陈述标 `[Inferred]` 或 `[Unresolved]`。有五份回执齐全的实验、干预改变了结果且撤销后复原时，结论就写成因果，不再加"支持""可能"之类的限定。
+1. **结论**：第一句写证据支持的最强结论，后面跟一个等级标签，取自结论所依 Claim 的 `verification`：`[Observed]`、`[Reconstructed]`、`[Differential-Supported]`、`[Replay-Counterfactual]`；没有经过验证的陈述标 `[Inferred]` 或 `[Unresolved]`。实验合格（定义见 $debugger-causal-method）时，结论就写成因果，不再加"支持""可能"之类的限定。
 2. **证据**：关键读数、实验前后的对比、审查结果。
 3. **未知项与未覆盖的范围**：单独成段，放在结论之后。
 4. **现场与后续**：现场是否已恢复，是否需要用户决定。
