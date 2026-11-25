@@ -14,7 +14,8 @@ import type {
   WorkflowApi,
 } from '../types/electron-api';
 import type { ElectronAPI } from '../types/electron';
-import type { RendererApiTransport, RendererEventCallback } from './transport';
+import type { RendererEvents } from './rendererEvents';
+import type { RendererApiTransport } from './transport';
 
 export function createAppMetaApi(transport: RendererApiTransport): AppMetaApi {
   return { get: () => transport.invoke('app:getMeta') };
@@ -55,7 +56,7 @@ export function createWindowControlsApi(transport: RendererApiTransport): Window
   };
 }
 
-export function createConversationApi(transport: RendererApiTransport): ConversationApi {
+export function createConversationApi(transport: RendererApiTransport, events: RendererEvents): ConversationApi {
   return {
     sendMessage: (request) => transport.invoke('conversation:sendMessage', request),
     rewriteFromMessage: (request) => transport.invoke('conversation:rewriteFromMessage', request),
@@ -76,12 +77,8 @@ export function createConversationApi(transport: RendererApiTransport): Conversa
     getAttachmentPreview: (request) => transport.invoke('conversation:getAttachmentPreview', request),
     accessAttachment: (request) => transport.invoke('conversation:accessAttachment', request),
     resolveMedia: (request) => transport.invoke('conversation:resolveMedia', request),
-    onEvent: (callback): void => {
-      transport.addListener('conversation:event', callback as unknown as RendererEventCallback);
-    },
-    offEvent: (callback): void => {
-      transport.removeListener('conversation:event', callback as unknown as RendererEventCallback);
-    },
+    onEvent: (callback) => events.add('conversation:event', callback),
+    offEvent: (callback) => events.remove('conversation:event', callback),
   };
 }
 

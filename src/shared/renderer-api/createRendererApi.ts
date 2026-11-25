@@ -17,6 +17,7 @@ import {
   createWorkflowApi,
 } from './core';
 import { createEventSubscriptionApi } from './events';
+import { createRendererEvents } from './rendererEvents';
 import { createLlmApi, createMemoryApi, createRdcRuntimeApi, createSettingsApi } from './settings';
 import {
   createCaptureApi,
@@ -47,6 +48,7 @@ function failingOnErrorResults(transport: RendererApiTransport): RendererApiTran
 
 export function createRendererApi(platform: NodeJS.Platform, ipcTransport: RendererApiTransport): ElectronAPI {
   const transport = failingOnErrorResults(ipcTransport);
+  const events = createRendererEvents(transport);
   const dialog = createDialogApi(transport);
   return {
     platform,
@@ -56,7 +58,7 @@ export function createRendererApi(platform: NodeJS.Platform, ipcTransport: Rende
     appMeta: createAppMetaApi(transport),
     appShell: createAppShellApi(transport),
     web: createWebApi(transport),
-    conversation: createConversationApi(transport),
+    conversation: createConversationApi(transport, events),
     command: createCommandApi(transport),
     selectFiles: dialog.selectFiles,
     selectRdcFiles: dialog.selectRdcFiles,
@@ -81,13 +83,13 @@ export function createRendererApi(platform: NodeJS.Platform, ipcTransport: Rende
     runtimeLog: createRuntimeLogApi(transport),
     capture: createCaptureApi(transport),
     context: createContextApi(transport),
-    events: createEventSubscriptionApi(transport),
+    events: createEventSubscriptionApi(events),
     windowControls: createWindowControlsApi(transport),
     on: (channel, callback) => {
-      if (isRendererEventChannel(channel)) transport.addListener(channel, callback);
+      if (isRendererEventChannel(channel)) events.add(channel, callback);
     },
     off: (channel, callback) => {
-      if (isRendererEventChannel(channel)) transport.removeListener(channel, callback);
+      if (isRendererEventChannel(channel)) events.remove(channel, callback);
     },
   };
 }

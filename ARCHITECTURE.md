@@ -186,6 +186,8 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不进入 renderer / IPC 明文 / Trace / RequestPlan。
 - **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。
+  - 反方向同样在边界校验一次：main 推送给 renderer 的每个事件在任何监听器之前按 `src/shared/renderer-api/eventPayloads.ts` 的通道 schema 检查，非法 payload 丢弃并记一条 renderer console 警告（只含通道与失败路径）。
+  - 流式 `conversation:event` 与体量大的投影只校验信封。
 - **CSP**：唯一来源是 `src/shared/utils/rendererCsp.ts` 的 `buildRendererCsp`；桌面会话响应头、Browser QA bridge 与 `src/renderer/index.html` 的 meta 都取自它（测试保证 meta 与生产一致）。
   - 生产 `connect-src 'self'`：renderer 只经 IPC 或同源 bridge 通信。
   - 生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；`img-src` 只放行 `'self' data: blob:`；`media-src 'self' blob:`。

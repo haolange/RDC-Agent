@@ -44,6 +44,8 @@
 
 **禁止**未门控直接 `upsertConversationMessage` / `setTracePresentation` / `setWorkflowState`。门禁：`pnpm run check:session-projection`。
 
+门控之前，renderer API（`src/shared/renderer-api/rendererEvents.ts`）已按通道 schema（`src/shared/renderer-api/eventPayloads.ts`）把每个推送的 payload 检查一次，监听器拿到的是 main 发出的原对象；不合契约的 payload 被丢弃并在 renderer console 记一条 `[ipc-event]` 警告。`conversation:event` 是逐增量的热路径，只校验信封：事件 `type`、`sessionId`、`turnId`，消息的 `id` / `turnId` / `role`，增量的 `messageId` / `seq` / `baseSeq` 与 `fields` / `trace` 的形状，`agent_event` 的 `id` / `type` / `timestamp`；消息与增量的正文是 main 的结构化输出，由 assembler 按序号应用，序号对不上时取快照。`trace:projectionChanged`、`session:recordChanged`、`context:changed`、`capture:openedStateChanged`、`capture:replayChanged` 同样只校验路由与身份字段。
+
 ## Composer Draft 与恢复
 
 - Draft / pending attachments / pending skills 按 `{projectId}:{sessionId}` scope 隔离（`buildComposerSessionScopeKey`）。

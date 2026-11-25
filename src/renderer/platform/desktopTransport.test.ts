@@ -20,7 +20,7 @@ describe('desktop renderer API', () => {
     const callback = vi.fn();
 
     api.conversation.onEvent(callback);
-    expect(ipc.subscribe).toHaveBeenCalledWith('conversation:event', callback);
+    expect(ipc.subscribe).toHaveBeenCalledWith('conversation:event', expect.any(Function));
     api.conversation.offEvent(callback);
     expect(unsubscribe).toHaveBeenCalledOnce();
   });

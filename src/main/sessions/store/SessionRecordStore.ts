@@ -8,12 +8,13 @@ import {
   sanitizeToken,
 } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
+import { ActionEventSchema } from '@shared/types/evidence';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
 import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
 import { appPathService } from '../../runtime/AppPathService';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
 import { renameWithRetrySync } from '../../platform/fileRename';
-import { ActionEventSchema, SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
+import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import { sessionRevisions } from './SessionRevisionRegistry';
 import type { ActionEvent } from '@shared/types/evidence';

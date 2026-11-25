@@ -2,6 +2,7 @@
  * Session Types - Session 控制面板相关类型定义
  */
 
+import { z } from 'zod';
 import type { ConversationTurnControls } from './modelCapability';
 import type { ReplayDeviceEntry } from './device';
 
@@ -22,6 +23,23 @@ export interface ProjectInputRecord {
   /** Absent until the original file has been successfully content-verified. */
   contentSha256?: string;
 }
+
+/** A project input as the registry stores it and `project:inputsChanged` carries it. */
+export const ProjectInputRecordSchema = z.object({
+  inputId: z.string().min(1),
+  fileName: z.string().min(1),
+  filePath: z.string().min(1),
+  source: z.enum(['project_resource', 'external_reference']),
+  referenceIdentity: z.object({ device: z.string(), inode: z.string(), birthtimeNs: z.string() }).optional(),
+  discoveredAt: z.number(),
+  lastModifiedAt: z.number(),
+  size: z.number(),
+  contentSha256: z.string().regex(/^[a-f0-9]{64}$/u).optional(),
+}).passthrough().superRefine((input, ctx) => {
+  if (input.source === 'external_reference' && (!input.referenceIdentity || !input.contentSha256)) {
+    ctx.addIssue({ code: 'custom', message: 'External capture references require file identity and content hash.' });
+  }
+}) satisfies z.ZodType<ProjectInputRecord>;
 
 export interface ProjectInputRemovePreparation {
   success: boolean;
@@ -323,6 +341,54 @@ export interface RunContextUsageSummary {
   /** 本 run 累计成本（美元）；无定价遥测时缺省。 */
   cumulativeCost?: number;
 }
+
+const ContextUsageBreakdownEntrySchema = z.object({
+  id: z.custom<ContextUsageBreakdownId>((value) => typeof value === 'string' && value.length > 0),
+  tokens: z.number(),
+  count: z.number().optional(),
+}).passthrough();
+
+const LlmUsageCostSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number().optional(),
+  cacheWrite: z.number().optional(),
+  total: z.number(),
+}).passthrough();
+
+const UsageCoreFields = {
+  runId: z.string().min(1),
+  providerId: z.string().min(1),
+  modelId: z.string().min(1),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  totalTokens: z.number(),
+  promptBudgetTokens: z.number().nullable(),
+  contextWindowTokens: z.number().nullable(),
+  usagePercent: z.number(),
+  occupiedTokens: z.number(),
+  breakdown: z.array(ContextUsageBreakdownEntrySchema).nullable(),
+  snapshotAt: z.number().nullable(),
+  cacheReadTokens: z.number().optional(),
+  cacheWriteTokens: z.number().optional(),
+  cacheHitTokens: z.number().optional(),
+  cacheMissTokens: z.number().optional(),
+  lastTurnCacheHitTokens: z.number().optional(),
+  lastTurnCacheMissTokens: z.number().optional(),
+  cacheSavedTokens: z.number().optional(),
+  lastTurnCacheHitRate: z.number().optional(),
+  cumulativeCacheHitRate: z.number().optional(),
+  reasoningTokens: z.number().optional(),
+  cost: LlmUsageCostSchema.optional(),
+  cumulativeCost: z.number().optional(),
+};
+
+/** A run's context usage as the session usage file stores it and `workflow:runUsageChanged` carries it. */
+export const RunContextUsageSummarySchema: z.ZodType<RunContextUsageSummary> = z.object({
+  ...UsageCoreFields,
+  maxOutputTokens: z.number().nullable(),
+  compactionThresholdTokens: z.number().nullable(),
+}).strict();
 
 export interface RunContextUsageRequest {
   sessionId: string;

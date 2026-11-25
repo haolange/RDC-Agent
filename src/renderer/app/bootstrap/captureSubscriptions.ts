@@ -4,15 +4,13 @@ import { useProjectStore } from '../../stores/projectStore';
 import { isActiveSessionScope } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import type { ContextSnapshot, SessionScopedPayload } from '@shared/types/session';
-import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';
 const projection = () => useSessionProjectionStore.getState();
 
 export function subscribeCaptureStatusChanged(electronAPI: ElectronAPI, projectScopedContext: (event: SessionScopedPayload<ContextSnapshot | null>) => void) {
-  return electronAPI.events.onCaptureStatusChanged((event) => {
-    const scoped = event as SessionScopedPayload<unknown>;
+  return electronAPI.events.onCaptureStatusChanged((scoped) => {
     if (!isActiveSessionScope(scoped)) return;
     electronAPI.context.get({ projectId: scoped.projectId, sessionId: scoped.sessionId }).then((snapshot) => {
       const payload: SessionScopedPayload<ContextSnapshot | null> = { ...scoped, payload: snapshot };
@@ -23,7 +21,7 @@ export function subscribeCaptureStatusChanged(electronAPI: ElectronAPI, projectS
 
 export function subscribeDeviceStatusChanged(electronAPI: ElectronAPI) {
   return electronAPI.events.onDeviceStatusChanged((payload) => {
-    useDeviceStore.getState().applyStatusPayload(payload as ReplayDeviceStatusChangedPayload);
+    useDeviceStore.getState().applyStatusPayload(payload);
   });
 }
 

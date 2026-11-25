@@ -1,9 +1,19 @@
+import { z } from 'zod';
 import type { RendererEventChannel } from '@shared/renderer-api';
 
 export interface BrowserBridgeEvent {
   channel: RendererEventChannel;
   args?: unknown[];
 }
+
+/**
+ * One SSE frame: a channel name and its arguments. Only listeners of declared channels exist, and the renderer API checks
+ * each payload against its channel.
+ */
+const BrowserBridgeEventSchema: z.ZodType<BrowserBridgeEvent> = z.object({
+  channel: z.custom<RendererEventChannel>((value) => typeof value === 'string'),
+  args: z.array(z.unknown()).optional(),
+});
 
 export interface EventStreamParser {
   /** Feeds decoded text and returns the events of every frame it completed. */
@@ -50,10 +60,9 @@ function parseFrame(frame: string): BrowserBridgeEvent | null {
     .join('\n');
   if (!data) return null;
   try {
-    const parsed: unknown = JSON.parse(data);
-    if (typeof parsed === 'object' && parsed !== null && typeof (parsed as { channel?: unknown }).channel === 'string') {
-      return parsed as BrowserBridgeEvent;
-    }
+    const parsed = BrowserBridgeEventSchema.safeParse(JSON.parse(data));
+    if (parsed.success) return parsed.data;
+    console.warn('[BrowserAppBridge] Dropped an event frame that is not a bridge event:', parsed.error.issues.map((issue) => issue.path.join('.')));
   } catch (error) {
     // A malformed frame is isolated; later valid frames on the same stream remain deliverable.
     console.warn('[BrowserAppBridge] Dropped a malformed event frame:', error);

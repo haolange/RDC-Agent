@@ -1,14 +1,13 @@
 import { useTerminalStore } from '../../stores/terminalStore';
 import { resetWorkbenchStores } from '../storesReset';
 import { notify } from '../../stores/notificationStore';
-import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';
 
 export function subscribeRuntimeLogAppended(electronAPI: ElectronAPI) {
   return electronAPI.events.onRuntimeLogAppended((entry) => {
-    useTerminalStore.getState().appendEntry(entry as RuntimeLogEntry);
+    useTerminalStore.getState().appendEntry(entry);
   });
 }
 

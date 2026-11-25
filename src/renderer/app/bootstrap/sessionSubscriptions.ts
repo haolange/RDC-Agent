@@ -11,8 +11,6 @@ import { isActiveSessionEvent, isActiveSessionScope } from '../../stores/session
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import type { RunSummary } from '@shared/types/session';
-import type { ActionEvent } from '@shared/types/evidence';
 
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';
@@ -50,8 +48,7 @@ export function subscribeTraceProjectionChanged(electronAPI: ElectronAPI) {
 }
 
 export function subscribeEvidenceEventAdded(electronAPI: ElectronAPI) {
-  return electronAPI.events.onEvidenceEventAdded((rawEvent) => {
-    const event = rawEvent as ActionEvent;
+  return electronAPI.events.onEvidenceEventAdded((event) => {
     const sessionId = event.session_id;
     if (!isActiveSessionEvent(sessionId)) {
       return;
@@ -67,13 +64,7 @@ export function subscribeEvidenceEventAdded(electronAPI: ElectronAPI) {
 }
 
 export function subscribeRunStatusChanged(electronAPI: ElectronAPI) {
-  return electronAPI.events.onRunStatusChanged((rawPayload) => {
-    const payload = rawPayload as {
-      runId: string;
-      sessionId: string;
-      status: RunSummary['status'];
-      stopReason?: string;
-    };
+  return electronAPI.events.onRunStatusChanged((payload) => {
     if (!isActiveSessionEvent(payload.sessionId)) {
       return;
     }

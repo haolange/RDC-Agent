@@ -5,15 +5,13 @@ import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { createConversationEventBatcher } from './conversationEventBatcher';
 import { createConversationMessageAssembler } from './conversationMessageAssembler';
-import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 
 import type { ElectronAPI } from '@shared/types/electron';
 const projection = () => useSessionProjectionStore.getState();
 
 export function subscribeToolExecutionComplete(electronAPI: ElectronAPI) {
-  return electronAPI.events.onToolExecutionComplete((rawTrace) => {
-    const trace = rawTrace as ToolTraceEntry;
+  return electronAPI.events.onToolExecutionComplete((trace) => {
     const conversation = useConversationStore.getState();
     const message = trace.turnId
       ? conversation.allConversationMessages.find(

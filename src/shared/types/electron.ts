@@ -90,7 +90,7 @@ import type {
   SessionScope,
   SessionScopedPayload,
 } from './session';
-import type { ToolRuntimeSummary } from './tool';
+import type { ToolRuntimeSummary, ToolTraceEntry } from './tool';
 import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { TraceProjectionChangedPayload } from './agenticTrace';
@@ -612,7 +612,7 @@ export interface ElectronAPI {
     onEffectiveCatalogChanged: (callback: (change: EffectiveCatalogChange) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
     onSessionRecordChanged: (callback: (snapshot: SessionRecordSnapshot) => void) => () => void;
-    onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;
+    onToolExecutionComplete: (callback: (trace: ToolTraceEntry) => void) => () => void;
     onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => () => void;
     onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => () => void;
     onCaptureStatusChanged: (callback: (status: SessionScopedPayload<unknown>) => void) => () => void;

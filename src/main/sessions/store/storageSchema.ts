@@ -1,9 +1,9 @@
 import { MaterialContextSchema } from '@shared/types/materialContext';
+import { RunContextUsageSummarySchema } from '@shared/types/session';
 import { z, type ZodType } from 'zod';
 import { REASONING_SELECTIONS } from '@shared/types/modelCapability';
 import { CURRENT_STORE_SCHEMA_VERSION, type StorageMigration } from '../../runtime/storedDocument';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { ActionEvent } from '@shared/types/evidence';
 import type { ExecutionIdentity } from '@shared/types/providerCapability';
 import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type { Message } from '../../agent-runtime/core/types';
@@ -134,53 +134,6 @@ export {
   PersistedRunRecordV3Schema as PersistedRunRecordSchema,
 } from '../run/runV3/runRecordSchema';
 
-const ContextUsageBreakdownEntrySchema = z.object({
-  id: z.string().min(1),
-  tokens: z.number(),
-  count: z.number().optional(),
-}).passthrough();
-
-const LlmUsageCostSchema = z.object({
-  input: z.number(),
-  output: z.number(),
-  cacheRead: z.number().optional(),
-  cacheWrite: z.number().optional(),
-  total: z.number(),
-}).passthrough();
-
-const UsageCoreFields = {
-  runId: z.string().min(1),
-  providerId: z.string().min(1),
-  modelId: z.string().min(1),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  totalTokens: z.number(),
-  promptBudgetTokens: z.number().nullable(),
-  contextWindowTokens: z.number().nullable(),
-  usagePercent: z.number(),
-  occupiedTokens: z.number(),
-  breakdown: z.array(ContextUsageBreakdownEntrySchema).nullable(),
-  snapshotAt: z.number().nullable(),
-  cacheReadTokens: z.number().optional(),
-  cacheWriteTokens: z.number().optional(),
-  cacheHitTokens: z.number().optional(),
-  cacheMissTokens: z.number().optional(),
-  lastTurnCacheHitTokens: z.number().optional(),
-  lastTurnCacheMissTokens: z.number().optional(),
-  cacheSavedTokens: z.number().optional(),
-  lastTurnCacheHitRate: z.number().optional(),
-  cumulativeCacheHitRate: z.number().optional(),
-  reasoningTokens: z.number().optional(),
-  cost: LlmUsageCostSchema.optional(),
-  cumulativeCost: z.number().optional(),
-};
-
-export const RunContextUsageSummarySchema: ZodType<RunContextUsageSummary> = z.object({
-  ...UsageCoreFields,
-  maxOutputTokens: z.number().nullable(),
-  compactionThresholdTokens: z.number().nullable(),
-}).strict() as ZodType<RunContextUsageSummary>;
-
 export interface SessionUsageDocument {
   schemaVersion: string;
   usage: RunContextUsageSummary;
@@ -228,21 +181,6 @@ export const SESSION_SHELL_STATE_MIGRATIONS: StorageMigration<SessionShellStateD
 
 const isObjectValue = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
 const nonBlank = z.string().refine((value) => value.trim().length > 0, 'must not be blank');
-
-export const ActionEventSchema: ZodType<ActionEvent> = z.object({
-  schema_version: z.string(),
-  event_id: z.string(),
-  turn_id: z.string().optional(),
-  ts_ms: z.number(),
-  run_id: z.string(),
-  session_id: z.string(),
-  agent_id: z.string(),
-  event_type: z.string(),
-  status: z.enum(['ok', 'error', 'sent', 'pass', 'fail', 'blocked', 'entered', 'warning', 'timeout', 'completed']),
-  duration_ms: z.number(),
-  refs: z.array(z.string()),
-  payload: z.record(z.string(), z.unknown()),
-});
 
 /**
  * The top-level fields of a stored conversation message. Its work trace is read back through `readStoredWorkTrace`;
