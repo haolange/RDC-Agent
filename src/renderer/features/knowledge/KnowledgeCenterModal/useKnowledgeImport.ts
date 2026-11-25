@@ -5,13 +5,13 @@ import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeOperation } from './useKnowledgeOperation';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { beginSynchronousFlight } from './knowledgeImportExportModel';
+import { useKnowledgeImportSource } from './useKnowledgeImportSource';
 import type { KnowledgeImportResult, KnowledgeSpace } from '@shared/types/knowledge';
 
-export type KnowledgeImportMode = 'file' | 'paste';
 /** One dialog, three moments: choose a source, see what it would do, see what it did. */
 export type KnowledgeImportStep = 'input' | 'preview' | 'result';
 /** Why importing stopped: one sentence to show, and the technical reason that only "Copy details" carries. */
-export interface KnowledgeImportError { message: string; detail?: string }
+export type KnowledgeImportError = { message: string; detail?: string };
 
 export function useKnowledgeImport(options: {
   open: boolean;
@@ -23,10 +23,6 @@ export function useKnowledgeImport(options: {
   const request = useKnowledgeRequestScope(options.open, options.sessionId ?? '');
   const inFlight = useRef(false);
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<KnowledgeImportMode>('file');
-  const [source, setSource] = useState('');
-  const [filePath, setFilePath] = useState<string | null>(null);
-  const [spaceId, setSpaceId] = useState(options.spaces[0]?.spaceId ?? 'user');
   const [preview, setPreview] = useState<KnowledgeImportResult | null>(null);
   const [result, setResult] = useState<KnowledgeImportResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,6 +30,8 @@ export function useKnowledgeImport(options: {
   // The person stopped the last import; main removed what it had written, so this is said plainly, not as an error.
   const [cancelled, setCancelled] = useState(false);
   const { run: runOperation, cancel: cancelImport, ...operation } = useKnowledgeOperation();
+  const input = useKnowledgeImportSource(options.spaces[0]?.spaceId ?? 'user', setPreview, setError);
+  const { source, filePath, spaceId, setSpaceId, chooseFile, resetSource } = input;
   const fail = useCallback((err: unknown) => setError({ message: humanizeError(err, t, 'app.error.actionFailed'), detail: errorDetail(err) }), [t]);
 
   const close = useCallback(() => {
@@ -41,42 +39,19 @@ export function useKnowledgeImport(options: {
     inFlight.current = false;
     setBusy(false);
     setOpen(false);
-    setMode('file');
-    setSource('');
-    setFilePath(null);
+    resetSource();
     setPreview(null);
     setResult(null);
     setError(null);
     setCancelled(false);
-  }, [request]);
+  }, [request, resetSource]);
 
-  useEffect(() => {
-    close();
-  }, [close, options.open, options.sessionId]);
+  useEffect(close, [close, options.open, options.sessionId]);
 
   const openPanel = useCallback(() => {
     setSpaceId(options.spaces[0]?.spaceId ?? 'user');
     setOpen(true);
-  }, [options.spaces]);
-
-  // File and paste are mutually exclusive inputs, so switching clears the other.
-  const changeMode = useCallback((next: KnowledgeImportMode) => {
-    setMode(next);
-    setError(null);
-    setPreview(null);
-    if (next === 'file') setSource('');
-    else setFilePath(null);
-  }, []);
-
-  const changeSource = useCallback((next: string) => {
-    setSource(next);
-    setPreview(null);
-  }, []);
-
-  const changeSpace = useCallback((next: string) => {
-    setSpaceId(next);
-    setPreview(null);
-  }, []);
+  }, [options.spaces, setSpaceId]);
 
   /** Reads the source and reports, item by item, what importing it into the chosen space would do. Writes nothing. */
   const previewSource = useCallback(async (input: { filePath: string } | { source: string }) => {
@@ -95,10 +70,9 @@ export function useKnowledgeImport(options: {
   }, [fail, request, spaceId]);
 
   const takeFile = useCallback(async (next: string) => {
-    setFilePath(next);
-    setSource('');
+    chooseFile(next);
     await previewSource({ filePath: next });
-  }, [previewSource]);
+  }, [chooseFile, previewSource]);
 
   const selectFile = useCallback(async () => {
     if (inFlight.current) return;
@@ -170,17 +144,11 @@ export function useKnowledgeImport(options: {
   }, [fail, filePath, options, request, runOperation, source, spaceId, t]);
 
   return {
+    ...input.view,
     open,
     openPanel,
     close,
     step: (result ? 'result' : preview ? 'preview' : 'input') as KnowledgeImportStep,
-    mode,
-    setMode: changeMode,
-    source,
-    setSource: changeSource,
-    filePath,
-    spaceId,
-    setSpaceId: changeSpace,
     preview,
     previewPasted,
     back,

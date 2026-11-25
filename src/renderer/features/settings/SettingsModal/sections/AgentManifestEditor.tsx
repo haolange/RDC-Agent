@@ -1,13 +1,9 @@
-import React, { useState } from 'react';
-import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
+import React from 'react';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { Button } from '../../../../ui/Button';
-import { Icon, type IconName } from '../../../../ui/Icon';
-import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Switch } from '../../../../ui/Switch';
-import { Textarea } from '../../../../ui/Textarea';
 import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { SettingsSection } from '../parts';
 import { Badge } from '../../../../ui/Badge';
@@ -15,13 +11,9 @@ import { InlineError } from '../../../../ui/InlineError';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { useI18n } from '../../../../i18n';
 import { AgentContractFields } from './AgentContractFields';
-import { AgentIdentityPanel } from './AgentIdentityPanel';
-import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
-import { AgentHandoffEditor } from './AgentHandoffEditor';
 import { AgentModelBindingFields, type AgentModelFieldChange } from './AgentModelBindingFields';
 import { configStatus, provenanceLabel } from './agentConfigStatus';
-import { agentPanelSummary, type AgentPanel } from './agentPanelSummary';
-import { AgentExecutionLimitField } from './AgentExecutionLimitField';
+import { AgentEditorPanels } from './AgentEditorPanels';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
 import type { AppSettings } from '@shared/types/settings';
 import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance, AgentModelOption } from '@shared/types/agentManifest';
@@ -48,13 +40,6 @@ interface AgentManifestEditorProps {
   agentManifestSaveBlocked?: boolean;
 }
 
-const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
-  { id: 'identity', icon: 'user' },
-  { id: 'permissions', icon: 'lock' },
-  { id: 'handoffs', icon: 'link' },
-  { id: 'instructions', icon: 'nav-skills' },
-];
-
 export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   skills,
   settings,
@@ -72,74 +57,13 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   agentManifestSaveBlocked = false,
 }) => {
   const { t } = useI18n();
-  const [openPanel, setOpenPanel] = useState<AgentPanel | null>(null);
   const provenanceScope = provenance?.scope ?? null;
-  const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
-  const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
   const status = configStatus(selectedAgent, settings, modelOptions, t);
   // A healthy or switched-off Agent says nothing here: the switch already shows it is off.
   const statusProblem = status.tone === 'warning' || status.tone === 'error';
   const agentAccentStyle = useDynStyle({
     '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
   });
-
-  const panelLabel = (panel: AgentPanel): string => (
-    panel === 'identity' ? t('settings.agentAdvancedIdentity')
-      : panel === 'permissions' ? t('settings.agentAdvancedCapabilities')
-        : panel === 'handoffs' ? t('settings.handoffs')
-          : t('settings.agentAdvancedInstructions')
-  );
-  const panelHint = (panel: AgentPanel): string => (
-    panel === 'identity' ? t('settings.agentAdvancedIdentityHint')
-      : panel === 'permissions' ? t('settings.agentAdvancedCapabilitiesHint')
-        : panel === 'handoffs' ? t('settings.agentHandoffsHint')
-          : t('settings.agentInstructionsHint')
-  );
-
-  const renderPanelBody = (panel: AgentPanel) => {
-    if (panel === 'identity') {
-      return <AgentIdentityPanel agent={selectedAgent} onUpdateAgent={onUpdateAgent} />;
-    }
-    if (panel === 'permissions') {
-      return (
-        <>
-          <AgentCapabilityPicker groups={capabilityGroups} skills={skills} targetAgentId={selectedAgent.id} />
-          <AgentExecutionLimitField agent={selectedAgent} onUpdateAgent={onUpdateAgent} />
-          {toolDiagnostics.length > 0 ? (
-            <InlineError data-testid="settings-agent-tool-diagnostics"
-              detail={toolDiagnostics.map(item => `${item.token} · ${item.message}`).join('\n')}>
-              {t('settings.agentToolDiagnosticsTitle')}
-            </InlineError>
-          ) : null}
-        </>
-      );
-    }
-    if (panel === 'handoffs') {
-      return (
-        <AgentHandoffEditor
-          skills={skills}
-          key={selectedAgent.id}
-          selfId={selectedAgent.id}
-          handoffs={selectedAgent.handoffs}
-          definitions={settings.agents.definitions}
-          forceShowRequired={agentManifestSaveBlocked}
-          onChange={(handoffs) => onUpdateAgent({ handoffs })}
-        />
-      );
-    }
-    return (
-      <>
-        <Textarea
-          sizing="content"
-          minRows={2}
-          aria-label={t('settings.agentInstructions')}
-          className="settings-agent-instructions settings-agent-instructions--editor"
-          value={selectedAgent.instructions}
-          onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })}
-        />
-      </>
-    );
-  };
 
   return (
     <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
@@ -224,40 +148,8 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           </div>
         </SettingsSection>
 
-        <div className="settings-agent-panels" data-testid="settings-agent-panels">
-          {PANELS.map(({ id, icon }) => {
-            const open = openPanel === id;
-            const summary = !open && agentPanelSummary(id, selectedAgent, settings, t);
-            return (
-              <section key={id} className={`settings-agent-panel${open ? ' is-open' : ''}`} data-panel={id}>
-                <Button variant="ghost"
-                  className="settings-agent-panel-toggle"
-                  data-tooltip={open ? undefined : panelHint(id)}
-                  aria-expanded={open}
-                  aria-controls={open ? `settings-agent-panel-body-${id}` : undefined}
-                  data-testid={`settings-agent-panel-${id}`}
-                  onClick={(event) => {
-                    const section = event.currentTarget.parentElement;
-                    setOpenPanel(open ? null : id);
-                    if (!open) requestAnimationFrame(() => section?.scrollIntoView({ block: 'nearest' }));
-                  }}
-                >
-                  <Icon name={icon} size={16} className="settings-agent-panel-icon" />
-                  <span className="settings-agent-panel-copy">
-                    <span className="settings-agent-panel-title">{panelLabel(id)}</span>
-                    {summary && <span className="settings-agent-panel-summary">{summary}</span>}
-                  </span>
-                  <Chevron open={open} className="settings-agent-panel-caret" />
-                </Button>
-                {open ? (
-                  <div id={`settings-agent-panel-body-${id}`} className="settings-agent-panel-body">
-                    {renderPanelBody(id)}
-                  </div>
-                ) : null}
-              </section>
-            );
-          })}
-        </div>
+        <AgentEditorPanels skills={skills} settings={settings} selectedAgent={selectedAgent} onUpdateAgent={onUpdateAgent}
+          agentManifestSaveBlocked={agentManifestSaveBlocked} />
 
       </div>
     </div>

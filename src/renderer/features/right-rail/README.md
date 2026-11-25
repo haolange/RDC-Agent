@@ -2,7 +2,7 @@
 
 `RightRail` 根据项目、会话与 `rightRailTarget` 选择项目导入面或 `SessionRightRail`；调用方直接导入入口。会话面是一条 Progress / Artifacts / Outputs / Context / Capture 标签栏（共享 `Tabs`），一次显示一张卡，空态与 populated 状态共用卡片外壳，Capture 自带标题和操作区。
 
-数据来自 main-owned `tracePresentation.rightPanel`，各列表不重建运行时状态。Artifact 与 Output 继续保持各自语义；`CapturePanel` 及其 hooks 维护请求 scope、当前预览对象 URL 与回放队列，不把设备进程存在解释成服务成功。
+数据来自 main-owned `tracePresentation.rightPanel`，各列表不重建运行时状态。Artifact 与 Output 继续保持各自语义；`CapturePanel` 及其 hooks（`useCaptureActions` 负责打开、关闭、刷新与导出图像）维护请求 scope、当前预览对象 URL 与回放队列，不把设备进程存在解释成服务成功。
 
 Investigation Artifact 行通过所属 session 和预期 hash 调用 `investigation:read`。Report 的七节预览只投影现有 `InvestigationReport`／`reportContract`，缺失字段诚实标明未记录；原始 JSON 置于次级折叠区，不作为默认阅读面。其它 record 保持原始内容预览。
 

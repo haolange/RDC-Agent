@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useI18n } from '../../../../i18n';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { errorDetail } from '../../../../lib/errorDetail';
-import { emptyForm, formFromContent, type ResourceFormState } from './scopedResourceForm';
+import { formFromContent } from './scopedResourceForm';
+import { useScopedResourceForm } from './useScopedResourceForm';
 import { deleteScopedResource } from './runtimeScopeActions';
 import { importScopedResourceFromPicker, saveScopedResource } from './runtimeScopeMutations';
 import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
-
-export { normalizeResourceId, templateResourceId } from './runtimeScopeMutations';
-
-/** The editor's last outcome: a confirmation, or a failure in product copy whose technical reason only "Copy details" carries. */
-export type ScopeNotice = { tone: 'success'; message: string } | { tone: 'error'; message: string; detail?: string };
 
 export interface RuntimeScopePanelOptions {
   overview: RdcRuntimeOverview | null;
@@ -32,166 +28,74 @@ export function useRuntimeScopePanel({
     () => overview?.resources.filter((entry) => entry.scope === scope && kinds.includes(entry.kind)) ?? [],
     [overview, scope, kinds],
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, ''));
-  const [baseline, setBaseline] = useState<ResourceFormState>(form);
-  const [notice, setNotice] = useState<ScopeNotice | null>(null);
+  const { setNotice, showForm, reset, setDialogEditing, ...editor } = useScopedResourceForm(kind, scope, resources);
+  const { form, creating } = editor;
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ScopedResourceDocument | null>(null);
-  const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
-  /** Dialog presentation: the selection drives a read-only detail; the editor opens only on explicit edit. */
-  const [dialogEditing, setDialogEditing] = useState(false);
 
-  const reset = () => {
-    const next = emptyForm(kind, '');
-    setSelectedId(null);
-    setCreating(false);
-    setDialogEditing(false);
-    setForm(next);
-    setBaseline(next);
-    setNotice(null);
-  };
-
-  useEffect(reset, [scope, kind]);
-
-  const selected = resources.find((entry) => entry.id === selectedId) ?? null;
-  const editing = creating || Boolean(selected);
-  const dirty = editing && JSON.stringify(form) !== JSON.stringify(baseline);
-
-  /** Routes an action through the unsaved guard when the form has a live draft. */
-  const guard = (action: () => void) => {
-    if (!dirty) {
-      action();
-      return;
-    }
-    setPendingDiscard(() => action);
-  };
-
-  const openResource = (resource: ScopedResourceDocument) => guard(() => {
-    const next = formFromContent(resource.kind, resource.id, resource.content);
-    setCreating(false);
-    setSelectedId(resource.id);
-    setForm(next);
-    setBaseline(next);
-    setNotice(null);
-  });
-
-  const startNew = () => guard(() => {
-    const next = emptyForm(kind, '');
-    setCreating(true);
-    setSelectedId(null);
-    setForm(next);
-    setBaseline(next);
-    setNotice(null);
-  });
-
-  const closeEditor = () => guard(reset);
-
-  const openDialogEditor = () => {
-    setNotice(null);
-    setDialogEditing(true);
-  };
-
-  /** Closes the dialog but keeps the selection so the read-only detail stays put. */
-  const closeDialogEditor = () => guard(() => {
-    setForm(baseline);
-    setCreating(false);
-    setDialogEditing(false);
-    setNotice(null);
-    if (creating) setSelectedId(null);
-  });
-
-  const patchForm = (patch: Partial<ResourceFormState>) => {
-    setForm((current) => ({ ...current, ...patch }));
-    setNotice((current) => (current?.tone === 'success' ? null : current));
-  };
-
-  const fail = (error: unknown, contextKey: 'app.error.saveFailed' | 'app.error.actionFailed') => setNotice(
-    { tone: 'error', message: humanizeError(error, t, contextKey), detail: errorDetail(error) });
-
-  const save = async () => {
+  /** One main-process call at a time; a failure reads in product copy and keeps its reason for "Copy details". */
+  const runBusy = async (contextKey: 'app.error.saveFailed' | 'app.error.actionFailed', task: () => Promise<void>,
+    options: { keepNotice?: boolean; settle?: () => void } = {}) => {
     setBusy(true);
-    setNotice(null);
+    if (!options.keepNotice) setNotice(null);
     try {
-      const outcome = await saveScopedResource({
-        kind,
-        scope,
-        form,
-        creating,
-        existingIds: resources.map((resource) => resource.id),
-        ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
-      });
-      if (!outcome.ok) {
-        setNotice(outcome.messageKey
-          ? { tone: 'error', message: t(`settings.${outcome.messageKey}` as const) }
-          : { tone: 'error', message: t('settings.resourceInvalid'), detail: outcome.message });
-        return;
-      }
-      onChanged?.(outcome.overview);
-      setCreating(false);
-      setSelectedId(outcome.id);
-      const saved = outcome.overview.resources.find(
-        (entry) => entry.scope === scope && entry.kind === kind && entry.id === outcome.id,
-      );
-      const savedForm = saved ? formFromContent(saved.kind, saved.id, saved.content) : form;
-      setForm(savedForm);
-      setBaseline(savedForm);
-      setDialogEditing(false);
-      setNotice({ tone: 'success', message: t('settings.scopeSaved') });
+      await task();
     } catch (error) {
-      fail(error, 'app.error.saveFailed');
+      setNotice({ tone: 'error', message: humanizeError(error, t, contextKey), detail: errorDetail(error) });
     } finally {
       setBusy(false);
+      options.settle?.();
     }
   };
+
+  const save = () => runBusy('app.error.saveFailed', async () => {
+    const outcome = await saveScopedResource({
+      kind,
+      scope,
+      form,
+      creating,
+      existingIds: resources.map((resource) => resource.id),
+      ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
+    });
+    if (!outcome.ok) {
+      setNotice(outcome.messageKey
+        ? { tone: 'error', message: t(`settings.${outcome.messageKey}` as const) }
+        : { tone: 'error', message: t('settings.resourceInvalid'), detail: outcome.message });
+      return;
+    }
+    onChanged?.(outcome.overview);
+    const saved = outcome.overview.resources.find(
+      (entry) => entry.scope === scope && entry.kind === kind && entry.id === outcome.id,
+    );
+    showForm(saved ? formFromContent(saved.kind, saved.id, saved.content) : form, outcome.id);
+    setDialogEditing(false);
+    setNotice({ tone: 'success', message: t('settings.scopeSaved') });
+  });
 
   const remove = async () => {
     const target = pendingDelete;
     if (!target) return;
-    setBusy(true);
-    try {
+    await runBusy('app.error.actionFailed', async () => {
       const next = await deleteScopedResource(target.kind, target.scope, target.id, overview?.projectRoot);
       if (next) onChanged?.(next);
       reset();
-    } catch (error) {
-      fail(error, 'app.error.actionFailed');
-    } finally {
-      setBusy(false);
-      setPendingDelete(null);
-    }
+    }, { keepNotice: true, settle: () => setPendingDelete(null) });
   };
 
-  const importResource = async () => {
-    setBusy(true);
-    setNotice(null);
-    try {
-      const result = await importScopedResourceFromPicker({
-        kind,
-        scope,
-        ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
-      });
-      if (!result) return;
-      onChanged?.(result.overview);
-      if (result.imported) {
-        const next = formFromContent(result.imported.kind, result.imported.id, result.imported.content);
-        setCreating(false);
-        setSelectedId(result.imported.id);
-        setForm(next);
-        setBaseline(next);
-      }
-      setNotice({ tone: 'success', message: t('settings.scopeImported') });
-    } catch (error) {
-      fail(error, 'app.error.actionFailed');
-    } finally {
-      setBusy(false);
-    }
-  };
+  const importResource = () => runBusy('app.error.actionFailed', async () => {
+    const result = await importScopedResourceFromPicker({
+      kind,
+      scope,
+      ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
+    });
+    if (!result) return;
+    onChanged?.(result.overview);
+    const { imported } = result;
+    if (imported) showForm(formFromContent(imported.kind, imported.id, imported.content), imported.id);
+    setNotice({ tone: 'success', message: t('settings.scopeImported') });
+  });
   return {
-    resources, selected, selectedId, creating, editing, dirty, form, notice, busy,
-    pendingDelete, pendingDiscard, setPendingDelete,
-    resolveDiscard: (accept: boolean) => { const action = pendingDiscard; setPendingDiscard(null); if (accept) action?.(); },
-    openResource, startNew, closeEditor, dialogEditing, openDialogEditor, closeDialogEditor,
-    patchForm, save, remove, guard, importResource: () => guard(() => void importResource()),
+    resources, ...editor, busy, pendingDelete, setPendingDelete, save, remove,
+    importResource: () => editor.guard(() => void importResource()),
   };
 }

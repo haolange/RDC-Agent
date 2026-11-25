@@ -1,21 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { clampReasoningSelection } from '@shared/types/modelCapability';
-import { useProjectStore } from '../../stores/projectStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { buildInitialTurnControls, sanitizeTurnControls } from '../../lib/turnControlsUtils';
 import {
-  buildSessionTurnControlsKey,
-  resolveTurnControlsForCapabilityChange,
+  buildSessionTurnControlsKey, capabilityKeys, resolveTurnControlsForCapabilityChange, routeFingerprint,
 } from '../../lib/turnControlHelpers';
 import { resolvedCapability } from '../../lib/capabilityResolution';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useEffectiveModelCapability } from './useEffectiveModelCapability';
-import { isSessionTurnControlsSaving, persistSessionTurnControls } from './sessionModelOverride';
+import { isSessionTurnControlsSaving } from './sessionModelOverride';
+import { useTurnControlsSave } from './useTurnControlsSave';
 import type { SessionRecord } from '@shared/types/session';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
-
-const IDLE_SAVE: { saving: boolean; error?: string } = { saving: false };
 
 export function useTurnControls(agentId: string, currentSession: SessionRecord | null) {
   const turnControls = useTurnControlsStore((state) => state.turnControls);
@@ -27,34 +24,10 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const settings = useAppSettingsStore((state) => state.settings);
   const agentReasoning = settings.agents?.definitions.find((definition) => definition.id === agentId)?.reasoningLevel;
   const { effective } = useComposerEffectiveModel(agentId, currentSession);
-  const providerId = effective?.providerId;
-  const modelId = effective?.modelId;
-  const provider = providerId
-    ? settings.llm.providers.find((entry) => entry.id === providerId)
-    : null;
-  const preference = provider?.models.find((entry) => entry.id === modelId);
-  const routeFingerprint = providerId && modelId && provider
-    ? [
-        providerId,
-        modelId,
-        provider.activeAccountId ?? `anonymous:${provider.id}`,
-        provider.protocol,
-        preference?.preferredRouteOptionId ?? '',
-      ].join('\u001f')
-    : '';
+  const route = routeFingerprint(settings.llm.providers, effective?.providerId, effective?.modelId);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
-  const [saveState, setSaveState] = useState<{ sessionId: string | null; saving: boolean; error?: string }>({ sessionId, saving: false });
-  useEffect(() => { setSaveState({ sessionId, saving: false }); }, [sessionId]);
-  const saveControls = useCallback(async (controls: ConversationTurnControls) => {
-    if (!sessionId) return;
-    setSaveState({ sessionId, saving: true });
-    const result = await persistSessionTurnControls(sessionId, controls);
-    // Only the newest save of the session's controls (its revision lane) speaks for them, while that session shows.
-    if (result.latest && useProjectStore.getState().currentSessionId === sessionId) {
-      setSaveState({ sessionId, saving: false, error: result.ok ? undefined : result.error });
-    }
-  }, [sessionId]);
+  const { saveState, saveControls } = useTurnControlsSave(sessionId);
   const sessionControls = currentSession?.turnControls ?? null;
   const capability = resolvedCapability(capabilityState);
   const lastSessionIdRef = useRef<string | null>(null);
@@ -65,18 +38,10 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const lastAgentRef = useRef<string | null>(null);
   const lastAgentReasoningRef = useRef(agentReasoning);
   const explicitReasoningRef = useRef(false);
-  const retryCapability = useEffectiveModelCapability(
-    agentId,
-    routeFingerprint,
-    settingsHydrated,
-    setCapabilityState,
-  );
+  const retryCapability = useEffectiveModelCapability(agentId, route, settingsHydrated, setCapabilityState);
 
-  const capabilityKey = capability
-    ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}:${capability.catalogRevision}:${capability.routeRevision}`
-    : null;
+  const { capabilityKey, routeIdentity } = capabilityKeys(agentId, capability);
   const sessionControlsKey = buildSessionTurnControlsKey(sessionControls);
-  const routeIdentity = capability ? `${capability.providerId}:${capability.modelId}:${capability.route.protocol}` : null;
   const preserveUnavailableAgentReasoning = useCallback((requested: ConversationTurnControls, normalized: ConversationTurnControls) => {
     const control = capability?.controls.reasoning;
     return agentReasoning && requested.reasoningLevel === agentReasoning && control
@@ -175,7 +140,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     capability,
     capabilityState,
     retryCapability,
-    saveState: saveState.sessionId === sessionId ? saveState : IDLE_SAVE,
+    saveState,
     retrySave,
     updateTurnControls,
     setTurnControls: (next: ConversationTurnControls) => {

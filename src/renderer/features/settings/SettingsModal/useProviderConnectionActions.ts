@@ -1,12 +1,11 @@
 import { getErrorMessage } from './utils';
-import { mergeTestedProviderModels } from './providerModelProjection';
+import { connectionFailureText, createProviderConnectionDraft } from './providerConnectionState';
 import {
-  connectionFailureText,
-  createProviderConnectionDraft,
-  getConnectionDraftSignature,
-  getConnectionRequestValues,
-} from './providerConnectionState';
-import { hasProviderConnectionDefinitionChanged, projectProviderModelPreferences } from './providerConnectionRequest';
+  hasProviderConnectionDefinitionChanged,
+  projectProviderModelPreferences,
+  providerConnectionRequest,
+  testedConnectionPatch,
+} from './providerConnectionRequest';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LlmProviderEntry, ProviderDefinitionSaveResult } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
@@ -62,46 +61,20 @@ export const useProviderConnectionActions = (
           return;
         }
         updateConnectionDraft({
-          busy: 'idle',
-          error: '',
+          ...testedConnectionPatch(connectionDraft, result),
           accountStatus: await window.electronAPI.llm.getProviderAccountStatus(connectionDraft.providerId),
-          discoveryDiagnostic: result.discoveryDiagnostic ?? null,
-          testedApiKey: connectionDraft.apiKey,
-          testedBaseUrl: connectionDraft.baseUrl,
-          testedProtocol: connectionDraft.protocol,
-          testedAuthMode: connectionDraft.authMode,
-          testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
-          discoveryAccountId: result.discoveryAccountId ?? null,
-          models: mergeTestedProviderModels(result.models, connectionDraft.models),
         });
         await refreshLocalSettings(connectionDraft.providerId);
         return;
       }
-      const request = {
-        providerId: connectionDraft.providerId,
-        authMode: connectionDraft.authMode,
-        apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
-        baseUrl: connectionDraft.baseUrl,
-        protocol: connectionDraft.protocol,
-        connectionValues: getConnectionRequestValues(connectionDraft),
-      } as Parameters<typeof window.electronAPI.llm.testProviderDraft>[0] & { protocol?: typeof connectionDraft.protocol };
+      const request = providerConnectionRequest(connectionDraft) as Parameters<typeof window.electronAPI.llm.testProviderDraft>[0]
+        & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.testProviderDraft(request);
       if (!result.success) {
         updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerTestFailed') });
         return;
       }
-      updateConnectionDraft({
-        busy: 'idle',
-        error: '',
-        discoveryDiagnostic: result.discoveryDiagnostic ?? null,
-        testedApiKey: connectionDraft.apiKey,
-        testedBaseUrl: connectionDraft.baseUrl,
-        testedProtocol: connectionDraft.protocol,
-        testedAuthMode: connectionDraft.authMode,
-        testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
-        discoveryAccountId: result.discoveryAccountId ?? null,
-        models: mergeTestedProviderModels(result.models, connectionDraft.models),
-      });
+      updateConnectionDraft(testedConnectionPatch(connectionDraft, result));
     } catch (error) {
       updateConnectionDraft({
         busy: 'idle',
@@ -146,12 +119,7 @@ export const useProviderConnectionActions = (
         return;
       }
       const request = {
-        providerId: connectionDraft.providerId,
-        authMode: connectionDraft.authMode,
-        apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
-        baseUrl: connectionDraft.baseUrl,
-        protocol: connectionDraft.protocol,
-        connectionValues: getConnectionRequestValues(connectionDraft),
+        ...providerConnectionRequest(connectionDraft),
         modelPreferences: modelPreferences(),
       } as Parameters<typeof window.electronAPI.llm.connectProvider>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.connectProvider(request);

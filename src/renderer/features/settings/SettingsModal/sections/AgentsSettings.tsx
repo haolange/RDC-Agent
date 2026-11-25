@@ -1,20 +1,16 @@
 import React, { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
-import { agentDescription } from '../../../../lib/agentDescription';
 import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
-import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
-import { SplitButton } from '../../../../ui/SplitButton';
 import { EmptyState } from '../../../../ui/EmptyState';
-import { Icon } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
-import { SettingsSaveMark, SettingsScopeBar } from '../parts';
 import { useScopedSkillSelection } from '../useScopedSkillSelection';
 import { useSettingsNavigationStore } from '../../../../stores/settingsNavigationStore';
 import { useI18n } from '../../../../i18n';
-import { uniqueResourceId } from './uniqueResourceId';
-import { createNewAgent, draftScope, toSlug, visibleDrafts, type AgentScope } from './agentDraftFactory';
+import { createNewAgent, draftDescription, draftScope, duplicateDraft, visibleDrafts, type AgentScope } from './agentDraftFactory';
 import { AgentManifestEditor } from './AgentManifestEditor';
-import { AgentListItem } from './AgentListItem';
+import { AgentListColumn } from './AgentListColumn';
+import { AgentsPageToolbar } from './AgentsPageToolbar';
+import { AgentDeleteDialog } from './AgentDeleteDialog';
 import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
 import { AgentDefaultModelSection } from './AgentDefaultModelSection';
 import { AgentReviewDialogs } from './AgentReviewDialogs';
@@ -85,12 +81,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   };
   const selectedAgent = missingAgentId ? null : scopedDrafts.find((agent) => agent.id === selectedAgentId) ?? scopedDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
-  // A shipped description is shown in the interface language until the user edits it.
-  const displayDescription = (agent: AgentManifestDraft): string => {
-    const definition = settings.agents.definitions.find((entry) => entry.id === agent.id);
-    return definition && definition.description === agent.description
-      ? agentDescription(definition, settings.appearance.language) : agent.description;
-  };
+  const displayDescription = (agent: AgentManifestDraft) => draftDescription(agent, settings);
   const diagnostics = settings.agents.diagnostics ?? [];
   useEffect(() => {
     if (!agentRequest || !agentManifestContextReady) return;
@@ -130,15 +121,8 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   const duplicateAgent = () => {
     if (!selectedAgent) return;
     onAgentManifestDraftsChange((current) => {
-      const nextId = uniqueResourceId(`${toSlug(selectedAgent.id)}-copy`, current.map((agent) => agent.id));
-      const duplicate = {
-        ...selectedAgent,
-        id: nextId,
-        fileName: `${nextId}.agent.md`,
-        name: uniqueResourceId(`${selectedAgent.name} Copy`, current.map((agent) => agent.name)),
-        basedOn: undefined,
-      };
-      setSelectedAgentId(nextId);
+      const duplicate = duplicateDraft(selectedAgent, current);
+      setSelectedAgentId(duplicate.id);
       return [...current, duplicate];
     });
   };
@@ -166,27 +150,10 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
         onChange={models.setDefaultField}
       />
-      <div className="settings-manifest-toolbar settings-manifest-page-toolbar" data-testid="settings-agents-toolbar">
-        <SettingsScopeBar
-          scope={scope}
-          onScopeChange={(next) => { clearAgentRequest(); setMissingAgentId(null); setScope(next); setDetailRequested(false); }}
-          canProject={canProject}
-          userLabel={t('settings.scopeUser')}
-          projectLabel={t('settings.scopeProject')}
-          groupLabel={t('settings.resourceScope')}
-        />
-        {/* Agents autosave: one mark for the page. A blocked save names what to fix; a failed one can be retried. */}
-        <SettingsSaveMark
-          status={agentManifestSaveState}
-          savingLabel={t('settings.saving')}
-          savedLabel={t('settings.agentManifestSaved')}
-          errorLabel={agentManifestSaveBlocked && agentManifestSaveMessage ? agentManifestSaveMessage : t('settings.agentManifestSaveFailed')}
-          errorDetail={agentManifestSaveBlocked ? undefined : agentManifestSaveMessage || undefined}
-          onRetry={agentManifestSaveBlocked ? undefined : () => void onRetrySaveAgentManifests()}
-          retryLabel={t('settings.retry')}
-          testId="settings-agent-autosave-status"
-        />
-      </div>
+      <AgentsPageToolbar scope={scope} canProject={canProject}
+        onScopeChange={(next) => { clearAgentRequest(); setMissingAgentId(null); setScope(next); setDetailRequested(false); }}
+        saveState={agentManifestSaveState} saveMessage={agentManifestSaveMessage} saveBlocked={agentManifestSaveBlocked}
+        onRetrySave={() => void onRetrySaveAgentManifests()} />
 
       <AgentManifestDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} diagnostics={diagnostics}
         onMigrate={(issue) => models.openOverrideAction('migrate', issue)}
@@ -194,51 +161,11 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         onReviewTrust={models.openTrustReview} />
       {missingAgentId ? <InlineError>{t('settings.agentNavigationNotFound', { id: missingAgentId })}</InlineError> : null}
       <div className="settings-manifest-layout">
-        <div className="settings-manifest-list-column">
-          <div className="settings-manifest-list-toolbar">
-            <span className="settings-manifest-count">
-              {t('settings.agentListCount', { count: scopedDrafts.length })}
-            </span>
-            <SplitButton dataTestId="settings-agent-create" label={t('settings.newAgent')} onClick={() => setNaming(true)}
-              disabled={scope === 'project' && !currentProjectId} menuLabel={t('settings.newAgentMore')}
-              items={[{ id: 'import', label: t('settings.importAgentManifest'), onSelect: () => void onImportAgentManifest() }]} />
-          </div>
-
-          <div ref={listRef} className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
-            {scopedDrafts.length === 0 ? (
-              <EmptyState
-                className="settings-manifest-list-empty"
-                title={t('settings.agentScopeEmpty', { scope: scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') })}
-              />
-            ) : scopedDrafts.map((agent) => (
-              <AgentListItem
-                key={agent.id}
-                id={agent.id}
-                name={agent.name}
-                description={displayDescription(agent)}
-                icon={agent.icon}
-                selected={agent.id === selectedId}
-                onSelect={() => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agent.id); openDetail(); }}
-              />
-            ))}
-          </div>
-
-          {diagnostics.length > 0 ? (
-            <div className="settings-agent-tool-diagnostics settings-agent-diagnostics-row" data-testid="settings-agent-manifest-diagnostics">
-              <Button
-                variant="secondary" size="sm" aria-haspopup="dialog"
-                className="settings-agent-diagnostics-toggle"
-                aria-expanded={diagnosticsOpen}
-                onClick={() => setDiagnosticsOpen(true)}
-              >
-                <Icon name="warning" size={14} className="settings-agent-diagnostics-icon" />
-                <span>{t('settings.agentDiagnosticsCount', { count: diagnostics.length })}</span>
-                <span className="settings-agent-diagnostics-link">{t('settings.agentDiagnosticsView')}</span>
-                <Chevron />
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        <AgentListColumn listRef={listRef} scope={scope} drafts={scopedDrafts} selectedId={selectedId}
+          describe={displayDescription} canCreate={!(scope === 'project' && !currentProjectId)}
+          diagnosticsCount={diagnostics.length} diagnosticsOpen={diagnosticsOpen}
+          onSelect={(agentId) => { clearAgentRequest(); setMissingAgentId(null); setSelectedAgentId(agentId); openDetail(); }}
+          onCreate={() => setNaming(true)} onImport={() => void onImportAgentManifest()} onOpenDiagnostics={() => setDiagnosticsOpen(true)} />
 
         {selectedAgent ? (
           <div className="settings-manifest-detail">
@@ -276,18 +203,8 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           existingIds={agentManifestDrafts.map((agent) => agent.id)} onCreate={addAgent} onClose={() => setNaming(false)} />
       ) : null}
       {pendingDelete ? (
-        <ConfirmationDialog
-          title={t(builtinUpdate ? 'settings.agentRestoreBuiltinTitle' : 'settings.deleteAgentTitle')}
-          message={t(builtinUpdate ? 'settings.agentRestoreBuiltinConfirm' : 'settings.deleteAgentConfirm', { name: pendingDelete.name || pendingDelete.id })}
-          details={[
-            { label: t('settings.agentName'), value: pendingDelete.name || pendingDelete.id },
-            { label: t('settings.resourceFieldId'), value: pendingDelete.id },
-          ]}
-          confirmLabel={t(builtinUpdate ? 'settings.agentRestoreBuiltin' : 'dialog.delete')}
-          cancelLabel={t('dialog.cancel')}
-          onCancel={() => setPendingDelete(null)}
-          onConfirm={confirmDeleteAgent}
-        />
+        <AgentDeleteDialog agent={pendingDelete} restoresBuiltin={Boolean(builtinUpdate)}
+          onCancel={() => setPendingDelete(null)} onConfirm={confirmDeleteAgent} />
       ) : null}
     </div>
   );

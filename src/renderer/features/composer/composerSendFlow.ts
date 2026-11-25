@@ -17,6 +17,7 @@ import {
   useComposerSessionContextStore,
 } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useWorkflowStore } from '../../stores/workflowStore';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { createConversationRequestId } from '../../services/conversationRequestId';
 import { notify } from '../../stores/notificationStore';
@@ -30,6 +31,23 @@ import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/ses
 import type { Translator } from '../../i18n/messages';
 
 export { createConversationRequestId };
+
+/**
+ * The conversation, session and trace writers a send applies its result with. Store actions never change identity,
+ * so a send reads them when it runs instead of a component holding a selector for each.
+ */
+export const conversationWriters = () => {
+  const conversation = useConversationStore.getState();
+  return {
+    setConversationMessages: conversation.setConversationMessages,
+    setBranchState: conversation.setBranchState,
+    setConversationSnapshot: conversation.setConversationSnapshot,
+    upsertConversationMessages: conversation.upsertConversationMessages,
+    setSessions: useProjectStore.getState().setSessions,
+    setCurrentRun: useSessionStore.getState().setCurrentRun,
+    setTracePresentation: useWorkflowStore.getState().setTracePresentation,
+  };
+};
 
 export async function sendComposerConversationTurn(options: {
   electronAPI: NonNullable<Window['electronAPI']>;

@@ -1,5 +1,6 @@
-import { projectEndpointTemplate } from './providerConnectionState';
-import type { LlmProviderEntry, LlmProviderModelPreference } from '@shared/types/settings';
+import { getConnectionDraftSignature, getConnectionRequestValues, projectEndpointTemplate } from './providerConnectionState';
+import { mergeTestedProviderModels } from './providerModelProjection';
+import type { LlmProviderEntry, LlmProviderModel, LlmProviderModelPreference } from '@shared/types/settings';
 import type { ProviderConnectionDraft } from './types';
 
 export function projectProviderModelPreferences(
@@ -35,4 +36,36 @@ export function hasProviderConnectionDefinitionChanged(
     || (storedProvider.baseUrl ?? '').replace(/\/+$/, '') !== resolvedBaseUrl
     || connectionValuesChanged
     || (!draft.usingStoredSecret && Boolean(draft.apiKey.trim()));
+}
+
+/** What main needs to test or connect the drafted connection; a stored secret is reused, never resent. */
+export function providerConnectionRequest(draft: ProviderConnectionDraft) {
+  return {
+    providerId: draft.providerId,
+    authMode: draft.authMode,
+    apiKey: draft.usingStoredSecret ? '' : draft.apiKey,
+    baseUrl: draft.baseUrl,
+    protocol: draft.protocol,
+    connectionValues: getConnectionRequestValues(draft),
+  };
+}
+
+/** A passing test: which connection it checked, so a later edit outdates it, and the models it discovered. */
+export function testedConnectionPatch(draft: ProviderConnectionDraft, result: {
+  discoveryDiagnostic?: ProviderConnectionDraft['discoveryDiagnostic'];
+  discoveryAccountId?: string | null;
+  models: LlmProviderModel[];
+}): Partial<ProviderConnectionDraft> {
+  return {
+    busy: 'idle',
+    error: '',
+    discoveryDiagnostic: result.discoveryDiagnostic ?? null,
+    testedApiKey: draft.apiKey,
+    testedBaseUrl: draft.baseUrl,
+    testedProtocol: draft.protocol,
+    testedAuthMode: draft.authMode,
+    testedConnectionSignature: getConnectionDraftSignature(draft),
+    discoveryAccountId: result.discoveryAccountId ?? null,
+    models: mergeTestedProviderModels(result.models, draft.models),
+  };
 }

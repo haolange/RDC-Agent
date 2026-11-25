@@ -1,176 +1,37 @@
 import React from 'react';
-import { getAgentModeConfig } from '@shared/constants/agents';
 import { ModeGlyph } from '../../ui/ModeGlyph';
-import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useI18n } from '../../i18n';
-import { withLanguage } from '../../i18n/messages';
-import { InlineError } from '../../ui/InlineError';
-import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
-import { EFFORT_LABEL_KEYS, isReasoningLevelLabel } from '../../lib/reasoningLabels';
-import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
-import { Skeleton } from '../../ui/Skeleton';
-import { getToolVerb } from './workProcessToolRows';
-import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
-import { formatDurationMs } from './workProcessFormat';
-import { useWorkClock } from './useWorkClock';
-import { WorkProcessContent } from './WorkProcessContent';
-import { buildWorkProcessPresentation } from './workProcessTracePresentation';
-import { SubagentCallDetails } from './SubagentCallDetails';
-import { DelegatedToolReceipt } from './DelegatedToolReceipt';
-import { DelegationTaskDocument } from './DelegationTaskDocument';
-import { useDelegationTrace } from './useDelegationTrace';
-import { useDelegationContent } from './useDelegationContent';
 import { useSubagentDisclosure } from './useSubagentDisclosure';
+import { useSubagentRow } from './useSubagentRow';
+import { subagentStatusLabelKey, type SubagentWorkRow } from './subagentRowModel';
+import { SubagentRowBody } from './SubagentRowBody';
 import { WorkCardHeader } from './WorkCardHeader';
 import { SubagentProgressDots } from './SubagentProgressDots';
-import { WorkDisclosure, FadingPreview } from './WorkDisclosure';
+import { FadingPreview } from './WorkDisclosure';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
-import type { AgentMode } from '@shared/types/layout';
-import type { WorkProcessRow } from './workProcessTypes';
-import type { ConversationWorkTrace } from '@shared/types/conversation';
-
-type SubagentWorkRow = Extract<WorkProcessRow, { type: 'subagent' }>;
-
-function DelegationBody({ sessionId, parentToolCallId, childSessionId, executionId, generation, kind, open, available, taskDisclosure }: {
-  sessionId?: string | null; parentToolCallId: string; childSessionId?: string;
-  executionId?: string; generation?: number; kind: 'task' | 'final'; open: boolean; available: boolean;
-  taskDisclosure?: Pick<React.ComponentProps<typeof DelegationTaskDocument>, 'factsOpen' | 'constraintsOpen' | 'toggle'>;
-}) {
-  const { t } = useI18n();
-  const content = useDelegationContent({ sessionId, parentToolCallId, kind, open, available,
-    childSessionId, executionId, generation });
-  return <>
-    {content.text ? kind === 'task'
-      ? !content.hasMore && taskDisclosure && <DelegationTaskDocument text={content.text} {...taskDisclosure} />
-      : <div className="work-process-subagent-final"><MessageMarkdown content={content.text} deferHeavyPlugins={content.hasMore} /></div> : null}
-    {content.loading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" count={2} inline /></span> : null}
-    {content.error ? <button type="button" className="work-process-subagent-more" onClick={content.retry}>{t('chat.subagentRetry')}</button> : null}
-    {content.hasMore ? <button type="button" className="work-process-subagent-more" onClick={() => void content.loadMore()}>{t('chat.subagentShowMore')}</button> : null}
-  </>;
-}
 
 export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | null }> = ({ row, sessionId }) => {
-  const { t, language } = useI18n();
-  const openAgentSettings = useSettingsNavigationStore((state) => state.openAgent);
-  const { expanded, workOpen, finalOpen, detailsOpen, factsOpen, constraintsOpen, toggle, openCard } = useSubagentDisclosure(sessionId, row.id);
+  const { t } = useI18n();
+  const disclosure = useSubagentDisclosure(sessionId, row.id);
+  const { expanded, workOpen, openCard } = disclosure;
   const contentId = React.useId();
-  const cardRef = React.useRef<HTMLLIElement>(null);
-  const { page, loading, headerLoading, hasEarlier, loadEarlier, retry } = useDelegationTrace(sessionId, row.id, expanded && workOpen);
-  const loadEarlierWithAnchor = React.useCallback(async () => {
-    const scroller = cardRef.current?.closest('.chat-messages') as HTMLElement | null;
-    const priorTop = scroller?.scrollTop ?? 0;
-    const priorHeight = scroller?.scrollHeight ?? 0;
-    await loadEarlier();
-    requestAnimationFrame(() => {
-      if (scroller && Math.abs(scroller.scrollTop - priorTop) < 2) {
-        scroller.scrollTop = priorTop + scroller.scrollHeight - priorHeight;
-      }
-    });
-  }, [loadEarlier]);
-  const header = page.header;
-  const executionStatus = header?.mode === 'background' ? header.executionStatus : undefined;
-  const rawStatus = executionStatus ?? header?.status ?? (row.status === 'error' ? 'failed'
-    : row.status === 'complete' ? 'complete' : row.status === 'cancelled' || row.status === 'skipped' ? 'cancelled'
-      : row.status === 'pending' ? 'queued' : 'running');
-  const status = rawStatus === 'completed' ? 'complete' : rawStatus;
-  const active = status === 'queued' || status === 'running' || status === 'waiting' || status === 'cancelling';
-  const startedAt = header?.startedAt;
-  // The delegated Agent's clock advances on the same shared second as the turn's Working header.
-  const now = useWorkClock(active && Boolean(startedAt));
-  const duration = header ? formatDurationMs(language, header.startedAt, active ? now : header.completedAt) : row.duration;
-  const task = header?.task || row.task || t('chat.subagentUntitledTask');
-  const profile = header?.profile || row.profile;
-  const definition = useAppSettingsStore(state => state.settings.agents.definitions.find(agent => agent.id === profile));
-  const mode = profile as AgentMode;
-  const agentLabel = definition?.name || getAgentModeConfig(mode)?.label || profile;
-  const trace = React.useMemo<ConversationWorkTrace>(() => ({
-    status: active ? 'running' : status === 'complete' ? 'complete' : status === 'cancelled' || status === 'interrupted' || status === 'partial' || status === 'blocked' ? 'stopped' : 'error',
-    blocks: page.steps.map((step) => step.block), updatedAt: header?.completedAt ?? Date.now(),
-  }), [active, status, page.steps, header?.completedAt]);
-  const localized = React.useMemo(() => withLanguage(t, language), [t, language]);
-  const presentation = React.useMemo(() => buildWorkProcessPresentation(trace, localized), [trace, localized]);
-  const renderToolDetail = React.useCallback((tool: Extract<WorkProcessRow, { type: 'tool' }>) => (
-    tool.status === 'complete' || tool.status === 'error' || tool.status === 'cancelled' || tool.status === 'skipped'
-      ? <DelegatedToolReceipt sessionId={sessionId} parentToolCallId={row.id} toolCallId={tool.id}
-        childSessionId={header?.childSessionId} executionId={header?.executionId} generation={header?.generation} />
-      : null
-  ), [sessionId, row.id, header?.childSessionId, header?.executionId, header?.generation]);
-  const latest = header?.latestAction
-    ? getToolVerb(header.latestAction, header.latestActionStatus ?? 'complete', undefined, t)
-    : active ? t('chat.subagentStillRunning') : t('chat.subagentProcessEnded');
-  const processPreview = latest;
-  const finalPreview = headerLoading ? t('chat.subagentLoading') : header?.finalPreview || (header?.finalUnavailableReason
-    ? t('chat.subagentContentUnavailable') : active ? t('chat.subagentStillRunning')
-      : t('chat.subagentNoFinal'));
-  const finalAvailable = !!header?.finalAvailable;
-  const finalShownInProcess = workOpen && page.steps.some((step) => step.block.items
-    ?.some((item) => item.kind === 'text' && item.phase === 'final_answer'));
-  const route = header?.preparedRoute;
-  const modelLabel = useModelDisplayLabel(route?.providerId, route?.modelId);
-  // The glyph already says this is a delegation; the header names the Agent, then the model and its reasoning level.
-  const routeLabel = route && modelLabel
-    ? [modelLabel, isReasoningLevelLabel(route.reasoningLevel) ? t(EFFORT_LABEL_KEYS[route.reasoningLevel]) : ''].filter(Boolean).join(' · ')
-    : '';
+  const state = useSubagentRow(row, sessionId, expanded && workOpen, workOpen);
+  const { status, active, headerLoading, definition, mode } = state;
+  const statusKey = subagentStatusLabelKey(status);
   const progressDots = <SubagentProgressDots state={active ? 'active' : status === 'complete' ? 'complete' : 'stopped'} />;
-  return <li ref={cardRef} className="work-process-step kind-subagent" data-work-process-block-id={row.id}>
+  return <li className="work-process-step kind-subagent" data-work-process-block-id={row.id}>
     <WorkProcessRailIcon row={row} active={status === 'running'} />
     <div className={`work-process-step-content work-process-subagent is-${status}${expanded ? ' is-expanded' : ''}`} data-testid="work-process-subagent" data-locate>
     <WorkCardHeader onClick={() => openCard(active)} expanded={expanded} controls={contentId}
       icon={<ModeGlyph mode={mode} icon={definition?.icon ?? undefined} className="work-process-tool-card-icon" />}
-      title={agentLabel} titleMeta={routeLabel ? <span className="work-process-subagent-route">{routeLabel}</span> : null}
-      duration={headerLoading ? undefined : duration}
+      title={state.agentLabel} titleMeta={state.routeLabel ? <span className="work-process-subagent-route">{state.routeLabel}</span> : null}
+      duration={headerLoading ? undefined : state.duration}
       status={<span className={`work-process-subagent-status is-${status}`}>
-        {status === 'queued' ? t('chat.subagentQueued')
-          : status === 'waiting' ? t('chat.subagentWaiting')
-            : status === 'cancelling' ? t('chat.subagentCancelling')
-              : status === 'partial' ? t('chat.subagentPartial')
-                : status === 'blocked' ? t('chat.subagentBlocked')
-                  : status === 'interrupted' ? t('chat.subagentInterrupted')
-          : status === 'cancelled' ? t('chat.subagentCancelled')
-            : status === 'complete' ? t('chat.subagentComplete')
-              : status === 'failed' ? t('chat.subagentFailed') : getRowStatusLabel('running', t)}
-      </span>} preview={expanded ? undefined : <FadingPreview text={task} />}
+        {statusKey ? t(statusKey) : getRowStatusLabel('running', t)}
+      </span>} preview={expanded ? undefined : <FadingPreview text={state.task} />}
       trailingPreview={expanded ? undefined : progressDots} />
-    {expanded ? <div id={contentId} className="work-process-subagent-body">
-      {page.error ? <p className="work-process-subagent-receipt-error" role="status">{t('chat.subagentTraceUnavailable')}</p> : null}
-      {header?.status === 'failed' && header.configurationError ? (
-        <InlineError detail={header.error} onRetry={() => openAgentSettings(header.profile)} retryLabel={t('chat.subagentOpenAgentSettings')}>
-          {t('chat.subagentConfigurationFailed')}
-        </InlineError>
-      ) : null}
-      {!headerLoading && !header && status === 'failed' && row.resultPreview
-        ? <InlineError detail={row.resultPreview}>{t('chat.subagentFailedSummary')}</InlineError> : null}
-      <div className="work-process-subagent-task" aria-label={t('chat.subagentTask')}>
-        {headerLoading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" inline /></span> : null}
-        {!headerLoading && !header && row.task ? <span className="work-process-subagent-note">{row.task}</span> : null}
-        <DelegationBody sessionId={sessionId} parentToolCallId={row.id} childSessionId={header?.childSessionId}
-          executionId={header?.executionId} generation={header?.generation} kind="task" taskDisclosure={{ factsOpen, constraintsOpen, toggle }} open={expanded} available={!!header?.taskAvailable} />
-        {!headerLoading && header && !header.taskAvailable ? <span className="work-process-subagent-note">{t('chat.subagentContentUnavailable')}</span> : null}
-      </div>
-      <WorkDisclosure title={t('chat.subagentProcess')} preview={processPreview} open={workOpen}
-        onToggle={() => toggle('workOpen')} bodyClassName="work-process-subagent-process-body">
-        {loading || headerLoading ? <span role="status" aria-label={t('chat.subagentLoading')}><Skeleton shape="line" count={2} inline /></span> : null}
-        {page.error ? <button type="button" className="work-process-subagent-more" onClick={retry}>{t('chat.subagentRetry')}</button> : null}
-        {!loading && !headerLoading && !page.error && page.steps.length === 0 ? <span className="work-process-subagent-note">{t('chat.subagentNoActions')}</span> : null}
-        <WorkProcessContent embedded density="compact" presentation={presentation} sessionId={sessionId} renderToolDetail={renderToolDetail}
-          active={row.status === 'running'}
-          leadingContent={hasEarlier ? <button type="button" className="work-process-subagent-more" onClick={() => void loadEarlierWithAnchor()}>{t('chat.subagentShowEarlier')}</button> : null}
-          disclosureScope={`${sessionId ?? ''}\u0000${row.id}`} />
-      </WorkDisclosure>
-      <WorkDisclosure title={t('chat.subagentFinal')} preview={finalPreview} open={finalOpen}
-        onToggle={() => toggle('finalOpen')} disabled={!finalAvailable}>
-        {finalShownInProcess ? <span className="work-process-subagent-note">{t('chat.subagentFinalShownAbove')}</span>
-          : <DelegationBody sessionId={sessionId} parentToolCallId={row.id} childSessionId={header?.childSessionId}
-            executionId={header?.executionId} generation={header?.generation} kind="final" open={finalOpen} available={finalAvailable} />}
-      </WorkDisclosure>
-      <WorkDisclosure title={t('chat.subagentDetails')} open={detailsOpen}
-        onToggle={() => toggle('detailsOpen')}>
-        <ScopedWorkDisclosure scope={`${sessionId ?? ''}:${row.id}:details`}><SubagentCallDetails header={header} sessionId={sessionId} parentToolCallId={row.id}
-          executionId={row.executionId} generation={row.generation} /></ScopedWorkDisclosure>
-      </WorkDisclosure>
-    </div> : null}
+    {expanded ? <SubagentRowBody id={contentId} row={row} sessionId={sessionId} state={state} disclosure={disclosure} /> : null}
     </div>
   </li>;
 };

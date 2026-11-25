@@ -1,18 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { formatBytes } from '../../lib/formatBytes';
 import { useDeviceStore } from '../../stores/deviceStore';
 import { useSessionDeviceStore } from '../../stores/sessionDeviceStore';
 import { DevicePreparationStatus, isDevicePreparing, isDeviceInstallationUnconfirmed } from '../../patterns/DevicePreparationStatus';
 import { CopyDiagnosticsButton } from '../../patterns/CopyDiagnostics';
-import { useProjectStore } from '../../stores/projectStore';
-import { useWorkflowStore } from '../../stores/workflowStore';
-import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
 import { Icon } from '../../ui/Icon';
-import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
-import { errorDetail } from '../../lib/errorDetail';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import {
   CaptureReplayCallouts,
@@ -25,11 +20,11 @@ import {
 } from './CaptureReplayStatus';
 import { useCaptureReplay } from './useCaptureReplay';
 import { useCaptureRecovery } from './useCaptureRecovery';
-import { clearOpenedCapture, getTraceProjection, openProjectCaptureInput, refreshProjectCaptureInputs, refreshReplayDevices, refreshReplayFrame, type CaptureScope } from './capturePanelActions';
+import { useCaptureActions, type CaptureAction } from './useCaptureActions';
+import { CaptureRecoveryCallout } from './CaptureRecoveryCallout';
+import type { CaptureScope } from './capturePanelActions';
 import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import './CaptureReplay.css';
-
-type Action = 'open' | 'close' | 'refresh' | 'image';
 
 function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: RdcContextPanelViewModel }) {
   const { t, language } = useI18n();
@@ -37,9 +32,8 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const recovery = useCaptureRecovery(scope, state?.revision);
   const devices = useDeviceStore((value) => value.devices);
   const [draft, setDraft] = useState<{ inputId: string } | null>(null);
-  const [action, setAction] = useState<Action | null>(null);
+  const { action, error, run: runAction, refreshProjection } = useCaptureActions(scope, reload, receive);
   const [restoring, setRestoring] = useState(false);
-  const [error, setError] = useState<{ message: string; action: Action } | null>(null);
   const actualInputId = state?.inputId ?? selection?.inputId ?? capture.availableCaptures[0]?.inputId ?? '';
   const actualDeviceId = state?.replayDeviceId ?? 'local';
   const targetDeviceId = state?.preparation.targetDeviceId ?? actualDeviceId;
@@ -55,37 +49,9 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const deviceDisabled = locked || installUnconfirmed || (!preparing && phaseBusy) || restoring || action !== null || !state;
   const deviceReady = targetDeviceId === 'local' || state?.preparation.phase === 'ready';
   const partial = isCapturePartialReady(state);
-  const refreshProjection = useCallback(async () => {
-    await reload();
-    const result = await getTraceProjection(scope.sessionId);
-    if (result.success && result.presentation) {
-      useSessionProjectionStore.getState().projectTrace(scope.sessionId, result.presentation);
-      if (useProjectStore.getState().currentSessionId === scope.sessionId) useWorkflowStore.getState().setTracePresentation(result.presentation);
-    }
-  }, [reload, scope]);
-  const run = async (operation: Action) => {
+  const run = async (operation: CaptureAction) => {
     if (disabled || !state) return;
-    setAction(operation); setError(null);
-    try {
-      if (operation === 'open' && selectedInput) {
-        const result = await openProjectCaptureInput({ ...scope, bindingGeneration: state.generation, inputId: selectedInput.inputId, filePath: selectedInput.filePath, replayDeviceId: targetDeviceId });
-        if (!result.success) {
-          if (result.issue) { setError({ message: result.issue.diagnostic, action: operation }); await reload(); return; }
-          throw new Error(result.error);
-        }
-        setDraft(null);
-      } else if (operation === 'close') {
-        const result = await clearOpenedCapture({ ...scope, bindingGeneration: state.generation });
-        if (!result.success) throw new Error(result.error);
-      } else if (operation === 'image') receive(await refreshReplayFrame({ ...scope, bindingGeneration: state.generation }));
-      else if (operation === 'refresh') {
-        const [result, nextDevices] = await Promise.all([refreshProjectCaptureInputs(scope.projectId), refreshReplayDevices()]);
-        useDeviceStore.getState().applyStatusPayload(nextDevices);
-        useProjectStore.getState().updateProjectInputs(scope.projectId, result.inputs);
-      }
-      if (operation === 'refresh') await refreshProjection();
-    } catch (reason) { setError({ message: errorDetail(reason), action: operation }); }
-    finally { setAction(null); }
+    await runAction(operation, state, selectedInput, targetDeviceId, () => setDraft(null));
   };
   const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
   const callouts = collectCaptureCallouts({
@@ -137,17 +103,12 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       <Button variant={open ? 'secondary' : 'primary'} size="sm" disabled={disabled || !selectedInput || (!open && !deviceReady)} onClick={() => void run(pending || !open ? 'open' : 'close')}>{t(pending ? 'control.replay.switch' : open ? 'control.replay.close' : 'control.captureOpen')}</Button>
     </div>
     {pending && <div className="capture-replay-pending"><small>{capture.availableCaptures.find((input) => input.inputId === actualInputId)?.fileName} · {deviceLabel(actualDeviceId)}</small><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDraft(null)}>{t('control.replay.cancel')}</Button></div>}
-    {recovery.status && <div className="capture-replay-callout is-warning" aria-live="polite">
-      <div className="capture-replay-callout-copy"><strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
-        {showRecoveryTarget ? <small>{originalRecovery.fileName} · {deviceLabel(originalRecovery.deviceId)}</small>
-          : !originalRecovery ? <small>{t('control.replay.recoveryNoCapture')}</small> : null}</div>
-      <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} data-tooltip={t('control.replay.recoveryDescription')} onClick={() => {
+    <CaptureRecoveryCallout status={recovery.status} error={recovery.error} locked={locked} disabled={disabled} restoring={restoring}
+      showTarget={Boolean(showRecoveryTarget)} deviceLabel={deviceLabel} onRestore={() => {
         if (!state) return;
         setRestoring(true);
         void recovery.restore(state.generation).then(async next => { if (next) { receive(next); await refreshProjection(); } }).finally(() => setRestoring(false));
-      }}>{t('control.replay.recoveryAction')}</Button>
-    </div>}
-    {recovery.error && <InlineError detail={recovery.error}>{t('control.replay.recoveryFailed')}</InlineError>}
+      }} />
     <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} hasCapture={open} disabled={locked}
       onRetry={() => { void useSessionDeviceStore.getState().prepare(scope, installUnconfirmed ? targetDeviceId : actionFailure?.deviceId ?? targetDeviceId); }}
       onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />

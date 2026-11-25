@@ -1,25 +1,21 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { useConversationStore } from '../../stores/conversationStore';
-import { useProjectStore } from '../../stores/projectStore';
 import { getCurrentSessionView } from '../../stores/sessionRecordStore';
-import { useSessionStore } from '../../stores/sessionStore';
-import { useWorkflowStore } from '../../stores/workflowStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
-import { sendComposerConversationTurn } from './composerSendFlow';
+import { conversationWriters, sendComposerConversationTurn } from './composerSendFlow';
 import { useComposerStop } from './useComposerStop';
 import { executeSlashCommand } from './slashCommandExecutor';
 import {
   isConcurrentModelSwitchCommand,
   shouldClearSubmittedPrompt,
 } from './composerCommandConcurrency';
-import { inspectHandoffCommit, type HandoffSendPayload } from './composerHandoffSend';
 import { shouldSendComposerOnEnter } from './composerKeyboard';
+import { inspectHandoffRequest, type HandoffSendPayload } from './composerHandoffSend';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 import type { useI18n } from '../../i18n';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 type Translate = ReturnType<typeof useI18n>['t'];
 
-export function useComposerSend(options: {
+interface ComposerSendOptions {
   t: Translate;
   selectedAgentId: string;
   setSelectedAgentId: (agentId: string) => void;
@@ -37,34 +33,15 @@ export function useComposerSend(options: {
   pendingSkillIds: string[];
   setPendingSkillIds: Dispatch<SetStateAction<string[]>>;
   armPendingSkill: (skillId: string, skillName?: string) => void;
-}) {
-  const {
-    t, selectedAgentId, setSelectedAgentId, openSettings, currentProject,
-    currentSession, currentRun, selectedDeviceEntry,
-    hasActiveDebugRun, hasActiveConversationTurn, promptValue,
-    setPromptValue, pendingAttachments, setPendingAttachments,
-    pendingSkillIds, setPendingSkillIds, armPendingSkill,
-  } = options;
+}
+
+export function useComposerSend(options: ComposerSendOptions) {
+  const { t, currentSession, currentRun, setPromptValue, setPendingAttachments, setPendingSkillIds } = options;
   const isPromptSending = useComposerSessionContextStore((state) => state.isPromptSending);
   const handoffPending = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
   const setIsPromptSending = useComposerSessionContextStore((state) => state.setIsPromptSending);
-  const promptValueRef = useRef(promptValue);
-  promptValueRef.current = promptValue;
-  const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
-  const setSessions = useProjectStore((state) => state.setSessions);
-  const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
-  const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
-  const setBranchState = useConversationStore((state) => state.setBranchState);
-  const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
-  const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
-
   const { handlePrimaryStop, stopPending } = useComposerStop({
-    t,
-    currentSession,
-    currentRun,
-    setPromptValue,
-    setPendingAttachments,
-    setPendingSkillIds,
+    t, currentSession, currentRun, setPromptValue, setPendingAttachments, setPendingSkillIds,
   });
 
   useEffect(() => {
@@ -74,42 +51,40 @@ export function useComposerSend(options: {
     }
   }, [currentSession?.sessionId, setIsPromptSending]);
 
-  const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
+  const isComposerBusy = isPromptSending || options.hasActiveConversationTurn || options.hasActiveDebugRun;
+  // A send reads the Composer as it is when it starts; the prompt is read again once a command has run.
+  const latest = useRef({ options, isComposerBusy });
+  latest.current = { options, isComposerBusy };
   const sendingRef = useRef(false);
   const performSend = useCallback(async (handoff?: HandoffSendPayload) => {
-    const session = handoff ? getCurrentSessionView() : currentSession;
+    const { options: composer, isComposerBusy: busy } = latest.current;
+    const { currentProject, currentSession: shown, selectedAgentId } = composer;
+    const session = handoff ? getCurrentSessionView() : shown;
     if (handoff && session?.sessionId !== handoff.sessionId) return { status: 'cancelled' as const, requestId: '' };
-    const trimmed = (handoff?.prompt ?? promptValue).trim();
-    const sentAttachments = handoff ? [] : pendingAttachments;
-    const sentSkills = handoff ? [] : pendingSkillIds;
+    const trimmed = (handoff?.prompt ?? composer.promptValue).trim();
+    const sentAttachments = handoff ? [] : composer.pendingAttachments;
+    const sentSkills = handoff ? [] : composer.pendingSkillIds;
     const concurrentModelSwitch = isConcurrentModelSwitchCommand(trimmed);
     if ((!trimmed && !sentAttachments.some((attachment) => !attachment.error))
-      || (isComposerBusy && !concurrentModelSwitch)) {
+      || (busy && !concurrentModelSwitch)) {
       return;
     }
 
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
+    const writers = conversationWriters();
+    // A model switch runs beside a turn in flight; every other command holds the Composer while it runs.
     if (!handoff && trimmed.startsWith('/')) {
       if (!concurrentModelSwitch) setIsPromptSending(true);
-      try {
-        const handled = await executeSlashCommand(trimmed, {
-          currentSession,
-          currentProject,
-          selectedAgentId,
-          setSelectedAgentId,
-          setConversationMessages,
-          upsertConversationMessages,
-          openSettings,
-          armPendingSkill,
-        });
-        if (handled) {
-          if (shouldClearSubmittedPrompt(promptValueRef.current, trimmed)) setPromptValue('');
-          return;
-        }
-      } finally {
-        if (!concurrentModelSwitch) setIsPromptSending(false);
+      const handled = await executeSlashCommand(trimmed, {
+        currentSession: shown, currentProject, selectedAgentId, setSelectedAgentId: composer.setSelectedAgentId,
+        openSettings: composer.openSettings, armPendingSkill: composer.armPendingSkill,
+        setConversationMessages: writers.setConversationMessages, upsertConversationMessages: writers.upsertConversationMessages,
+      }).finally(() => { if (!concurrentModelSwitch) setIsPromptSending(false); });
+      if (handled) {
+        if (shouldClearSubmittedPrompt(latest.current.options.promptValue, trimmed)) composer.setPromptValue('');
+        return;
       }
     }
 
@@ -117,7 +92,7 @@ export function useComposerSend(options: {
     sendingRef.current = true;
     setIsPromptSending(true);
     useComposerSessionContextStore.getState().setLastSent({
-      sessionId: currentSession?.sessionId ?? 'no-session',
+      sessionId: shown?.sessionId ?? 'no-session',
       projectId: currentProject?.projectId ?? null,
       prompt: trimmed,
       attachments: [...sentAttachments],
@@ -132,20 +107,14 @@ export function useComposerSend(options: {
         pendingSkillIds: sentSkills,
         currentProject,
         currentSession: session,
-        currentRun,
+        currentRun: composer.currentRun,
         selectedAgentId: handoff?.agentId ?? selectedAgentId,
-        selectedDeviceEntry,
-        setPromptValue,
-        setPendingAttachments,
-        setPendingSkillIds,
-        setConversationMessages,
-        setBranchState,
-        setConversationSnapshot,
-        upsertConversationMessages,
-        setSessions,
-        setCurrentRun,
-        setTracePresentation,
-        t,
+        selectedDeviceEntry: composer.selectedDeviceEntry,
+        setPromptValue: composer.setPromptValue,
+        setPendingAttachments: composer.setPendingAttachments,
+        setPendingSkillIds: composer.setPendingSkillIds,
+        ...writers,
+        t: composer.t,
         preserveDraft: Boolean(handoff),
         planReference: handoff?.planReference,
       });
@@ -153,21 +122,9 @@ export function useComposerSend(options: {
       sendingRef.current = false;
       setIsPromptSending(false);
     }
-  }, [
-    armPendingSkill, currentProject, currentRun, currentSession, isComposerBusy,
-    pendingAttachments, pendingSkillIds, promptValue, selectedDeviceEntry, selectedAgentId,
-    setSelectedAgentId, openSettings, setConversationMessages, setBranchState,
-    setConversationSnapshot, setCurrentRun, setIsPromptSending,
-    setPendingAttachments, setPendingSkillIds, setPromptValue, setTracePresentation,
-    setSessions, t, upsertConversationMessages,
-  ]);
+  }, [setIsPromptSending]);
   const handlePromptSend = useCallback(async () => { await performSend(); }, [performSend]);
   const sendHandoffPrompt = useCallback((payload: HandoffSendPayload) => performSend(payload), [performSend]);
-  const inspectHandoff = useCallback((sessionId: string, requestId: string) => {
-    const api = window.electronAPI;
-    return api ? inspectHandoffCommit(api.conversation, sessionId, requestId)
-      : Promise.resolve({ status: 'unknown' as const, requestId, error: 'BRIDGE_UNAVAILABLE' });
-  }, []);
 
   const handlePromptKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (shouldSendComposerOnEnter(event)) {
@@ -182,7 +139,8 @@ export function useComposerSend(options: {
     stopPending,
     handlePrimaryStop,
     handlePromptSend,
-    sendHandoffPrompt, inspectHandoff,
+    sendHandoffPrompt,
+    inspectHandoff: inspectHandoffRequest,
     handlePromptKeyDown,
   };
 }
