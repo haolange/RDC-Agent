@@ -34,7 +34,7 @@ export const MeasuredWorkRows: React.FC<{
     const locate = (event: Event) => {
       const detail = (event as CustomEvent<WorkProcessTaskLocationRequest>).detail;
       const list = listRef.current;
-      if (!list || !detail?.taskId) return;
+      if (!list || !detail.taskId) return;
       let index = -1;
       for (let candidate = rows.length - 1; candidate >= 0; candidate -= 1) {
         const row = rows[candidate];

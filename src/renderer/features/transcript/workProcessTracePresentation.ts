@@ -137,7 +137,7 @@ export const buildWorkProcessPresentation = (
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);
-  const summary = isMeaningfulText(trace.summary) ? trace.summary?.trim() ?? '' : '';
+  const summary = isMeaningfulText(trace.summary) ? trace.summary.trim() : '';
 
   return {
     rows,

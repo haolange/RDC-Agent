@@ -50,7 +50,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
   const deviceReady = targetDeviceId === 'local' || state?.preparation.phase === 'ready';
   const partial = isCapturePartialReady(state);
   const run = async (operation: CaptureAction) => {
-    if (disabled || !state) return;
+    if (disabled) return;
     await runAction(operation, state, selectedInput, targetDeviceId, () => setDraft(null));
   };
   const statusTone = resolveCaptureStatusTone({ phase: state?.phase, pending, partial });
@@ -121,7 +121,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
       onRetry={(operation) => void (operation === 'refresh' && !state ? reload() : run(operation))}
     />
     <CaptureWorkspace scope={scope} state={state}
-      disabled={disabled || !open || pending || state?.error?.retry === 'close'} receive={receive} />
+      disabled={disabled || !open || pending || state.error?.retry === 'close'} receive={receive} />
   </div>;
 }
 

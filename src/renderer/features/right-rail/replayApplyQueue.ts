@@ -10,11 +10,14 @@ export function createReplayApplyQueue<T>(apply: (value: T) => Promise<unknown>,
     const value = pending;
     pending = undefined;
     running = true;
-    try { await apply(value); } catch (error) { if (!disposed) onError(error); }
-    finally {
-      running = false;
-      if (!disposed && pending !== undefined) void drain();
-    }
+    try { await apply(value); } catch (error) { reportFailure(error); }
+    finally { settle(); }
+  };
+  // These run once apply() settles: dispose() and enqueue() may have run while it was awaited.
+  const reportFailure = (error: unknown) => { if (!disposed) onError(error); };
+  const settle = () => {
+    running = false;
+    if (!disposed && pending !== undefined) void drain();
   };
   return {
     enqueue(value: T, flush = false) {

@@ -63,7 +63,7 @@ export const ProjectCaptureImportPanel: React.FC = () => {
         ? await importProjectInputs(currentProject.projectId)
         : await refreshProjectInputs(currentProject.projectId);
       if (!result) return;
-      updateProjectInputs(currentProject.projectId, result.inputs ?? []);
+      updateProjectInputs(currentProject.projectId, result.inputs);
     } catch (reason) {
       setError(formatImportError(reason, t('projectCapture.sessionExpired')));
     } finally {

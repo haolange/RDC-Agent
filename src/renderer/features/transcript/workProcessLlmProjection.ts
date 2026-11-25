@@ -84,28 +84,24 @@ export function projectLlmTurn(
   const ordered = [...orderedSteps, ...thinkingRows.map(({ order, time, row }) => ({ order, time, row }))]
     .sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER));
   const steps = ctx.groupProcessRows(ordered.flatMap(({ row }) => row ? [row] : []));
-  const shouldRenderSection = steps.length > 0;
-
-  if (!shouldRenderSection) {
+  if (steps.length === 0) {
     return null;
   }
 
-  if (shouldRenderSection) {
-    loopRows.push({
-      type: 'section',
-      id: block.id,
-      loopId: block.id,
-      status: block.status,
-      hasActiveTools: block.toolCalls.some((call) => isTaskLifecycleTool(call.toolName) && call.status === 'running'
-        && call.executionStartedAt !== undefined && (!call.approval || call.approval.status === 'approved')),
-      stepCount: deps.countToolSteps(steps),
-      duration: formatDurationMs(ctx.t.language, block.startedAt, block.completedAt),
-      steps,
-      visibleSteps: groupSectionSteps(ordered.map(({ row }) => row), ctx.t.language),
-      outputPhase,
-      stopReason,
-    });
-  }
+  loopRows.push({
+    type: 'section',
+    id: block.id,
+    loopId: block.id,
+    status: block.status,
+    hasActiveTools: block.toolCalls.some((call) => isTaskLifecycleTool(call.toolName) && call.status === 'running'
+      && call.executionStartedAt !== undefined && (!call.approval || call.approval.status === 'approved')),
+    stepCount: deps.countToolSteps(steps),
+    duration: formatDurationMs(ctx.t.language, block.startedAt, block.completedAt),
+    steps,
+    visibleSteps: groupSectionSteps(ordered.map(({ row }) => row), ctx.t.language),
+    outputPhase,
+    stopReason,
+  });
 
   ctx.hasVisibleProcessEvidence = true;
 

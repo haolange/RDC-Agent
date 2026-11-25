@@ -1,5 +1,6 @@
 import { useLayoutEffect, type RefObject } from 'react';
 import { assignDynStyles, clearDynStyles } from '../../lib/useDynStyle';
+import { documentFonts } from '../../lib/documentFonts';
 
 const nodeTarget = '[data-work-node-heading], [data-work-node-prose]';
 
@@ -67,15 +68,15 @@ export function useWorkProcessTrack(ref: RefObject<HTMLDivElement | null>, first
     const mutations = new MutationObserver(schedule);
     mutations.observe(root, { childList: true, subtree: true, characterData: true, attributes: true,
       attributeFilter: ['open', 'class', 'data-work-node', 'data-work-node-prose'] });
-    const fonts = document.fonts;
-    fonts?.addEventListener?.('loadingdone', schedule);
-    void fonts?.ready?.then(schedule);
+    const fonts = documentFonts();
+    fonts?.addEventListener('loadingdone', schedule);
+    void fonts?.ready.then(schedule);
     measure();
     return () => {
       connected = false;
       if (frame) cancelAnimationFrame(frame);
       observer.disconnect(); mutations.disconnect();
-      fonts?.removeEventListener?.('loadingdone', schedule);
+      fonts?.removeEventListener('loadingdone', schedule);
       clearDynStyles([...measured, root]);
     };
   }, [ref, firstId]);

@@ -46,7 +46,7 @@ export async function loadSessionsOp(
     return;
   }
   ctx.setCurrentProject(selectedProject);
-  ctx.updateProjectInputs(selectedProject.projectId, selectedProject.inputs ?? []);
+  ctx.updateProjectInputs(selectedProject.projectId, selectedProject.inputs);
   ctx.ensureProjectExpanded(selectedProject.projectId);
 
   const currentSession = ctx.getCurrentSession();
@@ -103,7 +103,7 @@ export async function loadProjectsOp(
     return;
   }
 
-  const nextProjects = result.projects ?? [];
+  const nextProjects = result.projects;
   ctx.setProjects(nextProjects);
   const visibleProjectIds = new Set(nextProjects.map((project) => project.projectId));
   ctx.pruneTreeForProjects(visibleProjectIds);
@@ -197,7 +197,7 @@ export async function handleProjectSelectOp(
     ctx.setCaptures([]);
   }
   ctx.setCurrentProject(project);
-  ctx.updateProjectInputs(project.projectId, project.inputs ?? []);
+  ctx.updateProjectInputs(project.projectId, project.inputs);
   ctx.setRightRailTarget('project');
   ctx.ensureProjectExpanded(project.projectId);
 

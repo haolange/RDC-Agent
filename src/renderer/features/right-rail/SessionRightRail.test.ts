@@ -17,7 +17,7 @@ describe('session rail projection composition', () => {
     const host = document.createElement('div'); const root = createRoot(host);
     try {
       state.tracePresentation = { rightPanel: {
-        tasks: [
+        context: {}, tasks: [
           { id: 'started', sessionId: 'session', order: 0, title: 'Started', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.parentTurnStopped },
           { id: 'pending', sessionId: 'session', order: 1, title: 'Pending', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.createdTurnStopped },
           { id: 'custom', sessionId: 'session', order: 2, title: 'Custom', status: 'blocked', displayState: 'blocked', blockerSummary: '等待用户确认' },
@@ -40,7 +40,7 @@ describe('session rail projection composition', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const host = document.createElement('div'); const root = createRoot(host);
     try {
-      state.tracePresentation = { rightPanel: { tasks: [
+      state.tracePresentation = { rightPanel: { context: {}, tasks: [
         { id: 'done', sessionId: 'session', order: 0, title: 'Complete title retained', status: 'completed', displayState: 'completed' },
         { id: 'live', sessionId: 'session', order: 1, title: 'Live', status: 'in_progress', displayState: 'in_progress' },
         { id: 'cancelled', sessionId: 'session', order: 2, title: 'Cancelled', status: 'cancelled', displayState: 'cancelled' },

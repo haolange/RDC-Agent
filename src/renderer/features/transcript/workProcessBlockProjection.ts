@@ -96,5 +96,5 @@ export function buildPresentationUnits(
 }
 
 export function presentationUnitsToDetailRows(units: PresentationUnit[]): WorkProcessRow[] {
-  return units.flatMap((unit) => unit.kind === 'loop' || unit.kind === 'standalone' ? unit.rows : []);
+  return units.flatMap((unit) => unit.rows);
 }

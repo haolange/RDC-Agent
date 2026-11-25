@@ -32,8 +32,8 @@ export const SessionRightRail: React.FC = () => {
   const tasks = rightPanel?.tasks ?? [];
   const artifacts = rightPanel?.artifacts ?? { rows: [], totalCount: 0, storeDegraded: false };
   const outputs = rightPanel?.outputs ?? { current: [], previous: [] };
-  const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context?.task;
-  const captureContext: RdcContextPanelViewModel | undefined = rightPanel?.context?.rdc;
+  const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context.task;
+  const captureContext: RdcContextPanelViewModel | undefined = rightPanel?.context.rdc;
   const hasArtifacts = artifacts.totalCount > 0;
   const outputCount = outputs.current.length + outputs.previous.length;
   const hasTaskContext = Boolean(taskContext?.resources.length);

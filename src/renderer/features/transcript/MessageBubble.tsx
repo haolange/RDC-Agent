@@ -194,7 +194,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   // 诊断文案已由气泡正文承载时不再重复渲染独立诊断块，避免同一信息三重显示。
   const showDiagnosticBlock = Boolean(
     message.diagnostic
-    && message.diagnostic.userMessage.trim() !== (message.content ?? '').trim(),
+    && message.diagnostic.userMessage.trim() !== message.content.trim(),
   );
   // Links to pages this turn read become citations, in the Work Process final answer and in the bubble alike.
   const sources = useMemo(() => answerSources(trace), [trace]);
@@ -209,7 +209,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
         <div className="conversation-message-row">
           <div className="conversation-message-stack">
             {/* Working appears with its first content; a request still preparing shows no empty card. */}
-            {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary) ? (
+            {trace && (trace.blocks.length > 0 || trace.summary) ? (
                 <WorkProcess trace={trace} sessionId={message.sessionId} rowKey={message.id} answer={message.content} />
             ) : null}
             {message.workTraceDiscarded ? (

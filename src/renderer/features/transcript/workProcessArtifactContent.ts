@@ -13,9 +13,9 @@ export function unwrapArtifactContent(input: ToolContentInput): UnwrappedToolCon
     || (typeof details?.uri === 'string' && details.uri.startsWith('session://'));
   if (!artifactized) return null;
 
-  const summary = contentText || sanitizeContentText(stringifyPreview(details?.summary));
+  const summary = contentText || sanitizeContentText(stringifyPreview(details.summary));
   const previewLines = createDetailLines(summary, 4);
-  const display = toRecord(details?.display);
+  const display = toRecord(details.display);
   if (display?.kind === 'command' && typeof display.command === 'string') {
     return { previewKind: 'shell', commandText: display.command, bodyText: display.command, previewLines };
   }

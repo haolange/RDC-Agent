@@ -21,7 +21,7 @@ export function useProjectTree() {
 
   const loadProjectSessionList = useCallback(async (projectId: string) => {
     const result = await window.electronAPI.session.list(projectId);
-    const nextSessions = receiveSessionList(result.sessions ?? []);
+    const nextSessions = receiveSessionList(result.sessions);
     setProjectSessionsByProject((current) => ({
       ...current,
       [projectId]: nextSessions,

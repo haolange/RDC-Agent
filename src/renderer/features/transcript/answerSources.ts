@@ -10,7 +10,7 @@ import type { ConversationWorkTrace } from '@shared/types/conversation';
  */
 export function answerSources(trace: ConversationWorkTrace | null | undefined): MarkdownSource[] {
   if (!trace) return [];
-  const calls = trace.blocks.flatMap((block) => block.toolCalls ?? []);
+  const calls = trace.blocks.flatMap((block) => block.toolCalls);
   const snippets = new Map<string, string>();
   for (const call of calls) {
     if (call.toolName !== 'web_search' || call.status !== 'complete') continue;
