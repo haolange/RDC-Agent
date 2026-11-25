@@ -5,7 +5,6 @@ import type {
   ContextApi,
   DeviceApi,
   ProjectApi,
-  RunApi,
   RuntimeLogApi,
   SessionApi,
 } from '../types/electron-api';
@@ -57,10 +56,6 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
       ? transport.invoke(INVOKE.session.applyDeclaredHandoff, id, agent, label, expectedPlanHash)
       : transport.invoke(INVOKE.session.applyDeclaredHandoff, id, agent, label),
   };
-}
-
-export function createRunApi(transport: RendererApiTransport): RunApi {
-  return { list: (sessionId) => transport.invoke(INVOKE.run.list, sessionId) };
 }
 
 export function createRuntimeLogApi(transport: RendererApiTransport): RuntimeLogApi {

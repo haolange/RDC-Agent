@@ -180,9 +180,6 @@ export const RENDERER_INVOKE_CHANNEL = {
     setAgentId: 'session:setAgentId',
     applyDeclaredHandoff: 'session:applyDeclaredHandoff',
   },
-  run: {
-    list: 'run:list',
-  },
   runtime: {
     listLogs: 'runtimeLog:list',
     getPermissionState: 'runtime:getPermissionState',
@@ -236,9 +233,6 @@ export const RENDERER_EVENT_CHANNEL = {
   },
   knowledge: {
     progress: 'knowledge:progress',
-  },
-  agent: {
-    statusChanged: 'agent:statusChanged',
   },
   tools: {
     executionComplete: 'tool:executionComplete',

@@ -18,7 +18,6 @@ export type {
   ProjectApi,
   RawChannelSubscriptionApi,
   RendererElectronApi,
-  RunApi,
   RuntimeLogApi,
   SessionApi,
   SettingsApi,

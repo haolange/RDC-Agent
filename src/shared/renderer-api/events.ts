@@ -46,9 +46,6 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
         callback(change as Parameters<typeof callback>[0])
       ))
     ),
-    onAgentStatusChanged: (callback) => (
-      transport.subscribe(EVENT.agent.statusChanged, (state) => callback(state as Parameters<typeof callback>[0]))
-    ),
     onToolExecutionComplete: (callback) => (
       transport.subscribe(EVENT.tools.executionComplete, (trace) => callback(trace))
     ),

@@ -4,7 +4,6 @@ import type { CaptureReplayState, CaptureReplayApplyRequest } from './captureRep
 import type {
   WorkflowState,
 } from './workflow';
-import type { AgentState } from './agent';
 import type {
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
@@ -552,10 +551,6 @@ export interface ElectronAPI {
 
   };
 
-  run: {
-    list: (sessionId: string) => Promise<{ runs: RunSummary[] }>;
-  };
-
   runtime: {
     getPermissionState: () => Promise<RuntimePermissionState>;
   };
@@ -617,7 +612,6 @@ export interface ElectronAPI {
     onEffectiveCatalogChanged: (callback: (change: EffectiveCatalogChange) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
     onSessionRecordChanged: (callback: (snapshot: SessionRecordSnapshot) => void) => () => void;
-    onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;
     onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => () => void;
     onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => () => void;

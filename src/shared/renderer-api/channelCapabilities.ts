@@ -163,7 +163,6 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'session:setModelOverride': 'mutation',
   'session:setAgentId': 'mutation',
   'session:applyDeclaredHandoff': 'mutation',
-  'run:list': 'read',
   'runtimeLog:list': 'read',
   'runtime:getPermissionState': 'read',
   'capture:list': 'read',

@@ -19,7 +19,6 @@ export type {
   PlatformApi,
   ProjectApi,
   RawChannelSubscriptionApi,
-  RunApi,
   RuntimeLogApi,
   RuntimePermissionApi,
   SessionApi,

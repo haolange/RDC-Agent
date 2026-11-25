@@ -1,7 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { createConversationMessageDeltaEncoder } from '@shared/conversation/messageDelta';
 import { rendererEventHub } from '../../runtime/rendererEventHub';
-import type { AgentState } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 import type { RunContextUsageSummary, RunSummary, SessionScope } from '@shared/types/session';
@@ -65,10 +64,6 @@ export class WorkflowProjectionPublisher {
   /** The last streamed state of a message, for a renderer that missed an update (reload, dropped event). */
   conversationMessageSnapshot(messageId: string): { seq: number; message: ConversationMessage } | null {
     return this.messageDeltas.snapshot(messageId);
-  }
-
-  publishAgentStatus(state: AgentState): void {
-    this.publish('agent:statusChanged', state);
   }
 
 }

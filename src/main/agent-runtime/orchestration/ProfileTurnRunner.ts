@@ -30,7 +30,6 @@ import { newDelegationBudgetExhausted } from './DelegationAdmission';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
 import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
 import { createEphemeralScopeId, resolveExecutionScopeId } from './executionScope';
-import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import type { AgentConfig, AgentRole, AgentState } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
@@ -472,7 +471,7 @@ export class ProfileTurnRunner {
   }
 
   private updateAgentStatus(sessionOrScopeId: string, agentId: AgentRole, status: AgentState['status']): void {
-    const state = this.deps.slots.updateAgentStatus(sessionOrScopeId, agentId, status);
+    this.deps.slots.updateAgentStatus(sessionOrScopeId, agentId, status);
     runtimeLogService.log({
       scope: 'app',
       namespace: 'agent',
@@ -482,6 +481,5 @@ export class ProfileTurnRunner {
       sessionId: sessionOrScopeId,
       raw: { agentId, sessionId: sessionOrScopeId, status },
     });
-    workflowProjectionPublisher.publishAgentStatus(state);
   }
 }

@@ -23,7 +23,6 @@ import {
   ProjectRemoveArgsSchema,
   ProjectRenameArgsSchema,
   ProjectSelectArgsSchema,
-  RunListArgsSchema,
   SessionCreateArgsSchema,
   SessionIdOnlyArgsSchema,
   SessionListArgsSchema,
@@ -420,13 +419,5 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
-  });
-
-  ipcMain.handle('run:list', async (_event, ...rawArgs: unknown[]) => {
-    const [sessionId] = parseIpcArgs(RunListArgsSchema, rawArgs, {
-      label: 'run:list',
-      maxBytes: 4 * 1024,
-    });
-    return { runs: sessionRecordStore.listRuns(sessionId) };
   });
 }
