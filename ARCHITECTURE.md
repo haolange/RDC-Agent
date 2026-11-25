@@ -386,7 +386,7 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 | `windows-unit` | Windows 上的 node 单元测试 |
 | `linux-smoke` | Linux Browser QA smoke |
 | `browser-smoke` | Windows Browser QA smoke，分 full access 开/关两组 |
-| `desktop-smoke` | Windows pack 与打包版健康检查 |
+| `desktop-smoke` | Windows pack、打包版健康检查与 `check:release-package`（asar 内无开发载荷，资源与源码逐字节一致） |
 | `launcher-fresh-checkout` | Windows 与 Ubuntu 上的 launcher 准备与 `check:release-config` |
 | `visual-diff` | 差分渲染：同一组录制场景在 base 与 head 构建上各渲染一次，比对 DOM 指纹与位图，未经 `Visual-Diff-Allow` trailer 声明的差异即失败；push 事件不运行，`src/renderer` / `src/shared` / `src/preload` / `scripts/visual-diff` 无变化时跳过 |
 | `release` / `prerelease` | tag 触发，见「发布面与运行面」 |

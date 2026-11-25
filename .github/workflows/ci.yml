@@ -310,9 +310,10 @@ jobs:
       - run: pnpm run pack
       - name: Desktop unpacked health smoke
         run: pnpm run smoke:desktop
-      - name: Release config after pack
+      - name: Release config and payload after pack
         run: |
           pnpm run check:release-config
+          pnpm run check:release-package
           pnpm run release:sbom
           pnpm run release:checksums
 
@@ -368,6 +369,7 @@ jobs:
       # Requires a prerelease package version that the tag names exactly.
       - run: pnpm run check:release-config
       - run: pnpm exec electron-builder --win --publish never
+      - run: pnpm run check:release-package
       - run: pnpm run release:sbom
       - run: pnpm run release:checksums
       - name: Publish the unsigned prerelease

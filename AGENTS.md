@@ -140,14 +140,14 @@
 | 行为门禁（`behaviorChecks.test.ts` 的子集） | `check:work-process`、`check:conversation-branch`、`check:reasoning-delivery`、`check:browser-capability`、`check:settings-agents`、`check:i18n`、`check:appearance`、`check:host-platform` |
 | 聚焦 vitest（随 `test` / `test:coverage` 运行） | `check:contracts`、`check:scoped-resources`、`check:project-instructions`、`check:prompt-plan-snapshot`、`check:skills`、`check:hooks`、`check:memory-policy`、`check:provider-catalog` |
 | CI `build` 单独运行 | `check:coverage-ratchet`、`check:git-diff`、`check:request-cache-profile`、`check:agent-tool-capability` |
-| 发布 | `release:checksums`、`release:sbom`、`check:release-package` |
+| 发布 | `release:checksums`、`release:sbom`、`check:release-package`（CI `desktop-smoke` 与 `prerelease` 在打包后运行） |
 | Smoke | `smoke:agent-browser`、`smoke:desktop` |
 
 `check:gates` 的精确组成以 `package.json` 为准：
 
 - 它运行整个 `src/main/testing/gates/behaviorChecks.test.ts`，所以行为门禁的各子集都在其中。
 - 它另含没有脚本别名的 `check-doc-references`。
-- `check:renderer-structure` 在 `check:gates` 里只运行 `check-renderer-structure.mjs`，不含脚本前半段的 `node --test`。
+- `check:renderer-structure` 的两半（`renderer-source-analysis` 的 `node --test` 与 `check-renderer-structure.mjs`）都在 `check:gates` 里。
 
 **依赖方向与宿主**：行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` / `main-domains/direction` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）。宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
 
