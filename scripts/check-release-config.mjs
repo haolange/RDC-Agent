@@ -2,7 +2,7 @@
 /**
  * Release config gate.
  *
- * Asserts electron-builder.json has appId/files/platforms, no always-on secrets,
+ * Asserts electron-builder.json has appId/files/platforms, the required Electron fuses, no always-on secrets,
  * and that SBOM/checksum script paths exist.
  *
  * Signing (env-gated, never commit secrets):
@@ -63,6 +63,21 @@ const secretPatterns = [
   /sk-[a-zA-Z0-9]{10,}/,
   /-----BEGIN CERTIFICATE-----/,
 ];
+
+// Fuses are flipped in the packaged binary. RunAsNode stays on: the built-in hooks run as ELECTRON_RUN_AS_NODE
+// child processes. Everything that lets the environment or the command line inject code is off, and the app only
+// loads from its integrity-checked asar.
+const REQUIRED_FUSES = {
+  runAsNode: true,
+  enableCookieEncryption: true,
+  enableNodeOptionsEnvironmentVariable: false,
+  enableNodeCliInspectArguments: false,
+  enableEmbeddedAsarIntegrityValidation: true,
+  onlyLoadAppFromAsar: true,
+};
+for (const [fuse, expected] of Object.entries(REQUIRED_FUSES)) {
+  if (builder.electronFuses?.[fuse] !== expected) fail(`electron-builder.json electronFuses.${fuse} must be ${expected}.`);
+}
 
 const windowsTargets = (builder.win?.target ?? []).map(target => typeof target === 'string' ? target : target.target);
 if (!windowsTargets.includes('zip') || !windowsTargets.includes('nsis')) fail('Windows distribution must include zip and nsis.');
