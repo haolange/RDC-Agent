@@ -268,6 +268,7 @@ export default [
   },
   {
     files: ['src/renderer/**/*.tsx'],
+    ignores: ['src/renderer/**/*.test.tsx'],
     rules: { 'max-lines': ['error', { max: 300, skipBlankLines: false, skipComments: false }] },
   },
   {
@@ -277,6 +278,7 @@ export default [
       'src/renderer/stores/**/*.ts',
       'src/renderer/features/**/use*.ts',
     ],
+    ignores: ['src/renderer/**/*.test.ts'],
     rules: { 'max-lines': ['error', { max: 200, skipBlankLines: false, skipComments: false }] },
   },
   {

@@ -9,7 +9,8 @@ const repoRoot = process.cwd();
 const ORCHESTRATOR_REL = 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts';
 /** Distinct modules the façade imports (value or type). */
 const FAN_OUT_MAX = 12;
-/** Lines of the longest function, method or arrow function in the façade. */
+/** Body lines of the longest function, method or arrow function in the façade (the signature is not counted, so a
+ * parameter list wrapped by the formatter does not change the measure). */
 const FUNCTION_LINES_MAX = 16;
 
 const fail = (message) => {
@@ -46,7 +47,7 @@ const visit = (node) => {
     || ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node) || ts.isFunctionExpression(node)
     || ts.isArrowFunction(node)) && node.body) {
     const name = node.name && ts.isIdentifier(node.name) ? node.name.text : ts.isConstructorDeclaration(node) ? 'constructor' : '(anonymous)';
-    functionLengths.push({ name, lines: lineOf(node.getEnd()) - lineOf(node.getStart(sourceFile)) + 1 });
+    functionLengths.push({ name, lines: lineOf(node.body.getEnd()) - lineOf(node.body.getStart(sourceFile)) + 1 });
   }
   ts.forEachChild(node, visit);
 };

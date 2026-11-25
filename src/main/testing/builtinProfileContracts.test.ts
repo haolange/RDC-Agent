@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 // Scripts live outside tsconfig include; the .mjs is the shared check-script contract.
 // @ts-expect-error -- untyped ESM check helper
-import { assertBuiltinProfileContracts, assertManifestSourceContracts } from '../../../scripts/builtin-profile-contracts';
+import * as profileContracts from '../../../scripts/builtin-profile-contracts';
+
+const { assertBuiltinProfileContracts, assertManifestSourceContracts } = profileContracts;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const tempRoots: string[] = [];

@@ -26,7 +26,8 @@ const assert = (condition, message) => {
 };
 
 const readSource = (relativePath) => scriptRead(relativePath);
-const activeSignalStyles = readSource('src/renderer/styles/design-motion.css');
+// Whitespace is collapsed so the checks read declarations, not the formatter's line layout.
+const activeSignalStyles = readSource('src/renderer/styles/design-motion.css').replace(/\s+/g, ' ');
 const activeSignalRenderSource = [
   'src/renderer/features/transcript/WorkProcessSectionRow.tsx',
   'src/renderer/features/transcript/WorkProcessThinking.tsx',

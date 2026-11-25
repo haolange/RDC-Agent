@@ -205,7 +205,7 @@ if (!railShell) fail('RightRail.css must keep a .right-rail shell rule');
 requireText(railShell[0], 'padding: var(--space-3)', '.right-rail shell must use space-3 padding on all sides');
 requireText(railShell[0], 'gap: var(--space-3)', '.right-rail shell must keep space-3 session card gap');
 forbidText(railShell[0], 'padding: var(--space-2)', '.right-rail shell must not use space-2 padding');
-requireText(read('src/renderer/features/right-rail/RightRail.css'), '.project-capture-rail { gap: 0; }', 'Project rail must keep single-card gap: 0');
+requireText(read('src/renderer/features/right-rail/RightRail.css').replace(/\s+/g, ' '), '.project-capture-rail { gap: 0; }', 'Project rail must keep single-card gap: 0');
 
 // Escape, the Tab trap and focus return come from the shared modal layer, the same as every other modal surface.
 const drawer = read('src/renderer/app/WorkbenchPanelDrawer.tsx');
