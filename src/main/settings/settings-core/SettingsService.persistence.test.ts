@@ -27,7 +27,9 @@ vi.mock('electron', () => ({
   },
 }));
 
-describe('SettingsService provider persistence', () => {
+// Every case rebuilds the full settings view several times (about 100 ms each here, several times that on a loaded
+// Windows runner), so the suite has its own budget instead of the 5 s default.
+describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   let userDataRoot = '';
   let previousUserDataEnv: string | undefined;
   let previousRdcHomeEnv: string | undefined;

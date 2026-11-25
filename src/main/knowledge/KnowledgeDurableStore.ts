@@ -206,7 +206,8 @@ function upsertRecord<T extends { revision: number; contentHash: string }>(
     return build(1);
   }
   if (expectedRevision == null || expectedRevision !== existing.revision) {
-    throw new AppError('KNOWLEDGE_REVISION_CONFLICT', 
+    throw new AppError(
+      'KNOWLEDGE_REVISION_CONFLICT',
       `${label} revision ${existing.revision} does not match expected ${expectedRevision ?? 'none'}; refusing overwrite.`,
     );
   }
