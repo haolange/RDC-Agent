@@ -50,6 +50,17 @@ export const inlineHexStyleRestrictions = [
   "JSXAttribute[name.name='style'] Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
   "JSXAttribute[name.name='style'] TemplateElement[value.raw=/#[0-9a-fA-F]{3,8}\\b/]",
 ].map((selector) => ({ selector, message: inlineHexStyleMessage }));
+// Tests assert behavior, not wording: a test that reads source code or the repository's documents to match text pins
+// phrasing instead of what the code does (AGENTS.md "测行为与契约"). Fixtures, shipped resources and files a test
+// wrote itself stay readable.
+const sourceTextMessage = 'Tests do not read source files or repository documents to assert on their text; test the behavior.';
+const readFileCall = 'CallExpression:matches([callee.name=/^readFile(Sync)?$/], [callee.property.name=/^readFile(Sync)?$/])';
+const sourceOrDocumentPath = '/\\.(tsx?|mjs|cjs)$|(^|\\/)docs\\/|(^|\\/)(AGENTS|ARCHITECTURE|DESIGN|README(\\.en)?)\\.md$/';
+export const sourceTextRestrictions = [
+  `${readFileCall} Literal[value=${sourceOrDocumentPath}]`,
+  `${readFileCall} TemplateElement[value.raw=${sourceOrDocumentPath}]`,
+].map((selector) => ({ selector, message: sourceTextMessage }));
+const testSources = ['src/**/*.test.{ts,tsx}', 'src/main/testing/**/*.ts'];
 const productionSources = { files: ['src/**/*.{ts,tsx}'], ignores: ['src/**/*.test.{ts,tsx}', 'src/main/testing/**', 'src/**/*.d.ts'] };
 
 // Dependency direction (ARCHITECTURE.md): shared runs in every process, so it imports no Node
@@ -268,5 +279,15 @@ export default [
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
     },
+  },
+  {
+    files: testSources,
+    rules: { 'no-restricted-syntax': ['error', ...sourceTextRestrictions] },
+  },
+  {
+    // Main, shared and preload tests outside src/main/platform keep the host-platform gate as well.
+    files: ['src/main/**/*.test.ts', 'src/main/testing/**/*.ts', 'src/shared/**/*.test.ts', 'src/preload/**/*.test.ts'],
+    ignores: ['src/main/platform/**'],
+    rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions, ...sourceTextRestrictions] },
   },
 ];

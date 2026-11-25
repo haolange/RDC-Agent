@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -99,22 +98,7 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(source)).toThrow(/equal-specificity/u);
   });
 
-  it('keeps every user-facing one-million control named Max mode', () => {
-    const translations = fs.readFileSync(
-      path.resolve(process.cwd(), 'src/renderer/i18n.ts'),
-      'utf8',
-    );
-    for (const banned of [
-      "'1M context'",
-      "'1M 上下文'",
-      "'Verify 1M'",
-      "'验证 1M'",
-      "'1M mode'",
-      "'1M 模式'",
-    ]) {
-      expect(translations, banned).not.toContain(banned);
-    }
-
+  it('labels no catalog context tier as a one-million mode (the control is named Max mode)', () => {
     for (const surface of input().surfaces as Array<{ models?: Array<{ contextTiers?: Array<{ label?: string }> }> }>) {
       for (const model of surface.models ?? []) {
         for (const tier of model.contextTiers ?? []) {
