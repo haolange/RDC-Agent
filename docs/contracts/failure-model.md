@@ -37,13 +37,21 @@
 - **说人话**：`humanizeError(error, t, contextKey?)` 依次取 `errors.<CODE>` 专属文案、调用方的情境文案、失败分类文案；技术文本只经「复制详情」进剪贴板。用户经界面会遇到的码有专属中英文案（`src/renderer/i18n/locales/*/errors.ts`），其余码只到达模型或日志，用分类文案。`notify.failure` 发出的错误提示常驻到用户关闭，并带「复制详情」。门禁：每个专属文案键都是登记码，中英键集合由类型保证一致。
 - **领域结果值不在此列**：Provider 连接结果（`errorCode` 为 kebab-case）、发送预检结果等以返回值表达的领域状态保留各自的码与文案。
 
+## 存储原语
+
+持久化文件只经两个原语读写（`src/main/runtime/atomicFile.ts`），宿主差异只在 `src/main/platform/fileRename.ts`：
+
+- **写**：`writeFileAtomic(Sync)` 在目标旁写临时文件 → fsync → 改名覆盖目标 → fsync 目录（POSIX；Windows 由 NTFS 日志保证改名持久）。读者只会看到旧内容或新内容。Windows 上读者、索引或杀毒短暂占用目标时改名报 `EBUSY`/`EPERM`/`EACCES`，有界重试后仍失败才报错；不存在先删目标再改名、也不存在 `.bak` 交换。ESLint 禁止平台层之外调用 `rename`。
+- **读**：`readValidatedSync` 区分三态。文件不存在为 `null`；存在但无法解析或校验为损坏：报 `STORAGE_CORRUPT`（Integrity），**每次读都报**，直到属主重新写入，绝不读成空值；损坏字节按内容哈希在旁边保留一份 `<file>.corrupt-<hash>`，后续写入不会毁掉证据。更高的 schemaVersion 报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件；I/O 失败报 `STORAGE_UNREADABLE`（Availability），文件原样保留。
+- **信任记录**：hook、项目 MCP 与项目 Agent 的信任决定共用 `src/main/runtime/TrustStore.ts`（`{ schemaVersion: 3, records }`，原子写）。损坏的信任文件读时报 `STORAGE_CORRUPT`，用户重新 trust 即覆盖它；hook 加载时把它作为无效文件上报，其中的 hook 全部按未信任处理。其他版本写下的信任文件不被采信，用户会被重新询问。
+
 ## 关键点分类标注
 
 | 点 | 分类 | 说明 |
 | --- | --- | --- |
 | Browser Bridge 未 QA / 无 bearer / Origin / 未知或未注册 channel | Security | debug-only；canonical renderer manifest + handler registry fail-closed |
 | `safeStorage` 不可用 / secret IPC 明文 | Security | 禁止明文存储与跨层暴露；Linux `basic_text` / `unknown` 后端视为不可用，提示安装并解锁钥匙环 |
-| Provider secret 文件不可读（如 `EACCES`） | Availability（凭据操作仍 fail-closed） | 报文件访问失败并保留原件；只有内容确实损坏才隔离，缺文件按空配置处理。启动阶段失败经正常资源释放后以非零状态退出，不留活锁 |
+| Provider secret 文件不可读（如 `EACCES`） | Availability（凭据操作仍 fail-closed） | 报 `STORAGE_UNREADABLE` 并保留原件；内容确实损坏才报 `STORAGE_CORRUPT`（旁存损坏副本），缺文件按空配置处理。启动阶段失败经正常资源释放后以非零状态退出，不留活锁 |
 | Project MCP 覆盖 user executable / 未 trust | Security | `needsRetrust` + `assertConnectAllowed` |
 | IPC Zod 非法 payload / approvalToken 重放 | Security | **全量** handler `parseIpcArgs`；单次消费 token |
 | Sandbox / permission deny-by-default | Security | Electron 面 |
@@ -78,8 +86,8 @@
 | JSONL 末尾残行（追加中断） | Integrity | 读取时作为 `tornTail` 返回，之前的完整记录照常可读，会话不因此打不开；下一次追加或回合终态提交前，残行字节原样移入同目录 `<file>.torn-<ts>`（fsync 后）再截断，并经运行日志报告 `JSONL_TORN_TAIL`；只缺换行的完整记录补换行保留 |
 | 审计决定记录写入失败 | Security | `AUDIT_WRITE_FAILED`；记录在动作之前写，写失败则动作不发生（IPC 不执行、工具不执行、批准不生效、权限设置不写盘） |
 | 工具写入应用自有文件（凭据、设置、trust、`state/**`） | Security | 任何挡位 `FILE_WRITE_PROTECTED`；仅 `sessions/**/artifacts/**` 可写 |
-| Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
-| Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |
+| Storage schema 损坏 | Integrity | 每次读报 `STORAGE_CORRUPT`，原件留在原处并旁存一份损坏副本（见「存储原语」） |
+| Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，原件保留 |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
 | Session attachments.json | Integrity | 写入 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
 | Session shell-state.json | Integrity | 写入 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本 / 损坏 quarantine 或 `STORAGE_SCHEMA`；未知更高 `schemaVersion` 不 quarantine |

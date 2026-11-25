@@ -1,7 +1,9 @@
 import path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { argumentFileIdentities, canonicalRealpath, commandIdentity } from '../../runtime/fileIdentity';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { ProjectTrustStore, type ProjectTrustRecord } from './ProjectTrustStore';
+import { appPathService } from '../../runtime/AppPathService';
+import { TrustStore, type TrustRecord } from '../../runtime/TrustStore';
 import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
 
 export function mcpExecutableFingerprint(descriptor: Pick<AgentRuntimeMcpDescriptor, 'command' | 'args' | 'url' | 'env'>): string {
@@ -47,37 +49,42 @@ export function projectOverridesUserExecutable(
 }
 
 export function mcpUntrustedReason(descriptorId: string): string {
-  return `MCP_TRUST_REQUIRED: project MCP "${descriptorId}" is not trusted, or its command or files changed since it was trusted.`;
+  return `MCP_TRUST_REQUIRED: ${mcpUntrustedDetail(descriptorId)}`;
 }
 
+const mcpUntrustedDetail = (descriptorId: string): string => (
+  `project MCP "${descriptorId}" is not trusted, or its command or files changed since it was trusted.`
+);
+
 export class McpTrustService {
-  private readonly store: ProjectTrustStore;
+  private readonly store: TrustStore;
 
   constructor(explicitTrustStorePath?: string) {
-    this.store = new ProjectTrustStore('mcp-trust.json', explicitTrustStorePath);
+    this.store = new TrustStore(() => explicitTrustStorePath ?? path.join(appPathService.getAppStatePaths().appStateRoot, 'mcp-trust.json'));
   }
 
   resolveProjectRealpath(projectRoot: string): string {
-    return this.store.resolveProjectRealpath(projectRoot);
+    return canonicalRealpath(projectRoot);
   }
 
   isTrusted(projectRoot: string, descriptor: AgentRuntimeMcpDescriptor): boolean {
     const projectRealpath = this.resolveProjectRealpath(projectRoot);
-    return this.store.isTrusted(projectRealpath, descriptor.id, mcpTrustFingerprint(descriptor, projectRealpath));
+    return this.store.isTrusted('project', projectRealpath, descriptor.id, mcpTrustFingerprint(descriptor, projectRealpath));
   }
 
-  trust(projectRoot: string, descriptor: AgentRuntimeMcpDescriptor): ProjectTrustRecord {
+  trust(projectRoot: string, descriptor: AgentRuntimeMcpDescriptor): TrustRecord {
     const projectRealpath = this.resolveProjectRealpath(projectRoot);
-    return this.store.trust(projectRealpath, descriptor.id, mcpTrustFingerprint(descriptor, projectRealpath));
+    return this.store.trust('project', projectRealpath, descriptor.id, mcpTrustFingerprint(descriptor, projectRealpath));
   }
 
   revoke(projectRoot: string, descriptorId: string): void {
-    this.store.revoke(projectRoot, descriptorId);
+    const projectRealpath = this.resolveProjectRealpath(projectRoot).toLowerCase();
+    this.store.revoke((record) => record.ownerRealpath.toLowerCase() === projectRealpath && record.resourceId === descriptorId);
   }
 
   assertConnectAllowed(descriptor: AgentRuntimeMcpDescriptor, projectRoot?: string | null): void {
     if (descriptor.blockedReason && descriptor.blockedReason.startsWith('MCP_TRANSPORT_UNSUPPORTED:')) {
-      throw new Error(descriptor.blockedReason);
+      throw new AppError('MCP_TRANSPORT_UNSUPPORTED', descriptor.blockedReason.slice('MCP_TRANSPORT_UNSUPPORTED:'.length).trim());
     }
     // executableOverrideRejected means the project command was discarded and the
     // retained user executable may still connect.
@@ -86,7 +93,7 @@ export class McpTrustService {
     }
     // Re-fingerprint at connect time: the script may have changed since the settings snapshot.
     if (!projectRoot || !this.isTrusted(projectRoot, descriptor)) {
-      throw new Error(mcpUntrustedReason(descriptor.id));
+      throw new AppError('MCP_TRUST_REQUIRED', mcpUntrustedDetail(descriptor.id));
     }
   }
 }

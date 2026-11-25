@@ -142,7 +142,7 @@ export function commitInvestigationTxn(
   storageIo.ensureDir(stagingDir);
   for (const [index, mutation] of ordered.entries()) {
     const entry = plan[index]!;
-    storageIo.writeUtf8AtomicFsync(path.join(stagingDir, entry.stagingName), mutation.text);
+    storageIo.writeUtf8Atomic(path.join(stagingDir, entry.stagingName), mutation.text);
     emitBoundary(hooks, `temp:${mutation.role}`, { txnId, uri: mutation.uri, role: mutation.role });
   }
   const commit: InvestigationTxnCommitMarker = {
@@ -266,7 +266,7 @@ function cleanupTxn(sessionPath: string): void {
 function writeTxnDocument(sessionPath: string, name: string, value: unknown): void {
   const root = investigationTxnRoot(sessionPath);
   storageIo.ensureDir(root);
-  storageIo.writeUtf8AtomicFsync(path.join(root, name), `${JSON.stringify(value)}\n`);
+  storageIo.writeUtf8Atomic(path.join(root, name), `${JSON.stringify(value)}\n`);
 }
 
 function readTxnFile(filePath: string): string {

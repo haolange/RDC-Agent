@@ -38,6 +38,12 @@ export const errorContractRestrictions = [
     message: 'A rethrow inside catch passes { cause } so the original failure stays inspectable.',
   },
 ];
+// Storage primitives (src/main/runtime/atomicFile.ts): persisted files are written through writeFileAtomic and
+// renamed only by src/main/platform/fileRename.ts, which owns the host differences.
+export const storageRestrictions = [{
+  selector: "CallExpression[callee.property.name=/^rename(Sync)?$/]",
+  message: 'Write files with writeFileAtomic (src/main/runtime/atomicFile.ts); move paths with renameWithRetry (src/main/platform/fileRename.ts).',
+}];
 const productionSources = { files: ['src/**/*.{ts,tsx}'], ignores: ['src/**/*.test.{ts,tsx}', 'src/main/testing/**', 'src/**/*.d.ts'] };
 
 // Dependency direction (ARCHITECTURE.md): shared runs in every process, so it imports no Node
@@ -122,7 +128,7 @@ export default [
   {
     files: ['src/main/**/*.ts', 'src/shared/**/*.ts', 'src/preload/**/*.ts'],
     ignores: [...productionSources.ignores, 'src/main/platform/**', 'src/preload/index.ts'],
-    rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions, ...errorContractRestrictions] },
+    rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions, ...errorContractRestrictions, ...storageRestrictions] },
   },
   {
     files: ['src/shared/**/*.ts'],

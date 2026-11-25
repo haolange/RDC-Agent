@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { appPathService } from '../../runtime/AppPathService';
 import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
+import { writeFileAtomicSync } from '../../runtime/atomicFile';
 import { CatalogProjectionClock } from './CatalogProjectionClock';
 import {
   cloneJson,
@@ -509,10 +510,7 @@ export class EffectiveCatalogService {
   }
 
   private persistState(): void {
-    fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
-    const temporaryPath = `${this.statePath}.tmp`;
-    fs.writeFileSync(temporaryPath, JSON.stringify(this.state, null, 2), 'utf8');
-    fs.renameSync(temporaryPath, this.statePath);
+    writeFileAtomicSync(this.statePath, JSON.stringify(this.state, null, 2));
   }
 }
 

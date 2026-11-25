@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
+import { renameWithRetry } from '../../platform/fileRename';
 import { withMemoryDirectoryLock } from './memoryDirectoryLock';
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
@@ -96,34 +97,11 @@ function assertMemoryPathContained(memoryDir: string, targetPath: string): void 
 
 async function replaceFileAtomic(target: string, temporary: string): Promise<void> {
   try {
-    await fs.rename(temporary, target);
-    return;
+    await renameWithRetry(temporary, target);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code !== 'EEXIST' && code !== 'EPERM') throw error;
+    await fs.rm(temporary, { force: true });
+    throw error;
   }
-
-  const bakPath = `${target}.bak.${process.pid}.${randomBytes(4).toString('hex')}`;
-  try {
-    await fs.rename(target, bakPath);
-  } catch (bakError) {
-    await fs.rm(temporary, { force: true }).catch(() => undefined);
-    throw bakError;
-  }
-
-  try {
-    await fs.rename(temporary, target);
-  } catch (finalError) {
-    try {
-      await fs.rename(bakPath, target);
-    } catch {
-      // Leave bak for recovery if restore fails.
-    }
-    await fs.rm(temporary, { force: true }).catch(() => undefined);
-    throw finalError;
-  }
-
-  await fs.rm(bakPath, { force: true }).catch(() => undefined);
 }
 
 /** Explicit file-backed memory store. It never builds or injects a global index. */

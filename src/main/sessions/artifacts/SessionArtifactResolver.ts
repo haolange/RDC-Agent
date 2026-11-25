@@ -27,6 +27,7 @@ import { generateShortId } from '@shared/utils/id';
 import { normalizeSha256, sha256Hex } from '../../runtime/contentHash';
 import { StorageIo } from '../store/StorageIo';
 import { storageAdapter } from '../store/StorageAdapter';
+import { renameWithRetrySync } from '../../platform/fileRename';
 import { inspectArtifactJson, readArtifactJsonText, readDefaultToolResultText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';
 import { searchArtifactText, type ArtifactTextSearch } from './SessionArtifactTextSearch';
 import {
@@ -754,22 +755,7 @@ export class SessionArtifactResolver {
   }
 
   private atomicRename(from: string, to: string): void {
-    try {
-      fs.renameSync(from, to);
-      return;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== 'EEXIST' && code !== 'EPERM') throw error;
-    }
-    const bakPath = `${to}.${process.pid}.${generateShortId()}.swap.tmp`;
-    fs.renameSync(to, bakPath);
-    try {
-      fs.renameSync(from, to);
-    } catch (finalError) {
-      try { fs.renameSync(bakPath, to); } catch { /* leave bak for reconcile */ }
-      throw finalError;
-    }
-    try { fs.rmSync(bakPath, { force: true }); } catch { /* leftover tmp is reconciled */ }
+    renameWithRetrySync(from, to);
   }
 
   private sliceUtf8(text: string, maxBytes: number): string {

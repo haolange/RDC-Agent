@@ -1,8 +1,8 @@
-import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { writeFileAtomic } from '../../runtime/atomicFile';
 import { orderTasks } from './taskProjection';
 import {
   TASK_SCHEMA_VERSION,
@@ -207,7 +207,7 @@ export class FileTaskStore implements TaskStore {
 
   private async writeState(state: TaskStateDocument): Promise<void> {
     validateState(state);
-    await writeAtomic(this.statePath, Buffer.from(`${JSON.stringify(state, null, 2)}\n`, 'utf8'));
+    await writeFileAtomic(this.statePath, Buffer.from(`${JSON.stringify(state, null, 2)}\n`, 'utf8'));
   }
 }
 
@@ -252,27 +252,6 @@ export class MemoryTaskStore implements TaskStore {
 
 function emptyState(): TaskStateDocument {
   return { schemaVersion: TASK_SCHEMA_VERSION, tasks: {}, executions: {}, messages: {}, rootBudgets: {} };
-}
-
-async function writeAtomic(target: string, bytes: Buffer): Promise<void> {
-  await fs.mkdir(path.dirname(target), { recursive: true });
-  const temporary = `${target}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
-  await fs.writeFile(temporary, bytes, { flag: 'wx' });
-  try {
-    // Keep the same candidate and store lock while a transient Windows reader
-    // releases the destination. Never remove the authoritative file first.
-    for (let attempt = 0; ; attempt++) {
-      try { await fs.rename(temporary, target); break; }
-      catch (error) {
-        const code = (error as NodeJS.ErrnoException).code;
-        if (attempt >= 3 || (code !== 'EPERM' && code !== 'EBUSY')) throw error;
-        await new Promise(resolve => setTimeout(resolve, 10 * 2 ** attempt));
-      }
-    }
-  } catch (error) {
-    await fs.unlink(temporary).catch(() => undefined);
-    throw error;
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

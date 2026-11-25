@@ -1,18 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
+import { errorCodeOf } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
 import { canonicalRealpath } from '../runtime/fileIdentity';
+import { TrustStore, type TrustRecord, type TrustScope } from '../runtime/TrustStore';
 import { resolveHookCwd, resolveHookSpawn } from './hookResolve';
 import { computeHookTrustFingerprint } from './hookTrustFingerprint';
-import {
-  hookTrustKey,
-  readHookTrustStore,
-  writeHookTrustStore,
-  type HookTrustStoreV2,
-} from './hookTrustStore';
 import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -82,6 +78,8 @@ export class HookEngine {
     return this.explicitTrustStorePath ?? path.join(appPathService.getAppStatePaths().appStateRoot, 'hook-trust.json');
   }
 
+  private readonly trustStore = new TrustStore(() => this.trustStorePath);
+
   private loaded: LoadedHook[] = [];
   private invalid: InvalidHookFile[] = [];
 
@@ -118,7 +116,18 @@ export class HookEngine {
     if (projectRoot) addDirectory(appPathService.getProjectRdcPaths(projectRoot).hooksPath, 'project');
     this.invalid = invalid;
 
-    const trustStore = this.readTrustStore();
+    // A damaged trust file is reported like a damaged hook file; until the user trusts again, nothing in it counts.
+    let trustDamage: string | null = null;
+    const trustRecord = (scope: TrustScope, ownerRoot: string, hookId: string): TrustRecord | undefined => {
+      if (trustDamage !== null) return undefined;
+      try {
+        return this.trustStore.get(scope, ownerRoot, hookId);
+      } catch (error) {
+        if (errorCodeOf(error) !== 'STORAGE_CORRUPT') throw error;
+        trustDamage = (error as Error).message;
+        return undefined;
+      }
+    };
     this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {
       const scope = resource.provenance.scope;
       const trustFingerprint = computeHookTrustFingerprint({
@@ -130,8 +139,7 @@ export class HookEngine {
       const ownerRoot = scope === 'project' && projectRoot
         ? canonicalRealpath(projectRoot)
         : canonicalRealpath(path.dirname(resource.provenance.sourcePath));
-      const trustKey = scope === 'builtin' ? '' : hookTrustKey(scope, ownerRoot, resource.id);
-      const record = trustKey ? trustStore.records[trustKey] : undefined;
+      const record = scope === 'builtin' ? undefined : trustRecord(scope, ownerRoot, resource.id);
       const trusted = scope === 'builtin' || record?.trustFingerprint === trustFingerprint;
       return {
         definition: resource.value,
@@ -149,6 +157,7 @@ export class HookEngine {
         },
       };
     });
+    if (trustDamage) this.invalid.push({ scope: 'user', sourcePath: this.trustStorePath, reason: trustDamage });
     return this.list();
   }
 
@@ -176,16 +185,7 @@ export class HookEngine {
     const ownerRoot = hook.scope === 'project'
       ? canonicalRealpath(projectRoot ?? hook.trust.projectRoot ?? '')
       : canonicalRealpath(path.dirname(hook.sourcePath));
-    const trustedAt = new Date().toISOString();
-    const store = this.readTrustStore();
-    store.records[hookTrustKey(hook.scope, ownerRoot, hookId)] = {
-      trustFingerprint: hook.trustFingerprint,
-      trustedAt,
-      scope: hook.scope,
-      hookId,
-      ownerRoot,
-    };
-    this.writeTrustStore(store);
+    const { trustedAt } = this.trustStore.trust(hook.scope, ownerRoot, hookId, hook.trustFingerprint);
     hook.trust = {
       trusted: true,
       needsRetrust: false,
@@ -206,22 +206,15 @@ export class HookEngine {
   }
 
   revokeHook(hookId: string, projectRoot?: string): void {
-    const store = this.readTrustStore();
     const requestedOwnerRoot = projectRoot ? canonicalRealpath(projectRoot) : undefined;
-    if (requestedOwnerRoot) {
-      delete store.records[hookTrustKey('project', requestedOwnerRoot, hookId)];
-    } else {
-      for (const [key, record] of Object.entries(store.records)) {
-        if (record.hookId === hookId && record.scope === 'user') delete store.records[key];
-      }
-    }
-    this.writeTrustStore(store);
+    this.trustStore.revoke((record) => record.resourceId === hookId && (requestedOwnerRoot
+      ? record.scope === 'project' && record.ownerRealpath.toLowerCase() === requestedOwnerRoot.toLowerCase()
+      : record.scope === 'user'));
     const hook = this.loaded.find((entry) => (
       entry.definition.id === hookId
       && (requestedOwnerRoot
         ? entry.scope === 'project'
-          && hookTrustKey('project', canonicalRealpath(entry.trust.projectRoot ?? ''), hookId)
-            === hookTrustKey('project', requestedOwnerRoot, hookId)
+          && canonicalRealpath(entry.trust.projectRoot ?? '').toLowerCase() === requestedOwnerRoot.toLowerCase()
         : entry.scope === 'user')
     ));
     if (hook && hook.scope !== 'builtin') {
@@ -398,13 +391,6 @@ export class HookEngine {
     };
   }
 
-  private readTrustStore(): HookTrustStoreV2 {
-    return readHookTrustStore(this.trustStorePath);
-  }
-
-  private writeTrustStore(store: HookTrustStoreV2): void {
-    writeHookTrustStore(this.trustStorePath, store);
-  }
 }
 
 export const hookEngine = new HookEngine();

@@ -118,7 +118,7 @@ describe('ScopedRuntimeService', () => {
       hooks.trustProjectHook(project, 'verify');
       hookService.delete('hook', 'project', 'verify', project);
       expect(JSON.parse(fs.readFileSync(trustPath, 'utf8'))).toEqual({
-        schemaVersion: '2',
+        schemaVersion: 3,
         records: {},
       });
     } finally { fs.rmSync(project, { recursive: true, force: true }); }

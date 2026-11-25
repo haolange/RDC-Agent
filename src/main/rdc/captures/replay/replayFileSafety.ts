@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
+import { renameWithRetry } from '../../../platform/fileRename';
 
 export const assertHash = (value: string): void => {
   if (!/^[a-f0-9]{64}$/u.test(value)) throw new AppError('REPLAY_INVALID_HASH');
@@ -53,7 +54,7 @@ export async function atomicWrite(projectRoot: string, target: string, bytes: Bu
     const handle = await fs.open(temporary, 'wx');
     try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
     await safePath(projectRoot, target);
-    await fs.rename(temporary, target);
+    await renameWithRetry(temporary, target);
   } finally { await fs.rm(temporary, { force: true }); }
 }
 

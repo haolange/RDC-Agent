@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../primitives/_shared';
 import { COPY_MOVE_MAX_BYTES } from '../primitives/toolLimits';
+import { renameWithRetry } from '../../../platform/fileRename';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface MoveFileParams {
@@ -43,7 +44,7 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
     if (isPathExisting(dest)) {
       throw new Error(`Destination already exists; refusing overwrite: ${dest}`);
     }
-    await fs.rename(src, dest);
+    await renameWithRetry(src, dest);
     return {
       content: [{ type: 'text', text: `Moved ${src} → ${dest}` }],
       details: { source: src, destination: dest, overwritten: false },

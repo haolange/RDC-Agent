@@ -1,9 +1,9 @@
-import fs from 'fs';
 import path from 'path';
 import { safeStorage } from 'electron';
 import { sanitizeToken } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../../runtime/atomicFile';
 import { hardenSecretFile, secretStorageUnavailableReason } from '../../platform/secrets';
 
 interface SecretRecord {
@@ -23,26 +23,10 @@ export class SecretStorageUnavailableError extends AppError {
   }
 }
 
-export class SecretStoreCorruptError extends AppError {
-  constructor(readonly quarantinePath: string, cause?: unknown) {
-    super('STORAGE_CORRUPT', `Secret store is corrupt; quarantined to ${quarantinePath}`, { cause });
-    this.name = 'SecretStoreCorruptError';
-  }
-}
-
 function assertSafeStorageAvailable(): void {
   const reason = secretStorageUnavailableReason(safeStorage);
   if (reason) {
     throw new SecretStorageUnavailableError(reason);
-  }
-}
-
-function fsyncPath(targetPath: string): void {
-  const fd = fs.openSync(targetPath, 'r');
-  try {
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
   }
 }
 
@@ -51,79 +35,18 @@ export class SecretStorageService {
     return path.join(appPathService.getRuntimePaths().secretsPath, SECRET_FILE_NAME);
   }
 
-  private quarantineCorruptFile(filePath: string, cause: unknown): never {
-    const quarantinePath = `${filePath}.corrupt-${Date.now()}`;
-    try {
-      fs.renameSync(filePath, quarantinePath);
-    } catch (renameError) {
-      throw new SecretStoreCorruptError(filePath, renameError);
-    }
-    throw new SecretStoreCorruptError(quarantinePath, cause);
-  }
-
+  /** A damaged secret map is STORAGE_CORRUPT on every read (never an empty map), so credentials are not silently dropped. */
   private readSecretMap(workspaceRoot?: string): SecretMap {
-    const filePath = this.getSecretFilePath(workspaceRoot);
-    let contents: string;
-    try {
-      contents = fs.readFileSync(filePath, 'utf8');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return {};
-      }
-      throw new SecretStorageUnavailableError('Encrypted Provider secret store is unreadable; check file access.');
-    }
-
-    try {
-      const parsed = JSON.parse(contents) as SecretMap;
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        this.quarantineCorruptFile(filePath, new Error('Secret map is not an object'));
-      }
-      return parsed;
-    } catch (error) {
-      if (error instanceof SecretStoreCorruptError) {
-        throw error;
-      }
-      this.quarantineCorruptFile(filePath, error);
-    }
+    return readValidatedSync(this.getSecretFilePath(workspaceRoot), parseJsonWith((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('secret map is not an object');
+      return value as SecretMap;
+    })) ?? {};
   }
 
   private writeSecretMap(secretMap: SecretMap, workspaceRoot?: string): void {
     const filePath = this.getSecretFilePath(workspaceRoot);
-    const directory = path.dirname(filePath);
-    fs.mkdirSync(directory, { recursive: true });
-    const temporaryPath = `${filePath}.${process.pid}.tmp`;
-    const payload = `${JSON.stringify(secretMap, null, 2)}\n`;
-    try {
-      const fd = fs.openSync(temporaryPath, 'w', 0o600);
-      try {
-        fs.writeFileSync(fd, payload, 'utf8');
-        fs.fsyncSync(fd);
-      } finally {
-        fs.closeSync(fd);
-      }
-      try {
-        fs.renameSync(temporaryPath, filePath);
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code;
-        if (code !== 'EEXIST' && code !== 'EPERM') throw error;
-        fs.rmSync(filePath, { force: true, maxRetries: 5, retryDelay: 100 });
-        fs.renameSync(temporaryPath, filePath);
-      }
-      hardenSecretFile(filePath);
-      try {
-        fsyncPath(directory);
-      } catch {
-        // Directory fsync is best-effort on some platforms.
-      }
-    } finally {
-      try {
-        fs.rmSync(temporaryPath, { force: true, maxRetries: 5, retryDelay: 100 });
-      } catch (error) {
-        // Cleanup is best-effort: the durable rename already succeeded, and Windows
-        // may retain a transient ACL handle for the temporary path.
-        void error;
-      }
-    }
+    writeFileAtomicSync(filePath, `${JSON.stringify(secretMap, null, 2)}\n`, { mode: 0o600 });
+    hardenSecretFile(filePath);
   }
 
   createProviderSecretRef(providerId: string): string {

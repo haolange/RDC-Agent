@@ -5,6 +5,7 @@ import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
 import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { writeFileAtomicSync } from '../runtime/atomicFile';
 import { safeDelegationText as safeText } from './DelegationTraceText';
 import { finalizeTrace } from './ConversationWorkTrace';
 import { createDelegatedProjectionState, projectDelegatedEvent, type DelegatedProjectionState } from './DelegatedWorkProjection';
@@ -70,10 +71,7 @@ function append(target: string, entry: TraceEntry): void {
 function saveHeader(target: string, header: DelegationTraceHeader, sessionId: string): void {
   header.updatedAt = Date.now();
   append(target, { kind: 'header', header });
-  const head = headLocation(target);
-  const temp = `${head}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(header), 'utf8');
-  fs.renameSync(temp, head);
+  writeFileAtomicSync(headLocation(target), JSON.stringify(header));
   workflowProjectionPublisher.publish('conversation:delegationChanged', {
     sessionId, parentToolCallId: header.parentToolCallId, revision: header.revision,
   });

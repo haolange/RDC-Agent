@@ -91,7 +91,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 - `safeStorage` 不可用 → fail-closed（不得明文落盘）。Linux 上没有系统钥匙环时的 `basic_text` 后端（以及尚未选定的 `unknown`）视为不可用，见 [`../architecture/host-platform.md`](../architecture/host-platform.md)。
 - 对外查询仅 `{ hasSecret, maskedPreview? }`；不得返回明文。
-- 损坏条目 quarantine；文件权限 0600/ACL。
+- 损坏的凭据文件每次读都报 `STORAGE_CORRUPT`（不读成空，凭据不会被静默丢弃）；文件以 0600 原子写入，Windows 另加 ACL。
 - Credential 仅进入主进程 opaque lease，不进 manifest / Route / RequestPlan / IPC / Trace。
 - 落盘与可见投影统一走 `src/main/runtime/secretRedaction.ts`：凭据类字段名（api key、authorization、password、secret、private key、cookie、各类 `*_token` 与 `token`）整值替换；文本中识别 Bearer、`sk-`/`sk-ant-`/`xai-`/Slack `xox?-`、GitHub `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`/`github_pat_`、AWS `AKIA`/`ASIA`、Google `AIza`、JWT 与 PEM 私钥块。工作过程里任何工具的 `argsPreview` 都经 `redactedArgumentsPreview`，主回合与子代理不分两条路径。
 
@@ -117,7 +117,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。任一变化 → `needsRetrust`。
 - builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
 - 12 canonical events 保持单一 `HookEngine` 路径。见 `ARCHITECTURE.md` 裁决 K。
-- 信任记录存于 `hook-trust.json`（schemaVersion 2），匹配只认 `trustFingerprint`；其他形状的文件读作无信任，要求重新 trust。
+- 信任记录存于 `hook-trust.json`，与 MCP、Agent 信任共用 `TrustStore`（schemaVersion 3），匹配只认 `trustFingerprint`；其他版本的文件不被采信，要求重新 trust；损坏的文件作为无效 hook 文件上报，重新 trust 后覆盖。
 
 ## Project Agent Trust
 

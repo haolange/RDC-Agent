@@ -11,7 +11,7 @@
 | RDC 操作协调与恢复 | `src/main/rdc/RdcOperationCoordinator.ts`, `RdcOperationPolicy.ts`, `RdcOperationCatalog.ts`, `RdcCaptureRecovery.ts`, `RdcTurnBindings.ts`, `OwnedRdcDaemonRegistry.ts`, `RdcRemoteConnection.ts` | `RdcTurnBinding`, 操作回执 | 经 `shell.rdc` / `rdc_probe` 与 capture IPC | Capture 卡、session context | typecheck, shell smoke（契约见 `rdc-runtime.md`） |
 | Investigation | `src/main/investigation/*`（`InvestigationArtifactService`, `InvestigationTools`） | Investigation Artifact / manifest 记录 | `investigation:list` 等 | Right Rail Artifacts | typecheck, investigation tests |
 | Knowledge | `src/main/knowledge/*` | Knowledge candidate / index / export | knowledge IPC | `features/knowledge` | typecheck, knowledge tests |
-| Hooks | `src/main/hooks/*`（`HookEngine`, `hookTrustStore`） | Hook 文档与 trust fingerprint | `rdc-runtime:*` | Settings > Hooks | typecheck, scoped-resources |
+| Hooks | `src/main/hooks/*`（`HookEngine`；信任记录经 `src/main/runtime/TrustStore.ts`） | Hook 文档与 trust fingerprint | `rdc-runtime:*` | Settings > Hooks | typecheck, scoped-resources |
 | Conversation | `src/main/conversation/*`（`ConversationService`, `ConversationTurnRunner`, `ConversationWorkTrace`） | `ConversationWorkTrace`, 附件与分支 | `conversation:*` | `features/composer`, `features/transcript` | typecheck, agent-runtime, work-process |
 | Permissions | `src/main/agent-runtime/permissions/*`（`AgentPermissionPolicy`, `PolicyCompiler`） | 权限模式与 policy | `conversation:answerToolApproval` 等 | 审批卡、Settings > Policy | typecheck, 见 `contracts/permissions.md` |
 | Tasks | `src/main/agent-runtime/tasks/*`（`TaskRegistry`, `TaskTools`, `taskProjection`） | `TaskRailItem` | `task_*` 工具、trace 投影 | Right Rail Tasks、Tasks 历史卡 | typecheck, agent-runtime |

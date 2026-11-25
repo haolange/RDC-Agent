@@ -4,6 +4,7 @@ import { generateShortId, nowMs } from '@shared/utils/id';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../../runtime/jsonl';
 import { readStoredWorkTrace, sanitizeStoredWorkTrace } from '../../conversation/StoredWorkTrace';
 import { classifyAttachmentBytes } from '../../conversation/attachmentClassify';
+import { copyFileAtomicSync } from '../../runtime/atomicFile';
 import {
   CONVERSATION_COMPACTION_DELTA_THRESHOLD,
   type ConversationHistoryCacheEntry,
@@ -123,9 +124,7 @@ export class ConversationHistoryStore {
       for (let index = 0; index < sourceAttachmentPaths.length; index += 1) {
         const sourcePath = path.resolve(sourceAttachmentPaths[index]!);
         const targetPath = attachments[index]!.filePath;
-        const temporaryPath = `${targetPath}.${process.pid}.${generateShortId()}.tmp`;
-        fs.copyFileSync(sourcePath, temporaryPath);
-        fs.renameSync(temporaryPath, targetPath);
+        copyFileAtomicSync(sourcePath, targetPath);
       }
       this.host.io.writeJsonAtomic(
         this.host.sessions.getSessionAttachmentsManifestPath(sessionId),
@@ -202,16 +201,7 @@ export class ConversationHistoryStore {
     sessionId: string,
     state: import('@shared/types/conversationBranch').ConversationBranchState,
   ): void {
-    const filePath = this.getConversationBranchStatePath(sessionId);
-    const temporaryPath = `${filePath}.${process.pid}.tmp`;
-    this.host.io.ensureDir(path.dirname(filePath));
-    fs.writeFileSync(temporaryPath, JSON.stringify(state, null, 2), 'utf-8');
-    try {
-      fs.renameSync(temporaryPath, filePath);
-    } catch (error) {
-      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
-      throw error;
-    }
+    this.host.io.writeUtf8Atomic(this.getConversationBranchStatePath(sessionId), JSON.stringify(state, null, 2));
   }
 
   clearConversationBranchState(sessionId: string): void {
@@ -248,13 +238,13 @@ export class ConversationHistoryStore {
     const replaceAssistant = this.readConversationHistory(sessionId).some((message) => message.id === assistantMessage.id);
     const journal = prepareTerminalAppend(session.sessionPath, requestId, turnId, assistantMessage, contextEntry, !duplicate, replaceAssistant);
     const journalPath = this.getConversationTerminalCommitJournalPath(session.sessionPath);
-    this.host.io.writeUtf8AtomicFsync(journalPath, JSON.stringify(journal));
+    this.host.io.writeUtf8Atomic(journalPath, JSON.stringify(journal));
     this.host.terminalCommitSessionIds.add(sessionId);
     const committing: ConversationTerminalAppendJournal = { ...journal, phase: 'committing' };
     try {
-      this.host.io.writeUtf8AtomicFsync(journalPath, JSON.stringify(committing));
+      this.host.io.writeUtf8Atomic(journalPath, JSON.stringify(committing));
       this.applyConversationTerminalJournal(session, committing, true);
-      this.host.io.writeUtf8AtomicFsync(journalPath, JSON.stringify({ ...committing, phase: 'committed' }));
+      this.host.io.writeUtf8Atomic(journalPath, JSON.stringify({ ...committing, phase: 'committed' }));
       fs.rmSync(journalPath, { force: true });
       this.host.sessions.updateSession(sessionId, {});
       // Maintenance may rewrite history only after the append WAL is gone.
@@ -818,9 +808,7 @@ export class ConversationHistoryStore {
         targetPath = path.join(stagingDir, fileName);
         counter += 1;
       }
-      const temporaryPath = `${targetPath}.${process.pid}.${generateShortId()}.tmp`;
-      fs.copyFileSync(sourcePath, temporaryPath);
-      fs.renameSync(temporaryPath, targetPath);
+      copyFileAtomicSync(sourcePath, targetPath);
       stagedPaths.push(targetPath);
     }
     return stagedPaths;

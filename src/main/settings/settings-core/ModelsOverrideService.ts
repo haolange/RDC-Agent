@@ -1,18 +1,10 @@
-import fs from 'fs';
 import path from 'path';
 import { EventEmitter } from 'events';
 import { ModelsOverrideSchema, type ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
-import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../../runtime/atomicFile';
 
 const MODELS_OVERRIDE_FILE = 'models.json';
-
-export class ModelsOverrideCorruptError extends AppError {
-  constructor(readonly quarantinePath: string, cause?: unknown) {
-    super('STORAGE_CORRUPT', `models.json is corrupt; quarantined to ${quarantinePath}`, { cause });
-    this.name = 'ModelsOverrideCorruptError';
-  }
-}
 
 export interface ModelsOverrideChangeEvent {
   overrides: ModelsOverride;
@@ -26,36 +18,10 @@ export class ModelsOverrideService extends EventEmitter {
     return path.join(appPathService.getUserRdcRoot(), MODELS_OVERRIDE_FILE);
   }
 
-  private quarantineCorruptFile(filePath: string, cause: unknown): never {
-    const quarantinePath = `${filePath}.corrupt-${Date.now()}`;
-    try {
-      fs.renameSync(filePath, quarantinePath);
-    } catch (renameError) {
-      throw new ModelsOverrideCorruptError(filePath, renameError);
-    }
-    throw new ModelsOverrideCorruptError(quarantinePath, cause);
-  }
-
   getOverrides(): ModelsOverride {
-    if (this.cache) return this.cache;
-    const filePath = this.getFilePath();
-    if (!fs.existsSync(filePath)) {
-      const empty: ModelsOverride = { schemaVersion: 1, providers: {} };
-      this.cache = empty;
-      return empty;
-    }
-    try {
-      const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown;
-      const parsed = ModelsOverrideSchema.safeParse(raw);
-      if (!parsed.success) {
-        this.quarantineCorruptFile(filePath, parsed.error);
-      }
-      this.cache = parsed.data;
-      return parsed.data;
-    } catch (error) {
-      if (error instanceof ModelsOverrideCorruptError) throw error;
-      this.quarantineCorruptFile(filePath, error);
-    }
+    this.cache ??= readValidatedSync(this.getFilePath(), parseJsonWith((value) => ModelsOverrideSchema.parse(value)))
+      ?? { schemaVersion: 1, providers: {} };
+    return this.cache;
   }
 
   setOverrides(overrides: ModelsOverride): ModelsOverride {
@@ -79,33 +45,7 @@ export class ModelsOverrideService extends EventEmitter {
   }
 
   private writeAtomic(overrides: ModelsOverride): void {
-    const filePath = this.getFilePath();
-    const directory = path.dirname(filePath);
-    fs.mkdirSync(directory, { recursive: true });
-    const temporaryPath = `${filePath}.${process.pid}.tmp`;
-    const payload = `${JSON.stringify(overrides, null, 2)}\n`;
-    try {
-      const fd = fs.openSync(temporaryPath, 'w', 0o600);
-      try {
-        fs.writeFileSync(fd, payload, 'utf8');
-        fs.fsyncSync(fd);
-      } finally {
-        fs.closeSync(fd);
-      }
-      try {
-        fs.chmodSync(temporaryPath, 0o600);
-      } catch {
-        // Windows may ignore POSIX mode bits.
-      }
-      fs.renameSync(temporaryPath, filePath);
-      try {
-        fs.chmodSync(filePath, 0o600);
-      } catch {
-        // Best-effort on Windows.
-      }
-    } finally {
-      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
-    }
+    writeFileAtomicSync(this.getFilePath(), `${JSON.stringify(overrides, null, 2)}\n`, { mode: 0o600 });
   }
 }
 

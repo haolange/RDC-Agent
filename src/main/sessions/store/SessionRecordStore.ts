@@ -14,6 +14,7 @@ import { removeSessionTasks } from '../../agent-runtime/tasks/sessionTaskStore';
 import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
 import { appPathService } from '../../runtime/AppPathService';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
+import { renameWithRetrySync } from '../../platform/fileRename';
 import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import type { ActionEvent } from '@shared/types/evidence';
@@ -252,7 +253,7 @@ export class SessionRecordStore {
     if (branchState) {
       this.host.io.writeJsonAtomic(path.join(commit.stagingPath, 'conversation-branches.json'), branchState);
     }
-    fs.renameSync(commit.stagingPath, commit.finalPath);
+    renameWithRetrySync(commit.stagingPath, commit.finalPath);
     this.host.projects.touchProject(commit.session.projectId, commit.session.sessionId, commit.session.updatedAt);
     this.host.projects.setCurrentProjectId(commit.session.projectId);
     this.host.projects.setCurrentSessionId(commit.session.sessionId);

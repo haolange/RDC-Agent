@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId } from '@shared/utils/id';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { writeFileAtomicSync } from '../../runtime/atomicFile';
 
 export const SESSION_ARTIFACT_QUOTA_FILENAME = '.quota.json';
 
@@ -85,26 +86,7 @@ function persistLedger(artifactsRoot: string, disk: { bytes: number; toolOutputF
       extraFiles: reservation.extraFiles,
     })),
   };
-  const target = quotaPath(artifactsRoot);
-  const temporaryPath = `${target}.${process.pid}.${generateShortId()}.tmp`;
-  fs.writeFileSync(temporaryPath, `${JSON.stringify(document)}\n`, 'utf8');
-  try {
-    fs.renameSync(temporaryPath, target);
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'EEXIST' || code === 'EPERM') {
-      try {
-        fs.rmSync(target, { force: true });
-        fs.renameSync(temporaryPath, target);
-        return;
-      } catch (replaceError) {
-        if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
-        throw replaceError;
-      }
-    }
-    if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
-    throw error;
-  }
+  writeFileAtomicSync(quotaPath(artifactsRoot), `${JSON.stringify(document)}\n`);
 }
 
 export function isSessionArtifactQuotaBookkeeping(filePath: string): boolean {

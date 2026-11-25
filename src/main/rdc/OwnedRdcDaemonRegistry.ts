@@ -12,6 +12,7 @@ import {
   type ProcessLiveness,
   type ProcessTermination,
 } from '../platform/process';
+import { writeFileAtomicSync } from '../runtime/atomicFile';
 import { installationRootOfPython, resolveRdcInstallation } from './RdcInstallationService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
@@ -261,9 +262,5 @@ function readRegistry(registryPath?: string): RegistryDocument {
 }
 
 function writeRegistry(document: RegistryDocument, registryPath?: string): void {
-  const filePath = registryPath ?? ownedRdcDaemonRegistryPath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(tempPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
-  fs.renameSync(tempPath, filePath);
+  writeFileAtomicSync(registryPath ?? ownedRdcDaemonRegistryPath(), `${JSON.stringify(document, null, 2)}\n`);
 }

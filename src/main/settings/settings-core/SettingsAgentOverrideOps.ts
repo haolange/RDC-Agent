@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import { randomUUID } from 'node:crypto';
 import { AGENT_PROJECT_UNTRUSTED } from '@shared/types/agentManifest';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
@@ -7,6 +6,7 @@ import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict } from '../agent-manifests/agentManifestParse';
 import { planAgentModelFieldMigration } from '../agent-manifests/agentModelFieldMigration';
 import { projectAgentTrust } from '../agent-manifests/ProjectAgentTrust';
+import { writeFileAtomic } from '../../runtime/atomicFile';
 import { resolveRegisteredProjectRoot, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
 import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
 import type {
@@ -65,7 +65,7 @@ export class SettingsAgentOverrideOps {
     if (!migrated.ok) {
       throw new AppError('AGENT_MODEL_MIGRATION_STILL_INVALID', migrated.reason);
     }
-    await fs.promises.writeFile(`${target.sourcePath}.bak`, raw, 'utf8');
+    await writeFileAtomic(`${target.sourcePath}.bak`, raw);
     const agentModels = this.settings.getAll().agentModels;
     this.settings.setAll({
       agentModels: {
@@ -73,13 +73,7 @@ export class SettingsAgentOverrideOps {
         byAgent: { ...agentModels.byAgent, [target.agentId]: { ...agentModels.byAgent[target.agentId], ...plan.binding } },
       },
     });
-    const temporaryPath = `${target.sourcePath}.${process.pid}.${randomUUID()}.tmp`;
-    try {
-      await fs.promises.writeFile(temporaryPath, plan.content, 'utf8');
-      await fs.promises.rename(temporaryPath, target.sourcePath);
-    } finally {
-      await fs.promises.rm(temporaryPath, { force: true });
-    }
+    await writeFileAtomic(target.sourcePath, plan.content);
     return this.settings.getAll();
   }
 

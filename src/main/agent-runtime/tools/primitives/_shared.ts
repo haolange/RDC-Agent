@@ -13,6 +13,7 @@ import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { AppError } from '@shared/errors/appError';
 import { expandHomePath, samePath, stripLongPathPrefix } from '../../../platform/paths';
+import { renameWithRetry, syncDirectory } from '../../../platform/fileRename';
 import { BINARY_SAMPLE_BYTES, TEXT_FILE_MAX_BYTES } from './toolLimits';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
@@ -173,35 +174,12 @@ export async function writeTextFileNoFollow(absolutePath: string, content: strin
   }
 
   try {
-    await fsp.rename(temporaryPath, finalTarget);
+    await renameWithRetry(temporaryPath, finalTarget);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code !== 'EEXIST' && code !== 'EPERM') {
-      await fsp.rm(temporaryPath, { force: true }).catch(() => undefined);
-      throw error;
-    }
-
-    // Windows-safe bak-swap: no rm-then-rename data-loss window.
-    const bakTmpPath = `${finalTarget}.bak.tmp.${process.pid}.${Date.now().toString(36)}`;
-    try {
-      await fsp.rename(finalTarget, bakTmpPath);
-    } catch (bakError) {
-      await fsp.rm(temporaryPath, { force: true }).catch(() => undefined);
-      throw bakError;
-    }
-    try {
-      await fsp.rename(temporaryPath, finalTarget);
-    } catch (finalError) {
-      try {
-        await fsp.rename(bakTmpPath, finalTarget);
-      } catch {
-        // Leave bakTmp for recovery.
-      }
-      await fsp.rm(temporaryPath, { force: true }).catch(() => undefined);
-      throw finalError;
-    }
-    await fsp.rm(bakTmpPath, { force: true }).catch(() => undefined);
+    await fsp.rm(temporaryPath, { force: true });
+    throw error;
   }
+  await syncDirectory(realParent);
 
   assertNoSymlinkPath(finalTarget);
 }

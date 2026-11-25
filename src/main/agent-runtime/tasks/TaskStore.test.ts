@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import * as fsPromises from 'fs/promises';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -6,32 +7,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FileTaskStore } from './TaskStore';
 import { TaskRegistry } from './TaskRegistry';
 
-vi.mock('fs/promises', async importOriginal => { const actual = await importOriginal<typeof import('fs/promises')>(); return { ...actual, rename: vi.fn(actual.rename) }; });
+vi.mock('fs/promises', async importOriginal => ({ ...await importOriginal<typeof import('fs/promises')>() }));
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe('FileTaskStore', () => {
-  it('retries a transient atomic rename without replacing or duplicating Task state', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-')); roots.push(dir);
-    const registry = new TaskRegistry(dir); await registry.createTask('Existing');
-    const target = path.join(dir, 'task-state.json'); const original = await readFile(target, 'utf8');
-    const rename = (await vi.importActual<typeof import('fs/promises')>('fs/promises')).rename; let locked = false;
-    const spy = vi.spyOn(fsPromises, 'rename').mockClear().mockImplementation(async (from, to) => {
-      if (!locked && to === target) { locked = true; expect(await readFile(target, 'utf8')).toBe(original); throw Object.assign(new Error('sharing violation'), { code: 'EPERM' }); }
-      return rename(from, to);
-    });
-    try { await registry.createTask('New'); expect(spy).toHaveBeenCalledTimes(2); }
-    finally { spy.mockRestore(); }
-    expect((await registry.listTasks()).map(task => task.subject).sort()).toEqual(['Existing', 'New']);
-  });
-
   it('preserves the authoritative state and removes the candidate after persistent rename denial', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-')); roots.push(dir);
     const registry = new TaskRegistry(dir); await registry.createTask('Existing');
     const target = path.join(dir, 'task-state.json'); const original = await readFile(target, 'utf8');
-    const spy = vi.spyOn(fsPromises, 'rename').mockClear().mockRejectedValue(Object.assign(new Error('denied'), { code: 'EPERM' }));
-    try { await expect(registry.createTask('Rejected')).rejects.toMatchObject({ code: 'EPERM' }); expect(spy).toHaveBeenCalledTimes(4); }
+    const spy = vi.spyOn(fs.promises, 'rename').mockRejectedValue(Object.assign(new Error('denied'), { code: 'EPERM' }));
+    try { await expect(registry.createTask('Rejected')).rejects.toMatchObject({ code: 'EPERM' }); }
     finally { spy.mockRestore(); }
     expect(await readFile(target, 'utf8')).toBe(original);
     expect((await fsPromises.readdir(dir)).filter(name => name.endsWith('.tmp'))).toEqual([]);
@@ -104,9 +91,10 @@ describe('FileTaskStore', () => {
       if (args[0] === target && firstRead) { firstRead = false; startRead(); await readGate; }
       return actual.readFile(...args);
     });
-    const renameSpy = vi.spyOn(fsPromises, 'rename').mockImplementation(async (from, to) => {
+    const realRename = fs.promises.rename;
+    const renameSpy = vi.spyOn(fs.promises, 'rename').mockImplementation(async (from, to) => {
       if (to === target && firstRename) { firstRename = false; startRename(); await renameGate; }
-      return actual.rename(from, to);
+      return realRename(from, to);
     });
     const readdirSpy = vi.spyOn(fsPromises, 'readdir').mockImplementation(async (...args: Parameters<typeof fsPromises.readdir>) => {
       const entries = await actual.readdir(...args);

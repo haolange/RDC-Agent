@@ -32,11 +32,11 @@ export function composeProjectPlan(markdown: string, fields: ProjectPlanFrontmat
 export function writePlanFile(targetPath: string, document: string, io: StorageIo = storageAdapter.io): void {
   const target = assertPlanWritePath(targetPath);
   const original = fs.existsSync(target) ? fs.readFileSync(target) : null;
-  io.writeUtf8AtomicFsync(target, document);
+  io.writeUtf8Atomic(target, document);
   try {
     if (!fs.readFileSync(target).equals(Buffer.from(document, 'utf8'))) throw new AppError('PLAN_WRITE_VERIFY_FAILED');
   } catch (error) {
-    if (original) io.writeBytesAtomic(target, original, { fsync: true });
+    if (original) io.writeBytesAtomic(target, original);
     else fs.unlinkSync(target);
     throw error;
   }

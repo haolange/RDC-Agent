@@ -19,8 +19,8 @@ export function writeRunFiles(host: StorageHost, runPath: string, run: Persisted
     throw new AppError('STORAGE_SCHEMA', `refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
   }
   host.io.ensureDir(runPath);
-  host.io.writeUtf8AtomicFsync(path.join(runPath, 'run.json'), `${JSON.stringify(parsed.data, null, 2)}\n`);
-  host.io.writeUtf8AtomicFsync(path.join(runPath, 'run.yaml'), stringifyYaml(parsed.data));
+  host.io.writeUtf8Atomic(path.join(runPath, 'run.json'), `${JSON.stringify(parsed.data, null, 2)}\n`);
+  host.io.writeUtf8Atomic(path.join(runPath, 'run.yaml'), stringifyYaml(parsed.data));
 }
 
 export function readPersistedRun(

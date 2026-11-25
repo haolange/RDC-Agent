@@ -170,7 +170,7 @@ export class KnowledgeDurableStore {
   ): void {
     const statePath = this.resolveStatePath(sessionId);
     this.storage.ensureDir(path.dirname(statePath));
-    this.storage.writeUtf8AtomicFsync(statePath, serializeKnowledgeStateDocument(document, leftoverDrafts));
+    this.storage.writeUtf8Atomic(statePath, serializeKnowledgeStateDocument(document, leftoverDrafts));
     const written = this.storage.readJson<unknown>(statePath);
     if (!written) {
       throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', 'durable knowledge-state.json vanished after atomic replace.');

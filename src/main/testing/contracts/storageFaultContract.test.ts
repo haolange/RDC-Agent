@@ -71,13 +71,14 @@ describe('storageFaultContract: StorageIo corrupt JSON', () => {
     }
   });
 
-  it('throws STORAGE_CORRUPT and quarantines unrecoverable JSON (failure-class: integrity)', () => {
+  it('throws STORAGE_CORRUPT on every read and keeps a copy of unrecoverable JSON (failure-class: integrity)', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-storage-corrupt-'));
     const filePath = path.join(root, 'session.json');
     fs.writeFileSync(filePath, 'not-json', 'utf8');
     expect(() => io.readJson(filePath)).toThrow(/STORAGE_CORRUPT/);
-    expect(fs.existsSync(filePath)).toBe(false);
-    expect(fs.readdirSync(root).some((name) => name.includes('.corrupt.'))).toBe(true);
+    expect(() => io.readJson(filePath)).toThrow(/STORAGE_CORRUPT/);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('not-json');
+    expect(fs.readdirSync(root).filter((name) => name.startsWith('session.json.corrupt-'))).toHaveLength(1);
   });
 
   it('deepMerge rejects prototype pollution keys', () => {

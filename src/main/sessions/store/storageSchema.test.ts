@@ -179,13 +179,14 @@ describe('session shell-state schema', () => {
     )).toThrow(/missing schemaVersion/);
   });
 
-  it('quarantines a structurally invalid on-disk document', () => {
+  it('reports a structurally invalid on-disk document and keeps a copy', () => {
     const io = new StorageIo();
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-shell-state-'));
     const filePath = path.join(root, 'shell-state.json');
     fs.writeFileSync(filePath, JSON.stringify({ schemaVersion: '1', state: { cwd: 12 } }), 'utf8');
     expect(() => io.readJson(filePath, SESSION_SHELL_STATE_MIGRATIONS)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
-    expect(fs.existsSync(filePath)).toBe(false);
+    expect(fs.existsSync(filePath)).toBe(true);
+    expect(fs.readdirSync(path.dirname(filePath)).some((name) => name.startsWith(`${path.basename(filePath)}.corrupt-`))).toBe(true);
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -248,12 +249,13 @@ describe('StorageIo schema-backed readJson', () => {
     expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual(legacy);
   });
 
-  it('quarantines structurally invalid JSON under a schema', () => {
+  it('reports structurally invalid JSON under a schema and keeps a copy', () => {
     const root = tempRoot();
     const filePath = path.join(root, 'session.json');
     fs.writeFileSync(filePath, JSON.stringify({ sessionId: 1 }), 'utf8');
     expect(() => io.readJson(filePath, SessionRecordSchema)).toThrow(/STORAGE_CORRUPT/);
-    expect(fs.existsSync(filePath)).toBe(false);
+    expect(fs.existsSync(filePath)).toBe(true);
+    expect(fs.readdirSync(path.dirname(filePath)).some((name) => name.startsWith(`${path.basename(filePath)}.corrupt-`))).toBe(true);
   });
 
   it('does not quarantine unknown higher schema versions', () => {

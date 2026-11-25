@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import { createHash } from 'crypto';
 import { sanitizeUiPreferences } from '@shared/theme/uiPreferences';
 import {
@@ -17,6 +16,7 @@ import {
   isBuiltinProviderId,
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../../runtime/AppPathService';
+import { writeFileAtomicSync } from '../../runtime/atomicFile';
 import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import { StorageSchemaError } from '../../sessions/store/storageSchema';
 import { executionProfileService } from './ExecutionProfileService';
@@ -308,15 +308,7 @@ export function normalizePersistedSettings(
 }
 
 export function writeSettings(settings: PersistedSettingsPayload): void {
-  const filePath = appPathService.getRuntimePaths().settingsPath;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
-  try {
-    fs.writeFileSync(temporaryPath, JSON.stringify(settings, null, 2), 'utf8');
-    fs.renameSync(temporaryPath, filePath);
-  } finally {
-    if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
-  }
+  writeFileAtomicSync(appPathService.getRuntimePaths().settingsPath, JSON.stringify(settings, null, 2));
 }
 
 export function deleteSecretsAfterCommit(secretRefs: Iterable<string>, workspaceRoot: string): void {

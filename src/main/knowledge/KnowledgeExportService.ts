@@ -9,6 +9,7 @@ import {
   type KnowledgePackageCard,
 } from '@shared/types/knowledgeExport';
 import { AppError } from '@shared/errors/appError';
+import { writeFileAtomic } from '../runtime/atomicFile';
 import { resolveWithinRoot } from './knowledgeFs';
 import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeSensitiveText';
 import { isSafeKnowledgeImageRelative, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
@@ -164,10 +165,6 @@ export function createDefaultExportDependencies(services: {
         return null;
       }
     },
-    writeBytes: async (targetPath, contents) => {
-      const temp = `${targetPath}.tmp`;
-      await fs.writeFile(temp, contents);
-      await fs.rename(temp, targetPath);
-    },
+    writeBytes: (targetPath, contents) => writeFileAtomic(targetPath, contents),
   };
 }

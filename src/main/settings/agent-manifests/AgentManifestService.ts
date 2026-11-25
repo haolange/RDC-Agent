@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { createHash, randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
 import { GENERAL_AGENT_ID, isSafeAgentProfileId } from '@shared/types/agent';
 import {
@@ -19,6 +19,7 @@ import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import { resolvedPathKey, samePath } from '../../platform/paths';
 import { isReservedAgentId } from '../settings-core/reservedAgentIds';
+import { writeFileAtomic } from '../../runtime/atomicFile';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { projectAgentTrust } from './ProjectAgentTrust';
 import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
@@ -419,13 +420,7 @@ export class AgentManifestService {
       fileName,
       ...(basedOn ? { basedOn } : {}),
     });
-    const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-    try {
-      await fs.promises.writeFile(temporaryPath, content, 'utf8');
-      await fs.promises.rename(temporaryPath, filePath);
-    } finally {
-      await fs.promises.rm(temporaryPath, { force: true });
-    }
+    await writeFileAtomic(filePath, content);
 
     const ownedFileName = fileNameForId(agentId);
     if (path.basename(filePath) !== ownedFileName) {

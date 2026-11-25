@@ -59,23 +59,24 @@ describe('SecretStorageService fail-closed', () => {
     );
   });
 
-  it('quarantines corrupt secret files instead of returning an empty map', async () => {
+  it('reports a corrupt secret file on every read instead of returning an empty map', async () => {
     const { appPathService } = await import('../../runtime/AppPathService');
-    const { secretStorageService, SecretStoreCorruptError } = await import('./SecretStorageService');
+    const { secretStorageService } = await import('./SecretStorageService');
     const secretsPath = appPathService.getRuntimePaths().secretsPath;
     fs.mkdirSync(secretsPath, { recursive: true });
     const filePath = path.join(secretsPath, 'provider-secrets.json');
     fs.writeFileSync(filePath, '{not-json', 'utf8');
 
-    expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(SecretStoreCorruptError);
-    expect(fs.existsSync(filePath)).toBe(false);
-    const quarantined = fs.readdirSync(secretsPath).filter((entry) => entry.includes('.corrupt-'));
-    expect(quarantined.length).toBe(1);
+    for (let read = 0; read < 2; read += 1) {
+      expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+    }
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('{not-json');
+    expect(fs.readdirSync(secretsPath).filter((entry) => entry.includes('.corrupt-'))).toHaveLength(1);
   });
 
-  it('does not quarantine an unreadable but intact secret file', async () => {
+  it('reports an unreadable but intact secret file as unreadable and leaves it as it is', async () => {
     const { appPathService } = await import('../../runtime/AppPathService');
-    const { secretStorageService, SecretStorageUnavailableError } = await import('./SecretStorageService');
+    const { secretStorageService } = await import('./SecretStorageService');
     const secretsPath = appPathService.getRuntimePaths().secretsPath;
     fs.mkdirSync(secretsPath, { recursive: true });
     const filePath = path.join(secretsPath, 'provider-secrets.json');
@@ -87,7 +88,7 @@ describe('SecretStorageService fail-closed', () => {
     });
 
     expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(
-      SecretStorageUnavailableError,
+      expect.objectContaining({ code: 'STORAGE_UNREADABLE', category: 'availability' }),
     );
     expect(fs.readFileSync(filePath, 'utf8')).toBe('{}');
     expect(fs.readdirSync(secretsPath)).toEqual(['provider-secrets.json']);
