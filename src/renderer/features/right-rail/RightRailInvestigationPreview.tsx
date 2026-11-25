@@ -26,7 +26,8 @@ const recordText = (record: unknown): string => {
 
 /**
  * An investigation record opens on its content: the report, or the record's own statement. A record that failed its
- * integrity check says so first and loudly. Ids, the hash, timestamps and the raw JSON stay under the one「诊断」.
+ * integrity check says so first and loudly. The id, hash, version time, load state and superseded record are not
+ * shown; the copy-diagnostics button carries them.
  */
 export const RightRailInvestigationPreview: React.FC<{
   sessionId: string;

@@ -164,7 +164,6 @@ export class SettingsService {
     return agentManifestService.definitions(appPathService.getRuntimePaths(), projectRoot);
   }
 
-  /** Everything the renderer's Settings view needs, composed from the snapshot and the external inputs. */
   /** The renderer's settings view: user sections and connection state at the current revision, no catalog facts. */
   settingsView(): SettingsView {
     const { revision, user } = this.snapshot();

@@ -8,8 +8,8 @@ const prefix = 'control.rightRail.artifacts.preview.report' as const;
 
 /**
  * The report reads as a document: what was asked, what was found, how it was checked, where it stops and what it
- * concludes. Each claim carries one verification label. Record ids, scope pairs and settlement states sit under
- * one「诊断」at the end.
+ * concludes. Each claim carries one verification label. Record ids, scope pairs and settlement states are not shown;
+ * the copy-diagnostics button at the end carries them.
  */
 export const RightRailReportView: React.FC<{ report: InvestigationReport }> = ({ report }) => {
   const { t } = useI18n();
