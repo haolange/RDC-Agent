@@ -15,14 +15,13 @@ import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import {
   composeAbortSignals,
   ensureOk,
   normalizeError,
   parseSSE,
-  ProviderEmptyStreamError,
   ProviderHttpError,
   type ProviderStreamReadOptions,
 } from './internal/http';
@@ -222,7 +221,6 @@ export class BedrockConverseProvider implements ProviderStrategy {
       const toolNames = new Map<number, string>();
       const toolIds = new Map<number, string>();
       let sawOutput = false;
-      let finishReason: StopReason = 'stop';
       const thinkingMeta = {
         kind: 'raw' as const,
         source: 'unknown' as const,
@@ -319,7 +317,7 @@ export class BedrockConverseProvider implements ProviderStrategy {
         }
 
         if (event.messageStop) {
-          finishReason = mapBedrockStopReason(event.messageStop.stopReason);
+          builder.markTerminal(mapBedrockStopReason(event.messageStop.stopReason));
           continue;
         }
 
@@ -336,10 +334,7 @@ export class BedrockConverseProvider implements ProviderStrategy {
         }
       }
 
-      if (!sawOutput) {
-        throw new ProviderEmptyStreamError(PROVIDER_API);
-      }
-      builder.done(finishReason);
+      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
     } catch (err) {
       const thrown = normalizeError(err);
       const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
@@ -412,11 +407,7 @@ async function* parseBedrockSSE(
   options: ProviderStreamReadOptions,
 ): AsyncGenerator<BedrockStreamEvent> {
   for await (const data of parseSSE(response, signal, options)) {
-    try {
-      yield JSON.parse(data) as BedrockStreamEvent;
-    } catch {
-      // Malformed SSE data is not a Bedrock event.
-    }
+    yield parseProviderFrame<BedrockStreamEvent>(data, options.providerApi);
   }
 }
 

@@ -52,6 +52,8 @@ export interface ToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /** The model's argument text when it was not a JSON object; `arguments` is then empty and the call is not run. */
+  invalidArguments?: string;
   providerOutputRef?: ProviderOutputRef;
 }
 

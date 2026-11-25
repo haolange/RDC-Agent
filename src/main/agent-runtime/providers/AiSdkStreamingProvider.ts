@@ -74,11 +74,12 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
         abortSignal: composed.signal,
         maxRetries: 0,
       });
-      await consumeFullStream(result.fullStream, builder, model);
-      if (!builder.isFinished) builder.done('stop');
+      const sawOutput = await consumeFullStream(result.fullStream, builder, model);
+      builder.finish({ signal: composed.signal, sawOutput, providerApi: this.api });
     } catch (error) {
       if (!builder.isFinished) {
-        builder.fail(normalizeError(error), composed.signal.aborted ? 'aborted' : 'error');
+        const normalized = normalizeError(error);
+        builder.fail(normalized, composed.signal.aborted || normalized.name === 'AbortError' ? 'aborted' : 'error');
       }
     } finally {
       composed.dispose();
@@ -145,7 +146,7 @@ async function consumeFullStream(
   parts: AsyncIterable<TextStreamPart<ToolSet>>,
   builder: AssistantStreamBuilder,
   model: Model,
-): Promise<void> {
+): Promise<boolean> {
   const channels = new StreamChannelRefs(model.api);
   const startedKinds = new Map<string, 'text' | 'thinking' | 'tool_call'>();
   const toolBuffers = new Map<string, string>();
@@ -209,15 +210,16 @@ async function consumeFullStream(
           ? { reasoningTokens: part.totalUsage.outputTokenDetails.reasoningTokens }
           : {}),
       }));
-      builder.done(mapFinishReason(part.finishReason));
+      builder.markTerminal(mapFinishReason(part.finishReason));
     } else if (part.type === 'abort') {
-      builder.done('aborted');
+      throw new DOMException('The provider stream was aborted.', 'AbortError');
     } else if (part.type === 'error') {
       throw normalizeError(part.error);
     } else if (partWithId.id) {
       refFor(partWithId.id);
     }
   }
+  return startedKinds.size > 0;
 }
 
 function mapFinishReason(reason: string): StopReason {

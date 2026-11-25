@@ -5,6 +5,7 @@ import {
   mergeThinkingContent,
   type ThinkingContentInput,
 } from '../../reasoning/ReasoningArtifacts';
+import { ProviderEmptyStreamError } from './http';
 import type { EventStream } from '../../core/EventStream';
 import type {
   AssistantMessage,
@@ -37,7 +38,9 @@ export type ProviderStreamDiagnosticCode =
   | 'PROVIDER_STREAM_DELTA_BEFORE_START'
   | 'PROVIDER_STREAM_DUPLICATE_BLOCK_START'
   | 'PROVIDER_STREAM_BLOCK_CLOSED'
-  | 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL';
+  | 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL'
+  | 'PROVIDER_STREAM_TRUNCATED'
+  | 'PROVIDER_STREAM_MALFORMED_FRAME';
 
 export class ProviderStreamProtocolError extends Error {
   readonly code: ProviderStreamDiagnosticCode;
@@ -52,6 +55,21 @@ export class ProviderStreamProtocolError extends Error {
 }
 
 const EMPTY_USAGE: Usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+const TERMINAL_REF = Object.freeze({ protocol: 'provider-terminal', providerBlockKey: 'done', contentIndex: 0 });
+
+/** Parses one wire frame. A frame that is not JSON is a protocol violation, never a frame to skip. */
+export function parseProviderFrame<T>(data: string, providerApi: string): T {
+  try {
+    return JSON.parse(data) as T;
+  } catch {
+    throw new ProviderStreamProtocolError(
+      'PROVIDER_STREAM_MALFORMED_FRAME',
+      { protocol: providerApi, providerBlockKey: 'frame', contentIndex: 0 },
+      `${providerApi} sent a stream frame that is not valid JSON.`,
+    );
+  }
+}
 
 export function createProviderOutputRef(input: ProviderOutputRef): ProviderOutputRef {
   if (!input.protocol.trim() || !input.providerBlockKey.trim()) {
@@ -85,6 +103,7 @@ export class AssistantStreamBuilder {
   private execution: AssistantMessage['execution'];
   private started = false;
   private finished = false;
+  private terminalReason: StopReason | null = null;
 
   constructor(
     stream: EventStream<AssistantMessageEvent, AssistantMessage>,
@@ -277,13 +296,30 @@ export class AssistantStreamBuilder {
     };
   }
 
-  done(reason: StopReason): void {
-    const terminalRef = createProviderOutputRef({
-      protocol: 'provider-terminal',
-      providerBlockKey: 'done',
-      contentIndex: 0,
-    });
-    this.assertSemanticEvent(terminalRef);
+  /** Records the provider's own end-of-message signal and the stop reason it carried. */
+  markTerminal(reason: StopReason): void {
+    this.terminalReason = reason;
+  }
+
+  /**
+   * Ends a stream whose transport has closed. Only a stream that delivered output and its terminal signal completes;
+   * an aborted read reports the abort, a silent one is empty, and output without a terminal signal is truncated.
+   */
+  finish(context: { signal: AbortSignal; sawOutput: boolean; providerApi: string }): void {
+    if (context.signal.aborted) throw new DOMException('The provider stream was aborted.', 'AbortError');
+    if (!context.sawOutput) throw new ProviderEmptyStreamError(context.providerApi);
+    if (this.terminalReason === null) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_TRUNCATED',
+        TERMINAL_REF,
+        `${context.providerApi} stream ended without its terminal event.`,
+      );
+    }
+    this.complete(this.terminalReason);
+  }
+
+  private complete(reason: StopReason): void {
+    this.assertSemanticEvent(TERMINAL_REF);
     for (const key of this.orderedBlockKeys) {
       const block = this.blocks.get(key);
       if (block && !block.closed) this.closeBlock(block);
@@ -413,7 +449,7 @@ export class AssistantStreamBuilder {
       type: 'toolCall',
       id: block.id,
       name: block.name,
-      arguments: parseJsonSafely(block.argsBuffer),
+      ...toolCallArguments(block.argsBuffer),
       providerOutputRef: { ...block.ref },
     };
     this.stream.push({
@@ -448,7 +484,7 @@ export class AssistantStreamBuilder {
           type: 'toolCall',
           id: block.id,
           name: block.name,
-          arguments: parseJsonSafely(block.argsBuffer),
+          ...toolCallArguments(block.argsBuffer),
           providerOutputRef: { ...block.ref },
         });
       }
@@ -475,15 +511,19 @@ export class AssistantStreamBuilder {
   }
 }
 
-function parseJsonSafely(raw: string): Record<string, unknown> {
-  if (!raw || !raw.trim()) return {};
+/**
+ * Arguments the model streamed for a tool call. Text that is not a JSON object stays visible as `invalidArguments`
+ * so the executor can tell the model exactly that, instead of validating a fabricated object.
+ */
+function toolCallArguments(raw: string): Pick<ToolCall, 'arguments' | 'invalidArguments'> {
+  if (!raw.trim()) return { arguments: {} };
   try {
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
+      return { arguments: parsed as Record<string, unknown> };
     }
-    return { value: parsed };
   } catch {
-    return { _raw: raw };
+    // Falls through: the text is reported as invalid arguments below.
   }
+  return { arguments: {}, invalidArguments: raw };
 }

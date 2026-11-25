@@ -15,7 +15,7 @@ import { recordQuotaFromResponse } from '../../settings/provider-catalog/Provide
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,
   StreamChannelRefs,
@@ -26,7 +26,6 @@ import {
   ensureOk,
   normalizeError,
   parseJsonLines,
-  ProviderEmptyStreamError,
 } from './internal/http';
 import { reasoningProjectionSource } from './reasoningProjection';
 import { applyOllamaThink } from './reasoningWire';
@@ -144,19 +143,11 @@ export class OllamaProvider implements ProviderStrategy {
       const alternating = new AlternatingTextThinkingChannels(channels);
       const thinkingSource = reasoningProjectionSource(options.requestPlan, 'raw');
       let thinkingBuffer = '';
-      let doneReason: string | null = null;
-      let lastChunk: OllamaChunk | null = null;
       let sawOutput = false;
 
       for await (const line of parseJsonLines(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
-        let chunk: OllamaChunk;
-        try {
-          chunk = JSON.parse(line) as OllamaChunk;
-        } catch {
-          continue;
-        }
-        lastChunk = chunk;
+        const chunk = parseProviderFrame<OllamaChunk>(line, PROVIDER_API);
 
         const message = chunk.message;
         if (message) {
@@ -208,7 +199,7 @@ export class OllamaProvider implements ProviderStrategy {
         }
 
         if (chunk.done) {
-          doneReason = chunk.done_reason ?? 'stop';
+          builder.markTerminal(mapDoneReason(chunk.done_reason ?? 'stop', toolCallCounter > 0));
           if (typeof chunk.prompt_eval_count === 'number' || typeof chunk.eval_count === 'number') {
             builder.setUsage({
               inputTokens: chunk.prompt_eval_count ?? 0,
@@ -220,15 +211,7 @@ export class OllamaProvider implements ProviderStrategy {
         }
       }
 
-      // 防止上层未发 done：以最后一条 chunk 推断状态。
-      if (!doneReason && lastChunk?.done_reason) {
-        doneReason = lastChunk.done_reason;
-      }
-
-      if (!sawOutput) {
-        throw new ProviderEmptyStreamError(PROVIDER_API);
-      }
-      builder.done(mapDoneReason(doneReason, toolCallCounter > 0));
+      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
     } catch (err) {
       const thrown = normalizeError(err);
       const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error

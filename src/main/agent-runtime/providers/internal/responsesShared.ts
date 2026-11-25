@@ -4,12 +4,11 @@ import { createProviderStateRef, findLatestProviderState } from '../../reasoning
 import { partitionSystemPrompt } from '../promptCacheWire';
 import { buildOpenAiResponsesReasoning, reasoningVisibilityRequest } from '../reasoningWire';
 import { reasoningProjectionSource } from '../reasoningProjection';
-import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef, parseProviderFrame, ProviderStreamProtocolError } from './AssistantStreamBuilder';
 import { ResponsesItemChannels } from './responsesItemChannels';
 import {
   createResponsesStreamFailure,
   parseSSE,
-  ProviderEmptyStreamError,
 } from './http';
 import { finalizeProviderUsage } from './normalizeCacheUsage';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -87,8 +86,7 @@ export async function consumeResponsesEventStream(input: {
   const reasoningEventCounts: Record<string, number> = {};
   for await (const data of parseSSE(response, signal, { providerApi: protocol, ...options })) {
     if (signal.aborted) break;
-    const event = parseJsonObject(data);
-    if (!event) continue;
+    const event = readFrameRecord(data, protocol);
 
     const eventType = readString(event.type);
     if (eventType.startsWith('response.reasoning')) reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
@@ -260,9 +258,7 @@ export async function consumeResponsesEventStream(input: {
           items.closeRemaining();
           finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
         }
-        if (!sawOutput) {
-          throw new ProviderEmptyStreamError(protocol);
-        }
+        builder.markTerminal(finishReason);
         providerTerminalSeen = true;
         break;
       }
@@ -275,10 +271,7 @@ export async function consumeResponsesEventStream(input: {
           ));
         }
         items.closeRemaining();
-        finishReason = 'length';
-        if (!sawOutput) {
-          throw new ProviderEmptyStreamError(protocol);
-        }
+        builder.markTerminal('length');
         providerTerminalSeen = true;
         break;
       }
@@ -303,15 +296,12 @@ export async function consumeResponsesEventStream(input: {
     }
   }
 
-  if (!sawOutput) {
-    throw new ProviderEmptyStreamError(protocol);
-  }
-  items.closeRemaining();
+  if (sawOutput) items.closeRemaining();
   const summaryParts = items.summaryPartReports();
   if (Object.keys(reasoningEventCounts).length || summaryParts.length) {
     builder.setExecution({ reasoningEvents: { events: reasoningEventCounts, summaryParts } });
   }
-  builder.done(finishReason);
+  builder.finish({ signal, sawOutput, providerApi: protocol });
 }
 
 /** `summary[]` of a finished Responses reasoning item, by summary index; empty entries keep their index. */
@@ -541,15 +531,15 @@ function createResponsesReasoningArtifact(
   });
 }
 
-function parseJsonObject(raw: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
+/** One Responses stream frame; anything other than a JSON object is a protocol violation. */
+function readFrameRecord(raw: string, protocol: string): Record<string, unknown> {
+  const record = readRecord(parseProviderFrame<unknown>(raw, protocol));
+  if (record) return record;
+  throw new ProviderStreamProtocolError(
+    'PROVIDER_STREAM_MALFORMED_FRAME',
+    { protocol, providerBlockKey: 'frame', contentIndex: 0 },
+    `${protocol} sent a stream frame that is not a JSON object.`,
+  );
 }
 
 function readRecord(value: unknown): Record<string, unknown> | null {

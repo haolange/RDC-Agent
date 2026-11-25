@@ -828,7 +828,8 @@ describe('providerWireFixture fail-closed stream invariants', () => {
     builder.appendToolCallArgs(toolB, '{"path":"b.md"}');
     builder.endToolCall(toolA);
     builder.endToolCall(toolB);
-    builder.done('toolUse');
+    builder.markTerminal('toolUse');
+    builder.finish({ signal: new AbortController().signal, sawOutput: true, providerApi: 'fixture' });
 
     const message = await stream.result();
     const toolCalls = message.content.filter((block) => block.type === 'toolCall');

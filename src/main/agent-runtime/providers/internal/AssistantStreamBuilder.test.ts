@@ -3,6 +3,7 @@ import { EventStream } from '../../core/EventStream';
 import {
   AssistantStreamBuilder,
   createProviderOutputRef,
+  parseProviderFrame,
   ProviderStreamProtocolError,
 } from './AssistantStreamBuilder';
 import type { AssistantMessage, AssistantMessageEvent } from '../../core/types';
@@ -54,7 +55,8 @@ describe('AssistantStreamBuilder channel invariant', () => {
     builder.startToolCall(toolRef, 'call-1', 'read_file');
     builder.appendToolCallArgs(toolRef, '{"path":"README.md"}');
     builder.endToolCall(toolRef);
-    builder.done('toolUse');
+    builder.markTerminal('toolUse');
+    builder.finish({ signal: new AbortController().signal, sawOutput: true, providerApi: 'fixture' });
 
     const message = await stream.result();
     expect(message.content.map((block) => block.type)).toEqual(['thinking', 'text', 'toolCall']);
@@ -105,7 +107,8 @@ describe('AssistantStreamBuilder channel invariant', () => {
     const { builder } = makeBuilder();
     builder.startText(textRef);
     builder.appendText(textRef, 'done');
-    builder.done('stop');
+    builder.markTerminal('stop');
+    builder.finish({ signal: new AbortController().signal, sawOutput: true, providerApi: 'fixture' });
     expect(() => builder.appendText(textRef, 'late')).toThrowError(expect.objectContaining({
       code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
     }) as ProviderStreamProtocolError);
@@ -128,5 +131,36 @@ describe('AssistantStreamBuilder channel invariant', () => {
     })).toThrowError(expect.objectContaining({
       code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
     }) as ProviderStreamProtocolError);
+  });
+});
+
+describe('AssistantStreamBuilder terminal contract', () => {
+  const live = () => new AbortController().signal;
+
+  it('keeps argument text that is not a JSON object visible instead of fabricating fields', async () => {
+    const { builder, stream } = makeBuilder();
+    builder.startToolCall(toolRef, 'call-1', 'write_file');
+    builder.appendToolCallArgs(toolRef, '{"path":"/tmp/a/b');
+    builder.endToolCall(toolRef);
+    builder.markTerminal('toolUse');
+    builder.finish({ signal: live(), sawOutput: true, providerApi: 'test' });
+    const [call] = (await stream.result()).content;
+    expect(call).toMatchObject({ type: 'toolCall', arguments: {}, invalidArguments: '{"path":"/tmp/a/b' });
+  });
+
+  it('reports an aborted read as an abort, a silent stream as empty and a terminal-less stream as truncated', () => {
+    const aborted = new AbortController();
+    aborted.abort();
+    expect(() => makeBuilder().builder.finish({ signal: aborted.signal, sawOutput: true, providerApi: 'test' }))
+      .toThrowError(expect.objectContaining({ name: 'AbortError' }));
+    expect(() => makeBuilder().builder.finish({ signal: live(), sawOutput: false, providerApi: 'test' }))
+      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_EMPTY' }));
+    expect(() => makeBuilder().builder.finish({ signal: live(), sawOutput: true, providerApi: 'test' }))
+      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_TRUNCATED' }) as ProviderStreamProtocolError);
+  });
+
+  it('treats a frame that is not JSON as a protocol violation', () => {
+    expect(() => parseProviderFrame('{"type":', 'test'))
+      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' }) as ProviderStreamProtocolError);
   });
 });

@@ -90,20 +90,22 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | --- | --- | --- |
 | `ProviderEmptyStreamError` | `PROVIDER_STREAM_EMPTY` | 流结束但无 assistant 正文或 structured tool call；**禁止**合成 HTTP 502 |
 | `ProviderWireFailureError` | wire failure | OpenAI/Azure Responses SSE `error` / `response.failed` 无 400–599 status 时；有 status 则 `ProviderHttpError` |
-| `ProviderHttpError` | HTTP status | 真实 4xx/5xx；`createResponsesStreamFailure` 仅在 wire 带明确 status 时使用 |
+| `ProviderHttpError` | HTTP status | 真实 4xx/5xx；`createResponsesStreamFailure` 仅在 wire 带明确 status 时使用；携带服务端 `retry-after-ms` / `Retry-After` 解析出的 `retryAfterMs` |
+| `ProviderStreamProtocolError` | `PROVIDER_STREAM_TRUNCATED` | 已有输出、连接关闭，但没收到该协议的终止信号（`message_stop`、`finish_reason`、`[DONE]`、`done:true`、`response.completed` 等）；半截答案与半截工具调用不入库为完成 |
+| `ProviderStreamProtocolError` | `PROVIDER_STREAM_MALFORMED_FRAME` | 流中一帧不是 JSON；不跳过、不拼接后续帧 |
 
 ### ErrorRecovery 分类与重试
 
 | category | 行为 |
 | --- | --- |
 | `empty_stream` | 最多重试 **1** 次后 abort；**不**归入 `server_error` |
-| `rate_limit` / `network_error` / `server_error` | 均最多 **3** 次重试（`DEFAULT_MAX_RETRIES`），耗尽后 abort；`server_error` 为真实 HTTP 5xx |
+| `rate_limit` / `network_error` / `server_error` | 均最多 **3** 次重试（`DEFAULT_MAX_RETRIES`），耗尽后 abort；`server_error` 为真实 HTTP 5xx。等待取 `max(指数退避, 服务端 Retry-After)`；服务端要求超过 **60s**（`MAX_RETRY_AFTER_MS`）时直接 abort 并写明要求的等待 |
 | `overloaded` | HTTP **503/529**，或文案含 `at capacity` / `high demand` / `overloaded` / `service unavailable`；最多 **3** 次重试（`DEFAULT_MAX_RETRIES`）；连续 **3** 次（`OVERLOAD_SWITCH_THRESHOLD`）命中且存在不同的 fallback model 时 `switch_model` 并清零计数；无 fallback 则重试耗尽后 abort |
 | `prompt_too_long` | 先做一次 reactive compact；仍超长则 abort |
 | `max_tokens` | 输出上限决策：先 reactive compact（未尝试时），再 `continue_prompt` 最多 **2** 次（`DEFAULT_MAX_RECOVERY_RETRIES`），耗尽后 abort |
 | `unknown` | 立即 abort |
 | `auth_error` | **401/403**；立即 abort |
-| `stream_protocol` | `PROVIDER_STREAM_*` 协议违规；不重试 |
+| `stream_protocol` | `PROVIDER_STREAM_*` 协议违规（含截断与坏帧）；不重试 |
 
 `AgentRecoveryAbortError` 必须经 `createAbortError` 构造，始终携带 `cause` + `category` / `attempts` / `maxAttempts` / `lastStatus?` / `bodySnippet`（脱敏 ≤300）；禁止裸 `new Error('[Recovery abort]')`。
 

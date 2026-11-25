@@ -16,13 +16,13 @@ import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { AssistantStreamBuilder, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, parseProviderFrame, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,
   StreamChannelRefs,
   closeSwitchedChannel,
 } from './internal/streamChannelRefs';
-import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderEmptyStreamError, ProviderHttpError } from './internal/http';
+import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
@@ -200,15 +200,14 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
       const reasoningSource = reasoningProjectionSource(options.requestPlan, 'raw');
       let sawOutput = false;
 
-      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
+      const sseOptions = {
+        providerApi: PROVIDER_API,
+        ...options,
+        onDoneSentinel: () => builder.markTerminal(mapFinishReason(finishReason)),
+      };
+      for await (const data of parseSSE(response, composed.signal, sseOptions)) {
         if (composed.signal.aborted) break;
-        let chunk: OpenAIStreamChunk;
-        try {
-          chunk = JSON.parse(data) as OpenAIStreamChunk;
-        } catch {
-          // 单条解析失败不应中断整个流。
-          continue;
-        }
+        const chunk = parseProviderFrame<OpenAIStreamChunk>(data, PROVIDER_API);
 
         builder.setExecution({
           ...(typeof chunk.model === 'string' ? { modelId: chunk.model } : {}),
@@ -316,13 +315,11 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
 
         if (choice.finish_reason) {
           finishReason = choice.finish_reason;
+          builder.markTerminal(mapFinishReason(finishReason));
         }
       }
 
-      if (!sawOutput) {
-        throw new ProviderEmptyStreamError(PROVIDER_API);
-      }
-      builder.done(mapFinishReason(finishReason));
+      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
     } catch (err) {
       const thrown = normalizeError(err);
       const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error

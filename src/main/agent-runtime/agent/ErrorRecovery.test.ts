@@ -2,8 +2,8 @@
  * ErrorRecovery 单元测试。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../providers/internal/http';
-import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
+import { parseRetryAfterMs, ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../providers/internal/http';
+import { AgentRecoveryAbortError, ErrorRecovery, MAX_RETRY_AFTER_MS } from './ErrorRecovery';
 import type { Model } from '../core/types';
 
 const PRIMARY: Model = {
@@ -349,6 +349,23 @@ describe('ErrorRecovery', () => {
       expect(d1).toBeLessThanOrEqual(2500);
       expect(d2).toBeGreaterThanOrEqual(4000);
       expect(d2).toBeLessThanOrEqual(4500);
+    });
+
+    it('waits at least as long as the provider asked and ends the turn when the request exceeds the window', () => {
+      const asked = (retryAfterMs: number) => new ProviderHttpError('openai-responses', 429, 'slow down', undefined, retryAfterMs);
+      expect(recovery.decide(asked(9_000))).toEqual({ type: 'retry', delayMs: 9_000 });
+      const short = recovery.decide(asked(10));
+      expect(short.type).toBe('retry');
+      expect((short as { delayMs: number }).delayMs).toBeGreaterThanOrEqual(1000);
+      expect(recovery.decide(asked(MAX_RETRY_AFTER_MS + 1))).toMatchObject({ type: 'abort' });
+    });
+
+    it('reads Retry-After from seconds, HTTP dates and retry-after-ms headers', () => {
+      const headers = (values: Record<string, string>) => ({ get: (name: string) => values[name] ?? null });
+      expect(parseRetryAfterMs(headers({ 'retry-after': '3' }))).toBe(3_000);
+      expect(parseRetryAfterMs(headers({ 'retry-after-ms': '250' }))).toBe(250);
+      expect(parseRetryAfterMs(headers({ 'retry-after': new Date(10_000).toUTCString() }), 4_000)).toBe(6_000);
+      expect(parseRetryAfterMs(headers({}))).toBeUndefined();
     });
   });
 

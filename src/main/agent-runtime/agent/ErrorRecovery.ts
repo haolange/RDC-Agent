@@ -11,6 +11,7 @@
 
 import {
   isProviderEmptyStreamError,
+  parseRetryAfterMs,
   ProviderHttpError,
   ProviderWireFailureError,
 } from '../providers/internal/http';
@@ -113,6 +114,25 @@ const DEFAULT_MAX_RECOVERY_RETRIES = 2;
 const OVERLOAD_SWITCH_THRESHOLD = 3;
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER_MS = 500;
+/** Longest provider-requested wait honoured inside a turn; a longer request ends the turn with its reason. */
+export const MAX_RETRY_AFTER_MS = 60_000;
+
+/** The provider's requested retry delay carried by the error or the errors it wraps. */
+export function readRetryAfterMs(error: unknown): number | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current && typeof current === 'object'; depth += 1) {
+    const requested = (current as { retryAfterMs?: unknown }).retryAfterMs;
+    if (typeof requested === 'number' && Number.isFinite(requested) && requested >= 0) return requested;
+    const headers = (current as { responseHeaders?: unknown }).responseHeaders;
+    if (headers && typeof headers === 'object') {
+      const record = headers as Record<string, string | undefined>;
+      const parsed = parseRetryAfterMs({ get: (name) => record[name] ?? record[name.toLowerCase()] ?? null });
+      if (parsed !== undefined) return parsed;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
 
 // =====================================================================
 // 错误恢复管理器
@@ -249,10 +269,7 @@ export class ErrorRecovery {
             reason: 'rate limit retries exhausted',
           };
         }
-        return {
-          type: 'retry',
-          delayMs: this.getRetryDelay(this.state.recoveryCount),
-        };
+        return this.retryHonouringProvider(error, 'rate limit');
       }
 
       case 'overloaded': {
@@ -273,10 +290,7 @@ export class ErrorRecovery {
             reason: 'overloaded retries exhausted and no fallback available',
           };
         }
-        return {
-          type: 'retry',
-          delayMs: this.getRetryDelay(this.state.recoveryCount),
-        };
+        return this.retryHonouringProvider(error, 'overloaded');
       }
 
       case 'prompt_too_long': {
@@ -321,10 +335,7 @@ export class ErrorRecovery {
             reason: `${category} retries exhausted`,
           };
         }
-        return {
-          type: 'retry',
-          delayMs: this.getRetryDelay(this.state.recoveryCount),
-        };
+        return this.retryHonouringProvider(error, category);
       }
 
       case 'stream_protocol': {
@@ -345,6 +356,17 @@ export class ErrorRecovery {
   }
 
   /** 计算指数退避（含 0–500ms 抖动）。 */
+  /** Backs off at least as long as the provider asked; a wait beyond the in-turn window ends the turn instead. */
+  private retryHonouringProvider(error: Error, label: string): RecoveryAction {
+    const backoff = this.getRetryDelay(this.state.recoveryCount);
+    const requested = readRetryAfterMs(error);
+    if (requested === undefined) return { type: 'retry', delayMs: backoff };
+    if (requested > MAX_RETRY_AFTER_MS) {
+      return { type: 'abort', reason: `${label}: provider asked to retry after ${Math.ceil(requested / 1000)}s` };
+    }
+    return { type: 'retry', delayMs: Math.max(backoff, requested) };
+  }
+
   getRetryDelay(attempt: number): number {
     const exp = Math.pow(2, Math.max(0, attempt));
     const base = RETRY_BASE_MS * exp;

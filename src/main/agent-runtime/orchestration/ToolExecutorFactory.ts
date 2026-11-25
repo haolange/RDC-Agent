@@ -242,6 +242,19 @@ export class ToolExecutorFactory {
           }
         }
         await flushPolicyBudgetObservers(policyBudget);
+        if (toolCall.invalidArguments !== undefined) {
+          return {
+            role: 'toolResult',
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: [{
+              type: 'text',
+              text: `TOOL_ARGUMENTS_INVALID: the arguments were not a JSON object. Received: ${toolCall.invalidArguments.slice(0, 200)}`,
+            }],
+            isError: true,
+            timestamp: Date.now(),
+          };
+        }
         let validatedArgs: Record<string, unknown>;
         try {
           validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments ?? {});

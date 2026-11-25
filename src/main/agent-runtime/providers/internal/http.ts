@@ -10,6 +10,8 @@ export interface ProviderStreamReadOptions extends ProviderStreamTimeoutOptions 
   providerApi: string;
   /** Max incomplete-line buffer bytes before fail-closed. Default 8 MiB. */
   maxBufferBytes?: number;
+  /** Called when the Chat Completions `[DONE]` sentinel arrives; the protocol's own terminal signal. */
+  onDoneSentinel?: () => void;
 }
 
 export const DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS = 20_000;
@@ -53,14 +55,28 @@ export class ProviderHttpError extends Error {
   readonly status: number;
   readonly providerApi: string;
   readonly bodyText?: string;
+  /** How long the provider asked the client to wait before retrying (`retry-after-ms` / `Retry-After`). */
+  readonly retryAfterMs?: number;
 
-  constructor(providerApi: string, status: number, message: string, bodyText?: string) {
+  constructor(providerApi: string, status: number, message: string, bodyText?: string, retryAfterMs?: number) {
     super(`[${providerApi}] HTTP ${status}: ${message}`);
     this.name = 'ProviderHttpError';
     this.providerApi = providerApi;
     this.status = status;
     this.bodyText = bodyText;
+    this.retryAfterMs = retryAfterMs;
   }
+}
+
+/** Reads the provider's requested retry delay from `retry-after-ms`, or `Retry-After` in seconds or as an HTTP date. */
+export function parseRetryAfterMs(headers: { get(name: string): string | null }, now = Date.now()): number | undefined {
+  const milliseconds = headers.get('retry-after-ms')?.trim();
+  if (milliseconds && /^\d+(?:\.\d+)?$/u.test(milliseconds)) return Number(milliseconds);
+  const value = headers.get('retry-after')?.trim();
+  if (!value) return undefined;
+  if (/^\d+(?:\.\d+)?$/u.test(value)) return Number(value) * 1000;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - now) : undefined;
 }
 
 export const PROVIDER_EMPTY_STREAM_MESSAGE =
@@ -188,6 +204,7 @@ export async function* parseSSERecords(
         }
         const data = line.slice(5).trimStart();
         if (data === '[DONE]') {
+          options.onDoneSentinel?.();
           return;
         }
         if (data.length === 0) {
@@ -281,7 +298,7 @@ export async function ensureOk(response: Response, providerApi: string): Promise
       || response.statusText
       || 'HTML error response')
     : bodyText ? bodyText.slice(0, 500) : response.statusText || 'request failed';
-  throw new ProviderHttpError(providerApi, response.status, snippet, bodyText);
+  throw new ProviderHttpError(providerApi, response.status, snippet, bodyText, parseRetryAfterMs(response.headers));
 }
 
 export function nowMs(): number {

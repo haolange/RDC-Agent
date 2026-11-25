@@ -1,13 +1,12 @@
 import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
   ensureOk,
   normalizeError,
   parseSSE,
-  ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
 import {
@@ -106,26 +105,19 @@ export class GoogleInteractionsProvider implements ProviderStrategy {
         { providerApi: PROVIDER_API, ...options },
       )) {
         if (composed.signal.aborted) break;
-        if (data.trim() === '[DONE]') {
-          if (!state.outcome().terminalSeen) {
-            throw new ProviderHttpError(PROVIDER_API, 502, 'Google Interactions sent [DONE] before terminal.');
-          }
-          break;
-        }
         const event = parseEvent(data);
         if (!event) {
-          throw new ProviderHttpError(PROVIDER_API, 502, 'Malformed Google Interactions SSE event.');
+          throw new ProviderStreamProtocolError(
+            'PROVIDER_STREAM_MALFORMED_FRAME',
+            { protocol: PROVIDER_API, providerBlockKey: 'frame', contentIndex: 0 },
+            'Google Interactions sent a stream frame that is not a valid event.',
+          );
         }
         state.handle(event);
       }
       const outcome = state.outcome();
-      if (!outcome.terminalSeen) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Google Interactions stream ended without a terminal event.');
-      }
-      if (!outcome.sawOutput) {
-        throw new ProviderEmptyStreamError(PROVIDER_API);
-      }
-      builder.done(outcome.finishReason);
+      if (outcome.terminalSeen) builder.markTerminal(outcome.finishReason);
+      builder.finish({ signal: composed.signal, sawOutput: outcome.sawOutput, providerApi: PROVIDER_API });
     } catch (cause) {
       const thrown = normalizeError(cause);
       const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error

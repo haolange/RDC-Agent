@@ -16,7 +16,7 @@ import { recordQuotaFromResponse } from '../../settings/provider-catalog/Provide
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
 import {
   AlternatingTextThinkingChannels,
   StreamChannelRefs,
@@ -27,7 +27,6 @@ import {
   ensureOk,
   normalizeError,
   parseSSE,
-  ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
 import { applyGeminiReasoning, reasoningVisibilityRequest } from './reasoningWire';
@@ -162,17 +161,11 @@ export class GeminiProvider implements ProviderStrategy {
       const alternating = new AlternatingTextThinkingChannels(channels);
       const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
       const signatureSource = reasoningProjectionSource(options.requestPlan, 'opaque');
-      let finishReason: string | null = null;
       let sawOutput = false;
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
-        let chunk: GeminiStreamChunk;
-        try {
-          chunk = JSON.parse(data) as GeminiStreamChunk;
-        } catch {
-          continue;
-        }
+        const chunk = parseProviderFrame<GeminiStreamChunk>(data, PROVIDER_API);
 
         if (chunk.usageMetadata) {
           builder.setUsage({
@@ -267,14 +260,11 @@ export class GeminiProvider implements ProviderStrategy {
         }
 
         if (candidate.finishReason) {
-          finishReason = candidate.finishReason;
+          builder.markTerminal(mapFinishReason(candidate.finishReason, toolCallCounter > 0));
         }
       }
 
-      if (!sawOutput) {
-        throw new ProviderEmptyStreamError(PROVIDER_API);
-      }
-      builder.done(mapFinishReason(finishReason, toolCallCounter > 0));
+      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
     } catch (err) {
       const thrown = normalizeError(err);
       const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error

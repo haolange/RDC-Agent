@@ -4,7 +4,7 @@ import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import {
@@ -12,7 +12,6 @@ import {
   ensureOk,
   normalizeError,
   parseSSE,
-  ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
 import { applyReasoningToAnthropicLikeBody, reasoningVisibilityRequest } from './reasoningWire';
@@ -209,12 +208,7 @@ export class AnthropicProvider implements ProviderStrategy {
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
-        let event: AnthropicEventBase;
-        try {
-          event = JSON.parse(data) as AnthropicEventBase;
-        } catch {
-          continue;
-        }
+        const event = parseProviderFrame<AnthropicEventBase>(data, PROVIDER_API);
 
         switch (event.type) {
           case 'message_start': {
@@ -363,6 +357,7 @@ export class AnthropicProvider implements ProviderStrategy {
             break;
           }
           case 'message_stop':
+            builder.markTerminal(mapStopReason(stopReason));
             break;
           case 'error': {
             const evt = event as AnthropicErrorEvent;
@@ -373,10 +368,7 @@ export class AnthropicProvider implements ProviderStrategy {
         }
       }
 
-      if (!sawOutput) {
-        throw new ProviderEmptyStreamError(PROVIDER_API);
-      }
-      builder.done(mapStopReason(stopReason));
+      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
     } catch (err) {
       const thrown = normalizeError(err);
       const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
