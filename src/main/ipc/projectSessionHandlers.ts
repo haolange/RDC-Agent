@@ -8,7 +8,7 @@ import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoute
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { nativeMessage } from '../window/nativeI18n';
 import { assertSessionModelExecutable } from '../conversation/sessionModelGate';

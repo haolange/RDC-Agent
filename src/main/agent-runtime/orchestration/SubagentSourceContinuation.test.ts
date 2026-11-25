@@ -24,8 +24,8 @@ import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactReferences, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
+import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { createSubagentBudgetState, type TurnHandle } from './TurnCoordinator';
-import { SubagentRunner } from './SubagentRunner';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
@@ -50,7 +50,7 @@ it.each(['wait', 'background'] as const)('returns the exact missing delegation s
     const source = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/source.json', '{"value":1}');
     const missing = 'session://tool-outputs/missing.json';
     const sendProfileMessage = vi.fn(async () => 'must not start');
-    const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
+    const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
     const background = createBackgroundSubagentService(runner);
     runner.setBackgroundStarter(input => background.start(input));
     const registry = new TaskRegistry(createSessionTaskStore(sessionId));
@@ -94,7 +94,7 @@ it('does not promote a child exception into a trusted source-grant failure', asy
     const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
     const source = sessionArtifactResolver.write(sessionId, 'session://tool-outputs/source.json', '{"value":1}');
     const sendProfileMessage = vi.fn(async () => { throw new SessionArtifactError('ARTIFACT_NOT_FOUND', 'child-private-text'); });
-    const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
+    const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
     const response = await runner.createSubagentTools('general', sessionId)[0]!.execute('child-error', {
       goal: 'Review', task: 'Review', scope: 'fixture', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [],
       inputArtifactRefs: [source.uri], requiredSkillIds: [], stopConditions: [], outputRequirements: 'Review', budget: {}, profile: 'general',
@@ -168,7 +168,7 @@ it.each([
         } } });
       return hasRaw ? 'Checked original samples.' : 'Raw measurements were not granted.';
     });
-    const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
+    const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
     const background = createBackgroundSubagentService(runner);
     runner.setBackgroundStarter(input => background.start(input));
     const tool = runner.createSubagentTools('general', sessionId)[0]!;
@@ -243,7 +243,7 @@ it('grants an independent review the evidence its granted records depend on', as
       granted = delegatedArtifactReferences(options!.sessionId!)!;
       return 'not reviewed';
     });
-    const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
+    const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'Review', getActiveTurn: () => delegatingTurn() });
     await runner.createSubagentTools('general', sessionId)[0]!.execute('review-closure', {
       goal: 'Review findings', task: 'Review', scope: 'fixture', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [],
       inputArtifactRefs: [source.uri, claim.uri], requiredSkillIds: [], stopConditions: [], outputRequirements: 'Review',

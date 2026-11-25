@@ -9,7 +9,7 @@ const orchestrator = vi.hoisted(() => ({
   backgroundSubagents: { beforeParentProviderRequestMessages: vi.fn(() => []) },
 }));
 const storage = vi.hoisted(() => ({ updateSession: vi.fn(), updateRun: vi.fn(), commitConversationTerminal: vi.fn() }));
-vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({ agentOrchestrator: orchestrator }));
+vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({ agentOrchestrator: orchestrator }));
 vi.mock('../sessions/store/sessionStores', () => ({ sessionRecordStore: storage, conversationHistoryStore: storage }));
 vi.mock('./ConversationAttachmentMaterializer', () => ({ hydrateFrozenUserContent: vi.fn(async () => 'inspect') }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));

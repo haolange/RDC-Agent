@@ -6,7 +6,7 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 const fixture = vi.hoisted(() => ({ level: 'high', model: null as unknown as EffectiveModel, preparedControls: null as unknown }));
 vi.mock('electron', () => ({ app: { getPath: () => '.', getAppPath: () => '.' }, BrowserWindow: class {} }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { revalidateExternalInputs: () => undefined, providerConnections: { get: () => undefined, list: () => [] } } }));
-vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({ agentOrchestrator: { refreshProviderRuntimeCredentials: async () => 'lease' } }));
+vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({ agentOrchestrator: { refreshProviderRuntimeCredentials: async () => 'lease' } }));
 vi.mock('../provider-catalog/ProviderCatalogRegistry', () => ({ loadProviderSurface: async () => ({}) }));
 vi.mock('../settings/settings-core/compactionPercent', () => ({ resolveCompactionPercentForProject: () => 80 }));
 vi.mock('../settings/provider-catalog/EffectiveModelResolver', () => ({

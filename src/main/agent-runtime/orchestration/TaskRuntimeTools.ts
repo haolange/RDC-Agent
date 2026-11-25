@@ -8,12 +8,13 @@ import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
 import { bindTaskRootBudget } from './TaskRootBudget';
 import { readLiveTaskBudget } from './TaskRuntimeBudgetView';
 import type { TurnHandle } from './TurnCoordinator';
+import type { ActiveTurnLookup } from './orchestratorTypes';
 import type { AgentTool } from '../agent/AgentTool';
 
 export function createTaskRuntimeTools(input: {
   sessionId?: string | null;
   turnHandle?: TurnHandle | null;
-  getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
+  activeTurns: ActiveTurnLookup;
 }): AgentTool[] {
   const resolvedSessionId = input.sessionId ?? input.turnHandle?.eventSink?.sessionId ?? null;
   const delegatedScope = resolvedSessionId ? getDelegatedTaskScope(resolvedSessionId) : null;
@@ -34,7 +35,7 @@ export function createTaskRuntimeTools(input: {
   });
   registry.onTaskChange = ({ type, task, snapshot }) => {
     if (resolvedSessionId && !isSubagent) traceProjectionRefreshService.schedule(resolvedSessionId);
-    const sink = input.turnHandle?.eventSink ?? input.getActiveTurn(resolvedSessionId)?.eventSink;
+    const sink = input.turnHandle?.eventSink ?? input.activeTurns.getActiveTurn(resolvedSessionId)?.eventSink;
     if (!sink?.onEvent || (input.turnHandle && !input.turnHandle.isLive(input.turnHandle.generation))) return;
     sink.onEvent({
       id: generateEventId('agent-event'),
@@ -48,15 +49,15 @@ export function createTaskRuntimeTools(input: {
   const recovery = registry.reconcileInterruptedExecutions();
   const tools = createTaskTools(registry, {
     scopeRootTaskId: delegatedScope?.rootTaskId,
-    readLiveBudget: (rootBudgetId) => readLiveTaskBudget(input.turnHandle ?? input.getActiveTurn(resolvedSessionId), rootBudgetId),
+    readLiveBudget: (rootBudgetId) => readLiveTaskBudget(input.turnHandle ?? input.activeTurns.getActiveTurn(resolvedSessionId), rootBudgetId),
     readRequestUsage: resolvedSessionId ? () => requestSnapshotStore.readUsage(resolvedSessionId) : undefined,
     requestCurrentTurnStop: () => false,
     getCreationTurnRef: () => {
-      const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
+      const turn = input.turnHandle ?? input.activeTurns.getActiveTurn(resolvedSessionId);
       return turn?.turnId ? `turn:${turn.turnId}:generation:${turn.generation}` : undefined;
     },
     startOptions: async (taskId) => {
-      const turn = input.turnHandle ?? input.getActiveTurn(resolvedSessionId);
+      const turn = input.turnHandle ?? input.activeTurns.getActiveTurn(resolvedSessionId);
       const scopedExecutions = await registry.listExecutions(taskId);
       const priorRootBudgetId = delegatedScope?.executionId
         ? (await registry.getExecution(delegatedScope.executionId))?.rootBudgetId

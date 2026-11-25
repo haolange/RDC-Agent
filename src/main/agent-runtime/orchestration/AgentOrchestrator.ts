@@ -1,137 +1,82 @@
-import { agentAccessCeiling } from '@shared/types/agentManifest';
-import { AppError } from '@shared/errors/appError';
-import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../../investigation/missionCompletionContract';
 /**
- * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
- * turn runner, subagent runner, and prompt-plan helpers.
+ * AgentOrchestrator — façade over turn preparation, the turn runner, subagents and MCP.
  *
  * Public contract: `prepareTurnContext` / `sendProfileMessage` / `abortAndJoin`. LLM streaming and tool gating stay
- * in AgentTurnRunner; permissions stay in AgentPermissionPolicy.
+ * in AgentTurnRunner; permissions stay in AgentPermissionPolicy. The composition root (`agentRuntimeRoot.ts`)
+ * constructs every collaborator and passes them in; this file depends on their types only.
  */
 
+import { AppError } from '@shared/errors/appError';
+import { isTopLevelAgentId } from '@shared/types/agent';
+import { agentAccessCeiling } from '@shared/types/agentManifest';
+import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
+import { isSubagentScopeId, isTransientScopeId } from '@shared/utils/executionScope';
 import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import { appPathService } from '../../runtime/AppPathService';
+import { sessionRecordStore } from '../../sessions/store/sessionStores';
+import { settingsService } from '../../settings/settings-core/SettingsService';
+import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
+import { compiledRoutesFromDefinitions } from '../../settings/provider-catalog/compiledAgentRoutes';
+import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
+import { freezeProviderRuntimeCredentials } from '../../settings/provider-auth/ProviderRuntimeCredentialLease';
+import { planEffectiveModelRequest, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import { resolveCompactionPercentForProject } from '../../settings/settings-core/compactionPercent';
 import { delegableProfileIds } from './delegableProfiles';
-import {
-  AGENT_DISPLAY_NAMES,
-  AgentSlotRegistry,
-  AgentTurnRunner,
-  DeferredToolActivationTracker,
-  freezeProviderRuntimeCredentials,
-  isTopLevelAgentId,
-  McpConnectionCoordinator,
-  MemoryStore,
-  planEffectiveModelRequest,
-  PromptPlanForTurn,
-  providerRuntimeCredentialService,
-  resolveAgentToolAllowlistFromDefinition,
-  resolveCompactionPercentForProject,
-  resolveEffectiveModel,
-  RuntimeToolAssembly,
-  runtimeLogService,
-  appPathService,
-  agentManifestService,
-  compiledRoutesFromDefinitions,
-  settingsService,
-  sessionRecordStore,
-  SubagentRunner,
-  createBackgroundSubagentService,
-  type BackgroundSubagentService,
-  TokenizerService,
-  ToolExecutorFactory,
-  turnCoordinator,
-  TurnPreparationService,
-  ProfileTurnPreparation,
-  resolveProfileToolAllowlist,
-  OrchestratorMemoryUi,
-  resolveExecutionScopeId,
-  createEphemeralScopeId,
-  isSubagentScopeId,
-  isTransientScopeId,
-  workflowProjectionPublisher,
-  type AbortReason,
-  type AgentProfileTurnOptions,
-  type PreparedAgentTurnContext,
-  type TurnHandle,
-} from './AgentOrchestrator.deps';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
-import type {
-  AgentConfig,
-  AgentRole,
-  AgentState,
-} from '@shared/types/agent';
+import { resolveProfileToolAllowlist } from './ProfileTurnPreparation';
+import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
+import { createEphemeralScopeId, resolveExecutionScopeId } from './executionScope';
+import { turnCoordinator, type AbortReason } from './TurnCoordinator';
+import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
+import type { AgentConfig, AgentRole, AgentState } from '@shared/types/agent';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { LlmProviderId } from '@shared/types/settings';
-export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
+import type { AgentSlotRegistry } from './AgentSlotRegistry';
+import type { AgentTurnRunner } from './AgentTurnRunner';
+import type { BackgroundSubagentService } from './BackgroundSubagentService';
+import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { ProfileTurnPreparation } from './ProfileTurnPreparation';
+import type { PromptPlanForTurn } from './PromptPlanForTurn';
+import type { ToolExecutorFactory } from './ToolExecutorFactory';
+import type { TurnPreparationService } from './TurnPreparationService';
+import type { AgentProfileTurnOptions, PreparedAgentTurnContext } from './orchestratorTypes';
+
+/** The collaborators the composition root constructs for the façade. */
+export interface AgentOrchestratorCollaborators {
+  slots: AgentSlotRegistry;
+  mcp: McpConnectionCoordinator;
+  deferredActivation: DeferredToolActivationTracker;
+  promptPlan: PromptPlanForTurn;
+  toolExecutors: ToolExecutorFactory;
+  turnPrep: TurnPreparationService;
+  profilePrep: ProfileTurnPreparation;
+  turnRunner: AgentTurnRunner;
+  backgroundSubagents: BackgroundSubagentService;
+}
+
 export class AgentOrchestrator {
-  private readonly slots = new AgentSlotRegistry();
-  private readonly mcp = new McpConnectionCoordinator();
-  private readonly deferredActivation = new DeferredToolActivationTracker();
-  private readonly tokenizerService = new TokenizerService();
-  private readonly promptPlan = new PromptPlanForTurn();
-  private readonly tools: RuntimeToolAssembly;
+  private readonly slots: AgentSlotRegistry;
+  private readonly mcp: McpConnectionCoordinator;
+  private readonly deferredActivation: DeferredToolActivationTracker;
+  private readonly promptPlan: PromptPlanForTurn;
   private readonly toolExecutors: ToolExecutorFactory;
   private readonly turnPrep: TurnPreparationService;
   private readonly profilePrep: ProfileTurnPreparation;
   private readonly turnRunner: AgentTurnRunner;
-  private readonly subagents: SubagentRunner;
   readonly backgroundSubagents: BackgroundSubagentService;
-  private readonly memoryUi: OrchestratorMemoryUi;
 
-  constructor() {
-    this.slots.initializeDefaults();
-    this.memoryUi = new OrchestratorMemoryUi(() => this.getMemoryStore('user'));
-    const getActiveTurn = (sessionId?: string | null) =>
-      turnCoordinator.getActive(this.sessionTurnKey(sessionId));
-
-    this.subagents = new SubagentRunner({
-      sendProfileMessage: (agentId, content, options) => this.sendProfileMessage(agentId, content, options),
-      systemPromptForAgent: (agentId, prompt) => this.promptPlan.systemPromptForAgent(agentId, prompt),
-      getActiveTurn,
-    });
-    this.backgroundSubagents = createBackgroundSubagentService(this.subagents);
-    this.subagents.setBackgroundStarter((input) => this.backgroundSubagents.start(input));
-
-    this.tools = new RuntimeToolAssembly({
-      mcp: this.mcp,
-      getActiveTurn,
-      getMemoryStore: (scope, projectRootPath) => this.getMemoryStore(scope, projectRootPath),
-      createSubagentTools: (parentAgentId, sessionId, turnHandle) =>
-        this.subagents.createSubagentTools(parentAgentId, sessionId, turnHandle),
-      createBackgroundTools: (parentAgentId, sessionId, turnHandle) =>
-        this.backgroundSubagents.createTools(parentAgentId, sessionId, turnHandle),
-      getMcpServerStatusSummary: (projectRootPath, query) =>
-        this.mcp.getMcpServerStatusSummary(projectRootPath, query),
-    });
-
-    this.toolExecutors = new ToolExecutorFactory({
-      slots: this.slots,
-      deferredActivation: this.deferredActivation,
-      getActiveTurn,
-      resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
-      isAllowedForRuntime: (...args) => this.tools.isAllowedForRuntime(...args),
-      matchesToolAllowlist: (...args) => this.tools.matchesToolAllowlist(...args),
-    });
-
-    this.turnPrep = new TurnPreparationService({
-      mcp: this.mcp,
-      deferredActivation: this.deferredActivation,
-      resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
-      createToolSignature: (...args) => this.tools.createToolSignature(...args),
-    });
-    this.profilePrep = new ProfileTurnPreparation(this.turnPrep);
-
-    this.turnRunner = new AgentTurnRunner({
-      validateCompletion: enforceMissionTurnCompletion,
-      validateCompletionReadiness: enforceMissionTurnReadiness,
-      slots: this.slots,
-      mcp: this.mcp,
-      deferredActivation: this.deferredActivation,
-      tokenizerService: this.tokenizerService,
-      sessionTurnKey: (sessionId) => this.sessionTurnKey(sessionId),
-      resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
-      createToolSignature: (...args) => this.tools.createToolSignature(...args),
-      createToolExecutor: (...args) => this.toolExecutors.createToolExecutor(...args),
-    });
+  constructor(collaborators: AgentOrchestratorCollaborators) {
+    this.slots = collaborators.slots;
+    this.mcp = collaborators.mcp;
+    this.deferredActivation = collaborators.deferredActivation;
+    this.promptPlan = collaborators.promptPlan;
+    this.toolExecutors = collaborators.toolExecutors;
+    this.turnPrep = collaborators.turnPrep;
+    this.profilePrep = collaborators.profilePrep;
+    this.turnRunner = collaborators.turnRunner;
+    this.backgroundSubagents = collaborators.backgroundSubagents;
   }
 
   /** Re-reads the Agent model routes Settings assigns (after a settings or credential change). */
@@ -153,10 +98,6 @@ export class AgentOrchestrator {
   releaseSessionToolState = (sessionId: string): void => this.toolExecutors.releaseSession(sessionId);
   private getOrCreateAgentConfig(agentId: AgentRole): AgentConfig {
     return this.slots.getOrCreateAgentConfig(agentId);
-  }
-
-  private sessionTurnKey(sessionId?: string | null, ephemeralScopeId?: string | null): string {
-    return resolveExecutionScopeId(sessionId, ephemeralScopeId);
   }
 
   async refreshProviderRuntimeCredentials(providerId: LlmProviderId): Promise<string> {
@@ -429,8 +370,6 @@ export class AgentOrchestrator {
     }
   }
 
-  async runSubagent(input: Parameters<SubagentRunner['runSubagent']>[0]): Promise<Awaited<ReturnType<SubagentRunner['runSubagent']>>> { return this.subagents.runSubagent(input); }
-  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) { return this.subagents.createSubagentTools(parentAgentId, sessionId, turnHandle); }
   async abortAndJoin(sessionId: string | null | undefined, options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason }): Promise<void> {
     const key = sessionId?.trim();
     if (!key) return;
@@ -447,33 +386,6 @@ export class AgentOrchestrator {
     });
     turnCoordinator.endTurn(handle);
   }
-
-  private getMemoryStore(scope: 'user' | 'project', projectRootPath?: string | null): MemoryStore {
-    if (scope === 'project') {
-      if (!projectRootPath) throw new Error('Project scope memory requires an active project.');
-      return new MemoryStore(appPathService.getProjectRdcPaths(projectRootPath).memoryPath);
-    }
-    return new MemoryStore(appPathService.getUserRdcPaths().memoryPath);
-  }
-
-  async listMemoriesForUi(): Promise<Array<{ name: string; description: string; type: string; updatedAt: number }>> {
-    return this.memoryUi.listMemories();
-  }
-
-  async getMemoryForUi(name: string): Promise<{
-    name: string; description: string; type: string; content: string; tags?: string[]; createdAt: number; updatedAt: number;
-  } | null> {
-    return this.memoryUi.getMemory(name);
-  }
-
-  async writeMemoryForUi(request: { name: string; description: string; type: 'user' | 'feedback' | 'project' | 'reference'; content: string; tags?: string[] }): Promise<{ success: boolean; name: string; error?: string }> {
-    return this.memoryUi.writeMemory(request);
-  }
-
-  async deleteMemoryForUi(name: string): Promise<{ success: boolean; error?: string }> {
-    return this.memoryUi.deleteMemory(name);
-  }
-
 
   getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
     return this.mcp.getMcpServerStatusSummary(projectRootPath, query);
@@ -517,4 +429,3 @@ export class AgentOrchestrator {
 
 }
 
-export const agentOrchestrator = new AgentOrchestrator();

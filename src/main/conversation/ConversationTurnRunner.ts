@@ -5,7 +5,7 @@ import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
 import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -28,6 +28,7 @@ import {
   isActiveRun,
   recordLlmDiagnostic,
 } from './ConversationRoutePreflight';
+import type { PreparedAgentTurnContext } from '../agent-runtime/orchestration/orchestratorTypes';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,

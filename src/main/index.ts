@@ -37,7 +37,7 @@ import {
 } from './browserAppBridge/BrowserAppBridgeServer';
 import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
 import { conversationService } from './conversation/ConversationService';
-import { agentOrchestrator } from './agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from './agent-runtime/orchestration/agentRuntimeRoot';
 import { processSupervisor } from './runtime/ProcessSupervisor';
 import { turnCoordinator } from './agent-runtime/orchestration/TurnCoordinator';
 import {

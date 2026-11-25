@@ -52,7 +52,7 @@ import {
   countContinuationDecisions,
   type FrozenAttachmentManifestEntry,
   type PreparedAgentTurnContext,
-  type ResolvedRuntimeTools,
+  type RuntimeToolResolver,
 } from './orchestratorTypes';
 import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
@@ -61,7 +61,6 @@ import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { UserMessage, ToolDefinition } from '../core/types';
-import type { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
@@ -108,17 +107,7 @@ function resolveSkillIntersection(
 export interface TurnPreparationServiceDeps {
   mcp: McpConnectionCoordinator;
   deferredActivation: DeferredToolActivationTracker;
-  resolveRuntimeTools: (
-    agentId: AgentRole,
-    toolAllowlist: string[],
-    sessionId?: string | null,
-    turnHandle?: TurnHandle | null,
-    projectId?: string | null,
-    projectRootPath?: string | null,
-    mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
-  ) => ResolvedRuntimeTools;
-  createToolSignature: (tools: ToolDefinition[]) => string;
+  tools: RuntimeToolResolver;
 }
 
 export class TurnPreparationService {
@@ -257,7 +246,7 @@ export class TurnPreparationService {
     try {
       throwIfCancelled();
     const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
-    const runtimeTools = this.deps.resolveRuntimeTools(
+    const runtimeTools = this.deps.tools.resolveRuntimeTools(
       input.agentId,
       preparedToolAllowlist,
       input.sessionId,
@@ -269,7 +258,7 @@ export class TurnPreparationService {
     );
     const executionScopeId = resolveExecutionScopeId(input.sessionId);
     const slotKey = agentSlotKey(executionScopeId, input.agentId);
-    const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
+    const toolSignature = this.deps.tools.createToolSignature(runtimeTools.definitions);
     const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
     const investigationTools = ['investigation_schema', 'investigation_read', 'investigation_write', 'investigation_list'];
     preactivateWorkflowTools(

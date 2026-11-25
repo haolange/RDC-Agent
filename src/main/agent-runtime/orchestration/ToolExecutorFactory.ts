@@ -34,7 +34,7 @@ import { countSubagentDispatches, isConcurrencySafeSpec, resourceClaimOf } from 
 import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
 import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
-import { reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
+import { reserveDispatchBudget } from './TurnCoordinator';
 import { normalizeToolName } from './RuntimeToolPolicy';
 import { extractDeferredToolNamesFromToolSearchDetails } from './deferredTools';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
@@ -51,7 +51,7 @@ import {
   type ToolExecutorScope,
   type ValidatedToolCall,
 } from './ToolCallAdmission';
-import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
+import type { RuntimeToolResolver, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { ToolCall, ToolResultMessage } from '../core/types';
 import type { ToolExecutor } from '../agent/AgentLoop';
@@ -63,16 +63,7 @@ import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
 export interface ToolExecutorFactoryDeps extends ToolCallAdmissionDeps {
   deferredActivation: DeferredToolActivationTracker;
-  resolveRuntimeTools: (
-    agentId: AgentRole,
-    toolAllowlist: string[],
-    sessionId?: string | null,
-    turnHandle?: TurnHandle | null,
-    projectId?: string | null,
-    projectRootPath?: string | null,
-    mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
-  ) => ResolvedRuntimeTools;
+  tools: Pick<RuntimeToolResolver, 'resolveRuntimeTools'>;
 }
 
 export class ToolExecutorFactory {
@@ -94,7 +85,7 @@ export class ToolExecutorFactory {
   constructor(private readonly deps: ToolExecutorFactoryDeps) {}
 
   activateDeferredTools(toolNames: string[], sessionId?: string | null): void {
-    const activation = this.deps.getActiveTurn(sessionId)?.deferredActivation ?? null;
+    const activation = this.deps.activeTurns.getActiveTurn(sessionId)?.deferredActivation ?? null;
     if (!activation || toolNames.length === 0) {
       return;
     }
@@ -125,7 +116,7 @@ export class ToolExecutorFactory {
     const specOf = (toolName: string) => scope.tools.get(normalizeToolName(toolName))?.spec;
     return {
       shouldEndTurnAfterToolResult: (result) => {
-        const approved = this.deps.getActiveTurn(sessionId)?.approvedPlan;
+        const approved = this.deps.activeTurns.getActiveTurn(sessionId)?.approvedPlan;
         // The result names the tool exactly as called; only the canonical name resolves.
         return !result.isError && scope.tools.get(result.toolName)?.spec.interaction === 'plan-review'
           && approved?.toolCallId === result.toolCallId;
@@ -157,13 +148,13 @@ export class ToolExecutorFactory {
   ): ToolExecutorScope {
     const plan = runtimeContext?.effectivePlan;
     const effectiveToolAllowlist = plan ? [...plan.toolAllowlist] : toolAllowlist;
-    const tools = this.deps.resolveRuntimeTools(
+    const tools = this.deps.tools.resolveRuntimeTools(
       agentId,
       // Match the prepared schemas, including the tool_search closure. Building
       // from the broader profile list advertises tools the frozen Skill forbids.
       [...(plan?.skillIntersection ?? effectiveToolAllowlist)],
       sessionId,
-      this.deps.getActiveTurn(sessionId),
+      this.deps.activeTurns.getActiveTurn(sessionId),
       runtimeContext?.projectId ?? plan?.projectId,
       runtimeContext?.projectRootPath ?? plan?.projectRootPath,
       runtimeContext?.mcpPoolKey ?? null,
@@ -198,7 +189,7 @@ export class ToolExecutorFactory {
     const validated = validateToolArguments(tool, toolCall);
     if (!validated.ok) return validated.result;
     const call: ValidatedToolCall = { toolCall, tool, args: validated.value };
-    const captureDenial = captureAccessDenial(call, this.deps.getActiveTurn(runtimeContext?.sessionId ?? sessionId));
+    const captureDenial = captureAccessDenial(call, this.deps.activeTurns.getActiveTurn(runtimeContext?.sessionId ?? sessionId));
     if (captureDenial) return denyTool(captureDenial);
     if (tool.spec.interaction === 'user-input') {
       return this.executeAskUserTool({ ...toolCall, arguments: call.args }, agentId, runtimeContext, signal, onExecutionStart);
@@ -212,11 +203,11 @@ export class ToolExecutorFactory {
   private buildExecutionContext(scope: ToolExecutorScope, tool: AgentTool, executorSessionId: string | null): ToolExecutionContext {
     const { plan, runtimeContext, sessionId } = scope;
     const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
-    const executionPlan = this.deps.getActiveTurn(executorSessionId)?.runtimePlan ?? plan;
+    const executionPlan = this.deps.activeTurns.getActiveTurn(executorSessionId)?.runtimePlan ?? plan;
     return {
       successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
       rdcBinding: executionPlan ? getRdcTurnBinding(executionPlan) : undefined,
-      captureControl: this.deps.getActiveTurn(executorSessionId)?.captureControl ?? undefined,
+      captureControl: this.deps.activeTurns.getActiveTurn(executorSessionId)?.captureControl ?? undefined,
       agentId: scope.agentId,
       accessCeiling: plan?.accessCeiling,
       turnId: runtimeContext?.turnId,
@@ -300,7 +291,7 @@ export class ToolExecutorFactory {
       // canonical project root when available and fall back to session
       // ownership only for ephemeral/no-project execution.
       const resourceKey = toolResourceKey(projectRootPath, ownerSessionId);
-      const admissionTurn = this.deps.getActiveTurn(executorSessionId);
+      const admissionTurn = this.deps.activeTurns.getActiveTurn(executorSessionId);
       const admissionGeneration = admissionTurn?.generation;
       const argumentIdentity = JSON.stringify(validatedArgs);
       const assertLive = () => {
@@ -462,7 +453,7 @@ export class ToolExecutorFactory {
       if (handoffOptions.length === 0) {
         throw new AppError('PLAN_REVIEW_NO_HANDOFF', 'plan_artifact requires a declared continue handoff on this profile.');
       }
-      const turnHandle = this.deps.getActiveTurn(sessionId);
+      const turnHandle = this.deps.activeTurns.getActiveTurn(sessionId);
       if (turnHandle) {
         if (turnHandle.turnId !== runtimeContext.turnId) throw new AppError('PLAN_TURN_CHANGED', 'the planning turn is no longer active.');
         const unfinished = await listUnfinishedDirectTasks({ sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation });

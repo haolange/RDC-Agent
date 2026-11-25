@@ -130,9 +130,13 @@ describe('ToolExecutorFactory', () => {
       ['shell', { ...shellTool, execute: shell }],
       ['rdc_probe', { name: 'rdc_probe', description: 'probe', parameters: { type: 'object', properties: {} }, spec: RDC_PROBE_TOOL_SPEC, execute: probe }],
     ]);
-    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-      getActiveTurn: () => turn as never, resolveRuntimeTools: () => ({ toolMap: toolMap as never, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as never,
+      deferredActivation: {} as never,
+      activeTurns: { getActiveTurn: () => turn as never },
+      tools: { resolveRuntimeTools: () => ({ toolMap: toolMap as never, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+    });
     const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation(input => input.result);
     const executor = preparedExecutor(factory, 'general', ['shell', 'rdc_probe'], 'unscoped-mission', {
       sessionId: 'unscoped-mission', turnId: 'turn', projectId: 'p', projectRootPath: process.cwd(),
@@ -174,9 +178,13 @@ describe('ToolExecutorFactory', () => {
     const turn = { generation: 1, isLive: () => true, captureControl: { prepareRecovery, assertLiveAccess: vi.fn() }, runtimePlan: null };
     const tool = { name: 'rdc_probe', description: 'probe', parameters: { type: 'object', properties: {} },
       spec: RDC_PROBE_TOOL_SPEC, execute: effect };
-    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-      getActiveTurn: () => turn as never, resolveRuntimeTools: () => ({ toolMap: new Map([['rdc_probe', tool]]) as never, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as never,
+      deferredActivation: {} as never,
+      activeTurns: { getActiveTurn: () => turn as never },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map([['rdc_probe', tool]]) as never, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+    });
     vi.spyOn(factory, 'triggerRuntimeHooks').mockResolvedValue({ allowed: true });
     const executor = preparedExecutor(factory, 'general', ['rdc_probe'], 'recovery-owner', { sessionId: 'recovery-owner', turnId: 'turn',
       projectId: 'p', projectRootPath: process.cwd(), effectivePlan: { toolAllowlist: ['rdc_probe'], skillIntersection: null,
@@ -210,9 +218,13 @@ describe('ToolExecutorFactory', () => {
     hookTrigger.mockImplementationOnce(async () => { await hook; return []; });
     const started = vi.fn();
     const effect = vi.fn(async () => { expect(started).toHaveBeenCalledTimes(1); return { content: [] }; });
-    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as never,
+      deferredActivation: {} as never,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+    });
     const executor = preparedExecutor(factory, 'general', ['shell'], 'start-boundary', {
       sessionId: 'start-boundary', turnId: 'start-turn', eventContext: { sessionId: 'start-boundary', turnId: 'start-turn' },
       effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
@@ -235,9 +247,13 @@ describe('ToolExecutorFactory', () => {
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const started = [vi.fn(), vi.fn()];
     const effect = vi.fn(async (id: string) => { if (id === 'first') await gate; return { content: [] }; });
-    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as never,
+      deferredActivation: {} as never,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute: effect }]]), definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+    });
     const executor = preparedExecutor(factory, 'general', ['shell'], 'queued-start', {
       sessionId: 'queued-start', effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
     const hooks = vi.spyOn(factory, 'triggerRuntimeHooks').mockResolvedValue({ allowed: true });
@@ -258,9 +274,13 @@ describe('ToolExecutorFactory', () => {
   it('delivers the actual auto-review risk and reason without executing a rejected call', async () => {
     const execute = vi.fn();
     const toolMap = new Map([['shell', { ...shellTool, execute }]]);
-    const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as never,
+      deferredActivation: {} as never,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+    });
     permissionEvaluate.mockReturnValueOnce({ action: 'auto_review', risk: 'high', reason: 'Native mutation requires review.' } as never);
     const executor = preparedExecutor(factory, 'general', ['shell'], 'review-owner', { sessionId: 'review-owner', turnId: 'review-turn',
       eventContext: { sessionId: 'review-owner', turnId: 'review-turn' }, effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
@@ -285,8 +305,9 @@ describe('ToolExecutorFactory', () => {
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+        activeTurns: { getActiveTurn: () => null },
+        tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+        toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const result = await preparedExecutor(factory, 'general', ['read_file'], 'audit-owner', {
         effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
@@ -323,9 +344,13 @@ describe('ToolExecutorFactory', () => {
     try {
       const toolMap = new Map([['rdc_probe', { name: 'rdc_probe', description: 'probe',
         parameters: { type: 'object', properties: {} }, spec: RDC_PROBE_TOOL_SPEC, execute }]]);
-      const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+      const factory = new ToolExecutorFactory({
+        slots: { getSlot: () => null } as never,
+        deferredActivation: {} as never,
+        activeTurns: { getActiveTurn: () => null },
+        tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+        toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+      });
       const result = await preparedExecutor(factory, 'general', ['rdc_probe'], 'probe-owner', {
         effectivePlan: { toolAllowlist: ['rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
       }).execute({ type: 'toolCall', id: 'context-query', name: 'rdc_probe',
@@ -357,9 +382,13 @@ describe('ToolExecutorFactory', () => {
     try {
       const toolMap = new Map([['rdc_probe', { name: 'rdc_probe', description: 'probe',
         parameters: { type: 'object', properties: {} }, spec: RDC_PROBE_TOOL_SPEC, execute }]]);
-      const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+      const factory = new ToolExecutorFactory({
+        slots: { getSlot: () => null } as never,
+        deferredActivation: {} as never,
+        activeTurns: { getActiveTurn: () => null },
+        tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+        toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+      });
       const executor = preparedExecutor(factory, 'general', ['rdc_probe'], 'probe-scope', {
         effectivePlan: { toolAllowlist: ['rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
       });
@@ -393,8 +422,9 @@ describe('ToolExecutorFactory', () => {
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+        activeTurns: { getActiveTurn: () => null },
+        tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+        toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const discovery = kind === 'search' ? { kind, query: 'hardware shader trace', limit: 2 }
         : kind === 'describe' ? { kind, operation: 'rd.shader.debug_start' } : { kind, limit: 20 };
@@ -438,8 +468,9 @@ describe('ToolExecutorFactory', () => {
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-        getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+        activeTurns: { getActiveTurn: () => null },
+        tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+        toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const result = await preparedExecutor(factory, 'general', ['shell'], 'catalog-full', {
         effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
@@ -464,11 +495,11 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map([['read_file', { name: 'read_file', description: 'read text',
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map([['read_file', { name: 'read_file', description: 'read text',
         parameters: { type: 'object', properties: { path: { type: 'string' }, pinEvidence: { type: 'boolean' } } }, spec: readFileTool.spec, execute }]]),
-      definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     try {
       const result = await preparedExecutor(factory, 'general', ['read_file'], 'text-evidence', {
@@ -488,11 +519,12 @@ describe('ToolExecutorFactory', () => {
     const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation(input => input.result);
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
-      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map([['runtime_context', { name: 'runtime_context', description: 'owning context',
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map([['runtime_context', { name: 'runtime_context', description: 'owning context',
         parameters: { type: 'object', properties: {} }, spec: { ...EXCLUSIVE_SPEC, presentation: { pinEvidence: () => true } }, execute }]]),
-      definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     try {
       const result = await preparedExecutor(factory, 'general', ['runtime_context'], 'context-evidence', {
@@ -510,8 +542,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const result = await preparedExecutor(factory, 'general', ['shell'], 'plain-shell', {
       effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
@@ -544,11 +577,11 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map([[name, { name, description: name,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map([[name, { name, description: name,
         parameters: { type: 'object', properties: {} }, spec: shell ? shellTool.spec : readFileTool.spec, execute }]]),
-      definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+      definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     try {
       const result = await preparedExecutor(factory, 'general', [name], 'native-failure-session', {
@@ -576,9 +609,9 @@ describe('ToolExecutorFactory', () => {
       const factory = new ToolExecutorFactory({
         slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
         deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-        getActiveTurn: () => null,
-        resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-        isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+        activeTurns: { getActiveTurn: () => null },
+        tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+        toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const result = await preparedExecutor(factory, 'general', ['code_interpreter'], 'interpreter-session', {
         effectivePlan: { toolAllowlist: ['code_interpreter'], skillIntersection: null,
@@ -601,10 +634,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     permissionEvaluate.mockClear();
     const result = await preparedExecutor(factory, 'ask', ['shell']).execute({
@@ -626,10 +658,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const result = await factory.triggerRuntimeHooks('tool.before-call', 'ask', {
       sessionId: 'session-a', eventContext: { sessionId: 'session-a' }, onEvent,
@@ -650,10 +681,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     await factory.triggerRuntimeHooks('tool.after-call', 'ask', {
       sessionId: 'session-a', eventContext: { sessionId: 'session-a' }, onEvent,
@@ -669,10 +699,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     factory.activateDeferredTools([], 'sess');
     factory.activateDeferredTools(['mcp__x__y'], 'sess');
@@ -693,15 +722,14 @@ describe('ToolExecutorFactory', () => {
         }),
       } as unknown as AgentSlotRegistry,
       deferredActivation: { activate } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => ({
+      activeTurns: { getActiveTurn: () => ({
         deferredActivation: {
           slotKey: 'slot-1',
           allDefinitions: [],
         },
-      }) as never,
-      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      }) as never },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     factory.activateDeferredTools(['mcp__x__y'], 'sess');
     expect(activate).toHaveBeenCalled();
@@ -712,10 +740,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => false,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => false, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['read_file']);
     const result = await executor.execute({
@@ -743,10 +770,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['shell'], null, {
       effectivePlan: {
@@ -795,10 +821,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => false,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => false },
     });
     const executor = preparedExecutor(factory, 'ask', ['shell'], null, {
       effectivePlan: {
@@ -842,12 +867,11 @@ describe('ToolExecutorFactory', () => {
         }),
       } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => ({
+      activeTurns: { getActiveTurn: () => ({
         deferredActivation: { slotKey: 'slot-1', allDefinitions: [] },
-      }) as never,
-      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      }) as never },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['mcp__x__y']);
     const result = await executor.execute({
@@ -875,10 +899,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'plan', ['task_create'], 'session-1', {
       effectivePlan: {
@@ -915,10 +938,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const budget = { toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: Date.now(), maxToolCalls: 1, maxSubagents: 3, maxChildDepth: 3, maxWallTimeMs: 60_000 };
     const executor = preparedExecutor(factory, 'ask', ['read_file'], null, {
@@ -958,10 +980,9 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['read_file'], null, {
       effectivePlan: {
@@ -1007,14 +1028,13 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({
         toolMap: new Map([['read_file', read], ['shell', shell]] as never),
         definitions: [],
         deferredDefinitions: [],
-      }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const budget = {
       toolCalls: 0,
@@ -1057,8 +1077,8 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({
         toolMap: new Map([
           ['shell', {
             name: 'shell',
@@ -1070,9 +1090,8 @@ describe('ToolExecutorFactory', () => {
         ]),
         definitions: [],
         deferredDefinitions: [],
-      }),
-      isAllowedForRuntime: (agentId, toolName) => agentId !== 'debugger' || toolName !== 'shell',
-      matchesToolAllowlist: () => true,
+      }) },
+      toolPolicy: { isAllowedForRuntime: (agentId, toolName) => agentId !== 'debugger' || toolName !== 'shell', matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'debugger', ['shell']);
     const result = await executor.execute({
@@ -1121,14 +1140,13 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({
         toolMap: new Map(tools as never),
         definitions: [],
         deferredDefinitions: [],
-      }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'general', tools.map(([name]) => name), null, {
       effectivePlan: {
@@ -1194,17 +1212,16 @@ describe('ToolExecutorFactory', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: () => ({
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: () => ({
         toolMap: new Map([
           ['read_file', readFileTool],
           ['write_file', writeFileTool],
         ] as never),
         definitions: [],
         deferredDefinitions: [],
-      }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['read_file', 'write_file'], null, {
       effectivePlan: {
@@ -1251,7 +1268,7 @@ describe('ToolExecutorFactory', () => {
 it('passes the frozen native vision capability into the production tool context', async () => {
  const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
  const toolMap = new Map([['artifact_read', { name: 'artifact_read', description: 'read', parameters: { type: 'object', properties: {} }, spec: EXCLUSIVE_SPEC, execute }]]);
- const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }), isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+ const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, activeTurns: { getActiveTurn: () => null }, tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) }, toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true } });
  for (const visionInputMode of ['native', 'disabled'] as const) {
   const executor = preparedExecutor(factory, 'general', ['artifact_read'], 'vision-session', { effectivePlan: { toolAllowlist: ['artifact_read'], skillIntersection: null, projectId: null, projectRootPath: null, routeCapability: { visionInputMode } } as never });
   await executor.execute({ type: 'toolCall', id: visionInputMode, name: 'artifact_read', arguments: {} });
@@ -1262,7 +1279,7 @@ it('passes the frozen native vision capability into the production tool context'
 it('durably saves reserved cost before effects and rejects effects when durable accounting fails', async () => {
  const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
  const toolMap = new Map([['read_file', { name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, spec: readFileTool.spec, execute }]]);
- const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }), isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+ const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as unknown as AgentSlotRegistry, deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker, activeTurns: { getActiveTurn: () => null }, tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) }, toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true } });
  const ledger = createPolicyBudgetState(); let release!: () => void; const persisted: number[] = [];
  const gate = new Promise<void>((resolve) => { release = resolve; });
  const unregister = registerPolicyBudgetObserver(ledger, async (snapshot) => { await gate; persisted.push(snapshot.toolCalls); });
@@ -1425,14 +1442,13 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     return new ToolExecutorFactory({
       slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
       deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-      getActiveTurn: () => turn,
-      resolveRuntimeTools: () => ({
+      activeTurns: { getActiveTurn: () => turn },
+      tools: { resolveRuntimeTools: () => ({
         toolMap: new Map([['plan_artifact', planTool]]),
         definitions: [],
         deferredDefinitions: [],
-      }),
-      isAllowedForRuntime: () => true,
-      matchesToolAllowlist: () => true,
+      }) },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
   }
 
@@ -1471,9 +1487,9 @@ it('keeps private file-read state across turns and agent switches, isolates and 
   const make = () => new ToolExecutorFactory({
     slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
     deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
-    getActiveTurn: () => null,
-    resolveRuntimeTools: () => ({ toolMap: new Map([['read_file', tool]]), definitions: [], deferredDefinitions: [] }),
-    isAllowedForRuntime: () => true, matchesToolAllowlist: () => true,
+    activeTurns: { getActiveTurn: () => null },
+    tools: { resolveRuntimeTools: () => ({ toolMap: new Map([['read_file', tool]]), definitions: [], deferredDefinitions: [] }) },
+    toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
   });
   const factory = make();
   const run = async (session: string, agent = 'general', owner = factory) => {
@@ -1512,9 +1528,13 @@ it('reauthorizes prepared parent/child executors after a global mode switch with
     return { action: input.permissionState.mode === 'full-access' ? 'allow' : 'ask_user', risk: 'medium', temporaryPathRoots: [] };
   }) as never);
   const execute = vi.fn(async (id: string) => { if (id === 'parent') { entered(); await hold; } return { content: [] }; });
-  const factory = new ToolExecutorFactory({ slots: { getSlot: () => null } as never, deferredActivation: {} as never,
-    getActiveTurn: () => null, resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute }]]), definitions: [], deferredDefinitions: [] }),
-    isAllowedForRuntime: () => true, matchesToolAllowlist: () => true });
+  const factory = new ToolExecutorFactory({
+    slots: { getSlot: () => null } as never,
+    deferredActivation: {} as never,
+    activeTurns: { getActiveTurn: () => null },
+    tools: { resolveRuntimeTools: () => ({ toolMap: new Map([['shell', { ...shellTool, execute }]]), definitions: [], deferredDefinitions: [] }) },
+    toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+  });
   const hook = vi.spyOn(factory, 'triggerRuntimeHooks').mockImplementation(async event => { if (event === 'tool.before-call' && execute.mock.calls.length === 1) queued(); return { allowed: true }; });
   const ledger = createPolicyBudgetState({ maxToolCalls: 2, maxWallTimeMs: Number.MAX_SAFE_INTEGER, maxSubagents: 1, maxChildDepth: 1 });
   const context = { sessionId: 'owner', turnId: 'turn', projectRootPath: 'D:/permission-owner', eventContext: { sessionId: 'owner', turnId: 'turn' }, policyBudget: ledger };

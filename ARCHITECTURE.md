@@ -139,6 +139,8 @@ ESLint `no-restricted-imports` 强制以下方向（`eslint.config.mjs`）：
 - `src/main/ipc` 是最外层适配器：只有 `src/main/index.ts` 与 `src/main/browserAppBridge` 调用它；被多个域共用的原语（如单次审批 token）放在 `src/main/runtime`。
 - 生产代码不 import `src/main/testing`。
 
+**组合根**：`src/main/index.ts` 是进程的组合根（启动、宿主注册、关停顺序）。子系统的单例在各自的组合根里构造一次：`src/main/sessions/store/sessionStores.ts`（共享 `StorageIo` 与拥有各类文件的 store）、`src/main/agent-runtime/orchestration/agentRuntimeRoot.ts`（`AgentOrchestrator` 的全部协作者）。协作者之间只经消费方模块声明的窄接口相连，不传回调袋，不经转发层或 deps barrel；调用方直接 import 拥有数据或行为的模块。`AgentOrchestrator` 只依赖协作者的类型，`check:orchestrator-facade` 度量它的 fan-out 与最长函数，预算取实测最大值，只降不升。
+
 import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 
 ### Renderer 架构

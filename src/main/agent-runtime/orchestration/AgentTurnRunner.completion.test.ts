@@ -82,9 +82,12 @@ function harness(scope: string, validateCompletion: TurnCompletionValidator, app
     activatedDeferredTools: new Set<string>(),
   } as unknown as AgentSlot;
   const runner = new AgentTurnRunner({
-    validateCompletion, validateCompletionReadiness, slots: { flush: vi.fn() }, sessionTurnKey: (id: string) => id,
+    validateCompletion,
+    validateCompletionReadiness,
+    slots: { flush: vi.fn() },
     deferredActivation: { resolveActivatedSet: () => new Set<string>() },
-    resolveRuntimeTools: () => preparedRuntime.runtimeTools, createToolSignature: () => '', createToolExecutor: () => ({}),
+    tools: { resolveRuntimeTools: () => preparedRuntime.runtimeTools, createToolSignature: () => '' },
+    toolExecutors: { createToolExecutor: () => ({}) },
   } as unknown as AgentTurnRunnerDeps);
   vi.spyOn(runner, 'getOrCreateAgentSlot').mockImplementation(request => { slotRequest = request; return slot; });
   const run = () => runner.runAgentTurn({

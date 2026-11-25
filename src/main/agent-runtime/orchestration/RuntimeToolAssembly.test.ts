@@ -63,11 +63,11 @@ function createAssembly(): RuntimeToolAssembly {
     mcp: {
       getConnectedTools: () => [],
       getAgentTools: () => [],
+      getMcpServerStatusSummary: () => [],
     } as unknown as McpConnectionCoordinator,
-    getActiveTurn: () => null,
-    getMemoryStore: () => ({}) as never,
-    createSubagentTools: () => [],
-    getMcpServerStatusSummary: () => [],
+    memory: { memoryStore: () => ({}) as never },
+    activeTurns: { getActiveTurn: () => null },
+    subagentTools: { createSubagentTools: () => [] },
   });
 }
 
@@ -217,13 +217,12 @@ describe('RuntimeToolAssembly', () => {
     const factory = new ToolExecutorFactory({
       slots: { getSlot: () => undefined } as never,
       deferredActivation: {} as never,
-      getActiveTurn: () => null,
-      resolveRuntimeTools: (...args) => {
+      activeTurns: { getActiveTurn: () => null },
+      tools: { resolveRuntimeTools: (...args) => {
         resolved = assembly.resolveRuntimeTools(...args);
         return resolved;
-      },
-      isAllowedForRuntime: (...args) => assembly.isAllowedForRuntime(...args),
-      matchesToolAllowlist: (...args) => assembly.matchesToolAllowlist(...args),
+      } },
+      toolPolicy: { isAllowedForRuntime: (...args) => assembly.isAllowedForRuntime(...args), matchesToolAllowlist: (...args) => assembly.matchesToolAllowlist(...args) },
     });
     factory.createToolExecutor('general', ['read_file'], 'session-skill-discovery', {
       effectivePlan: { toolAllowlist: ['*'], skillIntersection: intersection } as never,

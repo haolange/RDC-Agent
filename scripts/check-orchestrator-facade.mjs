@@ -1,9 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
+// AgentOrchestrator stays a façade: the composition root (agentRuntimeRoot.ts) constructs its collaborators, and
+// every phase of a turn lives in a collaborator. The budgets are the measured maxima; lower them when the façade
+// shrinks, never raise them to admit new work.
 const repoRoot = process.cwd();
 const ORCHESTRATOR_REL = 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts';
-const VALUE_IMPORT_MAX = 10;
+/** Distinct modules the façade imports (value or type). */
+const FAN_OUT_MAX = 34;
+/** Lines of the longest function, method or arrow function in the façade. */
+const FUNCTION_LINES_MAX = 253;
 
 const fail = (message) => {
   console.error(`[orchestrator-facade] ${message}`);
@@ -16,33 +23,43 @@ if (!fs.existsSync(orchestratorPath)) {
   process.exit(1);
 }
 
-const source = fs.readFileSync(orchestratorPath, 'utf8');
+const sourceFile = ts.createSourceFile(
+  ORCHESTRATOR_REL,
+  fs.readFileSync(orchestratorPath, 'utf8'),
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TS,
+);
 
-/**
- * Count value (non-type-only) import declarations.
- * Multi-line `import { ... } from '...'` counts as one declaration.
- */
-const valueImportDecls = [];
-const importBlockRe = /^import\s+(?!type\b)[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm;
-let match = importBlockRe.exec(source);
-while (match) {
-  valueImportDecls.push(match[0].replace(/\s+/g, ' ').trim());
-  match = importBlockRe.exec(source);
+const importedModules = new Set();
+for (const statement of sourceFile.statements) {
+  if ((ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement))
+    && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+    importedModules.add(statement.moduleSpecifier.text);
+  }
 }
 
-if (valueImportDecls.length > VALUE_IMPORT_MAX) {
-  fail(
-    `${ORCHESTRATOR_REL} has ${valueImportDecls.length} non-type import declarations `
-    + `(hard budget <= ${VALUE_IMPORT_MAX}). Collapse collaborators behind a deps barrel.`,
-  );
-} else {
-  console.log(
-    `[orchestrator-facade] value imports OK: ${valueImportDecls.length} <= ${VALUE_IMPORT_MAX}`,
-  );
-}
+const lineOf = (position) => sourceFile.getLineAndCharacterOfPosition(position).line;
+const functionLengths = [];
+const visit = (node) => {
+  if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node)
+    || ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node) || ts.isFunctionExpression(node)
+    || ts.isArrowFunction(node)) && node.body) {
+    const name = node.name && ts.isIdentifier(node.name) ? node.name.text : ts.isConstructorDeclaration(node) ? 'constructor' : '(anonymous)';
+    functionLengths.push({ name, lines: lineOf(node.getEnd()) - lineOf(node.getStart(sourceFile)) + 1 });
+  }
+  ts.forEachChild(node, visit);
+};
+visit(sourceFile);
+const longest = functionLengths.reduce((max, entry) => (entry.lines > max.lines ? entry : max), { name: '(none)', lines: 0 });
 
-if (process.exitCode) {
-  process.exit(process.exitCode);
+if (importedModules.size > FAN_OUT_MAX) {
+  fail(`${ORCHESTRATOR_REL} imports ${importedModules.size} modules (budget ${FAN_OUT_MAX}). Move the work into a collaborator built by agentRuntimeRoot.ts.`);
 }
+if (longest.lines > FUNCTION_LINES_MAX) {
+  fail(`${ORCHESTRATOR_REL}: ${longest.name} is ${longest.lines} lines (budget ${FUNCTION_LINES_MAX}). Split it into named phases.`);
+}
+if (process.exitCode) process.exit(process.exitCode);
 
+console.log(`[orchestrator-facade] fan-out ${importedModules.size} <= ${FAN_OUT_MAX}; longest function ${longest.name} ${longest.lines} <= ${FUNCTION_LINES_MAX} lines`);
 console.log('[orchestrator-facade] OK');

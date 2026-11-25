@@ -8,14 +8,12 @@ import { AppError } from '@shared/errors/appError';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { readFileTool } from '../tools/primitives/ReadFileTool';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
-import type { RuntimeToolAssemblyDeps } from './RuntimeToolAssembly';
+import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { ScopedMemoryStores } from '../memory/MemoryStore';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { AgentRole } from '@shared/types/agent';
-
-/** Resolves the memory store for a declared scope; project memory follows the call's project root. */
-export type MemoryStoreResolver = RuntimeToolAssemblyDeps['getMemoryStore'];
 
 export function createAskUserTool(agentId: AgentRole): AgentTool<
   { questions?: unknown[] },
@@ -79,11 +77,11 @@ export function createAskUserTool(agentId: AgentRole): AgentTool<
   };
 }
 
-export function createMemorySearchTool(getMemoryStore: MemoryStoreResolver, sessionId?: string | null): AgentTool<
+export function createMemorySearchTool(memory: ScopedMemoryStores, sessionId?: string | null): AgentTool<
   { scope: 'user' | 'project'; query?: string; limit?: number },
   { sessionId: string | null; scope: 'user' | 'project'; count: number }
 > {
-  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => getMemoryStore(scope, projectRootPath);
+  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => memory.memoryStore(scope, projectRootPath);
   return {
     name: 'memory_search',
     label: 'Search Memory',
@@ -102,11 +100,11 @@ export function createMemorySearchTool(getMemoryStore: MemoryStoreResolver, sess
   };
 }
 
-export function createMemoryReadTool(getMemoryStore: MemoryStoreResolver, sessionId?: string | null): AgentTool<
+export function createMemoryReadTool(memory: ScopedMemoryStores, sessionId?: string | null): AgentTool<
   { scope: 'user' | 'project'; name: string },
   { sessionId: string | null; scope: 'user' | 'project'; count: number }
 > {
-  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => getMemoryStore(scope, projectRootPath);
+  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => memory.memoryStore(scope, projectRootPath);
   return {
     name: 'memory_read',
     label: 'Read Memory',
@@ -124,11 +122,11 @@ export function createMemoryReadTool(getMemoryStore: MemoryStoreResolver, sessio
   };
 }
 
-export function createMemoryWriteTool(getMemoryStore: MemoryStoreResolver): AgentTool<
+export function createMemoryWriteTool(memory: ScopedMemoryStores): AgentTool<
   { scope: 'user' | 'project'; name: string; description: string; type: string; content: string; tags?: string[]; approved: boolean },
   { scope: 'user' | 'project'; name: string; created: boolean }
 > {
-  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => getMemoryStore(scope, projectRootPath);
+  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => memory.memoryStore(scope, projectRootPath);
   const validTypes = new Set(['user', 'feedback', 'project', 'reference']);
   return {
     name: 'memory_write',
@@ -172,11 +170,11 @@ export function createMemoryWriteTool(getMemoryStore: MemoryStoreResolver): Agen
   };
 }
 
-export function createMemoryDeleteTool(getMemoryStore: MemoryStoreResolver): AgentTool<
+export function createMemoryDeleteTool(memory: ScopedMemoryStores): AgentTool<
   { scope: 'user' | 'project'; name: string; confirmed: boolean },
   { scope: 'user' | 'project'; name: string; deleted: boolean }
 > {
-  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => getMemoryStore(scope, projectRootPath);
+  const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => memory.memoryStore(scope, projectRootPath);
   return {
     name: 'memory_delete',
     label: 'Delete Memory',
@@ -315,7 +313,7 @@ export function createSkillReadTool(agentId: AgentRole): AgentTool<
   };
 }
 
-export function createMcpCatalogTool(getMcpServerStatusSummary: RuntimeToolAssemblyDeps['getMcpServerStatusSummary']): AgentTool<
+export function createMcpCatalogTool(mcp: Pick<McpConnectionCoordinator, 'getMcpServerStatusSummary'>): AgentTool<
   { query?: string },
   { count: number; servers: MCPServerStatusSummary[] }
 > {
@@ -334,7 +332,7 @@ export function createMcpCatalogTool(getMcpServerStatusSummary: RuntimeToolAssem
     spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
     async execute(_toolCallId, args, _signal, _onUpdate, context) {
       const query = typeof args.query === 'string' ? args.query : undefined;
-      const servers = getMcpServerStatusSummary(context?.projectRootPath ?? null, query);
+      const servers = mcp.getMcpServerStatusSummary(context?.projectRootPath ?? null, query);
       const lines = servers.map((server) => {
         const toolNames = (server.tools ?? []).slice(0, 12);
         const toolsLabel = toolNames.length > 0

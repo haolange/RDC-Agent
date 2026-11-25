@@ -16,7 +16,7 @@ import {
   getRdcContextLease,
   setRdcRuntimeContextForSession,
 } from '../../rdc/RdcRuntimeContextRegistry';
-import { SubagentRunner } from './SubagentRunner';
+import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
@@ -115,7 +115,7 @@ describe('SubagentRunner', () => {
         });
         return 'Findings, source ranges and limitations.';
       });
-      const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => delegatingTurn() });
+      const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => delegatingTurn() });
       const [tool] = runner.createSubagentTools('general', sessionId);
       const promise = tool.execute('analysis-call', { ...testCapsule({ requiredSkillIds: ['analysis-method'] }), taskId: task.id, profile: 'general' } as never);
       if (state === 'missing-proof') await expect(promise).rejects.toThrow('preparation proof');
@@ -133,7 +133,7 @@ describe('SubagentRunner', () => {
 
   it('runSubagent completes and forwards tool/assistant events', async () => {
     const parentEvents: Array<{ type: string }> = [];
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         options?.onEvent?.({
           id: 'e1',
@@ -195,7 +195,7 @@ describe('SubagentRunner', () => {
 
   it('runs a child with the stricter of its own and the delegating turn\'s access ceiling', async () => {
     const launched: Array<string | undefined> = [];
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async (_profile, _content, options) => {
         launched.push(options?.effectiveProfile?.accessCeiling);
         return 'done';
@@ -211,7 +211,7 @@ describe('SubagentRunner', () => {
 
   it('refuses to delegate from a turn without a frozen runtime plan', async () => {
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage,
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => ({ runtimePlan: null, eventSink: { sessionId: 'sess-1', onEvent: () => undefined } } as unknown as TurnHandle),
@@ -225,7 +225,7 @@ describe('SubagentRunner', () => {
   it('passes authoritative Task output keys to the isolated child without parent history', async () => {
     const getTask = vi.spyOn(TaskRegistry.prototype, 'getTask').mockResolvedValue({ id: 'owned', completionRequirements: ['analysis', 'limitations'] } as TaskRecord);
     let request = '';
-    const runner = new SubagentRunner({ sendProfileMessage: async (_profile, content) => { request = content; return 'done'; }, systemPromptForAgent: () => 'stable', getActiveTurn: () => null });
+    const runner = wireSubagentRunner({ sendProfileMessage: async (_profile, content) => { request = content; return 'done'; }, systemPromptForAgent: () => 'stable', getActiveTurn: () => null });
     try {
       const result = await runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', parentSessionId: 'task-contract-parent', parentToolCallId: 'call', taskId: 'owned', targetProfile: 'general', capsule: testCapsule() });
       expect(result.status).toBe('complete');
@@ -238,7 +238,7 @@ describe('SubagentRunner', () => {
   it('runSubagent marks cancelled when parent already aborted', async () => {
     const controller = new AbortController();
     controller.abort();
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async () => 'should-not-run',
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
@@ -254,7 +254,7 @@ describe('SubagentRunner', () => {
   });
 
   it('runSubagent marks failed on throw', async () => {
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async () => {
         throw new Error('boom');
       },
@@ -272,7 +272,7 @@ describe('SubagentRunner', () => {
   });
 
   it('reports the child wall deadline instead of a provider stream abort', async () => {
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => new Promise<string>((_resolve, reject) => {
         options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
       }),
@@ -301,7 +301,7 @@ describe('SubagentRunner', () => {
       const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
       const registry = new TaskRegistry(createSessionTaskStore(sessionId));
       const task = await registry.createTask('Timed review');
-      const runner = new SubagentRunner({
+      const runner = wireSubagentRunner({
         sendProfileMessage: async (_agentId, _content, options) => new Promise<string>((_resolve, reject) => {
           if (options?.signal?.aborted) { reject(new Error('EventStream aborted')); return; }
           options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
@@ -331,7 +331,7 @@ describe('SubagentRunner', () => {
     const parentBudget = createSubagentBudgetState();
     parentBudget.wallStartedAt = Date.now() - parentBudget.budget.maxAggregateWallMs - 1;
     const beforeFirstChild = Date.now();
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         options?.onEvent?.({
           id: 'e1', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
@@ -377,7 +377,7 @@ describe('SubagentRunner', () => {
 
   it('does not inflate aggregateToolCalls for events without toolCallId', async () => {
     const parentBudget = createSubagentBudgetState();
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         options?.onEvent?.({
           id: 'e1', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
@@ -416,7 +416,7 @@ describe('SubagentRunner', () => {
   });
 
   it('createSubagentTools executes a self run when frozen delegates are empty', async () => {
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async () => 'child done',
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => delegatingTurn(),
@@ -430,7 +430,7 @@ describe('SubagentRunner', () => {
   });
 
   it('uses the canonical subagent tool to start a Task-owned background execution', async () => {
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async () => 'unused',
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => delegatingTurn(),
@@ -471,7 +471,7 @@ describe('SubagentRunner', () => {
         registerProducer: () => () => undefined,
         eventSink: { sessionId, onEvent: () => undefined },
       } as unknown as TurnHandle;
-      const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => turn });
+      const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => turn });
       const [tool] = runner.createSubagentTools('general', sessionId);
       await tool.execute('review-call', { ...testCapsule(), taskId: task.id, profile: 'general' } as unknown as Record<string, unknown>);
       expect(sendProfileMessage).toHaveBeenCalledOnce();
@@ -481,7 +481,7 @@ describe('SubagentRunner', () => {
       expect((await registry.getRootBudget(execution!.rootBudgetId!))?.toolCalls).toBeGreaterThanOrEqual(800);
 
       const inconsistentTask = await registry.createTask('Budget inconsistency');
-      const inconsistentRunner = new SubagentRunner({
+      const inconsistentRunner = wireSubagentRunner({
         sendProfileMessage: async (_agent, _content, options) => {
           options!.policyBudget!.toolCalls = 9;
           return 'Untrusted child result';
@@ -504,7 +504,7 @@ describe('SubagentRunner', () => {
 
   it('fails closed when the capsule is missing required fields', async () => {
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage,
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
@@ -517,7 +517,7 @@ describe('SubagentRunner', () => {
   });
 
   it('authorizes only frozen profileDelegates and denies others', async () => {
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async () => 'child done',
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => ({
@@ -539,7 +539,7 @@ describe('SubagentRunner', () => {
 
   it.each([{ model: 'openai:gpt-5.6-sol' }, { reasoningLevel: 'low' }])('rejects parent-provided model controls in the Capsule', async (override) => {
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage,
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
@@ -558,7 +558,7 @@ describe('SubagentRunner', () => {
     ] as never);
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     try {
-      const runner = new SubagentRunner({
+      const runner = wireSubagentRunner({
         sendProfileMessage,
         systemPromptForAgent: () => 'fallback',
         getActiveTurn: () => null,
@@ -582,7 +582,7 @@ describe('SubagentRunner', () => {
     const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     try {
-      const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
+      const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
       const result = await runner.runSubagent({ parentAgentId: 'debugger', parentAccessCeiling: 'full', parentToolCallId: 'missing-agent',
         targetProfile: 'general', capsule: testCapsule(), parentSessionId: 'owner' });
       expect(result.status).toBe('failed');
@@ -599,7 +599,7 @@ describe('SubagentRunner', () => {
   ])('projects only trusted preparation failures as configuration errors', async ({ error, expected }) => {
     const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
     try {
-      const runner = new SubagentRunner({ sendProfileMessage: async () => { throw error; },
+      const runner = wireSubagentRunner({ sendProfileMessage: async () => { throw error; },
         systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
       const result = await runner.runSubagent({ parentAgentId: 'debugger', parentAccessCeiling: 'full', parentToolCallId: 'typed-error',
         targetProfile: 'general', capsule: testCapsule(), parentSessionId: 'owner' });
@@ -610,7 +610,7 @@ describe('SubagentRunner', () => {
 
   it('uses the selected Agent model and reasoning without inheriting the parent override', async () => {
     const sendProfileMessage = vi.fn(async () => 'child done');
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage,
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
@@ -643,7 +643,7 @@ describe('SubagentRunner', () => {
     setRdcRuntimeContextForSession('parent', { contextId: 'ctx-live', runtimeOwner: 'local', ownerLeaseId: 'lease:live',
       backend: 'local', updatedAt: Date.now(), captureId: 'cap-live' } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
-    const runner = new SubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
+    const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
     const parentTurn = { turnId: 'turn-parent', requiresApprovedCaptureScope: true,
       subagentBudget: createSubagentBudgetState(), registerProducer: () => () => undefined,
       generation: 1, isLive: () => true, eventSink: { sessionId: 'parent' } } as unknown as TurnHandle;
@@ -666,7 +666,7 @@ describe('SubagentRunner', () => {
       captureId: 'cap-live',
     } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
     let childSessionId = '';
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         childSessionId = options?.sessionId ?? '';
         expect(assertRdcContextLeaseOwnership({
@@ -714,7 +714,7 @@ describe('SubagentRunner', () => {
       updatedAt: Date.now(),
     } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
     let childSessionId = '';
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         childSessionId = options?.sessionId ?? '';
         expect(getRdcContextLease(childSessionId)?.delegatedFrom).toBe('parent');
@@ -749,7 +749,7 @@ describe('SubagentRunner', () => {
   it('fail-closes a lease-holding child when the parent has no RDC lease', async () => {
     clearRdcContextLeases();
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       sendProfileMessage,
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
@@ -780,7 +780,7 @@ describe('SubagentRunner', () => {
 it('enforces Capsule budget in child requests and aborts a pending provider at its deadline', async () => {
   const parent = createPolicyBudgetState({ maxToolCalls: 100, maxSubagents: 10, maxChildDepth: 3, maxWallTimeMs: 60000 });
   let captured = false;
-  const runner = new SubagentRunner({
+  const runner = wireSubagentRunner({
     sendProfileMessage: async (_agent, _content, options) => {
       captured = true;
       expect(options?.policyBudget?.maxToolCalls).toBe(1);
@@ -802,7 +802,7 @@ it('enforces Capsule budget in child requests and aborts a pending provider at i
 it('forwards a child approval with its actual execution identity and controlled parent answer', async () => {
   const approvals = new AgentToolApprovalRequestService();
   const events: import('@shared/types/agentRuntime').AgentEvent[] = [];
-  const runner = new SubagentRunner({
+  const runner = wireSubagentRunner({
     getActiveTurn: () => null, systemPromptForAgent: () => 'profile',
     sendProfileMessage: async (_agent, _content, options) => {
       const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-permission-turn', toolCallId: 'mutation', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'Write scoped output', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-permission-turn' }, signal: options?.signal, onEvent: options?.onEvent });

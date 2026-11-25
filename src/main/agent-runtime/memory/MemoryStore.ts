@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
 import { renameWithRetry } from '../../platform/fileRename';
+import { appPathService } from '../../runtime/AppPathService';
 import { withMemoryDirectoryLock } from './memoryDirectoryLock';
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
@@ -298,3 +299,19 @@ export class MemoryStore {
     return (await this.listMemories()).filter((record) => !needle || [record.name, record.displayName, record.normalizedName, record.description, record.content, ...(record.tags ?? [])].some((value) => value.toLocaleLowerCase().includes(needle))).slice(0, Math.max(1, Math.min(limit, 100)));
   }
 }
+
+/** The Memory store of a declared scope; project memory follows the call's project root. */
+export interface ScopedMemoryStores {
+  memoryStore(scope: 'user' | 'project', projectRootPath?: string | null): MemoryStore;
+}
+
+/** User memory under ~/.rdc-agent, project memory under the open project's .rdc-agent. */
+export const scopedMemoryStores: ScopedMemoryStores = {
+  memoryStore(scope, projectRootPath) {
+    if (scope === 'project') {
+      if (!projectRootPath) throw new Error('Project scope memory requires an active project.');
+      return new MemoryStore(appPathService.getProjectRdcPaths(projectRootPath).memoryPath);
+    }
+    return new MemoryStore(appPathService.getUserRdcPaths().memoryPath);
+  },
+};

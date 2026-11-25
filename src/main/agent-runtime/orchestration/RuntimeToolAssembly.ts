@@ -8,7 +8,6 @@ import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecu
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { toolToDefinition } from '../agent/AgentTool';
 import { createToolSearchTool, getPrimitiveTools } from '../tools';
-import { MemoryStore } from '../memory/MemoryStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
@@ -35,22 +34,24 @@ import { listActiveDelegations, listUnfinishedDirectTasks } from './DirectTaskTu
 import { completionBudgetEvidence } from './CompletionBudgetEvidence';
 import type { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
-import type { ResolvedRuntimeTools } from './orchestratorTypes';
+import type { ActiveTurnLookup, ResolvedRuntimeTools, RuntimeToolResolver } from './orchestratorTypes';
+import type { RuntimeToolPolicyCheck } from './ToolCallAdmission';
+import type { SubagentRunner } from './SubagentRunner';
+import type { BackgroundSubagentService } from './BackgroundSubagentService';
+import type { ScopedMemoryStores } from '../memory/MemoryStore';
 import type { ToolDefinition } from '../core/types';
 import type { AgentTool } from '../agent/AgentTool';
-import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { AgentRole } from '@shared/types/agent';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
-  getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
-  getMemoryStore: (scope: 'user' | 'project', projectRootPath?: string | null) => MemoryStore;
-  createSubagentTools: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
-  createBackgroundTools?: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
-  getMcpServerStatusSummary: (projectRootPath?: string | null, query?: string) => MCPServerStatusSummary[];
+  activeTurns: ActiveTurnLookup;
+  memory: ScopedMemoryStores;
+  subagentTools: Pick<SubagentRunner, 'createSubagentTools'>;
+  backgroundTools?: Pick<BackgroundSubagentService, 'createTools'>;
 }
 
-export class RuntimeToolAssembly {
+export class RuntimeToolAssembly implements RuntimeToolResolver, RuntimeToolPolicyCheck {
   constructor(private readonly deps: RuntimeToolAssemblyDeps) {}
 
   createToolSignature(tools: ToolDefinition[]): string {
@@ -87,7 +88,7 @@ export class RuntimeToolAssembly {
   }
 
   createTaskRuntimeTools(sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
-    return assembleTaskRuntimeTools({ sessionId, turnHandle, getActiveTurn: this.deps.getActiveTurn });
+    return assembleTaskRuntimeTools({ sessionId, turnHandle, activeTurns: this.deps.activeTurns });
   }
 
   createPlanArtifactTool(sessionId?: string | null): AgentTool<
@@ -145,10 +146,10 @@ export class RuntimeToolAssembly {
   createWorkbenchTools(agentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
     return [
       createAskUserTool(agentId),
-      createMemorySearchTool(this.deps.getMemoryStore, sessionId),
-      createMemoryReadTool(this.deps.getMemoryStore, sessionId),
-      createMemoryWriteTool(this.deps.getMemoryStore),
-      createMemoryDeleteTool(this.deps.getMemoryStore),
+      createMemorySearchTool(this.deps.memory, sessionId),
+      createMemoryReadTool(this.deps.memory, sessionId),
+      createMemoryWriteTool(this.deps.memory),
+      createMemoryDeleteTool(this.deps.memory),
       this.createPlanArtifactTool(sessionId),
       createOutputRegistrationTool({
         sessionId,
@@ -157,11 +158,11 @@ export class RuntimeToolAssembly {
       }) as unknown as AgentTool,
       createSkillsCatalogTool(agentId),
       createSkillReadTool(agentId),
-      createMcpCatalogTool(this.deps.getMcpServerStatusSummary),
+      createMcpCatalogTool(this.deps.mcp),
       ...createKnowledgeTools(sessionId),
       ...createInvestigationTools(sessionId),
-      ...this.deps.createSubagentTools(agentId, sessionId, turnHandle),
-      ...(this.deps.createBackgroundTools?.(agentId, sessionId, turnHandle) ?? []),
+      ...this.deps.subagentTools.createSubagentTools(agentId, sessionId, turnHandle),
+      ...(this.deps.backgroundTools?.createTools(agentId, sessionId, turnHandle) ?? []),
     ];
   }
 

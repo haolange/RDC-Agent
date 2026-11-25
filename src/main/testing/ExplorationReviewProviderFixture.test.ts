@@ -7,7 +7,6 @@ import { EventStream } from '../agent-runtime/core/EventStream';
 import { agentLoop } from '../agent-runtime/agent/AgentLoop';
 import { PromptPlanBuilder } from '../agent-runtime/prompt/PromptPlanBuilder';
 import { createTurnCompletionTool } from '../agent-runtime/orchestration/TurnControlTools';
-import { SubagentRunner } from '../agent-runtime/orchestration/SubagentRunner';
 import { TurnHandle } from '../agent-runtime/orchestration/TurnCoordinator';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
@@ -17,6 +16,7 @@ import { artifactReadTool } from '../agent-runtime/tools/primitives/ArtifactRead
 import { createInvestigationTools } from '../investigation/InvestigationTools';
 import { createInvestigationHarness, writeDraft, baselineWorld, hypothesisClaim, sampleChallenge, sampleCheckpoint, SESSION_ID } from './investigationTestFixtures';
 import { createTestRequestPlan } from './createTestRequestPlan';
+import { wireSubagentRunner } from './subagentRunnerDoubles';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentTool } from '../agent-runtime/agent/AgentTool';
@@ -112,7 +112,7 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mis
   const scope = 'Capture A only; inferred hypothesis, not verified; driver X negative path must be rechecked on driver change.';
   const makeCapsule = (skill: string): DelegationCapsule => ({ goal: skill === 'knowledge-scout' ? 'Synthesize source conditions' : 'Independently challenge the claim', task: skill, scope, acceptedFacts: [{ statement: 'Claim is only inferred', qualification: 'hypothesis, reconstructed', sourceRefs: [claim.contentUri] }], hypotheses: ['shader', 'state'], challengeRefs: [], negativePaths: [{ path: 'driver X', reason: 'prior negative test', applicableWhen: 'same driver/camera', recheckWhen: 'driver or camera changes' }], inputArtifactRefs: refs.map((ref) => ref.uri), requiredSkillIds: [skill], budget: { maxToolCalls: 5, maxWallTimeMs: 20000 }, stopConditions: ['Return after bounded synthesis'], outputRequirements: 'Return structured evidence, counterevidence and limits', profile: 'general' });
   const childSessions: string[] = [];
-  const runner = new SubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async (_profile, text, options) => {
+  const runner = wireSubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async (_profile, text, options) => {
     const sessionId = options!.sessionId!; childSessions.push(sessionId);
     const skillId = options!.preloadSkillIds![0]!;
     const sourcePath = path.join(process.cwd(), 'resources/agent-runtime/skills', skillId, 'SKILL.md');

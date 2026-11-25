@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { detectRdcInstallations, resolveRdcInstallation } from '../rdc/RdcInstallationService';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { parseRdcNativeResult } from '../rdc/RdcNativeProtocol';

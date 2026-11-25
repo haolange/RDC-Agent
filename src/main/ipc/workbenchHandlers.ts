@@ -4,7 +4,7 @@
 
 import { BrowserWindow, nativeTheme } from 'electron';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';

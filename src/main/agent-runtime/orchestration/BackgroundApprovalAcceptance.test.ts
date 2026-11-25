@@ -10,7 +10,7 @@ import { registerDelegatedTaskScope } from '../tasks/DelegatedTaskScopes';
 import { MemoryTaskStore } from '../tasks/TaskStore';
 import { TaskRegistry } from '../tasks/TaskRegistry';
 import { AgentToolApprovalRequestService } from '../permissions/AgentToolApprovalRequestService';
-import { SubagentRunner } from './SubagentRunner';
+import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
 import { TurnHandle, createPolicyBudgetState } from './TurnCoordinator';
 import { bindTaskRootBudget } from './TaskRootBudget';
@@ -21,7 +21,7 @@ it('canonical background dispatch projects the child approval after parent reply
  const events: AgentEvent[] = [];
  let release!: () => void;
  const gate = new Promise<void>((resolve) => { release = resolve; });
- const runner = new SubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async (_agent, _text, options) => {
+ const runner = wireSubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async (_agent, _text, options) => {
   await gate;
   const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-turn', toolCallId: 'mutation', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'bounded write', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-turn' }, signal: options?.signal, onEvent: options?.onEvent });
   expect(approved).toBe(true);
@@ -53,7 +53,7 @@ it('canonical background dispatch projects the child approval after parent reply
 
 it('keeps the immediate parent artifact allowlist when a nested background task uses the durable root store', async () => {
  let providerCalls = 0;
- const runner = new SubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async () => { providerCalls += 1; return 'unexpected'; } });
+ const runner = wireSubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async () => { providerCalls += 1; return 'unexpected'; } });
  const service = createBackgroundSubagentService(runner); runner.setBackgroundStarter((input) => service.start(input));
  const registry = new TaskRegistry(store); const root = await registry.createTask('delegated scope'); const childTask = await registry.createTask('nested work', { parentTaskId: root.id });
  const origin = 'owner::subagent::first';
@@ -78,7 +78,7 @@ it('restores the previous Task execution root before binding a fresh parent requ
  const rootId = await bindTaskRootBudget(registry, 'retry-owner', original);
  const old = await registry.startExecution(task.id, { mode: 'direct', rootBudgetId: rootId });
  await registry.settleExecution(old.id, { status: 'blocked', expectedGeneration: old.generation, result: { disposition: 'blocked', summary: 'requires retry', outputs: {}, evidenceRefs: [], counterevidence: [], unresolved: ['retry'], scope: 'fixture', sideEffects: [], recoveryState: [] } });
- const runner = new SubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async () => 'bounded result' });
+ const runner = wireSubagentRunner({ getActiveTurn: () => null, systemPromptForAgent: () => 'General', sendProfileMessage: async () => 'bounded result' });
  const service = createBackgroundSubagentService(runner); runner.setBackgroundStarter(input => service.start(input));
  const live = createPolicyBudgetState({ maxToolCalls: 40, maxSubagents: 5, maxChildDepth: 3, maxWallTimeMs: 600000 });
  live.toolCalls = 2;

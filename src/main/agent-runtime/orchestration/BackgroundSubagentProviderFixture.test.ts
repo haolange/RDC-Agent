@@ -8,6 +8,7 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: { getEffectiveProfiles: () => [{ id: 'general', enabled: true, instructions: 'General', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { providerId: 'openai', modelId: 'gpt-5.6-sol' } }] } }));
 
 import { TaskRegistry } from '../tasks';
+import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { SubagentRunner } from './SubagentRunner';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
@@ -45,7 +46,7 @@ describe('background SubagentRunner provider fixture', () => {
     let continueChild!: () => void;
     const gate = new Promise<void>((resolve) => { continueChild = resolve; });
     const childRequests: string[] = [];
-    const runner = new SubagentRunner({
+    const runner = wireSubagentRunner({
       systemPromptForAgent: () => 'General', getActiveTurn: () => null,
       sendProfileMessage: async (_agent, content, options) => {
         childRequests.push(content);

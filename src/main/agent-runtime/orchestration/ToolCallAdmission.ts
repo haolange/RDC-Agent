@@ -11,23 +11,28 @@ import { ToolValidationError, toolValidator } from '../core/ToolValidator';
 import { APPROVED_CAPTURE_SCOPE_REQUIRED, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import { normalizeToolName } from './RuntimeToolPolicy';
 import { isDeferredToolName } from './deferredTools';
-import type { ToolExecutorRuntimeContext } from './orchestratorTypes';
+import type { ActiveTurnLookup, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall, ToolResultMessage } from '../core/types';
 import type { AgentRole } from '@shared/types/agent';
 
-export interface ToolCallAdmissionDeps {
-  slots: AgentSlotRegistry;
-  getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
-  isAllowedForRuntime: (
+/** The runtime allowlist checks a call passes before permission review (RuntimeToolAssembly). */
+export interface RuntimeToolPolicyCheck {
+  isAllowedForRuntime(
     agentId: AgentRole,
     toolName: string,
     frozenToolAllowlist?: readonly string[],
     excludeRdcLeaseTools?: boolean,
-  ) => boolean;
-  matchesToolAllowlist: (toolName: string, toolAllowlist: string[]) => boolean;
+  ): boolean;
+  matchesToolAllowlist(toolName: string, toolAllowlist: string[]): boolean;
+}
+
+export interface ToolCallAdmissionDeps {
+  slots: AgentSlotRegistry;
+  activeTurns: ActiveTurnLookup;
+  toolPolicy: RuntimeToolPolicyCheck;
 }
 
 /** Facts one executor freezes when it is created and applies to every call it mediates. */
@@ -76,14 +81,14 @@ export function admitToolCall(
   const { agentId, plan, runtimeContext } = scope;
   const normalizedName = normalizeToolName(toolCall.name);
   if (
-    !deps.isAllowedForRuntime(agentId, toolCall.name, scope.effectiveToolAllowlist, plan?.excludeRdcLeaseTools === true)
+    !deps.toolPolicy.isAllowedForRuntime(agentId, toolCall.name, scope.effectiveToolAllowlist, plan?.excludeRdcLeaseTools === true)
     || !scope.tools.has(normalizedName)
   ) {
     return { ok: false, result: denyTool() };
   }
   if (
     scope.activeSkillAllowlist !== null
-    && !deps.matchesToolAllowlist(normalizedName, Array.from(scope.activeSkillAllowlist))
+    && !deps.toolPolicy.matchesToolAllowlist(normalizedName, Array.from(scope.activeSkillAllowlist))
   ) {
     return { ok: false, result: denyTool(`Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`) };
   }
@@ -91,7 +96,7 @@ export function admitToolCall(
     return { ok: false, result: denyTool(`POLICY_DENIED: tool "${toolCall.name}" is in deniedTools.`) };
   }
   if (isDeferredToolName(normalizedName)) {
-    const activation = deps.getActiveTurn(runtimeContext?.sessionId)?.deferredActivation ?? null;
+    const activation = deps.activeTurns.getActiveTurn(runtimeContext?.sessionId)?.deferredActivation ?? null;
     const slot = activation ? deps.slots.getSlot(activation.slotKey) : undefined;
     const activatedByFrozenPlan = scope.planActivatedDeferredTools.has(normalizedName);
     const activatedDuringTurn = slot?.activatedDeferredTools.has(normalizedName) === true;

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { beginRdcLifecycle, getRdcInteractionLock } from '../rdc/RdcOperationCoordinator';
 import { conversationService } from './ConversationService';
 import '../rdc/registerConversationRdcHost';
@@ -16,7 +16,7 @@ vi.mock('../sessions/store/sessionStores', () => ({
     readConversationBranchState: vi.fn(() => null),
   },
 }));
-vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
+vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({
   agentOrchestrator: {
     releaseProviderRuntimeCredentials: vi.fn(),
     refreshProviderRuntimeCredentials: vi.fn(),

@@ -55,7 +55,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { AgentOrchestrator } from './AgentOrchestrator';
+import { createAgentOrchestrator } from './agentRuntimeRoot';
 import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
@@ -181,7 +181,7 @@ describe('AgentOrchestrator prepared turn context', () => {
   });
 
   it('freezes the effective route and keeps provider window separate from prompt budget', async () => {
-    const result = await new AgentOrchestrator().prepareTurnContext(baseInput);
+    const result = await createAgentOrchestrator().prepareTurnContext(baseInput);
     expect(result.summary).toMatchObject({
       requestId: 'request-1',
       turnId: 'turn-1',
@@ -218,7 +218,7 @@ describe('AgentOrchestrator prepared turn context', () => {
   });
 
   it('fails before persistence when fixed prompt overhead leaves no message budget', async () => {
-    await expect(new AgentOrchestrator().prepareTurnContext({
+    await expect(createAgentOrchestrator().prepareTurnContext({
       ...baseInput,
       requestPlan: { ...requestPlan, contextBudgetTokens: 100 },
       promptPlan: {
@@ -232,7 +232,7 @@ describe('AgentOrchestrator prepared turn context', () => {
   it('honors cancellation before any runtime preparation work begins', async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(new AgentOrchestrator().prepareTurnContext({
+    await expect(createAgentOrchestrator().prepareTurnContext({
       ...baseInput,
       signal: controller.signal,
     })).rejects.toThrow(/^REQUEST_CANCELLED:/u);
@@ -249,7 +249,7 @@ describe('AgentOrchestrator prepared turn context', () => {
     knowledgeFixture.userKnowledgePath = userKnowledge;
     knowledgeFixture.projectKnowledgePath = projectKnowledge;
 
-    const result = await new AgentOrchestrator().prepareTurnContext({
+    const result = await createAgentOrchestrator().prepareTurnContext({
       ...baseInput,
       projectRootPath: project,
       projectId: 'proj-kn',
@@ -278,7 +278,7 @@ describe('AgentOrchestrator prepared turn context', () => {
     knowledgeFixture.userKnowledgePath = link;
     knowledgeFixture.projectKnowledgePath = path.join(tmp, 'missing-project-knowledge');
 
-    const result = await new AgentOrchestrator().prepareTurnContext(baseInput);
+    const result = await createAgentOrchestrator().prepareTurnContext(baseInput);
     expect(result.runtime.effectivePlan.knowledgeReadRoots).toEqual([]);
     expect(result.contextDiagnostic.knowledgeReadRootDiagnostics).toEqual([
       expect.objectContaining({

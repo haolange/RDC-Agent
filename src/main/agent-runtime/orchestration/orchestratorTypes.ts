@@ -13,7 +13,7 @@ import type { PreparedTurnContextSummary } from '@shared/types/session';
 import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
-import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
+import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { AgentEventBridgeContext } from '../AgentEventBridge';
 import type { AttachmentLayer } from '@shared/types/conversation';
@@ -115,6 +115,26 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
 export interface ResolvedRuntimeTools {
   definitions: ToolDefinition[];
   toolMap: Map<string, AgentTool>;
+}
+
+/** The live turn that owns a session or ephemeral scope, if one is running. */
+export interface ActiveTurnLookup {
+  getActiveTurn(sessionId?: string | null): TurnHandle | null;
+}
+
+/** Builds a turn's runtime tools and their order-free signature (RuntimeToolAssembly). */
+export interface RuntimeToolResolver {
+  resolveRuntimeTools(
+    agentId: AgentRole,
+    toolAllowlist: string[],
+    sessionId?: string | null,
+    turnHandle?: TurnHandle | null,
+    projectId?: string | null,
+    projectRootPath?: string | null,
+    mcpPoolKey?: string | null,
+    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
+  ): ResolvedRuntimeTools;
+  createToolSignature(tools: ToolDefinition[]): string;
 }
 
 export interface PreparedAgentRuntime {

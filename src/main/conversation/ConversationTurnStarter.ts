@@ -6,7 +6,7 @@ import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
 import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
 import { resolveCompactionPercentForProject } from '../settings/settings-core/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';

@@ -8,6 +8,7 @@ import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult }
 import { bindTaskRootBudget } from './TaskRootBudget';
 import { registerPolicyBudgetObserver } from './DelegationBudget';
 import type { TurnHandle } from './TurnCoordinator';
+import type { ActiveTurnLookup } from './orchestratorTypes';
 import type { BackgroundSubagentStart } from './BackgroundSubagentService';
 import type { AgentTool } from '../agent/AgentTool';
 import type { AgentRole } from '@shared/types/agent';
@@ -20,14 +21,14 @@ import type { SubagentRunner } from './SubagentRunner';
 
 /** What the subagent tool needs from its runner. */
 export interface SubagentToolHost {
-  getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
+  readonly activeTurns: ActiveTurnLookup;
   runSubagent: SubagentRunner['runSubagent'];
   startBackground?: (input: BackgroundSubagentStart) => Promise<TaskExecutionRecord>;
 }
 
 export function createSubagentTools(host: SubagentToolHost, parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
-  const { getActiveTurn, runSubagent, startBackground } = host;
-  const capturedTurn = turnHandle ?? getActiveTurn(sessionId);
+  const { activeTurns, startBackground } = host;
+  const capturedTurn = turnHandle ?? activeTurns.getActiveTurn(sessionId);
   const runSubagentTool: AgentTool<
     Record<string, unknown>,
     { subagentId: string; profile: string; status: string; executionId?: string; generation?: number }
@@ -70,7 +71,7 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
           details: { subagentId: '', errorCode: 'DELEGATION_CAPSULE_INVALID', profile: parentAgentId, status: 'failed' },
         };
       }
-      const turn = capturedTurn ?? getActiveTurn(sessionId);
+      const turn = capturedTurn ?? activeTurns.getActiveTurn(sessionId);
       const targetProfile = (capsule.profile?.trim() || parentAgentId) as AgentRole;
       const delegates = turn?.runtimePlan?.profileDelegates ?? [];
       const authorized = delegates.length === 0
@@ -133,7 +134,7 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
       const forwardAbort = () => executionController.abort();
       const sourceSignal = signal ?? turn?.signal ?? null;
       if (sourceSignal?.aborted) forwardAbort();
-      let runPromise: Promise<Awaited<ReturnType<typeof runSubagent>>> | undefined;
+      let runPromise: Promise<Awaited<ReturnType<SubagentToolHost['runSubagent']>>> | undefined;
       let releaseExecutionBudgetObserver: (() => void) | undefined;
       if (taskId) {
         if (!ownerSessionId) throw new AppError('TASK_EXECUTION_SESSION_REQUIRED', 'task-owned subagent requires a parent session.');
@@ -174,9 +175,9 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
         });
       }
       if (!sourceSignal?.aborted) sourceSignal?.addEventListener('abort', forwardAbort, { once: true });
-      let result: Awaited<ReturnType<typeof runSubagent>>;
+      let result: Awaited<ReturnType<SubagentToolHost['runSubagent']>>;
       try {
-        runPromise = runSubagent({
+        runPromise = host.runSubagent({
           parentAgentId,
           parentAccessCeiling,
           parentToolCallId: toolCallId,

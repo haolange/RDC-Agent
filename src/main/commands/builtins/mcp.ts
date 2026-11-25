@@ -4,7 +4,7 @@
  * Connections are owned by the runtime: a turn acquires the project's pool when its agent needs MCP tools and the
  * pool reconnects on demand, so there is no manual connect or disconnect here; servers are managed in Settings.
  */
-import { agentOrchestrator } from '../../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../../agent-runtime/orchestration/agentRuntimeRoot';
 import { projectWorkspaceStore } from '../../sessions/store/sessionStores';
 import type { CommandDefinition } from '@shared/types/command';
 

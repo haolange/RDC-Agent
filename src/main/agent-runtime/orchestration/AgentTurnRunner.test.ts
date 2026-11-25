@@ -23,13 +23,12 @@ import { TokenizerService } from '../core/TokenizerService';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { AgentTurnRunner } from './AgentTurnRunner';
 import { isSuccessfulProviderResponse } from './AgentSlotFactory';
-import { resolveExecutionScopeId } from './executionScope';
 import { createSubagentBudgetState, turnCoordinator, type SubagentBudgetState } from './TurnCoordinator';
 import type { AssistantMessage, ToolResultMessage } from '../core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
+import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { PreparedAgentRuntime } from './orchestratorTypes';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
@@ -40,15 +39,12 @@ function createRunner(): AgentTurnRunner {
     validateCompletion: () => undefined,
     validateCompletionReadiness: () => undefined,
     slots: {} as AgentSlotRegistry,
-    mcp: {} as McpConnectionCoordinator,
     deferredActivation: {
       resolveActivatedSet: () => new Set<string>(),
     } as unknown as DeferredToolActivationTracker,
     tokenizerService: new TokenizerService(),
-    sessionTurnKey: (sessionId) => resolveExecutionScopeId(sessionId),
-    resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
-    createToolSignature: () => '',
-    createToolExecutor: () => ({
+    tools: { resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }), createToolSignature: () => '' },
+    toolExecutors: { createToolExecutor: () => ({
       execute: async (): Promise<ToolResultMessage> => ({
         role: 'toolResult',
         toolCallId: '',
@@ -57,7 +53,7 @@ function createRunner(): AgentTurnRunner {
         isError: false,
         timestamp: 0,
       }),
-    }),
+    }) },
   });
 }
 

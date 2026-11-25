@@ -1,7 +1,7 @@
 import { subagentScopeId } from '@shared/utils/executionScope';
 import { AppError } from '@shared/errors/appError';
 import { delegationCapsuleArtifactRefs } from '../prompt/DelegationCapsuleCompiler';
-import { TaskRegistry, createSessionTaskStore, registerTaskExecutionCancellationOwner, type TaskExecutionRecord } from '../tasks';
+import { TaskRegistry, createSessionTaskStore, registerTaskExecutionCancellationOwner, type TaskExecutionRecord, type TaskRecord } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { requestSnapshotStore } from '../prompt';
 import { grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
@@ -379,26 +379,19 @@ export class BackgroundSubagentService {
       if (execution && ['running', 'waiting', 'cancelling'].includes(execution.status)) await registry.cancelTask(execution.taskId, 'Session work stopped.');
     }
   }
-  private async requireOwned(sessionId: string, executionId: string): Promise<TaskExecutionRecord> {
+  async requireOwned(sessionId: string, executionId: string): Promise<TaskExecutionRecord> {
     const execution = await this.registry(sessionId).getExecution(executionId);
     if (!execution) throw new AppError('BACKGROUND_EXECUTION_NOT_FOUND', 'execution is not owned by this session.');
     return execution;
   }
+  async listTasks(sessionId: string): Promise<TaskRecord[]> { return this.registry(sessionId).listTasks(); }
   stopAccepting(): void { this.accepting = false; }
   async abortAll(): Promise<void> {
     for (const sessionId of new Set(this.executionSessions.values())) await this.abortSession(sessionId);
   }
 
   createTools(_parentAgentId: AgentRole, sessionId?: string | null, _turn?: TurnHandle | null): AgentTool[] {
-    return createBackgroundTaskTools({
-      requireOwned: (owner, executionId) => this.requireOwned(owner, executionId),
-      listTasks: (owner) => this.registry(owner).listTasks(),
-      query: (owner, executionId) => this.query(owner, executionId),
-      join: (executionId) => this.join(executionId),
-      messages: (owner, executionId, cursor) => this.messages(owner, executionId, cursor),
-      postMessage: (owner, executionId, generation, body) => this.postMessage(owner, executionId, generation, body),
-      cancel: (owner, executionId) => this.cancel(owner, executionId),
-    }, sessionId);
+    return createBackgroundTaskTools(this, sessionId);
   }
 }
 

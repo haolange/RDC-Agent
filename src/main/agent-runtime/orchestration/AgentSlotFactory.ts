@@ -37,7 +37,7 @@ import type { AgentLoopConfig, ToolExecutor } from '../agent/AgentLoop';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentProfileTurnOptions } from './orchestratorTypes';
+import type { AgentProfileTurnOptions, RuntimeToolResolver } from './orchestratorTypes';
 
 /** A provider response that actually completed (not a transport/stream error). */
 export function isSuccessfulProviderResponse(message: AssistantMessage): boolean {
@@ -60,7 +60,7 @@ export interface AgentSlotFactoryDeps {
   slots: AgentSlotRegistry;
   deferredActivation: DeferredToolActivationTracker;
   tokenizerService: TokenizerService;
-  createToolSignature: (tools: ToolDefinition[]) => string;
+  tools: Pick<RuntimeToolResolver, 'createToolSignature'>;
 }
 
 export interface AgentSlotRequest {
@@ -105,7 +105,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
   if (deps.slots.isQuarantined(slotKey)) {
     throw new AppError('AGENT_SLOT_QUARANTINED', `${slotKey} is still owned by an orphaned turn.`);
   }
-  const toolSignature = deps.createToolSignature(signatureTools ?? tools);
+  const toolSignature = deps.tools.createToolSignature(signatureTools ?? tools);
   const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
   const requestCompactionThreshold = contextTokenLimit;
   const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);

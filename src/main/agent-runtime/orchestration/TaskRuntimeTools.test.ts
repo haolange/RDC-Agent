@@ -23,7 +23,7 @@ beforeEach(() => { state.store = new MemoryTaskStore(); vi.clearAllMocks(); });
 
 function runtimeUpdate(budget: ReturnType<typeof policy>, turnId = 'new-turn') {
   const turn = { policyBudget: budget, subagentBudget: { depth: 0 }, turnId, generation: 1 } as unknown as TurnHandle;
-  return createTaskRuntimeTools({ sessionId: 'owner', turnHandle: turn, getActiveTurn: () => turn })
+  return createTaskRuntimeTools({ sessionId: 'owner', turnHandle: turn, activeTurns: { getActiveTurn: () => turn } })
     .find(tool => tool.name === 'task_update')!;
 }
 
@@ -117,7 +117,7 @@ describe('direct Task runtime root selection', () => {
     const live = policy(2);
     const turn = new TurnHandle({ sessionKey: 'owner', turnId: 'budget-turn', generation: 1, policyBudget: live });
     try {
-      const tools = createTaskRuntimeTools({ sessionId: 'owner', turnHandle: turn, getActiveTurn: () => turn });
+      const tools = createTaskRuntimeTools({ sessionId: 'owner', turnHandle: turn, activeTurns: { getActiveTurn: () => turn } });
       await tools.find(tool => tool.name === 'task_update')!.execute('start', { taskId: task!.id, status: 'in_progress' });
       const before = await registry.getRootBudget((await registry.listExecutions(task!.id))[0]!.rootBudgetId!);
       const result = await tools.find(tool => tool.name === 'task_get')!.execute('preflight', { taskId: task!.id });

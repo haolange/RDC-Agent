@@ -46,30 +46,44 @@ import {
 } from './TurnCoordinator';
 import { deriveChildPolicyBudget, flushPolicyBudgetObservers } from './DelegationBudget';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
-import { createSubagentTools } from './SubagentTool';
+import { createSubagentTools, type SubagentToolHost } from './SubagentTool';
 import type { DelegationSourceFailure } from './SubagentResultEnvelope';
 import type { BackgroundSubagentStart } from './BackgroundSubagentService';
-import type { AgentProfileTurnOptions } from './orchestratorTypes';
+import type { ActiveTurnLookup, AgentProfileTurnOptions } from './orchestratorTypes';
 import type { AgentTool } from '../agent/AgentTool';
 import type {
   AgentEvent as SharedAgentEvent,
 } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 
-export interface SubagentRunnerDeps {
-  sendProfileMessage: (
-    agentId: AgentRole,
-    content: string,
-    options?: AgentProfileTurnOptions,
-  ) => Promise<string>;
-  systemPromptForAgent: (agentId: AgentRole, prompt?: string) => string;
-  getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
+/** Runs one child profile turn (the AgentOrchestrator façade). */
+export interface ProfileTurnSender {
+  sendProfileMessage(agentId: AgentRole, content: string, options?: AgentProfileTurnOptions): Promise<string>;
 }
 
-export class SubagentRunner {
-  private startBackground?: (input: BackgroundSubagentStart) => Promise<TaskExecutionRecord>;
+/** The system prompt an Agent runs with when its definition has no instructions (PromptPlanForTurn). */
+export interface SystemPromptSource {
+  systemPromptForAgent(agentId: AgentRole, prompt?: string): string;
+}
 
-  constructor(private readonly deps: SubagentRunnerDeps) {}
+export interface SubagentRunnerDeps {
+  prompts: SystemPromptSource;
+  activeTurns: ActiveTurnLookup;
+}
+
+export class SubagentRunner implements SubagentToolHost {
+  readonly activeTurns: ActiveTurnLookup;
+  startBackground?: (input: BackgroundSubagentStart) => Promise<TaskExecutionRecord>;
+  private profileTurns!: ProfileTurnSender;
+
+  constructor(private readonly deps: SubagentRunnerDeps) {
+    this.activeTurns = deps.activeTurns;
+  }
+
+  /** Wired once by the composition root: a child turn runs through the façade whose tools include this runner's. */
+  bindProfileTurns(profileTurns: ProfileTurnSender): void {
+    this.profileTurns = profileTurns;
+  }
 
   setBackgroundStarter(starter: (input: BackgroundSubagentStart) => Promise<TaskExecutionRecord>): void {
     this.startBackground = starter;
@@ -102,7 +116,7 @@ export class SubagentRunner {
   }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string; policyBudget?: TurnHandle['policyBudget']; completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null; sourceFailure?: DelegationSourceFailure }> {
     const capsule = input.capsule;
     const rdcDelegation = resolveRdcDelegation(capsule.domainExtensions);
-    const parentTurn = input.parentTurn ?? this.deps.getActiveTurn(input.parentSessionId);
+    const parentTurn = input.parentTurn ?? this.activeTurns.getActiveTurn(input.parentSessionId);
     if (rdcDelegation.requiresLease && parentTurn?.requiresApprovedCaptureScope) {
       throw new Error(APPROVED_CAPTURE_SCOPE_REQUIRED);
     }
@@ -145,7 +159,7 @@ export class SubagentRunner {
       return rejectConfiguration('MODEL_ROUTE_REQUIRED', `MODEL_ROUTE_REQUIRED: ${input.targetProfile} has no configured model route; configure this Agent in Settings.`);
     }
     const effectiveProfileIds = effectiveProfiles.filter((entry) => entry.enabled).map((entry) => entry.id);
-    const systemPrompt = definition.instructions?.trim() || this.deps.systemPromptForAgent(input.targetProfile);
+    const systemPrompt = definition.instructions?.trim() || this.deps.prompts.systemPromptForAgent(input.targetProfile);
 
     const parentBudget = input.subagentBudget ?? input.parentTurn?.subagentBudget ?? createSubagentBudgetState();
     assertSubagentBudgetAllowsChild(parentBudget);
@@ -315,7 +329,7 @@ export class SubagentRunner {
           ownerTurnId,
         });
       }
-      childPromise = withDelegatedInteractionOwner({ ownerSessionId: input.parentSessionId ?? subagentSessionId, childSessionId: subagentSessionId, executionId: input.executionId ?? subagentId }, () => this.deps.sendProfileMessage(
+      childPromise = withDelegatedInteractionOwner({ ownerSessionId: input.parentSessionId ?? subagentSessionId, childSessionId: subagentSessionId, executionId: input.executionId ?? subagentId }, () => this.profileTurns.sendProfileMessage(
         input.targetProfile,
         childInput,
         {
@@ -428,10 +442,6 @@ export class SubagentRunner {
   }
 
   createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
-    return createSubagentTools({
-      getActiveTurn: this.deps.getActiveTurn,
-      runSubagent: this.runSubagent.bind(this),
-      startBackground: this.startBackground,
-    }, parentAgentId, sessionId, turnHandle);
+    return createSubagentTools(this, parentAgentId, sessionId, turnHandle);
   }
 }

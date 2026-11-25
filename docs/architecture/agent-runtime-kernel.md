@@ -14,6 +14,10 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 - No RDC-specific bridge, MCP server, or skill registry is injected as a hidden default tool path.
 - Assistant text is never parsed as an executable tool call. Textual tool-call shaped output produces a diagnostic event only.
 
+## Composition
+
+`agentRuntimeRoot.ts` is the composition root of the agent runtime: it constructs every collaborator of the `AgentOrchestrator` façade once (slots, MCP coordinator, deferred-tool tracker, prompt plans, tool assembly, tool executor factory, turn preparation, turn runner, subagent runner, background subagents) and passes them to the façade's constructor; the façade depends on their types only. Collaborators reach each other through narrow interfaces the consuming module declares instead of bags of callbacks: `ActiveTurnLookup` and `RuntimeToolResolver` (`orchestratorTypes.ts`), `RuntimeToolPolicyCheck` (`ToolCallAdmission.ts`), `TurnToolExecutors` (`AgentTurnRunner.ts`), `ProfileTurnSender` and `SystemPromptSource` (`SubagentRunner.ts`), `ScopedMemoryStores` (`memory/MemoryStore.ts`), `SubagentToolHost` (`SubagentTool.ts`) and `BackgroundTaskToolHost` (`BackgroundTaskTools.ts`), which the subagent runner and the background service implement themselves. The one late binding is `SubagentRunner.bindProfileTurns`: a child turn runs through the same façade whose tools include the runner's.
+
 ## Tool Mediation
 
 The execution path for RDC work is:

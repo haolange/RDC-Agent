@@ -37,7 +37,7 @@ import {
   resolveEffectiveModel,
 } from '../../settings/provider-catalog/EffectiveModelResolver';
 import { resolveAgentRouteCapability } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
-import { AgentOrchestrator } from '../../agent-runtime/orchestration/AgentOrchestrator';
+import { createAgentOrchestrator } from '../../agent-runtime/orchestration/agentRuntimeRoot';
 import { PromptPlanForTurn } from '../../agent-runtime/orchestration/PromptPlanForTurn';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import { appPathService } from '../../runtime/AppPathService';
@@ -112,7 +112,7 @@ async function prepare(agentId: (typeof AGENTS)[number], scenario: Scenario): Pr
   const content = scenario === 'attachment'
     ? [{ type: 'text' as const, text: 'Why is the hair black?' }, { type: 'image' as const, data: 'iVBORw0KGgo=', mimeType: 'image/png' }]
     : 'Why is the hair black?';
-  return new AgentOrchestrator().prepareTurnContext({
+  return createAgentOrchestrator().prepareTurnContext({
     requestId: `request-${agentId}-${scenario}`, credentialHandle: 'credential', turnId: `turn-${agentId}-${scenario}`, agentId,
     content: content as never, imageTokenAdjustment: scenario === 'attachment' ? 85 : 0,
     providerId: 'ollama', selectedModelId: MODEL_ID, effectiveModel,

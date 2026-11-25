@@ -4,7 +4,7 @@ const status = vi.hoisted(() => ({ mode: 'auto-review' as const, servers: [] as 
 vi.mock('../../agent-runtime/permissions/RuntimePermissionStateService', () => ({
   runtimePermissionStateService: { getSnapshot: () => ({ mode: status.mode, revision: 3 }) },
 }));
-vi.mock('../../agent-runtime/orchestration/AgentOrchestrator', () => ({
+vi.mock('../../agent-runtime/orchestration/agentRuntimeRoot', () => ({
   agentOrchestrator: { getMcpServerStatusSummary: vi.fn((root: string | null) => (root === '/work/project' ? status.servers : [])) },
 }));
 vi.mock('../../sessions/store/sessionStores', () => ({

@@ -6,7 +6,7 @@ import { generateEventId } from '@shared/utils/id';
 import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { traceService } from '../agent-trace/TraceService';
 import { conversationHistoryStore, projectWorkspaceStore, sessionContextStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';

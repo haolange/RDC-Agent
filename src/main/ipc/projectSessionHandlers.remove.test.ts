@@ -45,7 +45,7 @@ vi.mock('../sessions/store/sessionStores', () => ({
 }));
 vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
 vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
-vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
+vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({
   agentOrchestrator: { syncSessionSlots, releaseSessionToolState: vi.fn(), backgroundSubagents: { abortSession: abortBackgroundSession } },
 }));
 vi.mock('../conversation/ConversationService', () => ({

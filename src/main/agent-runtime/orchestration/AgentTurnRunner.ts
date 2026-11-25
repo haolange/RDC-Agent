@@ -45,9 +45,10 @@ import type {
   AgentTurnOptions,
   PreparedAgentRuntime,
   ResolvedRuntimeTools,
+  RuntimeToolResolver,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
-import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
+import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
@@ -61,31 +62,24 @@ import type { ToolExecutor } from '../agent/AgentLoop';
 import type { AgentRole } from '@shared/types/agent';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 
-export interface AgentTurnRunnerDeps {
-  validateCompletion: TurnCompletionValidator;
-  validateCompletionReadiness: TurnCompletionReadinessValidator;
-  slots: AgentSlotRegistry;
-  mcp: McpConnectionCoordinator;
-  deferredActivation: DeferredToolActivationTracker;
-  tokenizerService: TokenizerService;
-  sessionTurnKey: (sessionId?: string | null) => string;
-  resolveRuntimeTools: (
-    agentId: AgentRole,
-    toolAllowlist: string[],
-    sessionId?: string | null,
-    turnHandle?: import('./TurnCoordinator').TurnHandle | null,
-    projectId?: string | null,
-    projectRootPath?: string | null,
-    mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
-  ) => ResolvedRuntimeTools;
-  createToolSignature: (tools: ToolDefinition[]) => string;
-  createToolExecutor: (
+/** Creates the executor a turn runs its tool calls through (ToolExecutorFactory). */
+export interface TurnToolExecutors {
+  createToolExecutor(
     agentId: AgentRole,
     toolAllowlist: string[],
     sessionId?: string | null,
     runtimeContext?: ToolExecutorRuntimeContext,
-  ) => ToolExecutor;
+  ): ToolExecutor;
+}
+
+export interface AgentTurnRunnerDeps {
+  validateCompletion: TurnCompletionValidator;
+  validateCompletionReadiness: TurnCompletionReadinessValidator;
+  slots: AgentSlotRegistry;
+  deferredActivation: DeferredToolActivationTracker;
+  tokenizerService: TokenizerService;
+  tools: RuntimeToolResolver;
+  toolExecutors: TurnToolExecutors;
 }
 
 export interface AgentTurnInput {
@@ -189,7 +183,7 @@ export class AgentTurnRunner {
       await mcpLease?.release({ discardIfIdle: true });
       throw error;
     }
-    const sessionKey = this.deps.sessionTurnKey(executionScopeId);
+    const sessionKey = executionScopeId;
     const turnHooksAllowed = await dispatchRuntimeHooks('turn.before-start', {
       agentId: input.agentId,
       sessionId: executionScopeId,
@@ -331,7 +325,7 @@ export class AgentTurnRunner {
     const { input, preparedRuntime, turnHandle, executionScopeId, mcpLease, slotKey } = run;
     const { promptPlan, routeCapability } = preparedRuntime;
     const frozenToolAllowlist = [...preparedRuntime.effectivePlan.toolAllowlist];
-    const liveRuntimeTools = this.deps.resolveRuntimeTools(
+    const liveRuntimeTools = this.deps.tools.resolveRuntimeTools(
       input.agentId,
       frozenToolAllowlist,
       executionScopeId,
@@ -350,7 +344,7 @@ export class AgentTurnRunner {
       definitions: preparedRuntime.runtimeTools.definitions,
       toolMap: liveRuntimeTools.toolMap,
     };
-    const allToolSignature = this.deps.createToolSignature(runtimeTools.definitions);
+    const allToolSignature = this.deps.tools.createToolSignature(runtimeTools.definitions);
     void this.deps.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
     const injectedToolDefinitions = preparedRuntime.activeToolDefinitions;
     // native-structured：core 常驻注入，mcp__* 与 extended builtin 默认 deferred；
@@ -390,7 +384,7 @@ export class AgentTurnRunner {
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? [...effectivePlan.toolAllowlist]
       : activeToolAllowlist;
-    return this.deps.createToolExecutor(input.agentId, executorAllowlist, executionScopeId, {
+    return this.deps.toolExecutors.createToolExecutor(input.agentId, executorAllowlist, executionScopeId, {
       sessionId: executionScopeId,
       runId: input.runId,
       turnId: input.turnId,
