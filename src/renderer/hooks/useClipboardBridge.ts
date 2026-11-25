@@ -5,8 +5,9 @@ export function useClipboardBridge() {
     try {
       const result = await window.electronAPI.appShell.copyText(text);
       if (result.success) return true;
-    } catch {
+    } catch (error) {
       // Fall through to the renderer clipboard API.
+      console.warn('[clipboard] the app bridge could not copy; trying the renderer clipboard', error);
     }
     try {
       await navigator.clipboard.writeText(text);
@@ -20,7 +21,8 @@ export function useClipboardBridge() {
     try {
       const result = await window.electronAPI.appShell.readClipboardText();
       if (result.success) return result.text;
-    } catch {
+    } catch (error) {
+      console.warn('[clipboard] the app bridge could not read the clipboard', error);
       return '';
     }
     return '';

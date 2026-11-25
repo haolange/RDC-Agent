@@ -37,7 +37,9 @@ export function useKnowledgeConflicts({ hits, pack, detailSeq, onBeginSelect, on
       if (!hit) return null;
       try {
         return await loadCard(hit.spaceId, hit.relativePath);
-      } catch {
+      } catch (error) {
+        // The pair still opens; the card that could not be read shows as missing.
+        console.warn('[knowledge] could not load a conflicting card', error);
         return null;
       }
     };

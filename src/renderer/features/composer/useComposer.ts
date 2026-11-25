@@ -53,7 +53,8 @@ export function useComposer(options: {
   const userInvocableAgents = agentDefinitions.filter((agent) => agent.enabled && agent.userInvocable);
 
   useEffect(() => {
-    void useAppSettingsStore.getState().reloadSettings().catch(() => undefined);
+    void useAppSettingsStore.getState().reloadSettings()
+      .catch((error: unknown) => console.warn('[composer] could not reload settings for the project', error));
   }, [currentProject?.projectId]);
 
   const selectedDeviceEntry = usePreparedSessionDevice(currentProject?.projectId, currentSession?.sessionId);

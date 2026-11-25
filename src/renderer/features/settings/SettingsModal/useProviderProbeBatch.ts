@@ -15,11 +15,15 @@ export function useProviderProbeBatch(providerIds?: string[]) {
       if (mounted.current) setBatch(previous => previous && next && previous.revision > next.revision ? previous : next);
     };
     const unsubscribe = api?.events.onProbeBatchChanged(accept);
-    void api?.llm.getProbeBatch().then(accept).catch(() => {});
+    void api?.llm.getProbeBatch().then(accept)
+      .catch((cause: unknown) => console.warn('[settings] could not read the provider probe batch', cause));
     return () => {
       mounted.current = false;
       unsubscribe?.();
-      if (owned.current) void api?.llm.cancelProbeBatch(owned.current).catch(() => {});
+      if (owned.current) {
+        void api?.llm.cancelProbeBatch(owned.current)
+          .catch((cause: unknown) => console.warn('[settings] could not cancel the provider probe batch', cause));
+      }
     };
   }, []);
   const action = async (kind: 'prepare' | 'start' | 'cancel' | 'retry') => {

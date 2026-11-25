@@ -49,7 +49,8 @@ export async function selectSessionOp(
     restoreSelectionSnapshot(ctx, rollbackState);
     ctx.setSidebarError({ contextKey: 'sidebar.selectSessionFailed', detail: result.error });
     if (options.optimisticSession?.projectId) {
-      await ctx.loadProjectSessionList(options.optimisticSession.projectId).catch(() => undefined);
+      await ctx.loadProjectSessionList(options.optimisticSession.projectId)
+        .catch((error: unknown) => console.warn('[sidebar] could not reload the session list', error));
     }
     return false;
   }

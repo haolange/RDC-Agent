@@ -42,7 +42,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const refreshSettings = useAppSettingsStore((state) => state.refreshSettings);
   // Opening Settings is where edits made outside the app (secrets, Agent files, trust) are picked up.
   useEffect(() => {
-    if (open) void refreshSettings().catch(() => undefined);
+    if (open) void refreshSettings().catch((error: unknown) => console.warn('[settings] could not refresh settings', error));
   }, [open, refreshSettings]);
 
   const providerConnection = useProviderConnection({

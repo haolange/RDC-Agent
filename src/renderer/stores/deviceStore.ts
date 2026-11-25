@@ -67,7 +67,9 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
     }
 
     deviceWatchRenewTimer = setInterval(() => {
-      void window.electronAPI.device.watchRenew().catch(() => undefined);
+      void window.electronAPI.device.watchRenew().catch((error: unknown) => {
+        console.warn('[devices] could not renew the device watch', error);
+      });
     }, DEVICE_WATCH_RENEW_MS);
   },
 
@@ -80,8 +82,9 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
 
     try {
       await window.electronAPI.device.watchStop();
-    } catch {
-      // ignore stop failures during teardown
+    } catch (error) {
+      // Teardown goes on; the failure is only reported.
+      console.warn('[devices] could not stop the device watch', error);
     }
   },
 

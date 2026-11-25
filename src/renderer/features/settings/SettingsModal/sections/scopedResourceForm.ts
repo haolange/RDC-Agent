@@ -73,27 +73,23 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
     };
   }
   if (kind === 'hook') {
-    try {
-      const lines = content.split(/\r?\n/);
-      const pick = (key: string): string | undefined => {
-        const line = lines.find((entry) => entry.startsWith(`${key}:`));
-        return line ? line.slice(key.length + 1).trim() : undefined;
-      };
-      const failure = pick('failurePolicy');
-      return {
-        ...base,
-        id: pick('id') ?? id,
-        enabled: pick('enabled') !== 'false',
-        event: pick('event') ?? 'tool.before-call',
-        command: pick('command') ?? '',
-        argsText: pick('args') ?? '[]',
-        timeoutMs: pick('timeoutMs') ?? '30000',
-        failurePolicy: failure === 'block' ? 'block' : 'warn',
-        body: content,
-      };
-    } catch {
-      return { ...base, id, body: content };
-    }
+    const lines = content.split(/\r?\n/);
+    const pick = (key: string): string | undefined => {
+      const line = lines.find((entry) => entry.startsWith(`${key}:`));
+      return line ? line.slice(key.length + 1).trim() : undefined;
+    };
+    const failure = pick('failurePolicy');
+    return {
+      ...base,
+      id: pick('id') ?? id,
+      enabled: pick('enabled') !== 'false',
+      event: pick('event') ?? 'tool.before-call',
+      command: pick('command') ?? '',
+      argsText: pick('args') ?? '[]',
+      timeoutMs: pick('timeoutMs') ?? '30000',
+      failurePolicy: failure === 'block' ? 'block' : 'warn',
+      body: content,
+    };
   }
   return { ...base, id, body: content };
 };

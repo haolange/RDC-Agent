@@ -50,7 +50,10 @@ export function useKnowledgeOperation() {
       state?.operationId === operationId ? { ...state, cancelling } : state
     ));
     settle(true);
-    void window.electronAPI.knowledge.cancel({ operationId }).catch(() => settle(false));
+    void window.electronAPI.knowledge.cancel({ operationId }).catch((error: unknown) => {
+      console.warn('[knowledge] could not cancel the operation', error);
+      settle(false);
+    });
   }, []);
 
   return {

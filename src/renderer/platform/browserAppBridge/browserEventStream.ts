@@ -54,8 +54,9 @@ function parseFrame(frame: string): BrowserBridgeEvent | null {
     if (typeof parsed === 'object' && parsed !== null && typeof (parsed as { channel?: unknown }).channel === 'string') {
       return parsed as BrowserBridgeEvent;
     }
-  } catch {
+  } catch (error) {
     // A malformed frame is isolated; later valid frames on the same stream remain deliverable.
+    console.warn('[BrowserAppBridge] Dropped a malformed event frame:', error);
   }
   return null;
 }

@@ -20,6 +20,9 @@ export { stopWorkTrace };
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
+/** The Stop notice never waits on the workflow stop, so its failure is only reported. */
+const reportWorkflowStopFailure = (error: unknown) => console.warn('[composer] the workflow did not stop', error);
+
 export function useComposerStop(options: {
   t: Translate;
   currentSession: SessionRecord | null;
@@ -111,7 +114,7 @@ export function useComposerStop(options: {
           useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
         }
         if (workflowStopPromise) {
-          void workflowStopPromise.catch(() => undefined);
+          void workflowStopPromise.catch(reportWorkflowStopFailure);
         }
         notify.info(t('app.stopRunSent'));
         return;
@@ -122,7 +125,7 @@ export function useComposerStop(options: {
 
       // Do not block notice on workflow stop latency.
       if (workflowStopPromise) {
-        void workflowStopPromise.catch(() => undefined);
+        void workflowStopPromise.catch(reportWorkflowStopFailure);
       }
 
       if (!cancelResult.success) {

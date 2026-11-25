@@ -61,8 +61,9 @@ const persistLayout = async (state: Pick<
         },
       },
     }]);
-  } catch {
+  } catch (error) {
     // Browser QA intentionally denies settings writes; keep this in-memory layout usable.
+    console.warn('[layout] could not save the layout', error);
   }
 };
 

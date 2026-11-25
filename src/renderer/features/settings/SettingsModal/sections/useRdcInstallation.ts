@@ -19,7 +19,10 @@ export function useRdcInstallation(draft: RdcCliInvokerSettings, onApplied: (set
       void detectRdcInstallations().then((found) => {
         const configured = found.find((candidate) => candidate.source === 'configured');
         if (revision.current === id && configured) setRoot(configured.root);
-      }).catch(() => { /* Explicit detection reports errors; existing invalid bindings remain visible. */ });
+      }).catch((cause: unknown) => {
+        // Explicit detection reports errors in the panel; existing invalid bindings remain visible.
+        console.warn('[settings] could not detect RenderDoc installations', cause);
+      });
     }
     return () => { revision.current += 1; };
   // The modal owns one draft lifetime. Later selections must not be replaced by persisted settings.

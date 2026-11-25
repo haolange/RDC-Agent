@@ -176,7 +176,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         entries: [...listed, ...appendedSince(latest.entries, new Set(listed.map((entry) => entry.id)))],
         isLoading: false,
       });
-    } catch {
+    } catch (error) {
+      console.warn('[terminal] could not list runtime log entries', error);
       const latest = get();
       if (!isCurrent(latest)) {
         return;

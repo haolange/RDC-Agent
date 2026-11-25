@@ -110,6 +110,8 @@ export class SettingsViewSync {
   }
 
   private readWhenIdle(): void {
-    if (this.ownWrites === 0 && this.unseen.size > 0) void this.readFor(undefined).catch(() => undefined);
+    if (this.ownWrites === 0 && this.unseen.size > 0) {
+      void this.readFor(undefined).catch((error: unknown) => console.warn('[settings] could not read a changed settings view', error));
+    }
   }
 }

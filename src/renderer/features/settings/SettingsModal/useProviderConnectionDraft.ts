@@ -121,7 +121,10 @@ export const useProviderConnectionDraft = ({
 
   const loginOwner = open && connectionDraft ? connectionDraft.providerId : null;
   useEffect(() => () => {
-    if (loginOwner) void window.electronAPI.llm.cancelProviderAccountLogin(loginOwner).catch(() => undefined);
+    if (loginOwner) {
+      void window.electronAPI.llm.cancelProviderAccountLogin(loginOwner)
+        .catch((error: unknown) => console.warn('[settings] could not cancel the account login', error));
+    }
   }, [loginOwner]);
 
   const openProviderConnection = (provider: LlmProviderEntry) => {
