@@ -1,7 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
-import type { SessionRecord } from '@shared/types/session';
 
 /** A transport whose responses the test releases one by one, in any order. */
 const pending = vi.hoisted(() => [] as Array<{ agentId: string; resolve: (value: unknown) => void }>);
@@ -14,6 +13,7 @@ vi.mock('../../platform/getElectronApi', () => ({
 }));
 
 import { persistSessionAgentId } from './sessionAgentId';
+import type { SessionRecord } from '@shared/types/session';
 
 const session = (agentId: string): SessionRecord => ({
   schemaVersion: '1', sessionId: 'session-a', projectId: 'project-a', title: 'A', goal: '', sessionPath: '/a',
