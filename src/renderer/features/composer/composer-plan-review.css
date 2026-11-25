@@ -81,12 +81,6 @@
 .composer-plan-review__footer { display: flex; flex-shrink: 0; min-height: var(--control-height-sm); }
 .composer-plan-review__stop .ui-icon { fill: currentColor; }
 
-.composer-plan-review__error {
-  margin: 0;
-  color: var(--token-status-error);
-  font-size: var(--type-body-size);
-}
-
 .composer-transition-announcement {
   position: absolute;
   width: 1px;

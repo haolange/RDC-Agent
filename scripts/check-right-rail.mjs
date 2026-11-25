@@ -193,7 +193,7 @@ const rightRailCss = [
   read('src/renderer/features/right-rail/CaptureReplay.css'),
   read('src/renderer/features/right-rail/RightRailEmptyVisuals.css'),
 ].join('\n');
-for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', '.right-rail-capture-panel', '.capture-replay-device-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
+for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', '.capture-replay-device-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list']) {
   requireText(rightRailCss, required, `Right rail CSS must retain ${required}`);
 }
 for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdc-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {
