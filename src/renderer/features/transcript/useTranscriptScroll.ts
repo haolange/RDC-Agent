@@ -1,30 +1,60 @@
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef, type MutableRefObject } from 'react';
 
 const STICKY_SCROLL_THRESHOLD = 96;
 
-/** Follow new content only while the reader remains near the bottom. */
+interface LaidOut { scrollHeight: number; clientHeight: number }
+
+/** Reads the container's heights and keeps them as the geometry the reader last saw. */
+const readLayout = (container: HTMLDivElement, laidOut: MutableRefObject<LaidOut>): number => {
+  laidOut.current = { scrollHeight: container.scrollHeight, clientHeight: container.clientHeight };
+  return laidOut.current.scrollHeight;
+};
+
+/**
+ * Follow new content only while the reader remains near the bottom.
+ *
+ * A scroll event reads no layout. While streaming, one arrives after every follow, and reading the geometry there
+ * forced a layout of the whole transcript each time. The event only marks the position as unsettled; the next follow
+ * decision (a commit or a resize) settles it first, measured against the content height the reader saw: the height
+ * from the last layout read, so content added since then does not count as the reader leaving the bottom.
+ */
 export function useTranscriptScroll(messageCount: number, activityAt: number | undefined) {
   const isEmpty = messageCount === 0;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottom = useRef(true);
+  const scrolledSinceSettled = useRef(false);
+  const laidOut = useRef<LaidOut>({ scrollHeight: 0, clientHeight: 0 });
+  const settleScroll = useCallback((container: HTMLDivElement) => {
+    if (!scrolledSinceSettled.current) return;
+    scrolledSinceSettled.current = false;
+    shouldStickToBottom.current = laidOut.current.scrollHeight - container.scrollTop
+      - laidOut.current.clientHeight < STICKY_SCROLL_THRESHOLD;
+  }, []);
   const followContent = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (container && shouldStickToBottom.current) {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' });
+    if (!container) return;
+    settleScroll(container);
+    if (shouldStickToBottom.current) {
+      container.scrollTo({ top: readLayout(container, laidOut), behavior: 'auto' });
     }
-  }, []);
-  const handleScroll = useCallback(() => {
+  }, [settleScroll]);
+  /** Resize observations arrive after layout, so their reads are free; they keep the laid-out height current. */
+  const followResize = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    shouldStickToBottom.current = container.scrollHeight - container.scrollTop
-      - container.clientHeight < STICKY_SCROLL_THRESHOLD;
+    settleScroll(container);
+    const scrollHeight = readLayout(container, laidOut);
+    if (shouldStickToBottom.current) container.scrollTo({ top: scrollHeight, behavior: 'auto' });
+  }, [settleScroll]);
+  const handleScroll = useCallback(() => {
+    scrolledSinceSettled.current = true;
   }, []);
 
   useLayoutEffect(followContent, [followContent, messageCount, activityAt]);
   useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(followContent);
+    const observer = new ResizeObserver(followResize);
     const observed = new Set<Element>();
     const refreshTargets = () => {
       const targets = new Set<Element>([container]);
@@ -43,7 +73,7 @@ export function useTranscriptScroll(messageCount: number, activityAt: number | u
     const mutations = new MutationObserver(refreshTargets);
     mutations.observe(container, { childList: true, subtree: true });
     return () => { mutations.disconnect(); observer.disconnect(); observed.clear(); };
-  }, [followContent, isEmpty]);
+  }, [followResize, isEmpty]);
 
   return { scrollContainerRef, handleScroll };
 }

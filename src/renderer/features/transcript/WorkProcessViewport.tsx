@@ -16,6 +16,11 @@ const easeOut = (progress: number) => 1 - (1 - progress) ** 3;
  * arrives and fades out toward the top. Scrolling up pauses following and offers「回到最新」; reaching the bottom
  * resumes it. When not following (the process ended, or the preference is "show all") the same element simply lays
  * its content out in full, so switching never remounts the rows or loses their open state.
+ *
+ * A scroll event reads no layout itself: following animates one scroll per frame, and reading the geometry in the
+ * event forced a layout whenever the transcript had changed since the last frame. The position is read once in the
+ * next animation frame instead, and "at the bottom" is judged against the heights from the last layout read (what
+ * the reader saw), so content added in that frame does not count as the reader leaving the bottom.
  */
 export const WorkProcessViewport: React.FC<{ following: boolean; children: React.ReactNode }> = ({ following, children }) => {
   const { t } = useI18n();
@@ -23,14 +28,23 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
   const contentRef = React.useRef<HTMLDivElement>(null);
   const stick = React.useRef(true);
   const animating = React.useRef(0);
+  /** The frame that reads the scroll position after a scroll event; 0 when none is pending. */
+  const scrollRead = React.useRef(0);
+  const laidOut = React.useRef({ scrollHeight: 0, clientHeight: 0 });
   const [paused, setPaused] = React.useState(false);
   const [hiddenAbove, setHiddenAbove] = React.useState(false);
+
+  /** Reads the scroller's heights and keeps them as the geometry the reader last saw. */
+  const readLayout = React.useCallback((scroller: HTMLDivElement) => {
+    laidOut.current = { scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight };
+    return laidOut.current.scrollHeight - laidOut.current.clientHeight;
+  }, []);
 
   const scrollToLatest = React.useCallback((smooth: boolean) => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     window.cancelAnimationFrame(animating.current);
-    const target = scroller.scrollHeight - scroller.clientHeight;
+    const target = readLayout(scroller);
     const from = scroller.scrollTop;
     if (!smooth || prefersReducedMotion() || Math.abs(target - from) < 2) {
       scroller.scrollTop = target;
@@ -40,15 +54,29 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
     const startedAt = performance.now();
     const step = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / FOLLOW_MS);
-      scroller.scrollTop = from + (scroller.scrollHeight - scroller.clientHeight - from) * easeOut(progress);
+      scroller.scrollTop = from + (readLayout(scroller) - from) * easeOut(progress);
       animating.current = progress < 1 ? window.requestAnimationFrame(step) : 0;
     };
     animating.current = window.requestAnimationFrame(step);
+  }, [readLayout]);
+
+  const readScroll = React.useCallback(() => {
+    scrollRead.current = 0;
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const top = scroller.scrollTop;
+    setHiddenAbove(top > 0);
+    if (animating.current) return;
+    const atBottom = laidOut.current.scrollHeight - laidOut.current.clientHeight - top <= BOTTOM_SLACK;
+    stick.current = atBottom;
+    setPaused(!atBottom);
   }, []);
 
   React.useLayoutEffect(() => {
     if (!following) {
       window.cancelAnimationFrame(animating.current);
+      window.cancelAnimationFrame(scrollRead.current);
+      scrollRead.current = 0;
       stick.current = true;
       setPaused(false);
       setHiddenAbove(false);
@@ -68,7 +96,13 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
     scrollToLatest(false);
     if (typeof ResizeObserver === 'undefined') return () => clearDynStyles([scroller]);
     const observer = new ResizeObserver(() => {
+      // Observations arrive after layout: settle a pending scroll first, then keep the new heights.
+      if (scrollRead.current) {
+        window.cancelAnimationFrame(scrollRead.current);
+        readScroll();
+      }
       measureGutter();
+      readLayout(scroller);
       if (stick.current) scrollToLatest(true);
     });
     observer.observe(content);
@@ -77,18 +111,16 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
       observer.disconnect();
       clearDynStyles([scroller]);
     };
-  }, [following, scrollToLatest]);
+  }, [following, readLayout, readScroll, scrollToLatest]);
 
-  React.useEffect(() => () => window.cancelAnimationFrame(animating.current), []);
+  React.useEffect(() => () => {
+    window.cancelAnimationFrame(animating.current);
+    window.cancelAnimationFrame(scrollRead.current);
+  }, []);
 
   const onScroll = () => {
-    const scroller = scrollerRef.current;
-    if (!scroller || !following) return;
-    setHiddenAbove(scroller.scrollTop > 0);
-    if (animating.current) return;
-    const atBottom = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= BOTTOM_SLACK;
-    stick.current = atBottom;
-    setPaused(!atBottom);
+    if (!scrollerRef.current || !following) return;
+    if (!scrollRead.current) scrollRead.current = window.requestAnimationFrame(readScroll);
   };
 
   return (

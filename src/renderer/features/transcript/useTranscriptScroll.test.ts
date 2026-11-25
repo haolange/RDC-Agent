@@ -114,3 +114,44 @@ it('observes virtual row growth after slice changes without forcing a reader bac
     host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
   }
 });
+
+it('reads no layout on a scroll event, and a streaming commit at the bottom reads it once', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('ResizeObserver', class { observe = vi.fn(); disconnect = vi.fn(); });
+  const scrollTo = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  function Probe({ activity }: { activity: number }) {
+    const { scrollContainerRef, handleScroll } = useTranscriptScroll(3, activity);
+    return createElement('div', { ref: scrollContainerRef, onScroll: handleScroll }, createElement('ol'));
+  }
+  try {
+    await act(async () => root.render(createElement(Probe, { activity: 1 })));
+    const container = host.firstElementChild as HTMLElement;
+    let reads = 0;
+    let scrollHeight = 2000;
+    let scrollTop = 1400;
+    Object.defineProperties(container, {
+      scrollHeight: { configurable: true, get: () => { reads += 1; return scrollHeight; } },
+      clientHeight: { configurable: true, get: () => { reads += 1; return 600; } },
+      scrollTop: { configurable: true, get: () => { reads += 1; return scrollTop; }, set: (value: number) => { scrollTop = value; } },
+    });
+    for (let activity = 2; activity < 6; activity += 1) {
+      // The scroll event that the previous follow caused.
+      reads = 0;
+      await act(async () => container.dispatchEvent(new Event('scroll')));
+      expect(reads).toBe(0);
+      scrollHeight += 300;
+      await act(async () => root.render(createElement(Probe, { activity })));
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: scrollHeight, behavior: 'auto' });
+      // One layout pass: the settled position and the new height are read together, once each.
+      expect(reads).toBe(3);
+      scrollTop = scrollHeight - 600;
+    }
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.restoreAllMocks(); vi.unstubAllGlobals();
+  }
+});
