@@ -71,6 +71,11 @@ vi.mock('../../hooks/HookEngine', () => ({
     run: async () => ({ continue: true }),
   },
 }));
+// Decisions are audited before tools run; this suite checks execution, not the audit file.
+vi.mock('../../runtime/AuditLog', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../runtime/AuditLog')>(),
+  auditLog: { record: vi.fn() },
+}));
 vi.mock('../../runtime/AppPathService', () => ({
   appPathService: {
     getUserRdcPaths: () => ({

@@ -5,7 +5,15 @@
  */
 import { ESLint } from 'eslint';
 
-const eslint = new ESLint({ cwd: process.cwd() });
+// The probes are virtual files that no tsconfig contains; the host gate is syntactic, so lint them without type info.
+const eslint = new ESLint({
+  cwd: process.cwd(),
+  overrideConfig: {
+    files: ['**/*.ts'],
+    languageOptions: { parserOptions: { projectService: false } },
+    rules: { '@typescript-eslint/no-floating-promises': 'off' },
+  },
+});
 const GATE_RULE = 'no-restricted-syntax';
 
 const violations = {

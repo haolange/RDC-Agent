@@ -2,8 +2,6 @@
  * ID Generation Utilities - ID生成工具
  */
 
-import { v4 as uuidv4 } from 'uuid';
-
 /** Hex of `byteCount` random bytes from Web Crypto, available in Node and the renderer alike. */
 function randomHex(byteCount: number): string {
   const bytes = globalThis.crypto.getRandomValues(new Uint8Array(byteCount));
@@ -14,14 +12,14 @@ function randomHex(byteCount: number): string {
  * 生成唯一ID
  */
 export function generateId(): string {
-  return uuidv4();
+  return globalThis.crypto.randomUUID();
 }
 
 /**
  * 生成短ID（12位）
  */
 export function generateShortId(): string {
-  return uuidv4().replace(/-/g, '').slice(0, 12);
+  return randomHex(6);
 }
 
 /**
