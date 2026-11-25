@@ -7,6 +7,7 @@ import {
   type AnalyzerExplanationLayer,
   type ChallengeRecord,
   type ClaimRecord,
+  type ClaimSet,
   type CompactProvenanceEntry,
   type EvidenceRecord,
   type ExperimentRecord,
@@ -299,6 +300,34 @@ export function assertClaimRecordRefs(
   if (options?.mission === 'analyzer') assertAnalyzerClaimLayer(claim, lookup);
 }
 
+/**
+ * S-EVIDENCE-01: an observation is only as good as what was observed. A non-projected observed claim cites at least
+ * one resolvable Evidence; a projected claim (a report conclusion) inherits through its provenance, so each observed
+ * source it cites must do the same.
+ */
+export function assertObservedClaimEvidence(
+  claim: ClaimRecord,
+  lookup: InvestigationLookup,
+  options?: { treatAsProjected?: boolean },
+): void {
+  const projected = options?.treatAsProjected === true || claim.projectionKind != null;
+  const cited = projected
+    ? (claim.compactProvenance ?? []).flatMap((entry) => {
+      const source = lookup.getClaim(entry.sourceClaimId);
+      return source && source.projectionKind == null && source.epistemic === 'observed' ? [source] : [];
+    })
+    : claim.epistemic === 'observed' ? [claim] : [];
+  for (const observed of cited) {
+    if (!verifyEvidenceIdsResolvable(observed.evidenceIds ?? [], lookup)) {
+      throw new InvestigationError(
+        'INVESTIGATION_INVARIANT_VIOLATION',
+        `observed claim ${observed.claimId} must cite at least one resolvable evidenceId (EvidenceRecord.evidenceId or an EvidencePack item, not an artifactId)`,
+        { invariantId: 'S-EVIDENCE-01', details: { claimId: observed.claimId, evidenceIds: observed.evidenceIds ?? [] } },
+      );
+    }
+  }
+}
+
 export function assertReportRecordRefs(
   report: InvestigationReport,
   lookup: InvestigationLookup,
@@ -465,4 +494,17 @@ export function collectProjectedClaims(record: unknown): ClaimRecord[] {
 
 function isClaimRecord(value: unknown): value is ClaimRecord {
   return Boolean(value && typeof value === 'object' && 'claimId' in value && 'claimKind' in value && 'epistemic' in value);
+}
+
+/**
+ * Applies S-EVIDENCE-01 when a record is written as ready: a ready claim, every item of a ready ClaimSet, and every
+ * conclusion of a ready report. Drafts may still be gathering evidence, and records read back are not re-judged, so
+ * investigations recorded before the rule keep reading.
+ */
+export function assertReadyObservedEvidence(kind: string, record: unknown, lookup: InvestigationLookup): void {
+  if (kind === 'claim') assertObservedClaimEvidence(record as ClaimRecord, lookup);
+  if (kind === 'claim_set') for (const claim of (record as ClaimSet).items) assertObservedClaimEvidence(claim, lookup);
+  if (kind === 'report') {
+    for (const claim of (record as InvestigationReport).claims) assertObservedClaimEvidence(claim, lookup, { treatAsProjected: true });
+  }
 }

@@ -220,7 +220,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       status: 'ready',
       sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
     });
-    const claim = writeDraft(service, 'claim', observedClaim('ws-old', 'claim-old'), {
+    const claim = writeDraft(service, 'claim', observedClaim('ws-old', 'claim-old', ['ev-old']), {
       status: 'ready',
       sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
     });
@@ -457,8 +457,9 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   });
 
   it('finds report sources inside a current ClaimSet even when no standalone Claim artifact matches', async () => {
-    const { service } = createInvestigationHarness();
+    const { resolver, service } = createInvestigationHarness();
     const world = writeDraft(service, 'world_state', baselineWorld('ws-model'));
+    writeDraft(service, 'evidence', evidenceOf('ws-model', seedNote(resolver)));
     const claim = observedClaim('ws-model', 'claim-model');
     const model = writeDraft(service, 'claim_set', { items: [claim] }, {
       mission: 'analyzer', status: 'ready',
@@ -1355,7 +1356,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       mission: 'debugger',
       title: 'ready claim',
       summary: 'depends on evidence hash',
-      record: observedClaim('ws-ready-src', 'claim-ready-src'),
+      record: observedClaim('ws-ready-src', 'claim-ready-src', ['ev-ready-src']),
       sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
       status: 'ready',
     });
@@ -1440,6 +1441,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const note = seedNote(resolver);
     const world = writeDraft(service, 'world_state', baselineWorld('ws-bound'));
     writeDraft(service, 'world_state', baselineWorld('ws-other'));
+    writeDraft(service, 'evidence', evidenceOf('ws-bound', note));
     expect(() => writeDraft(service, 'claim', observedClaim('ws-bound'), {
       worldStateId: 'ws-missing',
     })).toThrow(/INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/);
@@ -1654,6 +1656,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   it('P1-2 read rejects ready records whose worldStateId no longer binds', () => {
     const { resolver, service } = createInvestigationHarness();
     const world = writeDraft(service, 'world_state', baselineWorld('ws-bind-read'));
+    writeDraft(service, 'evidence', evidenceOf('ws-bind-read', seedNote(resolver)));
     const claim = service.writeRecord(SESSION_ID, {
       kind: 'claim',
       mission: 'debugger',
@@ -1712,5 +1715,35 @@ describe('verified record bodies', () => {
     const text = JSON.stringify({ items: 'claims' });
     expect(() => parseVerifiedRecordBody(entry(text), body(text))).toThrow(expect.objectContaining({ code: 'INVESTIGATION_SCHEMA_INVALID' }));
     expect(() => parseVerifiedRecordBodyOf(entry(text), body(text), 'EvidencePack')).toThrow(expect.objectContaining({ code: 'INVESTIGATION_INDEX_CORRUPT' }));
+  });
+});
+
+describe('S-EVIDENCE-01: observed claims rest on evidence', () => {
+  it('lets a draft observation wait for its evidence, and rejects it as ready until it cites a resolvable one', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-obs-ev'));
+    const draft = writeDraft(service, 'claim', observedClaim('ws-obs-ev', 'claim-waiting', []));
+    expect(service.readRecord(SESSION_ID, draft.manifest.artifactId).record).toMatchObject({ claimId: 'claim-waiting' });
+    expect(service.list(SESSION_ID, { kind: 'claim' })).toHaveLength(1);
+    const ready = (record: ClaimRecord) => service.writeRecord(SESSION_ID, {
+      kind: 'claim', mission: 'debugger', title: 'observation', summary: 'ready observation', record,
+      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }], status: 'ready',
+    });
+    expect(() => ready(observedClaim('ws-obs-ev', 'claim-uncited', []))).toThrow(/S-EVIDENCE-01/);
+    expect(() => ready(observedClaim('ws-obs-ev', 'claim-dangling', ['ev-missing']))).toThrow(/S-EVIDENCE-01/);
+    writeDraft(service, 'evidence', evidenceOf('ws-obs-ev', seedNote(resolver), 'ev-seen'));
+    expect(ready(observedClaim('ws-obs-ev', 'claim-cited', ['ev-seen'])).manifest.status).toBe('ready');
+  });
+
+  it('rejects a ready report whose conclusion projects an observation without evidence', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const source = writeDraft(service, 'world_state', baselineWorld('ws-report-ev'));
+    const uncited = writeDraft(service, 'claim', observedClaim('ws-report-ev', 'claim-report-uncited', []));
+    expect(() => writeReadyReport(service, { mission: 'debugger', source,
+      claims: [projectClaim(uncited.record as ClaimRecord, 'claim-report-uncited-proj')] })).toThrow(/S-EVIDENCE-01/);
+    writeDraft(service, 'evidence', evidenceOf('ws-report-ev', seedNote(resolver), 'ev-report'));
+    const cited = writeDraft(service, 'claim', observedClaim('ws-report-ev', 'claim-report-cited', ['ev-report']));
+    expect(writeReadyReport(service, { mission: 'debugger', source,
+      claims: [projectClaim(cited.record as ClaimRecord, 'claim-report-cited-proj')] }).manifest.status).toBe('ready');
   });
 });

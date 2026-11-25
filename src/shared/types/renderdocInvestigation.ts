@@ -302,6 +302,8 @@ export interface ClaimRecord {
   worldStateId: string;
   experimentId: string | null;
   declaresCounterfactual: boolean;
+  /** EvidenceRecord.evidenceId values the claim rests on; required (at least one) for a non-projected observed claim. */
+  evidenceIds?: string[];
   supports?: string[];
   contradicts?: string[];
   scope: InvestigationClaimScope;

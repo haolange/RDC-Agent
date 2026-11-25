@@ -992,12 +992,13 @@ describe('investigation system contract', () => {
     expect(isAllowedMissionCompletionStatus('verified')).toBe(true);
     expect(isAllowedMissionCompletionStatus('Pending')).toBe(false);
     expect(isAllowedMissionCompletionStatus('Partially')).toBe(false);
-    const { service } = createInvestigationHarness();
+    const { resolver, service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld(), { mission: 'analyzer' });
     writeDraft(service, 'checkpoint', sampleCheckpoint({
       checkpointId: 'cp-analyzer-one-layer',
       currentWorldStateId: 'ws-baseline',
     }), { mission: 'analyzer' });
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission: 'analyzer' });
     const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-one-layer'), { mission: 'analyzer' });
     const report = writeReadyReport(service, {
       mission: 'analyzer',

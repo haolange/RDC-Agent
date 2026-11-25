@@ -47,8 +47,9 @@ const reportRef = (report: { contentUri: string; contentHash: string }) => ({ ur
 
 describe('missionCompletionContract', () => {
   it('binds the exact declared report without requiring internal identifiers in the answer', () => {
-    const { service } = createInvestigationHarness();
+    const { resolver, service } = createInvestigationHarness();
     seedCheckpoint(service, 'analyzer');
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission: 'analyzer' });
     const source = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-declared-report'), { mission: 'analyzer' });
     const report = writeReadyReport(service, { mission: 'analyzer', source,
       claims: [projectClaim(source.record as never, 'claim-declared-report-projection')] });
@@ -238,8 +239,9 @@ describe('missionCompletionContract', () => {
   });
 
   it('allows an appropriately scoped Analyzer report without inventing other explanation layers', () => {
-    const { service } = createInvestigationHarness();
+    const { resolver, service } = createInvestigationHarness();
     seedCheckpoint(service, 'analyzer');
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission: 'analyzer' });
     const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-analyzer-obs'), { mission: 'analyzer' });
     const report = writeReadyReport(service, {
       mission: 'analyzer',
@@ -355,6 +357,7 @@ function seedMissionMethod(
   mission: typeof MISSIONS[number],
 ) {
   if (mission === 'analyzer') {
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission });
     const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-analyzer'), { mission });
     const reconstructed = writeDraft(service, 'claim', derivedStructureClaim('ws-baseline', 'claim-analyzer-recon'), { mission });
     const authoring = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-analyzer-auth'), { mission });

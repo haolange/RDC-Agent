@@ -150,6 +150,7 @@ const ClaimRecordShape = z.object({
   worldStateId: nonEmpty,
   experimentId: nonEmpty.nullable(),
   declaresCounterfactual: z.boolean(),
+  evidenceIds: z.array(nonEmpty).optional().describe('EvidenceRecord.evidenceId values (or EvidencePack item IDs) this claim rests on. An observed claim that is not a projection must cite at least one.'),
   supports: z.array(nonEmpty).optional(),
   contradicts: z.array(nonEmpty).optional(),
   scope: ClaimScopeSchema,

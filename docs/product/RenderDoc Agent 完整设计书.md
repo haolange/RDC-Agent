@@ -506,6 +506,10 @@ General 就地交付 / Report
 
 认识等级有偏序 `unknown < inferred < derived < observed`。Compact、Summary、Report 和视图不得抬高源结论的等级。
 
+### S-EVIDENCE-01：观察要有证据
+
+标为 observed 的结论必须指向至少一条可解引用的 Evidence；投影到报告里的结论通过来源追溯到这些 Evidence。
+
 ### S-CAUSAL-01：因果结论需要 Intervention
 
 因果结论必须引用一个已回滚并验证基线恢复的 Experiment，否则不得标为 Causally Verified。

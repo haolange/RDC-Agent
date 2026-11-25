@@ -137,7 +137,8 @@ export function derivedStructureClaim(worldStateId: string, claimId = 'claim-der
   };
 }
 
-export function observedClaim(worldStateId: string, claimId = 'claim-obs'): ClaimRecord {
+/** An observation cites the Evidence it rests on; `evidenceOf()` writes `ev-1` by default. */
+export function observedClaim(worldStateId: string, claimId = 'claim-obs', evidenceIds: string[] = ['ev-1']): ClaimRecord {
   return {
     ...hypothesisClaim(worldStateId, claimId),
     claimKind: 'observed_fact',
@@ -145,6 +146,7 @@ export function observedClaim(worldStateId: string, claimId = 'claim-obs'): Clai
     epistemic: 'observed',
     confidence: 'exact',
     verification: 'observed',
+    evidenceIds,
   };
 }
 

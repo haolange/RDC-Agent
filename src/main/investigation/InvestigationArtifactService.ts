@@ -47,6 +47,7 @@ import {
   assertEvidenceLinks,
   assertObservedToolEvidenceHasArtifact,
   assertOptimizerExperimentClose,
+  assertReadyObservedEvidence,
   assertReportContractPresent,
   assertReportRecordRefs,
   assertSCausal01,
@@ -145,14 +146,12 @@ export class InvestigationArtifactService {
     try {
       parsed = parseInvestigationWriteRecord(kindEntry.recordType, input.record);
     } catch (error) {
-      throw new InvestigationError(
-        'INVESTIGATION_SCHEMA_INVALID',
-        error instanceof Error ? error.message : String(error),
-      );
+      throw new InvestigationError('INVESTIGATION_SCHEMA_INVALID', error instanceof Error ? error.message : String(error));
     }
     const lookup = this.createRawLookup(sessionId);
     const mission = requireCanonicalWriteMission(kindEntry.kind, input.mission, parsed);
     this.assertRecordInvariants(sessionId, kindEntry.kind, parsed, lookup, mission);
+    if (input.status === 'ready') assertReadyObservedEvidence(kindEntry.kind, parsed, lookup);
     if (kindEntry.kind === 'experiment') this.assertExecutionEvidence(sessionId, parsed as ExperimentRecord);
     if (kindEntry.kind === 'report' && input.status === 'ready') {
       for (const id of (parsed as InvestigationReport).experimentIds) {

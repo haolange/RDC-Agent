@@ -193,9 +193,10 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
 
 `rdc.investigation.v1` 只存在于垂直 Session Artifact，由 `InvestigationArtifactService` 管理；记录类型：`WorldState`、`EvidenceRecord`、`ClaimRecord`（Hypothesis 是 `claimKind`，Decision 内嵌）、`ExperimentRecord`、`ChallengeRecord`、`MissionCheckpoint`、`InvestigationArtifactManifest`。记录有稳定 id（`claimId` / `experimentId` / `challengeId` / `artifactId`）；`kind` 经闭集 Registry 解析到 `recordType + schema` 且正文通过校验。模型经四个 deferred 工具访问：`investigation_schema` / `investigation_read` / `investigation_write` / `investigation_list`。记录只写 session-owned Session Artifact；Artifacts 卡只投影该 namespace。仓库只用脱敏 fixture。
 
-- **机器判定的系统不变量**：`S-CTX-01` / `S-STATE-01` / `S-CLAIM-01` / `S-CAUSAL-01` / `S-RDC-01`。认识论偏序 `unknown < inferred < derived < observed`；Confidence 与 Verification 分离。
+- **机器判定的系统不变量**：`S-CTX-01` / `S-STATE-01` / `S-CLAIM-01` / `S-EVIDENCE-01` / `S-CAUSAL-01` / `S-RDC-01`。认识论偏序 `unknown < inferred < derived < observed`；Confidence 与 Verification 分离。
 - **`ready`**：结构化 `sourceRefs`（`{ artifactId, expectedHash }`）`>= 1`，各 `expectedHash` 与源当前 sha256 匹配，`contentHash` 等于 `contentRef` 正文字节 sha256；旧版本标 `superseded`。
 - **`S-CLAIM-01`**：compact / report / view 投影 Claim 必须带 `compactProvenance`。
+- **`S-EVIDENCE-01`**：以 `ready` 写入的非投影 observed Claim（含 ClaimSet 各项）必须在 `evidenceIds` 引用至少一条可解引用的 EvidenceRecord；`ready` report 的投影结论经 `compactProvenance` 回指的 observed 源 Claim 同样须满足。草稿可先写后补证据，读回的记录不追溯判定。
 - **`S-CAUSAL-01`**：causal / counterfactual Claim 必须引用可解引用的 `ExperimentRecord`，且该实验 `intervention.type != none`、`status ∈ {recorded, rolled_back}`、`rollback.executed === true`、`rollback.baselineRestored === true`，并存在 verify evidence。
 - **`S-RDC-01`**：mutate 必有 Experiment + exclusive world state + rollback / restored 验证，否则 `polluted` / `stale`。
 - **领域边界**：Analyzer `claimKind` 不越 Observed / Reconstructed / Authoring 层；Optimizer 无 rollback 的 mutate 不得关闭。

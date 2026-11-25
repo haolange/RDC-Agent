@@ -8,7 +8,7 @@ import { RuntimePermissionStateService } from '../permissions/RuntimePermissionS
 import { EventStream } from '../core/EventStream';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { assertMissionTurnCompletion } from '../../investigation/missionCompletionContract';
-import { SESSION_ID, baselineWorld, createInvestigationHarness, observedClaim, projectClaim, sampleCheckpoint, writeDraft, writeReadyReport } from '../../testing/investigationTestFixtures';
+import { SESSION_ID, baselineWorld, createInvestigationHarness, evidenceOf, observedClaim, projectClaim, sampleCheckpoint, seedNote, writeDraft, writeReadyReport } from '../../testing/investigationTestFixtures';
 import { createApprovedGoalContinuation } from '../orchestration/ApprovedGoalContinuation';
 import { TurnHandle } from '../orchestration/TurnCoordinator';
 import { FileTaskStore, TaskRegistry, resolveSessionTasksDir } from '../tasks';
@@ -574,11 +574,12 @@ it('keeps an honest partial when its review leaves no useful work', async () => 
 
 it('accepts a normal final answer when the declaration binds the exact report', { timeout: 30_000 }, async () => {
   const sessionId = `completion-reference-${randomUUID()}`;
-  const { service, sessionPath } = createInvestigationHarness('rdc-final-reference-');
+  const { resolver, service, sessionPath } = createInvestigationHarness('rdc-final-reference-');
   const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
   try {
     writeDraft(service, 'world_state', baselineWorld('ws-baseline'), { mission: 'analyzer' });
     writeDraft(service, 'checkpoint', sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), { mission: 'analyzer' });
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission: 'analyzer' });
     const source = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-retry'), { mission: 'analyzer' });
     const report = writeReadyReport(service, { mission: 'analyzer', source,
       claims: [projectClaim(source.record as never, 'claim-retry-projected')] });
