@@ -1,5 +1,15 @@
 # Acceptance Ledger
 
+## 2026-11-25：收敛计划 W4/W5 卡顿实测（云端 Linux Browser QA，桩模型）
+
+- 提交：`37a3dbd511b17dc16a14f3254a52fcf3e889a149`（交互）；`cca1edab755859140e049763805a01f1ae749f03`（发送与批准、设置、Working）
+- 结果：点击到稳定，基线 → 现在（ms）：切会话 411→115，切 Agent 188→38，权限 531→22，选模型 303→68，新建会话 910→106，Agent 默认模型 791→161，Provider 模型开关 1292→38，主题 661→31，断开／重连 Provider 1268／1401→52／70。
+- 结果：长会话发送到回复完成 8444→1326，提交计划 3941→733，批准计划并交接 8428→709（先切 Agent 再批准 9356→781）。
+- 结果：Working 主进程每步忙时约 1100→71 ms；N=20／120／300 事件总量 27 MB／875 MB／5.4 GB → 2.1／11.1／31.8 MB；N=300 主循环 p99 895→78 ms，renderer long task 589 次／35.8 s → 19 次／1.2 s，打字 p95 114→86 ms。
+- 结果：plan 门打开时切 Agent 与基线一致无法操作，审阅面板接管 Composer。
+- 证据：本地：`flock qa.lock ./run.sh <name> drill.mjs|matrixB.mjs|matrixC.mjs --base base5` 与 `node working/run.mjs --steps 20|120|300`（会话临时测量脚本，未入库）
+- 人工介入：无。测量期间另有后台任务占用 CPU，数值偏保守。
+
 ## 2026-11-24：本地及 Android 回放恢复
 
 - 提交：`9fc247aab990191646ca18e3203fa45138864ad3`（改前工作区生产构建）
