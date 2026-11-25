@@ -142,6 +142,7 @@ describe('SettingsService provider persistence', () => {
     const service = new SettingsService();
 
     service.initialize();
+    const providersBefore = (JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { llm: { providers: unknown[] } }).llm.providers;
     service.setAll({ appearance: { theme: 'light' } });
 
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
@@ -153,6 +154,8 @@ describe('SettingsService provider persistence', () => {
     const persistedProvider = persisted.llm.providers.find((provider) => provider.id === 'deepseek');
 
     expect(persisted.appearance.theme).toBe('light');
+    // A single-section patch leaves every persisted provider field as it was.
+    expect(persisted.llm.providers).toEqual(providersBefore);
     expect(persistedProvider).toMatchObject({
       isConfigured: true,
       status: 'verified',
