@@ -54,14 +54,9 @@ Conclusion
 
 这也解释了几个有意的产品边界：MCP 不是 RDC-Agent 的运行时权威；RDC 的可编程 CLI / JSON contract 才是 Agent、脚本、测试和人共同使用的操作面。remote / Android 回放属于显式的 runtime capability，不会因为本地 PNG 成功就静默假装远端成功；工具集合按 catalog 发现、描述和裁剪，而不是把一张无法治理的全量工具表塞给模型。工具少而事实完整、身份明确、失败诚实，比按钮数量更重要。
 
-## 一份调查，服务不同岗位的两种阅读面
+## 一份调查，一份回指证据的报告
 
-最终结果不应只是一段聊天终答。RDC-Agent 的调查结果可以沿同一份事实源生成两种阅读面：
-
-- **Developer Report（Markdown）**：面向图形程序员、TA、引擎和性能工程师，包含目标、输入、环境、计划、任务时间线、Evidence、Claims、Experiments、Challenges、Limitations 和 Artifact Index。
-- **Executive Visual Report（generative UI / canvas）**：面向 QA、Artist、策划和需要快速理解影响面的协作者，用图文、Before / After / Diff、区域标注和可信度标记讲清“发生了什么、影响谁、建议做什么”。
-
-视觉报告只是事实的阅读投影，不是第二个结论引擎：每个关键判断仍需回指可解引用的 Claim、Evidence 和 verification 状态。这样同一份调查既能让专业人员深挖，也能让非图形岗位快速理解，而不会为了“好看”牺牲可信度。
+最终结果不应只是一段聊天终答。调查的 Report 是调查记录的一部分，在右栏 Artifacts 里按文档阅读：问了什么、发现了什么、怎样验证、边界在哪、结论是什么，每条 Claim 带一个验证等级。Report 由 Report Writer 从合格的 Claim 与 Evidence 整理而成，不升级它们的资格，也不隐藏局限；每个关键判断都回指可解引用的 Claim、Evidence 和验证状态，所以可读性不会跑在可信度前面。
 
 ![RDC-Agent workbench preview](docs/media/rdc-agent-workbench-preview.png)
 
@@ -98,7 +93,7 @@ Conclusion
 
 发行包用户：安装 `*-setup.exe`，或完整解压 Windows zip 后运行 `RdcAgent.exe`（保留同目录资源）。不需要 Node.js/pnpm。首次上手指南也可从标题栏问号重开；自行配置 Provider/Model 和项目即可使用 General。
 
-当前源码版本 **0.6.0-rc.5 按未签名预发布通道交付**；可下载版本以 [Releases](https://github.com/haolange/RDC-Agent/releases) 为准。Windows 可能提示未知发布者，受管理电脑可能阻止运行。仅从本仓库 Releases 下载并核对 SHA-256；不要关闭安全防护。稳定正式版仍保留签名要求。
+当前源码版本 **0.6.0-rc.8 按未签名预发布通道交付**；可下载版本以 [Releases](https://github.com/haolange/RDC-Agent/releases) 为准。Windows 可能提示未知发布者，受管理电脑可能阻止运行。仅从本仓库 Releases 下载并核对 SHA-256；不要关闭安全防护。稳定正式版仍保留签名要求。
 
 RDC 调查另从 [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases) 下载自包含 zip，解压后在 Settings → Tools 检测安装或选择 `rdc-tool` 根目录，再验证并应用；不需要另装 Python。Windows 默认安装目录为 `%LOCALAPPDATA%/Programs/rdc-tool`；Linux 上选择解压后的根目录。通用 Code Interpreter 是单独的可选配置。
 

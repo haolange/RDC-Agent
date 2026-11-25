@@ -54,14 +54,9 @@ The goal is not simply to expose more GPU buttons. It is to make the agent know 
 
 That is also why several boundaries are intentional: MCP is not RDC-Agent's runtime authority; the programmable RDC-Tool CLI / JSON contract is the operation surface shared by agents, scripts, tests, and people. Remote / Android replay is an explicit runtime capability—local PNG success must not silently become a claim of remote success. Tools are discovered, described, and scoped from a catalog instead of dumping an ungoverned full table into every model turn. Fewer tools with complete facts, explicit identity, and honest failure are more valuable than a larger button count.
 
-## One investigation, two reading surfaces
+## One investigation, one report that points back to its evidence
 
-The result should not be only a chat answer. The same source-backed investigation can be projected into two reading surfaces:
-
-- **Developer Report (Markdown)** for graphics programmers, TAs, engine and performance engineers: goal, inputs, environment, plan, task timeline, evidence, claims, experiments, challenges, limitations, and artifact index.
-- **Executive Visual Report (generative UI / canvas)** for QA, artists, designers, producers, and other collaborators: explain what happened, who is affected, and what to do next through diagrams, Before / After / Diff views, region annotations, and credibility markers.
-
-The visual report is a presentation layer, not a second conclusion engine. Important statements still point back to referenceable Claims, Evidence, and verification state, so readability never outruns trustworthiness.
+The result should not be only a chat answer. An investigation's Report is part of its record and reads as a document in the right rail's Artifacts: what was asked, what was found, how it was checked, where it stops and what it concludes, with one verification label per claim. Report Writer assembles it from eligible claims and evidence without upgrading their qualification or hiding limitations; every important statement points back to referenceable Claims, Evidence and verification state, so readability never outruns trustworthiness.
 
 ![RDC-Agent workbench preview](docs/media/rdc-agent-workbench-preview.png)
 
@@ -87,7 +82,7 @@ The release surface is **Windows-only**; the source runs on Windows and Linux (x
 
 ## Download and first use
 
-Windows releases provide an NSIS installer (`*-setup.exe`) and a portable zip. Extract the whole zip before running `RdcAgent.exe`; Node.js and pnpm are only needed for source development. Source version **0.6.0-rc.5 targets the unsigned prerelease channel**; see [Releases](https://github.com/haolange/RDC-Agent/releases) for available downloads. Windows may warn about an unknown publisher or block execution under managed security policies. Download only from this repository and verify SHA-256; do not disable security protections. Stable releases still require signing.
+Windows releases provide an NSIS installer (`*-setup.exe`) and a portable zip. Extract the whole zip before running `RdcAgent.exe`; Node.js and pnpm are only needed for source development. Source version **0.6.0-rc.8 targets the unsigned prerelease channel**; see [Releases](https://github.com/haolange/RDC-Agent/releases) for available downloads. Windows may warn about an unknown publisher or block execution under managed security policies. Download only from this repository and verify SHA-256; do not disable security protections. Stable releases still require signing.
 
 The four-step guide appears on first launch and can be reopened from the titlebar question mark. Configure your own provider/API key and model in Settings, then create a Project and import a capture. Official Agents, Skills and Hooks are bundled under `resources/agent-runtime` and are not copied into user space.
 
