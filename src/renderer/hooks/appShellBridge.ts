@@ -13,10 +13,17 @@ export async function resolveFaviconDataUrl(domain: string): Promise<string | nu
   return result?.dataUrl ?? null;
 }
 
-/** An https image an answer embeds, fetched by the main process; null when it is refused or unavailable. */
-export async function fetchRemoteImageDataUrl(url: string): Promise<string | null> {
-  const result = await getElectronApi()?.web.fetchImage(url);
-  return result?.dataUrl ?? null;
+export type RemoteImageFetch = { dataUrl: string } | { unverified: true } | null;
+
+/**
+ * An https image an answer embeds, fetched by the main process. `unverified` means no non-model source in the session
+ * supplied the URL, so nothing was requested; null means it was refused or is unavailable.
+ */
+export async function fetchRemoteImage(request: { sessionId: string; url: string; intent: 'auto' | 'click' }): Promise<RemoteImageFetch> {
+  const result = await getElectronApi()?.web.fetchImage(request);
+  if (!result) return null;
+  if (result.dataUrl !== null) return { dataUrl: result.dataUrl };
+  return result.error === 'REMOTE_IMAGE_UNVERIFIED' ? { unverified: true } : null;
 }
 
 export function selectFiles(): Promise<string[] | null | undefined> {

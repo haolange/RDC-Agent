@@ -109,6 +109,27 @@
   color: var(--token-text-secondary);
 }
 
+/* A remote image the model linked from a source the session did not supply: host and a load action, nothing fetched. */
+.markdown-media-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin: var(--space-1) 0 var(--space-3);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-card);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-secondary);
+}
+
+.markdown-media-pending-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ui-skeleton-stack.markdown-media-skeleton {
   display: flex;
   width: min(100%, 320px);

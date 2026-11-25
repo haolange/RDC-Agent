@@ -1,4 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useI18n } from '../../i18n';
+import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { ImageViewer, type ImageViewerItem } from '../../ui/ImageViewer';
 import { Skeleton } from '../../ui/Skeleton';
 import { useMarkdownSourceScope } from './markdownSources';
@@ -41,14 +44,29 @@ export const MarkdownGallery: React.FC<{ children: React.ReactNode }> = ({ child
 
 /**
  * An image or video an answer embeds. Remote images come through the main-process fetch and local references through
- * the session's media channel; both arrive as object URLs. A reference that cannot resolve leaves only its alt text.
+ * the session's media channel; both arrive as object URLs. A remote image whose URL only the model supplied waits as a
+ * compact placeholder (its host and a load action) until the person asks. A reference that cannot resolve leaves only
+ * its alt text.
  */
 export const MarkdownMedia: React.FC<{ src?: string; alt?: string }> = ({ src, alt = '' }) => {
+  const { t } = useI18n();
   const { sessionId } = useMarkdownSourceScope();
-  const media = useMarkdownMedia(src, sessionId);
+  const { media, loadRequested } = useMarkdownMedia(src, sessionId);
   const gallery = useContext(GalleryContext);
   if (media.status === 'loading') return <Skeleton shape="block" inline className="markdown-media-skeleton" />;
   if (media.status === 'unavailable') return alt ? <span className="markdown-media-missing">{alt}</span> : null;
+  if (media.status === 'unverified') {
+    return (
+      <span className="markdown-media-pending" data-testid="markdown-media-pending">
+        <Icon name="image" size={14} />
+        <span className="markdown-media-pending-label">{alt || media.host}</span>
+        <Button variant="secondary" size="sm" onClick={loadRequested}
+          data-tooltip={t('chat.markdownImageLoadHint', { host: media.host })}>
+          {t('chat.markdownImageLoad')}
+        </Button>
+      </span>
+    );
+  }
   if (media.kind === 'video') {
     return (
       <span className="markdown-media" role="figure" aria-label={alt || undefined}>

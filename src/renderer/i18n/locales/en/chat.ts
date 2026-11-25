@@ -272,6 +272,8 @@ export const enChat = {
   'chat.editResend': 'Edit and resend',
   'chat.markdownCodePlain': 'text',
   'chat.markdownCodeWrap': 'Wrap lines',
+  'chat.markdownImageLoad': 'Load image',
+  'chat.markdownImageLoadHint': 'Load this image from {host}',
   'chat.markdownCodeExpand': 'Show all {count} lines',
   'chat.markdownCodeCollapse': 'Collapse',
   'chat.markdownCallout.note': 'Note',

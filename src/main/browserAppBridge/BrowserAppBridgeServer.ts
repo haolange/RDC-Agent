@@ -6,6 +6,7 @@ import { extname, isAbsolute, join, normalize, relative, resolve } from 'path';
 import { URL } from 'url';
 import { app } from 'electron';
 import { AppError, IPC_ERROR_KEY, isIpcErrorResult } from '@shared/errors/appError';
+import { buildRendererCsp } from '@shared/utils/rendererCsp';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/provider-catalog/effectiveCatalogTypes';
 import {
@@ -264,19 +265,7 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
     'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
   };
   if (extname(filePath) === '.html') {
-    headers['Content-Security-Policy'] = [
-      "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self'",
-      "style-src-attr 'none'",
-      "img-src 'self' data: blob:",
-      "media-src 'self' blob:",
-      "font-src 'self' data:",
-      "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-    ].join('; ');
+    headers['Content-Security-Policy'] = buildRendererCsp('production');
   }
   response.writeHead(200, headers);
   createReadStream(filePath).pipe(response);

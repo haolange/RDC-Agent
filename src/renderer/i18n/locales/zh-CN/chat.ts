@@ -272,6 +272,8 @@ export const zhChat = {
   'chat.editResend': '编辑并重新发送',
   'chat.markdownCodePlain': '文本',
   'chat.markdownCodeWrap': '自动换行',
+  'chat.markdownImageLoad': '加载图片',
+  'chat.markdownImageLoadHint': '从 {host} 加载这张图片',
   'chat.markdownCodeExpand': '展开全部 {count} 行',
   'chat.markdownCodeCollapse': '收起',
   'chat.markdownCallout.note': '说明',

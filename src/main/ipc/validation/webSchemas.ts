@@ -6,5 +6,9 @@ export const WebResolveFaviconArgsSchema = z.tuple([
 ]);
 
 export const WebFetchImageArgsSchema = z.tuple([
-  ipcString(4096, 'url'),
+  z.object({
+    sessionId: ipcString(256, 'sessionId'),
+    url: ipcString(4096, 'url'),
+    intent: z.enum(['auto', 'click']),
+  }).strict(),
 ]);

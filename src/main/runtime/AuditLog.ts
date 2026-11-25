@@ -23,7 +23,9 @@ export type AuditEvent =
     turnId?: string;
     reason?: string;
   }
-  | { kind: 'permission-settings'; from: AgentPermissionSettings; to: AgentPermissionSettings };
+  | { kind: 'permission-settings'; from: AgentPermissionSettings; to: AgentPermissionSettings }
+  /** An outbound request the person asked for: an image the model linked whose URL no non-model source supplied. */
+  | { kind: 'network'; purpose: 'remote-image'; host: string; urlSha256: string; sessionId: string };
 
 export type AuditRecord = AuditEvent & { at: string; origin: AuditOrigin };
 

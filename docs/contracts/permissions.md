@@ -66,7 +66,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
   - IPv6：只有 `2000::/3` 是公网，其中再排除 `2001:db8::/32` 与 `3fff::/20`；`::ffff:0:0/96`、`::/96`、`64:ff9b::/96`、`2002::/16` 按内嵌的 IPv4 地址判定。
   - Provider、OAuth 与 MCP 的 HTTP 端点由用户配置，可以是本机服务，不经这条公网通道。
 - **Shell routine**：只有静态简单命令（无引号、变量、子 shell、重定向）且每个参数都留在工作区内时，才按 routine 自动放行。工作区外的绝对路径、盘符根或盘符相对路径（`D:`、`D:/`）、UNC（`//host/share`）、`~`、`..`、PowerShell provider 驱动器（`Env:`、`HKLM:` 等）逐个 token 判定，任何一个出界就改为审批；命令里另外出现工作区路径不能抵消。
-- CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`；`img-src 'self' data: blob:` 不放行远程主机，回答里的远程图片由主进程 `web:fetchImage` 代取（仅 https 公网地址、≤5MB、按内容嗅探、不带 cookie）；`media-src 'self' blob:` 只播放 `conversation:resolveMedia` 解析出的会话产物、附件与项目内视频。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。开发态 CSP（放行 Vite 开发服务器与 `unsafe-eval`）只在未打包的源码运行且 `NODE_ENV=development` 时使用；打包版无论环境变量如何都用生产 CSP（`src/main/runtime/developmentRun.ts`）。
+- CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`；`img-src 'self' data: blob:` 不放行远程主机，回答里的远程图片由主进程 `web:fetchImage` 代取（仅 https 公网地址、≤5MB、按内容嗅探、不带 cookie）。`web:fetchImage` 先过 active-session 门；`intent: 'auto'` 只放行在本会话非模型来源（用户消息、`web_fetch` / `web_search` / knowledge 工具结果）里出现过的 URL，其余 URL 不发请求、渲染为占位，用户点击后以 `intent: 'click'` 代取，取之前先写 `network` 审计记录（主机与 URL 指纹，写失败即不取）；`connect-src 'self'`；`media-src 'self' blob:` 只播放 `conversation:resolveMedia` 解析出的会话产物、附件与项目内视频。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。开发态 CSP（放行 Vite 开发服务器与 `unsafe-eval`）只在未打包的源码运行且 `NODE_ENV=development` 时使用；打包版无论环境变量如何都用生产 CSP（`src/main/runtime/developmentRun.ts`）。
 
 ## IPC Schema（Zod）
 

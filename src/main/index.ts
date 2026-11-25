@@ -5,6 +5,7 @@ import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { app, BrowserWindow, dialog, session } from 'electron';
 import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
+import { buildRendererCsp } from '@shared/utils/rendererCsp';
 import { installApplicationMenu } from './window/applicationMenu';
 import { nativeMessage } from './window/nativeI18n';
 import { providerAccountAuthService } from './settings/provider-auth/ProviderAccountAuthService';
@@ -155,24 +156,7 @@ function installRendererSecurityPolicy(): void {
   });
   ses.setPermissionCheckHandler(() => false);
 
-  const scriptSrc = isDev
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:*"
-    : "script-src 'self'";
-  const styleSrc = "style-src 'self'";
-  const styleSrcAttr = "style-src-attr 'none'";
-  const csp = [
-    "default-src 'self'",
-    scriptSrc,
-    styleSrc,
-    styleSrcAttr,
-    "img-src 'self' data: blob:",
-    "media-src 'self' blob:",
-    "font-src 'self' data:",
-    "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "frame-ancestors 'none'",
-  ].join('; ');
+  const csp = buildRendererCsp(isDev ? 'development' : 'production');
 
   ses.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = { ...details.responseHeaders };

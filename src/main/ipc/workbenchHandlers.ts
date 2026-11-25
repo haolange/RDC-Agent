@@ -262,7 +262,7 @@ export function registerIPCHandlers(): void {
   registerToolTraceBridge();
   preloadLlmConfig();
   registerShellHandlers();
-  registerWebHandlers();
+  registerWebHandlers(context);
   registerConversationHandlers(context);
   registerConversationMediaHandlers(context);
   registerPlanHandlers(context);

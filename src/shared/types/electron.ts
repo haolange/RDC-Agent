@@ -203,7 +203,8 @@ export interface ElectronAPI {
       dataUrl: string | null;
     }>;
     /** An https image an answer embeds, fetched by the main process (≤5 MB, sniffed raster types only). */
-    fetchImage: (url: string) => Promise<{ dataUrl: string } | { dataUrl: null; error: string }>;
+    /** `auto` loads only URLs a non-model source supplied in this session; `click` is the person asking (audited). */
+    fetchImage: (request: { sessionId: string; url: string; intent: 'auto' | 'click' }) => Promise<{ dataUrl: string } | { dataUrl: null; error: string }>;
   };
 
   conversation: {

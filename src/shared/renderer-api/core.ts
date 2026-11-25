@@ -34,7 +34,7 @@ export function createAppShellApi(transport: RendererApiTransport): AppShellApi 
 export function createWebApi(transport: RendererApiTransport): ElectronAPI['web'] {
   return {
     resolveFavicon: (domain) => transport.invoke(INVOKE.shell.resolveFavicon, domain),
-    fetchImage: (url) => transport.invoke(INVOKE.shell.fetchImage, url),
+    fetchImage: (request) => transport.invoke(INVOKE.shell.fetchImage, request),
   };
 }
 
