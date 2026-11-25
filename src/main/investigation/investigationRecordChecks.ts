@@ -1,5 +1,6 @@
-import { isCausalOrCounterfactualClaim, type ArtifactSourceRef, type ChallengeRecord, type ClaimRecord, type ClaimSet, type EvidencePack, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationMission, type InvestigationRecord, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { type ArtifactSourceRef, type ChallengeRecord, type ClaimRecord, type ClaimSet, type EvidencePack, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationMission, type InvestigationRecord, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
+import { isCausalOrCounterfactualClaim } from './investigationInvariants';
 import { InvestigationError } from './investigationErrors';
 import { hashesEqual } from './investigationHash';
 import { assertChallengeRecordRefs, assertCheckpointRecordRefs, assertClaimRecordRefs, assertEvidenceLinks, assertObservedToolEvidenceHasArtifact, assertOptimizerExperimentClose, assertReportRecordRefs, assertSCausal01, assertSClaim01, assertSState01, collectProjectedClaims, evaluateSRdc01, worldStateMarksEvidenceStale, type InvestigationLookup } from './investigationInvariants';

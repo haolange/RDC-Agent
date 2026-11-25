@@ -4,7 +4,7 @@ import { argumentFileIdentities, canonicalRealpath, commandIdentity } from '../.
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { appPathService } from '../../runtime/AppPathService';
 import { TrustStore, type TrustRecord } from '../../runtime/TrustStore';
-import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
+import type { AgentRuntimeMcpDescriptor } from '../agent-manifests/agentRuntimeTypes';
 
 export function mcpExecutableFingerprint(descriptor: Pick<AgentRuntimeMcpDescriptor, 'command' | 'args' | 'url' | 'env'>): string {
   return hashScopedResource({

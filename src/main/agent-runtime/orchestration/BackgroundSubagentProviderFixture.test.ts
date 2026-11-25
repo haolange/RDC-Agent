@@ -11,7 +11,7 @@ import { TaskRegistry } from '../tasks';
 import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { SubagentRunner } from './SubagentRunner';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './delegationCapsule';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });

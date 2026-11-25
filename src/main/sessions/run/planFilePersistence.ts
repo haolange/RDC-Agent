@@ -3,7 +3,6 @@ import path from 'node:path';
 import { stringify } from 'yaml';
 import { AppError } from '@shared/errors/appError';
 import { storageIo } from '../store/sessionStores';
-import type { ProjectPlanFrontmatter } from '@shared/types/planReview';
 import type { StorageIo } from '../../runtime/StorageIo';
 
 export function assertPlanWritePath(targetPath: string): string {
@@ -40,4 +39,13 @@ export function writePlanFile(targetPath: string, document: string, io: StorageI
     else fs.unlinkSync(target);
     throw error;
   }
+}
+
+export interface ProjectPlanFrontmatter {
+  planId: string;
+  revision: number;
+  sha256: string;
+  agent: string;
+  sessionId: string;
+  savedAt: string;
 }

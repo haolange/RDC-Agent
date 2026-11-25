@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolvePlanReference } from './planReferenceResolution';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { PlanReviewStateDocument, RecoverableApprovedHandoff } from '@shared/types/planReview';
+import type { RecoverableApprovedHandoff } from '@shared/types/planReview';
+import type { PlanReviewStateDocument } from '../sessions/run/PlanReviewStateStore';
 
 const hash = 'a'.repeat(64);
 const f = vi.hoisted(() => ({

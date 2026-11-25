@@ -70,7 +70,7 @@ const FORBIDDEN_RULES = [
   },
   {
     id: 'investigation.forbidden.harness-task',
-    file: 'src/shared/types/harness.ts',
+    file: 'src/main/reports/artifactRecord.ts',
     pattern: 'export interface HarnessTask',
     probe: 'source-pattern',
     note: 'HarnessTask remains; do not confuse with ArtifactRecord',
@@ -84,7 +84,7 @@ const FORBIDDEN_RULES = [
   },
   {
     id: 'investigation.forbidden.run-capsule',
-    file: 'src/shared/types/harness.ts',
+    file: 'src/main/reports/artifactRecord.ts',
     pattern: 'export interface RunCapsule',
     probe: 'source-pattern',
     note: 'RunCapsule is current debt',

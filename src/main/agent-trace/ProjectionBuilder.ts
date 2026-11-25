@@ -1,23 +1,9 @@
 import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
-import type {
-  TraceNode,
-  TimelineProjection,
-  TimelineNode,
-  PhaseGroupNode,
-  TaskFrameNode,
-  ThoughtSummaryNode,
-  ToolActionNode,
-  PlanNode,
-  ObservationNode,
-  FindingNode,
-  ArtifactNode,
-  ApprovalNode,
-  ErrorNode,
-  SubAgentNode,
-  AgentProfile,
-  AgentRun,
-} from '@shared/types/agenticTrace';
-import type { ToolManifest } from '@shared/types/agenticTrace';
+import type { TimelineProjection, TimelineNode, AgentRun } from '@shared/types/agenticTrace';
+import type { ObservationNode, FindingNode } from './traceNodes';
+import type { TraceNode, PhaseGroupNode, TaskFrameNode, ThoughtSummaryNode, ToolActionNode, PlanNode, ArtifactNode, ApprovalNode, ErrorNode, SubAgentNode } from './traceNodes';
+import type { AgentProfile } from './manifests/traceManifest';
+import type { ToolManifest } from './manifests/traceManifest';
 
 const rendererForNode = (node: TraceNode, manifest?: ToolManifest): string => {
   switch (node.kind) {
@@ -66,9 +52,9 @@ const projectChild = (node: TraceNode, profile: AgentProfile, collapsedRun: bool
     renderer: rendererForNode(node, manifest),
     title: titleForNode(node),
     status: node.kind === 'approval'
-      ? ((node as import('@shared/types/agenticTrace').ApprovalNode).status === 'approved'
+      ? ((node as import('./traceNodes').ApprovalNode).status === 'approved'
         ? 'succeeded'
-        : (node as import('@shared/types/agenticTrace').ApprovalNode).status === 'rejected'
+        : (node as import('./traceNodes').ApprovalNode).status === 'rejected'
           ? 'failed'
           : 'waiting_approval')
       : node.status,

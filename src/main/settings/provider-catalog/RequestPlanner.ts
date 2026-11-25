@@ -1,8 +1,4 @@
-import {
-  clampReasoningSelection,
-  createReasoningControl,
-  DEFAULT_CONTEXT_COMPACTION_PERCENT,
-} from '@shared/types/modelCapability';
+import { clampReasoningSelection, DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import {
   contextTierBudgetTokens,
   contextTierPromptCap,
@@ -26,19 +22,10 @@ import {
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { revisionFor } from './effectiveCatalogMerge';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type {
-  EffectiveModel,
-  ExecutionIdentity,
-  ProviderStateMode,
-  ToolLoopPhase,
-  CatalogModelRoute,
-  ContextTier,
-  ModelSelection,
-  RequestPlan,
-  RequestPlanningErrorCode,
-  RequestPlanningResult,
-} from '@shared/types/providerCapability';
+import type { EffectiveModel, ExecutionIdentity, ProviderStateMode, ToolLoopPhase, CatalogModelRoute, ContextTier, ModelSelection, RequestPlan, RequestPlanningErrorCode } from '@shared/types/providerCapability';
+import type { RequestPlanningResult } from './providerCatalogTypes';
 import type { JsonObject, JsonValue } from '@shared/utils/jsonValue';
+import type { ReasoningControl, ReasoningWireProfile } from '@shared/types/modelCapability';
 export interface RequestPlannerInput {
   model: EffectiveModel;
   /** Effective snapshot used to validate hidden internal model targets. */
@@ -115,7 +102,6 @@ function planningError(
 function routeMatches(left: CatalogModelRoute, right: CatalogModelRoute): boolean {
   return left.protocol === right.protocol && left.baseUrl === right.baseUrl;
 }
-
 
 /** A phase either yields its value or ends planning with the failure it found. */
 type PlanningStep<T> = { ok: true; value: T } | PlanningFailure;
@@ -653,4 +639,46 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
         : input.requestedTemperature,
   };
   return { ok: true, plan, controls, warnings: state.warnings };
+}
+
+export function createReasoningControl(control: ReasoningControl): ReasoningControl {
+  return {
+    ...control,
+    levels: [...control.levels],
+    wireProfile: cloneReasoningWireProfile(control.wireProfile),
+  };
+}
+
+function cloneReasoningWireProfile(profile: ReasoningWireProfile): ReasoningWireProfile {
+  switch (profile.kind) {
+    case 'openai-responses':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'openai-compatible':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'anthropic':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'gemini-thinking-level':
+      return {
+        ...profile,
+        levels: { ...profile.levels },
+      };
+    case 'gemini-thinking-budget':
+      return {
+        ...profile,
+        levels: { ...profile.levels },
+      };
+    case 'moonshot-thinking':
+    case 'none':
+    default:
+      return { ...profile };
+  }
 }

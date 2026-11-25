@@ -1,8 +1,8 @@
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { formatInvestigationContentHash, type ClaimRecord } from '@shared/types/renderdocInvestigation';
-import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
+import { type ClaimRecord } from '@shared/types/renderdocInvestigation';
+import { SESSION_ARTIFACT_ROOT_DIR } from '../sessions/artifacts/sessionArtifactContract';
 import { toolToDefinition } from '../agent-runtime/agent/AgentTool';
 import { toolValidator } from '../agent-runtime/core/ToolValidator';
 import {
@@ -26,6 +26,7 @@ import {
   writeDraft,
   writeReadyReport,
 } from '../testing/investigationTestFixtures';
+import { formatInvestigationContentHash } from './investigationHash';
 import { InvestigationError } from './investigationErrors';
 import { serializeInvestigationJson, sha256Prefixed } from './investigationHash';
 import { parseVerifiedRecordBody, parseVerifiedRecordBodyOf } from './investigationReadIntegrity';

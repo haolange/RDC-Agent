@@ -8,18 +8,15 @@ Runtime trace events are append-only JSONL records under the application state t
 
 ## Shared Types
 
-Primary contracts:
+Primary contracts (what crosses to the renderer):
 
 - `AgentRunPresentation`
 - `AgentRunViewModel`
-- `TraceEvent`
-- `TraceNode`
 - `TaskRailItem`
 - `TraceArtifactRecord`
-- `TraceContextRecord`
 - `RightPanelViewModel`
-- `TraceRevisionResult`
-- `TraceBranchSwitchResult`
+
+The trace event log (`TraceEvent`, `src/main/agent-trace/TraceEventStore.ts`) and the trace tree it builds (`TraceNode` and the node types, `src/main/agent-trace/traceNodes.ts`) are main-only: the renderer receives only the projection.
 
 Right-panel records use `traceLaneId`.
 

@@ -2,7 +2,7 @@
  * /status — 系统状态与诊断信息。
  */
 import { currentHost } from '../../platform/host';
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const statusCommand: CommandDefinition = {
   id: 'status',

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { ExecutionOffer } from '../sessions/run/executionOffer';
 import type { RdcLifecycleReceipt } from '../rdc/RdcLifecycleReceipts';
 
 it('accepts only a linked, signed transition for the same approved plan and owning turn', () => {

@@ -4,13 +4,8 @@ import { z, type ZodType } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
-import { runScopedStore } from '../../sessions/store/RunScopedStore';
-import type {
-  RequestBranch,
-  RequestBranchGroup,
-  UserRequest,
-  UserRequestRevision,
-} from '@shared/types/trace';
+import { runScopedStore } from '../../sessions/store/RunScopedStore';import type { RequestBranch } from '@shared/types/trace';
+
 
 const STORE_FILE = 'agentic-trace-state.json';
 
@@ -256,4 +251,27 @@ export class TraceStateStore {
 
 export const traceStateStore = new TraceStateStore();
 
+export interface UserRequestRevision {
+  id: string;
+  requestId: string;
+  branchId: string;
+  parentRevisionId?: string;
+  prompt: string;
+  createdAt: string;
+  resultingTraceLaneIds: string[];
+}
 
+export interface UserRequest {
+  id: string;
+  sessionId: string;
+  rootRevisionId: string;
+  activeRevisionId: string;
+  revisions: UserRequestRevision[];
+}
+
+export interface RequestBranchGroup {
+  id: string;
+  rootRequestId: string;
+  activeBranchId: string;
+  branches: RequestBranch[];
+}

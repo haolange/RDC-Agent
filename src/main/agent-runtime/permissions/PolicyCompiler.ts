@@ -5,11 +5,7 @@ import YAML from 'yaml';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { hashScopedResource, scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
-import type {
-  CompiledPolicy,
-  PolicyApprovalFloor,
-  RestrictivePolicy,
-} from '@shared/types/rdcRuntime';
+import type { RestrictivePolicy } from '../../runtime/scopedResourceTypes';
 
 const APPROVAL_STRENGTH = { none: 0, destructive: 1, mutation: 2, all: 3 } as const;
 const FLOOR_STRENGTH = { none: 0, auto_review: 1, user: 2 } as const;
@@ -236,3 +232,23 @@ export function emptyCompiledPolicy(): CompiledPolicy {
 }
 
 export const APPROVAL_STRENGTH_TABLE = APPROVAL_STRENGTH;
+
+export type PolicyApprovalFloor = 'none' | 'auto_review' | 'user';
+
+/**
+ * 编译后的执行期 Policy（不可变快照）。
+ * `.policy.yml` 解析失败必须 fail-closed，不得静默忽略。
+ */
+export interface CompiledPolicy {
+  deniedTools: readonly string[];
+  approvalFloorByTool: Readonly<Record<string, PolicyApprovalFloor>>;
+  approval: 'none' | 'destructive' | 'mutation' | 'all';
+  maxTurns: number;
+  maxToolCalls: number;
+  maxSubagents: number;
+  maxChildDepth: number;
+  maxWallTimeMs: number;
+  /** 100 = unlimited (does not constrain the user compaction percent). */
+  contextCompactionPercent: number;
+  sourceFingerprint: string;
+}

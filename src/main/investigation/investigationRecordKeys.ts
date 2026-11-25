@@ -1,18 +1,7 @@
 import * as fs from 'fs';
-import {
-  INVESTIGATION_SCHEMA_NAMESPACE,
-  type ChallengeRecord,
-  type ClaimRecord,
-  type ClaimSet,
-  type EvidencePack,
-  type EvidenceRecord,
-  type ExperimentRecord,
-  type InvestigationArtifactKind,
-  type InvestigationArtifactStatus,
-  type InvestigationRecord,
-  type WorldState,
-} from '@shared/types/renderdocInvestigation';
-import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { type ChallengeRecord, type ClaimRecord, type ClaimSet, type EvidencePack, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationArtifactStatus, type InvestigationRecord, type WorldState } from '@shared/types/renderdocInvestigation';
+import { formatSessionArtifactUri } from '../sessions/artifacts/sessionArtifactContract';
+import { INVESTIGATION_SCHEMA_NAMESPACE } from './investigationKindRegistry';
 
 export const INDEX_URI = formatSessionArtifactUri('investigation', 'index.json');
 

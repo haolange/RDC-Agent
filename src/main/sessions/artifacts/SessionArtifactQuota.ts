@@ -6,8 +6,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId } from '@shared/utils/id';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { writeFileAtomicSync } from '../../runtime/atomicFile';
+import { SessionArtifactError } from './sessionArtifactContract';
 
 export const SESSION_ARTIFACT_QUOTA_FILENAME = '.quota.json';
 

@@ -1,6 +1,6 @@
 import { ZodError } from 'zod';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { AppError } from '@shared/errors/appError';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 
 export const INVESTIGATION_ERROR_CODES = [
   'INVESTIGATION_SESSION_DENIED',

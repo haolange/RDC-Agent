@@ -1,18 +1,15 @@
 import * as fs from 'fs';
 import { z } from 'zod';
-import {
-  SessionArtifactError,
-  TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES,
-  formatSessionArtifactUri,
-  type SessionArtifactizedEnvelope,
-} from '@shared/types/sessionArtifact';
 import { toolResultDisplay } from '@shared/utils/toolResultDisplay';
 import { TOOL_RECEIPT_DECODED_TEXT_HEADING, TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING } from '@shared/constants/toolReceiptHeadings';
+import { SessionArtifactError } from '../../sessions/artifacts/sessionArtifactContract';
+import { TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES, formatSessionArtifactUri } from '../../sessions/artifacts/sessionArtifactContract';
 import { sha256Hex } from '../../runtime/contentHash';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { ToolResultSummarizer } from './ToolResultSummarizer';
 import { storeToolImage } from './ToolImageArtifact';
+import type { SessionArtifactizedEnvelope } from '../../sessions/artifacts/sessionArtifactContract';
 import type { AgentToolResult } from '../agent/AgentTool';
 
 const summarizer = new ToolResultSummarizer();
@@ -39,7 +36,6 @@ function serializeResult(result: AgentToolResult): string {
     details: result.details ?? null,
   });
 }
-
 
 function serializeEnvelope(
   sessionId: string,

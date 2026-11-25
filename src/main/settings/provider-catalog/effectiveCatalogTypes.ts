@@ -1,15 +1,5 @@
-import type {
-  CapabilityEvidence,
-  CapabilityEvidenceSource,
-  CapabilityState,
-  ControlDefinition,
-  ContextTier,
-  EffectiveCatalogSnapshot,
-  EffectiveModel,
-  ExecutionBindingDefinition,
-  CatalogModelRoute,
-  ProviderAvailability,
-} from '@shared/types/providerCapability';
+import type { CapabilityEvidence, CapabilityEvidenceSource, CapabilityState, ControlDefinition, ContextTier, EffectiveCatalogSnapshot, EffectiveModel, ExecutionBindingDefinition, CatalogModelRoute } from '@shared/types/providerCapability';
+import type { ProviderAvailability } from './providerCatalogTypes';
 import type { ModelCost } from '@shared/provider-catalog/modelManifestSchema';
 import type {
   LlmProviderCatalogOwnership,

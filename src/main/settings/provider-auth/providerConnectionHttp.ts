@@ -2,7 +2,7 @@ import { isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmissio
 import { providerConnectionError } from './providerConnectionErrors';
 import { normalizeDiscoveredModels } from './providerConnectionModelUtils';
 import type { LlmProviderModel } from '@shared/types/settings';
-import type { DiscoveryStrategy } from '@shared/types/providerCapability';
+import type { DiscoveryStrategy } from '../provider-catalog/providerCatalogTypes';
 
 export const REQUEST_TIMEOUT_MS = 20000;
 

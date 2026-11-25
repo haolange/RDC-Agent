@@ -1,10 +1,11 @@
 import { expect, it, vi } from 'vitest';
-import { renderPlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { renderPlanTaskRequirements } from './planTaskRequirements';
 
 const mocks = vi.hoisted(() => ({ readOffer: vi.fn(), readMarkdown: vi.fn() }));
 vi.mock('../store/sessionStores', () => ({ executionOfferStore: { read: mocks.readOffer } }));
 vi.mock('./sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mocks.readMarkdown } }));
 import { readApprovedPlanTasks } from './ApprovedPlanTasks';
+import type { PlanTaskRequirement } from './planTaskRequirements';
 
 it('reads only the owning execution offer plan with its exact URI and hash', () => {
   const task: PlanTaskRequirement = { taskId: 'task', revision: 1, subject: 'Work', description: '', blockedBy: [], completionRequirements: ['result'] };

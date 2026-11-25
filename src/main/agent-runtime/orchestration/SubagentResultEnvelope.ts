@@ -1,5 +1,5 @@
-import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
 import { AppError } from '@shared/errors/appError';
+import { formatSessionArtifactUri } from '../../sessions/artifacts/sessionArtifactContract';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import type { TaskCompletionResult, TaskExecutionRecord } from '../tasks';
 import type { TurnCompletionDeclaration } from './TurnCoordinator';

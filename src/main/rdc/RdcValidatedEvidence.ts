@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { safeResolvePath } from '../runtime/toolFiles';
 import { canonicalJson } from './RdcOperationCatalog';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 export type RdcValidatedEvidence =

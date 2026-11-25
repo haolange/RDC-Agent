@@ -9,7 +9,7 @@ import {
   type AwsBedrockCredentials,
 } from './AwsBedrockCredentials';
 import type { LlmProviderId } from '@shared/types/settings';
-import type { LLMProviderConfig } from '@shared/types/llm';
+import type { LlmProviderAuthMode, LlmProviderProtocol } from '@shared/types/settings';
 
 export type ProviderRuntimeCredentialOperation = 'chat' | 'embed';
 
@@ -144,3 +144,16 @@ export class ProviderRuntimeCredentialService {
 }
 
 export const providerRuntimeCredentialService = new ProviderRuntimeCredentialService();
+
+/** Runtime credentials and transport metadata. Model capability never lives here. */
+export interface LLMProviderConfig {
+  id: LlmProviderId;
+  protocol: LlmProviderProtocol;
+  authMode?: LlmProviderAuthMode;
+  label: string;
+  enabled: boolean;
+  apiKey: string;
+  baseUrl?: string;
+  accountId?: string;
+  docsUrl?: string;
+}

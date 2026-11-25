@@ -1,4 +1,4 @@
-import type { ProviderErrorInfo } from '@shared/types/providerErrors';
+import type { ProviderErrorInfo } from '../../core/providerErrors';
 import type { AssistantMessage } from '@main/agent-runtime/core/types';
 
 /**

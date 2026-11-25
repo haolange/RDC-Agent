@@ -2,7 +2,8 @@ import { contextTierPromptCap, contextTierWindowTokens, resolveContextTierChoice
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
-import type { CapabilityState, CatalogModelRoute, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
+import type { CapabilityState, CatalogModelRoute } from '@shared/types/providerCapability';
+import type { ProviderSurfaceDefinition } from './providerCatalogTypes';
 import type {
   NamedReasoningLevel,
   ReasoningControl,

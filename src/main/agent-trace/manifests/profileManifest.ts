@@ -1,6 +1,6 @@
 import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import { DEFAULT_AGENT_ID, isTopLevelAgentId, type AgentId } from '@shared/types/agent';
-import type { AgentProfile } from '@shared/types/agenticTrace';
+import type { AgentProfile } from './traceManifest';
 
 const BASELINE_PHASES: AgentProfile['phases'] = [
   { phaseId: 'understand', displayName: '理解任务' },

@@ -1,7 +1,7 @@
 import { AppError } from '@shared/errors/appError';
 import { rdcLifecycleReceipts, type RdcLifecycleReceipt } from '../rdc/RdcLifecycleReceipts';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
-import type { TaskRuntimeEpoch } from '@shared/types/taskExecution';
+import type { ExecutionOffer } from '../sessions/run/executionOffer';
+import type { TaskRuntimeEpoch } from '../agent-runtime/tasks/taskExecutionSchemas';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
 

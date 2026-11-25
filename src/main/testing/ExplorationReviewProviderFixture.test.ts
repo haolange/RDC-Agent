@@ -17,7 +17,7 @@ import { createInvestigationTools } from '../investigation/InvestigationTools';
 import { createInvestigationHarness, writeDraft, baselineWorld, hypothesisClaim, sampleChallenge, sampleCheckpoint, SESSION_ID } from './investigationTestFixtures';
 import { createTestRequestPlan } from './createTestRequestPlan';
 import { wireSubagentRunner } from './subagentRunnerDoubles';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from '../agent-runtime/orchestration/delegationCapsule';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentTool } from '../agent-runtime/agent/AgentTool';
 import type { AssistantMessage, AssistantMessageEvent, Message, Model, Context } from '../agent-runtime/core/types';
@@ -68,8 +68,6 @@ const TEST_REQUEST_PLAN = createTestRequestPlan({
     },
   },
 });
-
-
 
 it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mission evaluate after the user returns', { timeout: 30000 }, async () => {
   const harness = createInvestigationHarness('rdc-exploration-provider-');

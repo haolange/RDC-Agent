@@ -6,7 +6,7 @@ import { parseRdcNativeResult, RdcNativeFailure } from '../../rdc/RdcNativeProto
 import { assertRdcContextLeaseOwnership, getRdcContextLease, type RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { executePreservedPipelineProbe } from '../../rdc/RdcProbePipeline';
 import { quarantineFatalReplayFailure } from '../../rdc/RdcReplayFailure';
-import type { CLIResult } from '@shared/types/tool';
+import type { CLIResult } from '../../tools/ShellInvocationService';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { JsonSchema } from '../core/types';
 import type { AgentTool, AgentToolResult, AgentToolSpec } from '../agent/AgentTool';

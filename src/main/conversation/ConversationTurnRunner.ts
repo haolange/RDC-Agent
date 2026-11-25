@@ -1,8 +1,8 @@
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { buildMessageUpdateEvent, type MessageUpdateType } from '@shared/conversation/messageUpdateEvent';
 import { nowMs } from '@shared/utils/id';
-import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
 import { AppError } from '@shared/errors/appError';
+import { isHandoffOfferedAtTurnEnd } from '../agent-runtime/interactions/handoffSurface';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';

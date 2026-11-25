@@ -1,4 +1,3 @@
-import type { ElectronAPI } from './electron';
 export type {
   AppMetaApi,
   AppShellApi,
@@ -16,16 +15,11 @@ export type {
   KnowledgeApi,
   MemoryApi,
   McpApi,
-  PlatformApi,
   ProjectApi,
-  RawChannelSubscriptionApi,
   RuntimeLogApi,
-  RuntimePermissionApi,
   SessionApi,
   SettingsApi,
   ToolApi,
   WindowControlsApi,
   WorkflowApi,
 } from './electron/index';
-
-export type RendererElectronApi = ElectronAPI;

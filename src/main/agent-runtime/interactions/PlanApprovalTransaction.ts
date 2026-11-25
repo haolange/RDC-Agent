@@ -8,14 +8,10 @@ import { assertSessionModelAndControls } from './sessionModelGate';
 import { assertDeclaredHandoffForPlan, declaredExecutionOffer, declaredHandoffSuggestion } from './applyDeclaredHandoff';
 import type { PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import type { PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
-import type { PlanTaskRequirement } from '@shared/types/taskExecution';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type {
-  ConversationPlanReview,
-  PlanReviewHandoffIdentity,
-  PlanReviewHandoffSuggestion,
-  PlanReviewStateDocument,
-} from '@shared/types/planReview';
+import type { ConversationPlanReview, PlanReviewHandoffIdentity, PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import type { PlanReviewStateDocument } from '../../sessions/run/PlanReviewStateStore';
 import type { SessionModelOverride, SessionRecordSnapshot, SessionRevision } from '@shared/types/session';
 
 export interface PlanApprovalInput {

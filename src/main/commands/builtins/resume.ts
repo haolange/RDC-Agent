@@ -1,7 +1,7 @@
 /**
  * /resume — 恢复可恢复会话。
  */
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const resumeCommand: CommandDefinition = {
   id: 'resume',

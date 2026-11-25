@@ -1,5 +1,5 @@
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const usageCommand: CommandDefinition = {
   id: 'usage',

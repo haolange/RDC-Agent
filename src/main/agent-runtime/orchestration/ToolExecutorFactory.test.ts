@@ -2,9 +2,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseInvestigationPlanContract } from '@shared/types/planInvestigation';
+import { parseInvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 
-import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
+import { parsePlanTaskRequirements } from '../../sessions/run/planTaskRequirements';
 import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
 import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';

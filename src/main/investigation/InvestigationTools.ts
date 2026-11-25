@@ -1,10 +1,6 @@
-import {
-  INVESTIGATION_ARTIFACT_KINDS,
-  INVESTIGATION_ARTIFACT_STATUSES,
-  resolveInvestigationKind,
-  type InvestigationMission,
-} from '@shared/types/renderdocInvestigation';
+import { INVESTIGATION_ARTIFACT_KINDS, INVESTIGATION_ARTIFACT_STATUSES, type InvestigationMission } from '@shared/types/renderdocInvestigation';
 import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/artifacts/DelegatedArtifactAccess';
+import { resolveInvestigationKind } from './investigationKindRegistry';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { getInvestigationRecordJsonSchema } from './investigationRecordSchemas';
 import { recordKeyOf } from './investigationRecordKeys';

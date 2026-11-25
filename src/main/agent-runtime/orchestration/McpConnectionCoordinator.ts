@@ -20,7 +20,7 @@ import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentR
 import { mcpTrustService } from '../../settings/settings-core/McpTrustService';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
+import type { AgentRuntimeMcpDescriptor } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { AgentTool } from '../agent/AgentTool';
 import type { SupervisedProcess } from '../../runtime/ProcessSupervisor';

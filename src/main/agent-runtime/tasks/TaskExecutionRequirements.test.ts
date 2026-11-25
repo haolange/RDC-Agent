@@ -2,11 +2,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, type PlanTaskRequirement, type TaskExecutionPreparation } from '@shared/types/taskExecution';
+import { TaskExecutionPreparationSchema, type TaskExecutionPreparation } from '@shared/types/taskExecution';
+import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { TaskRegistry } from './TaskRegistry';
 import { FileTaskStore } from './TaskStore';
 import { snapshotTaskRequirement, preparePlanTaskRequirements } from './TaskExecutionRequirements';
 import { createTaskTools } from './TaskTools';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))));

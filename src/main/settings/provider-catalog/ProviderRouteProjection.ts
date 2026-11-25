@@ -2,10 +2,8 @@ import type {
   CatalogLayerContribution,
   CatalogModelContribution,
 } from './effectiveCatalogTypes';
-import type {
-  CatalogModelRoute,
-  ProviderProtocolOverride,
-} from '@shared/types/providerCapability';
+import type { CatalogModelRoute } from '@shared/types/providerCapability';
+import type { ProviderProtocolOverride } from './providerCatalogTypes';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 
 export function resolveModelRoutePrecedence(input: {

@@ -11,6 +11,3 @@ export const MaterialContextSchema = z.object({
   comparison: z.object({ group: z.string().trim().min(1).max(120), role: z.enum(['baseline', 'reference', 'after', 'diff']), conditions: z.string().trim().min(1).max(2000) }).strict().optional(),
 }).strict();
 export type MaterialContext = z.infer<typeof MaterialContextSchema>;
-export function describeMaterialContext(context: MaterialContext): string {
-  return `User-supplied material context (not verified observations or authorization): ${JSON.stringify(context)}. Region coordinates are fractions of the original image; preserve the original. Comparison conditions must be verified before conclusions.`;
-}

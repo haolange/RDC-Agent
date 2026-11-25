@@ -1,7 +1,8 @@
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
-import type { CompiledPromptCache, DerivedContextMessageRef } from '@shared/types/semanticContext';
+import type { CompiledPromptCache } from '@shared/types/semanticContext';
+import type { DerivedContextMessageRef } from '../context/structuredHandoff';
 import type { PromptSegment } from '@shared/types/rdcRuntime';
-import type { AssistantMessageDiagnostic } from '@shared/types/providerErrors';
+import type { AssistantMessageDiagnostic } from './providerErrors';
 import type { ToolCall } from '@shared/types/tool';
 
 /**
@@ -14,10 +15,6 @@ import type { ToolCall } from '@shared/types/tool';
 // =====================================================================
 
 export type ProviderOutputRef = import('@shared/types/reasoning').ProviderOutputRef;
-
-export type ProviderContinuationArtifact = import('@shared/types/reasoning').ProviderContinuationArtifact;
-
-export type ProviderStateRef = import('@shared/types/reasoning').ProviderStateRef;
 
 export type ThinkingArtifactKind = import('@shared/types/reasoning').ThinkingArtifactKind;
 
@@ -57,7 +54,6 @@ export interface ToolCallContent extends ToolCall {
 }
 
 export type ContentBlock = TextContent | ThinkingContent | ImageContent | ToolCallContent;
-
 
 // =====================================================================
 // 消息（Message）
@@ -352,6 +348,9 @@ export type AgentLoopEvent =
 import type { AgentContextCompactedPayload, ReasoningVisibility } from '@shared/types/agentRuntime';
 import type { ResolvedReasoningSelection } from '@shared/types/modelCapability';
 import type { RequestPlan } from '@shared/types/providerCapability';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
+import type { ExecutionIdentity } from '@shared/types/providerCapability';
+import type { ContinuationArtifactMetadata } from '@shared/types/reasoning';
 
 /** 调用 Provider 流式生成时的可选参数。 */
 export interface StreamOptions {
@@ -398,3 +397,29 @@ export interface CustomAgentMessage {
 
 /** Runtime 与应用层共同消费的消息类型。 */
 export type AgentMessage = Message | CustomAgentMessage;
+
+export interface ProviderStateRef {
+  schemaVersion: 1;
+  carrier: ProviderContractBundle['state']['carrier'];
+  value: string;
+  origin: ExecutionIdentity;
+  originFingerprint: string;
+  integrityHash: string;
+}
+
+export interface ProviderContinuationArtifact extends ContinuationArtifactMetadata {
+  origin: ExecutionIdentity;
+  id?: string;
+  encryptedContent?: string;
+  signature?: string;
+  thoughtSignature?: string;
+  redactedContent?: string;
+  opaqueState?: string;
+  reasoningContent?: string;
+  raw?: Record<string, unknown>;
+  containerBinding?: {
+    providerBlockKey: string;
+    itemId?: string;
+    toolCallIds?: string[];
+  };
+}

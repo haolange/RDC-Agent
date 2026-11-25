@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CommandRegistry } from './CommandRegistry';
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from './CommandRegistry';
 
 function makeCommand(overrides: Partial<CommandDefinition> = {}): CommandDefinition {
   return {

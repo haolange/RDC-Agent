@@ -1,4 +1,4 @@
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 const THEMES = new Set(['dark', 'light', 'system']);
 

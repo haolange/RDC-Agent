@@ -1,14 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
-import { GENERAL_AGENT_ID, isSafeAgentProfileId } from '@shared/types/agent';
-import {
-  AGENT_PROJECT_CEILING_NARROWED,
-  AGENT_PROJECT_UNTRUSTED,
-  agentAccessCeiling,
-  narrowerAccessCeiling,
-  type AgentAccessCeiling,
-} from '@shared/types/agentManifest';
+import { GENERAL_AGENT_ID } from '@shared/types/agent';
+import { AGENT_PROJECT_CEILING_NARROWED, AGENT_PROJECT_UNTRUSTED, agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { AGENT_ROLES } from '@shared/constants/agents';
 import { resolveAgentModel } from '@shared/utils/agentModelRoute';
 import { AppError } from '@shared/errors/appError';
@@ -19,9 +13,12 @@ import { resolvedPathKey, samePath } from '../../platform/paths';
 import { isReservedAgentId } from '../settings-core/reservedAgentIds';
 import { StampedValue, directoryStamp, fileStamp } from '../../runtime/externalInput';
 import { writeFileAtomic } from '../../runtime/atomicFile';
+import { narrowerAccessCeiling } from './accessCeiling';
+import { isSafeAgentProfileId } from './agentProfileId';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { projectAgentTrust } from './ProjectAgentTrust';
-import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from './agentRuntimeTypes';
+import type { ScopedResourceCandidate } from '../../runtime/scopedResourceTypes';
 import type { AgentModelSettings, AppRuntimePaths, LlmAgentRoute } from '@shared/types/settings';
 import type {
   AgentManifestDefinition,
@@ -660,8 +657,6 @@ export class AgentManifestService {
       modelId: '',
     });
   }
-
-
 
   private readGlobalInstructions(paths: Pick<AppRuntimePaths, 'instructionsPath'>): string {
     const filePath = this.getGlobalInstructionsPath(paths);

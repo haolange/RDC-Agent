@@ -1,11 +1,5 @@
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import type {
-  DerivedContextView,
-  StructuredHandoff,
-  StructuredHandoffFact,
-  StructuredHandoffProgress,
-  StructuredHandoffResourceRef,
-} from '@shared/types/semanticContext';
+import type { DerivedContextView, StructuredHandoff, StructuredHandoffFact, StructuredHandoffProgress, StructuredHandoffResourceRef } from './structuredHandoff';
 import type { AgentMessage, AssistantMessage, ToolResultMessage, UserMessage } from '../core/types';
 
 const SECRET_NAME = /^(?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)$/i;

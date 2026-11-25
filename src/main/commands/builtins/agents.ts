@@ -1,7 +1,7 @@
 /**
  * /agents — 列出或切换可用 Agent profiles。
  */
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const agentsCommand: CommandDefinition = {
   id: 'agents',

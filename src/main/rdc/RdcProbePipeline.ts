@@ -8,7 +8,7 @@ import { quarantineFatalReplayFailure } from './RdcReplayFailure';
 import { assertRdcContextLeaseOwnership, quarantineRdcContext, type RdcContextLease } from './RdcRuntimeContextRegistry';
 import { validateRdcSwitchSnapshot, type RdcSwitchSnapshot } from './RdcSwitchSnapshot';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
-import type { CLIResult } from '@shared/types/tool';
+import type { CLIResult } from '../tools/ShellInvocationService';
 
 type Execute = (command: string, args: string[], options: {
   abortSignal?: AbortSignal; settings?: RdcCliInvokerSettings; contextId?: string;

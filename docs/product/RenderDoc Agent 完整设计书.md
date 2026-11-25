@@ -4265,7 +4265,7 @@ RenderDoc 官方明确将其定位为调试自行开发程序的工具。
 
 ## A. Delegation Context Capsule
 
-对应 `DelegationCapsule`（`src/shared/types/delegationCapsule.ts`）。
+对应 `DelegationCapsule`（`src/main/agent-runtime/orchestration/delegationCapsule.ts`；模型可见的 JSON schema 在 `src/shared/types/delegationCapsule.ts`）。
 
 ```yaml
 goal: 找出目标 Pass 的主要成本机制

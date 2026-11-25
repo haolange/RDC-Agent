@@ -13,7 +13,8 @@ import {
   type ProviderCapabilityProbeDependencies,
   type ResolvedProbeTarget,
 } from './ProviderCapabilityProbeService';
-import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared/types/providerCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { RequestPlanningResult } from '../../settings/provider-catalog/providerCatalogTypes';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
 import type { AssistantMessage } from '../core/types';
 
@@ -215,7 +216,6 @@ describe('ProviderCapabilityProbeService', () => {
     expect(fixture.releaseCredentials).not.toHaveBeenCalled();
   });
 
-
   it('sends a real request for an implicit unknown Max tier instead of short-circuiting', async () => {
     const fixture = dependencies(model({
       contextTiers: [
@@ -367,7 +367,6 @@ describe('ProviderCapabilityProbeService', () => {
   });
 });
 
-
 describe('capability evidence and lifecycle', () => {
   it.each([
     ['default', 'fast-tier-default'],
@@ -445,7 +444,6 @@ describe('capability evidence and lifecycle', () => {
   });
 });
 
-
 it('classifies explicit insufficient balance as quota without inventing subscription denial', () => {
   expect(classifyCapabilityProbeFailure(402, false, 'Insufficient Balance (insufficient_balance_error)')).toBe('quota-exhausted');
   expect(classifyCapabilityProbeFailure(402, false, 'payment required')).toBe('unknown');
@@ -459,7 +457,6 @@ it('records an explicit model subscription denial without downgrading structural
   });
   expect(buildProbeFailurePatch(request, t, plan(request, t.model).plan, 403, false)).toBeNull();
 });
-
 
 it('allows an explicit retry of an account-scoped probe denial while keeping ordinary unavailable models closed', async () => {
   const denied = model({ availability: 'unavailable', provenance: [{ field: 'availability', source: 'observed',

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { hashScopedResource } from './ScopedResourceResolver';
-import type { ScopedInstructionResolution, ScopedInstructionSource } from '@shared/types/rdcRuntime';
+import type { ScopedInstructionResolution, ScopedInstructionSource } from './scopedResourceTypes';
 
 const DEFAULT_INSTRUCTION_BUDGET = 64 * 1024;
 

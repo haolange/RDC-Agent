@@ -1,6 +1,5 @@
-import {
-  ARTIFACT_READ_MAX_OUTPUT_LINES, SESSION_ARTIFACT_MAX_FILE_BYTES, SessionArtifactError,
-} from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
+import { ARTIFACT_READ_MAX_OUTPUT_LINES, SESSION_ARTIFACT_MAX_FILE_BYTES } from '../sessions/artifacts/sessionArtifactContract';
 import type { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 
 /** Internal complete JSON reads retain the Resolver's ownership, file bound and hash checks. */

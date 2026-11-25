@@ -137,8 +137,8 @@ export type LlmProviderProtocol =
  * - `environment` : Resolved from ambient environment / cloud credential chain (AWS, GCP).
  */
 export type LlmProviderAuthMode = 'none' | 'api-key' | 'local' | 'account' | 'environment';
-export type LlmProviderLifecycleStatus = 'stable' | 'beta' | 'retiring' | 'sunset';
-export type LlmProviderAvailabilityState = 'available' | 'unavailable' | 'unknown';
+type LlmProviderLifecycleStatus = 'stable' | 'beta' | 'retiring' | 'sunset';
+type LlmProviderAvailabilityState = 'available' | 'unavailable' | 'unknown';
 
 export interface LlmProviderAvailability {
   state: LlmProviderAvailabilityState;
@@ -160,7 +160,7 @@ export type LlmProviderCategory =
 export type LlmProviderCatalogOwnership = 'app-managed' | 'provider-managed' | 'user-managed';
 
 /** Provider operating and endpoint facts are explicit and never inferred from UI grouping. */
-export type LlmProviderEndpointClass =
+type LlmProviderEndpointClass =
   | 'first-party'
   | 'third-party-gateway'
   | 'cloud-hosted'
@@ -169,7 +169,7 @@ export type LlmProviderEndpointClass =
   | 'local-service'
   | 'user-endpoint';
 
-export type LlmProviderConnectionFieldKind = 'secret' | 'text' | 'url' | 'region' | 'path';
+type LlmProviderConnectionFieldKind = 'secret' | 'text' | 'url' | 'region' | 'path';
 
 export interface LlmProviderConnectionField {
   id: string;
@@ -200,7 +200,7 @@ export interface LlmProviderConnectionSchema {
   endpointTemplate?: string;
 }
 
-export interface LlmProviderCatalogProvenance {
+interface LlmProviderCatalogProvenance {
   source:
     | 'user-control-panel'
     | 'live-catalog'
@@ -228,7 +228,7 @@ export interface LlmProviderCatalogProvenance {
  * calls, structured outputs, vision input, etc.).
  * Image/video generation is out of product scope and must not appear here.
  */
-export type LlmProviderCapability =
+type LlmProviderCapability =
   | 'chat'
   | 'tool-calling'
   | 'structured-output'
@@ -237,14 +237,14 @@ export type LlmProviderCapability =
   | 'vision-input'
   | 'model-discovery';
 export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
-export type LlmProviderModelAvailability = 'available' | 'unavailable' | 'unknown';
+type LlmProviderModelAvailability = 'available' | 'unavailable' | 'unknown';
 export interface SidebarLayoutPreference {
   collapsed: boolean;
   width: number;
   expandedWidth: number;
 }
 
-export interface TerminalLayoutPreference {
+interface TerminalLayoutPreference {
   height: number;
 }
 
@@ -310,7 +310,7 @@ export interface AgentShellSettings {
   executable: string;
 }
 
-export type AgentShellKind = 'pwsh' | 'windows-powershell' | 'zsh' | 'bash' | 'sh';
+type AgentShellKind = 'pwsh' | 'windows-powershell' | 'zsh' | 'bash' | 'sh';
 
 export type ResolvedShellSnapshot =
   | {
@@ -459,7 +459,7 @@ export interface ProviderDefinitionSaveRequest {
   clientRevision: number;
 }
 
-export type ProviderDefinitionSaveStatus = 'committed' | 'superseded' | 'failed';
+type ProviderDefinitionSaveStatus = 'committed' | 'superseded' | 'failed';
 
 export interface ProviderDefinitionCommitSnapshot {
   clientRevision: number;
@@ -532,7 +532,7 @@ export interface LlmAgentRoute {
   modelId: string;
 }
 
-export interface LlmSettings {
+interface LlmSettings {
   providers: LlmProviderEntry[];
   /** Read-only runtime projection derived from canonical `.agent.md` manifests. */
   agentRoutes: LlmAgentRoute[];
@@ -591,7 +591,7 @@ export interface SettingsDiagnostic {
   path?: string;
 }
 
-export interface RuntimeResourceCatalog {
+interface RuntimeResourceCatalog {
   diagnostics: SettingsDiagnostic[];
 }
 
@@ -622,7 +622,7 @@ export interface AppSettings {
 }
 
 /** The fields of one Agent model binding, each set and cleared on its own. */
-export type AgentModelBindingField =
+type AgentModelBindingField =
   | { field: 'model'; value: string }
   | { field: 'reasoningLevel'; value: ReasoningSelection };
 
@@ -699,7 +699,7 @@ export interface LlmProviderAccountLoginStartRequest {
 }
 
 /** How a provider's account sign-in works, projected from its manifest for the connect dialog. */
-export interface LlmProviderAccountLogin {
+interface LlmProviderAccountLogin {
   mode: LlmProviderAccountLoginMode;
   /** The browser flow ends with a code the person pastes back into the app. */
   codeInput: boolean;

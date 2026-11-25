@@ -1,21 +1,6 @@
-import {
-  analyzerExplanationLayer,
-  epistemicRank,
-  isCausalOrCounterfactualClaim,
-  isClosedExperimentStatus,
-  isWorldStateMutated,
-  type AnalyzerExplanationLayer,
-  type ChallengeRecord,
-  type ClaimRecord,
-  type ClaimSet,
-  type CompactProvenanceEntry,
-  type EvidenceRecord,
-  type ExperimentRecord,
-  type InvestigationMission,
-  type InvestigationReport,
-  type WorldState,
-} from '@shared/types/renderdocInvestigation';
+import { type ChallengeRecord, type ClaimRecord, type ClaimSet, type CompactProvenanceEntry, type EvidenceRecord, type ExperimentRecord, type InvestigationMission, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
 import { InvestigationError } from './investigationErrors';
+import type { ClaimKind, EpistemicStatus, ExperimentStatus } from '@shared/types/renderdocInvestigation';
 
 const ANALYZER_LAYER_RANK: Record<AnalyzerExplanationLayer, number> = {
   authoring: 0,
@@ -507,4 +492,40 @@ export function assertReadyObservedEvidence(kind: string, record: unknown, looku
   if (kind === 'report') {
     for (const claim of (record as InvestigationReport).claims) assertObservedClaimEvidence(claim, lookup, { treatAsProjected: true });
   }
+}
+
+/** Epistemic partial order: unknown < inferred < derived < observed. */
+export const EPISTEMIC_RANK: Record<EpistemicStatus, number> = {
+  unknown: 0,
+  inferred: 1,
+  derived: 2,
+  observed: 3,
+};
+
+export function epistemicRank(status: EpistemicStatus): number {
+  return EPISTEMIC_RANK[status];
+}
+
+export function isCausalOrCounterfactualClaim(claim: Pick<ClaimRecord, 'claimKind' | 'declaresCounterfactual'>): boolean {
+  return claim.claimKind === 'causal_conclusion' || claim.declaresCounterfactual === true;
+}
+
+export const ANALYZER_EXPLANATION_LAYERS = ['observed', 'reconstructed', 'authoring'] as const;
+
+export type AnalyzerExplanationLayer = (typeof ANALYZER_EXPLANATION_LAYERS)[number];
+
+/** Observed / Reconstructed / Authoring. Non-architecture kinds return null. */
+export function analyzerExplanationLayer(claimKind: ClaimKind): AnalyzerExplanationLayer | null {
+  if (claimKind === 'observed_fact') return 'observed';
+  if (claimKind === 'derived_structure') return 'reconstructed';
+  if (claimKind === 'semantic_inference' || claimKind === 'hypothesis') return 'authoring';
+  return null;
+}
+
+export function isClosedExperimentStatus(status: ExperimentStatus): boolean {
+  return status === 'recorded' || status === 'rolled_back';
+}
+
+export function isWorldStateMutated(state: Pick<WorldState, 'shaderReplacement' | 'patchStack'>): boolean {
+  return state.shaderReplacement != null || state.patchStack.length > 0;
 }

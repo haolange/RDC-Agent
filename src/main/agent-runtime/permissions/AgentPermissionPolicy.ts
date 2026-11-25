@@ -18,7 +18,7 @@ import {
   resolvePolicyApprovalFloor,
 } from './PolicyCompiler';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
-import type { CompiledPolicy } from '@shared/types/rdcRuntime';
+import type { CompiledPolicy } from './PolicyCompiler';
 import type { AgentTool, ReplayLifecycleStep, ToolExecutionContext } from '../agent/AgentTool';
 import type { ToolCall } from '@shared/types/tool';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';

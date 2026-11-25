@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { KnowledgeCardRecordSchema } from './knowledgeCardSchema';
-import type { KnowledgeCardRecord, KnowledgeReviewRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
+import type { KnowledgeCardRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
 
 export const KNOWLEDGE_STATE_SCHEMA_VERSION = '1';
 export const KNOWLEDGE_STATE_FILE = 'knowledge-state.json';
@@ -121,4 +121,14 @@ export function serializeKnowledgeStateDocument(
       reviews: document.reviews,
     };
   return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
+export interface KnowledgeReviewRecord {
+  reviewId: string;
+  sessionId: string;
+  kind: 'write' | 'promote';
+  cardId: string;
+  createdAt: string;
+  revision: number;
+  contentHash: string;
 }

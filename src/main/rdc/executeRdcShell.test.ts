@@ -9,7 +9,7 @@ import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { executeRdcShell } from './executeRdcShell';
 import { RdcShellInputSchema } from './RdcShellInput';
 import { verifyRollbackIdentity } from './RdcValidatedEvidence';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), retainedLease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
 vi.mock('./RdcSessionService', () => ({ rdcSessionService: { observeAgentOperation: mock.observe } }));

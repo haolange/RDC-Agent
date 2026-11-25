@@ -2,7 +2,7 @@
  * /version — 显示应用版本信息。
  */
 import { app } from 'electron';
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const versionCommand: CommandDefinition = {
   id: 'version',

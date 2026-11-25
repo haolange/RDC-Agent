@@ -1,15 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
-import {
-  KNOWLEDGE_PACKAGE_SCHEMA,
-  type KnowledgeExportRequest,
-  type KnowledgeExportResult,
-  type KnowledgePackage,
-  type KnowledgePackageCard,
-} from '@shared/types/knowledgeExport';
+import { type KnowledgeExportRequest, type KnowledgeExportResult } from '@shared/types/knowledgeExport';
 import { AppError } from '@shared/errors/appError';
 import { writeFileAtomic } from '../runtime/atomicFile';
+import { KNOWLEDGE_PACKAGE_SCHEMA } from './knowledgePackage';
 import { resolveWithinRoot } from './knowledgeFs';
 import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeSensitiveText';
 import { isSafeKnowledgeImageRelative, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
@@ -18,6 +13,7 @@ import {
   utf8ToZip,
   zipKnowledgeFiles,
 } from './knowledgeZip';
+import type { KnowledgePackage, KnowledgePackageCard } from './knowledgePackage';
 import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type { KnowledgeCardDetail, KnowledgeImageRef, KnowledgeSpace } from '@shared/types/knowledge';
 

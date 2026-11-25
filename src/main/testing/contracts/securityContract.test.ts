@@ -14,7 +14,7 @@ import {
   mcpExecutableFingerprint,
   projectOverridesUserExecutable,
 } from '../../settings/settings-core/McpTrustService';
-import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
+import type { AgentRuntimeMcpDescriptor } from '../../settings/agent-manifests/agentRuntimeTypes';
 
 vi.mock('../../ipc/invokeRegistry', () => ({
   hasRegisteredIpcChannel: () => true,

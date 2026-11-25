@@ -11,9 +11,9 @@ import { safeDelegationText as safeText } from './DelegationTraceText';
 import { finalizeTrace } from './ConversationWorkTrace';
 import { createDelegatedProjectionState, projectDelegatedEvent, type DelegatedProjectionState } from './DelegatedWorkProjection';
 import type { ConversationWorkBlock } from '@shared/types/conversation';
-import type { DelegationTaskBody } from '@shared/types/delegationTrace';
 import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
 import type { AgentEvent, AgentEventOf } from '@shared/types/agentRuntime';
+import type { DelegationCapsule } from '../orchestration/delegationCapsule';
 
 type TraceEntry =
   | { kind: 'start'; header: DelegationTraceHeader }
@@ -404,3 +404,8 @@ export const delegationTraceStore = {
     } finally { fs.closeSync(descriptor); }
   },
 };
+
+export interface DelegationTaskBody {
+  capsule: DelegationCapsule;
+  completionRequirements: string[];
+}

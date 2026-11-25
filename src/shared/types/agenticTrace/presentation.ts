@@ -25,15 +25,6 @@ export interface AgentRunViewModel {
   inspectorSelection?: string | null;
 }
 
-export interface TraceChangedPayload extends SessionScope {
-  presentation: AgentRunPresentation;
-}
-
-export interface TraceEventAddedPayload {
-  runId: string;
-  event: import('./events').TraceEvent;
-}
-
 export interface TraceProjectionChangedPayload extends SessionScope {
   presentation: AgentRunPresentation;
 }

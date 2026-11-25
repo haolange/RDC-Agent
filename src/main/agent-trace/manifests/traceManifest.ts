@@ -1,4 +1,4 @@
-import type { ToolCategory } from './nodes';
+import type { ToolCategory } from '../traceNodes';
 
 export interface ToolManifestRenderer {
   key: string;

@@ -1,4 +1,4 @@
-import type { DiscoveryAdmission } from '@shared/types/providerCapability';
+import type { DiscoveryAdmission } from './providerCatalogTypes';
 
 const DEFAULT_DENY_PATTERNS = [
   '*embedding*',

@@ -5,8 +5,6 @@
  * src/main/agent-runtime/AgentEventBridge.ts before conversation and renderer projection.
  */
 import type { AgentRole } from './agent';
-import type { MCPTransport } from './mcp';
-import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
 import type { CapabilityState } from './providerCapability';
 import type { ProviderReasoningContract } from './rdcRuntime';
@@ -19,7 +17,7 @@ import type {
   ConversationTaskStatus,
 } from './conversation';
 import type { ConversationPlanReview, PlanReviewDecision } from './planReview';
-import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
+import type { LlmProviderId } from './settings';
 import type { ToolCall, ToolCallResult } from './tool';
 
 export type ToolCallingMode = 'native-structured' | 'text-only' | 'disabled';
@@ -47,7 +45,7 @@ export interface AgentRouteCapability {
   structuredOutputMode: 'native' | 'prompt-fallback';
 }
 
-export interface AgentRunStartedPayload {
+interface AgentRunStartedPayload {
   profileId: string;
   providerId: string;
   modelId: string;
@@ -55,13 +53,13 @@ export interface AgentRunStartedPayload {
   routeCapability?: AgentRouteCapability;
 }
 
-export interface AgentAssistantDeltaPayload {
+interface AgentAssistantDeltaPayload {
   text: string;
   phase?: 'commentary' | 'final_answer';
   providerOutputRef: ProviderOutputRef;
 }
 
-export interface AgentAssistantThinkingPayload {
+interface AgentAssistantThinkingPayload {
   text: string;
   thinking?: ThinkingArtifact;
   providerOutputRef: ProviderOutputRef;
@@ -79,32 +77,32 @@ export interface AgentAssistantCompletedPayload {
   };
 }
 
-export interface AgentToolRequestedPayload {
+interface AgentToolRequestedPayload {
   toolCall: ToolCall;
   providerOutputRef: ProviderOutputRef;
 }
 
-export interface AgentToolStartedPayload {
+interface AgentToolStartedPayload {
   permissionState?: import('./runtimePermission').RuntimePermissionState;
   toolCallId: string;
   toolName: string;
   args: Record<string, unknown>;
 }
 
-export interface AgentToolCompletedPayload {
+interface AgentToolCompletedPayload {
   toolCallId: string;
   toolName: string;
   result: ToolCallResult;
 }
 
-export interface AgentToolDeniedPayload {
+interface AgentToolDeniedPayload {
   toolCallId: string;
   toolName: string;
   reason: string;
   result?: ToolCallResult;
 }
 
-export interface AgentTaskEventPayload {
+interface AgentTaskEventPayload {
   taskId: string;
   title: string;
   status?: ConversationTaskStatus;
@@ -135,7 +133,7 @@ export interface AgentApprovalEventPayload {
   answer?: unknown;
 }
 
-export interface AgentDiagnosticPayload {
+interface AgentDiagnosticPayload {
   code: string;
   severity: ConversationDiagnosticSeverity;
   message: string;
@@ -146,7 +144,7 @@ export interface AgentDiagnosticPayload {
   phase?: 'started' | 'completed';
 }
 
-export interface AgentRunFinalPayload {
+interface AgentRunFinalPayload {
   status: 'complete' | 'failed' | 'cancelled';
   text?: string;
   error?: string;
@@ -210,91 +208,3 @@ export interface AgentEventOf<T extends AgentEventType> {
  * by `type`. Main's loop events (`AgentLoopEvent`) are translated into it by src/main/agent-runtime/AgentEventBridge.ts.
  */
 export type AgentEvent = { [T in AgentEventType]: AgentEventOf<T> }[AgentEventType];
-
-export interface AgentRuntimeSkillDescriptor {
-  id: string;
-  name: string;
-  label: string;
-  description: string;
-  source: 'builtin' | 'user' | 'project';
-  enabledByDefault: boolean;
-  path?: string;
-  parameters?: Record<string, unknown>;
-}
-
-export type ModelProviderBackendKind =
-  | 'native'
-  | 'openai-compatible'
-  | 'local'
-  | 'account-oauth';
-
-export interface ModelProviderCapabilityMatrix {
-  providerId: LlmProviderId;
-  protocol: LlmProviderProtocol;
-  authMode: LlmProviderAuthMode;
-  backendKind: ModelProviderBackendKind;
-  streaming: boolean;
-  nativeToolCalling: boolean;
-  structuredOutput: boolean;
-  vision: boolean;
-  reasoning: boolean;
-  parallelToolCalls: boolean;
-  oauth: boolean;
-  local: boolean;
-  toolCallFormat: 'openai-chat-completions' | 'openai-responses' | 'anthropic-messages' | 'google-gemini' | 'none';
-  structuredReliability: 'native' | 'prompted' | 'unsupported';
-}
-
-export interface AgentRuntimeProfileDescriptor extends AgentPromptProfile {
-  runtimePolicy: AgentToolPolicy;
-  providerRoute?: {
-    providerId: LlmProviderId;
-    modelId: string;
-  };
-  maxTurns?: number;
-  maxToolIterations?: number;
-}
-
-export interface AgentRuntimeTaskDescriptor {
-  id: string;
-  title: string;
-  status: 'pending' | 'running' | 'blocked' | 'completed' | 'failed' | 'cancelled';
-  ownerAgentId: AgentRole;
-  dependsOn?: string[];
-}
-
-export interface AgentRuntimeTaskGraphDescriptor {
-  id: string;
-  runId: string;
-  profileId: string;
-  execution: 'serial';
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-  tasks: AgentRuntimeTaskDescriptor[];
-}
-
-export interface AgentRuntimeMcpDescriptor {
-  id: string;
-  name: string;
-  description: string;
-  transport: MCPTransport;
-  enabledByDefault: boolean;
-  command?: string;
-  args?: string[];
-  url?: string;
-  env?: Record<string, string>;
-  scope?: 'builtin' | 'user' | 'project';
-  sourcePath?: string;
-  sourceHash?: string;
-  /** Project MCP requires hash-bound trust before connect. */
-  needsRetrust?: boolean;
-  /** Same-id project attempted to change user executable fields. */
-  executableOverrideRejected?: boolean;
-  projectRealpath?: string;
-  descriptorHash?: string;
-  blockedReason?: string;
-}
-
-export interface AgentRuntimeCatalog {
-  skills: AgentRuntimeSkillDescriptor[];
-  mcpServers: AgentRuntimeMcpDescriptor[];
-}

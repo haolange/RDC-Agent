@@ -2,7 +2,7 @@ import path from 'path';
 import YAML from 'yaml';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import { isAgentIconPreset } from '@shared/constants/agents';
-import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS, HANDOFF_SURFACES } from '@shared/types/agentManifest';
+import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { agentTextTranslationsSchema, handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft, AgentAccessCeiling, AgentCompletionContract, HandoffSurface } from '@shared/types/agentManifest';
@@ -230,3 +230,5 @@ export function serializeAgentMarkdown(definition: AgentManifestDraft): string {
   };
   return `---\n${YAML.stringify(frontmatter).trim()}\n---\n\n${definition.instructions.trim()}\n`;
 }
+
+export const HANDOFF_SURFACES = ['turn-end', 'plan-gate', 'hidden'] as const satisfies readonly HandoffSurface[];

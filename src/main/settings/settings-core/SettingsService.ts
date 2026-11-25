@@ -44,7 +44,7 @@ import { tryCurrentProjectId, tryCurrentProjectRoot } from './resolveRegisteredP
 import { SettingsStore, type SettingsSnapshot } from './settingsStore';
 import { orphanProviderDiagnostics, stableSerialize } from './settingsServiceHelpers';
 import type { SettingsFile, UserProviderState } from './settingsFileSchema';
-import type { LLMProviderConfig } from '@shared/types/llm';
+import type { LLMProviderConfig } from '../provider-auth/ProviderRuntimeCredentialService';
 import type {
   AgentBuiltinComparison,
   AgentDefinitionCommitQuery,

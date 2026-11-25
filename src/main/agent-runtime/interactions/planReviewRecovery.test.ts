@@ -4,7 +4,8 @@ import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
 import { readReferencedPlan } from '../../sessions/run/sessionPlanReference';
 import { AgentPlanReviewRequestService } from './AgentPlanReviewRequestService';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationPlanReview, PlanReviewStateDocument } from '@shared/types/planReview';
+import type { ConversationPlanReview } from '@shared/types/planReview';
+import type { PlanReviewStateDocument } from '../../sessions/run/PlanReviewStateStore';
 
 const fixture = vi.hoisted(() => ({ state: null as PlanReviewStateDocument | null, history: [] as ConversationMessage[],
   content: 'A verified plan', failWrite: false, freeze: vi.fn(), offer: vi.fn(), readOffer: vi.fn(), session: vi.fn() }));

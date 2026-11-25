@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { dialog, ipcMain } from 'electron';
-import { KNOWLEDGE_EXPORT_EXTENSION } from '@shared/types/knowledgeExport';
 import { AppError } from '@shared/errors/appError';
+import { KNOWLEDGE_EXPORT_EXTENSION } from '../knowledge/knowledgePackage';
 import { nativeMessage } from '../window/nativeI18n';
 import { confirmInMainProcess } from '../window/mainConfirmation';
 import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';

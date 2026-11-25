@@ -1,4 +1,4 @@
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from './sessionArtifactContract';
 import { sessionArtifactResolver } from './SessionArtifactResolver';
 import type { SessionArtifactResolver } from './SessionArtifactResolver';
 interface Grant { ownerSessionId: string; refs: Map<string, string>; outputs: Set<string> }

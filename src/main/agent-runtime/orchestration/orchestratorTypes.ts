@@ -10,7 +10,8 @@ import type {
 } from '@shared/types/modelCapability';
 import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
-import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState, TurnHandle } from './TurnCoordinator';
@@ -84,7 +85,7 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** Volatile Delegation Capsule segments appended to the child PromptPlan. */
   extraPromptSegments?: import('@shared/types/rdcRuntime').PromptSegment[];
   /** Frozen capsule stored on the child EffectiveRuntimePlan. */
-  frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
+  frozenDelegationCapsule?: import('./delegationCapsule').DelegationCapsule;
   /** Offline children strip rdc_context / rdc_probe at allowlist compile time. */
   excludeRdcLeaseTools?: boolean;
   /** Exact profile snapshot used to build this child turn. */
@@ -149,8 +150,8 @@ export interface PreparedAgentRuntime {
   effectivePlan: EffectiveRuntimePlan;
   /** The approved, hash-verified plan for this execution, if present. */
   approvedExecution?: {
-    offer: import('@shared/types/executionOffer').ExecutionOffer;
-    investigation: import('@shared/types/planInvestigation').InvestigationPlanContract | null;
+    offer: import('../../sessions/run/executionOffer').ExecutionOffer;
+    investigation: import('../../sessions/run/investigationPlanContract').InvestigationPlanContract | null;
   } | null;
 }
 

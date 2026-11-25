@@ -1,4 +1,4 @@
-import type { DelegationCapsuleBudget } from '@shared/types/delegationCapsule';
+import type { DelegationCapsuleBudget } from './delegationCapsule';
 import type { PolicyBudgetState } from './TurnCoordinator';
 
 const parents = new WeakMap<PolicyBudgetState, PolicyBudgetState>();

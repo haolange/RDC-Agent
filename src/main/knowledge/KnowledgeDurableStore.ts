@@ -18,10 +18,8 @@ import {
   type KnowledgeDurableReview,
   type KnowledgeStateDocument,
 } from './knowledgeStateSchema';
-import type {
-  KnowledgeReviewRecord,
-  SessionKnowledgeCandidate,
-} from '@shared/types/knowledge';
+import type { SessionKnowledgeCandidate } from '@shared/types/knowledge';
+import type { KnowledgeReviewRecord } from './knowledgeStateSchema';
 
 export interface KnowledgeDurableStoreDependencies {
   resolveStatePath(sessionId: string): string;

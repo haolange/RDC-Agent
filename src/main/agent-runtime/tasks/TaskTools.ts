@@ -17,8 +17,9 @@ import { AppError } from '@shared/errors/appError';
  *    便于测试时注入临时目录。
  */
 
-import { TaskExecutionRequirementsSchema, TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA, type TaskExecutionRequirements } from '@shared/types/taskExecution';
+import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { normalizeSha256 } from '../../runtime/contentHash';
+import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from './taskExecutionSchemas';
 import {
   INVALIDATED_REVIEW_GUIDANCE,
   TaskRegistry,
@@ -26,6 +27,7 @@ import {
   type TaskStatus,
 } from './TaskRegistry';
 import { readTaskBudgetSnapshot, type TaskLiveBudgetSnapshot } from './TaskBudgetSnapshot';
+import type { TaskExecutionRequirements } from './taskExecutionSchemas';
 import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
 import type { StartTaskExecutionOptions } from './TaskContracts';
 import type { RequestUsageSnapshot } from '../prompt/RequestUsageSnapshot';

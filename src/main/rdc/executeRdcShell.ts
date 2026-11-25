@@ -12,7 +12,7 @@ import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 
 function callableRdcDefinition(definition: RdcOperationDefinition): Record<string, unknown> {
   const inputSchema = structuredClone(definition.input_schema);

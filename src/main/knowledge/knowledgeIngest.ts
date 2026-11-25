@@ -12,7 +12,7 @@ import {
   type KnowledgeImportStatus,
   type KnowledgeScope,
 } from '@shared/types/knowledge';
-import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
+import { KNOWLEDGE_PACKAGE_SCHEMA } from './knowledgePackage';
 import { structuredText } from './knowledgeFs';
 import { readPackageImage, resolvePackageAsset } from './knowledgePackageAsset';
 import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeSensitiveText';

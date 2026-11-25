@@ -1,9 +1,10 @@
-import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
+import { parsePlanTaskRequirements } from '../../sessions/run/planTaskRequirements';
 import { resolveVisibleConversationMessages } from '../../sessions/store/ConversationBranchResolver';
 import { conversationHistoryStore, executionOfferStore, projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { readReferencedPlan } from '../../sessions/run/sessionPlanReference';
 import { assertDeclaredHandoffForPlan } from './applyDeclaredHandoff';
-import type { PlanReviewStateDocument, RecoverableApprovedHandoff } from '@shared/types/planReview';
+import type { RecoverableApprovedHandoff } from '@shared/types/planReview';
+import type { PlanReviewStateDocument } from '../../sessions/run/PlanReviewStateStore';
 
 /** An accepted user request after approval may already have consumed the intended action. */
 export function hasRequestAfterApproval(sessionId: string, approval: PlanReviewStateDocument): boolean {

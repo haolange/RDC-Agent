@@ -3,7 +3,7 @@ import * as path from 'path';
 import { z, type ZodType } from 'zod';
 import { nowIso } from '@shared/utils/id';
 import { runScopedStore } from '../sessions/store/RunScopedStore';
-import type { ArtifactRecord } from '@shared/types/harness';
+import type { ArtifactRecord } from './artifactRecord';
 
 export interface ArtifactStoreSnapshot {
   schemaVersion: '1';

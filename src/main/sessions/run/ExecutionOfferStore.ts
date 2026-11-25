@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { existsSync, unlinkSync } from 'node:fs';
 import { z } from 'zod';
-import { EXECUTION_OFFER_SCHEMA, type ExecutionOffer } from '@shared/types/executionOffer';
 import { AppError } from '@shared/errors/appError';
+import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
+import type { ExecutionOffer } from './executionOffer';
 import type { StorageIo } from '../../runtime/StorageIo';
 
 export const EXECUTION_OFFER_FILE = 'execution-offer.json';

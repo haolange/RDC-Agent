@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
+import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
 import { approvedExecutionOfferForAgent, executionOfferRequiredSkillIds } from './handoffSkills';
 
 const mocks = vi.hoisted(() => ({

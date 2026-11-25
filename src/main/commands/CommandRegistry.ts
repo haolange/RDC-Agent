@@ -7,13 +7,7 @@
  *  - 按类别列举命令供 UI 自动补全使用。
  */
 
-import type {
-  CommandContext,
-  CommandDefinition,
-  CommandResult,
-  CommandExecuteRequest,
-  CommandListResult,
-} from '@shared/types/command';
+import type { CommandContext, CommandResult, CommandExecuteRequest, CommandListResult } from '@shared/types/command';
 
 export class CommandRegistry {
   private readonly commands = new Map<string, CommandDefinition>();
@@ -112,4 +106,20 @@ export class CommandRegistry {
       };
     }
   }
+}
+
+/** Definition of a slash command. */
+export interface CommandDefinition {
+  /** Unique command ID (kebab-case, e.g. "help", "clear", "git-commit"). */
+  id: string;
+  /** Primary command name (without leading slash). */
+  name: string;
+  /** Short description shown in the command list popover. */
+  description: string;
+  /** Alternative names that trigger this command. */
+  aliases?: string[];
+  /** Category for grouping in the UI. */
+  category: 'workflow' | 'navigation' | 'system' | 'debug' | 'edit' | 'session';
+  /** Execute the command. Receives parsed arguments and context. */
+  execute: (args: string[], context: CommandContext) => Promise<CommandResult>;
 }

@@ -9,7 +9,7 @@ import { normalizeBranchId } from '../../sessions/store/ConversationBranchResolv
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
-import type { ProviderContinuationArtifact } from '@shared/types/reasoning';
+import type { ProviderContinuationArtifact } from '../core/types';
 import type { AssistantMessage, Message, ToolResultMessage } from '../core/types';
 
 /** Work-trace summary of a turn the app's exit interrupted before its terminal context entry was written. */

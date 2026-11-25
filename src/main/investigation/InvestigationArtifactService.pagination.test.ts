@@ -2,7 +2,7 @@ import { appendFileSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { ARTIFACT_READ_MAX_OUTPUT_BYTES } from '@shared/types/sessionArtifact';
+import { ARTIFACT_READ_MAX_OUTPUT_BYTES } from '../sessions/artifacts/sessionArtifactContract';
 import { baselineWorld, createInvestigationHarness, SESSION_ID, writeDraft } from '../testing/investigationTestFixtures';
 
 function withHarness(run: (harness: ReturnType<typeof createInvestigationHarness>) => void) {

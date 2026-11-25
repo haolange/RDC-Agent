@@ -1,13 +1,11 @@
 import { z, type ZodType } from 'zod';
 import { UNRESOLVED_BLOCKERS, type UnresolvedItem } from '@shared/types/unresolvedWork';
-import {
-  TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema,
-  TaskRuntimeEpochSchema,
-} from '@shared/types/taskExecution';
+import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema } from '@shared/types/taskExecution';
+import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
+import { TaskIndependentSourceSchema, TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import type { ConversationTaskStatus } from '@shared/types/conversation';
-import type {
-  TaskExecutionDispatch, TaskExecutionPreparation, TaskExecutionRequirements, TaskExecutionStatus, TaskIndependentSource, TaskRuntimeEpoch,
-} from '@shared/types/taskExecution';
+import type { TaskExecutionDispatch, TaskExecutionPreparation, TaskExecutionStatus } from '@shared/types/taskExecution';
+import type { TaskExecutionRequirements, TaskIndependentSource, TaskRuntimeEpoch } from './taskExecutionSchemas';
 
 export type { TaskExecutionStatus } from '@shared/types/taskExecution';
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { InvestigationError } from '../investigation/investigationErrors';
 import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
 import { IpcValidationError } from './validation/IpcPayloadGuard';

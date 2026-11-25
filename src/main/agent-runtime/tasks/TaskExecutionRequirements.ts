@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
-import {
-  TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, PlanTaskRevisionSchema,
-  type PlanTaskRequirement, type TaskExecutionPreparation, type TaskIndependentSource,
-} from '@shared/types/taskExecution';
+import { TaskExecutionPreparationSchema, type TaskExecutionPreparation } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { z } from 'zod';
+import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
+import type { TaskIndependentSource } from './taskExecutionSchemas';
 import type { StartTaskExecutionOptions, TaskCompletionResult, TaskExecutionRecord, TaskRecord } from './TaskContracts';
 import type { TaskStore } from './TaskStore';
 
@@ -215,3 +216,10 @@ export async function preparePlanTaskRequirements(
   }
   return snapshots;
 }
+
+export const PlanTaskRevisionSchema = z.object({
+  taskId: z.string().trim().min(1).max(256), expectedRevision: z.number().int().positive(),
+  subject: z.string().trim().min(1).optional(), description: z.string().optional(),
+  completionRequirements: z.array(z.string().min(1)).max(64).optional(),
+  executionRequirements: TaskExecutionRequirementsSchema.optional(),
+}).strict();

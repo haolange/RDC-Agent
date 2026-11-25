@@ -8,7 +8,7 @@ import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { canonicalJson } from './RdcOperationCatalog';
 import type { RdcTurnBinding } from './RdcTurnBindings';
 import type { RdcContextLease } from './RdcRuntimeContextRegistry';
-import type { CLIResult } from '@shared/types/tool';
+import type { CLIResult } from '../tools/ShellInvocationService';
 
 export interface RdcSwitchSnapshot {
   contextId: string;

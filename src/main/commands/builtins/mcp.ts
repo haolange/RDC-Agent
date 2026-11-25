@@ -6,7 +6,7 @@
  */
 import { agentOrchestrator } from '../../agent-runtime/orchestration/agentRuntimeRoot';
 import { projectWorkspaceStore } from '../../sessions/store/sessionStores';
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const mcpCommand: CommandDefinition = {
   id: 'mcp',

@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { resolveApprovedHandoff } from './approvedHandoffRecovery';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
-import type { PlanReviewStateDocument } from '@shared/types/planReview';
+import type { ExecutionOffer } from '../../sessions/run/executionOffer';
+import type { PlanReviewStateDocument } from '../../sessions/run/PlanReviewStateStore';
 
 const f = vi.hoisted(() => ({ history: [] as ConversationMessage[], offer: null as ExecutionOffer | null,
   source: { ownerSessionId: 's', turnId: 'turn', agentId: 'debugger', markdown: '# Plan' },

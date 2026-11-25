@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES } from '@shared/types/sessionArtifact';
+import { TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES } from '../../sessions/artifacts/sessionArtifactContract';
 import { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { resetSessionArtifactQuotaLedger } from '../../sessions/artifacts/SessionArtifactQuota';
 import { StorageIo } from '../../runtime/StorageIo';

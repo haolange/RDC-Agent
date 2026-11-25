@@ -36,8 +36,3 @@ export interface ConversationSwitchBranchResult {
   tracePresentation?: import('./agenticTrace').AgentRunPresentation | null;
   error?: string;
 }
-
-export interface ConversationHistoryResult {
-  messages: import('./conversation').ConversationMessage[];
-  branchState?: ConversationBranchState | null;
-}

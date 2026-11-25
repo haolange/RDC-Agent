@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
-import { isPlanApprovalRequest } from '@shared/types/planReview';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
@@ -12,11 +11,12 @@ import { resolveApprovedHandoff } from './approvedHandoffRecovery';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import { runPlanApprovalTransaction } from './PlanApprovalTransaction';
 import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, ConversationAnswerPlanReviewRequest, ConversationAnswerPlanReviewResult } from '@shared/types/planReview';
-import type { PlanTaskRequirement } from '@shared/types/taskExecution';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 import type { TurnHandle } from '../orchestration/TurnCoordinator';
 import type { ConversationPlanReview, PlanReviewHandoffIdentity } from '@shared/types/planReview';
 import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
+import type { PlanApprovalRequest } from '@shared/types/planReview';
 
 interface PendingPlanReviewRequest {
   reviewId: string;
@@ -387,3 +387,7 @@ export class AgentPlanReviewRequestService {
 }
 
 export const agentPlanReviewRequestService = new AgentPlanReviewRequestService();
+
+export function isPlanApprovalRequest(request: ConversationAnswerPlanReviewRequest): request is PlanApprovalRequest {
+  return request.decision.kind === 'approve';
+}

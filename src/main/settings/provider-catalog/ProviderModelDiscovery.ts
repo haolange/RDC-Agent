@@ -58,7 +58,7 @@ import {
   toDeclarativeCatalogContributions,
 } from './DeclarativeCatalogDiscovery';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import type { ProviderSurfaceDefinition } from '@shared/types/providerCapability';
+import type { ProviderSurfaceDefinition } from './providerCatalogTypes';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
 type ManifestProjectedCatalogParser = (

@@ -7,12 +7,8 @@ import {
   type KnowledgeDurableStore,
 } from './KnowledgeDurableStore';
 import { knowledgeQueryService } from './KnowledgeQueryService';
-import type {
-  KnowledgeCardRecord,
-  KnowledgeReviewRecord,
-  KnowledgeSpace,
-  SessionKnowledgeCandidate,
-} from '@shared/types/knowledge';
+import type { KnowledgeCardRecord, KnowledgeSpace, SessionKnowledgeCandidate } from '@shared/types/knowledge';
+import type { KnowledgeReviewRecord } from './knowledgeStateSchema';
 
 export type { SessionKnowledgeCandidate };
 

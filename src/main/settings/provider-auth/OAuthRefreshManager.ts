@@ -1,4 +1,4 @@
-import type { ProviderAccountKey } from '@shared/types/providerCapability';
+import type { ProviderAccountKey } from '../provider-catalog/providerCatalogTypes';
 
 export const DEFAULT_OAUTH_REFRESH_SKEW_MS = 60_000;
 

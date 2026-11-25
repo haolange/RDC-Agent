@@ -45,7 +45,7 @@ export interface TaskRailItem {
   waitingOn?: TaskDependencyWait[];
 }
 
-export type TraceArtifactType =
+type TraceArtifactType =
   | 'report'
   | 'generative_ui'
   | 'visual_report'
@@ -56,7 +56,7 @@ export type TraceArtifactType =
 
 export type TraceArtifactSource = 'report' | 'evidence' | 'image' | 'document' | 'data' | 'other';
 
-export type ArtifactStatus = 'draft' | 'ready' | 'failed' | 'superseded';
+type ArtifactStatus = 'draft' | 'ready' | 'failed' | 'superseded';
 
 export interface TraceArtifactRecord {
   id: string;
@@ -81,44 +81,7 @@ export interface TraceArtifactRecord {
   updatedAt: string;
 }
 
-export type ContextKind = 'capture' | 'file' | 'source' | 'capability';
-export type ContextImportance = 'normal' | 'important' | 'cited' | 'decisive';
-
-export interface TraceContextRecord {
-  id: string;
-  sessionId: string;
-  traceLaneId?: string;
-  branchId?: string;
-  kind: ContextKind;
-  label: string;
-  summary?: string;
-  importance: ContextImportance;
-  firstObservedAt: string;
-  lastObservedAt: string;
-  sourceEventIds?: string[];
-  artifactIds?: string[];
-  detailsRef?: string;
-}
-
-export interface UserRequestRevision {
-  id: string;
-  requestId: string;
-  branchId: string;
-  parentRevisionId?: string;
-  prompt: string;
-  createdAt: string;
-  resultingTraceLaneIds: string[];
-}
-
-export interface UserRequest {
-  id: string;
-  sessionId: string;
-  rootRevisionId: string;
-  activeRevisionId: string;
-  revisions: UserRequestRevision[];
-}
-
-export type RequestBranchStatus = 'active' | 'inactive' | 'abandoned' | 'completed';
+type RequestBranchStatus = 'active' | 'inactive' | 'abandoned' | 'completed';
 
 export interface RequestBranch {
   id: string;
@@ -126,13 +89,6 @@ export interface RequestBranch {
   revisionId: string;
   status: RequestBranchStatus;
   traceLaneIds: string[];
-}
-
-export interface RequestBranchGroup {
-  id: string;
-  rootRequestId: string;
-  activeBranchId: string;
-  branches: RequestBranch[];
 }
 
 export interface OutputsPanelViewModel {
@@ -161,7 +117,7 @@ export interface InvestigationArtifactsPanelViewModel {
   storeDegraded: boolean;
 }
 
-export type TaskContextResourceKind =
+type TaskContextResourceKind =
   | 'attachment'
   | 'reference'
   | 'file'
@@ -199,7 +155,7 @@ export interface RdcContextCaptureInput {
   sizeBytes: number;
 }
 
-export interface RdcContextCaptureViewModel {
+interface RdcContextCaptureViewModel {
   inputId: string;
   captureId?: string;
   captureFileId?: string;
@@ -213,7 +169,7 @@ export interface RdcContextCaptureViewModel {
   previewAvailable: boolean;
 }
 
-export interface RdcContextRuntimeViewModel {
+interface RdcContextRuntimeViewModel {
   contextId?: string;
   replaySessionId?: string;
   runtimeOwner?: string;
@@ -261,16 +217,6 @@ export interface TraceSessionResult {
   success: boolean;
   presentation?: import('./agenticTrace').AgentRunPresentation;
   error?: string;
-}
-
-export interface TraceRevisionResult extends TraceSessionResult {
-  runId?: string;
-  planId?: string;
-  branchId?: string;
-}
-
-export interface TraceBranchSwitchResult extends TraceSessionResult {
-  activeBranchId?: string;
 }
 
 /** Read-only pages of the same current Investigation selection used by the rail. */

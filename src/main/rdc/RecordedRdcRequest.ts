@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { SessionArtifactError, SESSION_ARTIFACT_MAX_FILE_BYTES, isSessionArtifactizedEnvelope } from '@shared/types/sessionArtifact';
 import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
+import { SESSION_ARTIFACT_MAX_FILE_BYTES, isSessionArtifactizedEnvelope } from '../sessions/artifacts/sessionArtifactContract';
 import { delegatedArtifactOwner } from '../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { conversationHistoryStore, sessionContextStore } from '../sessions/store/sessionStores';
@@ -67,7 +68,7 @@ export function materializeRecordedRdcRequest(
     }
   } catch { return fail('Invalid JSON output envelope.'); }
   if (!isSessionArtifactizedEnvelope(envelope) || envelope.owner !== sessionId || envelope.source.toolName !== 'shell') fail('Output owner/source is not the owning native shell.');
-  const output = envelope as import('@shared/types/sessionArtifact').SessionArtifactizedEnvelope;
+  const output = envelope as import('../sessions/artifacts/sessionArtifactContract').SessionArtifactizedEnvelope;
   const details = object(output.details);
   const content = Array.isArray(output.content) ? output.content : [];
   const block = content.find(item => object(item)?.type === 'text');

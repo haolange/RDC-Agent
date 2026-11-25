@@ -1,4 +1,4 @@
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import {
   AgentRecoveryAbortError,
   findProviderHttpError,

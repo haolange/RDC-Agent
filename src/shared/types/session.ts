@@ -6,9 +6,8 @@ import { z } from 'zod';
 import type { ConversationTurnControls } from './modelCapability';
 import type { ReplayDeviceEntry } from './device';
 
-export type MissionId = 'debugger' | 'analyzer' | 'optimizer';
+type MissionId = 'debugger' | 'analyzer' | 'optimizer';
 export type MissionKind = MissionId;
-export type RunKind = 'conversation' | 'mission';
 
 export interface ProjectInputRecord {
   inputId: string;
@@ -155,41 +154,16 @@ export interface SessionAttachmentRecord {
   createdAt: number;
 }
 
-
-export interface RunReportPaths {
+interface RunReportPaths {
   reportsDir: string;
   markdownPath?: string;
   jsonPath?: string;
   htmlPath?: string;
 }
 
-export interface CaptureInfo {
-  id: string;
-  filePath: string;
-  fileName: string;
-  fileSize: number;
-  capturedAt: number;
-  deviceId?: string;
-}
-
-export interface CaptureControl {
-  captures: CaptureInfo[];
-  activeCapture: string | null;
-  isLoading: boolean;
-}
-
-export interface SessionContext {
-  sessionId: string | null;
-  caseId: string | null;
-  startedAt: number | null;
-  deviceId: string | null;
-  replayContext: string | null;
-  captureControl: CaptureControl;
-}
-
 export type CaptureRole = 'primary' | 'baseline' | 'reference' | 'fix';
 
-export type ReplayBackendHint = 'local' | 'remote';
+type ReplayBackendHint = 'local' | 'remote';
 
 export interface CaptureDescriptor {
   id: string;
@@ -204,19 +178,6 @@ export interface CaptureDescriptor {
   contextId?: string;
 }
 
-export interface DebugSessionStartRequest {
-  projectId: string;
-  sessionId?: string;
-  turnId?: string;
-  profileId: string;
-  kind?: RunKind;
-  mission?: MissionKind;
-  goal: string;
-  captures?: CaptureDescriptor[];
-  primaryCaptureId?: string;
-  replayDevice?: ReplayDeviceEntry | null;
-}
-
 export type RunStatus =
   | 'queued'
   | 'planning'
@@ -229,7 +190,7 @@ export type RunStatus =
   | 'cancelled'
   | 'interrupted';
 
-export interface RunRecordBase {
+interface RunRecordBase {
   schemaVersion: '3';
   runId: string;
   turnId?: string;
@@ -249,11 +210,11 @@ export interface RunRecordBase {
   diagnostics?: string[];
 }
 
-export interface ConversationRunRecord extends RunRecordBase {
+interface ConversationRunRecord extends RunRecordBase {
   kind: 'conversation';
 }
 
-export interface MissionRunRecord extends RunRecordBase {
+interface MissionRunRecord extends RunRecordBase {
   kind: 'mission';
   mission: MissionKind;
 }
@@ -452,8 +413,6 @@ export interface PreparedTurnContextSummary {
   preparedAt: number;
   runtimeDiagnostics?: string[];
 }
-
-
 
 export interface RdcRuntimeContext {
   contextId: string;

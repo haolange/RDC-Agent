@@ -5,7 +5,7 @@ import { generateEventId, nowIso } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { parseJsonWith, readValidatedSync } from '../runtime/atomicFile';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../runtime/jsonl';
-import type { AgentRun, TraceEvent } from '@shared/types/agenticTrace';
+import type { AgentRun } from '@shared/types/agenticTrace';
 
 const AgentRunSchema: ZodType<AgentRun> = z.object({
   runId: z.string(),
@@ -166,4 +166,26 @@ export class TraceEventStore {
     writeJsonl(this.eventsPath(runId), events);
     this.seqCounters.set(runId, events.length > 0 ? Math.max(...events.map((e) => e.seq)) : 0);
   }
+}
+
+export type TraceEventType =
+  | 'node.created'
+  | 'node.updated'
+  | 'tool.started'
+  | 'tool.completed'
+  | 'tool.failed'
+  | 'phase.started'
+  | 'phase.completed'
+  | 'run.completed'
+  | 'run.failed'
+  | 'run.cancelled';
+
+export interface TraceEvent {
+  eventId: string;
+  runId: string;
+  seq: number;
+  timestamp: string;
+  type: TraceEventType;
+  payload: unknown;
+  visibility: 'user' | 'debug' | 'internal';
 }

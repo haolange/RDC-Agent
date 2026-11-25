@@ -1,44 +1,7 @@
 import { z, type ZodType } from 'zod';
-import {
-  CHALLENGE_KINDS,
-  CHALLENGE_STATUSES,
-  CHALLENGE_TARGET_TYPES,
-  CLAIM_DECISIONS,
-  CLAIM_KINDS,
-  CLAIM_PROJECTION_KINDS,
-  CONFIDENCE_LEVELS,
-  EPISTEMIC_STATUSES,
-  EVIDENCE_OBSERVATION_KINDS,
-  EVIDENCE_REGION_KINDS,
-  EVIDENCE_SOURCE_KINDS,
-  EVIDENCE_STRENGTHS,
-  EXPERIMENT_ACTION_CLASSES,
-  EXPERIMENT_PROTOCOLS,
-  EXPERIMENT_STATUSES,
-  INVESTIGATION_ARTIFACT_KINDS,
-  INVESTIGATION_ARTIFACT_STATUSES,
-  INVESTIGATION_MISSIONS,
-  INVESTIGATION_RECORD_TYPES,
-  INVESTIGATION_SCHEMA_NAMESPACE,
-  REPORT_CANDIDATE_STATUSES,
-  VERIFICATION_LEVELS,
-  WORLD_STATE_KINDS,
-  WORLD_STATE_VALIDITIES,
-  isCausalOrCounterfactualClaim,
-  type ArtifactSourceRef,
-  type ChallengeRecord,
-  type ClaimRecord,
-  type ClaimSet,
-  type EvidencePack,
-  type EvidenceRecord,
-  type ExperimentRecord,
-  type InvestigationArtifactManifest,
-  type InvestigationRecord,
-  type InvestigationRecordType,
-  type InvestigationReport,
-  type MissionCheckpoint,
-  type WorldState,
-} from '@shared/types/renderdocInvestigation';
+import { CHALLENGE_KINDS, CHALLENGE_STATUSES, CHALLENGE_TARGET_TYPES, CLAIM_DECISIONS, CLAIM_KINDS, CLAIM_PROJECTION_KINDS, CONFIDENCE_LEVELS, EPISTEMIC_STATUSES, EVIDENCE_OBSERVATION_KINDS, EVIDENCE_REGION_KINDS, EVIDENCE_SOURCE_KINDS, EVIDENCE_STRENGTHS, EXPERIMENT_ACTION_CLASSES, EXPERIMENT_PROTOCOLS, EXPERIMENT_STATUSES, INVESTIGATION_ARTIFACT_KINDS, INVESTIGATION_ARTIFACT_STATUSES, INVESTIGATION_MISSIONS, INVESTIGATION_RECORD_TYPES, REPORT_CANDIDATE_STATUSES, VERIFICATION_LEVELS, WORLD_STATE_KINDS, WORLD_STATE_VALIDITIES, type ArtifactSourceRef, type ChallengeRecord, type ClaimRecord, type ClaimSet, type EvidencePack, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactManifest, type InvestigationRecord, type InvestigationRecordType, type InvestigationReport, type MissionCheckpoint, type WorldState } from '@shared/types/renderdocInvestigation';
+import { INVESTIGATION_SCHEMA_NAMESPACE } from './investigationKindRegistry';
+import { isCausalOrCounterfactualClaim } from './investigationInvariants';
 
 const nonEmpty = z.string().trim().min(1);
 const hashValue = z.string().trim().min(16);

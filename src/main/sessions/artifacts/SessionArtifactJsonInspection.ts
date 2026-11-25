@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { isSessionArtifactizedEnvelope, SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from './sessionArtifactContract';
+import { isSessionArtifactizedEnvelope } from './sessionArtifactContract';
 
 export interface ArtifactJsonInspection {
   layers: Array<{ kind: 'file' | 'json-chunks' | 'json-text' | 'json-string'; pointer?: string; bytes: number; sha256: string }>;

@@ -1,12 +1,149 @@
-import type {
-  ArtifactRef,
-  AttachmentRef,
-  BaseTraceNode,
-  EvidenceRef,
-  TraceStatus,
-} from './base';
-import type { ToolResultPreview } from './previews';
-import type { ReasoningConfidence, VisibleReasoningMode } from './reasoning';
+import type { TraceStatus } from '@shared/types/agenticTrace/base';
+
+export type TraceVisibility = 'user' | 'debug' | 'internal';
+
+export interface BaseTraceNode {
+  id: string;
+  runId: string;
+  parentId?: string;
+  seq: number;
+  createdAt: string;
+  updatedAt?: string;
+  kind: string;
+  status?: TraceStatus;
+  visibility: TraceVisibility;
+  metadata?: Record<string, unknown>;
+}
+
+export type EvidenceRefKind =
+  | 'trace_node'
+  | 'tool_call'
+  | 'artifact'
+  | 'file_range'
+  | 'url'
+  | 'log'
+  | 'domain_object';
+
+export interface EvidenceRef {
+  kind: EvidenceRefKind;
+  refId: string;
+  label?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export type AttachmentKind =
+  | 'file'
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'url'
+  | 'text'
+  | 'binary';
+
+export interface AttachmentRef {
+  attachmentId: string;
+  kind: AttachmentKind;
+  name?: string;
+  uri?: string;
+  mimeType?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export type ArtifactRefKind =
+  | 'file'
+  | 'code'
+  | 'diff'
+  | 'image'
+  | 'table'
+  | 'chart'
+  | 'json'
+  | 'log'
+  | 'link'
+  | 'binary'
+  | 'domain_object';
+
+export interface ArtifactRef {
+  artifactId: string;
+  kind: ArtifactRefKind;
+  title: string;
+  uri?: string;
+  preview?: ToolResultPreview;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TextPreview {
+  kind: 'text';
+  text: string;
+}
+
+export interface CodePreview {
+  kind: 'code';
+  language?: string;
+  code: string;
+  path?: string;
+  startLine?: number;
+  endLine?: number;
+}
+
+export interface LogPreview {
+  kind: 'log';
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+}
+
+export interface DiffPreview {
+  kind: 'diff';
+  path: string;
+  unifiedDiff: string;
+}
+
+export interface ImagePreview {
+  kind: 'image';
+  url: string;
+  width?: number;
+  height?: number;
+}
+
+export interface TablePreview {
+  kind: 'table';
+  columns: string[];
+  rows: unknown[][];
+}
+
+export interface JsonPreview {
+  kind: 'json';
+  value: unknown;
+}
+
+export interface ArtifactPreview {
+  kind: 'artifact';
+  artifactId: string;
+}
+
+export type ToolResultPreview =
+  | TextPreview
+  | CodePreview
+  | LogPreview
+  | DiffPreview
+  | ImagePreview
+  | TablePreview
+  | JsonPreview
+  | ArtifactPreview;
+
+export type ReasoningConfidence = 'low' | 'medium' | 'high';
+
+export type VisibleReasoningMode =
+  | 'task_understanding'
+  | 'planning'
+  | 'intent'
+  | 'hypothesis'
+  | 'evidence_need'
+  | 'observation_summary'
+  | 'decision_update'
+  | 'next_action'
+  | 'risk_note'
+  | 'summary';
 
 export type PhaseKind =
   | 'understand'
@@ -18,18 +155,6 @@ export type PhaseKind =
   | 'verify'
   | 'summarize'
   | 'custom';
-
-export type ToolCategory =
-  | 'file'
-  | 'shell'
-  | 'code'
-  | 'browser'
-  | 'image'
-  | 'data'
-  | 'artifact'
-  | 'sub_agent'
-  | 'domain'
-  | 'unknown';
 
 export interface TaskFrameNode extends BaseTraceNode {
   kind: 'task_frame';
@@ -102,33 +227,6 @@ export interface ToolActionNode extends BaseTraceNode {
   artifacts?: ArtifactRef[];
   evidenceRefs?: EvidenceRef[];
   preview?: ToolResultPreview;
-}
-
-export interface ObservationFact {
-  label: string;
-  value: string;
-  evidenceRef?: EvidenceRef;
-}
-
-export interface ObservationNode extends BaseTraceNode {
-  kind: 'observation';
-  title: string;
-  facts: ObservationFact[];
-  summary?: string;
-  supportedHypotheses?: string[];
-  excludedHypotheses?: string[];
-}
-
-export type FindingSeverity = 'info' | 'warning' | 'error' | 'critical';
-
-export interface FindingNode extends BaseTraceNode {
-  kind: 'finding';
-  severity: FindingSeverity;
-  title: string;
-  diagnosis: string;
-  evidenceRefs: EvidenceRef[];
-  recommendation?: string;
-  confidence: ReasoningConfidence;
 }
 
 export type ArtifactNodeKind =
@@ -218,3 +316,42 @@ export type TraceNode =
   | ErrorNode
   | SubAgentNode
   | FinalResponseNode;
+
+export type ToolCategory =
+  | 'file'
+  | 'shell'
+  | 'code'
+  | 'browser'
+  | 'image'
+  | 'data'
+  | 'artifact'
+  | 'sub_agent'
+  | 'domain'
+  | 'unknown';
+
+export interface ObservationFact {
+  label: string;
+  value: string;
+  evidenceRef?: EvidenceRef;
+}
+
+export interface ObservationNode extends BaseTraceNode {
+  kind: 'observation';
+  title: string;
+  facts: ObservationFact[];
+  summary?: string;
+  supportedHypotheses?: string[];
+  excludedHypotheses?: string[];
+}
+
+export type FindingSeverity = 'info' | 'warning' | 'error' | 'critical';
+
+export interface FindingNode extends BaseTraceNode {
+  kind: 'finding';
+  severity: FindingSeverity;
+  title: string;
+  diagnosis: string;
+  evidenceRefs: EvidenceRef[];
+  recommendation?: string;
+  confidence: ReasoningConfidence;
+}

@@ -4,8 +4,8 @@ import { AppError } from '@shared/errors/appError';
  * the turn's tool map. Tool declarations live in TurnControlTools, WorkbenchTools and the tool modules.
  */
 
-import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
+import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '../tasks/taskExecutionSchemas';
 import { toolToDefinition } from '../agent/AgentTool';
 import { createToolSearchTool, getPrimitiveTools } from '../tools';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';

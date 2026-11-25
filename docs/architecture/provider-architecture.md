@@ -273,7 +273,7 @@ Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入
 
 ## 统一错误模型（Error Model）
 
-`src/shared/types/providerErrors.ts` 定义 `ProviderErrorCode` 联合类型，`src/main/agent-runtime/providers/internal/errorClassifier.ts` 实现分类逻辑：
+`src/main/agent-runtime/core/providerErrors.ts` 定义 `ProviderErrorCode` 联合类型，`src/main/agent-runtime/providers/internal/errorClassifier.ts` 实现分类逻辑：
 
 | ProviderErrorCode | 含义 | retryable |
 | --- | --- | --- |

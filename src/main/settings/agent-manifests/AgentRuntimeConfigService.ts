@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import { z } from 'zod';
-import { MCP_TRANSPORTS, type MCPTransport } from '@shared/types/mcp';
+import { MCP_TRANSPORTS } from '@shared/types/mcp';
 import { TOP_LEVEL_AGENT_IDS } from '@shared/types/agent';
 import { isSkillVisibleToProfile } from '@shared/constants/canonicalSkills';
 import { appPathService } from '../../runtime/AppPathService';
@@ -13,12 +13,11 @@ import {
   mcpUntrustedReason,
   projectOverridesUserExecutable,
 } from '../settings-core/McpTrustService';
-import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata, SkillSelectionProjection } from '@shared/types/rdcRuntime';
-import type {
-  AgentRuntimeMcpDescriptor,
-  AgentRuntimeSkillDescriptor,
-} from '@shared/types/agentRuntime';
-
+import type { MCPTransport } from './agentRuntimeTypes';
+import type { SkillMetadata, SkillSelectionProjection } from '@shared/types/rdcRuntime';
+import type { ScopedResourceCandidate } from '../../runtime/scopedResourceTypes';
+import type { SkillLoadResult } from './agentRuntimeTypes';
+import type { AgentRuntimeMcpDescriptor, AgentRuntimeSkillDescriptor } from './agentRuntimeTypes';
 
 const toRuntimeId = (value: string, fallback = 'custom'): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;

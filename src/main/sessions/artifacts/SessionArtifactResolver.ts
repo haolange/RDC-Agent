@@ -5,29 +5,14 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  ARTIFACT_READ_MAX_OUTPUT_BYTES,
-  ARTIFACT_READ_MAX_OUTPUT_LINES,
-  formatSessionArtifactUri,
-  isSessionArtifactizedEnvelope,
-  parseSessionArtifactUri,
-  SESSION_ARTIFACT_ALLOWED_MIME_SET,
-  SESSION_ARTIFACT_CATEGORIES,
-  SESSION_ARTIFACT_MAX_FILE_BYTES,
-  SESSION_ARTIFACT_MAX_IMAGE_BYTES,
-  SESSION_ARTIFACT_MAX_SESSION_BYTES,
-  SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES,
-  SESSION_ARTIFACT_ROOT_DIR,
-  SessionArtifactError,
-  type ParsedSessionArtifactUri,
-  type SessionArtifactCategory,
-  type SessionArtifactSourceRef,
-} from '@shared/types/sessionArtifact';
 import { generateShortId } from '@shared/utils/id';
 import { normalizeSha256, sha256Hex } from '../../runtime/contentHash';
 import { StorageIo } from '../../runtime/StorageIo';
 import { sessionRecordStore } from '../store/sessionStores';
 import { renameWithRetrySync } from '../../platform/fileRename';
+import { parseSessionArtifactUri, SessionArtifactError } from './sessionArtifactContract';
+import { SESSION_ARTIFACT_CATEGORIES } from './sessionArtifactContract';
+import { ARTIFACT_READ_MAX_OUTPUT_BYTES, ARTIFACT_READ_MAX_OUTPUT_LINES, formatSessionArtifactUri, isSessionArtifactizedEnvelope, SESSION_ARTIFACT_ALLOWED_MIME_SET, SESSION_ARTIFACT_MAX_FILE_BYTES, SESSION_ARTIFACT_MAX_IMAGE_BYTES, SESSION_ARTIFACT_MAX_SESSION_BYTES, SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES, SESSION_ARTIFACT_ROOT_DIR } from './sessionArtifactContract';
 import { inspectArtifactJson, readArtifactJsonText, readDefaultToolResultText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';
 import { searchArtifactText, type ArtifactTextSearch } from './SessionArtifactTextSearch';
 import {
@@ -40,6 +25,8 @@ import {
   type SessionArtifactQuotaSnapshot,
   type SessionArtifactReservation,
 } from './SessionArtifactQuota';
+import type { ParsedSessionArtifactUri, SessionArtifactCategory } from './sessionArtifactContract';
+import type { SessionArtifactSourceRef } from './sessionArtifactContract';
 
 const EXECUTABLE_EXTENSIONS = new Set([
   '.exe', '.dll', '.so', '.dylib', '.bin', '.com', '.msi', '.bat', '.cmd',
@@ -241,7 +228,6 @@ function looksLikeUtf8Text(bytes: Buffer): boolean {
     return false;
   }
 }
-
 
 function walkFiles(root: string, visitor: (filePath: string, stat: fs.Stats) => void): void {
   if (!fs.existsSync(root)) {

@@ -25,7 +25,7 @@ import { appPathService } from '../../runtime/AppPathService';
 import { AgentPermissionPolicyService, registerRdcShellBaseline } from './AgentPermissionPolicy';
 
 registerRdcShellBaseline(evaluateRdcShellBaseline);
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from '../../rdc/RdcOperationCatalog';
 import type { ToolCall } from '@shared/types/tool';
 import type { AgentTool, AgentToolSpec } from '../agent/AgentTool';
 import type { AgentPermissionSettings, AgentPermissionMode } from '@shared/types/settings';
@@ -827,7 +827,6 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
     expect(decision.temporaryPathRoots).not.toContain(knowledgeRoot);
   });
 });
-
 
 describe('file routing across permission modes', () => {
   it.each(['git status; git reset --hard', 'git status && git reset --hard', 'git status & git reset --hard',

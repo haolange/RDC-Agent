@@ -1,41 +1,18 @@
-import type {
-  ConversationTurnControls,
-  ReasoningControl,
-  ResolvedReasoningSelection,
-} from './modelCapability';
-import type {
-  ProviderSurfaceManifest,
-} from '../provider-catalog/catalogManifestSchema';
+import type { ReasoningControl, ResolvedReasoningSelection } from './modelCapability';
 import type { ProviderAdapterId } from '../provider-catalog/implementationRegistry';
-import type { JsonObject, JsonPrimitive, JsonValue } from '../utils/jsonValue';
-import type {
-  BooleanControlDefinition,
-  ExecutionBinding,
-  ModelCost,
-  ModelManifest,
-  ModelModeAction as CatalogModelModeAction,
-  ModelPresencePolicy,
-  ProviderContractBundle,
-} from '../provider-catalog/modelManifestSchema';
-import type {
-  LlmProviderLifecycleStatus,
-  LlmProviderProtocol,
-} from './settings';
+import type { JsonObject, JsonValue } from '../utils/jsonValue';
+import type { BooleanControlDefinition, ExecutionBinding, ModelCost, ModelPresencePolicy, ProviderContractBundle } from '../provider-catalog/modelManifestSchema';
+import type { LlmProviderProtocol } from './settings';
 
 export type EntitlementState = 'granted' | 'denied' | 'unknown';
 export type EffectiveAvailability = 'available' | 'unavailable' | 'unknown';
-
-export interface ProviderAccountKey {
-  providerId: string;
-  accountId: string;
-}
 
 export type CapabilityState =
   | { state: 'supported' }
   | { state: 'unsupported'; reason?: string }
   | { state: 'unknown' };
 
-export type TierActivation =
+type TierActivation =
   | { kind: 'implicit' }
   | { kind: 'header'; headers: Record<string, string> }
   | { kind: 'body'; patch: JsonObject };
@@ -80,11 +57,9 @@ export interface ModelSelection {
 }
 
 export type ControlDefinition = BooleanControlDefinition;
-export type ModelModeAction = CatalogModelModeAction;
 export type ExecutionBindingDefinition = ExecutionBinding;
-export type ModelPresence = ModelPresencePolicy;
 
-export type ResolvedControlState =
+type ResolvedControlState =
   | 'selectable'
   | 'fixed'
   | 'blocked'
@@ -250,7 +225,7 @@ export interface EffectiveModelUpdate {
 export type ProviderStateMode = 'local-stateless' | 'provider-managed';
 export type ToolLoopPhase = 'top-level' | 'assistant-tool-call' | 'tool-result' | 'terminal';
 
-export interface StatePlan {
+interface StatePlan {
   mode: ProviderStateMode;
   carrier: ProviderContractBundle['state']['carrier'];
   store: boolean;
@@ -266,7 +241,7 @@ export interface CachePlan {
   ttl: ProviderContractBundle['cache']['ttl'];
 }
 
-export interface ToolLoopPlan {
+interface ToolLoopPlan {
   phase: ToolLoopPhase;
   pinned: true;
   artifactPolicy: ProviderContractBundle['toolLoop']['artifactPolicy'];
@@ -274,7 +249,7 @@ export interface ToolLoopPlan {
   ordering: ProviderContractBundle['toolLoop']['ordering'];
 }
 
-export interface StreamingPlan {
+interface StreamingPlan {
   transport: ProviderContractBundle['streaming']['transport'];
   outputIdentity: ProviderContractBundle['streaming']['outputIdentity'];
   usage: ProviderContractBundle['streaming']['usage'];
@@ -359,72 +334,3 @@ export type RequestPlanningErrorCode =
   | 'NO_USABLE_CONTEXT_TIER'
   | 'PLAN_CONFLICT'
   | 'CONSTRAINT_REJECTED';
-
-export interface ModelRouteRecommendation {
-  providerId: string;
-  modelId: string;
-  label: string;
-}
-
-export type RequestPlanningResult =
-  | {
-      ok: true;
-      plan: RequestPlan;
-      controls: ConversationTurnControls;
-      warnings: string[];
-    }
-  | {
-      ok: false;
-      code: RequestPlanningErrorCode;
-      message: string;
-      controls: ConversationTurnControls;
-      recommendations?: ModelRouteRecommendation[];
-    };
-
-export type ProviderLifecycleStatus = LlmProviderLifecycleStatus;
-export type ProviderSurfaceAuthMode = 'none' | 'api-key' | 'oauth' | 'device' | 'environment' | 'local';
-
-export interface ProviderAvailability {
-  state: EffectiveAvailability;
-  reason?: string;
-}
-
-export interface DiscoveryFieldMapping {
-  id: string;
-  label?: string;
-  aliases?: string;
-  contextWindow?: string;
-  contextWindowKind?: 'prompt' | 'total';
-  maxOutputTokens?: string;
-  protocol?: string;
-  modality?: string;
-  toolCalling?: DiscoveryCapabilityMapping;
-  visionInput?: DiscoveryCapabilityMapping;
-  structuredOutput?: DiscoveryCapabilityMapping;
-}
-
-export interface DiscoveryCapabilityMapping {
-  path: string;
-  equals?: JsonPrimitive;
-  includes?: JsonPrimitive;
-}
-
-export interface DiscoveryRouteRule {
-  allowPatterns: string[];
-  protocol: LlmProviderProtocol;
-  baseUrl?: string;
-  headers?: Record<string, string>;
-}
-
-export interface DiscoveryAdmission {
-  allowPatterns?: string[];
-  denyPatterns?: string[];
-  allowedModalities?: string[];
-  requireContextWindow?: boolean;
-}
-
-export type DiscoveryStrategy = ProviderSurfaceManifest['discovery']['strategy'];
-export type CatalogModelDefinition = ModelManifest;
-export type ProviderSurfaceRoute = ProviderSurfaceManifest['routes'][number];
-export type ProviderProtocolOverride = ProviderSurfaceManifest['protocolOverrides'][number];
-export type ProviderSurfaceDefinition = ProviderSurfaceManifest;

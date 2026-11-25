@@ -6,7 +6,7 @@ import { safeResolvePath } from '../runtime/toolFiles';
 import { assertFileWriteBoundary } from '../runtime/FileOperationBoundary';
 import { operationFingerprint } from './RdcOperationCatalog';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from './RdcRuntimeContextRegistry';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 const allowedEffects = new Set(['replay_position', 'replay_position_temporary', 'artifact_write', 'context_metadata', 'shader_debug', 'shader_replacement']);

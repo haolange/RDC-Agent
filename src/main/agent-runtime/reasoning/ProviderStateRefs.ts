@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import type { ProviderStateRef } from '@shared/types/reasoning';
+import type { ProviderStateRef } from '../core/types';
 import type { Context } from '../core/types';
 
 export type ProviderStateReuseReason =

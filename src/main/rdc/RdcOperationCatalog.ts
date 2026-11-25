@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
-import type { RdcOperationDefinition } from '@shared/types/tool';
 
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
@@ -58,4 +57,15 @@ export function validateApplicationOperations(definitions: RdcOperationDefinitio
       throw new AppError('RDC_UPGRADE_REQUIRED', `application operation ${name} is missing or has an incompatible contract. Update RDC-Tool and RDC-Agent together.`);
     }
   }
+}
+
+export interface RdcOperationDefinition extends Record<string, unknown> {
+  name: string;
+  namespace: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+  scope: 'global' | 'context' | 'replay' | 'capture';
+  effects: string[];
+  evidence_kind: 'measurement' | 'intervention' | 'rollback' | null;
+  path_inputs: Array<{ name: string; access: 'read' | 'write' | 'read_directory' }>;
 }

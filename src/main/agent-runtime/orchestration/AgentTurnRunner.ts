@@ -51,7 +51,7 @@ import type {
 import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type {
   Message,
   StreamOptions,

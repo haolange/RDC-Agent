@@ -2,10 +2,10 @@ import path from 'path';
 import { z } from 'zod';
 import { AppError, type AppErrorOptions } from '@shared/errors/appError';
 import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
-import { isSafeAgentProfileId } from '@shared/types/agent';
 import { isHexColor } from '@shared/theme/color';
 import { THEME_PRESET_IDS } from '@shared/theme/presets';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import { isSafeAgentProfileId } from '../agent-manifests/agentProfileId';
 import type {
   AgentModelSettings,
   AgentRuntimeSettings,

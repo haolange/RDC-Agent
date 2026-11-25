@@ -7,7 +7,8 @@ import {
 } from '../runtime/fileIdentity';
 import { hashScopedResource } from '../runtime/ScopedResourceResolver';
 import { isNodeCommand, resolveHookArg, resolveHookCommand, resolveHookCwd } from './hookResolve';
-import type { HookDefinition, ResourceScope } from '@shared/types/rdcRuntime';
+import type { ResourceScope } from '@shared/types/rdcRuntime';
+import type { HookDefinition } from './hookTypes';
 
 export interface ExecutableIdentity {
   command: string;

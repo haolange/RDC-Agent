@@ -5,8 +5,8 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { AppError } from '@shared/errors/appError';
-import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
 import { expectMonotonicProgress } from '../testing/knowledgeProgress';
+import { KNOWLEDGE_PACKAGE_SCHEMA } from './knowledgePackage';
 import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
 import { createDefaultExportDependencies, KnowledgeExportService, isExportable, toPackageCard } from './KnowledgeExportService';
 import {

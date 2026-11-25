@@ -40,8 +40,9 @@ vi.mock('./handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompat
 
 import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
 import { runPlanApprovalTransaction, type PlanApprovalDeps, type PlanApprovalInput } from './PlanApprovalTransaction';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
-import type { ConversationPlanReview, PlanReviewStateDocument } from '@shared/types/planReview';
+import type { ExecutionOffer } from '../../sessions/run/executionOffer';
+import type { ConversationPlanReview } from '@shared/types/planReview';
+import type { PlanReviewStateDocument } from '../../sessions/run/PlanReviewStateStore';
 import type { SessionRecord } from '@shared/types/session';
 
 const hash = 'a'.repeat(64);

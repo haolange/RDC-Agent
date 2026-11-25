@@ -1,9 +1,10 @@
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
-import { formatInvestigationContentHash, type ChallengeRecord, type ClaimRecord, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationArtifactManifest, type InvestigationRecord, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { type ChallengeRecord, type ClaimRecord, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationArtifactManifest, type InvestigationRecord, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
 import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
+import { formatInvestigationContentHash } from './investigationHash';
 import { readCompleteInvestigationArtifact } from './investigationArtifactRead';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 import { InvestigationError, isInvestigationStoreDegraded, toInvestigationError } from './investigationErrors';

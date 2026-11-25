@@ -1,5 +1,5 @@
 import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
-import { isSafeAgentProfileId } from '@shared/types/agent';
+import { isSafeAgentProfileId } from '../agent-manifests/agentProfileId';
 import { appPathService } from '../../runtime/AppPathService';
 import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import { resolveRegisteredProjectRoot } from './resolveRegisteredProjectRoot';

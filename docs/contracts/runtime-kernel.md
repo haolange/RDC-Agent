@@ -139,7 +139,7 @@ Provider 请求失败或本地响应提交失败时，本次尚未交给工具�
 
 ## Provider 错误模型契约
 
-`src/shared/types/providerErrors.ts` 定义统一错误分类：
+`src/main/agent-runtime/core/providerErrors.ts` 定义统一错误分类：
 
 ```typescript
 type ProviderErrorCode =

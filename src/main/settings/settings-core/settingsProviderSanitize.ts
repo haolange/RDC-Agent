@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { isReasoningSelection } from '@shared/types/modelCapability';
-import { TOP_LEVEL_AGENT_IDS, isSafeAgentProfileId } from '@shared/types/agent';
+import { TOP_LEVEL_AGENT_IDS } from '@shared/types/agent';
+import { isSafeAgentProfileId } from '../agent-manifests/agentProfileId';
 import {
   getProviderAuthModeAvailability,
   getProviderCatalogModelSummaries,

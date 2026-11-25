@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 const definition = { evidence_kind: 'measurement' } as RdcOperationDefinition;
 const context = {} as ToolExecutionContext;

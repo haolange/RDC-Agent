@@ -59,7 +59,6 @@ const PENDING_DIRECTORIES = new Set([
   'src/renderer/stores',
   'src/renderer/ui',
   'src/renderer/ui/ContextMenu',
-  'src/shared/types',
   'src/shared/utils',
 ]);
 

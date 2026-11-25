@@ -2,9 +2,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { directoryLinkType } from '../../platform/paths';
 import { StorageIo } from '../../runtime/StorageIo';
+import { SessionArtifactError } from './sessionArtifactContract';
 import { SessionArtifactResolver } from './SessionArtifactResolver';
 import { SESSION_ARTIFACT_QUOTA_FILENAME, resetSessionArtifactQuotaLedger } from './SessionArtifactQuota';
 
@@ -501,7 +501,6 @@ function listTemps(sessionPath: string): string[] {
   }
   return found;
 }
-
 
 it('preserves original image bytes beyond the text-artifact limit and retains quota enforcement', () => {
   const a = makeSession('large-image');

@@ -10,7 +10,7 @@ export interface ReasoningSummary {
   createdAt: string;
 }
 
-export interface RunRecoveryState {
+interface RunRecoveryState {
   restartedFromRunId?: string;
   recoveredAt?: string;
   recoveryReason?: string;
@@ -27,24 +27,10 @@ export interface WorkflowState {
   lastUpdated: string;
 }
 
-export interface Blocker {
+interface Blocker {
   code: string;
   reason: string;
   refs: string[];
   detectedAt: string;
   resolvedAt?: string;
-}
-
-export type WorkflowStateView = WorkflowState;
-
-export interface Report {
-  title: string;
-  summary: string;
-  rootCause: string;
-  fixDescription: string;
-  evidenceSummary: string[];
-  recommendations: string[];
-  confidence: number;
-  generatedAt: string;
-  curatorAgentId: string;
 }

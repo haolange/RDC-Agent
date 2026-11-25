@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
 import { generateEventId } from '@shared/utils/id';
-import { DELEGATION_CAPSULE_JSON_SCHEMA, parseDelegationCapsule, type DelegationCapsule } from '@shared/types/delegationCapsule';
+import { DELEGATION_CAPSULE_JSON_SCHEMA } from '@shared/types/delegationCapsule';
 import { AppError } from '@shared/errors/appError';
 import { delegationCapsuleArtifactRefs } from '../prompt/DelegationCapsuleCompiler';
 import { TaskRegistry, createSessionTaskStore, registerTaskExecutionCancellationOwner, type TaskExecutionRecord, getDelegatedTaskScope } from '../tasks';
+import { parseDelegationCapsule } from './delegationCapsule';
 import { normalizeSubagentResult, persistSubagentResult, projectSubagentResult } from './SubagentResultEnvelope';
 import { bindTaskRootBudget } from './TaskRootBudget';
 import { registerPolicyBudgetObserver } from './DelegationBudget';
+import type { DelegationCapsule } from './delegationCapsule';
 import type { TurnHandle } from './TurnCoordinator';
 import type { ActiveTurnLookup } from './orchestratorTypes';
 import type { BackgroundSubagentStart } from './BackgroundSubagentService';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { authorizeRdcOperation, validateRdcArguments } from './RdcOperationPolicy';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
 function definition(patch: Partial<RdcOperationDefinition> = {}): RdcOperationDefinition { return {
   name: 'rd.texture.query', namespace: 'texture', description: '', scope: 'replay', effects: [], evidence_kind: null, path_inputs: [], prerequisites: [],
@@ -47,7 +47,6 @@ describe('capability execution policy', () => {
     expect(() => authorizeRdcOperation(vfs.name, { path: '/textures/../context' }, context(vfs), 'replay')).toThrow(/virtual/);
   });
 });
-
 
 it('injects the owning capture and rejects user identity overrides', () => {
   const item = definition({ name: 'rd.capture.get_thumbnail', namespace: 'capture', scope: 'capture',

@@ -4,8 +4,8 @@
  * the user's review. Every failure becomes an error tool result for the model.
  */
 
-import { isHandoffContinueAction } from '@shared/types/planReview';
 import { AppError } from '@shared/errors/appError';
+import { isHandoffContinueAction } from '../interactions/handoffSurface';
 import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
 import { assertDeclaredHandoffForPlan } from '../interactions/applyDeclaredHandoff';
 import { composePlanMarkdown, planArtifactWriter, sectionsFromMarkdown } from '../../sessions/run/sessionPlanArtifact';

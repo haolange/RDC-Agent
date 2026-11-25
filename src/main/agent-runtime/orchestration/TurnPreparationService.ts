@@ -54,7 +54,8 @@ import {
   type PreparedAgentTurnContext,
   type RuntimeToolResolver,
 } from './orchestratorTypes';
-import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
@@ -142,7 +143,7 @@ export class TurnPreparationService {
     activeBranchId?: string | null;
     signal?: AbortSignal;
     excludeRdcLeaseTools?: boolean;
-    frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
+    frozenDelegationCapsule?: import('./delegationCapsule').DelegationCapsule;
     subagentDepth?: number;
     inheritedMaxChildDepth?: number;
     excludeSubagent?: boolean;

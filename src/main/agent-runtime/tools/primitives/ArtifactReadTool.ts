@@ -1,9 +1,6 @@
-import {
-  ARTIFACT_TOOL_PAGE_BYTES,
-  ARTIFACT_READ_MAX_OUTPUT_LINES,
-  SessionArtifactError,
-} from '@shared/types/sessionArtifact';
 import { AppError } from '@shared/errors/appError';
+import { SessionArtifactError } from '../../../sessions/artifacts/sessionArtifactContract';
+import { ARTIFACT_TOOL_PAGE_BYTES, ARTIFACT_READ_MAX_OUTPUT_LINES } from '../../../sessions/artifacts/sessionArtifactContract';
 import { resolveDelegatedArtifactRead } from '../../../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver } from '../../../sessions/artifacts/SessionArtifactResolver';
 import { ARTIFACT_TEXT_SEARCH_MAX_MATCHES, type ArtifactTextSearch } from '../../../sessions/artifacts/SessionArtifactTextSearch';

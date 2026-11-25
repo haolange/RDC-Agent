@@ -133,7 +133,7 @@ export type SessionOpenResult =
   }
   | { success: false; error: string };
 
-export interface MemorySummary {
+interface MemorySummary {
   scope: 'user' | 'project';
   /** Canonical storage key; use displayName for user-facing text. */
   name: string;
@@ -144,7 +144,7 @@ export interface MemorySummary {
 }
 
 /** Memory 面板详情（含完整正文）。 */
-export interface MemoryDetail extends MemorySummary {
+interface MemoryDetail extends MemorySummary {
   content: string;
   tags?: string[];
   createdAt: number;
@@ -163,7 +163,7 @@ export interface MemoryWriteRequest {
 }
 
 /** Main 发放的敏感操作 approvalToken 请求。 */
-export interface MemoryApprovalTokenRequest {
+interface MemoryApprovalTokenRequest {
   action: 'memory.write' | 'memory.delete';
   scope: 'user' | 'project';
   name?: string;

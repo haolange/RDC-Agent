@@ -1,13 +1,25 @@
 import * as path from 'node:path';
 import { z } from 'zod';
-import {
-  PLAN_REVIEW_STATE_SCHEMA,
-  type PlanReviewStateDocument,
-} from '@shared/types/planReview';
 import { generateShortId, nowMs } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { executionOfferStore, sessionRecordStore, storageIo } from '../store/sessionStores';
 import type { StorageIo } from '../../runtime/StorageIo';
+import type { PlanReviewHandoffIdentity, PlanReviewStatus } from '@shared/types/planReview';
+
+export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
+
+export interface PlanReviewStateDocument {
+  schemaVersion: typeof PLAN_REVIEW_STATE_SCHEMA;
+  planId: string;
+  /** Absence means ownership is unproven; never infer it from the active session. */
+  ownerTurnId?: string;
+  revision: number;
+  status: PlanReviewStatus;
+  approvedHash?: string;
+  frozenUri?: string;
+  approvedHandoff?: PlanReviewHandoffIdentity;
+  updatedAt: number;
+}
 
 const planReviewStateSchema = z.object({
   schemaVersion: z.literal(PLAN_REVIEW_STATE_SCHEMA),

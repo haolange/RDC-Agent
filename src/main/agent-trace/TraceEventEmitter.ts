@@ -3,19 +3,15 @@ import { generateEventId, nowIso } from '@shared/utils/id';
 import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
 import { toolResultNormalizer } from './ToolResultNormalizer';
 import type { ActionEvent } from '@shared/types/evidence';
-import type {
-  TraceEvent,
-  TaskFrameNode,
-  ThoughtSummaryNode,
-  ToolActionNode,
-  SubAgentNode,
-  FinalResponseNode,
-  ObservationNode,
-  TraceStatus,
-  VisibleReasoningPacket,
-} from '@shared/types/agenticTrace';
+import type { TraceStatus } from '@shared/types/agenticTrace';
+import type { TraceEvent } from './TraceEventStore';
+import type { ObservationNode } from './traceNodes';
+import type { TaskFrameNode, ThoughtSummaryNode, ToolActionNode, SubAgentNode, FinalResponseNode } from './traceNodes';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { TraceEventStore } from './TraceEventStore';
+import type { EvidenceRef } from './traceNodes';
+import type { ReasoningConfidence } from './traceNodes';
+import type { VisibleReasoningMode } from './traceNodes';
 
 const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
   if (typeof value === 'string') return value;
@@ -154,7 +150,6 @@ export class TraceEventEmitter {
     return this.store.append(runId, 'node.created', node);
   }
 
-
   emitFinalResponse(runId: string, content: string, format: 'markdown' | 'plain' = 'markdown'): TraceEvent {
     const node: FinalResponseNode = {
       id: generateEventId('final'),
@@ -185,4 +180,14 @@ export class TraceEventEmitter {
     return this.store.append(runId, 'node.created', node);
   }
 
+}
+
+export interface VisibleReasoningPacket {
+  mode: VisibleReasoningMode;
+  title?: string;
+  content: string;
+  hypothesis?: string;
+  evidenceRefs?: EvidenceRef[];
+  nextAction?: string;
+  confidence?: ReasoningConfidence;
 }

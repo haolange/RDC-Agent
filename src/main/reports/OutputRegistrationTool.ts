@@ -4,7 +4,7 @@ import { generateEventId, nowIso } from '@shared/utils/id';
 import { runScopedStore } from '../sessions/store/RunScopedStore';
 import { safeResolvePath } from '../runtime/toolFiles';
 import { artifactStore } from './ArtifactStore';
-import type { ArtifactKind, ArtifactRecord } from '@shared/types/harness';
+import type { ArtifactKind, ArtifactRecord } from './artifactRecord';
 import type { AgentTool } from '../agent-runtime/agent/AgentTool';
 
 const OUTPUT_KINDS: ArtifactKind[] = ['report', 'screenshot', 'trace', 'shader', 'log', 'data', 'note'];

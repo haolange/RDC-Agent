@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { describeMaterialContext } from '@shared/types/materialContext';
 import { AppError } from '@shared/errors/appError';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
@@ -24,6 +23,7 @@ import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { SessionAttachmentKind, SessionAttachmentRecord } from '@shared/types/session';
 import type { UserMessage } from '../core/types';
 import type { FrozenAttachmentManifestEntry } from '../orchestration/orchestratorTypes';
+import type { MaterialContext } from '@shared/types/materialContext';
 
 export {
   MAX_ATTACHMENT_BYTES_PER_FILE,
@@ -379,4 +379,8 @@ export function attachmentManifestFingerprintOf(
     layer: entry.layer,
     kind: entry.kind,
   })));
+}
+
+export function describeMaterialContext(context: MaterialContext): string {
+  return `User-supplied material context (not verified observations or authorization): ${JSON.stringify(context)}. Region coordinates are fractions of the original image; preserve the original. Comparison conditions must be verified before conclusions.`;
 }

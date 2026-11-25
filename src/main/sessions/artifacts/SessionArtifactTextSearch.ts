@@ -1,4 +1,4 @@
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from './sessionArtifactContract';
 
 export const ARTIFACT_TEXT_SEARCH_MAX_MATCHES = 64;
 export interface ArtifactTextSearch {

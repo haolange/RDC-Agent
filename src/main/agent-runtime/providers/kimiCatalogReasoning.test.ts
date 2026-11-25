@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { clampReasoningSelection, createReasoningControl } from '@shared/types/modelCapability';
+import { clampReasoningSelection } from '@shared/types/modelCapability';
+import { createReasoningControl } from '../../settings/provider-catalog/RequestPlanner';
 import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
 import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import { applyAnthropicReasoning, applyOpenAiCompatibleReasoning } from './reasoningWire';

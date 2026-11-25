@@ -1,6 +1,6 @@
 import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
-import { isSafeAgentProfileId } from '@shared/types/agent';
+import { isSafeAgentProfileId } from '../agent-manifests/agentProfileId';
 import type { AgentModelBinding, AgentModelSettings } from '@shared/types/settings';
 
 function sanitizeBinding(raw: unknown, fixes: string[], label: string): AgentModelBinding {

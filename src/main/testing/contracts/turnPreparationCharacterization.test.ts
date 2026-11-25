@@ -26,9 +26,9 @@ vi.mock('../../sessions/run/handoffSkills', async (importOriginal) => ({
   approvedExecutionOfferForAgent: () => offer.current,
 }));
 
-import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
-import { renderInvestigationPlanContract } from '@shared/types/planInvestigation';
 import { agentAccessCeiling } from '@shared/types/agentManifest';
+import { EXECUTION_OFFER_SCHEMA } from '../../sessions/run/executionOffer';
+import { renderInvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import { getLoadedProviderSurface, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { parseOllamaInstalledModels } from '../../settings/provider-catalog/LiveProviderCatalogParsers';
 import {
@@ -187,7 +187,6 @@ describe('turn preparation characterization', () => {
     },
   );
 });
-
 
 describe('turn preparation budget', () => {
   /**

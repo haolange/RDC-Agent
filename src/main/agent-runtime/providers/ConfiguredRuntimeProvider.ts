@@ -30,7 +30,7 @@ import type {
 } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { LLMProviderConfig } from '@shared/types/llm';
+import type { LLMProviderConfig } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 
 const CONFIGURED_PROVIDER_API = 'rdc-agent-configured-provider';
 

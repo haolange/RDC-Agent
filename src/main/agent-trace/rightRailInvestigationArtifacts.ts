@@ -1,11 +1,5 @@
-import {
-  INVESTIGATION_MISSIONS,
-  bareInvestigationHash,
-  formatInvestigationContentHash,
-  type InvestigationArtifactManifest,
-  type InvestigationMission,
-  type InvestigationRecordType,
-} from '@shared/types/renderdocInvestigation';
+import { INVESTIGATION_MISSIONS, bareInvestigationHash, type InvestigationArtifactManifest, type InvestigationMission, type InvestigationRecordType } from '@shared/types/renderdocInvestigation';
+import { formatInvestigationContentHash } from '../investigation/investigationHash';
 import { hashesEqual } from '../investigation/investigationHash';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { collectSupersedeChain, type InvestigationIndexEntry } from '../investigation/investigationRecordKeys';

@@ -2,7 +2,7 @@
 
 | Domain | Main files | Shared contract | IPC/API surface | Renderer surface | Verification |
 | --- | --- | --- | --- | --- | --- |
-| Agentic Trace | `src/main/agent-trace/*`, `src/main/agent-runtime/orchestration/TraceStateStore.ts` | `AgentRunPresentation`, `TraceEvent`, `TraceNode`, `TaskRailItem`, `TraceArtifactRecord`, `TraceContextRecord` | `trace:getProjection`, `trace:projectionChanged` | `features/right-rail/SessionRightRail`, Work Process transcript | typecheck, qa-ids, browser-session smoke |
+| Agentic Trace | `src/main/agent-trace/*`, `src/main/agent-runtime/orchestration/TraceStateStore.ts` | `AgentRunPresentation`, `TaskRailItem`, `TraceArtifactRecord`（`TraceEvent` / `TraceNode` 只在 main：`src/main/agent-trace/`） | `trace:getProjection`, `trace:projectionChanged` | `features/right-rail/SessionRightRail`, Work Process transcript | typecheck, qa-ids, browser-session smoke |
 | Agent workbench | `src/main/agent-runtime/orchestration/AgentOrchestrator.ts`（façade；协作者由组合根 `src/main/agent-runtime/orchestration/agentRuntimeRoot.ts` 构造）, `src/main/settings/agent-manifests/AgentManifestService.ts`, `src/main/agent-runtime/*` | `.agent.md`, `AgentId`, `AgentManifestDefinition`, `WorkflowState`, `BUILTIN_AGENT_TOOL_IDS` / tool tokens | `conversation:*`, `session:applyDeclaredHandoff`, `workflow:stop`, `workflow:getState` | Composer, `features/transcript`, Settings > Agents, `features/right-rail` | typecheck, settings-agents, tool-system, browser smoke |
 | RDC runtime boundary | `src/main/rdc/RdcCliInvokerService.ts`, `src/main/tools/ShellInvocationService.ts`, `src/main/rdc/RdcSessionRuntime.ts` | `RdcRuntimeContext`, `OpenedCaptureState`, `RdcTurnBinding` | `capture:openProjectInput`, `context:get`, `capture:refreshFrame`, `tool:verifyInstallation` | Settings > Tools, capture library, session context, Activity | typecheck, shell/browser smoke |
 | Settings/provider system | `src/main/settings/settings-core`, `provider-catalog`, `provider-auth`, `agent-manifests` | `AppSettings`, provider catalog, routes, `ToolingSettings` | settings IPC | Settings modal | typecheck, provider-system tests |
@@ -17,7 +17,7 @@
 | Tasks | `src/main/agent-runtime/tasks/*`（`TaskRegistry` 生命周期变更，基于 `TaskExecutionLedger` 执行记账与 `TaskRegistryCore` 记录读取、依赖图与完成校验；`TaskTools`, `taskProjection`） | `TaskRailItem` | `task_*` 工具、trace 投影 | Right Rail Tasks、Tasks 历史卡 | typecheck, agent-runtime |
 | Provider adapters | `src/main/agent-runtime/providers/*` | `RequestPlan`, `EffectiveModel` | 无直接 IPC | 无 | typecheck, provider-system tests（见 `provider-architecture.md`） |
 | Browser app bridge | `src/main/browserAppBridge/*` | `src/shared/renderer-api/` manifest | localhost HTTP/SSE | Browser 路径同一 renderer | `bridgeSecurity.test.ts`（见 `browser-qa-surface.md`） |
-| Reports/evidence | `src/main/reports/*` | `ArtifactRecord`, `ActionEvent`, diagnostics | `evidence:getChain`, `evidence:eventAdded` | Activity, artifacts, trace cards | typecheck |
+| Reports/evidence | `src/main/reports/*` | `ActionEvent`, diagnostics（`ArtifactRecord` 只在 main：`src/main/reports/artifactRecord.ts`） | `evidence:getChain`, `evidence:eventAdded` | Activity, artifacts, trace cards | typecheck |
 | Host platform | `src/main/platform/*`（`host`、`paths`、`process`、`shell`、`secrets`、`rdcLayout`） | 无跨层类型 | 无 IPC；渲染层平台信息只经 `src/preload/index.ts` | `createRendererApi` 的 `isMac` / `isWindows` / `isLinux` | `check:host-platform`、`src/main/platform/*.test.ts`（见 `host-platform.md`） |
 
 Rules:

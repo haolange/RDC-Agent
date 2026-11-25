@@ -44,7 +44,7 @@ const FORBIDDEN = {
   coldDataKebab: token('cold', '-data'),
 };
 
-const HARNESS_REL = 'src/shared/types/harness.ts';
+const HARNESS_REL = 'src/main/reports/artifactRecord.ts';
 
 const walkFiles = (relativeRoot) => {
   const root = path.join(repoRoot, relativeRoot);
@@ -167,7 +167,6 @@ const collectPathHits = (relativePath) => (
 
 const collectExportHits = (symbol) => {
   const exportFiles = [
-    'src/shared/types/index.ts',
     'src/shared/constants/index.ts',
   ];
   const hits = [];

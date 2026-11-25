@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
+import { SESSION_ARTIFACT_ROOT_DIR } from '../sessions/artifacts/sessionArtifactContract';
 import {
   SESSION_ID,
   baselineWorld,

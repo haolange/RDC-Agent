@@ -1,5 +1,5 @@
 import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 const PERMISSION_MODES = new Set(['default', 'auto-review', 'full-access', 'custom']);
 

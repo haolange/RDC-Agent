@@ -10,7 +10,7 @@ vi.mock('../../../sessions/artifacts/SessionArtifactResolver', () => ({
   sessionArtifactResolver: { read },
 }));
 
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../../../sessions/artifacts/sessionArtifactContract';
 import { grantDelegatedArtifactAccess } from '../../../sessions/artifacts/DelegatedArtifactAccess';
 import { artifactReadTool } from './ArtifactReadTool';
 

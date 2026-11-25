@@ -3,7 +3,7 @@ import { AppError } from '@shared/errors/appError';
 import { executionOfferStore, sessionContextStore } from '../store/sessionStores';
 import { planReviewStateStore } from './PlanReviewStateStore';
 import { executionOfferMatches } from './ExecutionOfferStore';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { ExecutionOffer } from './executionOffer';
 
 const completionReceiptSchema = z.object({
   offerId: z.string().uuid().optional(), planUri: z.string().min(1),

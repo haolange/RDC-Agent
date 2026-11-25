@@ -1,10 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import type {
-  ContinuationArtifactMetadata,
-  ContinuationArtifactMutationPolicy,
-  ProviderContinuationArtifact,
-} from '@shared/types/reasoning';
+import type { ContinuationArtifactMetadata, ContinuationArtifactMutationPolicy } from '@shared/types/reasoning';
+import type { ProviderContinuationArtifact } from '../core/types';
 
 export interface ContinuationArtifactPayload {
   type: string;

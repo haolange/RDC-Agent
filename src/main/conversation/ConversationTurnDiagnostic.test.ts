@@ -5,7 +5,7 @@ vi.mock('../settings/settings-core/SettingsService', () => ({
     snapshot: () => ({ revision: 1, user: { appearance: { language: 'zh-CN' } } }),
   },
 }));
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { AgentRecoveryAbortError } from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../agent-runtime/providers/internal/http';

@@ -20,8 +20,8 @@ import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';
 import { joinFaultedRdcChild } from './RdcRecoveryChildren';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
-import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
+import type { ExecutionOffer } from '../../sessions/run/executionOffer';
 import type { TurnHandle } from './TurnCoordinator';
 import type { ApprovedCaptureHost } from './ApprovedCaptureController';
 

@@ -6,7 +6,7 @@
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from '../orchestration/delegationCapsule';
 
 export function delegationCapsuleArtifactRefs(capsule: DelegationCapsule): string[] {
   return [...new Set([

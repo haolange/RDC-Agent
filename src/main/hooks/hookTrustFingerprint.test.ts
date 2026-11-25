@@ -6,7 +6,7 @@ import {
   computeHookTrustFingerprint,
   resolveExecutableIdentity,
 } from './hookTrustFingerprint';
-import type { HookDefinition } from '@shared/types/rdcRuntime';
+import type { HookDefinition } from './hookTypes';
 
 const roots: string[] = [];
 const makeRoot = () => {

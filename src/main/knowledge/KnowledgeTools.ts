@@ -5,15 +5,7 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import {
-  KNOWLEDGE_CARD_TYPES,
-  type KnowledgeCardRecord,
-  type KnowledgeCardType,
-  type KnowledgeRelation,
-  type KnowledgeScope,
-  type KnowledgeImageRef,
-  type KnowledgeReadRequest,
-} from '@shared/types/knowledge';
+import { KNOWLEDGE_CARD_TYPES, type KnowledgeCardRecord, type KnowledgeCardType, type KnowledgeRelation, type KnowledgeScope, type KnowledgeImageRef } from '@shared/types/knowledge';
 import { samePath } from '../platform/paths';
 import { knowledgeCandidateService, type KnowledgeCandidateService } from './KnowledgeCandidateService';
 import { knowledgeCompileService, type KnowledgeCompileService } from './KnowledgeCompileService';
@@ -21,6 +13,7 @@ import { knowledgeQueryProperties, toKnowledgeQueryRequest } from './KnowledgeTo
 import { projectKnowledgeRead } from './KnowledgeReadService';
 import { knowledgeQueryService, type KnowledgeQueryService } from './KnowledgeQueryService';
 import { isPathInside, resolveWithinRoot } from './knowledgeFs';
+import type { KnowledgeReadRequest } from './KnowledgeReadService';
 import type { AgentTool, AgentToolResult } from '../agent-runtime/agent/AgentTool';
 
 export interface KnowledgeToolDependencies {

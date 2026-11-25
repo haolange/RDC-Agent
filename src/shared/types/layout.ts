@@ -32,10 +32,3 @@ export interface ModeConfig {
   accentColor: string;
   disabled: boolean;
 }
-
-// Panel state
-export interface PanelState {
-  leftSidebarCollapsed: boolean;
-  rightPanelCollapsed: boolean;
-  rightPanelActiveTab: string;
-}

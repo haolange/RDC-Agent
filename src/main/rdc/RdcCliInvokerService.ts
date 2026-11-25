@@ -14,16 +14,9 @@ import { assertRdcCatalogIdentity, packagedRdcCatalogIdentity, type RdcCatalogId
 import { resolveRdcBatchInvocation } from './resolveRdcBatchInvocation';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
-import type {
-  CLIResult,
-  ToolArtifact,
-  ToolCallRequest,
-  ToolCallResult,
-  ToolCatalog,
-  ToolRuntimeMetadata,
-  ToolRuntimeSummary,
-  ToolTraceEntry,
-} from '@shared/types/tool';
+import type { ToolArtifact, ToolCallResult, ToolRuntimeMetadata, ToolRuntimeSummary, ToolTraceEntry } from '@shared/types/tool';
+import type { CLIResult } from '../tools/ShellInvocationService';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 
 /** Artifacts RDC-Tool reports beside its data; fields this app does not read pass through. */
 const ToolArtifactsSchema: ZodType<ToolArtifact[] | undefined> = z.array(z.object({
@@ -348,3 +341,38 @@ export class RdcCliInvokerService {
 }
 
 export const rdcCliInvokerService = new RdcCliInvokerService();
+
+// 工具调用请求
+export interface ToolCallRequest {
+  toolName: string;
+  args: Record<string, unknown>;
+  turnId?: string;
+  contextId?: string;
+  runtimeOwner?: string;
+  ownerLeaseId?: string;
+  captureRef?: string;
+  runId?: string;
+  abortSignal?: AbortSignal;
+}
+
+// 工具目录
+export interface ToolCatalog {
+  schema_version: string;
+  source_path?: string;
+  tool_count?: number;
+  generated_at?: string;
+  tools: RdcOperationDefinition[];
+  fingerprint: string;
+  namespaces: Record<ToolNamespace, {
+    description: string;
+    groups: string[];
+  }>;
+  runtime?: ToolRuntimeMetadata;
+}
+
+/**
+ * Tool Types - 工具层相关类型定义
+ */
+
+// 工具命名空间
+export type ToolNamespace = string;

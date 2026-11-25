@@ -1,4 +1,5 @@
-import type { ToolManifest, ToolCategory } from '@shared/types/agenticTrace';
+import type { ToolCategory } from '../traceNodes';
+import type { ToolManifest } from './traceManifest';
 
 const PRIMITIVE_MANIFESTS: ToolManifest[] = [
   {

@@ -16,11 +16,8 @@ import {
 } from './ProviderCapabilityProbeRuntime';
 import type { AssistantMessage } from '../core/types';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
-import type {
-  EffectiveModel,
-  RequestPlan,
-  RequestPlanningResult,
-} from '@shared/types/providerCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { RequestPlanningResult } from '../../settings/provider-catalog/providerCatalogTypes';
 import type {
   LlmModelCapabilityProbeRequest,
   LlmModelCapabilityProbeResult,

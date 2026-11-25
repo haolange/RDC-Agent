@@ -1,11 +1,5 @@
 import { createHash } from 'crypto';
-import type {
-  ResolvedResource,
-  ResourceProvenance,
-  RestrictivePolicy,
-  ScopedResourceCandidate,
-  ScopedResourceCatalog,
-} from '@shared/types/rdcRuntime';
+import type { ResolvedResource, ResourceProvenance, RestrictivePolicy, ScopedResourceCandidate, ScopedResourceCatalog } from './scopedResourceTypes';
 
 const SCOPE_PRECEDENCE = { builtin: 0, user: 1, project: 2 } as const;
 const APPROVAL_STRENGTH = { none: 0, destructive: 1, mutation: 2, all: 3 } as const;

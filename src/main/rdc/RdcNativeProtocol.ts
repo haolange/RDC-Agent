@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
-import type { CLIResult } from '@shared/types/tool';
+import type { CLIResult } from '../tools/ShellInvocationService';
 import type { AgentToolResult } from '../agent-runtime/agent/AgentTool';
 
 /** Preserve native diagnostics while keeping credentials and private owner paths out of model results. */

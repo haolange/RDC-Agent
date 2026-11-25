@@ -1,11 +1,12 @@
 import { agentAccessCeiling, type AgentManifestDefinition } from '@shared/types/agentManifest';
-import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { parsePlanTaskRequirements } from '../../sessions/run/planTaskRequirements';
 import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist, resolveAgentToolAllowlistFromDefinition } from '../orchestration/RuntimeToolPolicy';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { compileEffectivePolicy } from '../permissions/PolicyCompiler';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 
 /** Compare explicit contracts only. Never add methods or infer them from prose. */
 export function assertDirectTaskSkillPreparation(tasks: readonly PlanTaskRequirement[], skillIds: readonly string[]): void {

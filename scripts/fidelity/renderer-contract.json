@@ -178,7 +178,7 @@
     "shared.channels": "src/shared/renderer-api/channels.ts",
     "shared.traceTypes": "src/shared/types/trace.ts",
     "shared.workbenchApi": "src/shared/renderer-api/workbench.ts",
-    "shared.executionOffer": "src/shared/types/executionOffer.ts",
+    "main.executionOffer": "src/main/sessions/run/executionOffer.ts",
     "shared.agentManifestTypes": "src/shared/types/agentManifest.ts",
     "shared.toolResultPreview": "src/shared/utils/toolResultPreview.ts",
     "main.rightRailProjectionService": "src/main/agent-trace/RightRailProjectionService.ts",

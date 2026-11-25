@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DELEGATION_CAPSULE_ERROR,
-  parseDelegationCapsule,
-  type DelegationCapsule,
-} from '@shared/types/delegationCapsule';
+import { DELEGATION_CAPSULE_ERROR, parseDelegationCapsule } from '../orchestration/delegationCapsule';
 import { investigationMethodCapsule } from '../../testing/fixtures/investigationMethodCases';
 import {
   applyDelegationCapsuleToPromptPlan,
@@ -11,6 +7,7 @@ import {
   renderDelegationCapsulePrompt,
   renderDelegationCapsuleInput,
 } from './DelegationCapsuleCompiler';
+import type { DelegationCapsule } from '../orchestration/delegationCapsule';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 function validCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCapsule {

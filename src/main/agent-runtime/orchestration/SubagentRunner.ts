@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { isTransientScopeId, rootScopeId, subagentScopeId } from '@shared/utils/executionScope';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
-import { agentAccessCeiling, narrowerAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
 import { generateEventId, nowMs } from '@shared/utils/id';
-import { freezeDelegationCapsule, type DelegationCapsule } from '@shared/types/delegationCapsule';
 import { AppError } from '@shared/errors/appError';
+import { SessionArtifactError } from '../../sessions/artifacts/sessionArtifactContract';
+import { narrowerAccessCeiling } from '../../settings/agent-manifests/accessCeiling';
 import { withDelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { reviewEvidenceClosure } from '../../investigation/reviewEvidenceClosure';
@@ -30,6 +30,7 @@ import {
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { TaskRegistry, createSessionTaskStore, releaseScopeTaskStore, type TaskExecutionRecord, registerDelegatedTaskScope, getDelegatedTaskScope } from '../tasks';
 import { delegationTraceStore } from '../workTrace/DelegationTraceStore';
+import { freezeDelegationCapsule } from './delegationCapsule';
 import { createEphemeralScopeId } from './executionScope';
 import {
   APPROVED_CAPTURE_SCOPE_REQUIRED,
@@ -47,6 +48,7 @@ import {
 import { deriveChildPolicyBudget, flushPolicyBudgetObservers } from './DelegationBudget';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
 import { createSubagentTools, type SubagentToolHost } from './SubagentTool';
+import type { DelegationCapsule } from './delegationCapsule';
 import type { DelegationSourceFailure } from './SubagentResultEnvelope';
 import type { BackgroundSubagentStart } from './BackgroundSubagentService';
 import type { ActiveTurnLookup, AgentProfileTurnOptions } from './orchestratorTypes';

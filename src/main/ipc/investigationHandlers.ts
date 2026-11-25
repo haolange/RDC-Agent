@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { AppError } from '@shared/errors/appError';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { InvestigationError, isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { sessionRecordStore } from '../sessions/store/sessionStores';

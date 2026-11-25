@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
-import type { CLIResult } from '@shared/types/tool';
+import type { CLIResult } from '../tools/ShellInvocationService';
 
 describe('native failure projection', () => {
   it('distinguishes truncated stdout from malformed native output without disclosing its content', () => {

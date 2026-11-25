@@ -6,7 +6,7 @@ import { safePath } from '../runtime/replayFileSafety';
 import { verifyExternalCaptureReference } from '../runtime/ExternalCaptureReference';
 import { selectedProbeDeviceId } from './RdcProbeLifecycle';
 import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
-import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
+import type { InvestigationPlanContract } from '../sessions/run/investigationPlanContract';
 import type { CaptureReplayState } from '@shared/types/captureReplay';
 
 const proposalSchema = z.object({

@@ -25,7 +25,7 @@ import {
   ScopedResourceImportArgsSchema,
   ScopedResourceWriteArgsSchema,
 } from './validation/rdcRuntimeSchemas';
-import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
+import type { AgentRuntimeMcpDescriptor } from '../settings/agent-manifests/agentRuntimeTypes';
 import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
 import type { IpcChannelTable } from './invokeRegistry';
 

@@ -1,4 +1,4 @@
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const undoCommand: CommandDefinition = {
   id: 'undo',

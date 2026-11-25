@@ -1,9 +1,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { z } from 'zod';
-import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
+import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, type TaskExecutionPreparation } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { writeFileAtomic } from '../../runtime/atomicFile';
+import { TaskIndependentSourceSchema, TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import { orderTasks } from './taskProjection';
 import {
   TASK_SCHEMA_VERSION,
@@ -16,6 +18,8 @@ import {
   type TaskRecord,
   type TaskRootBudgetRecord,
 } from './TaskContracts';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
+import type { TaskRuntimeEpoch } from './taskExecutionSchemas';
 
 interface TaskStateDocument {
   schemaVersion: typeof TASK_SCHEMA_VERSION;

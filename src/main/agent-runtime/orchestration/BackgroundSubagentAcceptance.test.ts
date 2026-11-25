@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { TaskRegistry } from '../tasks';
 import { BackgroundSubagentService } from './BackgroundSubagentService';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './delegationCapsule';
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 const capsule: DelegationCapsule = { goal: 'bounded check', task: 'check', scope: 'test', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [], requiredSkillIds: [], stopConditions: ['done'], outputRequirements: 'evidence', budget: { maxToolCalls: 3, maxWallTimeMs: 10000 } };
@@ -79,7 +79,6 @@ it('keeps nested result events with the live immediate parent then transfers onl
  await delivered.commit?.();
  expect((await service.beforeParentProviderRequestMessages('owner')).messages).toEqual([]);
 });
-
 
 it('retains new-parent spending when retry joins an older task root budget', async () => {
  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'background-budget-independent-')); roots.push(root);

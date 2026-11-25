@@ -22,7 +22,8 @@ import type {
   EffectiveCatalogRequest,
 } from './effectiveCatalogTypes';
 import type { ModelOverride, CustomModel } from '@shared/provider-catalog/modelsOverrideSchema';
-import type { EffectiveCatalogSnapshot, EffectiveModel, ModelRouteRecommendation, CatalogModelRoute, RequestPlanningResult } from '@shared/types/providerCapability';
+import type { EffectiveCatalogSnapshot, EffectiveModel, CatalogModelRoute } from '@shared/types/providerCapability';
+import type { ModelRouteRecommendation, RequestPlanningResult } from './providerCatalogTypes';
 import type { ConversationTurnControls, ReasoningControl } from '@shared/types/modelCapability';
 import type { LlmModelCapabilityProbeMode, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 

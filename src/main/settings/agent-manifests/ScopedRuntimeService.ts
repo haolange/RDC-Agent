@@ -8,7 +8,8 @@ import { hashScopedResource, scopedResourceResolver } from '../../runtime/Scoped
 import { appPathService } from '../../runtime/AppPathService';
 import { projectAgentTrust } from './ProjectAgentTrust';
 import { agentRuntimeConfigService } from './AgentRuntimeConfigService';
-import type { RdcRuntimeOverview, RestrictivePolicy, ScopedResourceDocument, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
+import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
+import type { RestrictivePolicy } from '../../runtime/scopedResourceTypes';
 
 const EXTENSIONS: Partial<Record<ScopedResourceKind, string>> = {
   agent: '.agent.md', mcp: '.mcp.json', hook: '.hook.yml', policy: '.policy.yml', memory: '.md', knowledge: '.md',

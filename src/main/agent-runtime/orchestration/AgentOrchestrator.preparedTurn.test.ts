@@ -56,7 +56,7 @@ vi.mock('electron', () => ({
 }));
 
 import { createAgentOrchestrator } from './agentRuntimeRoot';
-import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const requestPlan = createTestRequestPlan({

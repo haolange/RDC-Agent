@@ -7,7 +7,7 @@ import { delegationTraceStore } from '../workTrace/DelegationTraceStore';
 import { BackgroundSubagentService } from './BackgroundSubagentService';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { createSubagentBudgetState } from './TurnCoordinator';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './delegationCapsule';
 import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 
 const roots: string[] = [];

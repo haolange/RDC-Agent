@@ -1,6 +1,8 @@
 import * as crypto from 'crypto';
-import { TaskExecutionRequirementsSchema, TaskRuntimeEpochSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type TaskRuntimeEpoch, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { type TaskExecutionPreparation } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
+import { TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import {
   TASK_SCHEMA_VERSION, type SettleTaskExecutionOptions, type StartTaskExecutionOptions,
   type TaskCompletionResult, type TaskExecutionRecord, type TaskRecord, type TaskStatus,
@@ -10,6 +12,8 @@ import { assertApprovedTaskRequirement, assertTaskExecutionStart, assertTaskExec
 import { CANCELLING_TASK_TREES, INVALID_RESULT_REFERENCE } from './TaskRegistryCore';
 import { TaskExecutionLedger } from './TaskExecutionLedger';
 import { collectDescendants, dedupeIds, inheritBudget, isTerminalExecutionStatus, isTerminalTaskStatus, sameSettlement, validateBudget, validateResult } from './taskRegistryRules';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
+import type { TaskExecutionRequirements, TaskRuntimeEpoch } from './taskExecutionSchemas';
 
 const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 export const INVALIDATED_REVIEW_GUIDANCE = 'To revise a reviewed result, reexecute the source Task with its unchanged definition (for direct work use task_update status=in_progress), settle it with the new resultRef and resultHash, then dispatch the same review Task with that current source; preserve consumption and deadlines.';

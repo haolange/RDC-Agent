@@ -4,7 +4,7 @@ import { assertRdcBindingOwnership, authorizeRdcOperation, rdcCatalogCapabilityS
 import { readRdcHostControls } from './RdcHostControls';
 import type { AgentPermissionDecision, AgentPermissionDecisionInput } from '../agent-runtime/permissions/AgentPermissionPolicy';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 import type { AgentPermissionMode } from '@shared/types/settings';
 
 function request(

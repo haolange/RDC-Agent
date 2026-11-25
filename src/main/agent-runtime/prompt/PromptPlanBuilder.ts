@@ -14,16 +14,10 @@ import { runtimePermissionStateService } from '../../runtime/RuntimePermissionSt
 import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { applyRequestPlanFacts } from './RequestPlanFacts';
 import { runtimeIdentityContent } from './RuntimeIdentity';
-import type {
-  EffectiveAgentProfile,
-  PromptPlan,
-  PromptSegment,
-  ResourceScope,
-  ScopedInstructionResolution,
-  SkillLoadResult,
-  SkillMetadata,
-} from '@shared/types/rdcRuntime';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { PromptPlan, PromptSegment, ResourceScope, SkillMetadata } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile, SkillLoadResult } from '../../settings/agent-manifests/agentRuntimeTypes';
+import type { ScopedInstructionResolution } from '../../runtime/scopedResourceTypes';
+import type { ExecutionOffer } from '../../sessions/run/executionOffer';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';

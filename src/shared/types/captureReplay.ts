@@ -1,10 +1,10 @@
 import type { SessionScope, OpenedCapturePreview } from './session';
 import type { ReplayDeviceIssue, SessionDevicePreparation } from './device';
 export type CaptureReplayPhase = 'closed' | 'validating' | 'connecting' | 'transferring' | 'opening' | 'loading_image' | 'ready' | 'applying' | 'closing' | 'error';
-export interface CaptureReplayEvent { eventId: number }
+interface CaptureReplayEvent { eventId: number }
 export interface CaptureReplayTarget { textureId: string; outputSlot: number | null }
 export interface CaptureReplayError { code: string; message: string; retry: 'open' | 'close' | 'image' | 'apply' | null; issue?: ReplayDeviceIssue }
-export interface CaptureReplayObservation {
+interface CaptureReplayObservation {
   nativeRevision: number;
   modificationState: 'baseline' | 'intervention' | 'restored';
   displayParameters: { mip: number; slice: number; sample: number; rangeMin: number; rangeMax: number };

@@ -2,8 +2,6 @@ export type {
   AppMetaApi,
   AppShellApi,
   DialogApi,
-  PlatformApi,
-  RawChannelSubscriptionApi,
   WindowControlsApi,
 } from './platform';
 export type { ConversationApi } from './conversation';
@@ -16,4 +14,4 @@ export type { PlanApi } from './plan';
 export type { EvidenceApi, McpApi, ToolApi } from './tools';
 export type { LlmApi, SettingsApi } from './settings';
 export type { CaptureApi, ContextApi, DeviceApi, ProjectApi, SessionApi } from './project-session';
-export type { EventSubscriptionApi, RuntimeLogApi, RuntimePermissionApi } from './runtime';
+export type { EventSubscriptionApi, RuntimeLogApi } from './runtime';

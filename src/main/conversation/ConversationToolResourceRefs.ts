@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { extractSessionArtifactUris, isSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { isSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { extractSessionArtifactUris } from '../sessions/artifacts/sessionArtifactContract';
 import { pathComparisonKey } from '../platform/paths';
 import type { ConversationToolImagePreviewRef, ConversationToolResourceRef } from '@shared/types/conversation';
 import type { ToolCallResult } from '@shared/types/tool';

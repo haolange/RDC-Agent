@@ -1,13 +1,17 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import { formatSessionArtifactUri, shortArtifactHash } from '@shared/types/sessionArtifact';
-import { PLAN_TASK_REQUIREMENTS_HEADING, renderPlanTaskRequirements, parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
-import { PLAN_INVESTIGATION_HEADING, renderInvestigationPlanContract, parseInvestigationPlanContract, type InvestigationPlanContract } from '@shared/types/planInvestigation';
+import { PLAN_TASK_REQUIREMENTS_HEADING } from '@shared/types/taskExecution';
+import { PLAN_INVESTIGATION_HEADING } from '@shared/types/planInvestigation';
 import { splitPlanAppendix } from '@shared/utils/planAppendix';
 import { AppError } from '@shared/errors/appError';
+import { formatSessionArtifactUri, shortArtifactHash } from '../artifacts/sessionArtifactContract';
 import { sessionArtifactResolver, type SessionArtifactResolver, type SessionArtifactWriteResult } from '../artifacts/SessionArtifactResolver';
 import { normalizeSha256 } from '../../runtime/contentHash';
+import { renderInvestigationPlanContract, parseInvestigationPlanContract } from './investigationPlanContract';
+import { renderPlanTaskRequirements, parsePlanTaskRequirements } from './planTaskRequirements';
 import { assertReaderFacingPlan } from './planBodyContract';
+import type { InvestigationPlanContract } from './investigationPlanContract';
+import type { PlanTaskRequirement } from './planTaskRequirements';
 import type { PlanReviewSection } from '@shared/types/planReview';
 
 export const LIVE_PLAN_RELATIVE_PATH = 'plan.md';

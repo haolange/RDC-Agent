@@ -2,8 +2,6 @@ import type { ManifestTextTranslations } from './agentManifest';
 import type { ConversationTurnControls } from './modelCapability';
 import type { SessionModelOverride, SessionRecordSnapshot, SessionRevision } from './session';
 
-export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
-
 export type PlanReviewStatus = 'awaiting' | 'approved' | 'rejected' | 'superseded' | 'cancelled';
 
 export interface PlanReviewSection {
@@ -48,28 +46,6 @@ export interface ConversationPlanReview {
   status: PlanReviewStatus;
   decision?: PlanReviewDecision;
   handoffOptions: PlanReviewHandoffOption[];
-}
-
-export interface PlanReviewStateDocument {
-  schemaVersion: typeof PLAN_REVIEW_STATE_SCHEMA;
-  planId: string;
-  /** Absence means ownership is unproven; never infer it from the active session. */
-  ownerTurnId?: string;
-  revision: number;
-  status: PlanReviewStatus;
-  approvedHash?: string;
-  frozenUri?: string;
-  approvedHandoff?: PlanReviewHandoffIdentity;
-  updatedAt: number;
-}
-
-export interface ProjectPlanFrontmatter {
-  planId: string;
-  revision: number;
-  sha256: string;
-  agent: string;
-  sessionId: string;
-  savedAt: string;
 }
 
 export interface PlanReadRequest {
@@ -147,17 +123,13 @@ export interface PlanApprovalRequest {
   baseRevision: SessionRevision;
 }
 
-export interface PlanRejectionRequest {
+interface PlanRejectionRequest {
   sessionId: string;
   reviewId: string;
   decision: Extract<PlanReviewDecision, { kind: 'reject' }>;
 }
 
 export type ConversationAnswerPlanReviewRequest = PlanApprovalRequest | PlanRejectionRequest;
-
-export function isPlanApprovalRequest(request: ConversationAnswerPlanReviewRequest): request is PlanApprovalRequest {
-  return request.decision.kind === 'approve';
-}
 
 export interface PlanReviewContext {
   reviewId: string;
@@ -191,7 +163,3 @@ export type ConversationAnswerPlanReviewResult =
     handoff: { prompt: string; send: boolean };
   }
   | { decision: 'reject'; planReview: PlanReviewProjection; replan?: { agentId: string; source: PlanReadRequest; feedback: string } };
-
-export function isHandoffContinueAction(handoff: { surface?: 'turn-end' | 'plan-gate' | 'hidden' }): boolean {
-  return handoff.surface !== 'hidden';
-}

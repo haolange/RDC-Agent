@@ -5,7 +5,7 @@
  */
 
 import { AppError } from '@shared/errors/appError';
-import { UNRESOLVED_BLOCKERS, parseUnresolvedItems } from '@shared/types/unresolvedWork';
+import { UNRESOLVED_BLOCKERS } from '@shared/types/unresolvedWork';
 import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
@@ -14,6 +14,9 @@ import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/
 import { readRdcHostControls } from '../../rdc/RdcHostControls';
 import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
 import type { AgentTool, AgentToolSpec } from '../agent/AgentTool';
+import type { UnresolvedBlocker, UnresolvedItem } from '@shared/types/unresolvedWork';
+
+const MAX_TEXT = 1_000;
 
 /** Main-owned context controls: small results still keep a durable URI/hash as evidence. */
 export const RUNTIME_CONTEXT_TOOL_SPEC: AgentToolSpec = {
@@ -164,4 +167,24 @@ export function createRuntimeContextTool(sessionId?: string | null, projectId?: 
       };
     },
   };
+}
+
+/** Parse model-supplied items; any malformed item rejects the whole list. */
+export function parseUnresolvedItems(value: unknown): UnresolvedItem[] {
+  if (!Array.isArray(value) || value.length > 32) throw new AppError('TURN_COMPLETION_INVALID', 'result.unresolved must be an array of at most 32 items.');
+  return value.map((item, index) => {
+    const record = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : null;
+    const text = (field: string) => {
+      const raw = record?.[field];
+      if (typeof raw !== 'string' || !raw.trim() || raw.length > MAX_TEXT) {
+        throw new AppError('TURN_COMPLETION_INVALID', `result.unresolved[${index}].${field} must be a non-empty string of at most ${MAX_TEXT} characters.`);
+      }
+      return raw.trim();
+    };
+    const blocker = record?.blocker;
+    if (!UNRESOLVED_BLOCKERS.includes(blocker as UnresolvedBlocker)) {
+      throw new AppError('TURN_COMPLETION_INVALID', `result.unresolved[${index}].blocker must be one of ${UNRESOLVED_BLOCKERS.join(', ')}. An item without a real blocker is work to continue, not a reason to stop.`);
+    }
+    return { gap: text('gap'), attempted: text('attempted'), blocker: blocker as UnresolvedBlocker, resumeWhen: text('resumeWhen') };
+  });
 }

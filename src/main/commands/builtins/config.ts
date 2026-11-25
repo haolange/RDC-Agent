@@ -1,7 +1,7 @@
 /**
  * /config — 打开设置或查看/修改配置项。
  */
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const configCommand: CommandDefinition = {
   id: 'config',

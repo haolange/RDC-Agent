@@ -10,7 +10,9 @@ import { canonicalRealpath } from '../runtime/fileIdentity';
 import { TrustStore, type TrustRecord, type TrustScope } from '../runtime/TrustStore';
 import { resolveHookCwd, resolveHookSpawn } from './hookResolve';
 import { computeHookTrustFingerprint } from './hookTrustFingerprint';
-import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdcRuntime';
+import type { HookEvent } from '@shared/types/rdcRuntime';
+import type { HookDefinition, HookTrustState } from './hookTypes';
+import type { ScopedResourceCandidate } from '../runtime/scopedResourceTypes';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;

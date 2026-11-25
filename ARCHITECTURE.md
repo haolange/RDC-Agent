@@ -584,9 +584,9 @@ Knowledge 位于 `src/main/knowledge/`。Knowledge Center 为三列 UI（Spaces 
 保留的相邻结构及其边界：
 
 - `src/main/reports/ArtifactStore.ts`（`artifact_store.json`）是 `output_register` / Outputs 索引，不是 Investigation，不进入 Artifacts 卡。
-- `src/shared/types/harness.ts` 只含 Outputs 的 `ArtifactKind` / `ArtifactRecord`；Investigation `EvidenceRecord` 以 `renderdocInvestigation.ts` 为准。
+- `src/main/reports/artifactRecord.ts` 只含 Outputs 的 `ArtifactKind` / `ArtifactRecord`（只有 main 使用，不在 shared）；Investigation `EvidenceRecord` 以 `renderdocInvestigation.ts` 为准。
 - `RdcCliInvokerService` 的 `tool_count` 仅作诊断，Right Rail 与模型工具面不展示 catalog summary。
-- agent-trace `phases`（understand/work/summarize）是 Work Process / Trace UI 相位，不是 Run stage；`PhaseKind` 里的 `plan`/`execute` 是 trace node 词汇。
+- agent-trace `phases`（understand/work/summarize）是 Work Process / Trace UI 相位，不是 Run stage；`PhaseKind`（`src/main/agent-trace/traceNodes.ts`）里的 `plan`/`execute` 是 trace node 词汇。
 - `ErrorRecovery` 等 recoverable fallback 属 Availability 分类；`MCPManager` name-segment 在 `encode(decode(x)) !== x` 时 fail-closed，是 in-flight 协议需要。
 - 产品状态统一为 Provider `retiring`、Knowledge `retired`；外部模型 ID/来源网址及 OpenAI-compatible 协议名保留原始语义。门禁 `pnpm run check:legacy-residue` 与 `pnpm run check:acceptance-ledger`。
 

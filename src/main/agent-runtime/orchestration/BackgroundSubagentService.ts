@@ -12,7 +12,7 @@ import { bindTaskRootBudget } from './TaskRootBudget';
 import { createBackgroundTaskTools } from './BackgroundTaskTools';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './delegationCapsule';
 import type { AgentTool } from '../agent/AgentTool';
 import type { PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
 import type { TurnHandle } from './TurnCoordinator';

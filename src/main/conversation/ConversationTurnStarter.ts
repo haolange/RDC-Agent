@@ -30,7 +30,7 @@ import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../settings/agent-manifests/agentRuntimeTypes';
 import type { RunSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type { PreparedAgentTurnContext } from '../agent-runtime/orchestration/orchestratorTypes';
 import type {

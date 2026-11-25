@@ -9,7 +9,7 @@ import { MissionCompletionError } from '../../investigation/missionCompletionCon
 import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import { TurnHandle } from './TurnCoordinator';
-import type { PlanTaskRequirement } from '@shared/types/taskExecution';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 
 vi.mock('./DirectTaskTurnLifecycle', () => ({ listActiveDelegations: vi.fn(async () => []) }));
 

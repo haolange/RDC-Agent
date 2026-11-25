@@ -1,7 +1,7 @@
 /**
  * /session — 会话管理命令。
  */
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const sessionCommand: CommandDefinition = {
   id: 'session',

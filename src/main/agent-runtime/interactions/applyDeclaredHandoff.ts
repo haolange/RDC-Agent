@@ -1,17 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { isHandoffContinueAction } from '@shared/types/planReview';
-import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
-import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { parsePlanTaskRequirements } from '../../sessions/run/planTaskRequirements';
+import { EXECUTION_OFFER_SCHEMA } from '../../sessions/run/executionOffer';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { conversationHistoryStore, executionOfferStore, projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
 import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { resolveEnabledAgentDefinition } from '../../settings/agent-manifests/effectiveAgentSnapshot';
+import { isHandoffContinueAction } from './handoffSurface';
 import { assertDeclaredHandoffSkillCompatibility } from './handoffSkillCompatibility';
+import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 import type { AgentHandoffDefinition } from '@shared/types/agentManifest';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { ExecutionOffer } from '../../sessions/run/executionOffer';
 import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import type { SessionRecordSnapshot } from '@shared/types/session';
 

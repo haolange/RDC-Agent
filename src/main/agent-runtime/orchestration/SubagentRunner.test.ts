@@ -20,7 +20,7 @@ import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
 import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './delegationCapsule';
 import type { RdcRuntimeContext } from '@shared/types/session';
 
 vi.mock('electron', () => ({
@@ -776,7 +776,6 @@ describe('SubagentRunner', () => {
   });
 });
 
-
 it('enforces Capsule budget in child requests and aborts a pending provider at its deadline', async () => {
   const parent = createPolicyBudgetState({ maxToolCalls: 100, maxSubagents: 10, maxChildDepth: 3, maxWallTimeMs: 60000 });
   let captured = false;
@@ -797,7 +796,6 @@ it('enforces Capsule budget in child requests and aborts a pending provider at i
   expect(captured).toBe(true); expect(result.status).toBe('cancelled');
   expect(parent.maxToolCalls).toBe(100); expect(parent.toolCalls).toBe(1); expect(parent.subagents).toBe(1);
 });
-
 
 it('forwards a child approval with its actual execution identity and controlled parent answer', async () => {
   const approvals = new AgentToolApprovalRequestService();

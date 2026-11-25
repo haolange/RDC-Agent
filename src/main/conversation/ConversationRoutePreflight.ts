@@ -27,7 +27,8 @@ import type {
   SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
-import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../settings/agent-manifests/agentRuntimeTypes';
 import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';

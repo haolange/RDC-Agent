@@ -6,7 +6,8 @@ import {
 import { projectLiveModelObservations, type LiveModelObservation } from './LiveProviderCatalogProjection';
 import type { ProviderSurfaceManifest } from '@shared/provider-catalog/catalogManifestSchema';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
+import type { CapabilityState } from '@shared/types/providerCapability';
+import type { ProviderSurfaceDefinition } from './providerCatalogTypes';
 import type {
   NamedReasoningLevel,
   OpenAiWireEffort,
@@ -217,7 +218,6 @@ export function parseOpenAiReasoningControl(
         },
   };
 }
-
 
 function strictCatalogRecords(payload: unknown, surfaceLabel: string): Record<string, unknown>[] {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {

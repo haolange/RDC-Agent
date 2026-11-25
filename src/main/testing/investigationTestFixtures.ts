@@ -1,22 +1,10 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import {
-  INVESTIGATION_SCHEMA_NAMESPACE,
-  type ArtifactSourceRef,
-  type ChallengeRecord,
-  type ClaimRecord,
-  type EvidenceRecord,
-  type ExperimentRecord,
-  type InvestigationArtifactKind,
-  type InvestigationMission,
-  type InvestigationReport,
-  type InvestigationReportContract,
-  type MissionCheckpoint,
-  type WorldState,
-} from '@shared/types/renderdocInvestigation';
-import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
-import { formatInvestigationContentHash } from '@shared/types/renderdocInvestigation';
+import { type ArtifactSourceRef, type ChallengeRecord, type ClaimRecord, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationMission, type InvestigationReport, type InvestigationReportContract, type MissionCheckpoint, type WorldState } from '@shared/types/renderdocInvestigation';
+import { INVESTIGATION_SCHEMA_NAMESPACE } from '../investigation/investigationKindRegistry';
+import { formatSessionArtifactUri } from '../sessions/artifacts/sessionArtifactContract';
+import { formatInvestigationContentHash } from '../investigation/investigationHash';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
 import { serializeInvestigationJson } from '../investigation/investigationHash';

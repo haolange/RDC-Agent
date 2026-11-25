@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
 import { StorageIo } from '../../runtime/StorageIo';
+import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
 import {
   EXECUTION_OFFER_FILE,
   ExecutionOfferStore,

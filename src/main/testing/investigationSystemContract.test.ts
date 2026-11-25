@@ -8,19 +8,15 @@ import {
   CANONICAL_TOOL_TOKEN_EXPANSIONS,
 } from '@shared/constants/agentToolTokens';
 import { AGENT_WORKBENCH_TOOL_CATALOG } from '@shared/constants/agentWorkbenchCatalog';
-import {
-  INVESTIGATION_KIND_REGISTRY,
-  INVESTIGATION_SCHEMA_NAMESPACE,
-  epistemicRank,
-  isCausalOrCounterfactualClaim,
-  type ClaimRecord,
-} from '@shared/types/renderdocInvestigation';
+import { type ClaimRecord } from '@shared/types/renderdocInvestigation';
 import {
   CANONICAL_SKILL_IDS,
   GENERAL_SKILL_IDS,
   isSkillVisibleToProfile,
   MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
 } from '@shared/constants/canonicalSkills';
+import { INVESTIGATION_KIND_REGISTRY, INVESTIGATION_SCHEMA_NAMESPACE } from '../investigation/investigationKindRegistry';
+import { epistemicRank, isCausalOrCounterfactualClaim } from '../investigation/investigationInvariants';
 import { InvestigationError } from '../investigation/investigationErrors';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
 import { INVESTIGATION_TXN_COMMIT, INVESTIGATION_TXN_DIR, INVESTIGATION_TXN_JOURNAL } from '../investigation/investigationTxn';
@@ -599,13 +595,13 @@ describe('investigation system contract', () => {
   it('investigation.contract.non-invasion', () => {
     expect.hasAssertions();
     const task = readRepo('src/main/agent-runtime/tasks/TaskContracts.ts');
-    const profile = readRepo('src/shared/types/profile.ts');
+    const profile = readRepo('src/shared/types/agentManifest.ts');
     const message = readRepo('src/shared/types/conversation.ts');
     for (const source of [task, profile, message]) {
       expect(source).not.toMatch(/worldStateId|claimKind|compactProvenance|rdc\.investigation\.v1/);
     }
     expect(task).toMatch(/export interface TaskRecord/);
-    expect(profile).toMatch(/export interface AgentProfile/);
+    expect(profile).toMatch(/export interface AgentManifestDefinition/);
     expect(message).toMatch(/export interface ConversationMessage/);
     expect(BUILTIN_AGENT_TOOL_IDS).not.toContain('investigation_graph');
   });
@@ -939,7 +935,7 @@ describe('investigation system contract', () => {
     }
     expect(listed).toBe('empty-disguise');
     const task = readRepo('src/main/agent-runtime/tasks/TaskRegistry.ts');
-    const profile = readRepo('src/shared/types/profile.ts');
+    const profile = readRepo('src/shared/types/agentManifest.ts');
     const message = readRepo('src/shared/types/conversation.ts');
     for (const source of [task, profile, message]) {
       expect(source).not.toMatch(/INVESTIGATION_DEGRADED|rdc\.investigation\.v1/);

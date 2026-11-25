@@ -123,7 +123,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!sessionTypes.includes('mode: ExecutableAppMode'), 'session PlanContract must not use ExecutableAppMode.');
   assert(!sessionTypes.includes("export type AppMode"), 'AppMode must not return.');
 
-  const harnessTypes = read('src/shared/types/harness.ts');
+  const harnessTypes = read('src/main/reports/artifactRecord.ts');
   assert(!harnessTypes.includes('ExecutableAppMode'), 'harness leftover types must not use ExecutableAppMode.');
   assert(!harnessTypes.includes('mode: ExecutableAppMode'), 'harness leftover types must not use ExecutableAppMode.');
 

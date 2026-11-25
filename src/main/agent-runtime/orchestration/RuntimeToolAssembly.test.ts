@@ -54,7 +54,7 @@ import { createRuntimeContextTool, createTurnCompletionTool } from './TurnContro
 import { createAskUserTool, createSkillReadTool, createSkillsCatalogTool } from './WorkbenchTools';
 import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './RuntimeToolPolicy';
 import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
-import type { SkillLoadResult } from '@shared/types/rdcRuntime';
+import type { SkillLoadResult } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 

@@ -14,7 +14,7 @@ import type { UnresolvedItem } from '@shared/types/unresolvedWork';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { ToolDefinition } from '../core/types';
-import type { CompiledPolicy } from '@shared/types/rdcRuntime';
+import type { CompiledPolicy } from '../permissions/PolicyCompiler';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 
 export type AbortReason =
@@ -250,7 +250,7 @@ export class TurnHandle {
   runtimePlan: EffectiveRuntimePlan | null = null;
   promptPlan: import('@shared/types/rdcRuntime').PromptPlan | null = null;
   taskPreparation: import('@shared/types/taskExecution').TaskExecutionPreparation | null = null;
-  runtimeEpochs: import('@shared/types/taskExecution').TaskRuntimeEpoch[] = [];
+  runtimeEpochs: import('../tasks/taskExecutionSchemas').TaskRuntimeEpoch[] = [];
   captureControl: import('./ApprovedCaptureController').ApprovedCaptureController | null = null;
   /** Structured model-declared completion, populated only by turn_complete. */
   completionDeclaration: TurnCompletionDeclaration | null = null;

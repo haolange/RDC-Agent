@@ -1,4 +1,4 @@
-import type { CompletionArtifactRef } from '@shared/types/executionOffer';
+import type { CompletionArtifactRef } from '../../sessions/run/executionOffer';
 
 export type CompletionDisposition = 'completed' | 'partial' | 'blocked' | 'cancelled' | 'budget_paused';
 
@@ -25,6 +25,6 @@ export interface TurnCompletionReceipt {
   turnId: string;
   runtimePlanFingerprint: string;
   initialRuntimePlanFingerprint?: string;
-  runtimeEpochs?: import('@shared/types/taskExecution').TaskRuntimeEpoch[];
+  runtimeEpochs?: import('../tasks/taskExecutionSchemas').TaskRuntimeEpoch[];
   finalAnswerText: string;
 }

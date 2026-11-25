@@ -2,7 +2,7 @@
  * /tools — 列出或描述可用工具。
  */
 import { BUILTIN_AGENT_TOOL_IDS } from '@shared/constants/agentToolTokens';
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const toolsCommand: CommandDefinition = {
   id: 'tools',

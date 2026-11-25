@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../../sessions/artifacts/sessionArtifactContract';
 
 vi.mock('electron', () => ({
   BrowserWindow: class { static getAllWindows() { return []; } },
@@ -28,7 +28,7 @@ import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { createSubagentBudgetState, type TurnHandle } from './TurnCoordinator';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './delegationCapsule';
 
 /** The live turn a `subagent` call runs inside; its frozen plan carries delegates and ceiling. */
 const delegatingTurn = (): TurnHandle => ({

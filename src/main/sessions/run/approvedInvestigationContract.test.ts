@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { renderInvestigationPlanContract } from '@shared/types/planInvestigation';
+import { renderInvestigationPlanContract } from './investigationPlanContract';
 import { approvedInvestigationContract } from './approvedInvestigationContract';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { ExecutionOffer } from './executionOffer';
 
 const offer: ExecutionOffer = { schemaVersion: '1', sourceAgentId: 'analyzer', targetAgentId: 'general',
   plan: { uri: 'session://plans/old.md', hash: 'a'.repeat(64) }, requiredSkillIds: [], label: 'Continue', prompt: 'Execute', approvedAt: 1 };

@@ -1,7 +1,7 @@
 /**
  * /test — 运行测试或查看测试状态。
  */
-import type { CommandDefinition } from '@shared/types/command';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const testCommand: CommandDefinition = {
   id: 'test',

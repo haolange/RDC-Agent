@@ -1,4 +1,3 @@
-import type { DelegationCapsule } from './delegationCapsule';
 import type { ConversationWorkBlock } from './conversation';
 
 export interface DelegationTraceStep {
@@ -8,11 +7,6 @@ export interface DelegationTraceStep {
 }
 
 export type DelegationContentKind = 'task' | 'final' | 'invocation' | 'parent_receipt' | 'tool_receipt' | 'sent_prompt';
-
-export interface DelegationTaskBody {
-  capsule: DelegationCapsule;
-  completionRequirements: string[];
-}
 
 export interface DelegationTraceHeader {
   recordVersion: 2;
