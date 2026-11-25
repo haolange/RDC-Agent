@@ -2,26 +2,27 @@ import { type ToolContentInput, type UnwrappedToolContent, asFiniteNumber, filte
 import { createDetailLines, isLikelyBinaryText } from './workProcessContentText';
 import { compactText } from './workProcessFormat';
 
-export function unwrapGenericContent(input: ToolContentInput): UnwrappedToolContent {
+/** Any other tool: its readable result lines, with a count when the result reports one. */
+export function presentGenericContent(input: ToolContentInput): UnwrappedToolContent {
   const { toolName, parsed, t, record, details, contentText } = input;
   const previewLineLimit = 6;
 
-const baseLines = contentText
+  const baseLines = contentText
     ? createDetailLines(contentText, previewLineLimit)
     : extractReadableResultLines(parsed, undefined, previewLineLimit);
 
-const binarySafe = isLikelyBinaryText(baseLines.join('\n'))
+  const binarySafe = isLikelyBinaryText(baseLines.join('\n'))
     ? [t('chat.binaryPreviewOmitted')]
     : filterEnvelopeLines(baseLines);
 
-const previewLines = filterEnvelopeLines(enhanceToolPreviewLines(
+  const previewLines = filterEnvelopeLines(enhanceToolPreviewLines(
     toolName,
     parsed,
     contentText || undefined,
     binarySafe,
   ));
 
-const total = asFiniteNumber(
+  const total = asFiniteNumber(
     details?.total
     ?? details?.matched
     ?? details?.count
@@ -29,19 +30,18 @@ const total = asFiniteNumber(
     ?? record?.matched,
   );
 
-const bodyLines = previewLines.slice(0, 3);
+  const bodyLines = previewLines.slice(0, 3);
 
-let bodyText = total != null ? t('chat.previewItems', { count: total }) : undefined;
+  let bodyText = total != null ? t('chat.previewItems', { count: total }) : undefined;
 
-if (!bodyText && previewLines[0]) {
+  if (!bodyText && previewLines[0]) {
     bodyText = compactText(previewLines[0].replace(/\s+/g, ' ').trim(), 72);
   }
 
-return {
+  return {
     previewKind: 'generic',
     bodyText,
     bodyLines: bodyLines.length > 0 ? bodyLines : undefined,
     previewLines,
   };
-  
 }
