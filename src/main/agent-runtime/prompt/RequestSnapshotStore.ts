@@ -35,6 +35,31 @@ const MailboxDeliveriesSchema: ZodType<MailboxDeliveries> = z.array(z.object({
   messageIds: z.array(z.string()),
 }));
 
+const UsageSchema = z.object({
+  inputTokens: z.number().optional(),
+  outputTokens: z.number().optional(),
+  reasoningTokens: z.number().optional(),
+  cacheReadTokens: z.number().optional(),
+  cacheWriteTokens: z.number().optional(),
+  cacheHitTokens: z.number().optional(),
+  cacheMissTokens: z.number().optional(),
+  estimated: z.boolean().optional(),
+});
+
+const ReasoningEventsSchema = z.object({
+  events: z.record(z.string(), z.number()),
+  summaryParts: z.array(z.object({
+    itemKey: z.string(), index: z.number(), streamedChars: z.number(), completedChars: z.number().optional(), recovered: z.boolean(),
+  })),
+});
+
+/** What a request's completion adds to its snapshot, stored beside it so the large snapshot is written once. */
+const CompletionSchema = z.object({
+  completedAt: z.string(),
+  usage: UsageSchema.optional(),
+  reasoningEvents: ReasoningEventsSchema.optional(),
+}).strict();
+
 /**
  * A stored request snapshot. The frozen RequestPlan was validated when the request was planned; on read it is checked
  * to be the object this store wrote, and every field the store and the inspector read is validated here.
@@ -42,12 +67,7 @@ const MailboxDeliveriesSchema: ZodType<MailboxDeliveries> = z.array(z.object({
 const RequestEnvelopeSnapshotSchema: ZodType<RequestEnvelopeSnapshot> = z.object({
   id: z.string(),
   createdAt: z.string(),
-  reasoningEvents: z.object({
-    events: z.record(z.string(), z.number()),
-    summaryParts: z.array(z.object({
-      itemKey: z.string(), index: z.number(), streamedChars: z.number(), completedChars: z.number().optional(), recovered: z.boolean(),
-    })),
-  }).optional(),
+  reasoningEvents: ReasoningEventsSchema.optional(),
   completedAt: z.string().optional(),
   sessionId: z.string().optional(),
   turnId: z.string().optional(),
@@ -90,22 +110,18 @@ const RequestEnvelopeSnapshotSchema: ZodType<RequestEnvelopeSnapshot> = z.object
     providerReported: z.boolean(),
     reason: z.string(),
   }),
-  usage: z.object({
-    inputTokens: z.number().optional(),
-    outputTokens: z.number().optional(),
-    reasoningTokens: z.number().optional(),
-    cacheReadTokens: z.number().optional(),
-    cacheWriteTokens: z.number().optional(),
-    cacheHitTokens: z.number().optional(),
-    cacheMissTokens: z.number().optional(),
-    estimated: z.boolean().optional(),
-  }).optional(),
+  usage: UsageSchema.optional(),
   redactions: z.array(z.object({ path: z.string(), reason: z.string(), hash: z.string().optional() })),
 }).strict();
 
 /** A snapshot file listed in this store; a damaged file throws `STORAGE_CORRUPT`. */
+const completionPath = (snapshotPath: string): string => snapshotPath.replace(/\.json$/u, '.completion.meta');
+
 function readSnapshot(file: string): RequestEnvelopeSnapshot | null {
-  return readValidatedSync(file, parseJsonWith(RequestEnvelopeSnapshotSchema.parse));
+  const snapshot = readValidatedSync(file, parseJsonWith(RequestEnvelopeSnapshotSchema.parse));
+  if (!snapshot) return null;
+  const completion = readValidatedSync(completionPath(file), parseJsonWith(CompletionSchema.parse));
+  return completion ? { ...snapshot, ...completion } : snapshot;
 }
 
 export class RequestSnapshotStore {
@@ -150,7 +166,8 @@ export class RequestSnapshotStore {
     const dir = this.turnPath(snapshot.sessionId, snapshot.turnId);
     fs.mkdirSync(dir, { recursive: true });
     const name = `${String(snapshot.callIndex).padStart(3, '0')}-${safeSegment(snapshot.id)}`;
-    fs.writeFileSync(path.join(dir, `${name}.json`), `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
+    // Compact: the snapshot carries the whole request (history included) and is written once per model call.
+    fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(snapshot), 'utf8');
     // The right rail needs only the frozen PromptPlan segments. Keep a bounded
     // projection beside the full request so refreshing the rail never parses
     // every large message transcript in a long session.
@@ -208,12 +225,11 @@ export class RequestSnapshotStore {
   complete(snapshotId: string, sessionId: string | undefined, turnId: string | undefined, usage: RequestEnvelopeSnapshot['usage'],
     reasoningEvents?: RequestEnvelopeSnapshot['reasoningEvents']): void {
     const snapshotPath = this.findSnapshotPath(snapshotId, sessionId, turnId);
-    const snapshot = snapshotPath ? readSnapshot(snapshotPath) : null;
-    if (!snapshotPath || !snapshot) return;
-    snapshot.completedAt = new Date().toISOString();
-    snapshot.usage = usage;
-    if (reasoningEvents) snapshot.reasoningEvents = reasoningEvents;
-    fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
+    if (!snapshotPath) return;
+    // The completion goes beside the snapshot; reading the large request back to rewrite it cost as much as the
+    // request itself on every model call.
+    const completion = CompletionSchema.parse({ completedAt: new Date().toISOString(), usage, ...(reasoningEvents ? { reasoningEvents } : {}) });
+    fs.writeFileSync(completionPath(snapshotPath), JSON.stringify(completion), 'utf8');
   }
 
   list(sessionId: string, turnId?: string): RequestEnvelopeSnapshot[] {

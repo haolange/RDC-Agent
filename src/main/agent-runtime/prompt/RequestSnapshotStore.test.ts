@@ -173,6 +173,19 @@ describe('RequestSnapshotStore', () => {
     expect(store.get('session-a', 'turn-1', 'snap-1')?.usage).toEqual({ inputTokens: 12, outputTokens: 3 });
   });
 
+  it('writes the request once, compactly, and records its completion beside it', () => {
+    store.write(sampleSnapshot());
+    const turnDir = path.join(rootPath, 'session-a', 'turn-1');
+    const file = path.join(turnDir, fs.readdirSync(turnDir).find((name) => name.endsWith('.json'))!);
+    const written = fs.readFileSync(file, 'utf8');
+    expect(written).not.toContain('\n');
+
+    store.complete('snap-1', 'session-a', 'turn-1', { inputTokens: 7, outputTokens: 2 });
+    expect(fs.readFileSync(file, 'utf8')).toBe(written);
+    expect(store.get('session-a', 'turn-1', 'snap-1')).toMatchObject({ usage: { inputTokens: 7, outputTokens: 2 }, completedAt: expect.any(String) });
+    expect(store.nextCallIndex('session-a', 'turn-1')).toBe(2);
+  });
+
   it('reports a stored snapshot that is not a request snapshot as damaged', () => {
     store.write(sampleSnapshot());
     const turnDir = path.join(rootPath, 'session-a', 'turn-1');
