@@ -65,7 +65,6 @@ Plan 的 seed manifest 不包含 `bash`、`write`、`edit` 或 `rdcContext`；�
 - `pnpm run check:provider-catalog`
 - `pnpm run check:agent-runtime`
 - `pnpm run check:settings-agents`
-- `pnpm run check:shared-exports`
 - `pnpm run typecheck`
 
 涉及 browser-app endpoint 或 Settings UI 时，再用真实 browser-app session 检查 `settings:getProviderCatalog`、`/api/settings/providers/catalog`、Settings Provider Catalog 分组和 secret-free DTO。

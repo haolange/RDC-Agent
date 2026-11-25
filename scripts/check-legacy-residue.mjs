@@ -167,7 +167,6 @@ const collectPathHits = (relativePath) => (
 
 const collectExportHits = (symbol) => {
   const exportFiles = [
-    'scripts/fidelity/shared-exports.txt',
     'src/shared/types/index.ts',
     'src/shared/constants/index.ts',
   ];

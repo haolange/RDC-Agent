@@ -131,13 +131,15 @@ for (const filePath of sourceFiles) {
   }
 }
 
-// R6 — renderer must not re-export symbols listed in shared-exports baseline
+// R6 — renderer must not redeclare a type that src/shared exports; it imports it from @shared instead.
 const rendererRoot = path.join(repoRoot, 'src/renderer');
-const sharedExportsPath = path.join(repoRoot, 'scripts/fidelity/shared-exports.txt');
-if (fs.existsSync(sharedExportsPath)) {
-  const sharedSymbols = new Set(
-    fs.readFileSync(sharedExportsPath, 'utf8').split('\n').map((line) => line.trim()).filter(Boolean),
-  );
+{
+  const sharedSymbols = new Set();
+  const sharedTypeRe = /export\s+(?:type\s+)?(?:interface|type|enum)\s+([A-Za-z0-9_]+)/g;
+  for (const filePath of walk(path.join(repoRoot, 'src/shared'), [], /\.ts$/)) {
+    if (filePath.includes('.test.')) continue;
+    for (const match of fs.readFileSync(filePath, 'utf8').matchAll(sharedTypeRe)) sharedSymbols.add(match[1]);
+  }
   const exportTypeRe = /export\s+(?:type\s+)?(?:interface|type|enum)\s+([A-Za-z0-9_]+)/g;
   for (const filePath of walk(rendererRoot, [], /\.(ts|tsx)$/)) {
     const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');

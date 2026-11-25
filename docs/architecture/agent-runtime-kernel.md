@@ -98,7 +98,7 @@ Agent/Composer executable models require source-backed `toolCalling.state === 's
 - Static contract: `pnpm run typecheck`
 - Agent runtime contract: `pnpm run check:agent-runtime`
 - Work Process contract: `pnpm run check:work-process` and `pnpm run check:work-process-tool-coverage`
-- Architecture/fidelity/shared export checks after renderer or shared-contract changes
+- Architecture and QA-id checks after renderer or shared-contract changes
 - Shell smoke after window, preload, IPC, workspace permission, or RDC-Tool CLI invocation boundary changes
 
 

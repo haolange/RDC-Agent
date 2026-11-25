@@ -42,7 +42,7 @@ Renderer presentation 由 `ConversationThread`（`src/renderer/features/transcri
 
 ## Verification
 
-Use `pnpm run check:fidelity` for `trace-*` anchors, `pnpm run typecheck` for shared contracts, and browser-session smoke for renderer projection changes.
+Use `pnpm run check:qa-ids` for `trace-*` ids that Browser QA addresses, `pnpm run typecheck` for shared contracts, and browser-session smoke for renderer projection changes.
 
 ## Artifacts lane
 
