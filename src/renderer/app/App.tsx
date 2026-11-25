@@ -39,6 +39,10 @@ const App: React.FC = () => {
   const agentSettingsRequest = useSettingsNavigationStore((state) => state.agentRequest);
   const settingsSectionRequest = useSettingsNavigationStore((state) => state.sectionRequest);
   const clearAgentSettingsRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
+  const closeSettingsModal = useCallback(() => {
+    clearAgentSettingsRequest();
+    setSettingsModalOpen(false);
+  }, [clearAgentSettingsRequest]);
 
   useEffect(() => {
     if (agentSettingsRequest || settingsSectionRequest) setSettingsModalOpen(true);
@@ -223,7 +227,7 @@ const App: React.FC = () => {
         <SettingsModal
           open={settingsModalOpen}
           settings={settings}
-          onClose={() => { clearAgentSettingsRequest(); setSettingsModalOpen(false); }}
+          onClose={closeSettingsModal}
         />
 
         <KnowledgeCenterModal

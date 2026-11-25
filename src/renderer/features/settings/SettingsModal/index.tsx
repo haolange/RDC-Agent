@@ -24,7 +24,8 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, onClose }) => {
+/** Mounted while closed (drafts survive reopening); memoized so a closed modal does not re-render with App. */
+export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, onClose }) => {
   const modal = useSettingsModal(open, settings);
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
   const theme = settings.appearance.theme === 'system' ? systemTheme : settings.appearance.theme;
@@ -199,6 +200,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     </>,
     document.body,
   );
-};
+});
+SettingsModal.displayName = 'SettingsModal';
 
 export default SettingsModal;

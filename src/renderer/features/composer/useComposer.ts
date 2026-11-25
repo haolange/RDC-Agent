@@ -42,7 +42,9 @@ export function useComposer(options: {
   const usageStale = useSessionStore((state) => state.usageStale);
   const preparedTurnContext = useSessionStore((state) => state.preparedTurnContext);
   const conversationPreparationPhase = useSessionStore((state) => state.conversationPreparationPhase);
-  const conversationMessages = useConversationStore((state) => state.conversationMessages);
+  // Only whether a turn is active: subscribing to the messages re-rendered App on every streaming commit.
+  const hasActiveConversationTurn = useConversationStore((state) => state.conversationMessages.some((message) =>
+    message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming')));
   const selectedAgentId = useComposerAgentId();
   const currentMode = selectedAgentId as AgentMode;
   const setSelectedAgentId = useCallback((agentId: string) => {
@@ -62,8 +64,6 @@ export function useComposer(options: {
   );
 
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
-  const hasActiveConversationTurn = conversationMessages.some((message) =>
-    message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'));
 
   const attachments = useComposerAttachments({
     t,

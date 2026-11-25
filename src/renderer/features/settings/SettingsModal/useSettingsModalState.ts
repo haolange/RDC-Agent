@@ -22,7 +22,8 @@ export const useSettingsModalState = (
 ) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const [accountDraft, setAccountDraft] = useState(settings.profile);
-  const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
+  // Lazy: the modal stays mounted while closed, and an eager argument cloned every provider on each render.
+  const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(() => settings.llm.providers.map(cloneProvider));
   const [rdcCliDraft, setRdcCliDraft] = useState<RdcCliInvokerSettings>(settings.tooling.rdcCli);
   const [codeInterpreterDraft, setCodeInterpreterDraft] = useState<CodeInterpreterSettings>(
     settings.tooling.codeInterpreter,
