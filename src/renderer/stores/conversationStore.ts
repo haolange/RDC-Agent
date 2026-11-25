@@ -21,7 +21,7 @@ export const selectConversationMessageCount = (state: ConversationState): number
 export const selectLatestMessageActivityAt = (state: ConversationState): number =>
   state.latestMessageActivityAt;
 
-const messageActivityAt = (message: ConversationMessage): number => message.updatedAt ?? message.createdAt ?? 0;
+const messageActivityAt = (message: ConversationMessage): number => message.updatedAt ?? message.createdAt;
 
 const latestActivityAt = (messages: readonly ConversationMessage[]): number => {
   let max = 0;

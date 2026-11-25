@@ -65,22 +65,21 @@ export const useProjectStore = create<ProjectState>((set) => ({
     const shouldUpdateProjectInputs = state.currentProject?.projectId === projectId
       && !areProjectInputsEqual(state.projectInputs, inputs);
     const shouldUpdateCurrentProject = state.currentProject?.projectId === projectId
-      && !areProjectInputsEqual(state.currentProject.inputs ?? [], inputs);
-    let didUpdateProjectList = false;
+      && !areProjectInputsEqual(state.currentProject.inputs, inputs);
     const projects = state.projects.map((project) => {
       if (project.projectId !== projectId) {
         return project;
       }
-      if (areProjectInputsEqual(project.inputs ?? [], inputs)) {
+      if (areProjectInputsEqual(project.inputs, inputs)) {
         return project;
       }
-      didUpdateProjectList = true;
       return {
         ...project,
         inputs,
         inputsUpdatedAt,
       };
     });
+    const didUpdateProjectList = projects.some((project, index) => project !== state.projects[index]);
 
     if (!shouldUpdateProjectInputs && !shouldUpdateCurrentProject && !didUpdateProjectList) {
       return state;

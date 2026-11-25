@@ -42,10 +42,8 @@ const persistLayout = async (state: Pick<
   | 'rightPanelExpandedWidth'
   | 'terminalHeight'
 >): Promise<void> => {
-  const api = window.electronAPI;
-  if (!api) return;
   try {
-    await api.settings.patch([{
+    await window.electronAPI.settings.patch([{
       op: 'layout',
       value: {
         leftSidebar: {
@@ -96,7 +94,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       SIDEBAR_MAX_WIDTH,
     ),
     terminalHeight: clamp(
-      settings.layout.terminal?.height ?? TERMINAL_DEFAULT_HEIGHT,
+      settings.layout.terminal.height,
       TERMINAL_MIN_HEIGHT,
       TERMINAL_MAX_HEIGHT,
     ),

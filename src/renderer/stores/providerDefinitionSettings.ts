@@ -31,13 +31,10 @@ export const providerDefinitionRequest = (provider: LlmProviderEntry, clientRevi
 /** `provider` in place of the entry of the same connection; another connection of that provider stays. */
 const onSameConnection = (provider: LlmProviderEntry, next: (current: LlmProviderEntry) => LlmProviderEntry): SettingsOverlay => (settings) => {
   const identity = providerConnectionIdentity(provider);
-  let changed = false;
-  const providers = settings.llm.providers.map((entry) => {
-    if (entry.id !== provider.id || providerConnectionIdentity(entry) !== identity) return entry;
-    changed = true;
-    return next(entry);
-  });
-  return changed ? { ...settings, llm: { ...settings.llm, providers } } : settings;
+  const sameConnection = (entry: LlmProviderEntry) => entry.id === provider.id && providerConnectionIdentity(entry) === identity;
+  if (!settings.llm.providers.some(sameConnection)) return settings;
+  const providers = settings.llm.providers.map((entry) => (sameConnection(entry) ? next(entry) : entry));
+  return { ...settings, llm: { ...settings.llm, providers } };
 };
 
 /** The model choices shown while their save is in flight. */

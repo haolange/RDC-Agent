@@ -115,7 +115,7 @@ export async function applyConversationTurnResult(options: {
   const turnSession = result.session?.record;
   if (turnSession && currentProject?.projectId !== turnSession.projectId) {
     refreshTasks.push(electronAPI.project.list().then((projectsResult) => {
-      const nextProjects = projectsResult.projects ?? [];
+      const nextProjects = projectsResult.projects;
       useProjectStore.getState().setProjects(nextProjects);
       const matchedProject = nextProjects.find((project) => project.projectId === turnSession.projectId) ?? null;
       useProjectStore.getState().setCurrentProject(matchedProject);
@@ -129,7 +129,7 @@ export async function applyConversationTurnResult(options: {
     // the session inspector instead of leaving the project import surface visible.
     useProjectStore.getState().setRightRailTarget('session');
     refreshTasks.push(electronAPI.session.list(turnSession.projectId).then((sessionsResult) => {
-      setSessions(receiveSessionList(sessionsResult.sessions ?? []));
+      setSessions(receiveSessionList(sessionsResult.sessions));
     }));
   }
 

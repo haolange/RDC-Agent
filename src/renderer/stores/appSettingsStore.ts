@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_AGENT_RUNTIME, createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { useRuntimePermissionStore } from './runtimePermissionStore';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
 import { createSettingsDefinitionActions } from './appSettingsDefinitionActions';
@@ -85,8 +85,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
       await get().patchSettings([{ op: 'agentRuntime', value: { permissions: rules } }]);
     },
     setCompactionThresholdPercent: async (percent) => {
-      const previous = get().settings.agentRuntime?.context?.compactionThresholdPercent
-        ?? DEFAULT_AGENT_RUNTIME.context.compactionThresholdPercent;
+      const previous = get().settings.agentRuntime.context.compactionThresholdPercent;
       if (previous === percent) return;
       await get().patchSettings([{ op: 'agentRuntime', value: { context: { compactionThresholdPercent: percent } } }]);
     },

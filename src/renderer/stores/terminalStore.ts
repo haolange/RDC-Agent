@@ -148,11 +148,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   refreshEntries: async () => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI) {
-      return;
-    }
-
     const state = get();
     const requestContext: TerminalContext = {
       sessionId: state.sessionId,
@@ -171,12 +166,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       .filter((entry) => !knownAtRequest.has(entry.id) && !listed.has(entry.id));
     set({ isLoading: true });
     try {
-      const result = await electronAPI.runtimeLog.list(request);
+      const result = await window.electronAPI.runtimeLog.list(request);
       const latest = get();
       if (!isCurrent(latest)) {
         return;
       }
-      const listed = (result.entries ?? []).filter((entry) => matchesScopeFilter(entry, requestScopeFilter, requestContext));
+      const listed = result.entries.filter((entry) => matchesScopeFilter(entry, requestScopeFilter, requestContext));
       set({
         entries: [...listed, ...appendedSince(latest.entries, new Set(listed.map((entry) => entry.id)))],
         isLoading: false,
