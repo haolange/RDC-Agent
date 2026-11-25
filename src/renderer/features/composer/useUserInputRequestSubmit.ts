@@ -9,12 +9,7 @@ export const useUserInputRequestSubmit = () => useCallback(async (
 ): Promise<void> => {
   if (answers.length === 0) return;
 
-  const electronAPI = window.electronAPI;
-  if (!electronAPI) {
-    throw new Error('Conversation API is not available.');
-  }
-
-  const result = await electronAPI.conversation.answerUserInput({
+  const result = await window.electronAPI.conversation.answerUserInput({
     sessionId: request.sessionId,
     turnId: request.turnId,
     toolCallId: request.toolCallId,

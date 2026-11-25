@@ -22,7 +22,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const rememberControls = useTurnControlsStore((state) => state.rememberControls);
   const clearRememberedControls = useTurnControlsStore((state) => state.clearRememberedControls);
   const settings = useAppSettingsStore((state) => state.settings);
-  const agentReasoning = settings.agents?.definitions.find((definition) => definition.id === agentId)?.reasoningLevel;
+  const agentReasoning = settings.agents.definitions.find((definition) => definition.id === agentId)?.reasoningLevel;
   const { effective } = useComposerEffectiveModel(agentId, currentSession);
   const route = routeFingerprint(settings.llm.providers, effective?.providerId, effective?.modelId);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);

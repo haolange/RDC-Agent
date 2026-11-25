@@ -71,21 +71,17 @@ export function useComposerSend(options: ComposerSendOptions) {
     }
 
     const electronAPI = window.electronAPI;
-    if (!electronAPI) return;
-
     const writers = conversationWriters();
     // A model switch runs beside a turn in flight; every other command holds the Composer while it runs.
     if (!handoff && trimmed.startsWith('/')) {
       if (!concurrentModelSwitch) setIsPromptSending(true);
-      const handled = await executeSlashCommand(trimmed, {
+      await executeSlashCommand(trimmed, {
         currentSession: shown, currentProject, selectedAgentId, setSelectedAgentId: composer.setSelectedAgentId,
         openSettings: composer.openSettings, armPendingSkill: composer.armPendingSkill,
         setConversationMessages: writers.setConversationMessages, upsertConversationMessages: writers.upsertConversationMessages,
       }).finally(() => { if (!concurrentModelSwitch) setIsPromptSending(false); });
-      if (handled) {
-        if (shouldClearSubmittedPrompt(latest.current.options.promptValue, trimmed)) composer.setPromptValue('');
-        return;
-      }
+      if (shouldClearSubmittedPrompt(latest.current.options.promptValue, trimmed)) composer.setPromptValue('');
+      return;
     }
 
     if (sendingRef.current) return;

@@ -71,7 +71,7 @@ export function useComposerAttachments(options: {
       const leftovers = current[previous] ?? [];
       const released = stagingIdsOf(leftovers);
       if (released.length > 0) {
-        void window.electronAPI?.conversation.releaseAttachments({ stagingIds: released });
+        void window.electronAPI.conversation.releaseAttachments({ stagingIds: released });
       }
       if (!current[previous]) return current;
       const { [previous]: _removed, ...rest } = current;
@@ -90,7 +90,7 @@ export function useComposerAttachments(options: {
 
   const stageItems = useCallback(async (items: ConversationAttachmentStageItem[]) => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI || items.length === 0) return;
+    if (items.length === 0) return;
     try {
       if (items.length > COMPOSER_MAX_ATTACHMENT_COUNT) {
         throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${COMPOSER_MAX_ATTACHMENT_COUNT} attachments are allowed.`);
@@ -145,7 +145,7 @@ export function useComposerAttachments(options: {
 
   const handleAttachmentSelect = useCallback(async () => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI || !requireProject()) return;
+    if (!requireProject()) return;
     if (isBrowserAppSession()) {
       fileInputRef.current?.click();
       return;
@@ -167,7 +167,7 @@ export function useComposerAttachments(options: {
     const target = pendingAttachments.find((entry) => entry.id === attachmentId);
     setPendingAttachments((current) => current.filter((entry) => entry.id !== attachmentId));
     if (target?.stagingId && !target.error) {
-      void window.electronAPI?.conversation.releaseAttachments({ stagingIds: [target.stagingId] });
+      void window.electronAPI.conversation.releaseAttachments({ stagingIds: [target.stagingId] });
     }
   }, [pendingAttachments, setPendingAttachments]);
 

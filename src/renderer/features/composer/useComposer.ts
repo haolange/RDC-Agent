@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { AGENT_MODES, resolveAgentDisplay } from '@shared/constants/agents';
-import { COMPOSE_ACCENT_FALLBACK } from '@shared/theme/composeAccent';
 import { useI18n } from '../../i18n';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -93,7 +92,7 @@ export function useComposer(options: {
         label: selectedAgent?.name ?? currentMode,
         icon: selectedAgent?.icon ?? 'message-orbit',
         description: selectedAgent?.description ?? t('composer.agentProfile'),
-        accentColor: selectedAgent?.accent ?? agentAccent ?? COMPOSE_ACCENT_FALLBACK,
+        accentColor: selectedAgent?.accent ?? agentAccent,
         disabled: false,
       };
   const currentModeLabel = selectedAgent?.name ?? currentModeConfig.label;

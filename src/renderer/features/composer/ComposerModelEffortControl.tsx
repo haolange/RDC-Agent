@@ -69,7 +69,7 @@ export const ComposerModelEffortControl: React.FC<{
   const unavailable = !frozen && controlsState.capabilityState.status === 'unavailable';
   const waiting = disabled && preparing && !frozen;
   const currentOption = options.find((option) => (
-    option.providerId === selected?.providerId && option.modelId === selected?.modelId
+    option.providerId === selected?.providerId && option.modelId === selected.modelId
   ));
   // The same model name offered by two providers is ambiguous on the pill; name the provider only then.
   const sharedName = currentOption && options.some((option) => option.providerId !== currentOption.providerId && option.label === currentOption.label);

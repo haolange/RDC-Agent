@@ -240,10 +240,8 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
   }
 }
 
-export async function executeSlashCommand(input: string, context: SlashCommandContext): Promise<boolean> {
+export async function executeSlashCommand(input: string, context: SlashCommandContext): Promise<void> {
   const electronAPI = window.electronAPI;
-  if (!electronAPI) return false;
-
   try {
     const settings = useAppSettingsStore.getState().settings;
     const effectiveModel = readComposerEffectiveModel(
@@ -284,10 +282,7 @@ export async function executeSlashCommand(input: string, context: SlashCommandCo
     if (!response.result.success) {
       notify.failure(response.result.message, currentText, 'composer.commandFailed');
     }
-
-    return true;
   } catch (error) {
     notify.failure(error, currentText, 'composer.commandFailed');
-    return true;
   }
 }

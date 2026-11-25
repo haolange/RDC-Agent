@@ -46,7 +46,7 @@ export function useComposerEffortControl(options: {
   const displayLevels = useMemo(() => buildDisplaySelections(reasoningControl), [reasoningControl]);
   const displayLevelsKey = displayLevels.join('|');
   const reasoningLockedDisabled = !reasoningControl || reasoningControl.kind === 'unknown' || reasoningControl.kind === 'none';
-  const hasAdjustableReasoning = !disabled && !reasoningLockedDisabled && displayLevels.length > 1 && reasoningControl?.kind !== 'always-on';
+  const hasAdjustableReasoning = !disabled && !reasoningLockedDisabled && displayLevels.length > 1 && reasoningControl.kind !== 'always-on';
   const selectedLevel = resolveSelectedLevel(turnControls.reasoningLevel, reasoningControl, displayLevels);
 
   useEffect(() => {

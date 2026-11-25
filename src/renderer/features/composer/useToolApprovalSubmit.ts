@@ -7,17 +7,12 @@ export const useToolApprovalSubmit = () => useCallback(async (
   request: PendingToolApprovalRequest,
   approved: boolean,
 ): Promise<void> => {
-  const electronAPI = window.electronAPI;
-  if (!electronAPI) {
-    throw new Error('Conversation API is not available.');
-  }
-
   const current = () => {
     const pending = findPendingToolApproval(useConversationStore.getState().conversationMessages);
     return useProjectStore.getState().currentSessionId === request.sessionId && pending?.turnId === request.turnId && pending.approvalId === request.approvalId;
   };
   if (!current()) return;
-  const result = await electronAPI.conversation.answerToolApproval({
+  const result = await window.electronAPI.conversation.answerToolApproval({
     sessionId: request.sessionId,
     turnId: request.turnId,
     approvalId: request.approvalId,

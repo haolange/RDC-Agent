@@ -30,9 +30,11 @@ export function useComposerAttachmentDrop(options: {
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLElement>) => {
     if (disabled) return;
-    const files = clipboardItemsToFiles(event.clipboardData?.items);
+    // The DOM types clipboardData as nullable (a paste event built without data has none); React's type drops that.
+    const clipboard = event.nativeEvent.clipboardData;
+    const files = clipboardItemsToFiles(clipboard?.items);
     if (files.length === 0) return;
-    const text = event.clipboardData?.getData('text/plain') ?? '';
+    const text = clipboard?.getData('text/plain') ?? '';
     if (!text.trim()) event.preventDefault();
     void handleFilesIngest(files);
   }, [disabled, handleFilesIngest]);

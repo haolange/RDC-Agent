@@ -110,7 +110,7 @@ export const ComposerAgentMenu: React.FC = () => {
                 onClick={() => selectAgent(agent)}
               >
                 <span className="composer-agent-menu-item-icon" aria-hidden="true">
-                  <ModeGlyph mode={agentMode} icon={agent.icon ?? undefined} size={16} strokeWidth={2} />
+                  <ModeGlyph mode={agentMode} icon={agent.icon} size={16} strokeWidth={2} />
                 </span>
                 <span className="composer-agent-menu-item-label">{agent.name}</span>
                 <span className="composer-agent-menu-item-running-state">

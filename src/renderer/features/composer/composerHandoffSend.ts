@@ -18,9 +18,7 @@ export async function inspectHandoffCommit(
   return { status: 'unknown', requestId, error: 'HANDOFF_DELIVERY_UNCONFIRMED' };
 }
 
-/** Whether main committed a handoff send, read from the app bridge; without the bridge the answer is unknown. */
+/** Whether main committed a handoff send, read from the app bridge. */
 export function inspectHandoffRequest(sessionId: string, requestId: string): Promise<ComposerSendOutcome> {
-  const api = window.electronAPI;
-  return api ? inspectHandoffCommit(api.conversation, sessionId, requestId)
-    : Promise.resolve({ status: 'unknown', requestId, error: 'BRIDGE_UNAVAILABLE' });
+  return inspectHandoffCommit(window.electronAPI.conversation, sessionId, requestId);
 }

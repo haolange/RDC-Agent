@@ -101,7 +101,7 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [shellRef]);
   const requestReserve = useComposerRequestReserve(pendingRequest, requestShell);
   const requestReserveStyle = useDynStyle({ '--composer-request-reserve': `${requestReserve}px` });
-  const handoffPhase = composer.handoff?.phase;
+  const handoffPhase = composer.handoff.phase;
   const transitionLabel = conversationPreparationPhase === 'preparing' || handoffPhase === 'preparing'
     ? t('composer.handoff.preparing')
     : handoffPhase ? t('composer.handoff.switching') : '';
@@ -139,7 +139,7 @@ export const Composer: React.FC<ComposerProps> = ({
         />
       ) : null}
       <ComposerAttachmentTray />
-      {composer.handoff?.error ? (
+      {composer.handoff.error ? (
         <InlineError detail={composer.handoff.error === 'HANDOFF_DELIVERY_UNCONFIRMED' ? undefined : composer.handoff.error}
           onRetry={() => void composer.handoff.retry()}
           retryLabel={t(composer.handoff.checking ? 'app.handoffCheckDelivery' : 'app.handoffRetry')}>

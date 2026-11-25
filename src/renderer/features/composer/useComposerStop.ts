@@ -44,8 +44,6 @@ export function useComposerStop(options: {
   const handlePrimaryStop = useCallback(async () => {
     useComposerSessionContextStore.getState().clearHandoffSuggestion();
     const electronAPI = window.electronAPI;
-    if (!electronAPI) return;
-
     setStoppingSessionId(stopScope);
     try {
       useComposerSessionContextStore.getState().setIsPromptSending(false);

@@ -29,14 +29,15 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
     let invalidated = !isCurrent();
     if (invalidated) return;
     const invalidate = () => { if (!isCurrent()) invalidated = true; };
+    // Read at each step: a store change can invalidate the request while a call is awaited.
+    const live = () => !invalidated && isCurrent();
     const offSession = useProjectStore.subscribe(invalidate);
     const offConversation = useConversationStore.subscribe(invalidate);
     const offReview = usePlanReviewStore.subscribe(invalidate);
     try {
       // Queued model and control edits land first, so the approval is based on the newest record.
-      const saving = flushSessionModelSaves(request.sessionId);
-      if (saving) await saving;
-      if (invalidated || !isCurrent()) return;
+      await flushSessionModelSaves(request.sessionId);
+      if (!live()) return;
       let answer: ConversationAnswerPlanReviewRequest;
       if (decision.kind === 'approve') {
         const view = getSessionView(request.sessionId);
@@ -65,7 +66,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
       }
       usePlanReviewStore.getState().accept(result.planReview);
       if (result.decision === 'reject') {
-        if (result.replan && !invalidated && isCurrent()) {
+        if (result.replan && live()) {
           if (!onReplan) throw new AppError('PLAN_REPLAN_UNAVAILABLE');
           await onReplan({ sessionId: request.sessionId, agentId: result.replan.agentId, prompt: result.replan.feedback,
             planReference: { intent: 'revise', ...result.replan.source } });
@@ -73,7 +74,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
         return;
       }
       acceptSessionSnapshot(result.session);
-      if (decision.kind !== 'approve' || invalidated || !isCurrent()) return;
+      if (decision.kind !== 'approve' || !live()) return;
       useComposerSessionContextStore.getState().queueHandoffSuggestion({
         sessionId: request.sessionId, agentId: decision.handoff.agent, label: decision.handoff.label,
         prompt: result.handoff.prompt, send: result.handoff.send,
