@@ -136,29 +136,20 @@ describe('ToolValidator', () => {
     )).toThrow(/未声明字段/);
   });
 
-  it('rejects unsupported schema keywords at compile time', () => {
-    expect(() => validator.validate(
-      def({
-        type: 'object',
-        properties: {
-          mode: { anyOf: [{ type: 'string' }, { type: 'number' }] } as never,
-        },
-      }),
-      { mode: 'a' },
-    )).toThrow(/不支持的 schema 关键字/);
+  it('enforces anyOf and union types instead of rejecting them', () => {
+    const tool = def({
+      type: 'object',
+      properties: {
+        mode: { anyOf: [{ type: 'string', enum: ['fast'] }, { type: 'integer' }] } as never,
+        note: { type: ['string', 'null'] } as never,
+      },
+    });
+    expect(validator.validate(tool, { mode: 'fast', note: null })).toEqual({ mode: 'fast', note: null });
+    expect(() => validator.validate(tool, { mode: 'slow' })).toThrow(/anyOf/);
   });
 
-  it('rejects keywords outside the closed supported subset', () => {
-    const unsupported = [
-      'exclusiveMinimum',
-      'exclusiveMaximum',
-      'multipleOf',
-      'minProperties',
-      'maxProperties',
-      'uniqueItems',
-      'format',
-      '$id',
-    ];
+  it('rejects keywords outside the supported set', () => {
+    const unsupported = ['prefixItems', 'patternProperties', 'if', 'contains', 'dependentRequired', '$id'];
     for (const key of unsupported) {
       expect(() => validator.validate(
         def({

@@ -20,6 +20,8 @@ export class ToolValidationError extends Error {
 const SUPPORTED_SCHEMA_KEYS = new Set([
   'type',
   'oneOf',
+  'anyOf',
+  'allOf',
   'not',
   'enum',
   'const',
@@ -34,10 +36,18 @@ const SUPPORTED_SCHEMA_KEYS = new Set([
   'pattern',
   'minItems',
   'maxItems',
+  'uniqueItems',
+  'minProperties',
+  'maxProperties',
+  'exclusiveMinimum',
+  'exclusiveMaximum',
+  'multipleOf',
   'additionalProperties',
   'description',
   'title',
 ]);
+
+const JSON_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'array', 'object', 'null']);
 
 const MAX_SCHEMA_DEPTH = 12;
 const MAX_SCHEMA_NODES = 256;
@@ -94,25 +104,33 @@ function assertSupportedSchema(
       );
     }
   }
-  if (schema.oneOf !== undefined) {
-    if (!Array.isArray(schema.oneOf) || schema.oneOf.length < 1 || schema.oneOf.length > 16) {
-      throw new ToolValidationError('oneOf must contain 1-16 schemas', path, toolName);
+  for (const combinator of ['oneOf', 'anyOf', 'allOf'] as const) {
+    const branches = schema[combinator];
+    if (branches === undefined) continue;
+    if (!Array.isArray(branches) || branches.length < 1 || branches.length > 16) {
+      throw new ToolValidationError(`${combinator} must contain 1-16 schemas`, path, toolName);
     }
-    for (const [index, branch] of schema.oneOf.entries()) {
-      if (!branch || typeof branch !== 'object' || Array.isArray(branch)) throw new ToolValidationError('invalid oneOf branch', path, toolName);
-      assertSupportedSchema(branch as JsonSchema, path + '.oneOf.' + index, toolName, depth + 1, counters);
+    for (const [index, branch] of branches.entries()) {
+      if (!branch || typeof branch !== 'object' || Array.isArray(branch)) throw new ToolValidationError(`invalid ${combinator} branch`, path, toolName);
+      assertSupportedSchema(branch as JsonSchema, `${path}.${combinator}.${index}`, toolName, depth + 1, counters);
+    }
+  }
+  if (schema.type !== undefined) {
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+    if (types.length < 1 || types.some((type) => typeof type !== 'string' || !JSON_TYPES.has(type))) {
+      throw new ToolValidationError(`unsupported type ${JSON.stringify(schema.type)}`, path, toolName);
     }
   }
   if (schema.not !== undefined) {
     if (!schema.not || typeof schema.not !== 'object' || Array.isArray(schema.not)) throw new ToolValidationError('invalid not schema', path, toolName);
     assertSupportedSchema(schema.not as JsonSchema, path + '.not', toolName, depth + 1, counters);
   }
-  if (schema.additionalProperties !== undefined && schema.additionalProperties !== false) {
-    throw new ToolValidationError(
-      'additionalProperties 仅允许省略或 false（默认拒绝未声明字段）',
-      path,
-      toolName,
-    );
+  const additional = schema.additionalProperties;
+  if (additional !== undefined && typeof additional !== 'boolean') {
+    if (!additional || typeof additional !== 'object' || Array.isArray(additional)) {
+      throw new ToolValidationError('additionalProperties must be a boolean or a schema', path, toolName);
+    }
+    assertSupportedSchema(additional as JsonSchema, `${path}.additionalProperties`, toolName, depth + 1, counters);
   }
   if (schema.properties) {
     for (const [key, child] of Object.entries(schema.properties)) {
@@ -152,6 +170,11 @@ export class ToolValidator {
       throw new ToolValidationError('参数必须是对象', 'args', toolDef.name);
     }
     return validated as Record<string, unknown>;
+  }
+
+  /** Checks a schema once, when a tool is registered; a schema outside the supported keywords fails here. */
+  assertCompilable(schema: JsonSchema, toolName: string): void {
+    assertSupportedSchema(schema, 'parameters', toolName);
   }
 
   /**
@@ -199,6 +222,14 @@ export class ToolValidator {
     if (Array.isArray(schema.oneOf) && schema.oneOf.filter((branch) => matches(branch as JsonSchema)).length !== 1) {
       throw new ToolValidationError('oneOf requires exactly one matching input mode', path, toolName);
     }
+    if (Array.isArray(schema.anyOf) && !schema.anyOf.some((branch) => matches(branch as JsonSchema))) {
+      throw new ToolValidationError('anyOf requires at least one matching schema', path, toolName);
+    }
+    if (Array.isArray(schema.allOf)) {
+      for (const branch of schema.allOf) {
+        if (!matches(branch as JsonSchema)) throw new ToolValidationError('allOf requires every schema to match', path, toolName);
+      }
+    }
     if (schema.not && matches(schema.not as JsonSchema)) throw new ToolValidationError('not schema matched a forbidden input', path, toolName);
     if (!schema.type && Array.isArray(schema.required) && value && typeof value === 'object' && !Array.isArray(value)) {
       for (const key of schema.required) {
@@ -215,6 +246,22 @@ export class ToolValidator {
         );
       }
       return value;
+    }
+
+    if (Array.isArray(schema.type)) {
+      // A union type takes the first member type the value satisfies, under the same coercion rules. When the value
+      // already has one of the member types, that member's own constraint failure is the one worth reporting.
+      let ownTypeError: ToolValidationError | undefined;
+      for (const type of schema.type) {
+        try {
+          return this.validateValue(value, { ...schema, type }, path, toolName, safeParam, depth);
+        } catch (error) {
+          if (!(error instanceof ToolValidationError)) throw error;
+          if (!ownTypeError && hasJsonType(value, type)) ownTypeError = error;
+        }
+      }
+      throw ownTypeError
+        ?? new ToolValidationError(`期望类型之一 ${schema.type.join(' | ')}，实际为 ${describeType(value)}`, path, toolName);
     }
 
     const expectedType = schema.type;
@@ -370,6 +417,18 @@ export class ToolValidator {
         toolName,
       );
     }
+    const exclusiveMinimum = schemaNumber(schema, 'exclusiveMinimum');
+    if (exclusiveMinimum !== undefined && coerced <= exclusiveMinimum) {
+      throw new ToolValidationError(`数值必须大于 ${exclusiveMinimum}（实际: ${coerced}）`, path, toolName);
+    }
+    const exclusiveMaximum = schemaNumber(schema, 'exclusiveMaximum');
+    if (exclusiveMaximum !== undefined && coerced >= exclusiveMaximum) {
+      throw new ToolValidationError(`数值必须小于 ${exclusiveMaximum}（实际: ${coerced}）`, path, toolName);
+    }
+    const multipleOf = schemaNumber(schema, 'multipleOf');
+    if (multipleOf !== undefined && multipleOf > 0 && !Number.isInteger(coerced / multipleOf)) {
+      throw new ToolValidationError(`数值必须是 ${multipleOf} 的倍数（实际: ${coerced}）`, path, toolName);
+    }
 
     if (schema.enum && Array.isArray(schema.enum) && !schema.enum.includes(String(coerced))) {
       const numericEnum = schema.enum.map((e) => Number(e));
@@ -447,6 +506,9 @@ export class ToolValidator {
         toolName,
       );
     }
+    if (schema.uniqueItems === true && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) {
+      throw new ToolValidationError('数组元素必须互不相同', path, toolName);
+    }
     if (!schema.items) {
       return value;
     }
@@ -489,7 +551,15 @@ export class ToolValidator {
     // Kind-specific bodies such as investigation_write.record are enforced
     // by the tool's own Zod schema, not by inventing a second field list here.
     // An explicit empty `properties: {}` still rejects every key.
-    if (schema.properties === undefined) {
+    const minProperties = schemaNumber(schema, 'minProperties');
+    if (minProperties !== undefined && keys.length < minProperties) {
+      throw new ToolValidationError(`对象字段数不得小于 ${minProperties}（实际: ${keys.length}）`, path, toolName);
+    }
+    const maxProperties = schemaNumber(schema, 'maxProperties');
+    if (maxProperties !== undefined && keys.length > maxProperties) {
+      throw new ToolValidationError(`对象字段数不得大于 ${maxProperties}（实际: ${keys.length}）`, path, toolName);
+    }
+    if (schema.properties === undefined && schema.additionalProperties === undefined) {
       return { ...input };
     }
     const output: Record<string, unknown> = {};
@@ -530,8 +600,14 @@ export class ToolValidator {
       }
     }
 
+    const additional = schema.additionalProperties;
     for (const key of keys) {
-      if (!(schema.properties && key in schema.properties)) {
+      if (schema.properties && key in schema.properties) continue;
+      if (additional === true) {
+        output[key] = input[key];
+      } else if (additional && typeof additional === 'object') {
+        output[key] = this.validateValue(input[key], additional as JsonSchema, `${path}.${key}`, toolName, isSafeParamKey(key), depth + 1);
+      } else {
         throw new ToolValidationError(
           `未声明字段 "${key}" 被拒绝（默认 additionalProperties=false）`,
           `${path}.${key}`,
@@ -545,6 +621,11 @@ export class ToolValidator {
 }
 
 export const toolValidator = new ToolValidator();
+
+function hasJsonType(value: unknown, type: string): boolean {
+  if (type === 'integer') return Number.isInteger(value);
+  return describeType(value) === type;
+}
 
 function describeType(value: unknown): string {
   if (value === null) return 'null';

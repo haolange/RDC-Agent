@@ -200,7 +200,7 @@ export interface ToolDefinition {
  * 仅覆盖 Agent Runtime 验证需要用到的字段，未列出的字段允许通过索引签名透传。
  */
 export interface JsonSchema {
-  type?: string;
+  type?: string | string[];
   properties?: Record<string, JsonSchema & { description?: string }>;
   required?: string[];
   items?: JsonSchema;
@@ -213,7 +213,7 @@ export interface JsonSchema {
   minItems?: number;
   maxItems?: number;
   pattern?: string;
-  additionalProperties?: boolean;
+  additionalProperties?: boolean | JsonSchema;
   default?: unknown;
   [key: string]: unknown;
 }

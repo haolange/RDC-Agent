@@ -123,6 +123,7 @@ export const zhSettings = {
   'settings.mcpEnabledFor': '启用 {name}',
   'settings.mcpToolsLabel': '工具',
   'settings.mcpConnectFailed': '这个 MCP 服务连接失败',
+  'settings.mcpToolsUnavailable': '{count} 个工具的参数定义无法校验，未提供给模型',
   'settings.mcpToggleFailed': '没能切换这个 MCP 服务',
   'settings.mcpOverrideRejectedMessage': '项目试图改写你个人配置里的命令或地址，已被拒绝',
   'settings.mcpTrustHint': '项目里的 MCP 服务要先信任才会连接，配置一变就需要重新确认。项目不能改写你个人配置里的命令、参数或地址。',

@@ -26,6 +26,7 @@ import {
   StdioRpcClient,
 } from './mcpRpcTransport';
 import { buildMcpPrefixedName, decodeMcpNameSegment } from './mcpToolNames';
+import { compileMcpInputSchema } from './mcpInputSchema';
 import type { ChildProcess } from 'child_process';
 
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
@@ -119,6 +120,7 @@ export interface MCPDiscoveredTool {
 interface MCPConnection {
   config: MCPServerConfig;
   tools: MCPDiscoveredTool[];
+  unavailableTools?: Array<{ name: string; reason: string }>;
   /** stdio 模式下的子进程。 */
   process?: ChildProcess;
   /** ProcessSupervisor 句柄（stdio）。 */
@@ -227,6 +229,7 @@ export class MCPManager {
           connectionStatus: 'connected',
           toolCount: conn.tools.length,
           tools: conn.tools.map((tool) => tool.originalName),
+          ...(conn.unavailableTools?.length ? { unavailableTools: conn.unavailableTools } : {}),
         };
         if (status?.lastError) {
           summary.lastError = status.lastError;
@@ -330,9 +333,7 @@ export class MCPManager {
         const rawTools = Array.isArray(listResult?.tools)
           ? listResult!.tools!
           : [];
-        conn.tools = rawTools.map((t) =>
-          this.toDiscoveredTool(config.name, t),
-        );
+        this.assignDiscoveredTools(conn, rawTools);
       } catch (err) {
         rpc.close();
         supervised.abort('supervisor_kill');
@@ -377,9 +378,7 @@ export class MCPManager {
       const rawTools = Array.isArray(listResult?.tools)
         ? listResult!.tools!
         : [];
-      conn.tools = rawTools.map((t) =>
-        this.toDiscoveredTool(config.name, t),
-      );
+      this.assignDiscoveredTools(conn, rawTools);
 
       this.connections.set(config.name, conn);
       this.registerTools(conn.tools);
@@ -416,9 +415,7 @@ export class MCPManager {
       const rawTools = Array.isArray(listResult?.tools)
         ? listResult!.tools!
         : [];
-      conn.tools = rawTools.map((t) =>
-        this.toDiscoveredTool(config.name, t),
-      );
+      this.assignDiscoveredTools(conn, rawTools);
 
       this.connections.set(config.name, conn);
       this.registerTools(conn.tools);
@@ -633,27 +630,27 @@ export class MCPManager {
   // 内部
   // -------------------------------------------------------------------
 
-  private toDiscoveredTool(
-    serverId: string,
-    raw: Record<string, unknown>,
-  ): MCPDiscoveredTool {
-    const originalName =
-      typeof raw.name === 'string' ? raw.name : 'unnamed_tool';
-    const description =
-      typeof raw.description === 'string' ? raw.description : '';
-    const inputSchema =
-      raw.inputSchema && typeof raw.inputSchema === 'object'
-        ? (raw.inputSchema as JsonSchema)
-        : ({ type: 'object', properties: {} } as JsonSchema);
-
-    return {
-      serverId,
-      serverName: serverId,
-      originalName,
-      prefixedName: buildMcpPrefixedName(serverId, originalName),
-      description,
-      inputSchema,
-    };
+  /** Splits a server's declared tools into those offered to the model and those whose schema could not compile. */
+  private assignDiscoveredTools(conn: MCPConnection, rawTools: Array<Record<string, unknown>>): void {
+    const serverId = conn.config.name;
+    conn.tools = [];
+    conn.unavailableTools = [];
+    for (const raw of rawTools) {
+      const originalName = typeof raw.name === 'string' ? raw.name : 'unnamed_tool';
+      const compiled = compileMcpInputSchema(raw.inputSchema, originalName);
+      if (!compiled.ok) {
+        conn.unavailableTools.push({ name: originalName, reason: `MCP_TOOL_SCHEMA_UNSUPPORTED: ${compiled.reason}` });
+        continue;
+      }
+      conn.tools.push({
+        serverId,
+        serverName: serverId,
+        originalName,
+        prefixedName: buildMcpPrefixedName(serverId, originalName),
+        description: typeof raw.description === 'string' ? raw.description : '',
+        inputSchema: compiled.schema,
+      });
+    }
   }
 
   private registerTools(tools: MCPDiscoveredTool[]): void {

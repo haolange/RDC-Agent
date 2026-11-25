@@ -75,4 +75,6 @@ export interface MCPServerStatusSummary {
   lastError?: string;
   /** 工具短名称列表（不含 mcp__ 前缀） */
   tools?: string[];
+  /** Tools the server declared whose input schema could not be compiled; they are not offered to the model. */
+  unavailableTools?: Array<{ name: string; reason: string }>;
 }

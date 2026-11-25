@@ -118,6 +118,11 @@ export const McpServicesPanel: React.FC<{
           </dl>
         ) : null}
         {live?.lastError ? <InlineError detail={live.lastError}>{t('settings.mcpConnectFailed')}</InlineError> : null}
+        {live?.unavailableTools?.length ? (
+          <InlineError detail={live.unavailableTools.map((tool) => `${tool.name}: ${tool.reason}`).join('\n')}>
+            {t('settings.mcpToolsUnavailable', { count: live.unavailableTools.length })}
+          </InlineError>
+        ) : null}
         {server && overview ? <McpTrustPanel overview={overview} server={server} onChanged={onChanged} /> : null}
       </div>
     );

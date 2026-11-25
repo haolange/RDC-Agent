@@ -237,6 +237,7 @@ export const enSettings = {
   'settings.mcpEnabledFor': 'Enable {name}',
   'settings.mcpToolsLabel': 'Tools',
   'settings.mcpConnectFailed': 'Could not connect to this MCP server',
+  'settings.mcpToolsUnavailable': '{count} tools are not offered to the model because their input schema cannot be checked',
   'settings.mcpToggleFailed': 'Could not switch this MCP server',
   'settings.mcpOverrideRejectedMessage': 'The project tried to override the command or address in your own configuration and was refused',
   'settings.mcpTrustHint': 'A project MCP server connects only after you trust it, and needs confirming again whenever its configuration changes. A project cannot override the command, arguments or address in your own configuration.',
