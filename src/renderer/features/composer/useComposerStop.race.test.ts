@@ -33,8 +33,11 @@ const getHistory = vi.fn();
 let root: Root;
 let host: HTMLDivElement;
 let stop: () => Promise<void>;
+let stopPending: boolean[] = [];
 function Harness() {
-  stop = useComposerStop({ currentSession: session, currentRun: null, t: (key) => key }).handlePrimaryStop;
+  const controls = useComposerStop({ currentSession: session, currentRun: null, t: (key) => key });
+  stop = controls.handlePrimaryStop;
+  stopPending.push(controls.stopPending);
   return null;
 }
 beforeEach(() => {
@@ -55,6 +58,23 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals();
   Object.defineProperty(window, 'electronAPI', { configurable: true, value: undefined });
+});
+
+it('reports Stop as pending from the click until main answers, including when the request fails', async () => {
+  let answer!: (result: ConversationCancelActiveTurnResult) => void;
+  cancel.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+  stopPending = [];
+  let settled!: Promise<void>;
+  await act(async () => { settled = stop(); });
+  // The optimistic stop already ended the reply; the button must not fall back to an empty Send meanwhile.
+  expect(useConversationStore.getState().conversationMessages[0].status).toBe('stopped');
+  expect(stopPending.at(-1)).toBe(true);
+  await act(async () => { answer({ success: true, phase: 'running' }); await settled; });
+  expect(stopPending.at(-1)).toBe(false);
+  cancel.mockRejectedValue(new Error('bridge lost'));
+  await act(async () => stop());
+  expect(stopPending.at(-1)).toBe(false);
+  expect(useNotificationStore.getState().notifications.some((entry) => entry.tone === 'error')).toBe(true);
 });
 
 it('restores the matching persisted completion when Stop reaches main after the turn ended', async () => {

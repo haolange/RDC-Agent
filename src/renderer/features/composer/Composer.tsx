@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { agentDescription } from '../../lib/agentDescription';
 import { InlineError } from '../../ui/InlineError';
@@ -11,7 +11,8 @@ import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useComposerPendingRequest } from './useComposerPendingRequest';
 import { ComposerPendingRequest } from './ComposerPendingRequest';
-import { planReviewRequestKey } from './planReviewRequestModel';
+import { composerPendingRequestKey } from './pendingRequestSelection';
+import { useComposerRequestReserve } from './useComposerRequestReserve';
 import { ComposerEditor } from './ComposerEditor';
 import { ComposerFooter } from './ComposerFooter';
 import { useSlashCommand } from './useSlashCommand';
@@ -125,6 +126,14 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [composerMarkdown, isComposerBusy]);
 
   const pendingRequest = useComposerPendingRequest();
+  const [requestShell, setRequestShell] = useState<HTMLDivElement | null>(null);
+  const assignRequestShell = useCallback((node: HTMLDivElement | null) => {
+    setRequestShell(node);
+    if (typeof shellRef === 'function') shellRef(node);
+    else if (shellRef) (shellRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  }, [shellRef]);
+  const requestReserve = useComposerRequestReserve(pendingRequest, requestShell);
+  const requestReserveStyle = useDynStyle({ '--composer-request-reserve': `${requestReserve}px` });
   const handoffPhase = composer.handoff?.phase;
   const transitionLabel = conversationPreparationPhase === 'preparing' || handoffPhase === 'preparing'
     ? t('composer.handoff.preparing')
@@ -132,9 +141,10 @@ export const Composer: React.FC<ComposerProps> = ({
       : handoffPhase ? t('composer.handoff.switching') : '';
   return (
     <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
-    <ComposerMenuRegistryProvider key={pendingRequest?.kind === 'plan-review'
-      ? `${composerScopeKey}:${planReviewRequestKey(pendingRequest.request)}` : composerScopeKey}>
-    {pendingRequest ? <ComposerPendingRequest shellRef={shellRef} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
+    {/* A session switch starts a fresh Composer; a request arriving or settling only changes which menus may be open. */}
+    <ComposerMenuRegistryProvider key={composerScopeKey} scope={pendingRequest ? composerPendingRequestKey(pendingRequest) : 'composer'}>
+    <div className="composer-frame" {...requestReserveStyle}>
+    {pendingRequest ? <ComposerPendingRequest shellRef={assignRequestShell} pending={pendingRequest} composeAccentStyle={composeAccentStyle}
       agentId={pendingRequest.kind === 'plan-review' ? selectedAgentId : activeAgentId ?? selectedAgentId} currentSession={currentSession} onReplan={composer.sendExplicitPrompt} /> : <div
       ref={shellRef} className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}`}
       {...composeAccentStyle}
@@ -202,6 +212,7 @@ export const Composer: React.FC<ComposerProps> = ({
         conversationPreparationPhase={conversationPreparationPhase}
         selectedContextProfile={selectedContextProfile}
         isComposerBusy={isComposerBusy}
+        stopPending={composer.stopPending}
         attachButtonLabel={attachButtonLabel}
         primaryButtonDisabled={primaryButtonDisabled}
         primaryButtonDescription={primaryButtonDescription}
@@ -216,6 +227,7 @@ export const Composer: React.FC<ComposerProps> = ({
         currentSession={currentSession}
       />
     </div>}
+    </div>
     </ComposerMenuRegistryProvider>
     </ComposerTurnControlsProvider>
   );

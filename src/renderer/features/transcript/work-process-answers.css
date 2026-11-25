@@ -13,7 +13,7 @@
   margin: 0;
   min-width: 0;
   font-size: var(--type-body-size);
-  line-height: 1.65;
+  line-height: var(--leading-relaxed);
   overflow-wrap: anywhere;
 }
 
@@ -22,7 +22,7 @@
   grid-row: 1;
   color: var(--token-text-secondary);
   font-variant-numeric: tabular-nums;
-  line-height: 1.65;
+  line-height: var(--leading-relaxed);
 }
 
 .work-process-user-input-transcript-question {
@@ -86,7 +86,7 @@
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.55;
+  line-height: var(--type-body-line);
   overflow-wrap: anywhere;
 }
 

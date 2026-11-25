@@ -46,13 +46,13 @@
   min-width: 0;
   font-weight: var(--font-normal);
   overflow-wrap: anywhere;
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 .work-process-task-snapshot-reason {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.45;
+  line-height: var(--type-meta-line);
 }
 
 /* Done stays readable (the green mark carries the state); only a cancelled title recedes. */

@@ -16,6 +16,7 @@ import {
   knowledgeQuarantineReason,
   type KnowledgeImportOutcome,
 } from '../knowledgeImportExportModel';
+import { KnowledgeTaskProgress } from '../parts/KnowledgeTaskProgress';
 import type { KnowledgeImportItem, KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeImport } from '../useKnowledgeImport';
 import type { useKnowledgeCandidateInbox } from '../useKnowledgeCandidateInbox';
@@ -124,10 +125,15 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
   const planned = importer.preview?.items ?? [];
   const newCount = countKnowledgeImportOutcomes(planned).new;
 
+  // Reading the source happens on the first step, writing it on the preview step.
+  const progress = importer.busy && step !== 'result'
+    ? <KnowledgeTaskProgress label={t(step === 'preview' ? 'knowledgeCenter.progressImporting' : 'knowledgeCenter.progressReading')} />
+    : null;
   const footer = step === 'result' ? (
     <Button variant="primary" disabled={importer.busy} onClick={importer.close}>{t('knowledgeCenter.importDone')}</Button>
   ) : step === 'preview' ? (
     <>
+      {progress}
       <Button variant="ghost" disabled={importer.busy} onClick={importer.back}>{t('knowledgeCenter.importBack')}</Button>
       <Button variant="primary" disabled={importer.busy || newCount === 0} data-testid="knowledge-center-import-run"
         onClick={() => void importer.importSource()}>
@@ -136,6 +142,7 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
     </>
   ) : (
     <>
+      {progress}
       <Button variant="ghost" disabled={importer.busy} onClick={importer.close}>{t('knowledgeCenter.confirmCancel')}</Button>
       {importer.mode === 'paste' ? (
         <Button variant="primary" disabled={importer.busy || !importer.source.trim()} data-testid="knowledge-center-import-preview"

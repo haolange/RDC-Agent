@@ -4,6 +4,7 @@ import { ModeGlyph } from '../../ui/ModeGlyph';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useI18n } from '../../i18n';
+import { withLanguage } from '../../i18n/messages';
 import { InlineError } from '../../ui/InlineError';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 import { EFFORT_LABEL_KEYS, isReasoningLevelLabel } from '../../lib/reasoningLabels';
@@ -13,6 +14,7 @@ import { getToolVerb } from './workProcessToolRows';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
 import { formatDurationMs } from './workProcessFormat';
+import { useWorkClock } from './useWorkClock';
 import { WorkProcessContent } from './WorkProcessContent';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { SubagentCallDetails } from './SubagentCallDetails';
@@ -50,7 +52,7 @@ function DelegationBody({ sessionId, parentToolCallId, childSessionId, execution
 }
 
 export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | null }> = ({ row, sessionId }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const openAgentSettings = useSettingsNavigationStore((state) => state.openAgent);
   const { expanded, workOpen, finalOpen, detailsOpen, factsOpen, constraintsOpen, toggle, openCard } = useSubagentDisclosure(sessionId, row.id);
   const contentId = React.useId();
@@ -75,13 +77,9 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
   const status = rawStatus === 'completed' ? 'complete' : rawStatus;
   const active = status === 'queued' || status === 'running' || status === 'waiting' || status === 'cancelling';
   const startedAt = header?.startedAt;
-  const [, setClock] = React.useState(0);
-  React.useEffect(() => {
-    if (!active || !startedAt) return;
-    const timer = window.setInterval(() => setClock(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
-  }, [active, startedAt]);
-  const duration = header ? formatDurationMs(header.startedAt, active ? undefined : header.completedAt) : row.duration;
+  // The delegated Agent's clock advances on the same shared second as the turn's Working header.
+  const now = useWorkClock(active && Boolean(startedAt));
+  const duration = header ? formatDurationMs(language, header.startedAt, active ? now : header.completedAt) : row.duration;
   const task = header?.task || row.task || t('chat.subagentUntitledTask');
   const profile = header?.profile || row.profile;
   const definition = useAppSettingsStore(state => state.settings.agents.definitions.find(agent => agent.id === profile));
@@ -91,7 +89,8 @@ export const SubagentRow: React.FC<{ row: SubagentWorkRow; sessionId?: string | 
     status: active ? 'running' : status === 'complete' ? 'complete' : status === 'cancelled' || status === 'interrupted' || status === 'partial' || status === 'blocked' ? 'stopped' : 'error',
     blocks: page.steps.map((step) => step.block), updatedAt: header?.completedAt ?? Date.now(),
   }), [active, status, page.steps, header?.completedAt]);
-  const presentation = React.useMemo(() => buildWorkProcessPresentation(trace, t), [trace, t]);
+  const localized = React.useMemo(() => withLanguage(t, language), [t, language]);
+  const presentation = React.useMemo(() => buildWorkProcessPresentation(trace, localized), [trace, localized]);
   const renderToolDetail = React.useCallback((tool: Extract<WorkProcessRow, { type: 'tool' }>) => (
     tool.status === 'complete' || tool.status === 'error' || tool.status === 'cancelled' || tool.status === 'skipped'
       ? <DelegatedToolReceipt sessionId={sessionId} parentToolCallId={row.id} toolCallId={tool.id}

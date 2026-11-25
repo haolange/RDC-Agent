@@ -115,6 +115,12 @@ a.work-process-web-item-title:hover {
   text-decoration: underline;
 }
 
+a.work-process-web-item-title:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
 .work-process-web-item-url {
   overflow: hidden;
   color: var(--token-text-secondary);
@@ -168,5 +174,11 @@ a.work-process-web-item-title:hover {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  line-height: 1;
+  line-height: var(--leading-none);
+}
+
+/* A page that cannot be opened still takes focus for its tooltip; focus shows the ring, not the hover surface. */
+span.work-process-web-pill:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
 }

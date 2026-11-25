@@ -89,7 +89,7 @@ function renderThinking(text: string, visibility: ConversationThinkingItem['thin
     ? { ...item, thinking: { ...item.thinking, text, visibility } }
     : item);
   const trace = { ...gptSummaryTrace, blocks: [{ ...block, items }] };
-  return renderToStaticMarkup(createElement(WorkProcess, { trace, messageId: 'thinking-markdown' }));
+  return renderToStaticMarkup(createElement(WorkProcess, { trace, rowKey: 'thinking-markdown' }));
 }
 
 describe('Work Process thinking markdown', () => {

@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { removeOptimisticConversationMessages } from '../../stores/conversationSendHelpers';
@@ -36,12 +36,16 @@ export function useComposerStop(options: {
     setPendingSkillIds,
   } = options;
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
+  // The session whose Stop main has not answered yet: its button shows the pending icon from the click on.
+  const [stoppingSessionId, setStoppingSessionId] = useState<string | null>(null);
+  const stopScope = currentSession?.sessionId ?? 'no-session';
 
   const handlePrimaryStop = useCallback(async () => {
     useComposerSessionContextStore.getState().clearHandoffSuggestion();
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
+    setStoppingSessionId(stopScope);
     try {
       useComposerSessionContextStore.getState().setIsPromptSending(false);
       const activeTurn = useComposerSessionContextStore.getState().activeTurn;
@@ -153,8 +157,11 @@ export function useComposerStop(options: {
       notify.info(t('app.stopRunSent'));
     } catch (error) {
       notify.failure(error, t, 'app.stopRunFailed');
+    } finally {
+      setStoppingSessionId((current) => (current === stopScope ? null : current));
     }
   }, [
+    stopScope,
     currentRun,
     currentSession?.sessionId,
     setCurrentRun,
@@ -164,5 +171,5 @@ export function useComposerStop(options: {
     t,
   ]);
 
-  return { handlePrimaryStop };
+  return { handlePrimaryStop, stopPending: stoppingSessionId === stopScope };
 }

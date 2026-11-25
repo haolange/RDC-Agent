@@ -39,7 +39,7 @@ export const WebPillStrip: React.FC<{ pages: readonly WorkProcessWebPage[]; mark
           <a key={`${page.url}:${index}`} className={className} href={page.url} target="_blank" rel="noreferrer noopener"
             data-tooltip={tooltip} onClick={(event) => event.stopPropagation()}>{content}</a>
         ) : (
-          <span key={`${page.domain}:${index}`} className={className} data-tooltip={tooltip}>{content}</span>
+          <span key={`${page.domain}:${index}`} className={className} tabIndex={0} data-tooltip={tooltip}>{content}</span>
         );
       })}
     </div>

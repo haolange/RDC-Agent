@@ -19,10 +19,15 @@ import { useNarrowViewport } from './useNarrowViewport';
 
 type DragSide = 'left' | 'right';
 type RightRailMode = 'hidden' | 'project' | 'session';
+/** Longer than the column transition (`--duration-slow`), so the transition always finishes first. */
+const COLUMNS_SETTLE_MS = 400;
 
 export function useWorkbenchLayout(isReady: boolean) {
   const [appBodyWidth, setAppBodyWidth] = useState(() => (typeof window === 'undefined' ? 0 : Math.max(0, Math.round(window.innerWidth))));
   const [isResizing, setIsResizing] = useState(false);
+  // Columns move with a transition only for a person's collapse or expand; restore and selection settle in place.
+  const [columnsAnimating, setColumnsAnimating] = useState(false);
+  const columnsSettleTimer = useRef<number | undefined>(undefined);
   const appBodyRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ side: DragSide; startX: number; startWidth: number } | null>(null);
 
@@ -182,6 +187,18 @@ export function useWorkbenchLayout(isReady: boolean) {
     setRightPanelWidth,
   ]);
 
+  const settleColumns = useCallback(() => {
+    window.clearTimeout(columnsSettleTimer.current);
+    setColumnsAnimating(false);
+  }, []);
+  const animateColumns = useCallback(() => {
+    setColumnsAnimating(true);
+    window.clearTimeout(columnsSettleTimer.current);
+    // No transitionend arrives when nothing moved (or motion is reduced); the class must not outlive the toggle.
+    columnsSettleTimer.current = window.setTimeout(() => setColumnsAnimating(false), COLUMNS_SETTLE_MS);
+  }, []);
+  useEffect(() => () => window.clearTimeout(columnsSettleTimer.current), []);
+
   const startDragging = useCallback((side: DragSide, startWidth: number) => (event: React.PointerEvent<HTMLDivElement>) => {
     dragStateRef.current = { side, startX: event.clientX, startWidth };
     setIsResizing(true);
@@ -190,6 +207,9 @@ export function useWorkbenchLayout(isReady: boolean) {
   return {
     appBodyRef,
     isResizing,
+    columnsAnimating,
+    animateColumns,
+    settleColumns,
     isRightRailVisible,
     effectiveLeftCollapsed,
     effectiveRightCollapsed,

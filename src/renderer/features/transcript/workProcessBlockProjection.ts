@@ -1,7 +1,7 @@
 import { supersededAnswerLoopIds } from '@shared/conversation/loopItems';
 import { projectLlmTurn } from './workProcessLlmProjection';
 import { pushStandaloneBlock } from './workProcessStandaloneProjection';
-import type { Translator } from '../../i18n/messages';
+import type { LocalizedTranslator } from '../../i18n/messages';
 import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
@@ -17,7 +17,7 @@ import type { WorkProcessRow } from './workProcessTypes';
 export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 
 export interface BlockProjectionContext {
-  t: Translator;
+  t: LocalizedTranslator;
   visibleThinkingKeys: Set<string>;
   hasVisibleProcessEvidence: boolean;
   createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;

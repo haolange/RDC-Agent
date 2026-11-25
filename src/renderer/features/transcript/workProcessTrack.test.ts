@@ -2,7 +2,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
-import { translate } from '../../i18n/messages';
+import { localizedTranslator } from '../../i18n/messages';
 import { firstTrackEvent, isTrackActivity } from './workProcessTrack';
 import { WorkProcessRailIcon, WorkProcessTrackContext } from './WorkProcessRailIcon';
 import { createToolRowForPresentation } from './workProcessToolRows';
@@ -10,7 +10,7 @@ import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import type { WorkProcessRow } from './workProcessTypes';
 import type { ConversationToolCall } from '@shared/types/conversation';
 
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
+const t = localizedTranslator('zh-CN');
 
 const tool = (id: string, status: 'running' | 'pending' | 'error' | 'complete' = 'complete') => createToolRowForPresentation({
   id, toolName: 'read_file', status, startedAt: 1,

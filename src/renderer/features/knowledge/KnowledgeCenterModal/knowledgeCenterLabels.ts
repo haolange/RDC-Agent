@@ -80,15 +80,6 @@ export const RELATION_LABEL_KEYS: Record<KnowledgeRelationKind, TranslationKey> 
   failed_in: 'knowledgeCenter.relation.failed_in',
 };
 
-/** Local `YYYY-MM-DD HH:mm`; empty when the card carries no timestamp. */
-export function formatKnowledgeTime(ms: number | undefined): string {
-  if (ms == null || !Number.isFinite(ms)) return '';
-  const date = new Date(ms);
-  if (Number.isNaN(date.getTime())) return '';
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 export const CHAPTER_LABEL_KEYS: Record<KnowledgeCaseChapter, TranslationKey> = {
   claim: 'knowledgeCenter.chapterClaim',
   scopeExclusions: 'knowledgeCenter.chapterScopeExclusions',

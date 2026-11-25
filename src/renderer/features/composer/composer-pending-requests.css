@@ -1,3 +1,13 @@
+/* Holds the height of a request the running turn just answered, so its next request takes the same place. */
+.composer-frame {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--composer-request-reserve);
+}
+
 .composer-shell-user-input,
 .composer-shell-tool-approval {
   padding: var(--space-2);
@@ -44,14 +54,14 @@
   margin: 0;
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  line-height: 1.6;
+  line-height: var(--type-body-line);
   overflow-wrap: anywhere;
 }
 
 .composer-user-input-question-description {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
   overflow-wrap: anywhere;
 }
 

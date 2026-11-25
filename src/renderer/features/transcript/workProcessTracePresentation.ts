@@ -5,12 +5,13 @@ import { groupImageRows } from './groupImageRows';
 import { isMeaningfulText, getMeaningfulBlockSummary, isNoisyText } from './workProcessBlockText';
 import { createApprovalRow } from './workProcessDecisionRows';
 import { createToolRowForPresentation } from './workProcessToolRows';
-import { countWorkActions } from './workProcessSectionModel';
+import { countFailedActions, countWorkActions } from './workProcessSectionModel';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
 import { buildPresentationUnits, presentationUnitsToDetailRows, type ThinkingItemPresentation } from './workProcessBlockProjection';
 import { markReadSearchResults, mergeWebReadsAcrossSteps } from './workProcessWebFlow';
 import { hasVisibleThinkingMarkdown } from './workProcessThinkingContent';
-import type { Translator } from '../../i18n/messages';
+import type { LocalizedTranslator } from '../../i18n/messages';
+import type { AppLanguage } from '@shared/types/settings';
 
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
 
@@ -53,9 +54,9 @@ const resolveOutputPhase = (
  * "Thought for" only when this block's own reasoning start and settle times are known and apart; never the step's
  * time, and never an invented instant.
  */
-const resolveSettledThinkingLabel = (item: ConversationThinkingItem, t: Translator): string =>
+const resolveSettledThinkingLabel = (item: ConversationThinkingItem, t: LocalizedTranslator): string =>
   item.startedAt !== undefined && item.completedAt !== undefined && item.completedAt > item.startedAt
-    ? t('chat.workProcessThoughtFor', { duration: formatDurationMs(item.startedAt, item.completedAt) })
+    ? t('chat.workProcessThoughtFor', { duration: formatDurationMs(t.language, item.startedAt, item.completedAt) })
     : t('chat.workProcessThinkingComplete');
 
 /**
@@ -65,7 +66,7 @@ const resolveSettledThinkingLabel = (item: ConversationThinkingItem, t: Translat
 const resolveThinkingItem = (
   block: ConversationWorkBlock,
   item: ConversationThinkingItem,
-  t: Translator,
+  t: LocalizedTranslator,
 ): ThinkingItemPresentation | null => {
   const { thinking } = item;
   if (thinking.kind === 'opaque' || thinking.visibility === 'hidden') return null;
@@ -84,7 +85,7 @@ const resolveThinkingItem = (
   };
 };
 
-const getLoopProjectionDeps = (t: Translator) => ({
+const getLoopProjectionDeps = (t: LocalizedTranslator) => ({
   resolveOutputPhase,
   resolveReasoningState,
   resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => resolveThinkingItem(block, item, t),
@@ -97,13 +98,13 @@ const getLoopProjectionDeps = (t: Translator) => ({
   countToolSteps,
 });
 
-const buildProjectionContext = (t: Translator): {
+const buildProjectionContext = (t: LocalizedTranslator): {
   visibleThinkingKeys: Set<string>;
   hasVisibleProcessEvidence: boolean;
   createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
   groupProcessRows: typeof groupProcessRows;
   blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
-  t: Translator;
+  t: LocalizedTranslator;
 } => ({
   visibleThinkingKeys: new Set(),
   hasVisibleProcessEvidence: false,
@@ -113,7 +114,7 @@ const buildProjectionContext = (t: Translator): {
   t,
 });
 
-function blocksToDetailRows(blocks: ConversationWorkBlock[], t: Translator): WorkProcessRow[] {
+function blocksToDetailRows(blocks: ConversationWorkBlock[], t: LocalizedTranslator): WorkProcessRow[] {
   const ctx = buildProjectionContext(t);
   const units = buildPresentationUnits(blocks, getLoopProjectionDeps(t), ctx);
   return presentationUnitsToDetailRows(units);
@@ -121,7 +122,7 @@ function blocksToDetailRows(blocks: ConversationWorkBlock[], t: Translator): Wor
 
 export const buildWorkProcessPresentation = (
   trace: ConversationWorkTrace,
-  t: Translator,
+  t: LocalizedTranslator,
   owner?: { reply: string },
 ): WorkProcessPresentation => {
   const blocks = Array.isArray(trace.blocks) ? trace.blocks : [];
@@ -132,7 +133,7 @@ export const buildWorkProcessPresentation = (
       item.phase !== 'final_answer' && (!reply || item.text.trim() !== reply)
     )),
   } : block) : blocks;
-  const rows = markReadSearchResults(mergeWebReadsAcrossSteps(blocksToDetailRows(processBlocks, t)));
+  const rows = markReadSearchResults(mergeWebReadsAcrossSteps(blocksToDetailRows(processBlocks, t), t.language));
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);
@@ -143,9 +144,9 @@ export const buildWorkProcessPresentation = (
     stepCount,
     toolCount,
     actionCount: countWorkActions(rows),
+    failureCount: countFailedActions(rows),
     summary,
     toolEvidence: trace.toolEvidence ? { ...trace.toolEvidence } : undefined,
-    duration: formatTraceDuration(blocks),
     important,
   };
 };
@@ -169,15 +170,16 @@ const rowsHaveAttention = (rows: WorkProcessRow[]): boolean => rows.some((row) =
   return row.status === 'error' || row.status === 'running' || row.status === 'skipped';
 });
 
-const formatTraceDuration = (blocks: ConversationWorkBlock[]): string => {
+/** How long the turn has worked: from its first block to its last settled one, or to `now` while a block still runs. */
+export const formatTraceDuration = (blocks: ConversationWorkBlock[], language: AppLanguage, now?: number): string => {
   const timestamps = blocks.flatMap((block) => [block.startedAt, block.completedAt].filter(isNumber));
   if (timestamps.length === 0) return '';
-  return formatDurationMs(Math.min(...timestamps), blocks.some((block) => !block.completedAt) ? undefined : Math.max(...timestamps));
+  return formatDurationMs(language, Math.min(...timestamps), blocks.some((block) => !block.completedAt) ? now : Math.max(...timestamps));
 };
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-const createDiagnosticRow = (block: ConversationWorkBlock, t: Translator): WorkProcessRow => ({
+const createDiagnosticRow = (block: ConversationWorkBlock, t: LocalizedTranslator): WorkProcessRow => ({
   type: 'diagnostic',
   id: block.id,
   status: block.status === 'error' ? 'error' : block.status,
@@ -185,7 +187,7 @@ const createDiagnosticRow = (block: ConversationWorkBlock, t: Translator): WorkP
   isHookDiagnostic: block.id.startsWith('diagnostic-hook.') || block.id.startsWith('runtime-diagnostic-hook.'),
   message: getMeaningfulBlockSummary(block) || block.title || t('chat.runtimeDiagnostic'),
   detailLines: [],
-  duration: formatDurationMs(block.startedAt, block.completedAt),
+  duration: formatDurationMs(t.language, block.startedAt, block.completedAt),
 });
 
 const shouldSkipBlock = (block: ConversationWorkBlock): boolean => {

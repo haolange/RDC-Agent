@@ -1,9 +1,7 @@
 import { ToolApprovalRequestPanel } from './ToolApprovalRequestPanel';
 import { PlanReviewRequestPanel } from './PlanReviewRequestPanel';
 import { UserInputRequestPanel } from './UserInputRequestPanel';
-import { planReviewRequestKey } from './planReviewRequestModel';
-import { createRequestFingerprint } from './userInputRequestModel';
-import type { ComposerPendingRequestState } from './pendingRequestSelection';
+import { composerPendingRequestKey, type ComposerPendingRequestState } from './pendingRequestSelection';
 import type { SessionRecord } from '@shared/types/session';
 import type { Ref } from 'react';
 
@@ -17,16 +15,16 @@ export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, c
 }) {
   if (pending.kind === 'tool-approval') {
     return <div ref={shellRef} className="composer-shell composer-shell-tool-approval" {...composeAccentStyle}>
-      <ToolApprovalRequestPanel key={JSON.stringify([pending.request.sessionId, pending.request.turnId, pending.request.approvalId])} request={pending.request} />
+      <ToolApprovalRequestPanel key={composerPendingRequestKey(pending)} request={pending.request} />
     </div>;
   }
   if (pending.kind === 'plan-review') {
     return <div ref={shellRef} className="composer-shell composer-shell-plan-review" {...composeAccentStyle}>
-      <PlanReviewRequestPanel key={planReviewRequestKey(pending.request)} request={pending.request}
+      <PlanReviewRequestPanel key={composerPendingRequestKey(pending)} request={pending.request}
         agentId={agentId} currentSession={currentSession} onReplan={onReplan} />
     </div>;
   }
   return <div ref={shellRef} className="composer-shell composer-shell-user-input" {...composeAccentStyle}>
-    <UserInputRequestPanel key={createRequestFingerprint(pending.request)} request={pending.request} />
+    <UserInputRequestPanel key={composerPendingRequestKey(pending)} request={pending.request} />
   </div>;
 }

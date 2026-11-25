@@ -3,8 +3,45 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { WorkProcess } from './WorkProcess';
-import type { ConversationTextItem, ConversationThinkingItem, ConversationWorkTrace } from '@shared/types/conversation';
+import type { ConversationTextItem, ConversationThinkingItem, ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
+import type { PlanReviewStatus } from '@shared/types/planReview';
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock('./PlanReaderHost', () => ({ usePlanReader: () => () => undefined }));
+
+const planCall = (revision: number, status: PlanReviewStatus): ConversationToolCall => ({
+  id: `plan-${revision}`, toolName: 'plan_artifact', status: status === 'awaiting' ? 'running' : 'complete', startedAt: revision,
+  completedAt: status === 'awaiting' ? undefined : revision + 1, displayOrder: revision,
+  planReview: { status, planId: 'plan', revision, title: `Plan ${revision}`, hash: 'h', uri: 'session://plans/plan.md',
+    summary: ['Find the draw'], sections: [], handoffOptions: [] },
+});
+
+it('shows one plan card inside Working through review and revision, then folds once when the turn completes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  const render = (status: ConversationWorkTrace['status'], calls: ConversationToolCall[]) => act(async () => root.render(
+    React.createElement(WorkProcess, { trace: { status, updatedAt: 9, blocks: [{
+      id: 'loop', kind: 'llm_turn', title: 'Loop', status: status === 'running' ? 'running' : 'complete', startedAt: 1,
+      completedAt: status === 'running' ? undefined : 9, toolCalls: calls,
+    }] }, sessionId: 'plan-session', rowKey: 'request:plan:assistant' })));
+  const collapsed = () => host.querySelector('.work-process')?.classList.contains('is-collapsed');
+  const cards = () => [...host.querySelectorAll('[data-testid="plan-card"]')].map((card) => card.textContent);
+  try {
+    await render('running', [planCall(1, 'awaiting')]);
+    expect(collapsed()).toBe(false);
+    expect(cards()).toEqual([expect.stringContaining('Plan 1')]);
+    // Feedback returns in the same turn: the rejected revision folds to a shell row and the new one is the only card.
+    await render('running', [planCall(1, 'rejected'), planCall(2, 'awaiting')]);
+    expect(collapsed()).toBe(false);
+    expect(cards()).toEqual([expect.stringContaining('Plan 2')]);
+    await render('complete', [planCall(1, 'rejected'), planCall(2, 'approved')]);
+    expect(collapsed()).toBe(true);
+    // A stop cancels the review: no card is left claiming a decision, and the stopped Working stays open.
+    await render('stopped', [planCall(1, 'rejected'), planCall(2, 'cancelled')]);
+    expect(collapsed()).toBe(false);
+    expect(cards()).toEqual([]);
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
 
 it('restores a main-process tool after folding the process and isolates another message', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -15,7 +52,7 @@ it('restores a main-process tool after folding the process and isolates another 
     toolCalls: [{ id: 'same-tool-id', toolName: 'read_file', status: 'complete', startedAt: 1, completedAt: 2,
       argsPreview: '{"path":"sample.ts"}', resultPreview: 'Verified content' }],
   }] };
-  const render = (messageId: string) => act(async () => root.render(React.createElement(WorkProcess, { trace, sessionId: 'disclosure-session', messageId })));
+  const render = (rowKey: string) => act(async () => root.render(React.createElement(WorkProcess, { trace, sessionId: 'disclosure-session', rowKey })));
   try {
     await render('message-a');
     await act(async () => host.querySelector<HTMLButtonElement>('.work-card-trigger')!.click());
@@ -37,9 +74,9 @@ it('folds Working when its turn completes and keeps a manual choice across updat
   const root = createRoot(host);
   const block = { id: 'loop', kind: 'llm_turn' as const, title: 'Loop', status: 'running' as const, startedAt: 1,
     toolCalls: [{ id: 'read', toolName: 'read_file', status: 'complete' as const, startedAt: 1, completedAt: 2 }] };
-  const render = (status: ConversationWorkTrace['status'], messageId: string) => act(async () => root.render(React.createElement(WorkProcess, {
+  const render = (status: ConversationWorkTrace['status'], rowKey: string) => act(async () => root.render(React.createElement(WorkProcess, {
     trace: { status, updatedAt: 3, blocks: [{ ...block, status: status === 'running' ? 'running' : 'complete', completedAt: status === 'running' ? undefined : 3 }] },
-    sessionId: 'collapse-session', messageId })));
+    sessionId: 'collapse-session', rowKey })));
   const collapsed = () => host.querySelector('.work-process')?.classList.contains('is-collapsed');
   try {
     await render('running', 'turn-a');
@@ -68,7 +105,7 @@ it('keeps streamed text in the same DOM node when its phase is confirmed', async
   const trace: ConversationWorkTrace = { status: 'running', updatedAt: 2, blocks: [{
     id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1, toolCalls: [], items: [output],
   }] };
-  const render = () => act(async () => root.render(React.createElement(WorkProcess, { trace: { ...trace }, sessionId: 'session', messageId: 'a' })));
+  const render = () => act(async () => root.render(React.createElement(WorkProcess, { trace: { ...trace }, sessionId: 'session', rowKey: 'a' })));
   try {
     await render();
     const node = host.querySelector('[data-testid="work-process-output"]');
@@ -98,5 +135,28 @@ it('keeps streamed text in the same DOM node when its phase is confirmed', async
     trace.blocks[0].toolCalls[0].approval = { approvalId: 'approval', status: 'pending' };
     await render();
     expect(host.querySelector('[data-testid="work-process-tool-call"] [data-active-signal="info"]')).toBeNull();
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
+it('states how many actions failed and keeps a completed Working with failures open', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  const call = (id: string, status: ConversationToolCall['status']): ConversationToolCall => ({
+    id, toolName: 'read_file', status, startedAt: 1, executionStartedAt: 1, completedAt: 2, argsPreview: '{"path":"a.ts"}',
+    ...(status === 'error' ? { error: 'ENOENT' } : {}),
+  });
+  const render = (rowKey: string, calls: ConversationToolCall[]) => act(async () => root.render(React.createElement(WorkProcess, {
+    trace: { status: 'complete', updatedAt: 3, blocks: [{ id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'complete',
+      startedAt: 1, completedAt: 3, toolCalls: calls }] }, sessionId: 'failure-session', rowKey })));
+  const header = () => host.querySelector('.work-process-header');
+  try {
+    await render('request:clean:assistant', [call('read-a', 'complete')]);
+    expect(host.querySelector('.work-process')?.classList.contains('is-collapsed')).toBe(true);
+    expect(header()?.querySelector('.work-process-meta-failures')).toBeNull();
+    await render('request:failed:assistant', [call('read-a', 'complete'), call('read-b', 'error'), call('read-c', 'error')]);
+    expect(host.querySelector('.work-process')?.classList.contains('is-expanded')).toBe(true);
+    expect(header()?.querySelector('.work-process-meta-failures')?.textContent).toBe('chat.workProcessFailures');
+    expect(header()?.getAttribute('aria-expanded')).toBe('true');
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

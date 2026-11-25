@@ -1,6 +1,7 @@
 import { normalizeWebUrl } from '@shared/utils/webUrl';
 import { webGroup } from './groupWebRows';
 import type { WorkProcessRow } from './workProcessTypes';
+import type { AppLanguage } from '@shared/types/settings';
 
 type ToolRow = Extract<WorkProcessRow, { type: 'tool' }>;
 type SectionRow = Extract<WorkProcessRow, { type: 'section' }>;
@@ -18,7 +19,7 @@ const hasLead = (section: SectionRow) => section.visibleSteps.some((step) => ste
  * Reads that continue across model steps with nothing visible in between (no thinking, commentary or other tool)
  * join the previous step's read card; a step left empty by that disappears.
  */
-export function mergeWebReadsAcrossSteps(rows: WorkProcessRow[]): WorkProcessRow[] {
+export function mergeWebReadsAcrossSteps(rows: WorkProcessRow[], language: AppLanguage): WorkProcessRow[] {
   const output: WorkProcessRow[] = [];
   for (const row of rows) {
     const previous = output.at(-1);
@@ -39,7 +40,7 @@ export function mergeWebReadsAcrossSteps(rows: WorkProcessRow[]): WorkProcessRow
       output.push(row);
       continue;
     }
-    previous.visibleSteps = [...previous.visibleSteps.slice(0, -1), webGroup([...tail, ...moving])];
+    previous.visibleSteps = [...previous.visibleSteps.slice(0, -1), webGroup([...tail, ...moving], language)];
     const rest = row.visibleSteps.slice(carried);
     if (rest.length > 0) output.push({ ...row, visibleSteps: rest });
   }

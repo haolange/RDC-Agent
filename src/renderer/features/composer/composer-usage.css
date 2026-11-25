@@ -52,7 +52,7 @@
 .composer-usage-value {
   display: inline-flex;
   align-items: center;
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 /* The used share sits beside the ring at caption size; readable text never shrinks below it. */

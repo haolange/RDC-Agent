@@ -2,6 +2,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
+import { localizedTranslator } from '../../i18n/messages';
 import { UserInputRow } from './WorkProcessRows';
 import { createUserInputRow } from './workProcessDecisionRows';
 import type { ConversationToolCall } from '@shared/types/conversation';
@@ -17,7 +18,7 @@ const call: ConversationToolCall = {
 };
 
 function renderInput(changes: Partial<ConversationToolCall> = {}) {
-  const row = createUserInputRow({ ...call, ...changes }, (key) => key);
+  const row = createUserInputRow({ ...call, ...changes }, localizedTranslator('en'));
   if (row.type !== 'userInput') throw new Error('Expected an Ask transcript');
   return new DOMParser().parseFromString(renderToStaticMarkup(createElement(UserInputRow, { row })), 'text/html');
 }

@@ -1,7 +1,7 @@
 .markdown-body {
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  line-height: 1.75;
+  line-height: var(--leading-relaxed);
   overflow-wrap: anywhere;
 }
 
@@ -26,7 +26,7 @@
   margin: var(--space-5) 0 var(--space-2);
   color: var(--token-text-primary);
   font-weight: var(--font-semibold);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }
 
 /* Six levels on the four type roles: size steps down, then weight and colour carry the last levels. */
@@ -113,7 +113,7 @@
   border: 1px solid color-mix(in srgb, var(--token-border-muted) 60%, transparent);
   color: var(--token-text-primary);
   font-family: var(--font-mono);
-  font-size: 0.92em;
+  font-size: inherit;
 }
 
 .markdown-body pre {
@@ -175,7 +175,7 @@
   background: transparent;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 .markdown-mermaid {
@@ -219,7 +219,7 @@
   background: color-mix(in srgb, var(--token-bg-raised) 60%, transparent);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.55;
+  line-height: var(--type-meta-line);
   white-space: pre-wrap;
 }
 
@@ -231,7 +231,7 @@
 
 .markdown-body .katex {
   color: var(--token-text-secondary);
-  font-size: 1.05em;
+  font-size: inherit;
 }
 
 .markdown-body pre code {
@@ -240,7 +240,7 @@
   background: transparent;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 .markdown-body blockquote {
@@ -310,7 +310,7 @@
 }
 
 .conversation-bubble-assistant .markdown-body {
-  line-height: 1.62;
+  line-height: var(--leading-relaxed);
 }
 
 .conversation-bubble-assistant .markdown-body p {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { translate } from '../../renderer/i18n/messages';
+import { localizedTranslator } from '../../renderer/i18n/messages';
 import { createToolRowForPresentation } from '../../renderer/features/transcript/workProcessToolRows';
 import { stopWorkTrace } from '../../renderer/lib/stopWorkTrace';
 import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
@@ -61,7 +61,7 @@ describe('request cancellation is not rejection or failure', () => {
     const call = next.blocks[0].toolCalls[0];
     expect(call.status).toBe(status);
     expect(call.completedAt).toBe(2);
-    expect(createToolRowForPresentation(call, (key, params) => translate('zh-CN', key, params)).status).toBe(status);
+    expect(createToolRowForPresentation(call, localizedTranslator('zh-CN')).status).toBe(status);
   });
   it.each(['pending', 'running'] as const)('keeps a %s tool live when only its old permission approval is cancelled', status => {
     let trace = upsertRuntimeToolCall(undefined, { id: 'switch', toolName: 'shell', status, startedAt: 10,
@@ -72,14 +72,14 @@ describe('request cancellation is not rejection or failure', () => {
     let call = trace.blocks[0].toolCalls[0];
     expect(call).toMatchObject({ id: 'switch', status, approval: { approvalId: 'old-approval', status: 'cancelled', errorCode: 'PERMISSION_MODE_CHANGED' } });
     expect(call.completedAt).toBeUndefined(); expect(call.error).toBeUndefined();
-    expect(createToolRowForPresentation(call, (key, params) => translate('en', key, params)).status).toBe(status);
+    expect(createToolRowForPresentation(call, localizedTranslator('en')).status).toBe(status);
     trace = upsertRuntimeToolCall(trace, { id: 'switch', toolName: 'shell', status: 'running', executionStartedAt: 30 });
     expect(trace.blocks[0].toolCalls[0].status).toBe('running');
     trace = upsertRuntimeToolCall(trace, { id: 'switch', toolName: 'shell', status: 'complete', completedAt: 40, resultPreview: 'node version', });
     call = trace.blocks[0].toolCalls[0];
     expect(trace.blocks[0].id).toBe(blockId); expect(call.status).toBe('complete');
     expect(call.approval?.status).toBe('cancelled'); expect(call.completedAt).toBe(40);
-    expect(createToolRowForPresentation(call, (key, params) => translate('en', key, params)).status).toBe('complete');
+    expect(createToolRowForPresentation(call, localizedTranslator('en')).status).toBe('complete');
   });
 
   it('does not merge a superseded approval cancellation into the next unique request', () => {

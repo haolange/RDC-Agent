@@ -1,6 +1,7 @@
 import { KNOWLEDGE_SCOPE_AXES, type KnowledgeCardDetail, type KnowledgeLaneHit } from '@shared/types/knowledge';
 import { useI18n } from '../../../../i18n';
-import { formatKnowledgeTime, LIFECYCLE_LABEL_KEYS, RELATION_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
+import { formatDateTime } from '../../../../lib/formatTime';
+import { LIFECYCLE_LABEL_KEYS, RELATION_LABEL_KEYS, SCOPE_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { Button } from '../../../../ui/Button';
 
 interface CardMetaGridProps {
@@ -16,7 +17,7 @@ interface CardMetaGridProps {
  * lives, the scope it applies to and how it relates to other cards.
  */
 export function CardMetaGrid({ card, spaceLabel, resolveRelation, onOpenRelation }: CardMetaGridProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const exclusions = card.scope.exclusions ?? {};
   const axes = KNOWLEDGE_SCOPE_AXES.filter((axis) => card.scope[axis] || exclusions[axis]?.length);
   return (
@@ -37,7 +38,7 @@ export function CardMetaGrid({ card, spaceLabel, resolveRelation, onOpenRelation
           </div>
           <div>
             <dt>{t('knowledgeCenter.metaUpdatedAt')}</dt>
-            <dd>{formatKnowledgeTime(card.updatedAt) || '—'}</dd>
+            <dd>{formatDateTime(language, card.updatedAt) || '—'}</dd>
           </div>
           <div>
             <dt>{t('knowledgeCenter.metaSpace')}</dt>

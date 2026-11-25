@@ -11,8 +11,6 @@ import { readCssRules, readDeclarations, splitTopLevel } from './lib/cssRules.mj
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rendererRoot = path.join(repoRoot, 'src/renderer');
 
-// Non-zero ceilings below count hits in files another change owns at the moment (transcript, composer); the
-// report names each one. They fall to 0 when those files are fixed.
 const CEILINGS = {
   'invalid-transition': 0,
   'inline-svg': 0,
@@ -20,15 +18,11 @@ const CEILINGS = {
   'raw-error-render': 0,
   'literal-color': 0,
   'bare-alert': 0,
-  // Pending in transcript CSS: message-actions, work-process-disclosure (2) and work-process-web.
-  'hover-focus-pair': 4,
+  'hover-focus-pair': 0,
   'focus-same-as-hover': 0,
   'reduced-motion': 0,
-  // Pending: MeasuredWorkRows asks lib/motion instead of scrolling smoothly unconditionally.
-  'smooth-scroll': 1,
-  // Pending: ComposerModelEffortPanel, ComposerSkillChips, SubagentCallDetails, WorkProcessFamilyLayers (4),
-  // WorkProcessToolCardParts (4) and WorkProcessWebParts.
-  'tooltip-target': 12,
+  'smooth-scroll': 0,
+  'tooltip-target': 0,
 };
 
 /** Token and motion definition layers may hold literal values; components may not. */

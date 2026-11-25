@@ -1,6 +1,7 @@
 import React from 'react';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
+import { motionScrollBehavior } from '../../lib/motion';
 import { useWorkProcessFolded } from './workProcessFold';
 import type { WorkProcessRow } from './workProcessTypes';
 
@@ -121,7 +122,7 @@ export const MeasuredWorkRows: React.FC<{
           }
           const reason = target.querySelector('details');
           if (reason) reason.open = true;
-          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.scrollIntoView({ behavior: motionScrollBehavior(), block: 'center' });
           target.focus({ preventScroll: true });
           target.classList.remove('is-trace-flash');
           void target.offsetWidth;

@@ -46,7 +46,7 @@
 .work-process-approval-message {
   min-width: 0;
   color: var(--token-text-secondary);
-  line-height: 1.65;
+  line-height: var(--leading-relaxed);
   overflow-wrap: anywhere;
 }
 

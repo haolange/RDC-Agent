@@ -67,14 +67,32 @@
   outline-offset: var(--focus-ring-offset);
 }
 
+/* Every mode's name sits in the same grid cell, so the cell (and the pill) is as wide as the widest name. */
 .composer-permission-pill-label {
+  display: grid;
+  min-width: 0;
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-none);
+}
+
+.composer-permission-pill-label-option {
+  grid-area: 1 / 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
-  line-height: 1;
+  visibility: hidden;
+}
+
+.composer-permission-pill-label-option.is-shown {
+  visibility: visible;
+}
+
+/* While main confirms a switch the label names the requested mode in the neutral tone, not as granted. */
+.composer-permission-pill.is-pending .composer-permission-pill-label,
+.composer-permission-pill.is-pending .composer-permission-pill-caret {
+  color: var(--token-text-secondary);
 }
 
 .composer-permission-pill-caret {

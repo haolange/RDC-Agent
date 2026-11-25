@@ -1,3 +1,4 @@
+import { TOOL_RECEIPT_DECODED_TEXT_HEADING, TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING } from '@shared/constants/toolReceiptHeadings';
 import { normalizeToolName } from './workProcessToolCatalog';
 import { toRecord, stringifyPreview, createDetailLines, readNestedValue, collectReadableText, extractContentTextFromJsonishString, isJsonLike, isEnvelopeText, ENVELOPE_KEY_PATTERN } from './workProcessContentText';
 import { getDetailsRecord } from './workProcessWebPresentation';
@@ -45,9 +46,8 @@ export const asFiniteNumber = (value: unknown): number | undefined => {
 };
 
 // Receipts carry the same identity in their model-facing text and structured details.
-const imageEvidenceHeading = 'Image evidence (grant each exact URI explicitly to a reviewer; the result wrapper does not grant pixels):';
-const decodedTextHeading = 'Decoded tool text: call artifact_read with one of the following exact selections, then follow its next cursor. '
-  + 'These select returned text blocks, not omitted source-file ranges or domain validation.';
+const imageEvidenceHeading = TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING;
+const decodedTextHeading = TOOL_RECEIPT_DECODED_TEXT_HEADING;
 
 function withoutEvidenceReceipt(lines: string[], parsed: unknown): string[] {
   const record = toRecord(parsed);

@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { translate } from '../../i18n';
+import { localizedTranslator } from '../../i18n/messages';
 import { ToolApprovalCallout } from './WorkProcessToolCardParts';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import type { ConversationToolCall } from '@shared/types/conversation';
@@ -15,7 +16,7 @@ it('translates operation risk, review source and non-execution labels independen
   const row = createToolRowForPresentation({ id: 'approval', toolName: 'shell', status: 'error', startedAt: 1,
     approval: { approvalId: 'approval', status: 'rejected', risk: 'high', reviewMethod: 'model', reviewer: 'auto_review',
       errorCode: 'REVIEW_TIMEOUT', reason: 'Host timeout detail.' },
-  }, (key, params) => translate('en', key, params));
+  }, localizedTranslator('en'));
   if (row.type !== 'tool' || !row.approval) throw new Error('expected approval row');
   const html = renderToStaticMarkup(createElement(ToolApprovalCallout, { approval: row.approval }));
   for (const key of ['chat.workProcessReviewIncomplete', 'chat.workProcessRiskHigh', 'chat.workProcessModelReview', 'chat.workProcessNotExecuted'] as const) {
@@ -26,7 +27,7 @@ it('translates operation risk, review source and non-execution labels independen
 });
 
 it.each(['en', 'zh-CN'] as const)('distinguishes withdrawn approvals from stopped tools in %s without altering raw content', language => {
-  const t = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(language, key, params);
+  const t = localizedTranslator(language);
   const call: ConversationToolCall = { id: 'continued-command', toolName: 'shell', status: 'complete', startedAt: 1,
     executionStartedAt: 2, completedAt: 3, resultPreview: '原始 output: PERMISSION_MODE_CHANGED',
     approval: { approvalId: 'old-request', status: 'cancelled', errorCode: 'PERMISSION_MODE_CHANGED',

@@ -35,7 +35,7 @@ const ChipRow: React.FC<{ chips?: string[] }> = ({ chips }) => {
 
 const PathRow: React.FC<{ path: string }> = ({ path }) => (
   <div className="work-process-family-path">
-    <code className="work-process-tool-card-path" data-tooltip={path}>{path}</code>
+    <code className="work-process-tool-card-path" tabIndex={0} data-tooltip={path}>{path}</code>
     <CopyPathButton path={path} />
   </div>
 );
@@ -75,7 +75,7 @@ const MemoryBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   return (
     <div className="work-process-tool-card-body family-memory">
       <ChipRow chips={row.chips} />
-      {sample ? <span className="work-process-tool-card-body-text is-summary" data-tooltip={sample}>{sample}</span> : null}
+      {sample ? <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={sample}>{sample}</span> : null}
     </div>
   );
 };
@@ -98,7 +98,7 @@ const SkillBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   if (!name) return null;
   return (
     <div className="work-process-tool-card-body family-skill">
-      <span className="work-process-tool-card-body-text is-summary" data-tooltip={name}>{name}</span>
+      <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={name}>{name}</span>
     </div>
   );
 };
@@ -121,7 +121,7 @@ const McpBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   return (
     <div className="work-process-tool-card-body family-mcp">
       <ChipRow chips={row.chips} />
-      {summary ? <span className="work-process-tool-card-body-text is-summary" data-tooltip={summary}>{summary}</span> : null}
+      {summary ? <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={summary}>{summary}</span> : null}
     </div>
   );
 };

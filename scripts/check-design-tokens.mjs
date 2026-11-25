@@ -61,28 +61,7 @@ const STOP_COLOR_EXEMPT = new Set();
  * Hits the stricter typography rules found in files another change owns at the moment, counted per file. A count may
  * only fall: more hits fail, fewer print the number to lower it to, and an entry leaves this map at 0.
  */
-const PENDING_OWNER_FIXES = {
-  'src/renderer/features/composer/ComposerMarkdownInput.css': 1,
-  'src/renderer/features/composer/composer-agent-popup.css': 1,
-  'src/renderer/features/composer/composer-editor.css': 1,
-  'src/renderer/features/composer/composer-pending-requests.css': 2,
-  'src/renderer/features/composer/composer-permission-options.css': 1,
-  'src/renderer/features/composer/composer-permission.css': 1,
-  'src/renderer/features/composer/composer-usage.css': 1,
-  'src/renderer/features/composer/composer-user-input.css': 2,
-  'src/renderer/features/transcript/AgentChat.markdown.css': 8,
-  'src/renderer/features/transcript/message-bubbles.css': 5,
-  'src/renderer/features/transcript/message-editor.css': 2,
-  'src/renderer/features/transcript/message-layout.css': 1,
-  'src/renderer/features/transcript/work-process-answers.css': 3,
-  'src/renderer/features/transcript/work-process-decisions.css': 1,
-  'src/renderer/features/transcript/work-process-families.css': 1,
-  'src/renderer/features/transcript/work-process-layout.css': 5,
-  'src/renderer/features/transcript/work-process-tasks.css': 2,
-  'src/renderer/features/transcript/work-process-thinking.css': 4,
-  'src/renderer/features/transcript/work-process-tool-cards.css': 7,
-  'src/renderer/features/transcript/work-process-web.css': 1,
-};
+const PENDING_OWNER_FIXES = {};
 
 const RULES = [
   {

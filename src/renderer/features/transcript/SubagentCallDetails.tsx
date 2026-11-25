@@ -57,7 +57,7 @@ export const SubagentCallDetails: React.FC<{
       executionId={header?.executionId} generation={header?.generation} />
     {identifiers.length > 0 ? <WorkDisclosure variant="secondary-card" title={t('chat.subagentIdentifiers')}
       open={identifiersOpen} onToggle={toggleIdentifiers}><dl className="work-process-subagent-identifiers">
-      {identifiers.map(([label, value]) => <div key={label}><dt>{label}</dt><dd data-tooltip={String(value)}>{value}<Button variant="ghost" size="sm" onClick={() => void copyText(String(value))}>{t('chat.subagentCopy')}</Button></dd></div>)}
+      {identifiers.map(([label, value]) => <div key={label}><dt>{label}</dt><dd><span tabIndex={0} data-tooltip={String(value)}>{value}</span><Button variant="ghost" size="sm" onClick={() => void copyText(String(value))}>{t('chat.subagentCopy')}</Button></dd></div>)}
     </dl></WorkDisclosure> : null}
     {header?.error ? <InlineError detail={header.error}>{humanizeError(header.error, t, 'chat.subagentFailedSummary')}</InlineError> : null}
   </div>;

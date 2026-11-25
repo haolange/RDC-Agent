@@ -79,12 +79,12 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     return (
       <div className={`work-process-tool-card-body family-${row.family}`}>
         {bodyText ? (
-          <span className="work-process-tool-card-body-text is-summary" data-tooltip={bodyText}>{bodyText}</span>
+          <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={bodyText}>{bodyText}</span>
         ) : null}
         {sampleLines.length > 0 ? (
           <ul className="work-process-tool-card-body-list">
             {sampleLines.map((line) => (
-              <li key={line} className="work-process-tool-card-body-list-item" data-tooltip={line}>{line}</li>
+              <li key={line} className="work-process-tool-card-body-list-item" tabIndex={0} data-tooltip={line}>{line}</li>
             ))}
           </ul>
         ) : null}
@@ -99,7 +99,7 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
           {row.chips.map((chip) => <span key={chip} className="work-process-path-chip">{chip}</span>)}
         </div>
       ) : null}
-      {bodyText ? <span className="work-process-tool-card-body-text" data-tooltip={bodyText}>{bodyText}</span> : null}
+      {bodyText ? <span className="work-process-tool-card-body-text" tabIndex={0} data-tooltip={bodyText}>{bodyText}</span> : null}
       {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
     </div>
   );
@@ -167,7 +167,7 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className="work-process-tool-card-detail family-generic" data-testid="work-process-tool-preview">
       {lines[0] ? <p className="work-process-tool-card-caption">{lines[0]}</p> : null}
       {row.pathChip ? (
-        <span className="work-process-path-chip" data-tooltip={row.pathChip}>{row.pathChip}</span>
+        <span className="work-process-path-chip" tabIndex={0} data-tooltip={row.pathChip}>{row.pathChip}</span>
       ) : null}
       {lines.length > 1 ? (
         <pre className="work-process-tool-card-preview">{lines.slice(1).join('\n')}</pre>

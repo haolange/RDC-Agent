@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import { translate } from '../../i18n/messages';
+import { localizedTranslator } from '../../i18n/messages';
 import { WorkCardHeader } from './WorkCardHeader';
 import { WorkDisclosure } from './WorkDisclosure';
 import { DelegationTaskDocument } from './DelegationTaskDocument';
@@ -14,7 +14,7 @@ import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessContent } from './WorkProcessContent';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
+const t = localizedTranslator('zh-CN');
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { count: number }) => `${key}${values ? `:${values.count}` : ''}` }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('p', null, content) }));

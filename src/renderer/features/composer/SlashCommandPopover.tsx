@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCommandCatalog } from '../../hooks/useCommandCatalog';
 import { useI18n } from '../../i18n';
 import { useOverlayDismiss } from '../../lib/overlayStack';
+import { isImeComposing } from '../../lib/ime';
 import { InlineError } from '../../ui/InlineError';
 import { Skeleton } from '../../ui/Skeleton';
 import './SlashCommandPopover.css';
@@ -33,6 +34,8 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({ filter
   useEffect(() => setSelectedIndex(0), [filterText]);
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    // An input method's Enter commits its candidate; it must not also pick a command.
+    if (isImeComposing(event)) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setSelectedIndex((previous) => Math.min(previous + 1, ordered.length - 1));

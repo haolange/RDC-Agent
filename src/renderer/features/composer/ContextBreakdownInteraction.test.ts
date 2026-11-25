@@ -26,7 +26,7 @@ it('lets the portal own dismissal and preserves disclosure across reopenings', (
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   try {
     act(() => root.render(createElement(StrictMode, null,
-      createElement(ComposerMenuRegistryProvider, { children: createElement(Owner) }))));
+      createElement(ComposerMenuRegistryProvider, { scope: 'composer', children: createElement(Owner) }))));
     const trigger = host.querySelector<HTMLButtonElement>('[data-testid="composer-usage-indicator"]')!;
     const agent = host.querySelector<HTMLButtonElement>('[data-testid="agent-trigger"]')!;
     act(() => agent.click());

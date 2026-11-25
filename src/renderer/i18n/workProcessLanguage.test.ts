@@ -9,11 +9,11 @@ import { buildWorkProcessPresentation } from '../features/transcript/workProcess
 import { WorkProcess } from '../features/transcript/WorkProcess';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { localizeCommands } from '../lib/commandLabels';
-import { translate, type Translator } from './messages';
+import { localizedTranslator, translate } from './messages';
 import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 import type { AppLanguage } from '@shared/types/settings';
 
-const translator = (language: AppLanguage): Translator => (key, params) => translate(language, key, params);
+const translator = localizedTranslator;
 const call = (toolName: string, status: ConversationToolCall['status'] = 'complete'): ConversationToolCall => ({
   id: toolName, toolName, status, startedAt: 1, executionStartedAt: status === 'pending' ? undefined : 1,
   completedAt: status === 'running' || status === 'pending' ? undefined : 100,
@@ -97,7 +97,7 @@ it('updates an already mounted historical tool without losing disclosure or focu
   });
   try {
     await switchTo('zh-CN');
-    await act(async () => root.render(createElement(WorkProcess, { trace, sessionId: 'language-test', messageId: 'history' })));
+    await act(async () => root.render(createElement(WorkProcess, { trace, sessionId: 'language-test', rowKey: 'history' })));
     // A settled Working is folded: open it to reach the historical tool card; its steps are laid out flat.
     await act(async () => { host.querySelector<HTMLButtonElement>('.work-process-header')!.click(); });
     const trigger = host.querySelector<HTMLButtonElement>('.work-card-trigger')!;

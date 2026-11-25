@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
-import { translate } from '../../i18n/messages';
+import { localizedTranslator } from '../../i18n/messages';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import { createApprovalRow } from './workProcessDecisionRows';
@@ -13,7 +13,7 @@ import type {
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
+const t = localizedTranslator('zh-CN');
 
 const now = 1_700_000_000_000;
 
@@ -432,7 +432,7 @@ describe('buildWorkProcessPresentation', () => {
     }, t);
 
     expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
-      label: '已思考 · 1.5s',
+      label: '已思考 · 1.5秒',
       preview: 'raw chain-of-thought that must not be result text',
       openByDefault: false,
     })]);

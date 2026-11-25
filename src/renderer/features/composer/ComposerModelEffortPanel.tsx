@@ -182,9 +182,10 @@ export const ComposerModelEffortPanel: React.FC<{
       </div>
 
       {onLevel ? (
-        <div className="composer-effort-switch-row" data-tooltip={t('composer.effort.thinkingSwitchHint')}>
+        <div className="composer-effort-switch-row">
           <span className="composer-effort-switch-title">{t('composer.effort.thinkingSwitch')}</span>
           <Switch data-testid="composer-effort-switch" aria-label={t('composer.effort.thinkingSwitch')}
+            data-tooltip={t('composer.effort.thinkingSwitchHint')}
             checked={displayLevel !== 'off'} onCheckedChange={(on) => onSelectLevel(on ? onLevel : 'off')} />
         </div>
       ) : (

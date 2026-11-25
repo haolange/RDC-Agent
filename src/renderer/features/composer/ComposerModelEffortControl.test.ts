@@ -34,7 +34,7 @@ vi.mock('./ComposerModelEffortPanel', () => ({ ComposerModelEffortPanel: ({ onOp
   createElement('button', { onClick: onOpenModels, 'data-testid': 'open-models' }, 'Effort') }));
 let root: Root; let host: HTMLDivElement;
 const render = (scope = 'first') => act(async () => root.render(createElement(ComposerMenuRegistryProvider, {
-  key: scope,
+  key: scope, scope,
   children: createElement(ComposerModelEffortControl, { agentId: 'debugger', currentSession: null,
     onSaveStateChange: (state: ComposerModelSaveState) => mock.save(state) }),
 })));
@@ -76,7 +76,7 @@ it('preserves the normal Composer model and effort label without an override', a
 
 it('shows the main-confirmed request while disabled, and hides stale draft labels during preparation', async () => {
   const paint = (prepared: PreparedTurnContextSummary | null, preparing: boolean) => act(async () => root.render(
-    createElement(ComposerMenuRegistryProvider, { children: createElement(ComposerModelEffortControl, {
+    createElement(ComposerMenuRegistryProvider, { scope: 'composer', children: createElement(ComposerModelEffortControl, {
       agentId: 'debugger', currentSession: null, disabled: true, prepared, preparing,
     }) })));
   await paint(null, true);

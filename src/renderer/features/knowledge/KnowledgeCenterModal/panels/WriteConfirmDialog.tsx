@@ -9,7 +9,7 @@ import { useI18n } from '../../../../i18n';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { ConflictRow } from '../parts/ConflictRow';
 import { KnowledgeStatusTag } from '../parts/KnowledgeStatusTag';
-import { formatKnowledgeTime } from '../knowledgeCenterLabels';
+import { formatDateTime } from '../../../../lib/formatTime';
 import type { ReactNode } from 'react';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
@@ -25,7 +25,7 @@ interface WriteConfirmDialogProps {
  * still current, and the user has explicitly ticked the confirmation.
  */
 export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   if (!write.open || !write.after) return null;
 
   const space = spaces.find(({ spaceId }) => spaceId === write.after?.spaceId);
@@ -88,7 +88,7 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
         )}
         {fact(
           t('knowledgeCenter.confirmVersion'),
-          formatKnowledgeTime(write.after.updatedAt) || '—',
+          formatDateTime(language, write.after.updatedAt) || '—',
         )}
         {fact(
           t('knowledgeCenter.confirmConflict'),

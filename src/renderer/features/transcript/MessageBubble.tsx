@@ -11,16 +11,17 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useI18n } from '../../i18n';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { errorDetail } from '../../lib/errorDetail';
+import { formatClockTime } from '../../lib/formatTime';
 import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
 import { WorkProcess } from './WorkProcess';
 import { MessageActions } from './MessageActions';
 import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
-import { PlanDeliverable } from './PlanDeliverable';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { answerSources } from './answerSources';
+import { transcriptRowKey } from './transcriptRowKey';
 import type {
   ConversationMessage,
   ConversationMessageStatus,
@@ -29,15 +30,6 @@ import type {
 interface MessageBubbleProps {
   message: ConversationMessage;
 }
-
-const formatClockTime = (epoch: number): string => {
-  if (!Number.isFinite(epoch) || epoch <= 0) return '';
-  return new Date(epoch).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-};
 
 const StreamingCursor: React.FC = () => (
   <span className="conversation-streaming-cursor" aria-hidden="true" />
@@ -97,14 +89,14 @@ const MessageMetaBar: React.FC<{
 };
 
 const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
-  const time = formatClockTime(message.createdAt);
+  const { t, language } = useI18n();
+  const time = formatClockTime(language, message.createdAt);
   const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [editError, setEditError] = useState('');
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const rewriteMessage = useUserMessageRewrite(message);
-  const { t } = useI18n();
   const selectedAgentId = useLayoutStore((state) => state.selectedAgentId);
   const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
   const selectedAgent = agentDefinitions.find((agent) => agent.id === selectedAgentId);
@@ -192,9 +184,9 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
 };
 
 const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const agentId = message.agentId;
-  const time = formatClockTime(message.createdAt);
+  const time = formatClockTime(language, message.createdAt);
   const trace = message.workTrace ?? null;
   const status: ConversationMessageStatus = message.status ?? 'complete';
   const isInProgress = status === 'streaming' || status === 'draft';
@@ -217,10 +209,10 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
       >
         <div className="conversation-message-row">
           <div className="conversation-message-stack">
-            {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
-                <WorkProcess trace={trace} sessionId={message.sessionId} messageId={message.id} answer={message.content} />
+            {/* Working appears with its first content; a request still preparing shows no empty card. */}
+            {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary) ? (
+                <WorkProcess trace={trace} sessionId={message.sessionId} rowKey={transcriptRowKey(message)} answer={message.content} />
             ) : null}
-            <PlanDeliverable trace={trace} />
             {message.workTraceDiscarded ? (
               <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>
             ) : null}

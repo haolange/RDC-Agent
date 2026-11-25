@@ -100,7 +100,7 @@ export function pushStandaloneBlock(
           status: block.status,
           text: block.status === 'running' ? t('chat.workProcessCompactRunning') : block.status === 'error' ? t('chat.workProcessCompactFailed') : t('chat.workProcessCompactComplete'),
           detailLines,
-          duration: formatDurationMs(block.startedAt, block.completedAt),
+          duration: formatDurationMs(t.language, block.startedAt, block.completedAt),
           compactionProvenance: stats?.provenance,
         }],
         loopIds: [block.id],
@@ -120,7 +120,7 @@ export function pushStandaloneBlock(
           completed: block.taskSnapshot.completed,
           total: block.taskSnapshot.total,
           items: block.taskSnapshot.items,
-          duration: formatDurationMs(block.startedAt, block.completedAt),
+          duration: formatDurationMs(t.language, block.startedAt, block.completedAt),
         }],
         loopIds: [block.id],
       });
@@ -152,7 +152,7 @@ export function pushStandaloneBlock(
           status: block.status,
           text: summaryText,
           detailLines: [],
-          duration: formatDurationMs(block.startedAt, block.completedAt),
+          duration: formatDurationMs(t.language, block.startedAt, block.completedAt),
         }],
         loopIds: [block.id],
       });

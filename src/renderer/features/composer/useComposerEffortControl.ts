@@ -91,8 +91,7 @@ export function useComposerEffortControl(options: {
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
   const capabilityStateDetail = reasoningUnavailable ? t('composer.effort.reasoningUnavailableHint')
-    : capabilityState.status === 'unavailable' || capabilityState.status === 'error'
-    ? capabilityState.message : statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
+    : statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
   const { maxContextStatusLabel, fastModelStatusLabel } = buildEffortCapabilityStatusLabels({
     capability,
     capabilityReady,

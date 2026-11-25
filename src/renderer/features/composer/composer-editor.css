@@ -61,7 +61,7 @@
   background: transparent;
   box-shadow: none;
   color: var(--token-text-secondary);
-  line-height: 1.55;
+  line-height: var(--type-body-line);
   /* Keep in lockstep with ComposerMarkdownInput; composer-viewport.css also pins --type-body-size. */
   font-size: var(--type-body-size);
 }

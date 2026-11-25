@@ -73,7 +73,7 @@
 
 ## Assistant Full-bleed
 
-- Composer、正式计划卡和用户气泡右缘沿对话外列。展开与折叠时，Working 状态点左缘与最终回复正文、Composer 左缘共线。Working 内部步骤左右等量内缩，跟随视窗与终态的卡片边界一致。
+- Composer 和用户气泡右缘沿对话外列。展开与折叠时，Working 状态点左缘与最终回复正文、Composer 左缘共线。Working 内部步骤左右等量内缩，跟随视窗与终态的卡片边界一致。
 - 悬停工具卡、Tasks 卡头或可展开的任务原因时，只高亮当前层的标题。键盘焦点提供同样反馈，展开本身只改变箭头和正文。长标题换行后仍保持稳定的卡片尺寸。
 - Ask 在 Working 展开时显示整批问题及配对回答。等待、缺答和数据不完整分别标示，作答在 Composer 完成。
 - 仅用户 prompt 使用 raised bubble、fit-content、右对齐。

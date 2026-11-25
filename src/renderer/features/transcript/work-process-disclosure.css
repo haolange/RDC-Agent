@@ -34,6 +34,12 @@
   color: var(--token-text-secondary);
 }
 
+/* Keyboard focus keeps the folded header muted too; the header's focus ring is what shows focus. */
+.work-process.is-collapsed .work-process-header:focus-visible .work-process-label:not(.is-active),
+.work-process.is-collapsed .work-process-header:focus-visible .work-process-meta {
+  color: var(--token-text-secondary);
+}
+
 @keyframes work-process-result-pulse {
   0%, 100% { opacity: 0.32; }
   50% { opacity: 0.72; }

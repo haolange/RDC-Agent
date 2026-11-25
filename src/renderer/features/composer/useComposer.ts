@@ -134,12 +134,13 @@ export function useComposer(options: {
     hasProject: Boolean(currentProject),
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
+    stopPending: send.stopPending,
   });
   const capabilityState = useTurnControlsStore((state) => state.capabilityState);
   const modelReady = capabilityState.status === 'ready' || capabilityState.status === 'refreshing';
-  const primaryButtonDisabled = send.isComposerBusy
+  const primaryButtonDisabled = send.stopPending || (send.isComposerBusy
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
-    : (!modelReady || (!hasMessageContent && !hasPendingAttachments));
+    : (!modelReady || (!hasMessageContent && !hasPendingAttachments)));
   const handoff = useQueuedHandoffSuggestion({
     isComposerBusy: send.isPromptSending || hasActiveConversationTurn || hasActiveDebugRun,
     sessionId: currentSession?.sessionId, setPromptValue, sendPrompt: send.sendHandoffPrompt, inspectRequest: send.inspectHandoff,
@@ -174,6 +175,7 @@ export function useComposer(options: {
     selectedContextProfile,
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
+    stopPending: send.stopPending,
     promptPlaceholder: presentation.promptPlaceholder,
     attachButtonLabel: presentation.attachButtonLabel,
     primaryButtonDisabled,

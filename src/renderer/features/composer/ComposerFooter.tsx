@@ -5,7 +5,8 @@ import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
-import { PermissionModeSelector } from './PermissionModeSelector';
+import { Spinner } from '../../ui/Spinner';
+import { PermissionModeSelector, PermissionSwitchNotice } from './PermissionModeSelector';
 import { ComposerModelEffortControl } from './ComposerModelEffortControl';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { useComposerMenu } from './useComposerMenuRegistry';
@@ -25,6 +26,7 @@ type ComposerFooterProps = Pick<ComposerController,
   | 'conversationPreparationPhase'
   | 'selectedContextProfile'
   | 'isComposerBusy'
+  | 'stopPending'
   | 'attachButtonLabel'
   | 'primaryButtonDisabled'
   | 'primaryButtonDescription'
@@ -55,13 +57,17 @@ function RegisteredContextUsageIndicator(
 export function ComposerFooter({
   currentMode, currentModeConfig, currentModeLabel, selectedAgentId, userInvocableAgents,
   setSelectedAgentId, lastKnownUsage, usageEstimated, usageStale, preparedTurnContext,
-  conversationPreparationPhase, selectedContextProfile, isComposerBusy, attachButtonLabel,
+  conversationPreparationPhase, selectedContextProfile, isComposerBusy, stopPending, attachButtonLabel,
   primaryButtonDisabled, primaryButtonDescription, handlePrimaryStop, handleAttachmentSelect,
   handlePromptSend, transitionLabel,
   selectedAgentDefinition, selectedAgentCapability, activeAgentId, setCurrentMode, currentSession,
 }: ComposerFooterProps) {
   const handingOff = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
+  // From the Stop click until main answers, the button stays Stop and shows that it is stopping.
+  const stopSlot = isComposerBusy || stopPending;
   return (
+    <>
+      <PermissionSwitchNotice />
       <div className="composer-footer-bar" data-testid="composer-footer-bar">
         <div className="composer-toolbar-group composer-toolbar-group-left">
           <IconButton
@@ -107,16 +113,17 @@ export function ComposerFooter({
           />
           <span role="status" className="composer-transition-announcement">{transitionLabel}</span>
           <Button
-            variant={isComposerBusy ? 'danger' : 'primary'}
+            variant={stopSlot ? 'danger' : 'primary'}
             size="sm"
-            className="chat-send-button"
-            data-testid={isComposerBusy ? 'debugger-stop-button' : 'debugger-start-button'}
+            className={`chat-send-button${stopPending ? ' is-pending' : ''}`}
+            data-testid={stopSlot ? 'debugger-stop-button' : 'debugger-start-button'}
             onClick={() => void (isComposerBusy ? handlePrimaryStop() : handlePromptSend())}
             disabled={primaryButtonDisabled}
+            aria-busy={stopPending || undefined}
             aria-label={primaryButtonDescription}
             data-tooltip={[transitionLabel, primaryButtonDescription].filter(Boolean).join(' · ')}
           >
-            {isComposerBusy ? (
+            {stopPending ? <Spinner size="sm" /> : isComposerBusy ? (
               <Icon name="stop" filled />
             ) : (
               <Icon name="arrow-up" />
@@ -124,5 +131,6 @@ export function ComposerFooter({
           </Button>
         </div>
       </div>
+    </>
   );
 }

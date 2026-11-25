@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, createElement, StrictMode, useRef } from 'react';
+import { act, createElement, StrictMode, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComposerMenuRegistryProvider, useComposerMenu } from './useComposerMenuRegistry';
@@ -38,7 +38,7 @@ function Menu({ id }: { id: 'agent' | 'permission' }) {
     menu.open ? createElement('span', { 'data-panel': id }, id) : null);
 }
 function Menus({ scope }: { scope: string }) {
-  return createElement(StrictMode, null, createElement(ComposerMenuRegistryProvider, { key: scope,
+  return createElement(StrictMode, null, createElement(ComposerMenuRegistryProvider, { key: scope, scope,
     children: [
       createElement(Menu, { key: 'agent', id: 'agent' }),
       createElement(Menu, { key: 'permission', id: 'permission' }),
@@ -62,6 +62,25 @@ describe('Composer lifecycle', () => {
     click('agent');
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     expect(host.querySelector('[data-panel]')).toBeNull();
+  });
+
+  it('closes an open menu when a pending request arrives without remounting the Composer underneath', () => {
+    const mounts: string[] = [];
+    function Counted({ id }: { id: 'agent' | 'permission' }) {
+      useState(() => mounts.push(id));
+      return createElement(Menu, { id });
+    }
+    const render = (scope: string) => act(() => root.render(createElement(ComposerMenuRegistryProvider, { scope,
+      children: [createElement(Counted, { key: 'agent', id: 'agent' }), createElement(Counted, { key: 'permission', id: 'permission' })] })));
+    render('composer');
+    act(() => host.querySelector<HTMLButtonElement>('[data-menu="agent"]')!.click());
+    expect(host.querySelector('[data-panel="agent"]')).not.toBeNull();
+    render('plan-review:review-1');
+    expect(host.querySelector('[data-panel]')).toBeNull();
+    render('composer');
+    expect(host.querySelector('[data-panel]')).toBeNull();
+    expect(mounts).toEqual(['agent', 'permission']);
+    expect(frames.size).toBe(0);
   });
 
   it('releases popup observers and settling frames on close and scope unmount', () => {

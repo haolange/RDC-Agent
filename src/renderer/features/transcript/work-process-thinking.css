@@ -8,7 +8,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 9rem;
@@ -36,7 +36,7 @@
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.65;
+  line-height: var(--leading-relaxed);
 }
 
 .work-process-thinking-state.kind-summary {
@@ -129,7 +129,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-sans);
   font-size: var(--type-body-size);
-  line-height: 1.55;
+  line-height: var(--type-body-line);
   overflow-wrap: anywhere;
 }
 
@@ -154,7 +154,7 @@
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   color: inherit;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-heading);
 }
 
 .work-process-thinking-preview .markdown-body p {

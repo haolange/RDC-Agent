@@ -10,6 +10,26 @@ it('positions expanded messages using measured heights', () => {
     .toEqual([0, 160, 800, 960]);
 });
 
+it('keeps a request\'s row in place when main\'s message replaces its optimistic placeholder', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const row = (id: string, content: string) => ({ id, requestId: 'request-1', role: 'assistant', content } as ConversationMessage);
+  const render = (message: ConversationMessage) => act(async () => root.render(createElement(VirtualMessageList, {
+    messages: [message], renderMessage: (entry) => createElement('span', { 'data-message-id': entry.id }, entry.content) })));
+  try {
+    await render(row('optimistic-assistant-request-1', ''));
+    const item = host.querySelector('li');
+    await render(row('msga-1', 'Answer'));
+    expect(host.querySelector('li')).toBe(item);
+    expect(host.querySelector('[data-message-id="msga-1"]')?.textContent).toBe('Answer');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove(); vi.unstubAllGlobals();
+  }
+});
+
 it('renders short state samples and windows a long conversation while releasing listeners and observers', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const observers: { disconnected: boolean }[] = [];

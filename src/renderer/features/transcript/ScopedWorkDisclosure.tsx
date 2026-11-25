@@ -7,33 +7,30 @@ export const ScopedWorkDisclosure: React.FC<{ scope?: string; children: React.Re
   <Scope.Provider value={scope ?? null}>{children}</Scope.Provider>
 );
 
-/** Remembers only user gestures, so a changing default still controls untouched rows. */
+/**
+ * Remembers only user gestures, so a changing default still controls untouched rows. The open state is read while
+ * rendering (the gesture remembered for this scope and row, else the default), so a new default or scope shows in the
+ * frame that brings it, never one frame late behind the previous state.
+ */
 export function useScopedWorkDisclosure(rowId: string, defaultOpen: boolean): [boolean, () => void] {
   const scope = React.useContext(Scope);
-  const key = scope ? `${scope}\u0000${rowId}` : null;
-  const defaultRef = React.useRef(defaultOpen);
-  defaultRef.current = defaultOpen;
-  const [state, setState] = React.useState(() => ({ open: key && choices.has(key) ? choices.get(key)! : defaultOpen,
-    overridden: !!key && choices.has(key) }));
-  const current = React.useRef(state);
-  current.current = state;
-  React.useEffect(() => {
-    const next = { open: key && choices.has(key) ? choices.get(key)! : defaultRef.current,
-      overridden: !!key && choices.has(key) };
-    current.current = next;
-    setState(next);
-  }, [key]);
-  React.useEffect(() => { setState((current) => current.overridden ? current : { ...current, open: defaultOpen }); }, [defaultOpen]);
+  const key = scope === null ? null : `${scope}\u0000${rowId}`;
+  // A row outside any scope keeps its gesture locally; scoped gestures outlive remounts in the shared map.
+  const [localChoice, setLocalChoice] = React.useState<boolean | null>(null);
+  const [, rerender] = React.useReducer((revision: number) => revision + 1, 0);
+  const open = (key === null ? localChoice : choices.get(key)) ?? defaultOpen;
+  const current = React.useRef(open);
+  current.current = open;
   const toggle = React.useCallback(() => {
-    const open = !current.current.open;
-    const next = { open, overridden: true };
-    current.current = next;
-    if (key) {
-      choices.delete(key);
-      choices.set(key, open);
-      if (choices.size > MAX_CHOICES) choices.delete(choices.keys().next().value!);
+    const next = !current.current;
+    if (key === null) {
+      setLocalChoice(next);
+      return;
     }
-    setState(next);
+    choices.delete(key);
+    choices.set(key, next);
+    if (choices.size > MAX_CHOICES) choices.delete(choices.keys().next().value!);
+    rerender();
   }, [key]);
-  return [state.open, toggle];
+  return [open, toggle];
 }

@@ -85,6 +85,7 @@ export function useKnowledgeCenter(open: boolean) {
     setViewMode('cards');
     void selectCard(card.spaceId, card.relativePath, card.cardId);
   }, [clearConflict, selectCard]);
+  /** Resolves once the rebuilt index is shown; a failure rejects, so the dialog that asked keeps it in view. */
   const rebuildIndex = useCallback(async () => {
     const seq = rebuildSeq.current.next();
     setRebuilding(true);
@@ -94,8 +95,6 @@ export function useKnowledgeCenter(open: boolean) {
       await refreshOverview();
       if (!rebuildSeq.current.isCurrent(seq)) return;
       await refreshQuery();
-    } catch (err) {
-      if (rebuildSeq.current.isCurrent(seq)) setError(errorDetail(err));
     } finally {
       if (rebuildSeq.current.isCurrent(seq)) setRebuilding(false);
     }

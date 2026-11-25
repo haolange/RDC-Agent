@@ -7,6 +7,7 @@ import {
   type SessionArtifactizedEnvelope,
 } from '@shared/types/sessionArtifact';
 import { toolResultDisplay } from '@shared/utils/toolResultDisplay';
+import { TOOL_RECEIPT_DECODED_TEXT_HEADING, TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING } from '@shared/constants/toolReceiptHeadings';
 import { sha256Hex } from '../../runtime/contentHash';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
@@ -178,7 +179,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     for (const image of imageReferences) grantDelegatedOutput(sessionId, image.uri, image.hash);
     grantDelegatedOutput(sessionId, written.uri, written.hash);
     const imageEvidenceText = imageReferences.length
-      ? '\nImage evidence (grant each exact URI explicitly to a reviewer; the result wrapper does not grant pixels):\n'
+      ? `\n${TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING}\n`
         + imageReferences.map(image => `${image.uri}\nsha256:${image.hash}`).join('\n')
       : '';
     if (belowThreshold) {
@@ -195,8 +196,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
       ? [{ uri: written.uri, expectedHash: written.hash, textPointer: `/content/${index}/text` }]
       : []).slice(0, 8);
     const textReadHint = textReads.length
-      ? '\nDecoded tool text: call artifact_read with one of the following exact selections, then follow its next cursor. '
-        + 'These select returned text blocks, not omitted source-file ranges or domain validation.\n'
+      ? `\n${TOOL_RECEIPT_DECODED_TEXT_HEADING}\n`
         + textReads.map(selection => JSON.stringify(selection)).join('\n')
       : '';
     // Offload large text and evidence payloads, but keep native image blocks in

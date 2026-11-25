@@ -76,6 +76,7 @@ const App: React.FC = () => {
       layout.toggleLeftDrawer();
       return;
     }
+    layout.animateColumns();
     void toggleLeftSidebar();
   }, [layout, toggleLeftSidebar]);
 
@@ -121,6 +122,7 @@ const App: React.FC = () => {
       layout.toggleRightRailDrawer();
       return;
     }
+    layout.animateColumns();
     void toggleRightPanel();
   }, [layout, toggleRightPanel]);
 
@@ -175,6 +177,8 @@ const App: React.FC = () => {
         body={<WorkbenchShell
           appBodyRef={layout.appBodyRef}
           isResizing={layout.isResizing}
+          columnsAnimating={layout.columnsAnimating}
+          onColumnsSettled={layout.settleColumns}
           resolvedWidths={layout.resolvedWidths}
           effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
           effectiveRightCollapsed={layout.effectiveRightCollapsed}

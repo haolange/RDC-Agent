@@ -62,7 +62,7 @@ export function useComposerSend(options: {
   const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
 
-  const { handlePrimaryStop } = useComposerStop({
+  const { handlePrimaryStop, stopPending } = useComposerStop({
     t,
     currentSession,
     currentRun,
@@ -187,6 +187,7 @@ export function useComposerSend(options: {
   return {
     isPromptSending,
     isComposerBusy: isComposerBusy || handoffPending,
+    stopPending,
     handlePrimaryStop,
     handlePromptSend,
     sendHandoffPrompt, inspectHandoff,

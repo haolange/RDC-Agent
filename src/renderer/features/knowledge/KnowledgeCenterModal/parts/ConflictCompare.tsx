@@ -3,7 +3,7 @@ import { Button } from '../../../../ui/Button';
 import { Chevron } from '../../../../ui/Chevron';
 import { Icon } from '../../../../ui/Icon';
 import { useI18n } from '../../../../i18n';
-import { formatKnowledgeTime } from '../knowledgeCenterLabels';
+import { formatDateTime } from '../../../../lib/formatTime';
 import { Skeleton } from '../../../../ui/Skeleton';
 import { KnowledgeStatusTag } from './KnowledgeStatusTag';
 import type { KnowledgeCardDetail } from '@shared/types/knowledge';
@@ -26,7 +26,7 @@ function ConflictCardPane({
   loading: boolean;
   onOpen: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   return (
     <section className="knowledge-conflict-pane" data-testid="knowledge-conflict-pane">
       <header className="knowledge-conflict-pane-head">
@@ -56,7 +56,7 @@ function ConflictCardPane({
           {card.updatedAt ? (
             <div>
               <dt>{t('knowledgeCenter.metaUpdatedAt')}</dt>
-              <dd>{formatKnowledgeTime(card.updatedAt)}</dd>
+              <dd>{formatDateTime(language, card.updatedAt)}</dd>
             </div>
           ) : null}
         </dl>

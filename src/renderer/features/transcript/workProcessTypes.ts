@@ -235,7 +235,8 @@ export interface WorkProcessPresentation {
   toolCount: number;
   summary: string;
   toolEvidence?: ConversationToolExecutionEvidence;
-  duration: string;
   actionCount: number;
+  /** Failed actions; Working states the number and stays open while there are any. */
+  failureCount: number;
   important: boolean;
 }

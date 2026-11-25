@@ -219,7 +219,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.45;
+  line-height: var(--type-meta-line);
 }
 
 .work-process-tool-card-link {
@@ -269,7 +269,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.55;
+  line-height: var(--type-meta-line);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: calc(var(--type-meta-size) * 1.55 * 12);
@@ -300,7 +300,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.45;
+  line-height: var(--type-meta-line);
   overflow-wrap: anywhere;
 }
 
@@ -308,7 +308,7 @@
   margin: 0 0 var(--space-2);
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 .work-process-tool-card-raw {
@@ -331,7 +331,7 @@
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -341,7 +341,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 9rem;
@@ -363,7 +363,7 @@
   background: transparent;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.55;
+  line-height: var(--type-body-line);
   text-align: left;
   cursor: pointer;
 }
@@ -423,4 +423,15 @@
   .work-process-tool-card-meta {
     gap: var(--space-1) var(--space-2);
   }
+}
+
+/* Truncated card text whose full value is a tooltip takes keyboard focus, so it shows the same focus ring. */
+.work-process-tool-card-path:focus-visible,
+.work-process-tool-card-body-text:focus-visible,
+.work-process-tool-card-body-list-item:focus-visible,
+.work-process-path-chip:focus-visible,
+.work-process-subagent-identifiers dd > span:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
 }

@@ -102,7 +102,7 @@ export const PlanReviewRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'pla
     <li className={`work-process-step is-appear status-${row.status} kind-plan-review`} data-testid="work-process-plan-review">
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
-        <PlanCard variant="process" plan={row.plan} onOpen={openPlan} />
+        <PlanCard plan={row.plan} onOpen={openPlan} />
       </div>
     </li>
   );

@@ -88,7 +88,7 @@ it('defaults historical cards to open even when they belong to separate turns', 
   const html = renderToStaticMarkup(createElement(WorkProcessContent, {
     presentation: { rows: [section('turn-1', snapshot('first', 'created')),
       section('turn-2', snapshot('second', 'updated'))], stepCount: 2, toolCount: 0,
-    summary: '', duration: '', actionCount: 2, important: false },
+    summary: '', actionCount: 2, failureCount: 0, important: false },
     disclosureScope: 'nested-task-test', active: false,
   }));
   const parsed = new DOMParser().parseFromString(html, 'text/html');

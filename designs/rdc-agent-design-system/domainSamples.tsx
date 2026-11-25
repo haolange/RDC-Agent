@@ -6,6 +6,7 @@ import { TaskSnapshotCard } from '../../src/renderer/features/transcript/TaskSna
 import { WorkProcessContent } from '../../src/renderer/features/transcript/WorkProcessContent';
 import { buildWorkProcessPresentation } from '../../src/renderer/features/transcript/workProcessTracePresentation';
 import { useI18n } from '../../src/renderer/i18n';
+import { withLanguage } from '../../src/renderer/i18n/messages';
 import type { ConversationToolCall, ConversationWorkBlock } from '../../src/shared/types/conversation';
 import { ScopedWorkDisclosure } from '../../src/renderer/features/transcript/ScopedWorkDisclosure';
 import { RightRailTaskList } from '../../src/renderer/features/right-rail/RightRailTaskList';
@@ -83,7 +84,7 @@ const webTurn = (id: string, text: string, toolCalls: ConversationToolCall[]): C
 
 /** Search, reads that merge across steps, a failed page and a single read: every web card state, no network. */
 export function WorkProcessWebSample() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const presentation = buildWorkProcessPresentation({ status: 'complete', updatedAt: at + 4_000, blocks: [
     webTurn('search', '先找 Vulkan 抓帧相关的资料。', [{ id: 'search', toolName: 'web_search', status: 'complete',
       argsPreview: JSON.stringify({ query: 'RenderDoc Vulkan capture' }), startedAt: at, executionStartedAt: at, completedAt: at + 640,
@@ -96,7 +97,7 @@ export function WorkProcessWebSample() {
     webTurn('reads', '', [read('quick', 'https://renderdoc.org/docs/getting_started/quick_start.html', 'Quick Start — RenderDoc', 700, 1_300),
       read('khronos', 'https://www.khronos.org/vulkan/', 'Vulkan Overview', 720, 1_900), read('gone', 'https://example.com/moved', undefined, 740, 1_100, true)]),
     webTurn('single', '再确认一下仓库说明。', [read('repo', 'https://github.com/baldurk/renderdoc', 'baldurk/renderdoc', 2_000, 2_450)]),
-  ] }, t);
+  ] }, withLanguage(t, language));
   return <ScopedWorkDisclosure scope="catalog-web"><WorkProcessContent presentation={presentation} active={false} /></ScopedWorkDisclosure>;
 }
 

@@ -193,7 +193,7 @@
   border-radius: var(--radius-full);
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 

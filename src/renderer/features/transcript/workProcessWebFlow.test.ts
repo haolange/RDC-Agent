@@ -1,12 +1,11 @@
 import { expect, it } from 'vitest';
-import { translate } from '../../i18n/messages';
+import { localizedTranslator } from '../../i18n/messages';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { toolHeadline } from './workProcessHeadline';
-import type { TranslationKey } from '../../i18n/messages';
 import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
 import type { WorkProcessRow } from './workProcessTypes';
 
-const t = (key: TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
+const t = localizedTranslator('zh-CN');
 const now = 1_700_000_000_000;
 
 const fetchCall = (id: string, url: string, title: string, startedAt: number, completedAt: number): ConversationToolCall => ({
@@ -44,7 +43,7 @@ it('joins reads across steps into one card that spans their whole time, and mark
   const rows = flatten(presentation.rows);
   const group = rows.find((row) => row.type === 'webGroup');
   expect(group?.type === 'webGroup' && group.pages.map((page) => page.domain)).toEqual(['khronos.org', 'renderdoc.org']);
-  expect(group?.type === 'webGroup' && group.duration).toBe('1.2s');
+  expect(group?.type === 'webGroup' && group.duration).toBe('1.2秒');
   const search = rows.find((row) => row.type === 'tool' && row.toolName === 'web_search');
   expect(search?.type === 'tool' && search.webPages?.map((page) => page.read)).toEqual([true, false]);
 });

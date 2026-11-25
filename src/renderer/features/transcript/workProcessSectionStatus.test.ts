@@ -2,14 +2,14 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import { translate } from '../../i18n/messages';
+import { localizedTranslator } from '../../i18n/messages';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
 import { WorkProcessContent } from './WorkProcessContent';
 import { PlanReaderHost } from './PlanReaderHost';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import type { ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
 
-const t = (key: import('../../i18n/messages').TranslationKey, params?: Record<string, string | number>) => translate('zh-CN', key, params);
+const t = localizedTranslator('zh-CN');
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 const plan: ConversationPlanReview = { planId: 'plan', revision: 1, uri: 'session://plans/plan.md',

@@ -1,6 +1,7 @@
 /** Windowed messages with measured row heights, including expanded work cards. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDynStyle } from '../../lib/useDynStyle';
+import { transcriptRowKey } from './transcriptRowKey';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 const VIRTUALIZE_THRESHOLD = 48;
@@ -14,9 +15,9 @@ interface Props {
   'data-testid'?: string;
 }
 
-export function measuredMessageOffsets(messages: readonly Pick<ConversationMessage, 'id'>[], heights: ReadonlyMap<string, number>, estimate: number): number[] {
+export function measuredMessageOffsets(messages: readonly Parameters<typeof transcriptRowKey>[0][], heights: ReadonlyMap<string, number>, estimate: number): number[] {
   const offsets = [0];
-  for (const message of messages) offsets.push(offsets[offsets.length - 1] + (heights.get(message.id) ?? estimate));
+  for (const message of messages) offsets.push(offsets[offsets.length - 1] + (heights.get(transcriptRowKey(message)) ?? estimate));
   return offsets;
 }
 
@@ -40,16 +41,17 @@ const VirtualMessageItem: React.FC<{
   msg: ConversationMessage;
   index: number;
   renderMessage: Props['renderMessage'];
-  onHeight: (id: string, height: number) => void;
+  onHeight: (rowKey: string, height: number) => void;
 }> = ({ msg, index, renderMessage, onHeight }) => {
   const ref = useRef<HTMLLIElement>(null);
+  const rowKey = transcriptRowKey(msg);
   useEffect(() => {
     const element = ref.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => onHeight(msg.id, element.getBoundingClientRect().height));
+    const observer = new ResizeObserver(() => onHeight(rowKey, element.getBoundingClientRect().height));
     observer.observe(element);
     return () => observer.disconnect();
-  }, [msg.id, onHeight]);
+  }, [rowKey, onHeight]);
   return <li ref={ref} className="conversation-thread-item" data-message-role={msg.role}
     data-message-status={msg.status ?? 'complete'}>{renderMessage(msg, index)}</li>;
 };
@@ -71,13 +73,13 @@ export const VirtualMessageList: React.FC<Props> = ({
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
-  const onHeight = useCallback((id: string, height: number) => {
+  const onHeight = useCallback((rowKey: string, height: number) => {
     if (!Number.isFinite(height) || height <= 0) return;
-    const previous = heights.current.get(id);
+    const previous = heights.current.get(rowKey);
     if (previous !== undefined && Math.abs(previous - height) < 1) return;
-    const index = messagesRef.current.findIndex((message) => message.id === id);
+    const index = messagesRef.current.findIndex((message) => transcriptRowKey(message) === rowKey);
     if (index < 0) return;
-    heights.current.set(id, height);
+    heights.current.set(rowKey, height);
     const parent = listRef.current?.closest('.chat-messages') as HTMLElement | null;
     if (parent && index < rangeRef.current.start) parent.scrollTop += height - (previous ?? estimateHeight);
     setHeightRevision((revision) => revision + 1);
@@ -112,14 +114,14 @@ export const VirtualMessageList: React.FC<Props> = ({
 
   if (messages.length <= VIRTUALIZE_THRESHOLD) return <ol ref={listRef} className={className} data-testid={testId}
     data-message-count={messages.length} data-virtualized="false">{messages.map((message, index) =>
-      <li key={message.id} className="conversation-thread-item" data-message-role={message.role}
+      <li key={transcriptRowKey(message)} className="conversation-thread-item" data-message-role={message.role}
         data-message-status={message.status ?? 'complete'}>{renderMessage(message, index)}</li>)}</ol>;
 
   const visible = messages.slice(range.start, range.end);
   return <ol ref={listRef} className={`${className ?? ''} conversation-thread-virtual`.trim()}
     data-testid={testId} data-message-count={messages.length} data-virtualized="true">
     <VirtualSpacer height={offsets[range.start] ?? 0} />
-    {visible.map((message, index) => <VirtualMessageItem key={message.id} msg={message} index={range.start + index}
+    {visible.map((message, index) => <VirtualMessageItem key={transcriptRowKey(message)} msg={message} index={range.start + index}
       renderMessage={renderMessage} onHeight={onHeight} />)}
     <VirtualSpacer height={Math.max(0, offsets[messages.length] - (offsets[range.end] ?? 0))} />
   </ol>;

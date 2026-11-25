@@ -3,6 +3,7 @@ import { formatDurationMs } from './workProcessFormat';
 import { groupImageRows } from './groupImageRows';
 import { groupWebRows } from './groupWebRows';
 import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
+import type { AppLanguage } from '@shared/types/settings';
 import type { LoopPresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 import type { WorkProcessRow } from './workProcessTypes';
 import type { BlockProjectionContext, LoopProjectionDeps, ThinkingItemPresentation } from './workProcessBlockProjection';
@@ -37,14 +38,14 @@ export function projectLlmTurn(
         profile: call.delegation.profile, task: call.delegation.task, mode: call.delegation.mode,
         argsPreview: call.argsPreview ?? '', resultPreview: call.resultPreview ?? '',
         executionId: call.delegation.executionId, generation: call.delegation.generation,
-        duration: formatDurationMs(call.executionStartedAt, call.completedAt),
+        duration: formatDurationMs(ctx.t.language, call.executionStartedAt, call.completedAt),
       } as WorkProcessRow : ctx.createToolRow(call) })),
     ...snapshots.filter((snapshot) => snapshot.taskSnapshot).map((snapshot) => ({
       order: snapshot.displayOrder, time: snapshot.startedAt,
       row: { type: 'taskSnapshot', id: snapshot.id, status: snapshot.status,
         change: snapshot.taskSnapshot!.change, completed: snapshot.taskSnapshot!.completed,
         total: snapshot.taskSnapshot!.total, items: snapshot.taskSnapshot!.items,
-        duration: formatDurationMs(snapshot.startedAt, snapshot.completedAt) } as WorkProcessRow,
+        duration: formatDurationMs(ctx.t.language, snapshot.startedAt, snapshot.completedAt) } as WorkProcessRow,
     })),
     ...interactions.flatMap((interaction) => interaction.toolCalls.filter(isVisibleToolCall).map((call) => ({
       order: call.displayOrder, time: call.executionStartedAt ?? call.approval?.requestedAt ?? call.startedAt,
@@ -98,9 +99,9 @@ export function projectLlmTurn(
       hasActiveTools: block.toolCalls.some((call) => isTaskLifecycleTool(call.toolName) && call.status === 'running'
         && call.executionStartedAt !== undefined && (!call.approval || call.approval.status === 'approved')),
       stepCount: deps.countToolSteps(steps),
-      duration: formatDurationMs(block.startedAt, block.completedAt),
+      duration: formatDurationMs(ctx.t.language, block.startedAt, block.completedAt),
       steps,
-      visibleSteps: groupSectionSteps(ordered.map(({ row }) => row)),
+      visibleSteps: groupSectionSteps(ordered.map(({ row }) => row), ctx.t.language),
       outputPhase,
       stopReason,
     });
@@ -131,15 +132,15 @@ function isDuplicateThinking(
 }
 
 /** A suppressed call interrupts a contiguous run of image or web requests. */
-function groupSectionSteps(steps: (WorkProcessRow | null)[]): WorkProcessRow[] {
+function groupSectionSteps(steps: (WorkProcessRow | null)[], language: AppLanguage): WorkProcessRow[] {
   const output: WorkProcessRow[] = [];
   let run: WorkProcessRow[] = [];
   for (const row of steps) {
     if (row) run.push(row);
     else {
-      output.push(...groupImageRows(groupWebRows(run)));
+      output.push(...groupImageRows(groupWebRows(run, language)));
       run = [];
     }
   }
-  return output.concat(groupImageRows(groupWebRows(run)));
+  return output.concat(groupImageRows(groupWebRows(run, language)));
 }

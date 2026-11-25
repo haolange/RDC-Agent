@@ -9,7 +9,7 @@ const deferred = <T>() => {
 };
 
 describe('main-owned permission state', () => {
-  beforeEach(() => store.setState({ snapshot: { mode: 'default', revision: 1 }, pendingMode: null, error: false }));
+  beforeEach(() => store.setState({ snapshot: { mode: 'default', revision: 1 }, pendingMode: null, error: false, failedSwitch: null }));
   afterEach(() => vi.unstubAllGlobals());
 
   it('keeps the confirmed mode while saving and accepts the committed snapshot', async () => {
@@ -40,7 +40,11 @@ describe('main-owned permission state', () => {
       runtime: { getPermissionState: vi.fn().mockResolvedValue({ mode: 'default', revision: 1 }) },
     } });
     await expect(store.getState().saveMode('full-access')).rejects.toThrow('disk full');
-    expect(store.getState()).toMatchObject({ snapshot: { mode: 'default', revision: 1 }, pendingMode: null, error: true });
+    expect(store.getState()).toMatchObject({ snapshot: { mode: 'default', revision: 1 }, pendingMode: null, error: true,
+      failedSwitch: { mode: 'full-access', detail: expect.stringContaining('disk full') } });
+    // The next attempt clears the notice while it runs.
+    void store.getState().saveMode('auto-review').catch(() => undefined);
+    expect(store.getState().failedSwitch).toBeNull();
   });
 
   it('rejects old snapshots and never lets a late request clear a newer pending choice', async () => {

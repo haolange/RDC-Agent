@@ -96,9 +96,7 @@ const isTechnicalContext = (node) => {
  * Hard-coded copy in files another change owns at the moment, counted per file; a count may only fall. The receipt
  * heading is model-facing text copied from main's ToolResultArtifactizer: both sides should read one shared constant.
  */
-const PENDING_OWNER_FIXES = {
-  'src/renderer/features/transcript/workProcessToolContentShared.ts': 1,
-};
+const PENDING_OWNER_FIXES = {};
 const pendingCopy = new Map();
 const rendererSources = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
   const full = path.join(dir, entry.name);

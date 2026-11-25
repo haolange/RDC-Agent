@@ -132,3 +132,26 @@ export const translate = (
 };
 
 export type Translator = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+/** A translator that also names its language, for text that formats numbers, dates and durations with `Intl`. */
+export type LocalizedTranslator = Translator & { readonly language: AppLanguage };
+
+/** Gives an existing translator its language; components pair `useI18n`'s `t` and `language` this way. */
+export const withLanguage = (t: Translator, language: AppLanguage): LocalizedTranslator => Object.assign(
+  (key: TranslationKey, params?: Record<string, string | number>) => t(key, params),
+  { language },
+);
+
+const localizedTranslators = new Map<AppLanguage, LocalizedTranslator>();
+
+/** One translator per language, so caches keyed by translator identity survive re-renders. */
+export const localizedTranslator = (language: AppLanguage): LocalizedTranslator => {
+  const existing = localizedTranslators.get(language);
+  if (existing) return existing;
+  const created = Object.assign(
+    (key: TranslationKey, params?: Record<string, string | number>) => translate(language, key, params),
+    { language },
+  );
+  localizedTranslators.set(language, created);
+  return created;
+};

@@ -10,7 +10,7 @@ import { emptyUnwrappedContent } from './workProcessToolContentShared';
 import { extractWebToolPresentation } from './workProcessWebPresentation';
 import { formatDurationMs, normalizeWorkProcessText, compactText } from './workProcessFormat';
 import { getToolOutcome } from './workProcessOutcome';
-import type { Translator } from '../../i18n/messages';
+import type { LocalizedTranslator, Translator } from '../../i18n/messages';
 
 const TARGET_KEYS = [
   'uri',
@@ -55,9 +55,9 @@ const RAW_PAYLOAD_TARGET_KEYS = new Set(['content', 'text', 'body', 'payload']);
  * rows (and the preview parsing behind them) are reused across updates. A call still running reads the clock for its
  * duration and is built each time. Rows are shared: consumers derive new rows rather than edit these.
  */
-const settledRows = new WeakMap<ConversationToolCall, { t: Translator; row: WorkProcessRow }>();
+const settledRows = new WeakMap<ConversationToolCall, { t: LocalizedTranslator; row: WorkProcessRow }>();
 
-export const createToolRowForPresentation = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
+export const createToolRowForPresentation = (call: ConversationToolCall, t: LocalizedTranslator): WorkProcessRow => {
   if (call.completedAt === undefined) return buildToolRow(call, t);
   const cached = settledRows.get(call);
   if (cached?.t === t) return cached.row;
@@ -66,14 +66,14 @@ export const createToolRowForPresentation = (call: ConversationToolCall, t: Tran
   return row;
 };
 
-const buildToolRow = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
+const buildToolRow = (call: ConversationToolCall, t: LocalizedTranslator): WorkProcessRow => {
   if (normalizeToolName(call.toolName) === 'ask_user') {
     return createUserInputRow(call, t);
   }
   // Working shows the current revision as the plan card; revisions it replaced fold into one compact row.
   if (normalizeToolName(call.toolName) === 'plan_artifact' && call.planReview) {
     const replaced = ['superseded', 'rejected', 'cancelled'].includes(call.planReview.status);
-    return replaced ? createPlanReviewShellRow(call, t) : createPlanReviewRow(call);
+    return replaced ? createPlanReviewShellRow(call, t) : createPlanReviewRow(call, t);
   }
   const display = getToolDisplay(call.toolName);
   const approval = createToolApprovalPresentation(call.approval, t);
@@ -107,7 +107,7 @@ const buildToolRow = (call: ConversationToolCall, t: Translator): WorkProcessRow
     family: getToolFamily(call.toolName),
     toolName: call.toolName,
     target: (normalizeToolName(call.toolName) === 'artifact_read' ? artifactObject(call.argsPreview, t) : '') || getToolTarget(call.toolName, call.argsPreview),
-    duration: formatDurationMs(call.executionStartedAt, call.completedAt),
+    duration: formatDurationMs(t.language, call.executionStartedAt, call.completedAt),
     startedAt: call.executionStartedAt,
     completedAt: call.completedAt,
     argsLines: createDetailLines(prettyPrint(call.argsPreview), 10),

@@ -18,6 +18,9 @@ type DragSide = 'left' | 'right';
 export interface WorkbenchShellProps {
   appBodyRef: RefObject<HTMLDivElement>;
   isResizing: boolean;
+  /** A person toggled a sidebar: the columns animate to their new widths, and only then. */
+  columnsAnimating: boolean;
+  onColumnsSettled: () => void;
   resolvedWidths: { left: number; right: number };
   effectiveLeftCollapsed: boolean;
   effectiveRightCollapsed: boolean;
@@ -46,6 +49,8 @@ export interface WorkbenchShellProps {
 export function WorkbenchShell({
   appBodyRef,
   isResizing,
+  columnsAnimating,
+  onColumnsSettled,
   resolvedWidths,
   effectiveLeftCollapsed,
   effectiveRightCollapsed,
@@ -111,8 +116,11 @@ export function WorkbenchShell({
     <PlanReaderHost>
     <div
       ref={appBodyRef}
-      className={`app-body ${isResizing ? 'is-resizing' : ''} ${isLeftDrawerMode ? 'has-left-drawer' : ''}`}
+      className={`app-body ${isResizing ? 'is-resizing' : ''} ${isLeftDrawerMode ? 'has-left-drawer' : ''}${columnsAnimating ? ' is-animating-columns' : ''}`}
       {...shellDynStyle}
+      onTransitionEnd={(event) => {
+        if (event.target === event.currentTarget && event.propertyName === 'grid-template-columns') onColumnsSettled();
+      }}
     >
       <aside
         className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}

@@ -315,6 +315,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 - 一条 transition 只写一条缓动曲线（`transition: opacity var(--duration-fast) var(--ease-standard), transform …`），把两条曲线写进同一条声明会让整条失效，门禁拒绝。
 - 每个进场都有退场：TaskDialog、ReadingSheet、Settings、知识中心、Popover、Select、ContextMenu、Toast、Tooltip 共用 `design-motion.css` 的成对关键帧（`overlay-fade-*`、`surface-rise-*`、`popover-*`），关闭时元素带 `data-state="closing"` 播放退场，`ui/usePresence` 在它自己的 animationend 后卸载；没有退场动画或减少动效时立即卸载。
 - **悬停定位**：Working 内可展开的卡头和子行统一用 `WorkRowTitle`，行根标记 `data-locate`。默认标题为次级色和正常字重，鼠标悬停或键盘聚焦时用主色和半粗字重，保留错误、警告色及运行扫光。嵌套时，鼠标只高亮最内层的可交互标题。隐藏的半粗标题副本预留宽高，长任务标题照常换行。箭头和正文表达开合。静态 Ask、审批和计划卡沿用各自样式。
+- **三栏宽度**：工作台左右栏只在用户折叠或展开侧栏时以 `--duration-slow` 过渡；启动恢复、选择项目或会话、拖拽与窗口缩放都直接到位，不让正文和 Composer 逐帧位移。
 - **跟随视窗**：Working 在「跟随最新」偏好下的限高容器，内容增长时用 200ms 缓动滚到底；用户上滚即暂停跟随。
 - 系统 `prefers-reduced-motion: reduce` 时，`design-reduced-motion.css` 把时长 token 置零，并停掉每一个无限循环动画：spin、骨架屏、任务进行中弧线、启动进度条、Working 运行点、子代理点阵、流式光标、trace flash、agent 菜单运行点。这一层在组件 CSS 之前加载，所以每个选择器都加 `:root` 前缀，多一级特异性压过它要停的组件规则。只有两项保留资产不受系统偏好影响，因为它们的运动就是运行状态本身：Active Signal 扫光与 Composer 折射边缘（`composerEnergyOrbit`）。Max 画布由 `EffortMaxField` 自己收束。程序触发的平滑滚动一律经 `lib/motion` 的 `motionScrollBehavior()`，减少动效时直接跳到目标；Working 跟随视窗同样直接跳到最新。`check:ui-contract` 的 `reduced-motion` 与 `smooth-scroll` 拒绝漏掉的无限动画与字面量平滑滚动。
 
@@ -423,13 +424,13 @@ Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属
 
 侧栏 Knowledge / 用户入口共用 ghost Button、36px 行高、24px 图标轨与一致文本起点，使用实色 sidebar，不保留原生灰按钮、58px 用户卡或渐变装饰。项目 Capture 面板共用 SectionHeader / Button / EmptyState，与 Session rail 使用同一 panel 刻度；列表仅展示文件与大小，不伪装成可点击控件。DeviceSelector 仅保留工作台顶部入口，退役 sidebar variant。
 
-Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28×28；圆角与 padding 通过 `--btn-*` 配置，避免全局 CSS 加载顺序覆盖。Send 是 agent accent 实色与向上箭头，Stop 为停止方块；禁用、hover、按下使用共享 Button 行为，焦点环跟随 agent accent。不保留全局 chat-send-button 渐变与 icon-only / label 旧分支。
+Composer Send / Stop 共用 Button 的 primary / danger 状态，尺寸固定 28×28；圆角与 padding 通过 `--btn-*` 配置，避免全局 CSS 加载顺序覆盖。Send 是 agent accent 实色与向上箭头，Stop 为停止方块；按下 Stop 到主进程答复前，按钮留在 Stop 槽位并立即显示等待图标（`Spinner`，`aria-busy`），不退成空的禁用按钮；禁用、hover、按下使用共享 Button 行为，焦点环跟随 agent accent。不保留全局 chat-send-button 渐变与 icon-only / label 旧分支。
 
 用户入口再次点击直接关闭菜单；外部点击处理须排除入口自身，避免 mousedown 关闭后 click 重开。入口使用 aria-expanded / aria-controls，与弹层状态一致，保留 Escape 焦点返回。菜单使用实色 overlay、无嵌套卡片的紧凑头像/名称头部，语言/主题/字号采用公共标签列和等宽 `Tabs fullWidth` 控件列；弹层以实测尺寸定位并限制在 viewport 内，窄屏自身滚动。项目 Capture 面板的 SectionHeader actions 内有三个 28px IconButton（引用外部文件的链接、导入的加号、刷新），共用默认、hover、focus、disabled 状态和可访问名称，不保留独立文字按钮行；每个文件行右端有移除按钮（外部引用行为「解除引用」），外部引用行带「外部引用」标注。
 
 Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允许收缩。model-effort 菜单独随生效模型名 + 思考等级 hug，用 `max-width` 封顶（默认 12rem），`min-width: 0` 可压；胶囊 `width: auto`，不预留固定槽、不贯通 `width: 100%`。窄容器（`@container composer`，宽度 ≤560px / ≤420px）只收紧 `max-width`（8rem / 6rem），不用 `flex-basis` 预留槽。窄宽规则具有足够 specificity，不受后加载 Pill / Effort 基础样式覆盖。禁止 viewport 规则恢复右组 flex-shrink:0。<=720px 主内容轨道使用留白内全宽，不继续使用桌面 77% 上限；模型名只对实际溢出文本渐隐，完整名留在 `title`。
 
-计划卡共用 transcript-card padding/border/radius。正式交付卡保留完整标题层级和六行摘要。Working 中的同修订剪影使用次级表面、正文字号标题及四行摘要，并显示实际决策状态。标题左对齐，正文为连续、有界 Markdown 预览，短内容自然收缩、长内容裁切，无分节折叠、内部 URI 或卡内滚动。整卡为唯一阅读入口，提供键盘操作与焦点环，不另设阅读按钮。Composer 计划门使用紧凑决策列表与常驻修改意见输入，不重复标题/摘要，不以关闭或跳过隐式批准。
+计划卡共用 transcript-card padding/border/radius，只在 Working 里出现一张：次级表面、正文字号标题及四行摘要，并显示实际决策状态。标题左对齐，正文为连续、有界 Markdown 预览，短内容自然收缩、长内容裁切，无分节折叠、内部 URI 或卡内滚动。整卡为唯一阅读入口，提供键盘操作与焦点环，不另设阅读按钮。Composer 计划门使用紧凑决策列表与常驻修改意见输入，不重复标题/摘要，不以关闭或跳过隐式批准。
 
 计划阅读器左右严格对齐当前可见Composer的border-box，主内容顶部至少留space-4，像Context Window一样锚定Composer上方并留`--space-2`间距；实色卡片自然收缩，长正文按可用高度滚动，不铺满工作区，不模糊背景。几何由工作区上下文测量，经 `useDynStyle` 随布局、字体及视口变化更新，不使用固定 rem 宽高上限。全窗口透明点击层负责外部关闭，面板采用实色 `--token-bg-overlay`。标题、版本和操作栏固定，正文独立滚动，窄屏将标题与操作分行；保留 overlay stack、键盘焦点循环和关闭回焦。卡片尺寸、文字淡出与背景呈现须观察实际界面，computed style不能替代视觉验收。
 
@@ -440,7 +441,7 @@ Composer 宽度分配：左组及图标 menu wrapper 不参与压缩；右组允
 
 ### Transcript 局部密度
 
-计划卡整卡为阅读入口，无常驻阅读按钮；正文六行/28dvh限高、末尾可见文字2行仅在溢出时使用前缓后快的100%→透明文字遮罩（过渡不超过可见正文高度的一半），按Range定位，不能落在Markdown留白，背景/标题/状态不透明衰减。handoff与修改意见外框共用md圆角、边框和表面，32px最小高度；handoff不带末尾箭头，停止采用方块IconButton。修改意见外框使用32px刻度，16px图标、正文原刻度，内容自然增高；不通过扩大控件或全面缩字解决对齐。
+计划卡整卡为阅读入口，无常驻阅读按钮；正文四行/24dvh限高、末尾可见文字2行仅在溢出时使用前缓后快的100%→透明文字遮罩（过渡不超过可见正文高度的一半），按Range定位，不能落在Markdown留白，背景/标题/状态不透明衰减。handoff与修改意见外框共用md圆角、边框和表面，32px最小高度；handoff不带末尾箭头，停止采用方块IconButton。修改意见外框使用32px刻度，16px图标、正文原刻度，内容自然增高；不通过扩大控件或全面缩字解决对齐。
 
 图片工具使用双叠图轮廓，摘要最多四张80px（窄容器64px）contain缩略图、8px间距，技术路径与回执按需展开。图片预览使用共享弹层和焦点体系。
 

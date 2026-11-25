@@ -68,7 +68,7 @@
 .composer-user-input-option-label,
 .composer-user-input-custom-label {
   min-width: 0;
-  line-height: 1.55;
+  line-height: var(--leading-normal);
   overflow-wrap: anywhere;
 }
 
@@ -85,7 +85,7 @@
   min-width: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.45;
+  line-height: var(--type-meta-line);
 }
 
 .composer-user-input-option-description-text {

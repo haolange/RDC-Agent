@@ -22,7 +22,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: calc(var(--type-meta-size) * 1.6 * 12);

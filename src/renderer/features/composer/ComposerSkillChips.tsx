@@ -11,9 +11,9 @@ export const ComposerSkillChips: React.FC<{
 }> = ({ pendingSkills, removePendingSkill, armedSkillMeta, removeArmedSkillLabel }) => (
   <>
     {pendingSkills.map((skill) => (
-      <div key={`skill-${skill.id}`} className="composer-skill-chip" data-testid="composer-skill-chip" data-tooltip={armedSkillMeta}>
+      <div key={`skill-${skill.id}`} className="composer-skill-chip" data-testid="composer-skill-chip">
         <Icon name="skill-read" size={16} className="composer-skill-chip-glyph" />
-        <span className="composer-skill-chip-name">{skill.name}</span>
+        <span className="composer-skill-chip-name" tabIndex={0} data-tooltip={armedSkillMeta}>{skill.name}</span>
         <IconButton size="sm" className="composer-skill-chip-remove" onClick={() => removePendingSkill(skill.id)}
           label={removeArmedSkillLabel(skill.name)}>
           <Icon name="close" size={12} />

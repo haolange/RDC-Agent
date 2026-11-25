@@ -18,10 +18,6 @@ export const ACTIVE_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>(
 export const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
   messages.slice().sort(compareConversationMessages);
 
-export const projectVisibleMessages = (
-  allMessages: ConversationMessage[],
-  branchState: ConversationBranchState | null,
-): ConversationMessage[] => resolveVisibleConversationMessages(allMessages, branchState);
 
 /** True when a late streaming/draft patch must not reopen a monotonically stopped turn. */
 export function shouldRejectActivePatchForMonotonicStop(
@@ -36,6 +32,27 @@ export function shouldRejectActivePatchForMonotonicStop(
   if (TERMINAL_ASSISTANT_STATUSES.has(next.status)) return false;
   return ACTIVE_ASSISTANT_STATUSES.has(next.status);
 }
+
+/** Optimistic placeholders (send and rewrite) carry the `optimistic-` id prefix until main answers the request. */
+const isOptimisticMessage = (message: ConversationMessage): boolean => message.id.startsWith('optimistic-');
+const requestRole = (message: ConversationMessage): string => `${message.requestId}\u0000${message.role}`;
+
+/**
+ * Main's message for a request replaces its optimistic placeholder, whichever arrives first (a stream event or the send
+ * result), so the transcript never shows both and the row keeps its identity across the swap.
+ */
+const dropAnsweredOptimisticMessages = (messages: ConversationMessage[]): ConversationMessage[] => {
+  if (!messages.some(isOptimisticMessage)) return messages;
+  const answered = new Set(messages.filter((message) => message.requestId && !isOptimisticMessage(message)).map(requestRole));
+  const kept = messages.filter((message) => !isOptimisticMessage(message) || !answered.has(requestRole(message)));
+  return kept.length === messages.length ? messages : kept;
+};
+
+/** The active branch as the transcript shows it: a placeholder whose answer is visible already gives way to it. */
+export const projectVisibleMessages = (
+  allMessages: ConversationMessage[],
+  branchState: ConversationBranchState | null,
+): ConversationMessage[] => dropAnsweredOptimisticMessages(resolveVisibleConversationMessages(allMessages, branchState));
 
 export const mergeConversationMessages = (
   currentMessages: ConversationMessage[],

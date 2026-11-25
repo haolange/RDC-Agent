@@ -7,7 +7,7 @@ import { ComposerFooter } from './ComposerFooter';
 
 // Domain menus have separate interaction suites; keep actual editor and action controls mounted.
 vi.mock('./ComposerAgentMenu', () => ({ ComposerAgentMenu: () => null }));
-vi.mock('./PermissionModeSelector', () => ({ PermissionModeSelector: () => null }));
+vi.mock('./PermissionModeSelector', () => ({ PermissionModeSelector: () => null, PermissionSwitchNotice: () => null }));
 vi.mock('./ComposerModelEffortControl', () => ({ ComposerModelEffortControl: () => null }));
 vi.mock('./useComposerMenuRegistry', () => ({ useComposerMenu: () => ({}) }));
 vi.mock('../../patterns/ContextUsageIndicator', () => ({ ContextUsageIndicator: () => null }));
@@ -46,6 +46,13 @@ it('routes attachment/send/stop actions and preserves disabled behavior as runni
     host.querySelector<HTMLButtonElement>('.composer-attach-button')!.click();
   });
   expect(stop).toHaveBeenCalledTimes(1); expect(send).toHaveBeenCalledTimes(1); expect(attach).toHaveBeenCalledTimes(1);
+  // Stop sent, reply already ended locally: the button stays Stop and shows the pending icon until main answers.
+  await render({ isComposerBusy: false, stopPending: true, primaryButtonDisabled: true, primaryButtonDescription: 'Stopping' });
+  const pending = host.querySelector<HTMLButtonElement>('[data-testid="debugger-stop-button"]');
+  expect(pending?.disabled).toBe(true);
+  expect(pending?.getAttribute('aria-busy')).toBe('true');
+  expect(pending?.querySelector('.ui-spinner')).not.toBeNull();
+  expect(host.querySelector('[data-testid="debugger-start-button"]')).toBeNull();
 });
 
 it('renders long controlled drafts, forwards text/IME events and remounts the input on session replacement', async () => {

@@ -7,6 +7,7 @@ import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { knowledgeCardKey } from '../knowledgeImportExportModel';
+import { KnowledgeTaskProgress } from '../parts/KnowledgeTaskProgress';
 import type { KnowledgeExportFormat, KnowledgeExportScope } from '@shared/types/knowledgeExport';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeExport } from '../useKnowledgeExport';
@@ -68,6 +69,7 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
         <Button variant="primary" onClick={exporter.close}>{t('knowledgeCenter.importDone')}</Button>
       ) : (
         <>
+          {exporter.busy ? <KnowledgeTaskProgress label={t('knowledgeCenter.progressExporting')} /> : null}
           <Button variant="ghost" disabled={exporter.busy} onClick={exporter.close}>
             {t('knowledgeCenter.confirmCancel')}
           </Button>
