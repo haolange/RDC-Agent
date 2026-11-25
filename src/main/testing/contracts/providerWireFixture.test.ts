@@ -10,7 +10,6 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from '@shared/provider-catalog/protocolWireFixtureCoverage';
 import { getProviderAdapterImplementation, type ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
 import { buildAnthropicMessagesUrl } from '../../agent-runtime/providers/AnthropicProvider';
 import { buildGeminiStreamUrl } from '../../agent-runtime/providers/GeminiProvider';
@@ -40,6 +39,7 @@ import * as azureTesting from '../../agent-runtime/providers/AzureOpenAIResponse
 import * as mistralTesting from '../../agent-runtime/providers/MistralProvider';
 import * as bedrockTesting from '../../agent-runtime/providers/BedrockConverseProvider';
 import { buildGoogleInteractionsRequest } from '../../agent-runtime/providers/GoogleInteractionsWire';
+import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from './protocolWireFixtureCoverage';
 import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import type { Context, Model } from '../../agent-runtime/core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';

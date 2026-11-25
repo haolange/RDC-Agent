@@ -6,12 +6,12 @@ import {
   providerAdapterIdForProtocol,
 } from '@shared/provider-catalog/implementationRegistry';
 import {
-  PROTOCOL_WIRE_FIXTURE_COVERAGE,
-} from '@shared/provider-catalog/protocolWireFixtureCoverage';
-import {
   hasImplementedStructuredToolAdapter,
   isAgentToolExecutableModel,
 } from '@shared/utils/agentToolCapability';
+import {
+  PROTOCOL_WIRE_FIXTURE_COVERAGE,
+} from '../testing/contracts/protocolWireFixtureCoverage';
 import { compileProviderCatalog, dedicatedToolCallingFactSourceIds } from './catalogCompiler';
 import { loadProviderCatalogManifestInput } from './manifestLoader';
 import type { LlmProviderProtocol } from '@shared/types/settings';

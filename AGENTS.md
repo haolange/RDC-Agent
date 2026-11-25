@@ -105,6 +105,7 @@
 - **只减不增的清单**。以下门禁的清单或预算只允许收紧：
   - `check:indexed-access`：生产代码按目录收紧 `noUncheckedIndexedAccess`，清单外的目录必须零错误。清单只减不增，已清零或已不存在的目录留在清单里会让门禁失败，所以清零的目录在同一次改动里移出。
   - `check:orchestrator-facade`：`AgentOrchestrator.ts` 的 fan-out 与最长函数预算取实测最大值，façade 缩小时下调，不为新工作上调。
+- **模块图**。`check:module-graph`（在 `check:gates` 内）要求 `src/` 下每个生产模块都能从发布入口（electron-vite 的 main、workers、preload、renderer 入口）或直接读源码的构建、`scripts/`、`designs/` 经 import 到达：只被测试引用的模块移到 `testing/` 或 `fixtures/` 目录，没人引用的删除。它同时拒绝转发层：公开方法多数只把参数原样转给某个成员的类，以及每个导出函数都只把参数原样转给某个 import 的模块；调用方直接依赖所有者。`AgentOrchestrator` façade 由 `check:orchestrator-facade` 另行度量。
 - **停止扩查**。适用的验证通过后停止；只有新的直接失败才补充修复与验证。
 
 ### 验证命令
@@ -136,7 +137,7 @@
 | 测试 | `test`、`test:watch`、`test:coverage`、`test:coverage:renderer` |
 | 类型与 lint | `typecheck`、`lint` |
 | 门禁总线 | `check:gates` |
-| `check:gates` 串联的仓库与架构门禁 | `check:readme-version`、`check:bundle-deps`、`check:indexed-access`、`check:repository-hygiene`、`check:architecture`、`check:orchestrator-facade`、`check:qa-ids`、`check:legacy-residue`、`check:acceptance-ledger`、`check:release-config`、`check:identity`、`check:secrets` |
+| `check:gates` 串联的仓库与架构门禁 | `check:readme-version`、`check:bundle-deps`、`check:indexed-access`、`check:unnecessary-condition`、`check:module-graph`、`check:repository-hygiene`、`check:architecture`、`check:orchestrator-facade`、`check:qa-ids`、`check:legacy-residue`、`check:acceptance-ledger`、`check:release-config`、`check:identity`、`check:secrets` |
 | `check:gates` 串联的领域与 UI 门禁 | `check:work-process-tool-coverage`、`check:agent-runtime`、`check:tool-system`、`check:session-projection`、`check:right-rail`、`check:knowledge-system`、`check:investigation-system`、`check:provider-system`、`check:design-tokens`、`check:ui-contract`、`check:renderer-structure`、`check:rdc-tool-guides` |
 | 行为门禁（`behaviorChecks.test.ts` 的子集） | `check:work-process`、`check:conversation-branch`、`check:reasoning-delivery`、`check:browser-capability`、`check:settings-agents`、`check:i18n`、`check:appearance`、`check:host-platform` |
 | 聚焦 vitest（随 `test` / `test:coverage` 运行） | `check:contracts`、`check:scoped-resources`、`check:project-instructions`、`check:prompt-plan-snapshot`、`check:skills`、`check:hooks`、`check:memory-policy`、`check:provider-catalog` |

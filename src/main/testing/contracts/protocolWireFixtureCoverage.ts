@@ -1,5 +1,5 @@
-import type { LlmProviderProtocol } from '../types/settings';
-import type { ProviderAdapterId } from './implementationRegistry';
+import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
+import type { LlmProviderProtocol } from '@shared/types/settings';
 
 export interface ProtocolWireFixtureCoverage {
   dir: string;

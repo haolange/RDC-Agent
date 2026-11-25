@@ -4,6 +4,9 @@ import { workflowProjectionPublisher } from '../agent-runtime/orchestration/Work
 import { conversationService } from '../conversation/ConversationService';
 import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { readToolImagePreviewDataUrl } from '../agent-runtime/attachments/ToolImagePreviewStore';
+import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
+import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import {
   assertAttachmentPreviewPath,
@@ -205,7 +208,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       maxBytes: 256 * 1024,
     }) as [ConversationAnswerUserInputRequest];
     const sessionId = requireActiveSessionOwner(state, request.sessionId ?? state.currentSessionId);
-    return conversationService.answerUserInput({ ...request, sessionId });
+    return agentUserInputRequestService.answer({ ...request, sessionId });
   });
 
   // Failures leave through the IPC error exit as registered codes; a returned value is a committed decision.
@@ -215,7 +218,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       maxBytes: 32 * 1024,
     });
     if (request.sessionId !== state.currentSessionId) throw new AppError('PLAN_SESSION_DENIED');
-    return conversationService.answerPlanReview(request);
+    return agentPlanReviewRequestService.answer(request);
   });
 
   ipcMain.handle('conversation:answerToolApproval', async (_event, ...rawArgs: unknown[]) => {
@@ -224,7 +227,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       maxBytes: 8 * 1024,
     }) as [ConversationAnswerToolApprovalRequest];
     const sessionId = requireActiveSessionOwner(state, request.sessionId ?? state.currentSessionId);
-    return conversationService.answerToolApproval({ ...request, sessionId });
+    return agentToolApprovalRequestService.answer({ ...request, sessionId });
   });
 
   ipcMain.handle('conversation:getToolImagePreview', async (_event, ...rawArgs: unknown[]) => {

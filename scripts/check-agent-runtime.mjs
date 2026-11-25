@@ -202,7 +202,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!conversationIpc.includes('conversation:previewNextRequestContext'), 'Main IPC must not expose draft-time context preview.');
 
   assert(fs.existsSync(path.join(repoRoot, 'src/main/provider-catalog/agentToolCapabilityAudit.test.ts')), 'Catalog tool-calling audit must exist.');
-  assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/protocolWireFixtureCoverage.ts')), 'Native protocol wire-fixture coverage map must exist.');
+  assert(fs.existsSync(path.join(repoRoot, 'src/main/testing/contracts/protocolWireFixtureCoverage.ts')), 'Native protocol wire-fixture coverage map must exist.');
   const toolCapability = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/check-agent-tool-capability.mjs')], {
     cwd: repoRoot,
     env: process.env,

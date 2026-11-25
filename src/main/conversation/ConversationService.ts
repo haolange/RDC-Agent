@@ -19,11 +19,6 @@ import {
 import { hashAttachmentContents } from '../agent-runtime/attachments/ConversationAttachmentHashing';
 import { resolvePlanReference } from './planReferenceResolution';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
-import {
-  answerConversationPlanReview,
-  answerConversationToolApproval,
-  answerConversationUserInput,
-} from './ConversationInteractionAnswers';
 import { conversationRdcHost } from './conversationRdcHost';
 import { canonicalJson } from './ConversationRoutePreflight';
 import { startProfileTurn as runStartProfileTurn, type PreparingConversationRequests, type ProfileTurnStart } from './ConversationTurnStarter';
@@ -201,9 +196,6 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     };
   }
 
-  answerUserInput = answerConversationUserInput;
-  answerPlanReview = answerConversationPlanReview;
-  answerToolApproval = answerConversationToolApproval;
   registerActiveTurn(turn: ActiveConversationTurn): void {
     this.activeTurns.set(turn.turnId, turn);
     if (turn.sessionId) conversationRdcHost().setInteractionLock(turn.sessionId, turn.turnId, true);

@@ -395,6 +395,7 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 
 - `check:gates` 串联 hygiene、架构与 façade、行为门禁、各领域 `check:*`、文档引用、设计 token 与 UI 契约等静态门禁，精确清单以 `package.json` 为准。`check:contracts` 等聚焦的 vitest 门禁在 `test:coverage` 内运行。
 - `check:coverage-ratchet` 是固定底线（基线 `scripts/fidelity/coverage-ratchet.json` 与 renderer 的 `scripts/fidelity/coverage-ratchet-renderer.json`），只在大幅回退时失败。
+- `check:module-graph`：`src/` 下每个生产模块都要能从发布入口或构建、脚本、设计系统预览经 import 到达，只被测试引用的放进 `testing/` 或 `fixtures/`；转发层（多数方法原样转给成员的类、每个导出函数都原样转给 import 的模块）被拒绝。
 - renderer 生产代码在带 `noUncheckedIndexedAccess` 的类型程序（`src/renderer/tsconfig.lint.json`）上执行 ESLint `@typescript-eslint/no-unnecessary-condition`：类型已排除的判空、可选链、兜底与分支不保留。未清理的文件逐项注明原因，列在 `eslint.config.mjs` 的 `UNNECESSARY_CONDITION_PENDING`；清单只减不增，`check:unnecessary-condition` 在列出的文件已干净、不存在或不在规则范围内时失败。
 
 **Provider 失败诊断保真**（契约见 [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md)「provider 失败诊断保真」）：
