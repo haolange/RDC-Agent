@@ -1,8 +1,7 @@
 /**
  * TokenizerService — 基于 gpt-tokenizer 的真实 Token 计数服务。
  *
- * 包装 gpt-tokenizer 的 `encode` / `countTokens` 方法，
- * 为每种模型族自动选择合适的编码器。回退到字符估算。
+ * 包装 gpt-tokenizer 的 `encode`，按文本缓存计数；没有模型或编码失败时回退到字符估算。
  *
  * countMessagesTokens 覆盖全部计费内容块：text、image（尺寸估算）、
  * toolCall（名称 + JSON 参数）、thinking（可读文本或 opaque continuation payload）。
@@ -20,25 +19,54 @@ const estimateImageTokens = (base64Length: number): number => {
   return Math.max(256, Math.ceil(byteLength / 1024));
 };
 
+/** Texts shorter than this encode faster than a cache lookup pays back. */
+const CACHE_MIN_CHARS = 256;
+/** The cache keeps its keys alive, so it is bounded by the characters it holds rather than by entry count. */
+const CACHE_MAX_CHARS = 16_000_000;
+const CACHE_MAX_TEXT_CHARS = CACHE_MAX_CHARS / 8;
+
 export class TokenizerService {
-  private encoderCache = new Map<string, boolean>();
+  /**
+   * Token counts by text, least recently used first. A turn counts its whole history before every request; the
+   * history is the same strings each step, so each text is encoded once and later steps cost a lookup. There is one
+   * encoding (gpt-tokenizer's default), so the text alone is the key.
+   */
+  private readonly counts = new Map<string, number>();
+  private cachedChars = 0;
 
   /**
    * 计算文本的 token 数。
-   * 优先使用 gpt-tokenizer 精确计数，不支持的模型族回退到字符估算。
+   * 有模型时用 gpt-tokenizer 精确计数（按文本缓存），否则或编码失败时回退到字符估算。
    */
   countTokens(text: string, modelId?: string): number {
     if (!text) return 0;
-
-    if (modelId && this.supportsEncoding(modelId)) {
+    if (modelId) {
       try {
-        return encode(text).length;
+        return this.encodedLength(text);
       } catch {
-        // 编码失败时回退
+        // gpt-tokenizer rejects texts that contain special tokens; those are estimated.
       }
     }
-
     return Math.ceil(text.length / CHAR_PER_TOKEN);
+  }
+
+  private encodedLength(text: string): number {
+    if (text.length < CACHE_MIN_CHARS || text.length > CACHE_MAX_TEXT_CHARS) return encode(text).length;
+    const cached = this.counts.get(text);
+    if (cached !== undefined) {
+      this.counts.delete(text);
+      this.counts.set(text, cached);
+      return cached;
+    }
+    const count = encode(text).length;
+    this.counts.set(text, count);
+    this.cachedChars += text.length;
+    for (const oldest of this.counts.keys()) {
+      if (this.cachedChars <= CACHE_MAX_CHARS) break;
+      this.counts.delete(oldest);
+      this.cachedChars -= oldest.length;
+    }
+    return count;
   }
 
   /**
@@ -99,20 +127,5 @@ export class TokenizerService {
       }
     }
     return 0;
-  }
-
-  /** 检查模型族是否被 gpt-tokenizer 支持（简化：始终尝试编码）。 */
-  private supportsEncoding(_modelId: string): boolean {
-    const cached = this.encoderCache.get(_modelId);
-    if (cached !== undefined) return cached;
-
-    try {
-      encode('test');
-      this.encoderCache.set(_modelId, true);
-      return true;
-    } catch {
-      this.encoderCache.set(_modelId, false);
-      return false;
-    }
   }
 }
