@@ -43,6 +43,9 @@ function isSafeRunId(runId: string): boolean {
 }
 
 export class SessionRecordStore {
+  /** The project each session was last found under; see `findSessionLocation`. */
+  private readonly sessionProjects = new Map<string, ProjectRecord>();
+
   constructor(private readonly host: import('./storageHost').StorageHost) {}
 
   removeSession(sessionId: string): void {
@@ -55,6 +58,7 @@ export class SessionRecordStore {
     if (fs.existsSync(location.sessionPath)) {
       fs.rmSync(location.sessionPath, { recursive: true, force: true });
     }
+    this.sessionProjects.delete(sessionId);
     sessionRevisions.forget(sessionId);
 
     const selection = this.host.projects.readSelection();
@@ -620,14 +624,34 @@ export class SessionRecordStore {
     persistRunFiles(this.host, this.getRunPath(run.sessionId, run.runId), run);
   }
 
+  /**
+   * The project a session belongs to and its directory. Every streaming commit asks, so the project a session was
+   * found under is kept in memory: a later lookup checks only that project's directory and reads no registry. The
+   * entry goes when the session's `session.json` is no longer there (removed or moved), when the session is removed,
+   * and all entries go whenever the registry is written (`forgetSessionLocations`: projects created, renamed or removed,
+   * sessions created or touched). A miss reads the registry under its lock as before. Not finding a session is not
+   * kept.
+   */
   findSessionLocation(sessionId: string): { project: ProjectRecord; sessionPath: string } | null {
+    const known = this.sessionProjects.get(sessionId);
+    if (known) {
+      const sessionPath = path.join(this.host.projects.ensureProjectSessionsRoot(known), sessionId);
+      if (fs.existsSync(path.join(sessionPath, 'session.json'))) return { project: known, sessionPath };
+      this.sessionProjects.delete(sessionId);
+    }
     for (const project of this.host.projects.listProjects()) {
       const sessionPath = path.join(this.host.projects.ensureProjectSessionsRoot(project), sessionId);
       if (fs.existsSync(path.join(sessionPath, 'session.json'))) {
+        this.sessionProjects.set(sessionId, project);
         return { project, sessionPath };
       }
     }
     return null;
+  }
+
+  /** Called whenever the project registry is written or moves; the next lookup of each session reads it again. */
+  forgetSessionLocations(): void {
+    this.sessionProjects.clear();
   }
 
   normalizeSessionRecord(session: SessionRecord, sessionPath?: string): SessionRecord {

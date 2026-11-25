@@ -17,6 +17,7 @@
 会话事实（`agentId`、`modelOverride`、`turnControls`、标题等）只有一个 renderer 来源。
 
 - 主进程 `SessionRevisionRegistry` 在内存中持有 `{ epoch, n }`：`epoch` 是本次主进程运行的标识，`n` 是本次运行内的会话写入计数；不落盘，持久 schema 不变。`SessionRecordStore` 的每次 session.json 写入（创建、提交暂存会话、更新、标题对账）取下一个 `n`，并广播 `session:recordChanged { record, revision }`。
+- `SessionRecordStore.findSessionLocation` 在内存中记住每个会话所在的项目：每次流式提交都要定位会话，命中时只检查该项目目录下的 `session.json` 是否仍在，不读项目 registry、不取 `.registry.lock`。文件不在（会话被删除或移走）、`removeSession`、以及任何一次 registry 写入（项目创建、改名、删除，会话创建或 touch；`ProjectWorkspaceStore` 唯一的写入点调用 `forgetSessionLocations`）都使记忆失效；未命中照旧在锁内读 registry，找不到的结果不记住。registry 写入仍在锁内。
 - 每个携带会话的响应都附带该会话最后一次写入的 revision，形状是 `SessionRecordSnapshot { record, revision }`：`project:select`、`session:list/create/rename/remove/open/setModelOverride/setAgentId/applyDeclaredHandoff`，以及 `conversation:sendMessage` / `rewriteFromMessage` 的 `turn.session`。记录与 revision 在同一同步段内配对，中间不跨 await；之后的写入经新的广播到达。
 - Renderer `sessionRecordStore.records` 按会话只接受更新的 revision：epoch 不同（主进程已重启）一律接受，同 epoch 只接受更大的 `n`；迟到的旧响应或旧事件不覆盖新记录。该 store 按会话分键，后台会话的记录也是当前事实，`session:recordChanged` 不经 active-session gate。
 - `pending` 是在途意图的覆盖层：人改 Agent 或模型时先 `beginIntent`，界面立刻显示；主进程应答（无论是否被接受）后 `settleIntent`。同一字段的后一个意图替换前一个，前一个的迟到应答不再影响显示；失败只移除覆盖层，视图回到主进程持有的记录。`useSessionView(id)` 返回 record 加覆盖层；`useCurrentSessionView()` 是当前会话的视图。

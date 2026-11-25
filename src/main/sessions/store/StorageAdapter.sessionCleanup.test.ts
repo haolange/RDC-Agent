@@ -91,6 +91,53 @@ vi.mock('../../runtime/AppPathService', () => {
   };
 });
 
+describe('StorageAdapter session locations', () => {
+  it('finds a session again without the registry, and follows moves, removals and project changes', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const root = (name: string) => { const dir = path.join(tempRoot, name); fs.mkdirSync(dir, { recursive: true }); return dir; };
+    const first = await storageAdapter.createProject(root('location-first'));
+    const second = await storageAdapter.createProject(root('location-second'));
+    const session = storageAdapter.createSession(first.projectId, 'Located');
+    const locate = (sessionId: string) => storageAdapter.sessions.findSessionLocation(sessionId);
+
+    expect(locate(session.sessionId)).toMatchObject({ project: { projectId: first.projectId }, sessionPath: session.sessionPath });
+    const registryReads = vi.spyOn(storageAdapter.projects, 'readRegistry');
+    try {
+      expect(locate(session.sessionId)?.sessionPath).toBe(session.sessionPath);
+      storageAdapter.appendConversationMessage(session.sessionId, {
+        id: 'located-user', turnId: 'located-turn', role: 'user', content: 'hi',
+        sessionId: session.sessionId, projectId: first.projectId, createdAt: 1,
+      });
+      expect(registryReads).not.toHaveBeenCalled();
+
+      // Moved on disk into the other project's sessions directory.
+      const movedPath = path.join(storageAdapter.projects.getProjectSessionsRoot(second), session.sessionId);
+      fs.renameSync(session.sessionPath, movedPath);
+      expect(locate(session.sessionId)).toMatchObject({ project: { projectId: second.projectId }, sessionPath: movedPath });
+
+      storageAdapter.renameProject(second.projectId, 'Renamed second');
+      expect(locate(session.sessionId)?.project.name).toBe('Renamed second');
+
+      storageAdapter.removeSession(session.sessionId);
+      expect(locate(session.sessionId)).toBeNull();
+
+      const removedOnDisk = storageAdapter.createSession(first.projectId, 'Removed on disk');
+      expect(locate(removedOnDisk.sessionId)).not.toBeNull();
+      fs.rmSync(removedOnDisk.sessionPath, { recursive: true, force: true });
+      expect(locate(removedOnDisk.sessionId)).toBeNull();
+
+      // Removing a project keeps its session directories, but its sessions are no longer found.
+      const orphaned = storageAdapter.createSession(first.projectId, 'Orphaned');
+      expect(locate(orphaned.sessionId)).not.toBeNull();
+      storageAdapter.removeProject(first.projectId);
+      expect(fs.existsSync(path.join(orphaned.sessionPath, 'session.json'))).toBe(true);
+      expect(locate(orphaned.sessionId)).toBeNull();
+    } finally {
+      registryReads.mockRestore();
+    }
+  });
+});
+
 describe('StorageAdapter.removeSession side-channel cleanup', () => {
   it('keeps an unsupported session visible without recovering or rewriting it during startup', async () => {
     const { storageAdapter } = await import('./StorageAdapter');

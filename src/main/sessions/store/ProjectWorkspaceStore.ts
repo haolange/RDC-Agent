@@ -289,10 +289,12 @@ export class ProjectWorkspaceStore {
 
   syncRuntimePaths(): void {
     const paths = appPathService.getRuntimePaths();
+    const registryPath = path.join(paths.projectsPath, 'registry.json');
+    if (registryPath !== this.host.registryPath) this.host.sessions.forgetSessionLocations();
     this.host.dataRootPath = paths.appStateRoot;
     this.host.projectsRootPath = paths.projectsPath;
     this.host.globalKnowledgePath = paths.knowledgePath;
-    this.host.registryPath = path.join(this.host.projectsRootPath, 'registry.json');
+    this.host.registryPath = registryPath;
     this.host.selectionPath = path.join(this.host.projectsRootPath, 'selection.json');
   }
 
@@ -369,7 +371,9 @@ export class ProjectWorkspaceStore {
     };
   }
 
+  /** The only registry write; session locations found from the previous registry are dropped with it. */
   private persistRegistryUnlocked(registry: ProjectRegistry): void {
+    this.host.sessions.forgetSessionLocations();
     this.host.io.writeJsonAtomic(this.host.registryPath, registry);
   }
 
