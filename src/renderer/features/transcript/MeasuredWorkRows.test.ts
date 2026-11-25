@@ -74,7 +74,7 @@ it('follows the scroller when the Working window switches between following and 
   } finally { await act(async () => root.unmount()); transcript.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); }
 });
 
-it('renders every row of a folded Working, so the reply at its end is never windowed away', async () => {
+it('mounts no rows while Working is folded and the window again when it opens', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div'); host.className = 'chat-messages'; document.body.append(host);
   const root = createRoot(host);
@@ -90,8 +90,11 @@ it('renders every row of a folded Working, so the reply at its end is never wind
     await render(false);
     expect(host.querySelector('[data-virtualized="true"]')).not.toBeNull();
     await render(true);
-    expect(host.querySelector('[data-virtualized="true"]')).toBeNull();
+    expect(host.querySelectorAll('.work-card-trigger')).toHaveLength(0);
     expect(host.querySelector('.work-process-row-spacer')).toBeNull();
-    expect(host.querySelectorAll('.work-card-trigger')).toHaveLength(60);
+    await render(false);
+    expect(host.querySelector('[data-virtualized="true"]')).not.toBeNull();
+    expect(host.querySelectorAll('.work-card-trigger').length).toBeGreaterThan(0);
+    expect(host.querySelectorAll('.work-card-trigger').length).toBeLessThan(60);
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

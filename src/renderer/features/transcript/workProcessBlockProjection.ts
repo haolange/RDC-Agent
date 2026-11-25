@@ -55,20 +55,25 @@ export function buildPresentationUnits(
   const units: PresentationUnit[] = [];
   const snapshotsByLoop = new Map<string, ConversationWorkBlock[]>();
   const interactionsByLoop = new Map<string, ConversationWorkBlock[]>();
+  const loopIds = new Set(blocks.filter((block) => block.kind === 'llm_turn').map((block) => block.id));
   let previousLoop: string | undefined;
   for (const block of blocks) {
     if (block.kind === 'llm_turn') previousLoop = block.id;
     if (block.kind === 'user_input' || block.kind === 'plan_review') {
       const owner = block.parentLoopId;
-      if (owner && blocks.some((candidate) => candidate.kind === 'llm_turn' && candidate.id === owner)) {
-        interactionsByLoop.set(owner, [...(interactionsByLoop.get(owner) ?? []), block]);
+      if (owner && loopIds.has(owner)) {
+        const owned = interactionsByLoop.get(owner);
+        if (owned) owned.push(block);
+        else interactionsByLoop.set(owner, [block]);
       }
       continue;
     }
     if (block.kind !== 'task_snapshot') continue;
     const owner = block.parentLoopId ?? previousLoop;
-    if (!owner || !blocks.some((candidate) => candidate.kind === 'llm_turn' && candidate.id === owner)) continue;
-    snapshotsByLoop.set(owner, [...(snapshotsByLoop.get(owner) ?? []), block]);
+    if (!owner || !loopIds.has(owner)) continue;
+    const owned = snapshotsByLoop.get(owner);
+    if (owned) owned.push(block);
+    else snapshotsByLoop.set(owner, [block]);
   }
   // Answers the runtime sent back read as commentary, also in sessions recorded before the runtime said so.
   const superseded = supersededAnswerLoopIds(blocks);
@@ -85,7 +90,7 @@ export function buildPresentationUnits(
     }
 
     if (!groupedSnapshots.has(block.id) && !groupedInteractions.has(block.id)) pushStandaloneBlock(block, units, deps, ctx);
-    }
+  }
 
   return units;
 }

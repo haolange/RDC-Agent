@@ -5,25 +5,59 @@ export interface BrowserBridgeEvent {
   args?: unknown[];
 }
 
-export function parseEventStreamChunk(buffer: string): { events: BrowserBridgeEvent[]; remainder: string } {
-  const normalized = buffer.replace(/\r\n/gu, '\n');
-  const frames = normalized.split('\n\n');
-  const remainder = frames.pop() ?? '';
-  const events: BrowserBridgeEvent[] = [];
-  for (const frame of frames) {
-    const data = frame.split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trimStart())
-      .join('\n');
-    if (!data) continue;
-    try {
-      const parsed = JSON.parse(data) as Partial<BrowserBridgeEvent>;
-      if (typeof parsed.channel === 'string') events.push(parsed as BrowserBridgeEvent);
-    } catch {
-      // A malformed frame is isolated; later valid frames on the same stream remain deliverable.
+export interface EventStreamParser {
+  /** Feeds decoded text and returns the events of every frame it completed. */
+  push(text: string): BrowserBridgeEvent[];
+}
+
+/**
+ * Incremental SSE framing. Only the text that arrived since the last push is scanned for a frame boundary, so a large
+ * frame delivered in many chunks costs linear time; re-splitting the whole buffer per chunk was quadratic.
+ */
+export function createEventStreamParser(): EventStreamParser {
+  let buffer = '';
+  let scanFrom = 0;
+  let pendingCarriageReturn = false;
+  return {
+    push(text) {
+      // CRLF and lone CR both end a line; a CR at the end of a chunk may pair with an LF at the start of the next.
+      let chunk = pendingCarriageReturn ? `\r${text}` : text;
+      pendingCarriageReturn = chunk.endsWith('\r');
+      if (pendingCarriageReturn) chunk = chunk.slice(0, -1);
+      buffer += chunk.replace(/\r\n?/gu, '\n');
+      const events: BrowserBridgeEvent[] = [];
+      let frameStart = 0;
+      for (;;) {
+        const boundary = buffer.indexOf('\n\n', scanFrom);
+        if (boundary < 0) break;
+        const event = parseFrame(buffer.slice(frameStart, boundary));
+        if (event) events.push(event);
+        frameStart = boundary + 2;
+        scanFrom = frameStart;
+      }
+      if (frameStart > 0) buffer = buffer.slice(frameStart);
+      // The next boundary may begin with the last newline already buffered.
+      scanFrom = Math.max(0, buffer.length - 1);
+      return events;
+    },
+  };
+}
+
+function parseFrame(frame: string): BrowserBridgeEvent | null {
+  const data = frame.split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trimStart())
+    .join('\n');
+  if (!data) return null;
+  try {
+    const parsed: unknown = JSON.parse(data);
+    if (typeof parsed === 'object' && parsed !== null && typeof (parsed as { channel?: unknown }).channel === 'string') {
+      return parsed as BrowserBridgeEvent;
     }
+  } catch {
+    // A malformed frame is isolated; later valid frames on the same stream remain deliverable.
   }
-  return { events, remainder };
+  return null;
 }
 
 function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
@@ -61,15 +95,12 @@ export function connectBrowserEventStream(
         retryDelay = 250;
         reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
+        const parser = createEventStreamParser();
         while (!controller.signal.aborted) {
           const chunk = await reader.read();
           if (controller.signal.aborted) break;
           if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true });
-          const parsed = parseEventStreamChunk(buffer);
-          buffer = parsed.remainder;
-          for (const event of parsed.events) {
+          for (const event of parser.push(decoder.decode(chunk.value, { stream: true }))) {
             if (controller.signal.aborted) break;
             try { onEvent(event); } catch (error) {
               console.error('[BrowserAppBridge] Event listener failed:', error);

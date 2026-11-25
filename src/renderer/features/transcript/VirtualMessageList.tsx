@@ -66,18 +66,22 @@ export const VirtualMessageList: React.FC<Props> = ({
   offsetsRef.current = offsets;
   const rangeRef = useRef(range);
   rangeRef.current = range;
+  // Read through a ref so the callback stays the same while messages stream; a new callback would make every visible
+  // item drop and recreate its ResizeObserver on each update.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const onHeight = useCallback((id: string, height: number) => {
     if (!Number.isFinite(height) || height <= 0) return;
     const previous = heights.current.get(id);
     if (previous !== undefined && Math.abs(previous - height) < 1) return;
-    const index = messages.findIndex((message) => message.id === id);
+    const index = messagesRef.current.findIndex((message) => message.id === id);
     if (index < 0) return;
     heights.current.set(id, height);
     const parent = listRef.current?.closest('.chat-messages') as HTMLElement | null;
     if (parent && index < rangeRef.current.start) parent.scrollTop += height - (previous ?? estimateHeight);
     setHeightRevision((revision) => revision + 1);
-  }, [messages, estimateHeight]);
+  }, [estimateHeight]);
 
   const updateRange = useCallback(() => {
     const list = listRef.current;

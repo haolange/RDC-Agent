@@ -35,7 +35,7 @@ export const MeasuredWorkRows: React.FC<{
   className: string;
 }> = ({ rows, renderRow, className }) => {
   const listRef = React.useRef<HTMLOListElement>(null);
-  // Folded rows take no space; windowing by their earlier heights would hide the reply behind empty spacers.
+  // A folded Working shows none of its rows (its body is not displayed), so it mounts none; unfolding mounts the window.
   const folded = useWorkProcessFolded();
   const windowed = rows.length > THRESHOLD && !folded;
   const heights = React.useRef(new Map<string, number>());
@@ -170,6 +170,7 @@ export const MeasuredWorkRows: React.FC<{
     return () => observer.disconnect();
   }, [rows, range.start, range.end, windowed]);
 
+  if (folded) return <ol ref={listRef} className={className} />;
   if (!windowed) return <ol ref={listRef} className={className}>{rows.map(renderRow)}</ol>;
   return <ol ref={listRef} className={className} data-virtualized="true">
     {range.start > 0 ? <Spacer height={offsets[range.start] ?? 0} /> : null}

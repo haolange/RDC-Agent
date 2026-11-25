@@ -18,6 +18,19 @@ vi.mock('../../i18n', () => ({
 vi.mock('../../patterns/Markdown/markdownHighlight', () => ({ MARKDOWN_LANGUAGES: {}, MARKDOWN_LANGUAGE_ALIASES: {} }));
 vi.mock('katex/dist/katex.min.css', () => ({}));
 
+// A finished Working is folded and mounts no rows; these cases read the rendered steps, so Working shows everything.
+// Server rendering reads a zustand store's initial state, so the setting is fixed through the module.
+vi.mock('../../stores/appSettingsStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../stores/appSettingsStore')>();
+  const initial = actual.useAppSettingsStore.getState();
+  const state = {
+    ...initial,
+    settings: { ...initial.settings, appearance: { ...initial.settings.appearance, workProcessExpansion: 'all' as const } },
+  };
+  const useExpandedSettings = <T,>(selector: (value: typeof state) => T): T => selector(state);
+  return { ...actual, useAppSettingsStore: Object.assign(useExpandedSettings, actual.useAppSettingsStore) };
+});
+
 const now = 1_700_000_000_000;
 
 const gptSummaryTrace: ConversationWorkTrace = {

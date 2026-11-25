@@ -1,12 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
-import { connectBrowserEventStream, parseEventStreamChunk } from './browserEventStream';
+import { connectBrowserEventStream, createEventStreamParser } from './browserEventStream';
 
 describe('browser event stream', () => {
   it('parses split CRLF and multiline frames while isolating malformed JSON', () => {
-    const first = parseEventStreamChunk('data: {"channel":"conversation:event","args":[1]}\r\n\r\ndata: {bad}\n\ndata: {"channel":');
-    expect(first.events).toEqual([{ channel: 'conversation:event', args: [1] }]);
-    const second = parseEventStreamChunk(`${first.remainder}"app:event","args":[]}\n\n`);
-    expect(second.events).toEqual([{ channel: 'app:event', args: [] }]);
+    const parser = createEventStreamParser();
+    expect(parser.push('data: {"channel":"conversation:event","args":[1]}\r\n\r\ndata: {bad}\n\ndata: {"channel":'))
+      .toEqual([{ channel: 'conversation:event', args: [1] }]);
+    expect(parser.push('"app:event",\ndata: "args":[]}\r')).toEqual([]);
+    expect(parser.push('\n\r\n')).toEqual([{ channel: 'app:event', args: [] }]);
+  });
+
+  it('finds a boundary split across chunks and keeps a large frame linear', () => {
+    const parser = createEventStreamParser();
+    const payload = JSON.stringify({ channel: 'conversation:event', args: ['x'.repeat(200_000)] });
+    const frame = `data: ${payload}\n\n`;
+    const events = [];
+    for (let offset = 0; offset < frame.length; offset += 1_000) events.push(...parser.push(frame.slice(offset, offset + 1_000)));
+    expect(events).toHaveLength(1);
+    expect(parser.push('data: {"channel":"app:event"}\n')).toEqual([]);
+    expect(parser.push('\n')).toEqual([{ channel: 'app:event' }]);
   });
 
   it('uses authenticated POST, dispatches stream frames, and aborts ownership', async () => {

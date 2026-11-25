@@ -50,7 +50,23 @@ const TARGET_KEYS = [
 
 const RAW_PAYLOAD_TARGET_KEYS = new Set(['content', 'text', 'body', 'payload']);
 
+/**
+ * A settled call's row is derived from the call alone; streaming keeps unchanged calls as the same objects, so their
+ * rows (and the preview parsing behind them) are reused across updates. A call still running reads the clock for its
+ * duration and is built each time. Rows are shared: consumers derive new rows rather than edit these.
+ */
+const settledRows = new WeakMap<ConversationToolCall, { t: Translator; row: WorkProcessRow }>();
+
 export const createToolRowForPresentation = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
+  if (call.completedAt === undefined) return buildToolRow(call, t);
+  const cached = settledRows.get(call);
+  if (cached?.t === t) return cached.row;
+  const row = buildToolRow(call, t);
+  settledRows.set(call, { t, row });
+  return row;
+};
+
+const buildToolRow = (call: ConversationToolCall, t: Translator): WorkProcessRow => {
   if (normalizeToolName(call.toolName) === 'ask_user') {
     return createUserInputRow(call, t);
   }
