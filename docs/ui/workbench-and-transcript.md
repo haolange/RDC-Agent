@@ -18,7 +18,7 @@
 
 ## 准备清单
 
-不弹引导对话框。空工作台在仍有准备项未完成时，在标题下列出三项：RDC 工具、模型服务、项目，状态全部读自当前配置（`useWorkbenchSetup`），不记录"已读"。第一个未完成项带主按钮，其余为次按钮；动作直达：RDC 工具与模型服务经 `settingsNavigationStore.openSection` 打开对应设置分区，项目经 `projectStore.requestAddProject` 打开侧栏的添加项目对话框。全部完成后清单消失，恢复三张 Agent 卡。
+不弹引导对话框。空工作台在仍有准备项未完成时，在标题下列出三项：RDC 工具、模型服务、项目，状态全部读自当前配置（`useWorkbenchSetup`），不记录"已读"。第一个未完成项带主按钮，其余为次按钮；动作直达：RDC 工具与模型服务经 `settingsNavigationStore.openSection` 打开对应设置分区，项目经 `projectStore.requestAddProject` 打开侧栏的添加项目对话框。全部完成后清单消失，恢复三张 Agent 卡。标题栏工具区的「?」（`app/SetupGuideButton.tsx`）随时用浮层重开同一份清单（`patterns/SetupChecklist.tsx`），数据同样读自 `useWorkbenchSetup`，只是临时浮层状态；点任一步的动作先关闭浮层再执行。
 
 RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。高级项仅呈现启用、超时和环境；验证错误展示实际原因。普通 General 任务不要求 RDC 已配置。
 

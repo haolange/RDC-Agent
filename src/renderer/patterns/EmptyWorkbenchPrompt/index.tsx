@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ModeGlyph } from '../../ui/ModeGlyph';
-import { SetupChecklist } from './SetupChecklist';
+import { SetupChecklist } from '../SetupChecklist';
 import type { WorkbenchSetupStep } from '../../hooks/useWorkbenchSetup';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentMode } from '@shared/types/layout';

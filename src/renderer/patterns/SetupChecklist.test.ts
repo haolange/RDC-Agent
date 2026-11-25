@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { SetupChecklist } from './SetupChecklist';
 
-vi.mock('../../i18n', () => ({
+vi.mock('../i18n', () => ({
   useI18n: () => ({ t: (key: string, params?: Record<string, number>) => (params ? `${key}:${params.done}/${params.total}` : key) }),
 }));
 

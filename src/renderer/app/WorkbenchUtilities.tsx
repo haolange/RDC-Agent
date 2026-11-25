@@ -1,6 +1,7 @@
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { useI18n } from '../i18n';
 import { Icon } from '../ui/Icon';
+import { SetupGuideButton } from './SetupGuideButton';
 
 interface WorkbenchUtilitiesProps {
   isTerminalOpen: boolean;
@@ -8,12 +9,13 @@ interface WorkbenchUtilitiesProps {
   onToggleTerminal: () => void;
 }
 
-/** Title-bar utilities: the replay device and the terminal drawer. */
+/** Title-bar utilities: the setup guide, the replay device and the terminal drawer. */
 export function WorkbenchUtilities({ isTerminalOpen, activityAlertSeverity, onToggleTerminal }: WorkbenchUtilitiesProps) {
   const { t } = useI18n();
   const label = isTerminalOpen ? t('terminal.close') : t('terminal.open');
   return (
     <div className="titlebar-utilities">
+      <SetupGuideButton />
       <DeviceSelector />
       <button
         type="button"

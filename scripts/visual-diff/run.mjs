@@ -108,9 +108,11 @@ async function record(ids) {
       const recordedPath = path.join(workDir, 'recorded.json');
       writeJson(definitionPath, definition);
       runHost(['--mode', 'record', '--scenario', definitionPath, '--bridge', url, '--out', recordedPath, '--build', repoRoot]);
-      // The disposable instance's directories differ per run; a fixed placeholder lets identical answers dedupe.
+      // The disposable instance's directories and the checkout's location differ per run and machine; fixed
+      // placeholders keep machine paths out of the recordings and let identical answers dedupe.
       const recorded = JSON.parse(fs.readFileSync(recordedPath, 'utf8')
-        .split(JSON.stringify(userData).slice(1, -1)).join('/visual-diff'));
+        .split(JSON.stringify(userData).slice(1, -1)).join('/visual-diff')
+        .split(JSON.stringify(repoRoot).slice(1, -1)).join('/visual-diff-repo'));
       writeJson(path.join(scenarioDir, `${definition.id}.json`), { ...recorded, responses: externalize(recorded.responses, shared) });
       console.log(`[visual-diff] recorded ${definition.id}`);
     } finally {

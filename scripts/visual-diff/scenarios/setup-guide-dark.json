@@ -1,0 +1,140 @@
+{
+ "id": "setup-guide-dark",
+ "viewport": [
+  1440,
+  900
+ ],
+ "theme": "dark",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"titlebar-setup-guide\"]"
+  },
+  {
+   "click": true,
+   "testId": "titlebar-setup-guide",
+   "waitMs": 400
+  }
+ ],
+ "settleMs": 1000,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "5140fa7b21e2aec2918d0ce6"
+   },
+   {
+    "ref": "5140fa7b21e2aec2918d0ce6"
+   },
+   {
+    "ref": "5140fa7b21e2aec2918d0ce6"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-676db774b706-1795605707375",
+       "timestamp": 1795605707375,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-e72255fa71c2-1795605707494",
+       "timestamp": 1795605707494,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-e0d059cb66f8-1795605707494",
+       "timestamp": 1795605707494,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-f463909f9570-1795605707508",
+       "timestamp": 1795605707508,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ]
+ }
+}

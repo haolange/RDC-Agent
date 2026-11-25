@@ -1,4 +1,5 @@
 export const zhOnboarding = {
+  'setup.reopen': '设置向导',
   'setup.title': '准备工作 · {done} / {total} 已完成',
   'setup.rdcTool.title': '配置 RDC 工具',
   'setup.rdcTool.body': '指定 RenderDoc 回放组件的位置，Agent 才能打开 capture。',

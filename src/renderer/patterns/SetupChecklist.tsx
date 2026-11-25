@@ -1,8 +1,8 @@
 import React from 'react';
-import { useI18n } from '../../i18n';
-import { Button } from '../../ui/Button';
-import { Icon } from '../../ui/Icon';
-import type { WorkbenchSetupStep } from '../../hooks/useWorkbenchSetup';
+import { useI18n } from '../i18n';
+import { Button } from '../ui/Button';
+import { Icon } from '../ui/Icon';
+import type { WorkbenchSetupStep } from '../hooks/useWorkbenchSetup';
 import './SetupChecklist.css';
 
 /**

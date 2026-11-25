@@ -32,5 +32,13 @@
       { "click": true, "testId": "sidebar-knowledge-center-trigger", "waitMs": 600 }
     ],
     "settleMs": 1200
+  },
+  {
+    "id": "setup-guide-dark", "viewport": [1440, 900], "theme": "dark",
+    "steps": [
+      { "waitFor": "[data-testid=\"titlebar-setup-guide\"]" },
+      { "click": true, "testId": "titlebar-setup-guide", "waitMs": 400 }
+    ],
+    "settleMs": 1000
   }
 ]
