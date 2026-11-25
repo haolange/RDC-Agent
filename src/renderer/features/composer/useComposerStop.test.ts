@@ -140,8 +140,6 @@ describe('selectActiveAssistantForTurn', () => {
         projectId: 'project-1',
         requestId: 'request-owned',
         agentId: 'plan',
-        optimisticTurnId: null,
-        realTurnId: 'turn-owned',
       },
     )?.id).toBe('owned');
   });
@@ -155,8 +153,6 @@ describe('selectActiveAssistantForTurn', () => {
         projectId: 'project-1',
         requestId: 'request-edit',
         agentId: 'edit',
-        optimisticTurnId: 'optimistic-turn-request-edit',
-        realTurnId: null,
       },
     )).toBeNull();
   });

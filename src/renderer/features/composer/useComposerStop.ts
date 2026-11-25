@@ -1,7 +1,8 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useConversationStore } from '../../stores/conversationStore';
-import { removeOptimisticConversationMessages } from '../../stores/conversationSendHelpers';
+import { removeRequestMessages } from '../../stores/conversationSendHelpers';
 import {
   restoreLastSentIfCurrentSession,
   type ActiveTurnOwnership,
@@ -67,33 +68,18 @@ export function useComposerStop(options: {
         activeTurn,
       );
 
-      // Optimistic stop for both preparing (optimistic-turn-*) and committed streaming turns.
-      if (activeAssistant) {
-        if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
-        if (activeAssistant.requestId) {
-          conversation.markRequestMonotonicallyStopped(activeAssistant.requestId);
-        }
-        conversation.markTurnMonotonicallyStopped(activeAssistant.turnId);
-        if (activeTurn?.optimisticTurnId) {
-          conversation.markTurnMonotonicallyStopped(activeTurn.optimisticTurnId);
-        }
-        conversation.updateAssistantMessageByTurnId(activeAssistant.turnId, stopWorkTrace);
-      } else if (requestId) {
-        conversation.markRequestMonotonicallyStopped(requestId);
-        if (activeTurn?.optimisticTurnId) {
-          conversation.markTurnMonotonicallyStopped(activeTurn.optimisticTurnId);
-        }
-      }
-
-      const clearlyPastPreparing = Boolean(
-        activeAssistant
-        && !activeAssistant.turnId.startsWith('optimistic-turn-'),
-      );
+      // Stop shows at once, whether the turn is still preparing or already streaming: the turn id is the same one
+      // main gives it (conversationTurnIds), so the marks hold for main's messages too.
+      const turnId = activeAssistant?.turnId ?? (requestId ? conversationTurnIds(requestId).turnId : null);
+      if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
+      if (activeAssistant?.requestId) conversation.markRequestMonotonicallyStopped(activeAssistant.requestId);
+      if (turnId) conversation.markTurnMonotonicallyStopped(turnId);
+      if (activeAssistant) conversation.updateAssistantMessageByTurnId(activeAssistant.turnId, stopWorkTrace);
 
       const cancelPromise = electronAPI.conversation.cancelActiveTurn({
         requestId: requestId ?? undefined,
         sessionId: currentSession?.sessionId,
-        turnId: clearlyPastPreparing ? activeAssistant?.turnId : undefined,
+        turnId: turnId ?? undefined,
       });
 
       const workflowStopPromise = currentRun
@@ -110,14 +96,8 @@ export function useComposerStop(options: {
           ?? null;
         if (revokedRequestId) {
           conversation.markRequestRevoked(revokedRequestId);
-          const optimisticIds = conversation.allConversationMessages
-            .filter((message) => message.requestId === revokedRequestId)
-            .map((message) => message.id);
           useConversationStore.getState().setConversationMessages(
-            removeOptimisticConversationMessages(
-              useConversationStore.getState().allConversationMessages,
-              optimisticIds,
-            ),
+            removeRequestMessages(useConversationStore.getState().allConversationMessages, revokedRequestId),
           );
         }
         if (setPromptValue && setPendingAttachments && setPendingSkillIds) {

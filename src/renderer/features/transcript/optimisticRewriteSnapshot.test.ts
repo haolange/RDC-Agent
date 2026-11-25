@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -41,7 +42,11 @@ describe('buildOptimisticRewriteSnapshot', () => {
       agentId: 'debugger',
     });
 
-    expect(snapshot.branchState.activeLeafBranchId).toBe(snapshot.optimisticBranchId);
+    // The branch and messages carry the ids main gives the rewrite, so its answer updates them in place.
+    const ids = conversationTurnIds('req-rewrite');
+    expect(snapshot.branchState.activeLeafBranchId).toBe(ids.branchId);
+    expect(snapshot.messages.slice(-2).map((message) => [message.id, message.turnId]))
+      .toEqual([[ids.userMessageId, ids.turnId], [ids.assistantMessageId, ids.turnId]]);
     const visible = resolveVisibleConversationMessages(snapshot.messages, snapshot.branchState);
     expect(visible.some((message) => message.content === 'edited prompt')).toBe(true);
     expect(visible.some((message) => (

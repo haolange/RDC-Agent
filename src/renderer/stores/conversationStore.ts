@@ -131,13 +131,6 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       ? {}
       : { monotonicStoppedRequestIds: [...state.monotonicStoppedRequestIds, requestId] }
   )),
-  migrateMonotonicStoppedTurn: (fromTurnId, toTurnId) => set((state) => {
-    if (!state.monotonicStoppedTurnIds.includes(fromTurnId)) return {};
-    const withoutFrom = state.monotonicStoppedTurnIds.filter((id) => id !== fromTurnId);
-    return withoutFrom.includes(toTurnId)
-      ? { monotonicStoppedTurnIds: withoutFrom }
-      : { monotonicStoppedTurnIds: [...withoutFrom, toTurnId] };
-  }),
   markRequestRevoked: (requestId) => set((state) => (
     state.revokedRequestIds.includes(requestId)
       ? {}

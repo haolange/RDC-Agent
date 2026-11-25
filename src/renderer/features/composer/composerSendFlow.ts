@@ -7,7 +7,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import {
   applyConversationTurnResult,
   buildOptimisticConversationTurn,
-  removeOptimisticConversationMessages,
+  removeRequestMessages,
   resolveComposerProfileId,
   toConversationAttachmentInputs,
 } from '../../stores/conversationSendHelpers';
@@ -119,18 +119,14 @@ export async function sendComposerConversationTurn(options: {
     } } : {}),
   });
 
+  // A refused request takes its messages back out; an accepted one keeps them, since main's carry the same ids.
   const rollbackOptimistic = () => {
-    setConversationMessages(removeOptimisticConversationMessages(
-      useConversationStore.getState().allConversationMessages,
-      optimistic.optimisticIds,
-    ));
+    setConversationMessages(removeRequestMessages(useConversationStore.getState().allConversationMessages, requestId));
   };
 
   useComposerSessionContextStore.getState().beginTurn({
     ...turnOwnership,
     projectId: currentProject?.projectId ?? null,
-    optimisticTurnId: optimistic.assistantDraftMessage.turnId,
-    realTurnId: null,
   });
   if (!preserveDraft) {
     setPromptValue('');
@@ -234,19 +230,12 @@ export async function sendComposerConversationTurn(options: {
       void electronAPI.conversation.releaseAttachments({ stagingIds: stagedIds });
     }
 
-    // Drop optimistic placeholders before applying authoritative turn messages.
-    rollbackOptimistic();
-
     const turn = result.turn;
     const committedSessionId = turn.session?.record.sessionId
       ?? turn.userMessage.sessionId
       ?? turn.assistantDraftMessage.sessionId
       ?? turnOwnership.sessionId;
-    useComposerSessionContextStore.getState().setRealTurnId(
-      turnOwnership,
-      turn.userMessage.turnId,
-      committedSessionId,
-    );
+    useComposerSessionContextStore.getState().bindCommittedSession(turnOwnership, committedSessionId);
     turnOwnership = { ...turnOwnership, sessionId: committedSessionId };
     if (isOwningSelectionActive(committedSessionId)) {
       useSessionStore.getState().setPreparedTurnContext(result.preparedContext);

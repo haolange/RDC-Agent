@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, it, vi } from 'vitest';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { restoreLastSentIfCurrentSession, useComposerSessionContextStore as context } from '../../stores/composerSessionContextStore';
@@ -68,4 +69,16 @@ it('sends a handoff on the session\'s committed configuration, freezing none of 
 it('does not restore the handoff payload into the composer when Stop revokes preparation', () => {
   context.getState().setLastSent({ sessionId: 's', projectId: 'p', prompt: 'handoff', attachments: [], skillIds: [], preserveDraft: true });
   expect(restoreLastSentIfCurrentSession('s', prompt)).toBe(true); expect(prompt).not.toHaveBeenCalled();
+});
+it('shows the send under main\'s ids and keeps those messages once main accepts, removing them only when refused', async () => {
+  const ids = () => useConversationStore.getState().allConversationMessages.map((message) => message.id);
+  const accepted = await sendComposerConversationTurn(options(false));
+  const { userMessageId, assistantMessageId } = conversationTurnIds(accepted.requestId);
+  expect(send.mock.calls[0]![0]).toMatchObject({ requestId: accepted.requestId });
+  expect(ids()).toEqual([userMessageId, assistantMessageId]);
+
+  send.mockResolvedValue({ status: 'rejected', error: { code: 'DENIED', message: 'Denied' } });
+  const refused = await sendComposerConversationTurn(options(false));
+  expect(refused.status).toBe('rejected');
+  expect(ids()).toEqual([userMessageId, assistantMessageId]);
 });

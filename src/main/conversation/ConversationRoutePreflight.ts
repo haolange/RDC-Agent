@@ -2,7 +2,7 @@ import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagno
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
-import { generateEventId, nowMs } from '@shared/utils/id';
+import { nowMs } from '@shared/utils/id';
 import {
   classifyAgentToolEligibility,
   describeAgentToolIneligibility,
@@ -160,6 +160,8 @@ export function createConversationMessage(
   role: ConversationMessage['role'],
   content: string,
   options: {
+    /** From `conversationTurnIds(requestId)`: main and the renderer name a request's messages alike. */
+    id: string;
     requestId?: string;
     requestFingerprint?: string;
     turnId: string;
@@ -181,7 +183,7 @@ export function createConversationMessage(
 ): ConversationMessage {
   const createdAt = nowMs();
   return {
-    id: generateEventId(role === 'user' ? 'msgu' : role === 'assistant' ? 'msga' : 'msgs'),
+    id: options.id,
     requestId: options.requestId,
     requestFingerprint: options.requestFingerprint,
     turnId: options.turnId,

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagnostic';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
 import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
@@ -87,7 +88,8 @@ export async function startProfileTurn(
     : null;
   const effectiveMessage = rawMessage;
   const conversationAgentId = resolveConversationAgentId(requestedAgentId, requestedProfileId, pendingProjectRootPath);
-  const turnId = generateEventId('turn');
+  const turnIds = conversationTurnIds(requestId);
+  const { turnId } = turnIds;
   const throwIfPreparationCancelled = () => {
     if (preparationController.signal.aborted) {
       throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
@@ -375,6 +377,7 @@ export async function startProfileTurn(
       ?? branchState?.activeLeafBranchId
       ?? ROOT_BRANCH_ID;
     userMessage = createConversationMessage('user', rawMessage, {
+      id: turnIds.userMessageId,
       requestId,
       requestFingerprint,
       turnId,
@@ -391,6 +394,7 @@ export async function startProfileTurn(
       planReference: context.planReference,
     });
     assistantDraftMessage = createConversationMessage('assistant', '', {
+      id: turnIds.assistantMessageId,
       requestId,
       turnId,
       sessionId: sessionIdForBranch,

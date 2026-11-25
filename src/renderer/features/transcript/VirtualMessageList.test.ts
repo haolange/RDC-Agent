@@ -2,6 +2,7 @@
 import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { VirtualMessageList, measuredMessageOffsets } from './VirtualMessageList';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -10,20 +11,21 @@ it('positions expanded messages using measured heights', () => {
     .toEqual([0, 160, 800, 960]);
 });
 
-it('keeps a request\'s row in place when main\'s message replaces its optimistic placeholder', async () => {
+it('keeps a request\'s row in place when main\'s message for it arrives under the same id', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  const row = (id: string, content: string) => ({ id, requestId: 'request-1', role: 'assistant', content } as ConversationMessage);
+  const { assistantMessageId } = conversationTurnIds('request-1');
+  const row = (content: string) => ({ id: assistantMessageId, requestId: 'request-1', role: 'assistant', content } as ConversationMessage);
   const render = (message: ConversationMessage) => act(async () => root.render(createElement(VirtualMessageList, {
     messages: [message], renderMessage: (entry) => createElement('span', { 'data-message-id': entry.id }, entry.content) })));
   try {
-    await render(row('optimistic-assistant-request-1', ''));
+    await render(row(''));
     const item = host.querySelector('li');
-    await render(row('msga-1', 'Answer'));
+    await render(row('Answer'));
     expect(host.querySelector('li')).toBe(item);
-    expect(host.querySelector('[data-message-id="msga-1"]')?.textContent).toBe('Answer');
+    expect(host.querySelector(`[data-message-id="${assistantMessageId}"]`)?.textContent).toBe('Answer');
   } finally {
     await act(async () => root.unmount());
     host.remove(); vi.unstubAllGlobals();

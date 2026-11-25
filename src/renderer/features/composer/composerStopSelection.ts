@@ -1,3 +1,4 @@
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ActiveTurnContext } from '../../stores/composerSessionContextStore';
 
@@ -25,12 +26,9 @@ export function selectActiveAssistantForTurn(
     return candidates[0] ?? null;
   }
 
+  const { turnId } = conversationTurnIds(activeTurn.requestId);
   return candidates.find((message) => (
     message.agentId === activeTurn.agentId
-    && (
-      message.requestId === activeTurn.requestId
-      || message.turnId === activeTurn.optimisticTurnId
-      || message.turnId === activeTurn.realTurnId
-    )
+    && (message.requestId === activeTurn.requestId || message.turnId === turnId)
   )) ?? null;
 }

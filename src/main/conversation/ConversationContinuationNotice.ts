@@ -1,3 +1,4 @@
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { createConversationMessage } from './ConversationRoutePreflight';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -31,6 +32,7 @@ export function createContinuationDropNotice(options: {
     'system',
     'Model switched. Reasoning continuation from the previous model cannot be reused.',
     {
+      id: conversationTurnIds(options.requestId).noticeMessageId,
       requestId: options.requestId,
       turnId: options.turnId,
       sessionId: options.sessionId,

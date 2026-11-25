@@ -17,7 +17,6 @@ const session: SessionRecord = {
 };
 const ownership = {
   sessionId: session.sessionId, projectId: session.projectId, requestId: 'request-a', agentId: 'general',
-  optimisticTurnId: null, realTurnId: 'turn-a',
 };
 const assistant = (patch: Partial<ConversationMessage> = {}): ConversationMessage => ({
   id: 'assistant-a', turnId: 'turn-a', requestId: 'request-a', role: 'assistant', agentId: 'general',
@@ -121,7 +120,7 @@ it('merges only the stopped turn without replacing a newer request in the same s
   const newer = assistant({ id: 'assistant-new', turnId: 'turn-new', requestId: 'request-new', createdAt: 20, updatedAt: 20 });
   getHistory.mockImplementation(async () => {
     useConversationStore.getState().upsertConversationMessage(newer);
-    useComposerSessionContextStore.getState().beginTurn({ ...ownership, requestId: 'request-new', realTurnId: 'turn-new' });
+    useComposerSessionContextStore.getState().beginTurn({ ...ownership, requestId: 'request-new' });
     return { messages: [completed()], branchState: null };
   });
   await act(async () => stop());
@@ -140,8 +139,8 @@ it.each([
 });
 
 it('keeps clean preparing cancellation without reading committed history', async () => {
-  useConversationStore.getState().setConversationMessages([assistant({ turnId: 'optimistic-turn-request-a' })]);
-  useComposerSessionContextStore.getState().beginTurn({ ...ownership, optimisticTurnId: 'optimistic-turn-request-a', realTurnId: null });
+  useConversationStore.getState().setConversationMessages([assistant({ turnId: 'turn-request-a' })]);
+  useComposerSessionContextStore.getState().beginTurn(ownership);
   cancel.mockResolvedValue({ success: true, phase: 'preparing', cancelledRequestId: 'request-a' });
   await act(async () => stop());
   expect(getHistory).not.toHaveBeenCalled();

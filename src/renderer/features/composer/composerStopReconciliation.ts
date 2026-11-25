@@ -21,7 +21,7 @@ export async function reconcileConversationStop(options: {
   // A successful session stop may only have joined background work: the
   // requested conversation can already be complete. Read the exact persisted
   // terminal before applying another optimistic stop.
-  if (cancelResult.success && sessionId && activeAssistant && !activeAssistant.turnId.startsWith('optimistic-turn-')) {
+  if (cancelResult.success && sessionId && activeAssistant) {
     const history = await conversationAPI.getHistory(sessionId);
     const terminal = history.messages.find((message) => (
       message.role === 'assistant'

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionRecordStore } from '../../stores/sessionRecordStore';
@@ -90,7 +91,7 @@ describe('applyConversationTurnResult session isolation', () => {
 
   it('forces stopped when requestId was monotonically stopped before reconcile', async () => {
     useConversationStore.getState().markRequestMonotonicallyStopped('req-stop');
-    useConversationStore.getState().markTurnMonotonicallyStopped('optimistic-turn-req-stop');
+    useConversationStore.getState().markTurnMonotonicallyStopped(conversationTurnIds('req-stop').turnId);
 
     const electronAPI = {
       project: { list: async () => ({ projects: [] }) },

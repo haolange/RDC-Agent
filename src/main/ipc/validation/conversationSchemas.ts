@@ -104,7 +104,8 @@ export const ConversationSendRequestSchema = z.object({
       expectedHash: planReference.expectedHash,
     }).strict(),
   ]).optional(),
-  requestId: ipcNonEmptyString(200, 'requestId'),
+  // The turn's ids derive from it (conversationTurnIds), so it keeps to the id grammar and leaves room for their prefix.
+  requestId: ipcId(120, 'requestId'),
   projectId: NullableId.optional(),
   sessionId: NullableId.optional(),
   currentRunId: NullableId.optional(),

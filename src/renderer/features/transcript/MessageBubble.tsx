@@ -21,7 +21,6 @@ import { MessageAttachments } from './MessageAttachments';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { answerSources } from './answerSources';
-import { transcriptRowKey } from './transcriptRowKey';
 import type {
   ConversationMessage,
   ConversationMessageStatus,
@@ -211,7 +210,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           <div className="conversation-message-stack">
             {/* Working appears with its first content; a request still preparing shows no empty card. */}
             {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary) ? (
-                <WorkProcess trace={trace} sessionId={message.sessionId} rowKey={transcriptRowKey(message)} answer={message.content} />
+                <WorkProcess trace={trace} sessionId={message.sessionId} rowKey={message.id} answer={message.content} />
             ) : null}
             {message.workTraceDiscarded ? (
               <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>

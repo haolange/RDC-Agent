@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { stopWorkTrace } from '../lib/stopWorkTrace';
 import {
   shouldRejectActivePatchForMonotonicStop,
@@ -87,35 +88,32 @@ describe('conversationStore monotonic stop', () => {
     expect(useConversationStore.getState().consumeRevokedRequest('req-1')).toBe(false);
   });
 
-  it('rejects late streaming patches by requestId after rewrite stop', () => {
+  it('keeps a request stopped before main answered stopped when main\'s message for it arrives late', () => {
     const store = useConversationStore.getState();
+    const { turnId, assistantMessageId } = conversationTurnIds('req-9');
     store.upsertConversationMessage(baseAssistant({
-      id: 'assistant-opt',
-      turnId: 'optimistic-turn-req-9',
+      id: assistantMessageId,
+      turnId,
       requestId: 'req-9',
       status: 'streaming',
       updatedAt: 1,
     }));
     store.markRequestMonotonicallyStopped('req-9');
-    store.markTurnMonotonicallyStopped('optimistic-turn-req-9');
-    store.updateAssistantMessageByTurnId('optimistic-turn-req-9', (message) => ({
-      ...message,
-      status: 'stopped',
-      updatedAt: 2,
-    }));
+    store.markTurnMonotonicallyStopped(turnId);
+    store.updateAssistantMessageByTurnId(turnId, (message) => ({ ...message, status: 'stopped' }));
 
-    // Simulate IPC reconcile replacing optimistic turn with real turn id.
-    store.migrateMonotonicStoppedTurn('optimistic-turn-req-9', 'turn-real-9');
+    // Main's message carries the same ids; a late streaming version of it cannot reopen the stopped turn.
     store.upsertConversationMessage(baseAssistant({
-      id: 'assistant-real',
-      turnId: 'turn-real-9',
+      id: assistantMessageId,
+      turnId,
       requestId: 'req-9',
       status: 'streaming',
       updatedAt: 100,
-      content: 'late after rewrite stop',
+      content: 'late after stop',
     }));
 
-    const late = useConversationStore.getState().allConversationMessages.find((m) => m.id === 'assistant-real');
-    expect(late).toBeUndefined();
+    const [message] = useConversationStore.getState().allConversationMessages;
+    expect(message).toMatchObject({ id: assistantMessageId, status: 'stopped' });
+    expect(message.content).not.toBe('late after stop');
   });
 });

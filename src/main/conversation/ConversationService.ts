@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
@@ -632,7 +633,7 @@ export class ConversationService {
       }
     }
 
-    const newBranchId = generateEventId('branch');
+    const newBranchId = conversationTurnIds(input.requestId).branchId;
     const variantIndex = fork.branches.length;
 
     const updatedContext: ResolvedConversationContext = {

@@ -12,7 +12,8 @@ import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 /**
  * Turn 响应里的消息以“可见分支成员集”为准，但流事件（SSE/IPC）可能先于
  * invoke 响应送达终态 patch；对账时按 updatedAt 保留 store 中更新的版本，
- * 避免把已完成的 assistant 消息覆盖回 streaming draft。
+ * 避免把已完成的 assistant 消息覆盖回 streaming draft。发送时先显示的消息与
+ * 主进程的消息同 id（conversationTurnIds），主进程创建得更晚，因此原位替换它们。
  */
 const reconcileTurnMessages = (
   currentMessages: ConversationMessage[],
@@ -152,13 +153,6 @@ export async function applyConversationTurnResult(options: {
       if (result.branchState !== undefined) {
         setBranchState(result.branchState ?? null);
       }
-    }
-    if (requestStopped && requestId) {
-      const realTurnId = result.assistantDraftMessage.turnId || result.userMessage.turnId;
-      const optimisticTurnId = `optimistic-turn-${requestId}`;
-      useConversationStore.getState().migrateMonotonicStoppedTurn(optimisticTurnId, realTurnId);
-      useConversationStore.getState().markTurnMonotonicallyStopped(realTurnId);
-      useConversationStore.getState().markRequestMonotonicallyStopped(requestId);
     }
   } else {
     upsertConversationMessages(forceStoppedMessages([

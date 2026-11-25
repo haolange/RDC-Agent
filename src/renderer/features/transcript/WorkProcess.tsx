@@ -14,7 +14,7 @@ import type { ConversationWorkTrace } from '@shared/types/conversation';
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
   sessionId?: string | null;
-  /** The transcript row's lasting identity (`transcriptRowKey`); open and close choices are remembered under it. */
+  /** The transcript row's lasting identity (its message id); open and close choices are remembered under it. */
   rowKey: string;
   answer?: string;
 }
@@ -26,7 +26,7 @@ const awaitsPlanReview = (trace: ConversationWorkTrace): boolean => trace.blocks
 /**
  * Working stays open while the turn runs, including while its plan card waits for review, when it ends in an error or
  * a stop, and while any of its actions failed. Under "follow latest" it folds once the turn completes cleanly. Opening or closing Working by
- * hand is remembered for this transcript row, across the optimistic-to-main swap and windowed remounts, and always wins.
+ * hand is remembered for this transcript row, from the send through main's answer and across windowed remounts, and always wins.
  */
 const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer }) => {
   const { t, language } = useI18n();

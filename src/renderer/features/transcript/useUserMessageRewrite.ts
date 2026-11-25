@@ -4,10 +4,7 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import {
-  applyConversationTurnResult,
-  removeOptimisticConversationMessages,
-} from '../../stores/conversationSendHelpers';
+import { applyConversationTurnResult } from '../../stores/conversationSendHelpers';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { createConversationRequestId } from '../../services/conversationRequestId';
 import { buildConversationConfigurationCommit } from '../../stores/conversationConfigurationCommit';
@@ -67,8 +64,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     useComposerSessionContextStore.getState().beginTurn({
       ...turnOwnership,
       projectId: message.projectId ?? currentProject?.projectId ?? null,
-      optimisticTurnId: optimistic.optimisticTurnId,
-      realTurnId: null,
     });
 
     try {
@@ -110,20 +105,9 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         return;
       }
 
-      // Drop optimistic placeholders before applying authoritative rewrite messages.
-      const optimisticIds = optimistic.messages
-        .filter((entry) => entry.requestId === requestId)
-        .map((entry) => entry.id);
-      setConversationMessages(removeOptimisticConversationMessages(
-        useConversationStore.getState().allConversationMessages,
-        optimisticIds,
-      ));
-
-      useComposerSessionContextStore.getState().setRealTurnId(
-        turnOwnership,
-        result.userMessage.turnId,
-        result.session?.record.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId,
-      );
+      // Main's messages and branch carry the ids the snapshot used, so they update it in place.
+      const committedSessionId = result.session?.record.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId;
+      if (committedSessionId) useComposerSessionContextStore.getState().bindCommittedSession(turnOwnership, committedSessionId);
 
       await applyConversationTurnResult({
         electronAPI,

@@ -1,7 +1,7 @@
 export {
   resolveComposerProfileId,
   buildOptimisticConversationTurn,
-  removeOptimisticConversationMessages,
+  removeRequestMessages,
   toConversationAttachmentInputs,
 } from './conversationSendOptimistic';
 export { applyConversationTurnResult } from './conversationSendApply';

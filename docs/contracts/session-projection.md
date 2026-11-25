@@ -59,15 +59,15 @@ interface ActiveTurnContext {
   projectId: string | null;
   requestId: string;
   agentId: AgentId;
-  optimisticTurnId: string | null;
-  realTurnId: string | null;
 }
 ```
+
+- 一次请求的 turn、user/assistant 消息、模型切换提示与改写分支的 id 都由 `conversationTurnIds(requestId)`（`src/shared/conversation/conversationTurnIds.ts`）派生，主进程创建它们与 renderer 先显示的消息用同一函数。renderer 先显示的消息即主进程消息的 id，主进程的版本（流事件或发送回包，先到者）按 id 原位更新它，没有占位替换或重新分键；被拒绝或在 preparing 被 Stop 撤销的请求按 `requestId` 移除其消息。转录行以消息 id 为身份。`requestId` 遵循 IPC id 语法（≤ 120 字符），派生 id 同样合法。
 
 - Session 切换时清空 context 与 `isPromptSending`；Agent 运行态只读取当前 context 的 `agentId`，禁止扫描历史 draft/streaming 消息推断。
 - Work Process 的模型段落内，文本项、thinking、工具、审批和 Tasks 快照以首次可见顺序排列，更新按输出项身份或 toolCallId 原位落位；子代理过程沿用相同规则。同回合新增记录使用主进程记录的顺序，旧记录只按已有时间及存储顺序投影。中性流式文本确认成 commentary 时原位显示。一次模型响应结束即关闭对应工作段，后续响应建立新段。Provider 标记的终答待宿主验收，主会话从已结算消息读取正文，放在 Working 之后。停止时保留已公开的工作记录与停止状态。
 - Stop 只读当前 session 的 context；禁止依赖跨 session 的 stale `activeRequestIdRef`。
-- Send、Rewrite、Stop 与运行中菜单状态都按 `sessionId + requestId + agentId` 投影。Monotonic stop 以 **`requestId` 为主**、`turnId` 为辅：optimistic → real turnId 替换后，已停止的 request 仍拒绝迟到 `draft`/`streaming` patch。
+- Send、Rewrite、Stop 与运行中菜单状态都按 `sessionId + requestId + agentId` 投影。Monotonic stop 以 **`requestId` 为主**、`turnId` 为辅；turn id 从发送起就是主进程的 id，已停止的 request 拒绝迟到 `draft`/`streaming` patch。
 
 ## Session 切换 Hygiene
 
@@ -90,12 +90,12 @@ interface ActiveTurnContext {
 - `preparing` → 干净撤销（本 session 草稿恢复；transcript 不留本轮）；
 - `committing` / `running` → 单调落停；
 - Stop 回执成功不代表指定 assistant 被取消：可能仅停止了后台工作，原回合已先完成。committed 回合停止后，renderer 经现有 `conversation.getHistory` 对账同 session/request/turn/agent 的权威终态，仅合并该消息；已完成/失败/停止消息不得再被乐观停止改写。读取期间切换会话时只更新所属 cache，新请求的消息与 ActiveTurnContext 不被旧停止回执覆盖。
-- Rewrite 提交立即写入 ActiveTurnContext；Stop 可在 optimistic 阶段按 `requestId` 落停，IPC reconcile 不得用 `streaming` 覆盖已停止 request。
+- Rewrite 提交立即写入 ActiveTurnContext；Stop 可在主进程应答前按 `requestId` 落停，取消请求总带派生的 turn id，IPC reconcile 不得用 `streaming` 覆盖已停止 request。
 - 改写分支的 `anchorUserMessageId/rootTurnId` 标识分叉首轮，不是后续每轮的身份。终态写入须核对当前 user/assistant 的 turn 与 branch，并验证分支锚点仍属于该分支及其 root turn；同分支后续回合允许提交，切换可见分支不撤销后台回合的归属。
 
 ## 验证
 
-- 单元：`sessionEventGate`、`sessionRecordStore`（revision 次序、覆盖层）、Agent 切换迟到应答与失败回退、会话模型 lane（renderer 与主进程 `SessionModelLanes`）、composer restore session bind、monotonic requestId、projection cache activate。
+- 单元：`sessionEventGate`、`sessionRecordStore`（revision 次序、覆盖层）、Agent 切换迟到应答与失败回退、会话模型 lane（renderer 与主进程 `SessionModelLanes`）、`conversationTurnIds`、composer restore session bind、monotonic requestId、projection cache activate。
 - 静态：`pnpm run check:session-projection`。
 - Browser QA：删尽 QA project sessions → 新建隔离 session → 多 session 串台 / Stop / Rewrite 矩阵（见 `AGENTS.md`）。
 
