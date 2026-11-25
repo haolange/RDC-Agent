@@ -4,8 +4,6 @@ import { useAsyncValue } from '../lib/useAsyncValue';
 
 interface FaviconImageProps {
   domain: string;
-  className?: string;
-  alt?: string;
 }
 
 const monogramForDomain = (domain: string): string => {
@@ -14,11 +12,7 @@ const monogramForDomain = (domain: string): string => {
   return letter ? letter.toUpperCase() : '?';
 };
 
-export const FaviconImage: React.FC<FaviconImageProps> = ({
-  domain,
-  className = '',
-  alt = '',
-}) => {
+export const FaviconImage: React.FC<FaviconImageProps> = ({ domain }) => {
   const cleaned = domain.replace(/^https?:\/\//i, '').split('/')[0]?.trim() ?? '';
   const favicon = useAsyncValue(cleaned || null, () => resolveFaviconDataUrl(cleaned));
   const dataUrl = favicon.status === 'ready' ? favicon.value : null;
@@ -28,9 +22,9 @@ export const FaviconImage: React.FC<FaviconImageProps> = ({
   if (dataUrl) {
     return (
       <img
-        className={`favicon-image ${className}`.trim()}
+        className="favicon-image"
         src={dataUrl}
-        alt={alt}
+        alt=""
         width={14}
         height={14}
         loading="lazy"
@@ -41,7 +35,7 @@ export const FaviconImage: React.FC<FaviconImageProps> = ({
   if (!resolved) {
     return (
       <span
-        className={`favicon-image is-pending ${className}`.trim()}
+        className="favicon-image is-pending"
         aria-hidden="true"
       />
     );
@@ -49,7 +43,7 @@ export const FaviconImage: React.FC<FaviconImageProps> = ({
 
   return (
     <span
-      className={`favicon-image is-monogram ${className}`.trim()}
+      className="favicon-image is-monogram"
       aria-hidden="true"
       data-letter={monogramForDomain(cleaned)}
     >

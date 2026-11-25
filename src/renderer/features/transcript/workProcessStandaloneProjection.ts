@@ -15,7 +15,6 @@ export function pushStandaloneBlock(
     if (block.kind === 'plan_review') {
       const planReviewRows = ctx.groupProcessRows(block.toolCalls.filter(isVisibleToolCall).map((call) => ctx.createToolRow(call)));
       if (planReviewRows.length > 0) {
-        ctx.hasVisibleProcessEvidence = true;
         const lastUnit = units[units.length - 1];
         if (lastUnit?.kind === 'loop') {
           const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
@@ -41,7 +40,6 @@ export function pushStandaloneBlock(
     if (block.kind === 'user_input') {
       const userInputRows = ctx.groupProcessRows(block.toolCalls.filter(isVisibleToolCall).map((call) => ctx.createToolRow(call)));
       if (userInputRows.length > 0) {
-        ctx.hasVisibleProcessEvidence = true;
         const lastUnit = units[units.length - 1];
         if (lastUnit?.kind === 'loop') {
           const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
@@ -69,7 +67,6 @@ export function pushStandaloneBlock(
     }
 
     if (block.kind === 'approval') {
-      ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
         rows: [deps.createApprovalRow(block)],
@@ -79,7 +76,6 @@ export function pushStandaloneBlock(
     }
 
     if (block.kind === 'compaction') {
-      ctx.hasVisibleProcessEvidence = true;
       const stats = block.compactionStats;
       const detailLines: string[] = block.summary ? [block.summary] : [];
       if (stats?.usage) detailLines.push(t('chat.compactionUsage', { input: stats.usage.inputTokens, output: stats.usage.outputTokens }));
@@ -109,7 +105,6 @@ export function pushStandaloneBlock(
     }
 
     if (block.kind === 'task_snapshot' && block.taskSnapshot) {
-      ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
         rows: [{
@@ -132,7 +127,6 @@ export function pushStandaloneBlock(
     }
 
     if (block.kind === 'diagnostic' || block.status === 'error') {
-      ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
         rows: [deps.createDiagnosticRow(block)],
@@ -143,7 +137,6 @@ export function pushStandaloneBlock(
 
     const summaryText = deps.getMeaningfulBlockSummary(block);
     if (summaryText) {
-      ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
         rows: [{

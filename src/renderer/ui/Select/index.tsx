@@ -25,7 +25,6 @@ export const Select: React.FC<SelectProps> = ({
   options,
   onChange,
   placeholder: suppliedPlaceholder,
-  emptyLabel: suppliedEmptyLabel,
   disabled = false,
   dataTestId,
   ariaLabel,
@@ -36,11 +35,10 @@ export const Select: React.FC<SelectProps> = ({
   className = '',
   triggerClassName = '',
   menuClassName = '',
-  optionClassName = '',
 }) => {
   const labels = useUiLabels();
   const placeholder = suppliedPlaceholder ?? labels.selectPlaceholder;
-  const emptyLabel = suppliedEmptyLabel ?? labels.selectEmpty;
+  const emptyLabel = labels.selectEmpty;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -269,7 +267,6 @@ export const Select: React.FC<SelectProps> = ({
           dataTestId={dataTestId}
           triggerAriaLabel={triggerAriaLabel}
           menuClassName={menuClassName}
-          optionClassName={optionClassName}
           emptyLabel={emptyLabel}
           value={value}
           options={options}

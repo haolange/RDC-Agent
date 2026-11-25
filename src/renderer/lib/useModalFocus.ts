@@ -19,13 +19,6 @@ export function getModalFocusableElements(container: HTMLElement): HTMLElement[]
     ));
 }
 
-export function resolveModalTrapRoot(
-  container: HTMLElement,
-  trapRoot: HTMLElement | null | undefined,
-): HTMLElement {
-  return trapRoot && container.contains(trapRoot) ? trapRoot : container;
-}
-
 export function shouldCaptureEscapedFocus(trap: boolean): boolean {
   return trap;
 }
@@ -42,7 +35,6 @@ export function useModalFocus(options: {
   onClose: () => void;
   busy?: boolean;
   trap?: boolean;
-  trapRootRef?: RefObject<HTMLElement>;
   /** Focus target after an edit removes the action that opened the dialog. */
   fallbackFocusRef?: RefObject<HTMLElement>;
   /**
@@ -51,7 +43,7 @@ export function useModalFocus(options: {
    */
   layerId?: number | null;
 }): void {
-  const { open, containerRef, onClose, busy = false, trap = true, trapRootRef, fallbackFocusRef, layerId = null } = options;
+  const { open, containerRef, onClose, busy = false, trap = true, fallbackFocusRef, layerId = null } = options;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -76,9 +68,8 @@ export function useModalFocus(options: {
   useEffect(() => {
     if (!open) return undefined;
     const focusTrapRoot = () => {
-      const container = containerRef.current;
-      if (!container) return;
-      const root = resolveModalTrapRoot(container, trapRootRef?.current);
+      const root = containerRef.current;
+      if (!root) return;
       if (root.contains(document.activeElement)) return;
       const first = getModalFocusableElements(root)[0];
       (first ?? root).focus();
@@ -88,8 +79,8 @@ export function useModalFocus(options: {
       focusTrapRoot();
     });
     const handleKeyDown = (event: KeyboardEvent) => {
-      const container = containerRef.current;
-      if (!container) return;
+      const root = containerRef.current;
+      if (!root) return;
       // An Escape another layer already consumed must not close this one as well: listener order on the
       // document follows effect order, and the closed layer can unmount before later listeners run.
       if (event.key === 'Escape' && event.defaultPrevented) return;
@@ -102,7 +93,6 @@ export function useModalFocus(options: {
         return;
       }
       if (event.key !== 'Tab' || !trap) return;
-      const root = resolveModalTrapRoot(container, trapRootRef?.current);
       const focusable = getModalFocusableElements(root);
       if (focusable.length === 0) {
         event.preventDefault();
@@ -125,5 +115,5 @@ export function useModalFocus(options: {
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [busy, containerRef, layerId, onClose, open, trap, trapRootRef]);
+  }, [busy, containerRef, layerId, onClose, open, trap]);
 }

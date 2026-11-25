@@ -15,19 +15,18 @@ export interface ProgressBarProps {
   tone?: ProgressBarTone;
   /** A bar with no visible text beside it takes focus and shows its label on hover. */
   standalone?: boolean;
-  className?: string;
 }
 
 /**
  * A determinate track for work whose size is known: the caller reports real counts, the bar never animates on its
  * own and never invents a fraction. A zero `max` (nothing counted yet) draws an empty track.
  */
-export function ProgressBar({ value, max, label, valueText, tone = 'active', standalone = false, className = '' }: ProgressBarProps) {
+export function ProgressBar({ value, max, label, valueText, tone = 'active', standalone = false }: ProgressBarProps) {
   const bounded = max > 0 ? Math.min(Math.max(value, 0), max) : 0;
   const fill = useDynStyle({ '--ui-progress-fill': `${max > 0 ? (bounded / max) * 100 : 0}%` });
   return (
     <span
-      className={`ui-progress${tone === 'done' ? ' is-done' : ''}${className ? ` ${className}` : ''}`}
+      className={`ui-progress${tone === 'done' ? ' is-done' : ''}`}
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={max}

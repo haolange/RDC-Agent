@@ -58,6 +58,6 @@ export function Toast({ open, title, message, tone = 'info', dismissLabel, onDis
   );
 }
 
-export function ToastStack({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('ui-toast-stack', className)} aria-live="polite">{children}</div>;
+export function ToastStack({ children }: { children: ReactNode }) {
+  return <div className="ui-toast-stack" aria-live="polite">{children}</div>;
 }

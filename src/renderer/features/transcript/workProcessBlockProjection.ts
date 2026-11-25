@@ -19,7 +19,6 @@ export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit
 export interface BlockProjectionContext {
   t: LocalizedTranslator;
   visibleThinkingKeys: Set<string>;
-  hasVisibleProcessEvidence: boolean;
   createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
   groupProcessRows: (rows: WorkProcessRow[]) => WorkProcessRow[];
   blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
@@ -35,7 +34,7 @@ export interface ThinkingItemPresentation {
 }
 
 export interface LoopProjectionDeps {
-  resolveOutputPhase: (block: ConversationWorkBlock, hasVisibleProcessEvidence: boolean) => ConversationLoopOutputPhase;
+  resolveOutputPhase: (block: ConversationWorkBlock) => ConversationLoopOutputPhase;
   resolveReasoningState: (block: ConversationWorkBlock) => ConversationReasoningState;
   resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => ThinkingItemPresentation | null;
   isNonFinalStopReason: (stopReason?: ConversationLoopStopReason) => boolean;

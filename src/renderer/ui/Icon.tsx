@@ -26,22 +26,19 @@ export interface IconProps {
   name: IconName;
   size?: IconSize;
   className?: string;
-  title?: string;
   /** Solid glyphs (the stop square, status dots) fill their shapes instead of stroking them. */
   filled?: boolean;
 }
 
-export function Icon({ name, size = 16, className, title, filled }: IconProps) {
+export function Icon({ name, size = 16, className, filled }: IconProps) {
   const parts: readonly IconPart[] = ICON_REGISTRY[name];
   return (
     <svg
       className={cn('ui-icon', `is-size-${size}`, filled && 'is-filled', className)}
       viewBox="0 0 24 24"
-      aria-hidden={title ? undefined : true}
-      role={title ? 'img' : undefined}
+      aria-hidden
       focusable="false"
     >
-      {title ? <title>{title}</title> : null}
       {parts.map((part, index) => {
         if ('d' in part) {
           return <path key={index} d={part.d} />;

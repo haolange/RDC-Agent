@@ -9,7 +9,6 @@ interface LocalToolDisclosureProps {
   status: string;
   testId: string;
   children: ReactNode;
-  defaultOpen?: boolean;
 }
 
 /**
@@ -22,10 +21,9 @@ export function LocalToolDisclosure({
   status,
   testId,
   children,
-  defaultOpen = false,
 }: LocalToolDisclosureProps) {
   return (
-    <Details className="settings-local-tool" data-testid={testId} open={defaultOpen} summaryClassName="settings-local-tool-summary" summary={<>
+    <Details className="settings-local-tool" data-testid={testId} summaryClassName="settings-local-tool-summary" summary={<>
         <Icon name={icon} size={16} className="settings-local-tool-icon" />
         <span className="settings-local-tool-title">
           {title}

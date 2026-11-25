@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  APP_MIN_MAIN_WIDTH,
   APP_RESIZE_HANDLE_WIDTH,
   LEFT_SIDEBAR_MIN_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
@@ -10,7 +11,6 @@ import {
 import { useLayoutStore } from '../stores/layoutStore';
 import { useProjectStore } from '../stores/projectStore';
 import {
-  getResponsiveMinMainWidth,
   resolveResponsiveSidebarState,
   resolveSidebarWidths,
 } from '../shell/layoutGeometry';
@@ -134,7 +134,7 @@ export function useWorkbenchLayout(isReady: boolean) {
         rightPanelWidth,
         effectiveLeftCollapsed,
         effectiveRightCollapsed,
-        getResponsiveMinMainWidth(containerWidth),
+        APP_MIN_MAIN_WIDTH,
         isRightRailVisible,
       );
 
@@ -143,7 +143,7 @@ export function useWorkbenchLayout(isReady: boolean) {
           LEFT_SIDEBAR_MIN_WIDTH,
           Math.min(
             SIDEBAR_MAX_WIDTH,
-            containerWidth - getResponsiveMinMainWidth(containerWidth) - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedRight,
+            containerWidth - APP_MIN_MAIN_WIDTH - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedRight,
           ),
         );
         setLeftSidebarWidth(Math.min(maxByMain, dragState.startWidth + (event.clientX - dragState.startX)));
@@ -154,7 +154,7 @@ export function useWorkbenchLayout(isReady: boolean) {
           RIGHT_PANEL_MIN_WIDTH,
           Math.min(
             SIDEBAR_MAX_WIDTH,
-            containerWidth - getResponsiveMinMainWidth(containerWidth) - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedLeft,
+            containerWidth - APP_MIN_MAIN_WIDTH - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedLeft,
           ),
         );
         setRightPanelWidth(Math.min(maxByMain, dragState.startWidth - (event.clientX - dragState.startX)));

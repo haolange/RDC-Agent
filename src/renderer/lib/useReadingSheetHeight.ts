@@ -21,7 +21,6 @@ export function useReadingSheetHeight(
   sheetRef: RefObject<HTMLDivElement | null>,
   contentRef: RefObject<HTMLDivElement | null>,
   hasStatus: boolean,
-  hasFooter: boolean,
 ): void {
   const measure = useCallback(() => {
     const sheet = sheetRef.current;
@@ -56,5 +55,5 @@ export function useReadingSheetHeight(
     }
     return () => observer.disconnect();
     // The observed chrome changes only when an optional element enters or leaves.
-  }, [enabled, sheetRef, contentRef, measure, hasStatus, hasFooter]);
+  }, [enabled, sheetRef, contentRef, measure, hasStatus]);
 }

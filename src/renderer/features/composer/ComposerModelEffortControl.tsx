@@ -100,7 +100,7 @@ export const ComposerModelEffortControl: React.FC<{
   }, [menu]);
 
   useEffect(() => {
-    if (!open) setView((current) => nextComposerModelEffortView(current, 'menu-closed'));
+    if (!open) setView(nextComposerModelEffortView('menu-closed'));
   }, [open]);
 
   useEffect(() => {
@@ -120,7 +120,7 @@ export const ComposerModelEffortControl: React.FC<{
     inside: () => [menuRef.current],
     onDismiss: (reason) => {
       if (reason === 'outside') menu.close();
-      else setView((current) => nextComposerModelEffortView(current, 'escape'));
+      else setView(nextComposerModelEffortView('escape'));
     },
   });
 
@@ -159,7 +159,7 @@ export const ComposerModelEffortControl: React.FC<{
           popupShiftPx={effort.popupShift}
           trackRef={effort.trackRef}
           modelLabel={loading && !currentOption && !effective ? t('composer.model.loading') : modelLabel}
-          onOpenModels={() => setView(nextComposerModelEffortView(view, 'open-models'))}
+          onOpenModels={() => setView(nextComposerModelEffortView('open-models'))}
           capabilityStateDetail={controlsState.saveState.error ? t('composer.model.saveFailed') : effort.capabilityStateDetail}
           capabilityRefreshing={effort.capabilityRefreshing}
           capabilityRetryLabel={controlsState.saveState.error ? t('composer.model.retrySave') : effort.capabilityRetryLabel}
@@ -203,7 +203,7 @@ export const ComposerModelEffortControl: React.FC<{
           currentSession={currentSession}
           popupRef={popupRef}
           popupShiftPx={effort.popupShift}
-          onChosen={() => setView(nextComposerModelEffortView(view, 'chosen'))}
+          onChosen={() => setView(nextComposerModelEffortView('chosen'))}
           onSaveStateChange={handleSaveState}
         />
       ) : null}

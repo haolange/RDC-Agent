@@ -11,7 +11,6 @@ export interface ColorFieldProps {
   onChange: (hex: string) => void;
   testId: string;
   className?: string;
-  fallbackHex?: string;
   /** `inline` = stacked label + compact chip (Agents look strip). Default = label | control grid (Appearance). */
   hideLabel?: boolean;
   layout?: 'grid' | 'inline';
@@ -24,6 +23,7 @@ export interface ColorFieldProps {
 }
 
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const FALLBACK_HEX = '#33d1ff';
 
 export function ColorField({
   label,
@@ -31,7 +31,6 @@ export function ColorField({
   onChange,
   testId,
   className = '',
-  fallbackHex = '#33d1ff',
   layout = 'grid',
   hideLabel = false,
   areaLabel,
@@ -58,7 +57,7 @@ export function ColorField({
     className,
   ].filter(Boolean).join(' ');
   const swatchStyle = useDynStyle({ '--color-field-swatch-bg': value });
-  const resolved = HEX_PATTERN.test(value) ? value.toLowerCase() : fallbackHex;
+  const resolved = HEX_PATTERN.test(value) ? value.toLowerCase() : FALLBACK_HEX;
 
   return (
     <div className={classes}>

@@ -22,7 +22,6 @@ export interface SearchMultiSelectProps {
   errorDetail?: string;
   disabled?: boolean;
   onRetry?: () => void;
-  className?: string;
   label: string;
   searchLabel: string;
   emptyLabel: string;
@@ -35,7 +34,7 @@ export interface SearchMultiSelectProps {
 
 /** Presentational catalog picker. Resolution, permissions and persistence belong to its caller. */
 export function SearchMultiSelect({ value, options, onChange, unavailable = {}, loading = false,
-  error, errorDetail, disabled = false, onRetry, className, label, searchLabel, emptyLabel, noResultsLabel,
+  error, errorDetail, disabled = false, onRetry, label, searchLabel, emptyLabel, noResultsLabel,
   loadingLabel, unavailableLabel, removeLabel, retryLabel }: SearchMultiSelectProps) {
   const [query, setQuery] = useState('');
   const id = useId();
@@ -43,7 +42,7 @@ export function SearchMultiSelect({ value, options, onChange, unavailable = {}, 
   const selected = [...new Set(value)];
   const catalog = new Map(options.map((option) => [option.id, option]));
   return (
-    <div className={cn('ui-search-multi-select', disabled && 'is-disabled', className)} role="group"
+    <div className={cn('ui-search-multi-select', disabled && 'is-disabled')} role="group"
       aria-labelledby={`${id}-label`} aria-busy={loading}>
       <span id={`${id}-label`} className="ui-search-multi-select-label">{label}</span>
       {selected.length > 0 && <ul className="ui-search-multi-select-selected">

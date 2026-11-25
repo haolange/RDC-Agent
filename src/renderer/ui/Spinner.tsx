@@ -1,18 +1,15 @@
 import './Spinner.css';
 
 export interface SpinnerProps {
-  className?: string;
-  label?: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
-export function Spinner({ className = '', label, size = 'md' }: SpinnerProps) {
+export function Spinner({ size = 'md' }: SpinnerProps) {
   return (
     <span
-      className={`ui-spinner animate-spin${size !== 'md' ? ` is-size-${size}` : ''}${className ? ` ${className}` : ''}`}
+      className={`ui-spinner animate-spin${size !== 'md' ? ` is-size-${size}` : ''}`}
       role="status"
-      aria-label={label}
-      aria-hidden={label ? undefined : true}
+      aria-hidden
     />
   );
 }

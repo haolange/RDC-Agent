@@ -24,7 +24,7 @@ export function projectLlmTurn(
   interactions: ConversationWorkBlock[] = [],
   superseded = false,
 ): LoopPresentationUnit | StandalonePresentationUnit | null {
-  const outputPhase = superseded ? 'commentary' : deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
+  const outputPhase = superseded ? 'commentary' : deps.resolveOutputPhase(block);
   const reasoningState = deps.resolveReasoningState(block);
   const stopReason = block.result?.stopReason;
   // Successful TaskRegistry mutations already have authoritative snapshots;
@@ -102,8 +102,6 @@ export function projectLlmTurn(
     outputPhase,
     stopReason,
   });
-
-  ctx.hasVisibleProcessEvidence = true;
 
   return {
     kind: 'loop',

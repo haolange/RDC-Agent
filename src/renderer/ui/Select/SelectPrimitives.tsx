@@ -7,11 +7,11 @@ import { normalizeTestIdSegment } from './selectUtils';
 import type { SelectOption } from './types';
 import type { PresenceState } from '../usePresence';
 
-function AaSwatch(props: { color: string; className?: string }) {
+function AaSwatch(props: { color: string }) {
   const dynStyle = useDynStyle({ '--dropdown-swatch-bg': props.color });
   return (
     <span
-      className={['dropdown-select-swatch', props.className].filter(Boolean).join(' ')}
+      className="dropdown-select-swatch"
       {...dynStyle}
       aria-hidden="true"
     >
@@ -93,7 +93,6 @@ interface SelectMenuProps {
   dataTestId: string;
   triggerAriaLabel: string;
   menuClassName: string;
-  optionClassName: string;
   emptyLabel: string;
   value: string;
   options: SelectOption[];
@@ -117,7 +116,6 @@ const SelectMenuPortal: React.FC<SelectMenuProps> = ({
   dataTestId,
   triggerAriaLabel,
   menuClassName,
-  optionClassName,
   emptyLabel,
   value,
   options,
@@ -171,7 +169,6 @@ const SelectMenuPortal: React.FC<SelectMenuProps> = ({
                 isActive ? 'is-active' : '',
                 option.disabled ? 'is-disabled' : '',
                 option.swatchColor ? 'has-swatch' : '',
-                optionClassName,
               ].filter(Boolean).join(' ')}
               data-testid={optionTestId}
               role="option"

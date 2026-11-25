@@ -12,7 +12,6 @@ export interface SelectProps {
   options: SelectOption[];
   onChange: (value: string) => void;
   placeholder?: string;
-  emptyLabel?: string;
   disabled?: boolean;
   dataTestId: string;
   ariaLabel?: string;
@@ -25,5 +24,4 @@ export interface SelectProps {
   className?: string;
   triggerClassName?: string;
   menuClassName?: string;
-  optionClassName?: string;
 }

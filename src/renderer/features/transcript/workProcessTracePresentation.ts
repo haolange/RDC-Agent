@@ -34,18 +34,12 @@ const isNonFinalStopReason = (stopReason?: ConversationLoopStopReason): boolean 
   stopReason === 'max_tokens' || stopReason === 'refusal' || stopReason === 'aborted'
 );
 
-const resolveOutputPhase = (
-  block: ConversationWorkBlock,
-  _hasVisibleProcessEvidence: boolean,
-): ConversationLoopOutputPhase => {
+const resolveOutputPhase = (block: ConversationWorkBlock): ConversationLoopOutputPhase => {
   // Runtime phase is authoritative. Before it settles, a loop without tools reads as the
   // answering loop; its text items stream in place and take their phase when the loop settles.
   if (block.result?.outputPhase) return block.result.outputPhase;
   if (block.toolCalls.length > 0 || isNonFinalStopReason(block.result?.stopReason)) {
     return 'commentary';
-  }
-  if (block.status === 'running' || block.status === 'pending') {
-    return 'final_answer';
   }
   return 'final_answer';
 };
@@ -100,14 +94,12 @@ const getLoopProjectionDeps = (t: LocalizedTranslator) => ({
 
 const buildProjectionContext = (t: LocalizedTranslator): {
   visibleThinkingKeys: Set<string>;
-  hasVisibleProcessEvidence: boolean;
   createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
   groupProcessRows: typeof groupProcessRows;
   blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
   t: LocalizedTranslator;
 } => ({
   visibleThinkingKeys: new Set(),
-  hasVisibleProcessEvidence: false,
   createToolRow: (call) => createToolRowForPresentation(call, t),
   groupProcessRows,
   blocksToDetailRows: (blocks) => blocksToDetailRows(blocks, t),

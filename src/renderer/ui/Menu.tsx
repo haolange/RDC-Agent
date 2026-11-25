@@ -21,7 +21,6 @@ export interface MenuProps {
   items: MenuItem[];
   align?: 'start' | 'end';
   side?: 'top' | 'bottom';
-  className?: string;
   label?: string;
 }
 
@@ -38,7 +37,6 @@ export function Menu({
   items,
   align = 'start',
   side = 'bottom',
-  className,
   label,
 }: MenuProps) {
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -69,7 +67,7 @@ export function Menu({
       trigger={trigger}
       align={align}
       side={side}
-      className={cn('ui-menu', className)}
+      className="ui-menu"
       role="presentation"
       dismissOnTab
     >

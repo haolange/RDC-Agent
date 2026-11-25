@@ -2,20 +2,16 @@ import { forwardRef, type InputHTMLAttributes } from 'react';
 import { cn } from '../lib/cn';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
-import { Input, type InputSize } from './Input';
+import { Input } from './Input';
 import './SearchField.css';
 
 export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'type'> {
-  inputSize?: InputSize;
-  error?: boolean;
   onClear?: () => void;
   clearLabel?: string;
 }
 
 export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
   {
-    inputSize = 'md',
-    error = false,
     onClear,
     clearLabel = 'Clear search',
     className,
@@ -32,8 +28,6 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
       <Input
         ref={ref}
         type="search"
-        inputSize={inputSize}
-        error={error}
         value={value}
         disabled={disabled}
         {...rest}

@@ -17,16 +17,15 @@ export interface InlineErrorProps {
   retryLabel?: string;
   retryDisabled?: boolean;
   className?: string;
-  id?: string;
   'data-testid'?: string;
 }
 
 /** The single error presentation: icon, sentence, optional retry, and a copy action for the technical reason. */
-export function InlineError({ children, detail, onRetry, retryLabel, retryDisabled, className, id, 'data-testid': testId }: InlineErrorProps) {
+export function InlineError({ children, detail, onRetry, retryLabel, retryDisabled, className, 'data-testid': testId }: InlineErrorProps) {
   const labels = useUiLabels();
   const copyText = useCopyText();
   return (
-    <div className={cn('ui-inline-error', className)} role="alert" id={id} data-testid={testId}>
+    <div className={cn('ui-inline-error', className)} role="alert" data-testid={testId}>
       <div className="ui-inline-error-line">
         <Icon name="error" size={16} className="ui-inline-error-icon" />
         <span className="ui-inline-error-message">{children}</span>

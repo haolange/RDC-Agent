@@ -344,14 +344,13 @@ export function resolveMaxFieldCell(input: {
   };
 }
 
-export function resolveMaxClipX(
-  width: number,
-  emitterRatio: number,
-  thumbWidthPx: number = 32,
-): number {
+/** The slider thumb's width: at either end of the track the clip edge stops at the thumb's center. */
+const MAX_THUMB_WIDTH_PX = 32;
+
+export function resolveMaxClipX(width: number, emitterRatio: number): number {
   const safeWidth = Math.max(0, width);
   if (safeWidth <= 0) return 0;
   const ratio = clampMaxProgress(emitterRatio);
-  const half = Math.min(Math.max(thumbWidthPx, 0) / 2, safeWidth / 2);
+  const half = Math.min(MAX_THUMB_WIDTH_PX / 2, safeWidth / 2);
   return half + ratio * (safeWidth - 2 * half);
 }

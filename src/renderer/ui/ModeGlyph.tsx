@@ -7,7 +7,6 @@ import './ModeGlyph.css';
 interface ModeGlyphProps {
   mode: AgentMode;
   icon?: ModeIconKey;
-  accentColor?: string;
   className?: string;
   size?: number;
   strokeWidth?: number;
@@ -154,14 +153,13 @@ const FALLBACK_MODE_CONFIG = {
 export const ModeGlyph: React.FC<ModeGlyphProps> = ({
   mode,
   icon,
-  accentColor,
   className,
   size = 16,
   strokeWidth = 2,
 }) => {
   const modeConfig = getAgentModeConfig(mode) ?? FALLBACK_MODE_CONFIG;
   const resolvedIcon = icon ?? modeConfig.icon;
-  const resolvedAccent = accentColor ?? modeConfig.accentColor;
+  const resolvedAccent = modeConfig.accentColor;
   const dynStyle = useDynStyle({ '--mode-glyph-color': resolvedAccent });
 
   return (

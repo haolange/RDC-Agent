@@ -34,8 +34,6 @@ const reduceOverflow = (
   };
 };
 
-export const getResponsiveMinMainWidth = (_containerWidth: number): number => APP_MIN_MAIN_WIDTH;
-
 const getResizeHandleAllowance = (
   leftCollapsed: boolean,
   rightCollapsed: boolean,
@@ -79,7 +77,7 @@ export const resolveResponsiveSidebarState = (
     };
   }
 
-  const minMainWidth = getResponsiveMinMainWidth(containerWidth);
+  const minMainWidth = APP_MIN_MAIN_WIDTH;
   let nextLeftCollapsed = leftCollapsed;
   let nextRightCollapsed = rightVisible ? rightCollapsed : true;
 

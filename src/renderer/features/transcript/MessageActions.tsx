@@ -10,14 +10,12 @@ import type { ConversationMessage } from '@shared/types/conversation';
 interface MessageActionsProps {
   message: ConversationMessage;
   branchState?: ConversationBranchState | null;
-  onCopy?: (content: string) => void | Promise<void>;
   onEditResend?: (content: string) => void;
 }
 
 export const MessageActions: React.FC<MessageActionsProps> = ({
   message,
   branchState = null,
-  onCopy,
   onEditResend,
 }) => {
   const { t } = useI18n();
@@ -26,10 +24,8 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
 
   const handleCopy = useCallback(async () => {
     if (!message.content) return false;
-    const didCopy = await copyText(message.content);
-    await onCopy?.(message.content);
-    return didCopy;
-  }, [copyText, message.content, onCopy]);
+    return copyText(message.content);
+  }, [copyText, message.content]);
 
   const handleEditResend = useCallback(() => {
     if (onEditResend && message.content) {

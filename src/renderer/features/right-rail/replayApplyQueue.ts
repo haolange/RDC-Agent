@@ -1,5 +1,8 @@
+/** How long an enqueued value waits for a newer one before it is applied. */
+const COALESCE_MS = 100;
+
 /** At most one request in flight and one newest pending value. */
-export function createReplayApplyQueue<T>(apply: (value: T) => Promise<unknown>, onError: (error: unknown) => void, interval = 100) {
+export function createReplayApplyQueue<T>(apply: (value: T) => Promise<unknown>, onError: (error: unknown) => void) {
   let pending: T | undefined;
   let running = false;
   let disposed = false;
@@ -26,7 +29,7 @@ export function createReplayApplyQueue<T>(apply: (value: T) => Promise<unknown>,
       if (flush && timer) { clearTimeout(timer); timer = undefined; }
       if (!running && !timer) {
         if (flush) void drain();
-        else timer = setTimeout(() => void drain(), interval);
+        else timer = setTimeout(() => void drain(), COALESCE_MS);
       }
     },
     flush() {

@@ -23,7 +23,7 @@ export { Menu, type MenuItem, type MenuProps } from './Menu';
 export { ModeGlyph } from './ModeGlyph';
 export { OverflowFade, type OverflowFadeProps } from './OverflowFade';
 export { Panel, type PanelProps } from './Panel';
-export { Pill, type PillProps, type PillSize } from './Pill';
+export { Pill, type PillProps } from './Pill';
 export { Popover, type PopoverProps } from './Popover';
 export { ProgressBar, type ProgressBarProps, type ProgressBarTone } from './ProgressBar';
 export { ReadingSheet, type ReadingSheetProps } from './ReadingSheet';
@@ -35,7 +35,7 @@ export { Spinner, type SpinnerProps } from './Spinner';
 export { Switch, type SwitchProps } from './Switch';
 export { Tabs, type TabItem, type TabsProps, type TabsVariant } from './Tabs';
 export { TaskDialog, type TaskDialogProps, type TaskDialogSize } from './TaskDialog';
-export { Textarea, type TextareaProps, type TextareaSize } from './Textarea';
+export { Textarea, type TextareaProps } from './Textarea';
 export { UnsavedChangesDialog, type UnsavedChangesDialogProps } from './UnsavedChangesDialog';
 export { Toast, ToastStack, type ToastProps, type ToastTone } from './Toast';
 

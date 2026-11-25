@@ -4,10 +4,10 @@ import { useAsyncValue } from '../../../lib/useAsyncValue';
 import { resolveSkillSelectionRequest, type SkillSelectionScope } from './scopedSkillSelection';
 
 /** The overview endpoint owns resolution; this hook only scopes its reads (a late answer for another scope is dropped). */
-export function useScopedSkillSelection(scope: SkillSelectionScope, open = true) {
+export function useScopedSkillSelection(scope: SkillSelectionScope) {
   const currentProjectRoot = useProjectStore((state) => state.currentProject?.rootPath);
   const request = resolveSkillSelectionRequest(scope, currentProjectRoot);
-  const enabled = open && request.enabled;
+  const enabled = request.enabled;
   const projectRoot = request.projectRoot;
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
