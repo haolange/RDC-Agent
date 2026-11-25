@@ -12,7 +12,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -134,6 +134,10 @@ async function main() {
   ok(`Starting ${executable} for ${HOLD_MS}ms`);
 
   const root = mkdtempSync(path.join(tmpdir(), 'rdc-agent-desktop-smoke-'));
+  // The profile is redirected to `root`. Windows expands its known folders from %USERPROFILE% and fails
+  // `app.getPath('appData')` when the expanded folder does not exist, so the isolated profile carries them.
+  mkdirSync(path.join(root, 'AppData', 'Roaming'), { recursive: true });
+  mkdirSync(path.join(root, 'AppData', 'Local'), { recursive: true });
   let child;
   let output = '';
   try {
