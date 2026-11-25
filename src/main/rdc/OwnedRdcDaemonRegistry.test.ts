@@ -83,13 +83,37 @@ describe('OwnedRdcDaemonRegistry', () => {
     })).toBe(true);
   });
 
+  it('leaves daemon state without an ownership record running instead of assuming it is ours', async () => {
+    const root = makeRoot();
+    const intermediateRoot = path.join(root, 'rdc-tool-intermediate');
+    fs.mkdirSync(path.join(intermediateRoot, 'runtime', 'rdc_tool_cli'), { recursive: true });
+    fs.writeFileSync(path.join(intermediateRoot, 'runtime', 'rdc_tool_cli', `daemon_state_${contextId}.json`), '{}');
+    const execute = vi.fn();
+    const terminateProcess = vi.fn();
+    const result = await harvestOwnedRdcDaemons({ registryPath: path.join(root, 'owned-rdc-daemons.json'), intermediateRoot, execute, terminateProcess });
+    expect(result).toEqual({ released: [], failed: [], unconfirmed: [contextId] });
+    expect(execute).not.toHaveBeenCalled();
+    expect(terminateProcess).not.toHaveBeenCalled();
+  });
+
+  it('reports an unreadable registry without stopping anything or throwing', async () => {
+    const root = makeRoot();
+    const registryPath = path.join(root, 'owned-rdc-daemons.json');
+    fs.writeFileSync(registryPath, '{"schemaVersion":1,"records":');
+    const execute = vi.fn();
+    const result = await harvestOwnedRdcDaemons({ registryPath, intermediateRoot: root, execute });
+    expect(result.released).toEqual([]);
+    expect(result.failed).toEqual([{ contextId: 'owned-rdc-daemons.json', error: expect.any(String) }]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('retires a proven dead registration without invoking an obsolete installation', async () => {
     const root = makeRoot(); const registryPath = path.join(root, 'owned-rdc-daemons.json');
     rememberOwnedRdcDaemon({ contextId, command: 'retired', intermediateRoot: root, ownerPid: 91, ownerBirth: 'owner-birth', daemonPid: 92, daemonBirth: 'daemon-birth', workerPid: 0, workerBirth: '', startedAt: 1 }, { registryPath });
     const execute = vi.fn();
     const probe = vi.fn((_identity: ProcessIdentity): ProcessLiveness => 'exited');
     const result = await harvestOwnedRdcDaemons({ registryPath, intermediateRoot: root, probeProcess: probe, execute });
-    expect(result).toEqual({ released: [contextId], failed: [] });
+    expect(result).toEqual({ released: [contextId], failed: [], unconfirmed: [] });
     expect(probe).toHaveBeenCalledWith({ pid: 91, birth: 'owner-birth' });
     expect(probe).toHaveBeenCalledWith({ pid: 92, birth: 'daemon-birth' });
     expect(execute).not.toHaveBeenCalled(); expect(listOwnedRdcDaemons({ registryPath })).toEqual([]);

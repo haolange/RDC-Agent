@@ -103,7 +103,7 @@ export class RdcSessionRuntime {
         if (!previous.captureFileId || !previous.replaySessionId) throw new Error('RDC_SWITCH_IDENTITY_INVALID: capture and replay identities are required.');
         await closeOwnedRemoteCapture({ scope, contextId: this.contextId!, replaySessionId: previous.replaySessionId,
           captureFileId: previous.captureFileId, binding: currentBinding, signal: options.signal,
-          onReplayClosed: () => {
+          onClosed: () => {
             setRdcRuntimeContextForSession(scope.sessionId, null);
             this.openedCapture = null; this.runtimeContext = null; this.captures = []; this.activeCaptureId = null;
           },

@@ -601,17 +601,9 @@ async function initializeServices(): Promise<void> {
     
     await rdcCliInvokerService.getRuntimeSummary();
     console.log('[Main] RDC-Tool CLI invoker initialized');
+    // Harvest logs its own failures and unconfirmed state; a failure there never stops the rest of startup.
     const leftover = await harvestOwnedRdcDaemons();
-    if (leftover.failed.length) {
-      runtimeLogService.log({
-        scope: 'app',
-        namespace: 'context',
-        severity: 'error',
-        title: 'RDC leftover daemon harvest failed',
-        summary: leftover.failed.map((item) => `${item.contextId}: ${item.error}`).join('; '),
-        raw: leftover,
-      });
-    } else if (leftover.released.length) {
+    if (leftover.released.length) {
       runtimeLogService.log({
         scope: 'app',
         namespace: 'context',

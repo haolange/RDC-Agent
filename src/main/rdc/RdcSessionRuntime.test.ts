@@ -353,7 +353,7 @@ describe('selected remote before opening a capture', () => {
       await runtime.clearOpenedCaptureForSession(scope);
     },
   );
-  it('withdraws the closed replay lease if file release fails, retaining context ownership until cleanup', async () => {
+  it('quarantines the still-held lease if file release fails, retaining context ownership until cleanup', async () => {
     remoteNative(); const runtime = new RdcSessionRuntime(); const binding = remoteBinding();
     await runtime.prepareReplayDevice(scope, remoteDevice, { binding });
     await runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding });
@@ -361,9 +361,11 @@ describe('selected remote before opening a capture', () => {
     nativeStop.mockImplementation(async (command: string, args: string[], options: unknown) => args[0] === 'rd.capture.close_file'
       ? { exitCode: 1, stdout: '', stderr: 'file release uncertain' } : native(command, args, options));
     await expect(runtime.openProjectInput({ ...request, inputId: 'replacement', replayDevice: remoteDevice }, { binding })).rejects.toThrow('CLI_FAILED');
-    expect(getRdcContextLease('session')).toBeNull(); expect(runtime.snapshotOpenedCaptureForSession(scope)).toBeNull();
-    expect(runtime.snapshotContextForSession(scope)).toMatchObject({ contextId, runtimeContext: null, captureDescriptors: [] });
+    expect(getRdcContextLease('session')).toMatchObject({ contextId, quarantineReason: expect.stringContaining('could not be verified') });
+    expect(runtime.snapshotOpenedCaptureForSession(scope)).toMatchObject({ status: 'error' });
+    nativeStop.mockImplementation(native);
     await runtime.clearOpenedCaptureForSession(scope); expect(runtime.getContextId()).toBeNull();
+    expect(getRdcContextLease('session')).toBeNull();
   });
   it('does not implicitly install/connect on Open or accept an old loose remote schema', async () => {
     const runtime = new RdcSessionRuntime();

@@ -6,7 +6,11 @@ import { validateRdcSwitchSnapshot } from './RdcSwitchSnapshot';
 import type { SessionScope } from '@shared/types/session';
 import type { RdcTurnBinding } from './RdcTurnBindings';
 
-/** Close a replay and file whose native success payloads do not carry a context identity. */
+/**
+ * Close a replay and file whose native success payloads do not carry a context identity. The lease stays in place
+ * until both closes are confirmed, so any failure on the way quarantines the live lease; `onClosed` releases it only
+ * after the daemon reports neither the replay nor the file.
+ */
 export async function closeOwnedRemoteCapture(input: {
   scope: SessionScope;
   contextId: string;
@@ -14,7 +18,7 @@ export async function closeOwnedRemoteCapture(input: {
   captureFileId: string;
   binding: RdcTurnBinding;
   signal?: AbortSignal;
-  onReplayClosed: () => void;
+  onClosed: () => void;
   onUnconfirmed: () => void;
 }): Promise<void> {
   const { scope, contextId, replaySessionId, captureFileId, binding, signal } = input;
@@ -70,12 +74,13 @@ export async function closeOwnedRemoteCapture(input: {
     await invoke('rd.capture.close_replay', { session_id: replaySessionId });
     checkClosedState(await readContext(), captureFileId, snapshot.processIdentity);
     assertLease();
-    input.onReplayClosed();
     await invoke('rd.capture.close_file', { capture_file_id: captureFileId });
     checkClosedState(await readContext(), '', snapshot.processIdentity);
+    assertLease();
   } catch (error) {
     quarantineRdcContext(scope.sessionId, lease.version, 'The previous capture close could not be verified; close the owning context before continuing.');
     input.onUnconfirmed();
     throw error;
   }
+  input.onClosed();
 }

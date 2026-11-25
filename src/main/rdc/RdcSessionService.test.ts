@@ -21,7 +21,7 @@ vi.mock('./captures/replay/ReplayLivePreviewStore', () => ({
   replayLivePreviewStore: { read: mocks.liveRead, clear: mocks.liveClear, write: vi.fn() },
 }));
 vi.mock('../tools/ShellInvocationService', () => ({ shellInvocationService: { hasUnconfirmedProcesses: () => false } }));
-vi.mock('./OwnedRdcDaemonRegistry', () => ({ harvestOwnedRdcDaemons: vi.fn(async () => ({ released: [], failed: [] })) }));
+vi.mock('./OwnedRdcDaemonRegistry', () => ({ harvestOwnedRdcDaemons: vi.fn(async () => ({ released: [], failed: [], unconfirmed: [] })) }));
 vi.mock('./RdcReplayObservation', () => ({ observeReplay: mocks.observe, readReplayEvents: mocks.events }));
 vi.mock('./captures/ReplayDeviceService', () => ({ replayDeviceService: {
   subscribe: (listener: (snapshot: ReplayDeviceSnapshot) => void) => { mocks.deviceSubscribers.add(listener); return () => mocks.deviceSubscribers.delete(listener); },
@@ -400,6 +400,7 @@ it('fails closeAll when leftover harvest cannot confirm release', async () => {
   vi.mocked(harvestOwnedRdcDaemons).mockResolvedValueOnce({
     released: [],
     failed: [{ contextId: 'rdc-left', error: 'daemon still owned' }],
+    unconfirmed: [],
   });
   const service = new RdcSessionService();
   await expect(service.closeAll()).rejects.toThrow('CLOSE_FAILED');

@@ -43,6 +43,8 @@ export interface OwnedRdcDaemonHarvestFailure {
 export interface OwnedRdcDaemonHarvestResult {
   released: string[];
   failed: OwnedRdcDaemonHarvestFailure[];
+  /** Daemon state on disk with no ownership record. No receipt proves it is ours, so it is left running. */
+  unconfirmed: string[];
 }
 
 export interface OwnedRdcDaemonStoreOptions {
@@ -112,22 +114,19 @@ export async function harvestOwnedRdcDaemons(
 ): Promise<OwnedRdcDaemonHarvestResult> {
   const intermediateRoot = options.intermediateRoot ?? hostIntermediateRoot(options.settings);
   const discovered = listAppDaemonContextsInIntermediateRoot(intermediateRoot);
-  const records = new Map(listOwnedRdcDaemons(options).map((record) => [record.contextId, record]));
-  for (const contextId of discovered) {
-    if (!records.has(contextId)) {
-      records.set(contextId, {
-        contextId,
-        command: options.settings?.command ?? settingsService.getAll().tooling.rdcCli.command,
-        intermediateRoot,
-        ownerPid: process.pid,
-        ownerBirth: '',
-        daemonPid: 0,
-        daemonBirth: '',
-        workerPid: 0,
-        workerBirth: '',
-        startedAt: 0,
-      });
-    }
+  let records: Map<string, OwnedRdcDaemonRecord>;
+  try {
+    records = new Map(listOwnedRdcDaemons(options).map((record) => [record.contextId, record]));
+  } catch (error) {
+    // Without a readable registry no daemon is provably ours: stop nothing and report, so the caller can carry on.
+    const message = error instanceof Error ? error.message : String(error);
+    logHarvest('error', 'RDC daemon ownership registry unreadable', message, { error: message, discovered });
+    return { released: [], failed: [{ contextId: REGISTRY_FILE, error: message }], unconfirmed: discovered };
+  }
+  // Another instance (for example a Browser QA run with its own userData) may own these; they are not stopped.
+  const unconfirmed = discovered.filter((contextId) => !records.has(contextId));
+  if (unconfirmed.length) {
+    logHarvest('warning', 'RDC daemon state without an ownership record left running', unconfirmed.join(', '), { unconfirmed });
   }
 
   const released: string[] = [];
@@ -150,17 +149,14 @@ export async function harvestOwnedRdcDaemons(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       failed.push({ contextId: record.contextId, error: message });
-      runtimeLogService.log({
-        scope: 'app',
-        namespace: 'context',
-        severity: 'error',
-        title: 'RDC daemon harvest failed',
-        summary: `${record.contextId}: ${message}`,
-        raw: { contextId: record.contextId, error: message },
-      });
+      logHarvest('error', 'RDC daemon harvest failed', `${record.contextId}: ${message}`, { contextId: record.contextId, error: message });
     }
   }
-  return { released, failed };
+  return { released, failed, unconfirmed };
+}
+
+function logHarvest(severity: 'error' | 'warning', title: string, summary: string, raw: Record<string, unknown>): void {
+  runtimeLogService.log({ scope: 'app', namespace: 'context', severity, title, summary, raw });
 }
 
 async function stopOwnedDaemon(
