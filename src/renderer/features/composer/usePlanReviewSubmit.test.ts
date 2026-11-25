@@ -19,8 +19,11 @@ vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: { getStat
 } }) } }));
 vi.mock('react', () => ({ useCallback: (fn: unknown) => fn }));
 vi.mock('../../hooks/useElectronApi', () => ({ useElectronApi: () => ({ conversation: { answerPlanReview: mock.answer, getHistory: mock.history } }) }));
+vi.mock('../../stores/sessionRecordStore', () => ({
+  getCurrentSessionView: () => ({ sessionId: mock.sessionId, agentId: 'debugger', modelOverride: mock.modelOverride }),
+}));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: {
-  getState: () => ({ currentSession: { sessionId: mock.sessionId, agentId: 'debugger', modelOverride: mock.modelOverride } }),
+  getState: () => ({ currentSessionId: mock.sessionId }),
   subscribe: (fn: () => void) => { mock.sessionListeners.add(fn); return () => mock.sessionListeners.delete(fn); },
 } }));
 vi.mock('../../stores/conversationStore', () => ({ useConversationStore: {

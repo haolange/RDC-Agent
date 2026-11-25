@@ -12,7 +12,7 @@ export const humanImageTitle = (fileName: string): string =>
 
 export const WorkProcessImageThumbs: React.FC<{ previews: ConversationToolImagePreviewRef[] }> = ({ previews }) => {
   const { t } = useI18n();
-  const sessionId = useProjectStore(state => state.currentSession?.sessionId);
+  const sessionId = useProjectStore(state => state.currentSessionId) ?? undefined;
   const { values, retry } = useToolImagePreviews(sessionId, previews);
   const [opened, setOpened] = useState<{ id: string; scope?: string } | null>(null);
   // Only loaded images join the viewer; the session scope keeps a viewer from following the user into another session.

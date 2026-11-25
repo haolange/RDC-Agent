@@ -1,3 +1,4 @@
+import { acceptSessionSnapshot } from '../../../stores/sessionRecordStore';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { ProjectSelectionHandlerOpsContext } from './projectSelectionContext';
 
@@ -46,13 +47,10 @@ export async function commitSessionRenameOp(
       return;
     }
 
+    acceptSessionSnapshot(result.session);
     const nextSessions = await ctx.loadProjectSessionList(session.projectId);
     if (ctx.getCurrentProject()?.projectId === session.projectId) {
       ctx.setSessions(nextSessions);
-      if (ctx.getCurrentSession()?.sessionId === session.sessionId) {
-        const matchedSession = nextSessions.find((entry) => entry.sessionId === session.sessionId) ?? result.session;
-        ctx.setCurrentSession(matchedSession);
-      }
     }
   } finally {
     onClose();

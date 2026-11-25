@@ -126,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
                     isExpanded={isExpanded}
                     projectSessions={projectSessions}
                     showAllSessions={tree.showAllSessionsByProject[project.projectId] ?? false}
-                    currentSessionId={selection.currentSession?.sessionId}
+                    currentSessionId={selection.currentSessionId ?? undefined}
                     rightRailTarget={selection.rightRailTarget}
                     onProjectSelect={selection.handleProjectSelect}
                     onProjectChevronClick={handleProjectChevronClick}

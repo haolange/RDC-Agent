@@ -1,6 +1,5 @@
 import { applyToolTraceToMessage } from '../../services/conversationTimeline';
 import { useConversationStore } from '../../stores/conversationStore';
-import { useLayoutStore } from '../../stores/layoutStore';
 import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -102,17 +101,7 @@ export function subscribeConversation(electronAPI: ElectronAPI, t: EventBridgeOp
         || event.event.type === 'handoff.consumed'
         || event.event.type === 'handoff.cancelled'
       ) {
-        const toAgentId = String(
-          event.event.payload.toAgentId
-          ?? event.event.payload.toProfile
-          ?? '',
-        ).trim();
-        if (
-          (event.event.type === 'handoff.requested' || event.event.type === 'handoff.consumed')
-          && toAgentId
-        ) {
-          useLayoutStore.getState().setSelectedAgentId(toAgentId);
-        }
+        // The Agent a handoff selects arrives as the session record main wrote; this event does not set it.
         if (
           event.event.type === 'handoff.cancelled'
           && event.event.payload.cancelReason === 'restart_degrade'

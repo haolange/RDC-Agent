@@ -46,7 +46,6 @@ const App: React.FC = () => {
 
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const currentMode = useLayoutStore((state) => state.currentMode);
   const toggleLeftSidebar = useLayoutStore((state) => state.toggleLeftSidebar);
   const toggleRightPanel = useLayoutStore((state) => state.toggleRightPanel);
 
@@ -196,7 +195,7 @@ const App: React.FC = () => {
           avatarPath={avatarPath}
           composer={composer}
           showMainPromptBar={Boolean(currentProject)}
-          mainPage={<DebuggerPage mode={currentMode} />}
+          mainPage={<DebuggerPage mode={composer.currentMode} />}
           t={t}
           onOpenKnowledgeCenter={() => setKnowledgeCenterOpen(true)}
           isUserMenuOpen={Boolean(userMenuAnchor)}

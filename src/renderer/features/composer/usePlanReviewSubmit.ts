@@ -4,6 +4,7 @@ import { AppError } from '@shared/errors/appError';
 import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReviewStore';
 import { useElectronApi } from '../../hooks/useElectronApi';
 import { useProjectStore } from '../../stores/projectStore';
+import { getCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
@@ -24,7 +25,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
   if (!api) {
     throw new Error('Conversation API is not available.');
   }
-  const isCurrent = () => useProjectStore.getState().currentSession?.sessionId === request.sessionId
+  const isCurrent = () => useProjectStore.getState().currentSessionId === request.sessionId
     && isCurrentPlanReview(request, decision.kind);
   let invalidated = !isCurrent();
   if (invalidated) return;
@@ -38,7 +39,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
     if (invalidated || !isCurrent()) return;
     if (decision.kind === 'approve') {
       const settings = useAppSettingsStore.getState().settings;
-      const session = useProjectStore.getState().currentSession;
+      const session = getCurrentSessionView();
       const sourceAgentId = session?.agentId ?? request.agentId;
       const route = resolveComposerEffectiveModel(session?.modelOverride, null, readCompiledComposerRoute(settings, sourceAgentId));
       const controls = { ...useTurnControlsStore.getState().turnControls };
@@ -52,7 +53,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
         throw new AppError('MODEL_UNAVAILABLE', 'Please select an available model before executing the plan.');
       }
       const assertSelectionCurrent = () => {
-        const latest = useProjectStore.getState().currentSession;
+        const latest = getCurrentSessionView();
         const latestSettings = useAppSettingsStore.getState().settings;
         const latestRoute = resolveComposerEffectiveModel(latest?.modelOverride, null,
           readCompiledComposerRoute(latestSettings, latest?.agentId ?? request.agentId));

@@ -52,7 +52,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   hydrateContextUsage: (contextUsage) => set(contextUsage),
   setLoading: (isLoading) => set({ isLoading }),
   reset: () => {
-    useProjectStore.getState().setCurrentSession(null);
+    useProjectStore.getState().setCurrentSessionId(null);
     useProjectStore.getState().setRightRailTarget('project');
     useCaptureStore.getState().reset();
     useConversationStore.getState().reset();

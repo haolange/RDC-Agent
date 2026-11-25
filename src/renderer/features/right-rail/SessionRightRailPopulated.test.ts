@@ -19,7 +19,7 @@ const state = vi.hoisted(() => ({
   restoreRecovery: vi.fn(async () => null),
 }));
 vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value: typeof state) => unknown) => select(state) }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (value: { currentSession: { sessionId: string; projectId: string } }) => unknown) => select({ currentSession: { sessionId: 'session', projectId: 'project' } }) }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (value: { currentProject: { projectId: string }; currentSessionId: string }) => unknown) => select({ currentProject: { projectId: 'project' }, currentSessionId: 'session' }) }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 // Mock data/lifecycle boundaries; render the actual rail, artifact preview, CapturePanel,
 // CaptureWorkspace, replay controls, status chips and callouts throughout these samples.

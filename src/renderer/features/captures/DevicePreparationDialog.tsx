@@ -10,7 +10,7 @@ export function DevicePreparationDialog() {
   const confirming = useSessionDeviceStore((state) => state.confirming);
   const confirm = useSessionDeviceStore((state) => state.confirm);
   const dismiss = useSessionDeviceStore((state) => state.dismissConfirmation);
-  const currentSessionId = useProjectStore((state) => state.currentSession?.sessionId);
+  const currentSessionId = useProjectStore((state) => state.currentSessionId);
   const devices = useDeviceStore((state) => state.devices);
   if (!pending || pending.scope.sessionId !== currentSessionId) return null;
   const target = devices.find((device) => device.id === pending.deviceId);

@@ -25,7 +25,7 @@ vi.mock('../../hooks/useElectronApi', () => ({ useElectronApi: () => ({}) }));
 vi.mock('../../lib/useModalFocus', () => ({ useModalFocus: () => undefined }));
 vi.mock('../../lib/overlayStack', () => ({ useOverlayLayer: () => ({ layerId: 'layer' }) }));
 vi.mock('../../lib/useReadingPanelGeometry', () => ({ useReadingPanelGeometry: () => ({ ready: true, anchored: true, style: {} }) }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentSession: { sessionId: 's' } }) }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentSessionId: 's' }) }));
 vi.mock('../../stores/planReviewStore', () => ({ usePlanReviewStore: (select: (state: unknown) => unknown) => select({ bySession: {} }) }));
 vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => createElement('div', { 'data-markdown': true }, content) }));
 const actions = { readPlan: async () => ({ markdown }), copyPlan: vi.fn(), saveToProject: vi.fn(), exportPlan: vi.fn() };

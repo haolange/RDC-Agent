@@ -60,7 +60,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     const result = await getTraceProjection(scope.sessionId);
     if (result.success && result.presentation) {
       useSessionProjectionStore.getState().projectTrace(scope.sessionId, result.presentation);
-      if (useProjectStore.getState().currentSession?.sessionId === scope.sessionId) useWorkflowStore.getState().setTracePresentation(result.presentation);
+      if (useProjectStore.getState().currentSessionId === scope.sessionId) useWorkflowStore.getState().setTracePresentation(result.presentation);
     }
   }, [reload, scope]);
   const run = async (operation: Action) => {

@@ -1,70 +1,95 @@
 import { useEffect } from 'react';
-import { hydrateMessagesWithActionEvents } from '../../services/conversationTimeline';
+import { hydrateMessagesWithActionEvents, mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useConversationStore } from '../../stores/conversationStore';
+import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useWorkflowStore } from '../../stores/workflowStore';
 import type { ActionEvent } from '@shared/types/evidence';
+import type { AgentTimelineEntry } from '@shared/types/agent';
+import type { ConversationMessage } from '@shared/types/conversation';
+import type { WorkflowState } from '@shared/types/workflow';
 
+function applyEvidence(events: ActionEvent[], messagesFrom: () => ConversationMessage[]): ConversationMessage[] {
+  useEvidenceStore.getState().setActionEvents(events);
+  useConversationStore.getState().setTimeline(events
+    .map((event) => mapActionEventToTimelineEntry(event))
+    .filter((entry): entry is AgentTimelineEntry => entry !== null));
+  return hydrateMessagesWithActionEvents(messagesFrom(), events);
+}
+
+/**
+ * Loads what the current session's surfaces show, once per session id. A session that becomes current through the
+ * session opener already carries history and trace, so only its evidence and workflow state load here; one that
+ * became current another way loads history and trace too. A change of the session's record (Agent, model, title) is
+ * not a reason to load again.
+ */
 export function useSessionSurfaceBootstrap(shellReady: boolean): void {
-  const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
-  const currentRun = useSessionStore((state) => state.currentRun);
-  const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
+  const currentProjectId = useProjectStore((state) => state.currentProject?.projectId ?? null);
+  const sessionId = useProjectStore((state) => state.currentSessionId);
+  const currentRunId = useSessionStore((state) => state.currentRun?.runId ?? null);
   const clearUsageSnapshot = useSessionStore((state) => state.clearUsageSnapshot);
   const setActiveTerminalContext = useTerminalStore((state) => state.setActiveContext);
   const refreshTerminalEntries = useTerminalStore((state) => state.refreshEntries);
 
   useEffect(() => {
-    setActiveTerminalContext({
-      sessionId: currentSession?.sessionId ?? null,
-      projectId: currentProject?.projectId ?? null,
-      runId: currentRun?.runId ?? null,
-    });
+    setActiveTerminalContext({ sessionId, projectId: currentProjectId, runId: currentRunId });
     void refreshTerminalEntries();
-  }, [
-    currentProject?.projectId,
-    currentRun?.runId,
-    currentSession?.sessionId,
-    refreshTerminalEntries,
-    setActiveTerminalContext,
-  ]);
+  }, [currentProjectId, currentRunId, sessionId, refreshTerminalEntries, setActiveTerminalContext]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
-    if (!currentSession?.sessionId) {
-      setConversationSnapshot([], null);
+    if (!sessionId) {
+      useConversationStore.getState().setConversationSnapshot([], null);
+      useConversationStore.getState().setTimeline([]);
+      useWorkflowStore.getState().setTracePresentation(null);
       return;
     }
     if (!shellReady) return;
 
-    const sessionId = currentSession.sessionId;
-    const conversation = useConversationStore.getState();
-    // The session opener loads history and trace in one request; only a session that became current another way
-    // (or whose surface was cleared since) loads here.
-    if (conversation.surfaceSessionId === sessionId || conversation.historyLoadingSessionId === sessionId) return;
-
     let cancelled = false;
-    void (async () => {
-      conversation.setHistoryLoadingSessionId(sessionId);
-      const [historyResult, evidenceResult, traceResult] = await Promise.all([
-        electronAPI.conversation.getHistory(sessionId).catch(() => ({ messages: [], branchState: null, planReview: null })),
-        electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
-        electronAPI.trace.getProjection(sessionId).catch(() => ({ success: false, presentation: null })),
-      ]);
-      if (cancelled) return;
-      useConversationStore.getState().setHistoryLoadingSessionId(null);
-      hydrateLoadedSessionSurface({
-        sessionId,
-        messages: hydrateMessagesWithActionEvents(historyResult.messages ?? [], (evidenceResult.events ?? []) as ActionEvent[]),
-        branchState: historyResult.branchState ?? null,
-        planReview: historyResult.planReview ?? null,
-        tracePresentation: traceResult.presentation ?? null,
-        applyTrace: true,
+    const live = () => !cancelled && useProjectStore.getState().currentSessionId === sessionId;
+    void electronAPI.workflow.getState().then((state) => {
+      if (!live()) return;
+      const workflow = state as WorkflowState | null;
+      useWorkflowStore.getState().setWorkflowState(workflow);
+      useConversationStore.getState().setReasoningSummaries(workflow?.reasoningSummaries ?? []);
+    }).catch(() => undefined);
+    const evidence = electronAPI.evidence.getChain()
+      .then((result) => (result.events ?? []) as ActionEvent[])
+      .catch(() => [] as ActionEvent[]);
+
+    const conversation = useConversationStore.getState();
+    if (conversation.surfaceSessionId === sessionId || conversation.historyLoadingSessionId === sessionId) {
+      void evidence.then((events) => {
+        if (!live()) return;
+        useConversationStore.getState().setConversationMessages(
+          applyEvidence(events, () => useConversationStore.getState().allConversationMessages),
+        );
       });
-    })();
+    } else {
+      conversation.setHistoryLoadingSessionId(sessionId);
+      void (async () => {
+        const [historyResult, events, traceResult] = await Promise.all([
+          electronAPI.conversation.getHistory(sessionId).catch(() => ({ messages: [], branchState: null, planReview: null })),
+          evidence,
+          electronAPI.trace.getProjection(sessionId).catch(() => ({ success: false, presentation: null })),
+        ]);
+        if (cancelled) return;
+        useConversationStore.getState().setHistoryLoadingSessionId(null);
+        hydrateLoadedSessionSurface({
+          sessionId,
+          messages: applyEvidence(events, () => historyResult.messages ?? []),
+          branchState: historyResult.branchState ?? null,
+          planReview: historyResult.planReview ?? null,
+          tracePresentation: traceResult.presentation ?? null,
+          applyTrace: true,
+        });
+      })();
+    }
     return () => {
       cancelled = true;
       // A switch may already have marked the next session as being opened; only this load's own mark is cleared.
@@ -72,24 +97,22 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
         useConversationStore.getState().setHistoryLoadingSessionId(null);
       }
     };
-  }, [currentSession?.sessionId, shellReady, setConversationSnapshot]);
+  }, [sessionId, shellReady]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI || !currentSession?.sessionId) {
+    if (!electronAPI || !sessionId) {
       clearUsageSnapshot();
       return undefined;
     }
-    const sessionId = currentSession.sessionId;
-    const runId = currentRun?.runId;
     let cancelled = false;
     void electronAPI.workflow.getRunUsage({
       sessionId,
-      ...(runId ? { runId } : {}),
+      ...(currentRunId ? { runId: currentRunId } : {}),
     }).then((result) => {
-      if (cancelled || useProjectStore.getState().currentSession?.sessionId !== sessionId) return;
+      if (cancelled || useProjectStore.getState().currentSessionId !== sessionId) return;
       useSessionStore.getState().setCurrentRunUsage(result.usage, result.stale);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [clearUsageSnapshot, currentRun?.runId, currentSession?.sessionId]);
+  }, [clearUsageSnapshot, currentRunId, sessionId]);
 }

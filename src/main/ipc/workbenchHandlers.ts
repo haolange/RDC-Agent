@@ -7,7 +7,7 @@ import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
+import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { applyProductIcon } from '../window/productIcon';
@@ -170,7 +170,7 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
   return {
     project,
     currentSession: selectedSession?.projectId === projectId
-      ? projectSessionForClient(selectedSession)
+      ? sessionRevisions.snapshot(selectedSession)
       : null,
     currentRun: state.currentSessionId ? storageAdapter.getLatestRun(state.currentSessionId) : null,
   };

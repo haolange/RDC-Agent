@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WorkProcessImageRow } from './WorkProcessImageRow';
 import type { ToolRowModel } from './workProcessToolTypes';
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, args?: { count?: number }) => `${key}:${args?.count ?? ''}` }) }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentSession: { sessionId: 'scope' } }) }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentSessionId: 'scope' }) }));
 vi.mock('./ScopedWorkDisclosure', () => ({ useScopedWorkDisclosure: () => { const [open, set] = useState(false); return [open, () => set(value => !value)]; } }));
 vi.mock('./WorkProcessImageThumbs', () => ({ WorkProcessImageThumbs: ({ previews }: { previews: Array<{ previewId: string }> }) => createElement('div', { 'data-gallery': true }, previews.map(p => createElement('img', { key: p.previewId, 'data-preview': p.previewId }))) }));
 vi.mock('./WorkProcessToolCardParts', () => ({ RawPanel: ({ row }: { row: ToolRowModel }) => createElement('pre', null, row.id) }));

@@ -6,11 +6,21 @@
 
 工具审批的 `reviewMethod` / `errorCode` 来自主进程，随 owning session / turn / toolCall 的现有 workTrace 持久化及 delegated 投影传递。规则检查、独立模型判定、审核异常与人工审批分别显示；历史缺字段保持未知，不依据 risk 或 reason 补造来源。拒绝与审核异常明确当前动作未执行，已批准后的工具错误按实际执行结果展示。Composer 的“模型思考”与审批的“操作风险”分开标识，不改变原有 generation、取消及 currentSession 隔离。
 
-- `projectStore.currentSession.sessionId` 是 renderer 唯一 active session。
+- `projectStore.currentSessionId` 是 renderer 唯一 active session；`projectStore` 只另存侧栏列表行，会话事实读 `useSessionView`（见「Session 记录与 revision」）。
 - 跨项目选择项目根而不选会话时，先缓存并清空旧 session 的 transcript、运行态、右栏与 Composer 上下文，再投影目标项目；此时 `currentSession=null` 不代表旧 turn 又成为前台。旧 turn 的流事件及最终返回留在所属 session cache，不能重新选择旧项目或会话。仅从当前所选项目的无会话 Composer 发出的首轮结果可以建立前台新 session。
 - Sidebar 每个项目节点只投影 `session.projectId` 与该节点一致的会话；乐观切换期间旧项目的 session 列表不能暂挂到新项目标题下。
-- Main `session:open` / `session:create` 更新权威 current；不 abort 其它 session 的 active turn（多 session 并行是契约意图，见 `concurrencyContract`）。`session:open` 一次返回会话、当前 run、run 列表、history 与 trace 投影；renderer 打开期间以 `historyLoadingSessionId` 标记该会话，加载完成记为 `surfaceSessionId`，两个 surface bootstrap 见到任一标记即不再重复拉取，每次切换由 switch hygiene 清空 `surfaceSessionId`。同项目新建会话只发 create、open 与会话列表三个请求，跨项目才走项目选择与项目级设置重载。
+- Main `session:open` / `session:create` 更新权威 current；不 abort 其它 session 的 active turn（多 session 并行是契约意图，见 `concurrencyContract`）。`session:open` 一次返回会话、当前 run、run 列表、history 与 trace 投影；renderer 打开期间以 `historyLoadingSessionId` 标记该会话，加载完成记为 `surfaceSessionId`，唯一的 `useSessionSurfaceBootstrap` 按 session id 订阅，见到任一标记只补拉证据链与 workflow 状态、不再重复拉取 history 与 trace，会话记录（Agent、模型、标题）变化不触发重拉；每次切换由 switch hygiene 清空 `surfaceSessionId`。同项目新建会话只发 create、open 与会话列表三个请求，跨项目才走项目选择与项目级设置重载。
 - Capture 所有权仍按 `ownerSessionId` fail-closed（见 `permissions.md`）。
+
+## Session 记录与 revision
+
+会话事实（`agentId`、`modelOverride`、`turnControls`、标题等）只有一个 renderer 来源。
+
+- 主进程 `SessionRevisionRegistry` 在内存中持有 `{ epoch, n }`：`epoch` 是本次主进程运行的标识，`n` 是本次运行内的会话写入计数；不落盘，持久 schema 不变。`SessionRecordStore` 的每次 session.json 写入（创建、提交暂存会话、更新、标题对账）取下一个 `n`，并广播 `session:recordChanged { record, revision }`。
+- 每个携带会话的响应都附带该会话最后一次写入的 revision，形状是 `SessionRecordSnapshot { record, revision }`：`project:select`、`session:list/create/rename/remove/open/setModelOverride/setAgentId/applyDeclaredHandoff`，以及 `conversation:sendMessage` / `rewriteFromMessage` 的 `turn.session`。记录与 revision 在同一同步段内配对，中间不跨 await；之后的写入经新的广播到达。
+- Renderer `sessionRecordStore.records` 按会话只接受更新的 revision：epoch 不同（主进程已重启）一律接受，同 epoch 只接受更大的 `n`；迟到的旧响应或旧事件不覆盖新记录。该 store 按会话分键，后台会话的记录也是当前事实，`session:recordChanged` 不经 active-session gate。
+- `pending` 是在途意图的覆盖层：人改 Agent 或模型时先 `beginIntent`，界面立刻显示；主进程应答（无论是否被接受）后 `settleIntent`。同一字段的后一个意图替换前一个，前一个的迟到应答不再影响显示；失败只移除覆盖层，视图回到主进程持有的记录。`useSessionView(id)` 返回 record 加覆盖层；`useCurrentSessionView()` 是当前会话的视图。
+- `projectStore` 只保留 `currentSessionId` 与侧栏列表行；`layoutStore` 不镜像 Agent。Composer 的 Agent 胶囊由 `useComposerAgentId` 从会话视图派生；会话尚不存在时用该项目 Composer 的草稿 Agent，首轮发送后由主进程写入新会话。没有任何其它位置整体覆写会话对象或另存 Agent。
 
 ## IPC 门控
 
@@ -29,7 +39,7 @@
 ## Composer Draft 与恢复
 
 - Draft / pending attachments / pending skills 按 `{projectId}:{sessionId}` scope 隔离（`buildComposerSessionScopeKey`）。
-- `lastSentPrompt` / `restoreComposerDraft` / Stop 恢复必须携带 owning `sessionId`（及 `projectId`）；恢复前校验与 `currentSession` 一致，否则跳过。
+- `lastSentPrompt` / `restoreComposerDraft` / Stop 恢复必须携带 owning `sessionId`（及 `projectId`）；恢复前校验与 `currentSessionId` 一致，否则跳过。
 - Markdown Composer 输入以 `key={scopeKey}` remount，避免 CodeMirror 文档残留。
 
 ## Active Turn Context
@@ -62,7 +72,7 @@ interface ActiveTurnContext {
 
 切换或新建 session 时同步：
 
-跨项目直接选择 session 时，Immediate 清理必须先于 `currentProject/currentSession` 的乐观切换；不能等异步 `project.select` 和 session 列表完成后才清理，否则新项目加载期间会短暂显示旧项目 transcript 与右栏。
+跨项目直接选择 session 时，Immediate 清理必须先于 `currentProject/currentSessionId` 的乐观切换；不能等异步 `project.select` 和 session 列表完成后才清理，否则新项目加载期间会短暂显示旧项目 transcript 与右栏。
 若目标项目或会话选择被拒绝，恢复原选择及其缓存投影，错误只展示在当前导航入口。
 
 1. Immediate：`setConversationSnapshot([], null)`、`setTracePresentation(null)`、`setWorkflowState(null)`、clear usage / prepared turn；
@@ -84,7 +94,7 @@ interface ActiveTurnContext {
 
 ## 验证
 
-- 单元：`sessionEventGate`、composer restore session bind、monotonic requestId、projection cache activate。
+- 单元：`sessionEventGate`、`sessionRecordStore`（revision 次序、覆盖层）、Agent 切换迟到应答与失败回退、composer restore session bind、monotonic requestId、projection cache activate。
 - 静态：`pnpm run check:session-projection`。
 - Browser QA：删尽 QA project sessions → 新建隔离 session → 多 session 串台 / Stop / Rewrite 矩阵（见 `AGENTS.md`）。
 

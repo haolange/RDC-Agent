@@ -3,13 +3,13 @@ import { AGENT_MODES, resolveAgentDisplay } from '@shared/constants/agents';
 import { COMPOSE_ACCENT_FALLBACK } from '@shared/theme/composeAccent';
 import { useI18n } from '../../i18n';
 import { useConversationStore } from '../../stores/conversationStore';
-import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { usePreparedSessionDevice } from '../../hooks/useSessionDevicePreparation';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { hydrateComposerAgentFromSession } from '../../stores/sessionAgentHydration';
+import { useComposerAgentId } from '../../hooks/useComposerAgentId';
 import { agentArgumentHint } from '../../lib/agentDescription';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerPendingSkills } from './useComposerPendingSkills';
@@ -21,7 +21,7 @@ import { useSelectedContextProfile } from './useSelectedContextProfile';
 import { useComposerDomEffects } from './useComposerDomEffects';
 import { persistSessionAgentId } from './sessionAgentId';
 import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
-import type { ModeConfig } from '@shared/types/layout';
+import type { AgentMode, ModeConfig } from '@shared/types/layout';
 
 
 export function useComposer(options: {
@@ -36,23 +36,18 @@ export function useComposer(options: {
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
 
   const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
+  const currentSession = useCurrentSessionView();
   const currentRun = useSessionStore((state) => state.currentRun);
   const lastKnownUsage = useSessionStore((state) => state.lastKnownUsage);
   const usageStale = useSessionStore((state) => state.usageStale);
   const preparedTurnContext = useSessionStore((state) => state.preparedTurnContext);
   const conversationPreparationPhase = useSessionStore((state) => state.conversationPreparationPhase);
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
-  const currentMode = useLayoutStore((state) => state.currentMode);
-  const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
-  const selectedAgentId = useLayoutStore((state) => state.selectedAgentId);
+  const selectedAgentId = useComposerAgentId();
+  const currentMode = selectedAgentId as AgentMode;
   const setSelectedAgentId = useCallback((agentId: string) => {
-    void persistSessionAgentId(useProjectStore.getState().currentSession?.sessionId, agentId);
+    void persistSessionAgentId(useProjectStore.getState().currentSessionId, agentId);
   }, []);
-
-  useEffect(() => {
-    hydrateComposerAgentFromSession(currentSession);
-  }, [currentSession]);
   const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
   const userInvocableAgents = agentDefinitions.filter((agent) => agent.enabled && agent.userInvocable);
 
@@ -105,10 +100,8 @@ export function useComposer(options: {
 
   const send = useComposerSend({
     t,
-    currentMode,
     selectedAgentId,
     setSelectedAgentId,
-    setCurrentMode,
     openSettings,
     currentProject,
     currentSession,
@@ -150,7 +143,6 @@ export function useComposer(options: {
     selectedAgentId,
     userInvocableAgents,
     setSelectedAgentId,
-    setCurrentMode,
   });
 
   return {

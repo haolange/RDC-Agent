@@ -12,7 +12,7 @@ const hasReplyInFlight = (messages: readonly ConversationMessage[]): boolean => 
  * the projection that background conversation events keep current.
  */
 export function useSessionRunning(sessionId: string): boolean {
-  const openSessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
+  const openSessionId = useProjectStore((state) => state.currentSessionId);
   const live = useConversationStore((state) => openSessionId === sessionId && hasReplyInFlight(state.allConversationMessages));
   const background = useSessionProjectionStore((state) => openSessionId !== sessionId
     && hasReplyInFlight(state.bySessionId[sessionId]?.allMessages ?? []));

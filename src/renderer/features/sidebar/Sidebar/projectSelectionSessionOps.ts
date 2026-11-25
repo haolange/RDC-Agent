@@ -4,7 +4,7 @@ import { useSessionStore } from '../../../stores/sessionStore';
 import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
 import { useAgentStore } from '../../../stores/agentStore';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
-import { hydrateComposerAgentFromSession } from '../../../stores/sessionAgentHydration';
+import { acceptSessionSnapshot } from '../../../stores/sessionRecordStore';
 import {
   captureSelectionSnapshot,
   restoreSelectionSnapshot,
@@ -28,7 +28,7 @@ export async function selectSessionOp(
       previousSessionId,
       nextSessionId: options.optimisticSession.sessionId,
     });
-    ctx.setCurrentSession(options.optimisticSession);
+    ctx.setCurrentSessionId(options.optimisticSession.sessionId);
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
@@ -56,16 +56,17 @@ export async function selectSessionOp(
     return false;
   }
 
-  if ((options.optimisticSession?.sessionId ?? previousSessionId) !== result.session.sessionId) {
+  const opened = result.session.record;
+  if ((options.optimisticSession?.sessionId ?? previousSessionId) !== opened.sessionId) {
     applySessionSwitchHygiene({
       previousSessionId: options.optimisticSession?.sessionId ?? previousSessionId,
-      nextSessionId: result.session.sessionId,
+      nextSessionId: opened.sessionId,
     });
   }
-  ctx.setCurrentSession(result.session);
-  hydrateComposerAgentFromSession(result.session);
+  acceptSessionSnapshot(result.session);
+  ctx.setCurrentSessionId(opened.sessionId);
   hydrateLoadedSessionSurface({
-    sessionId: result.session.sessionId,
+    sessionId: opened.sessionId,
     messages: result.history.messages,
     branchState: result.history.branchState ?? null,
     planReview: result.history.planReview,
@@ -108,14 +109,16 @@ export async function handleSessionCreateOp(
       return;
     }
 
+    const created = result.session.record;
     const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
     const sameProject = ctx.getCurrentProject()?.projectId === targetProject.projectId;
     applySessionSwitchHygiene({
       previousSessionId,
-      nextSessionId: result.session.sessionId,
+      nextSessionId: created.sessionId,
     });
+    acceptSessionSnapshot(result.session);
     ctx.setCurrentProject(targetProject);
-    ctx.setCurrentSession(result.session);
+    ctx.setCurrentSessionId(created.sessionId);
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
@@ -123,7 +126,7 @@ export async function handleSessionCreateOp(
     ctx.ensureProjectExpanded(targetProject.projectId);
     if (!sameProject) {
       // Another project becomes current: its selection and project-scoped settings load with it.
-      await ctx.loadProjects(targetProject.projectId, result.session.sessionId, {
+      await ctx.loadProjects(targetProject.projectId, created.sessionId, {
         autoSelectSession: true,
         rightRailTarget: 'session',
         requestId,
@@ -133,7 +136,7 @@ export async function handleSessionCreateOp(
     // Same project: the list gains the new session, and the session opens in one request alongside it.
     const [nextSessions] = await Promise.all([
       ctx.loadProjectSessionList(targetProject.projectId),
-      selectSessionOp(ctx, result.session.sessionId, { optimisticSession: result.session, requestId }),
+      selectSessionOp(ctx, created.sessionId, { optimisticSession: created, requestId }),
     ]);
     if (ctx.isLatestSelectionRequest(requestId)) ctx.setSessions(nextSessions);
   } finally {
@@ -173,12 +176,13 @@ export async function handleSessionRemoveOp(
         return;
       }
 
-      const nextSession = result.nextSession ?? nextSessions[0] ?? null;
+      if (result.nextSession) acceptSessionSnapshot(result.nextSession);
+      const nextSession = result.nextSession?.record ?? nextSessions[0] ?? null;
       applySessionSwitchHygiene({
         previousSessionId: session.sessionId,
         nextSessionId: nextSession?.sessionId ?? null,
       });
-      ctx.setCurrentSession(nextSession);
+      ctx.setCurrentSessionId(nextSession?.sessionId ?? null);
       if (nextSession) {
         ctx.setRightRailTarget('session');
         ctx.setCurrentRun(result.nextRun ?? null);
@@ -214,7 +218,7 @@ export async function handleSessionActivateOp(
   }
   useSessionStore.getState().clearUsageSnapshot();
   ctx.setCurrentProject(project);
-  ctx.setCurrentSession(session);
+  ctx.setCurrentSessionId(session.sessionId);
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(null);
   ctx.setCaptures([]);

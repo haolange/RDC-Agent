@@ -32,7 +32,7 @@ export function useWorkbenchLayout(isReady: boolean) {
   const dragStateRef = useRef<{ side: DragSide; startX: number; startWidth: number } | null>(null);
 
   const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
+  const currentSessionId = useProjectStore((state) => state.currentSessionId);
   const rightRailTarget = useProjectStore((state) => state.rightRailTarget);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
   const rightPanelCollapsed = useLayoutStore((state) => state.rightPanelCollapsed);
@@ -45,7 +45,7 @@ export function useWorkbenchLayout(isReady: boolean) {
 
   const rightRailMode: RightRailMode = !currentProject
     ? 'hidden'
-    : rightRailTarget === 'session' && currentSession
+    : rightRailTarget === 'session' && currentSessionId
       ? 'session'
       : 'project';
   const isRightRailVisible = rightRailMode !== 'hidden';
@@ -74,7 +74,7 @@ export function useWorkbenchLayout(isReady: boolean) {
   const closeLeftDrawer = leftDrawer.close;
   useEffect(() => {
     closeLeftDrawer();
-  }, [currentProject?.projectId, currentSession?.sessionId, closeLeftDrawer]);
+  }, [currentProject?.projectId, currentSessionId, closeLeftDrawer]);
 
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(

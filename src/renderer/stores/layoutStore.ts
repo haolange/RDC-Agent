@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -13,13 +12,10 @@ import {
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 import type { AppSettings } from '@shared/types/settings';
-import type { AgentMode } from '@shared/types/layout';
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 interface LayoutState {
-  currentMode: AgentMode;
-  selectedAgentId: string;
   leftSidebarCollapsed: boolean;
   rightPanelCollapsed: boolean;
   leftSidebarWidth: number;
@@ -28,8 +24,6 @@ interface LayoutState {
   rightPanelExpandedWidth: number;
   terminalHeight: number;
   hydrateFromSettings: (settings: AppSettings) => void;
-  setCurrentMode: (mode: AgentMode) => void;
-  setSelectedAgentId: (agentId: string) => void;
   toggleLeftSidebar: () => Promise<void>;
   toggleRightPanel: () => Promise<void>;
   setLeftSidebarWidth: (width: number) => void;
@@ -75,8 +69,6 @@ const persistLayout = async (state: Pick<
 };
 
 export const useLayoutStore = create<LayoutState>((set, get) => ({
-  currentMode: DEFAULT_AGENT_ID,
-  selectedAgentId: DEFAULT_AGENT_ID,
   leftSidebarCollapsed: false,
   rightPanelCollapsed: false,
   leftSidebarWidth: LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -109,8 +101,6 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       TERMINAL_MAX_HEIGHT,
     ),
   }),
-  setCurrentMode: (mode) => set({ currentMode: mode, selectedAgentId: mode }),
-  setSelectedAgentId: (agentId) => set({ selectedAgentId: agentId, currentMode: agentId as AgentMode }),
   toggleLeftSidebar: async () => {
     const state = get();
     const nextCollapsed = !state.leftSidebarCollapsed;

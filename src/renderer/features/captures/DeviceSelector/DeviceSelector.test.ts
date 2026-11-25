@@ -7,7 +7,7 @@ import { useSessionDeviceStore } from '../../../stores/sessionDeviceStore';
 import { replayFixture } from '../../../testing/replayFixture';
 import { DeviceSelector } from './index';
 const mocks = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn(), select: vi.fn(), activeSession: true, unconfirmed: false, connected: false }));
-vi.mock('../../../stores/projectStore', () => ({ useProjectStore: (selector: (value: unknown) => unknown) => selector({ currentProject: { projectId: 'project' }, currentSession: mocks.activeSession ? { sessionId: 'session' } : null }) }));
+vi.mock('../../../stores/projectStore', () => ({ useProjectStore: (selector: (value: unknown) => unknown) => selector({ currentProject: { projectId: 'project' }, currentSessionId: mocks.activeSession ? 'session' : null }) }));
 vi.mock('../../../hooks/useSessionDevicePreparation', () => ({ useSessionDevicePreparation: () => ({ state: replayFixture(mocks.unconfirmed ? {
   preparation: { targetDeviceId: 'remote', phase: 'failed', issue: { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Pending installation', recovery: 'retry', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } } },
 } : mocks.connected ? { preparation: { targetDeviceId: 'remote', phase: 'ready', issue: null } } : {}), error: null, actionFailure: null }) }));

@@ -64,12 +64,10 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
         fallbackRunId: state.currentRunId,
       });
 
-      if (result.session?.projectId) {
-        state.currentProjectId = result.session.projectId;
-      }
-      if (result.session?.sessionId) {
-        state.currentSessionId = result.session.sessionId;
-        storageAdapter.setCurrentSessionId(result.session.sessionId);
+      if (result.session) {
+        state.currentProjectId = result.session.record.projectId;
+        state.currentSessionId = result.session.record.sessionId;
+        storageAdapter.setCurrentSessionId(result.session.record.sessionId);
       }
       if (result.runUpdate?.runId) {
         state.currentRunId = result.runUpdate.runId;
@@ -98,12 +96,10 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       fallbackRunId: state.currentRunId,
     });
 
-    if (result.session?.projectId) {
-      state.currentProjectId = result.session.projectId;
-    }
-    if (result.session?.sessionId) {
-      state.currentSessionId = result.session.sessionId;
-      storageAdapter.setCurrentSessionId(result.session.sessionId);
+    if (result.session) {
+      state.currentProjectId = result.session.record.projectId;
+      state.currentSessionId = result.session.record.sessionId;
+      storageAdapter.setCurrentSessionId(result.session.record.sessionId);
     }
     if (result.runUpdate?.runId) {
       state.currentRunId = result.runUpdate.runId;

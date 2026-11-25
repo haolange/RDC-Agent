@@ -13,7 +13,7 @@ import type {
   RunSummary,
   SessionAttachmentLayer,
   SessionAttachmentRecord,
-  SessionRecord,
+  SessionRecordSnapshot,
 } from './session';
 import type { ConversationMessageDelta } from '../conversation/messageDelta';
 
@@ -539,7 +539,7 @@ export type {
 
 export interface ConversationTurnResult {
   requestId: string;
-  session: SessionRecord | null;
+  session: SessionRecordSnapshot | null;
   mode: ConversationMode;
   userMessage: ConversationMessage;
   assistantDraftMessage: ConversationMessage;

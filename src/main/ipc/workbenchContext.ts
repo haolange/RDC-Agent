@@ -1,6 +1,6 @@
 import type {
   RunSummary,
-  SessionRecord,
+  SessionRecordSnapshot,
   ProjectRecord,
 } from '@shared/types/session';
 
@@ -19,7 +19,7 @@ export interface RunLifecyclePatch {
 
 export interface ProjectSelectionResult {
   project: ProjectRecord | null;
-  currentSession: SessionRecord | null;
+  currentSession: SessionRecordSnapshot | null;
   currentRun: RunSummary | null;
 }
 

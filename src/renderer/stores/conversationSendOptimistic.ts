@@ -1,16 +1,14 @@
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import type { ConversationAttachmentInput, ConversationMessage } from '@shared/types/conversation';
-import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { PendingAttachmentDraft } from '../types/attachments';
 
-export const resolveComposerProfileId = (_mode: AgentMode, selectedAgentId?: string): string =>
+export const resolveComposerProfileId = (selectedAgentId?: string): string =>
   selectedAgentId?.trim() || DEFAULT_AGENT_ID;
 
 export function buildOptimisticConversationTurn(options: {
   requestId: string;
   trimmed: string;
-  currentMode: AgentMode;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -22,7 +20,6 @@ export function buildOptimisticConversationTurn(options: {
   const {
     requestId,
     trimmed,
-    currentMode,
     currentProject,
     currentSession,
     currentRun,
@@ -32,7 +29,7 @@ export function buildOptimisticConversationTurn(options: {
   } = options;
   const turnId = `optimistic-turn-${requestId}`;
   const now = Date.now();
-  const profileId = resolveComposerProfileId(currentMode, selectedAgentId);
+  const profileId = resolveComposerProfileId(selectedAgentId);
   const userId = `optimistic-user-${requestId}`;
   const assistantId = `optimistic-assistant-${requestId}`;
 
@@ -74,7 +71,7 @@ export function buildOptimisticConversationTurn(options: {
     runId: currentRun?.runId ?? null,
     profileId,
     role: 'assistant',
-    agentId: selectedAgentId || currentMode,
+    agentId: profileId,
     content: '',
     status: 'streaming',
     updatedAt: now,

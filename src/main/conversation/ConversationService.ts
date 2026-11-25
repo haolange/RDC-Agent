@@ -379,7 +379,7 @@ export class ConversationService {
       );
       return {
         requestId,
-        session,
+        session: storageAdapter.readSessionSnapshot(session.sessionId),
         mode: 'talk',
         userMessage,
         assistantDraftMessage,

@@ -10,7 +10,7 @@ import { DevicePreparationDialog } from './DevicePreparationDialog';
 
 const locale = vi.hoisted(() => ({ language: 'en' as 'en' | 'zh-CN' }));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate(locale.language, key, params) }) }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (selector: (state: { currentSession: { sessionId: string } }) => unknown) => selector({ currentSession: { sessionId: 'session' } }) }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: (selector: (state: { currentSessionId: string }) => unknown) => selector({ currentSessionId: 'session' }) }));
 afterEach(() => { vi.unstubAllGlobals(); });
 
 it.each(['en', 'zh-CN'] as const)('localizes Local in the real close confirmation and preserves Android names (%s)', async (language) => {

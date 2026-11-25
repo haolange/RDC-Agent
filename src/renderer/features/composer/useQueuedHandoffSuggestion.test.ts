@@ -14,7 +14,7 @@ let controller: ReturnType<typeof useQueuedHandoffSuggestion>;
 const setPrompt = vi.fn(); const send = vi.fn(); const inspect = vi.fn();
 const request = () => ({ sessionId: 's', agentId: 'general', label: 'Execute with General', prompt: 'execute', send: true });
 function Probe({ busy = false }) {
-  controller = useQueuedHandoffSuggestion({ sessionId: useProjectStore(s => s.currentSession?.sessionId),
+  controller = useQueuedHandoffSuggestion({ sessionId: useProjectStore(s => s.currentSessionId),
     isComposerBusy: busy, setPromptValue: setPrompt, sendPrompt: send, inspectRequest: inspect });
   return null;
 }
@@ -22,7 +22,7 @@ const render = (busy = false) => act(async () => root.render(createElement(Probe
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.clearAllMocks();
   usePlanReviewStore.getState().reset();
-  useProjectStore.setState({ currentSession: { sessionId: 's' } as never });
+  useProjectStore.setState({ currentSessionId: 's' });
   context.setState({ handoffSuggestionRequest: request(), activeTurn: null, isPromptSending: false });
   useConversationStore.setState({ conversationMessages: [] });
   mock.apply.mockResolvedValue({ ok: true, suggestion: { prompt: 'confirmed prompt' } });
@@ -51,7 +51,7 @@ it.each(['session', 'stop'])('isolates late switch results after %s', async reas
   mock.apply.mockImplementation(() => new Promise(resolve => { finish = resolve; })); await render();
   await act(async () => {
     if (reason === 'stop') context.getState().clearHandoffSuggestion();
-    else useProjectStore.setState({ currentSession: { sessionId: 'other' } as never });
+    else useProjectStore.setState({ currentSessionId: 'other' });
     finish({ ok: true, suggestion: { prompt: 'late' } });
   });
   expect(setPrompt).not.toHaveBeenCalled(); expect(send).not.toHaveBeenCalled();

@@ -87,6 +87,7 @@ import type {
   RunContextUsageSummary,
   RunSummary,
   SessionRecord,
+  SessionRecordSnapshot,
   SessionScope,
   SessionScopedPayload,
 } from './session';
@@ -125,7 +126,7 @@ import type {
 export type SessionOpenResult =
   | {
     success: true;
-    session: SessionRecord;
+    session: SessionRecordSnapshot;
     currentRun: RunSummary | null;
     runs: RunSummary[];
     history: { messages: ConversationMessage[]; planReview: PlanReviewProjection | null; branchState?: import('./conversationBranch').ConversationBranchState | null };
@@ -456,7 +457,7 @@ export interface ElectronAPI {
     select: (projectId: string) => Promise<{
       success: boolean;
       project?: ProjectRecord;
-      currentSession?: SessionRecord | null;
+      currentSession?: SessionRecordSnapshot | null;
       currentRun?: RunSummary | null;
       error?: string;
     }>;
@@ -501,20 +502,20 @@ export interface ElectronAPI {
   };
 
   session: {
-    list: (projectId?: string) => Promise<{ sessions: SessionRecord[] }>;
+    list: (projectId?: string) => Promise<{ sessions: SessionRecordSnapshot[] }>;
     create: (projectId: string, title?: string) => Promise<{
       success: boolean;
-      session?: SessionRecord;
+      session?: SessionRecordSnapshot;
       error?: string;
     }>;
     rename: (id: string, title: string) => Promise<{
       success: boolean;
-      session?: SessionRecord;
+      session?: SessionRecordSnapshot;
       error?: string;
     }>;
     remove: (id: string) => Promise<{
       success: boolean;
-      nextSession?: SessionRecord | null;
+      nextSession?: SessionRecordSnapshot | null;
       nextRun?: RunSummary | null;
       error?: string;
     }>;
@@ -526,7 +527,7 @@ export interface ElectronAPI {
       turnControls?: import('./modelCapability').ConversationTurnControls,
     ) => Promise<{
       success: boolean;
-      session?: SessionRecord;
+      session?: SessionRecordSnapshot;
       error?: string;
     }>;
     setAgentId: (
@@ -534,7 +535,7 @@ export interface ElectronAPI {
       agentId: string,
     ) => Promise<{
       success: boolean;
-      session?: SessionRecord;
+      session?: SessionRecordSnapshot;
       error?: string;
     }>;
     applyDeclaredHandoff: (
@@ -544,7 +545,7 @@ export interface ElectronAPI {
       expectedPlanHash?: string,
     ) => Promise<{
       success: boolean;
-      session?: SessionRecord;
+      session?: SessionRecordSnapshot;
       suggestion?: PlanReviewHandoffSuggestion;
       error?: string;
     }>;
@@ -615,6 +616,7 @@ export interface ElectronAPI {
     onKnowledgeProgress: (callback: (progress: KnowledgeOperationProgress) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (change: EffectiveCatalogChange) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
+    onSessionRecordChanged: (callback: (snapshot: SessionRecordSnapshot) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;
     onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => () => void;

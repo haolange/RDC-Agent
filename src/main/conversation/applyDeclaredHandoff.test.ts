@@ -105,7 +105,7 @@ describe('applyDeclaredHandoff', () => {
       label: 'Execute with General',
     });
     expect(result.success).toBe(true);
-    expect(result.session?.agentId).toBe('general');
+    expect(result.session?.record.agentId).toBe('general');
     expect(mocks.offerWrite).toHaveBeenCalledWith('sess', expect.objectContaining({
       sourceAgentId: 'debugger',
       targetAgentId: 'general',

@@ -4,7 +4,7 @@ import type { ElectronAPI } from '@shared/types/electron';
 import type { ContextSnapshot } from '@shared/types/session';
 
 const state = vi.hoisted(() => ({
-  project: { currentProject: { projectId: 'project' }, currentSession: { sessionId: 'a' } },
+  project: { currentProject: { projectId: 'project' }, currentSessionId: 'a' },
   capture: { setContextSnapshot: vi.fn(), setCaptures: vi.fn(), setOpenedCapture: vi.fn() },
   projection: { projectContextSnapshot: vi.fn(), projectOpenedCapture: vi.fn() },
   device: { loadDevices: vi.fn(), applyStatusPayload: vi.fn() },
@@ -17,7 +17,7 @@ vi.mock('../../stores/deviceStore', () => ({ useDeviceStore: { getState: () => s
 describe('capture event subscriptions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    state.project.currentSession = { sessionId: 'a' };
+    state.project.currentSessionId = 'a';
   });
 
   it('keeps background snapshots in their projection without updating active capture UI', () => {
@@ -36,7 +36,7 @@ describe('capture event subscriptions', () => {
     const context = new Promise<ContextSnapshot | null>((resolve) => { resolveContext = resolve; });
     const api = { context: { get: vi.fn(() => context) }, capture: { getOpenedState: vi.fn(async () => null) } };
     createCaptureProjection(api as unknown as ElectronAPI, vi.fn()).hydrate();
-    state.project.currentSession = { sessionId: 'b' };
+    state.project.currentSessionId = 'b';
     resolveContext(null);
     await context;
     await Promise.resolve();

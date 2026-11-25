@@ -1,4 +1,5 @@
 import { useCallback, useState, type MouseEvent } from 'react';
+import { receiveSessionList } from '../../../stores/sessionRecordStore';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export const getProjectOriginName = (project: ProjectRecord): string => {
@@ -20,7 +21,7 @@ export function useProjectTree() {
 
   const loadProjectSessionList = useCallback(async (projectId: string) => {
     const result = await window.electronAPI.session.list(projectId);
-    const nextSessions = result.sessions ?? [];
+    const nextSessions = receiveSessionList(result.sessions ?? []);
     setProjectSessionsByProject((current) => ({
       ...current,
       [projectId]: nextSessions,

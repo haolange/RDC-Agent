@@ -9,6 +9,7 @@ import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import { SessionRecordStore } from './SessionRecordStore';
 import { ConversationHistoryStore } from './ConversationHistoryStore';
 import { SessionContextStore } from './SessionContextStore';
+import { sessionRevisions } from './SessionRevisionRegistry';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -20,6 +21,7 @@ import type {
   RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
+  SessionRecordSnapshot,
 } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
 import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
@@ -205,6 +207,11 @@ export class StorageAdapter implements StorageHost {
 
   updateSession(sessionId: string, patch: Partial<SessionRecord>): SessionRecord | null {
     return this.sessions.updateSession(sessionId, patch);
+  }
+
+  readSessionSnapshot(sessionId: string): SessionRecordSnapshot | null {
+    const session = this.readSession(sessionId);
+    return session ? sessionRevisions.snapshot(session) : null;
   }
 
   listRuns(sessionId: string): RunSummary[] {

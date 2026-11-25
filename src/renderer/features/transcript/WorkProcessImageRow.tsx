@@ -15,7 +15,7 @@ export function WorkProcessImageRow({ row, renderToolDetail }: {
   row: ToolRowModel; renderToolDetail?: (row: ToolRowModel) => ReactNode;
 }) {
   const { t } = useI18n();
-  const scope = useProjectStore(state => state.currentSession?.sessionId);
+  const scope = useProjectStore(state => state.currentSessionId) ?? undefined;
   const calls = row.imageCalls ?? [row];
   const count = calls.reduce((total, call) => total + Math.max(1, call.imagePreviews?.length ?? 0), 0);
   const [expanded, toggle] = useScopedWorkDisclosure(`images-${row.id}`, false);

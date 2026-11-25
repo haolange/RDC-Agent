@@ -24,9 +24,11 @@ const areProjectInputsEqual = (
 
 interface ProjectState {
   projects: ProjectRecord[];
+  /** Sidebar list rows. Session facts (Agent, model, controls) come from `sessionRecordStore`, not from here. */
   sessions: SessionRecord[];
   currentProject: ProjectRecord | null;
-  currentSession: SessionRecord | null;
+  /** The renderer's one active session; its record is `useCurrentSessionView()`. */
+  currentSessionId: string | null;
   rightRailTarget: RightRailTarget;
   projectInputs: ProjectInputRecord[];
   /** Bumped to ask the sidebar to open its add-project dialog. */
@@ -36,7 +38,7 @@ interface ProjectState {
   setProjects: (projects: ProjectRecord[]) => void;
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentProject: (project: ProjectRecord | null) => void;
-  setCurrentSession: (session: SessionRecord | null) => void;
+  setCurrentSessionId: (sessionId: string | null) => void;
   setRightRailTarget: (target: RightRailTarget) => void;
   setProjectInputs: (inputs: ProjectInputRecord[]) => void;
   updateProjectInputs: (projectId: string, inputs: ProjectInputRecord[]) => void;
@@ -48,14 +50,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
   projects: [],
   sessions: [],
   currentProject: null,
-  currentSession: null,
+  currentSessionId: null,
   rightRailTarget: 'project',
   projectInputs: [],
 
   setProjects: (projects) => set({ projects }),
   setSessions: (sessions) => set({ sessions }),
   setCurrentProject: (project) => set({ currentProject: project }),
-  setCurrentSession: (session) => set({ currentSession: session }),
+  setCurrentSessionId: (currentSessionId) => set({ currentSessionId }),
   setRightRailTarget: (rightRailTarget) => set({ rightRailTarget }),
   setProjectInputs: (inputs) => set({ projectInputs: inputs }),
   updateProjectInputs: (projectId, inputs) => set((state) => {

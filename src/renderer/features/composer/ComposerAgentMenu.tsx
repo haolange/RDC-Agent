@@ -19,7 +19,6 @@ export const ComposerAgentMenu: React.FC<{
   userInvocableAgents: AgentManifestDefinition[];
   activeAgentId: string | null;
   setSelectedAgentId: (agentId: string) => void;
-  setCurrentMode: (mode: AgentMode) => void;
 }> = ({
   currentMode,
   currentModeConfig,
@@ -30,7 +29,6 @@ export const ComposerAgentMenu: React.FC<{
   userInvocableAgents,
   activeAgentId,
   setSelectedAgentId,
-  setCurrentMode,
 }) => {
   const { t, language } = useI18n();
   const menu = useComposerMenu('agent');
@@ -55,7 +53,6 @@ export const ComposerAgentMenu: React.FC<{
 
   const selectAgent = (agent: AgentManifestDefinition) => {
     setSelectedAgentId(agent.id);
-    setCurrentMode(agent.id);
     closeAndRestoreFocus();
   };
 

@@ -11,7 +11,7 @@ export function PlanReaderHost({ children }: { children: ReactNode }) {
   const [readerOpen, setReaderOpen] = useState(false);
   const opened = useRef<{ planId: string; sessionId: string | undefined } | null>(null);
   const open = useCallback((next: ConversationPlanReview) => {
-    opened.current = { planId: next.planId, sessionId: useProjectStore.getState().currentSession?.sessionId };
+    opened.current = { planId: next.planId, sessionId: useProjectStore.getState().currentSessionId ?? undefined };
     setPlan(next);
     setReaderOpen(true);
   }, []);
@@ -19,7 +19,7 @@ export function PlanReaderHost({ children }: { children: ReactNode }) {
     const target = opened.current;
     setReaderOpen(false);
     requestAnimationFrame(() => {
-      if (!target || useProjectStore.getState().currentSession?.sessionId !== target.sessionId) return;
+      if (!target || useProjectStore.getState().currentSessionId !== target.sessionId) return;
       // The original trigger may have remounted while the reader stayed open.
       Array.from(document.querySelectorAll<HTMLElement>('[data-plan-id]'))
         .find((button) => button.dataset.planId === target.planId)?.focus({ preventScroll: true });

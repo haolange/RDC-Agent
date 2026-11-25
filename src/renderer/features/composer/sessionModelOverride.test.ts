@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const persistInvoke = vi.fn();
 const projection = vi.hoisted(() => ({ projectId: 'project-a', sessionId: 'session-a' as string | null,
-  current: vi.fn(), sessions: vi.fn(), listeners: new Set<() => void>() }));
+  listeners: new Set<() => void>() }));
+let revision = 0;
+/** What main answers: the session record it wrote, with that write's revision. */
+const saved = (patch: Record<string, unknown> = {}) => ({ success: true, session: {
+  record: { schemaVersion: '1' as const, sessionId: 'session-a', projectId: 'project-a', title: 'A', goal: '', sessionPath: '/a',
+    createdAt: 1, updatedAt: 1, ...patch },
+  revision: { epoch: 'run-1', n: ++revision },
+} });
 
 vi.mock('../../platform/getElectronApi', () => ({
   getElectronApi: () => ({
@@ -17,15 +24,12 @@ vi.mock('../../platform/getElectronApi', () => ({
 vi.mock('../../stores/projectStore', () => ({
   useProjectStore: {
     getState: () => ({
-      currentSession: projection.sessionId ? { sessionId: projection.sessionId } : null,
+      currentSessionId: projection.sessionId,
       currentProject: { projectId: projection.projectId },
-      sessions: [],
-      setCurrentSession: projection.current,
-      setSessions: projection.sessions,
     }),
     subscribe: (listener: (state: unknown) => void) => {
       const notify = () => listener({ currentProject: { projectId: projection.projectId },
-        currentSession: projection.sessionId ? { sessionId: projection.sessionId } : null });
+        currentSessionId: projection.sessionId });
       projection.listeners.add(notify); return () => projection.listeners.delete(notify);
     },
   },
@@ -36,29 +40,31 @@ import {
   useComposerModelDraftStore,
   writeComposerDraftModel,
 } from '../../stores/composerModelDraftStore';
+import { getSessionView, useSessionRecordStore } from '../../stores/sessionRecordStore';
 import { clearComposerModelChoice, commitComposerModelChoice, persistSessionModelOverride, persistSessionTurnControls, flushSessionModelSaves } from './sessionModelOverride';
 
 beforeEach(() => {
   projection.projectId = 'project-a'; projection.sessionId = 'session-a';
-  projection.current.mockClear(); projection.sessions.mockClear(); projection.listeners.clear();
+  projection.listeners.clear();
+  useSessionRecordStore.getState().reset();
 });
 
 it('serializes controls after the model save and holds approval until all fields commit', async () => {
   let finish!: (value: unknown) => void;
   persistInvoke.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
-    .mockResolvedValueOnce({ success: true, session: { sessionId: 'session-a' } });
+    .mockResolvedValueOnce(saved());
   const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
   const controls = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
   const second = persistSessionTurnControls('session-a', controls);
   const barrier = flushSessionModelSaves('session-a');
   expect(persistInvoke).toHaveBeenCalledTimes(1);
-  finish({ success: true, session: { sessionId: 'session-a' } });
+  finish(saved());
   await Promise.all([first, second, barrier]);
   expect(persistInvoke).toHaveBeenLastCalledWith('session-a', null, controls);
 });
 
 it('atomically saves an explicit inherited model together with every turn control', async () => {
-  persistInvoke.mockReset().mockResolvedValue({ success: true, session: { sessionId: 'session-a' } });
+  persistInvoke.mockReset().mockResolvedValue(saved());
   const model = { providerId: 'p', modelId: 'inherited' };
   const controls = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
   expect(await persistSessionModelOverride('session-a', model, controls)).toEqual({ ok: true });
@@ -74,9 +80,9 @@ it('includes later queued controls in an already waiting approval barrier', asyn
   let flushed = false;
   const barrier = flushSessionModelSaves('session-a')!.then(() => { flushed = true; });
   const second = persistSessionTurnControls('session-a', { reasoningLevel: 'low', fastModel: true, maxContextMode: true });
-  finishFirst({ success: true, session: { sessionId: 'session-a' } }); await first;
+  finishFirst(saved()); await first;
   expect(flushed).toBe(false);
-  finishSecond({ success: true, session: { sessionId: 'session-a' } });
+  finishSecond(saved());
   await Promise.all([second, barrier]); expect(flushed).toBe(true);
 });
 
@@ -87,11 +93,21 @@ it('cancels queued saves after leaving and returning to the session', async () =
   const second = persistSessionTurnControls('session-a', { reasoningLevel: 'low', fastModel: false, maxContextMode: false });
   projection.sessionId = null; projection.listeners.forEach((listener) => listener());
   projection.sessionId = 'session-a'; projection.listeners.forEach((listener) => listener());
-  finish({ success: true, session: { sessionId: 'session-a' } });
+  finish(saved());
   await first;
   expect(await second).toEqual({ ok: false, error: 'MODEL_SAVE_CANCELLED' });
   expect(persistInvoke).toHaveBeenCalledTimes(1);
-  expect(projection.current).not.toHaveBeenCalled();
+});
+
+it('shows a chosen model while it saves and returns to the saved model when main refuses it', async () => {
+  useSessionRecordStore.getState().accept(saved({ modelOverride: { providerId: 'p', modelId: 'old' } }).session);
+  let finish!: (value: unknown) => void;
+  persistInvoke.mockReset().mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  const pending = commitComposerModelChoice({ providerId: 'p', modelId: 'new' }, 'session-a', 'project-a');
+  expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'p', modelId: 'new' });
+  finish({ success: false, error: 'MODEL_UNAVAILABLE' });
+  expect(await pending).toEqual({ ok: false, error: 'MODEL_UNAVAILABLE' });
+  expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'p', modelId: 'old' });
 });
 
 describe('commitComposerModelChoice', () => {
@@ -115,7 +131,7 @@ describe('commitComposerModelChoice', () => {
   });
 });
 
-it.each(['project', 'no-session', 'switch-back'])('does not project a late model save after %s navigation', async (kind) => {
+it.each(['project', 'no-session', 'switch-back'])('keeps a late model save on its own session after %s navigation', async (kind) => {
   let finish!: (value: unknown) => void;
   persistInvoke.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
   const pending = commitComposerModelChoice({ providerId: 'openai', modelId: 'model' }, 'session-a', 'project-a');
@@ -123,10 +139,10 @@ it.each(['project', 'no-session', 'switch-back'])('does not project a late model
   else projection.sessionId = null;
   projection.listeners.forEach((listener) => listener());
   if (kind === 'switch-back') { projection.sessionId = 'session-a'; projection.listeners.forEach((listener) => listener()); }
-  finish({ success: true, session: { sessionId: 'session-a', projectId: 'project-a' } });
+  finish(saved({ modelOverride: { providerId: 'openai', modelId: 'model' } }));
   await pending;
-  expect(projection.current).not.toHaveBeenCalled();
-  expect(projection.sessions).not.toHaveBeenCalled();
+  expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'openai', modelId: 'model' });
+  expect(useSessionRecordStore.getState().pending).toEqual({});
   expect(projection.listeners.size).toBe(0);
 });
 
@@ -137,19 +153,7 @@ describe('clearComposerModelChoice', () => {
   });
 
   it('persists a null session override when a session exists', async () => {
-    persistInvoke.mockResolvedValue({
-      success: true,
-      session: {
-        sessionId: 'session-a',
-        projectId: 'project-a',
-        title: 'A',
-        goal: '',
-        sessionPath: '/tmp/session-a',
-        createdAt: 1,
-        updatedAt: 2,
-        modelOverride: null,
-      },
-    });
+    persistInvoke.mockResolvedValue(saved({ modelOverride: null }));
     const result = await clearComposerModelChoice('session-a', 'project-a');
     expect(result).toEqual({ ok: true });
     expect(persistInvoke).toHaveBeenCalledWith('session-a', null);

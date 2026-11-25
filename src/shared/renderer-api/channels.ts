@@ -222,6 +222,9 @@ export const RENDERER_EVENT_CHANNEL = {
     planReviewChanged: 'plan:reviewChanged',
     delegationChanged: 'conversation:delegationChanged',
   },
+  session: {
+    recordChanged: 'session:recordChanged',
+  },
   workflow: {
     runStatusChanged: 'workflow:runStatusChanged',
     runUsageChanged: 'workflow:runUsageChanged',

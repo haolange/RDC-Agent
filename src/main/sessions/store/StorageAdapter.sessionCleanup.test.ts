@@ -582,3 +582,28 @@ describe('StorageAdapter terminal transaction', () => {
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
 });
+
+describe('session revisions', () => {
+  it('numbers every session write in order, broadcasts the written record and pairs reads with the last write', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const { sessionRevisions } = await import('./SessionRevisionRegistry');
+    const projectRoot = path.join(tempRoot, 'revision-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const seen: Array<import('@shared/types/session').SessionRecordSnapshot> = [];
+    const off = sessionRevisions.subscribe((snapshot) => seen.push(snapshot));
+    const session = storageAdapter.createSession(project.projectId, 'Revisions');
+    storageAdapter.updateSession(session.sessionId, { agentId: 'debugger' });
+    storageAdapter.updateSession(session.sessionId, { agentId: 'analyzer' });
+    off();
+
+    const own = seen.filter((snapshot) => snapshot.record.sessionId === session.sessionId);
+    expect(own.map((snapshot) => snapshot.record.agentId)).toEqual([undefined, 'debugger', 'analyzer']);
+    expect(new Set(own.map((snapshot) => snapshot.revision.epoch)).size).toBe(1);
+    expect(own[1]!.revision.n).toBeGreaterThan(own[0]!.revision.n);
+    expect(own[2]!.revision.n).toBeGreaterThan(own[1]!.revision.n);
+    expect(storageAdapter.readSessionSnapshot(session.sessionId)).toMatchObject({
+      record: { agentId: 'analyzer' }, revision: own[2]!.revision,
+    });
+  });
+});

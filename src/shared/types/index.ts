@@ -367,6 +367,8 @@ export type {
   SessionAttachmentRecord,
   SessionModelOverride,
   SessionRecord,
+  SessionRecordSnapshot,
+  SessionRevision,
 } from './session';
 export type {
   AppSettings,

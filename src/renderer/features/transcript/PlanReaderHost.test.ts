@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { PlanReaderHost, usePlanReader } from './PlanReaderHost';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: { getState: () => ({ currentSession: { sessionId: 's' } }) } }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: { getState: () => ({ currentSessionId: 's' }) } }));
 // The reader stays mounted while it closes and reports when it has left, as ReadingSheet does.
 vi.mock('./PlanReviewPanel', async () => {
   const { useEffect } = await vi.importActual<typeof import('react')>('react');

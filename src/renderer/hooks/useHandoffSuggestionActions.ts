@@ -5,7 +5,7 @@ import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 
 export function useHandoffSuggestionActions() {
   return useCallback((suggestion: PlanReviewHandoffSuggestion) => {
-    const sessionId = useProjectStore.getState().currentSession?.sessionId;
+    const sessionId = useProjectStore.getState().currentSessionId;
     if (!sessionId) return;
     useComposerSessionContextStore.getState().queueHandoffSuggestion({
       sessionId,

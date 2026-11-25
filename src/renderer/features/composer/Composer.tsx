@@ -4,8 +4,8 @@ import { agentDescription } from '../../lib/agentDescription';
 import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
-import { useLayoutStore } from '../../stores/layoutStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
@@ -50,13 +50,12 @@ export const Composer: React.FC<ComposerProps> = ({
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
   const resolvedTheme: ResolvedTheme = appearanceTheme === 'system' ? systemTheme : appearanceTheme;
   const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
+  const currentSession = useCurrentSessionView();
   const activeAgentId = useComposerSessionContextStore((state) => (
     state.activeTurn?.sessionId === (currentSession?.sessionId ?? 'no-session')
       ? state.activeTurn.agentId
       : null
   ));
-  const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
   const composerScopeKey = useMemo(
     () => buildComposerSessionScopeKey(currentProject?.projectId, currentSession?.sessionId),
     [currentProject?.projectId, currentSession?.sessionId],
@@ -223,7 +222,6 @@ export const Composer: React.FC<ComposerProps> = ({
         selectedAgentDefinition={selectedAgentDefinition}
         selectedAgentCapability={selectedAgentCapability}
         activeAgentId={activeAgentId}
-        setCurrentMode={setCurrentMode}
         currentSession={currentSession}
       />
     </div>}

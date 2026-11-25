@@ -7,6 +7,7 @@ import { acceptsContextUsage } from '../../stores/contextUsageProjectionModel';
 import { useConversationStore } from '../../stores/conversationStore';
 import { notify } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { acceptSessionSnapshot } from '../../stores/sessionRecordStore';
 import { isActiveSessionEvent, isActiveSessionScope } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -29,10 +30,14 @@ const isAgentStatePayload = (value: unknown): value is AgentState => {
     && obj.sessionId.trim().length > 0;
 };
 
+/** Every session write main makes. The record store is keyed by session and keeps the newest revision, so no gate applies. */
+export function subscribeSessionRecordChanged(electronAPI: ElectronAPI) {
+  return electronAPI.events.onSessionRecordChanged((snapshot) => acceptSessionSnapshot(snapshot));
+}
+
 export function subscribeRunUsageChanged(electronAPI: ElectronAPI) {
   return electronAPI.events.onRunUsageChanged((event) => {
-    const currentSession = useProjectStore.getState().currentSession;
-    if (!currentSession || currentSession.sessionId !== event.sessionId) {
+    if (useProjectStore.getState().currentSessionId !== event.sessionId) {
       projection().projectRunUsage(event.sessionId, event.payload, null);
       return;
     }

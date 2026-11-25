@@ -15,7 +15,7 @@ interface Delivery {
 
 function current(request: HandoffSuggestionRequest): boolean {
   if (useComposerSessionContextStore.getState().handoffSuggestionRequest !== request
-    || useProjectStore.getState().currentSession?.sessionId !== request.sessionId) return false;
+    || useProjectStore.getState().currentSessionId !== request.sessionId) return false;
   if (request.approvedPlan) return usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash === request.approvedPlan.hash;
   if (!request.sourcePlan) return true;
   return isCurrentPlanReview({ sessionId: request.sessionId, reviewId: request.sourcePlan.reviewId }, 'approve');

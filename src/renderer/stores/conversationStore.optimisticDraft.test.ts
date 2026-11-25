@@ -4,7 +4,7 @@ import { useConversationStore } from './conversationStore';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 const optimistic = () => buildOptimisticConversationTurn({
-  requestId: 'request-1', trimmed: 'Find the draw', currentMode: 'general', currentProject: null, currentSession: null,
+  requestId: 'request-1', trimmed: 'Find the draw', currentProject: null, currentSession: null,
   currentRun: null, pendingAttachments: [],
 });
 const fromMain = (role: 'user' | 'assistant', overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({

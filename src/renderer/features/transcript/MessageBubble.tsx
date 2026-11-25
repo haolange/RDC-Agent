@@ -6,10 +6,10 @@ import { MarkdownSourcesRow } from '../../patterns/Markdown/MarkdownSourcesRow';
 import { InlineError } from '../../ui/InlineError';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
-import { useLayoutStore } from '../../stores/layoutStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useI18n } from '../../i18n';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { useComposerAgentId } from '../../hooks/useComposerAgentId';
 import { errorDetail } from '../../lib/errorDetail';
 import { formatClockTime } from '../../lib/formatTime';
 import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
@@ -97,10 +97,10 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
   const [editError, setEditError] = useState('');
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const rewriteMessage = useUserMessageRewrite(message);
-  const selectedAgentId = useLayoutStore((state) => state.selectedAgentId);
+  const selectedAgentId = useComposerAgentId();
   const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
   const selectedAgent = agentDefinitions.find((agent) => agent.id === selectedAgentId);
-  const currentSession = useProjectStore((state) => state.currentSession);
+  const currentSession = useCurrentSessionView();
   const { effective } = useComposerEffectiveModel(selectedAgentId, currentSession);
   const modelLabel = useModelDisplayLabel(effective?.providerId, effective?.modelId);
   const executionPreview = t('chat.rewriteWillUse', {

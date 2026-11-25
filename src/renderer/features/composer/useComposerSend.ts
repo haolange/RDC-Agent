@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { getCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
@@ -16,15 +17,12 @@ import { shouldSendComposerOnEnter } from './composerKeyboard';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 import type { useI18n } from '../../i18n';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
-import type { AgentMode } from '@shared/types/layout';
 type Translate = ReturnType<typeof useI18n>['t'];
 
 export function useComposerSend(options: {
   t: Translate;
-  currentMode: AgentMode;
   selectedAgentId: string;
   setSelectedAgentId: (agentId: string) => void;
-  setCurrentMode: (mode: AgentMode) => void;
   openSettings: (section?: string) => void;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
@@ -41,7 +39,7 @@ export function useComposerSend(options: {
   armPendingSkill: (skillId: string, skillName?: string) => void;
 }) {
   const {
-    t, currentMode, selectedAgentId, setSelectedAgentId, setCurrentMode, openSettings, currentProject,
+    t, selectedAgentId, setSelectedAgentId, openSettings, currentProject,
     currentSession, currentRun, selectedDeviceEntry,
     hasActiveDebugRun, hasActiveConversationTurn, promptValue,
     setPromptValue, pendingAttachments, setPendingAttachments,
@@ -54,7 +52,6 @@ export function useComposerSend(options: {
   promptValueRef.current = promptValue;
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setSessions = useProjectStore((state) => state.setSessions);
-  const setCurrentSession = useProjectStore((state) => state.setCurrentSession);
   const setRuns = useSessionStore((state) => state.setRuns);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
@@ -81,7 +78,7 @@ export function useComposerSend(options: {
   const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
   const sendingRef = useRef(false);
   const performSend = useCallback(async (handoff?: HandoffSendPayload) => {
-    const session = handoff ? useProjectStore.getState().currentSession : currentSession;
+    const session = handoff ? getCurrentSessionView() : currentSession;
     if (handoff && session?.sessionId !== handoff.sessionId) return { status: 'cancelled' as const, requestId: '' };
     const trimmed = (handoff?.prompt ?? promptValue).trim();
     const sentAttachments = handoff ? [] : pendingAttachments;
@@ -103,7 +100,6 @@ export function useComposerSend(options: {
           currentProject,
           selectedAgentId,
           setSelectedAgentId,
-          setCurrentMode,
           setConversationMessages,
           upsertConversationMessages,
           openSettings,
@@ -135,7 +131,6 @@ export function useComposerSend(options: {
         trimmed,
         pendingAttachments: sentAttachments,
         pendingSkillIds: sentSkills,
-        currentMode,
         currentProject,
         currentSession: session,
         currentRun,
@@ -148,7 +143,6 @@ export function useComposerSend(options: {
         setBranchState,
         setConversationSnapshot,
         upsertConversationMessages,
-        setCurrentSession,
         setSessions,
         setCurrentRun,
         setRuns,
@@ -162,10 +156,10 @@ export function useComposerSend(options: {
       setIsPromptSending(false);
     }
   }, [
-    armPendingSkill, currentProject, currentMode, currentRun, currentSession, isComposerBusy,
+    armPendingSkill, currentProject, currentRun, currentSession, isComposerBusy,
     pendingAttachments, pendingSkillIds, promptValue, selectedDeviceEntry, selectedAgentId,
-    setSelectedAgentId, setCurrentMode, openSettings, setConversationMessages, setBranchState,
-    setConversationSnapshot, setCurrentRun, setCurrentSession, setIsPromptSending,
+    setSelectedAgentId, openSettings, setConversationMessages, setBranchState,
+    setConversationSnapshot, setCurrentRun, setIsPromptSending,
     setPendingAttachments, setPendingSkillIds, setPromptValue, setTracePresentation,
     setRuns, setSessions, t, upsertConversationMessages,
   ]);

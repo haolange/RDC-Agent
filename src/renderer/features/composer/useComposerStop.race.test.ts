@@ -50,7 +50,7 @@ beforeEach(() => {
   useConversationStore.getState().upsertConversationMessage(assistant());
   useComposerSessionContextStore.getState().resetForSessionSwitch();
   useComposerSessionContextStore.getState().beginTurn(ownership);
-  useProjectStore.getState().setCurrentSession(session);
+  useProjectStore.getState().setCurrentSessionId(session.sessionId);
   useSessionProjectionStore.getState().reset();
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   act(() => root.render(createElement(Harness)));
@@ -106,7 +106,7 @@ it('keeps a real main-owned stopped result and its complete tool receipts', asyn
 it('routes a delayed terminal read to its owning cache after switching sessions', async () => {
   const other = assistant({ id: 'assistant-b', turnId: 'turn-b', requestId: 'request-b', sessionId: 'session-b' });
   getHistory.mockImplementation(async () => {
-    useProjectStore.getState().setCurrentSession({ ...session, sessionId: 'session-b' });
+    useProjectStore.getState().setCurrentSessionId('session-b');
     useConversationStore.getState().setConversationMessages([other]);
     useComposerSessionContextStore.getState().beginTurn({ ...ownership, sessionId: 'session-b', requestId: 'request-b' });
     return { messages: [completed()], branchState: null };

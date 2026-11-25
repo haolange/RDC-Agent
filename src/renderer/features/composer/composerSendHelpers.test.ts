@@ -90,12 +90,11 @@ const makeElectronApi = () => ({
 
 describe('composerSendHelpers', () => {
   it('defaults an empty composer identity to general instead of ask', () => {
-    expect(resolveComposerProfileId('general', undefined)).toBe('general');
-    expect(resolveComposerProfileId('general', '')).toBe('general');
+    expect(resolveComposerProfileId(undefined)).toBe('general');
+    expect(resolveComposerProfileId('')).toBe('general');
     const optimistic = buildOptimisticConversationTurn({
       requestId: 'req-1',
       trimmed: 'hello',
-      currentMode: 'general',
       currentProject: null,
       currentSession: null,
       currentRun: null,
@@ -110,11 +109,11 @@ describe('composerSendHelpers', () => {
     const planReference = { intent: 'execute' as const, planId: 'plan', revision: 2, hash: 'a'.repeat(64),
       uri: 'session://plans/plan.md', title: 'Find the draw', agentId: 'general' };
     const optimistic = buildOptimisticConversationTurn({
-      requestId: 'req-plan', trimmed: 'Execute the frozen plan.', currentMode: 'general', currentProject: null,
+      requestId: 'req-plan', trimmed: 'Execute the frozen plan.', currentProject: null,
       currentSession: null, currentRun: null, pendingAttachments: [], selectedAgentId: 'general', planReference,
     });
     expect(optimistic.userMessage.planReference).toEqual(planReference);
-    expect(buildOptimisticConversationTurn({ requestId: 'req-plain', trimmed: 'hi', currentMode: 'general', currentProject: null,
+    expect(buildOptimisticConversationTurn({ requestId: 'req-plain', trimmed: 'hi', currentProject: null,
       currentSession: null, currentRun: null, pendingAttachments: [] }).userMessage).not.toHaveProperty('planReference');
   });
 
@@ -149,7 +148,6 @@ describe('composerSendHelpers', () => {
       electronAPI: makeElectronApi(),
       result,
       currentProject: null,
-      setCurrentSession: vi.fn(),
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
       setRuns: vi.fn(),
@@ -197,7 +195,6 @@ describe('composerSendHelpers', () => {
       electronAPI: makeElectronApi(),
       result,
       currentProject: null,
-      setCurrentSession: vi.fn(),
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
       setRuns: vi.fn(),
@@ -229,7 +226,6 @@ describe('composerSendHelpers', () => {
       electronAPI: makeElectronApi(),
       result,
       currentProject: null,
-      setCurrentSession: vi.fn(),
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
       setRuns: vi.fn(),

@@ -1,4 +1,3 @@
-import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { useCallback } from 'react';
 import { getElectronApi } from '../../platform/getElectronApi';
 import { useConversationStore } from '../../stores/conversationStore';
@@ -14,8 +13,9 @@ import { createConversationRequestId } from '../../services/conversationRequestI
 import { buildConversationConfigurationCommit } from '../../stores/conversationConfigurationCommit';
 import { resolveComposerProfileId } from '../../stores/conversationSendHelpers';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
-import { useLayoutStore } from '../../stores/layoutStore';
+import { getCurrentSessionView } from '../../stores/sessionRecordStore';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { readComposerAgentId } from '../../hooks/useComposerAgentId';
 import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -34,7 +34,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
   const currentProject = useProjectStore((state) => state.currentProject);
   const setSessions = useProjectStore((state) => state.setSessions);
-  const setCurrentSession = useProjectStore((state) => state.setCurrentSession);
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setRuns = useSessionStore((state) => state.setRuns);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
@@ -48,7 +47,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     const previousMessages = useConversationStore.getState().allConversationMessages;
     const previousBranchState = useConversationStore.getState().branchState;
     const requestId = createConversationRequestId();
-    const rewriteAgentId = useLayoutStore.getState().selectedAgentId || DEFAULT_AGENT_ID;
+    const rewriteAgentId = readComposerAgentId();
     const turnOwnership = {
       sessionId: message.sessionId ?? 'no-session',
       requestId,
@@ -79,7 +78,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
         modelOverride: readComposerEffectiveModel(
           rewriteAgentId,
-          useProjectStore.getState().currentSession,
+          getCurrentSessionView(),
           currentProject?.projectId,
         ),
       });
@@ -91,7 +90,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         currentRunId: message.runId ?? null,
         replayDeviceId: null,
         agentId: rewriteAgentId,
-        profileId: resolveComposerProfileId(useLayoutStore.getState().currentMode, rewriteAgentId),
+        profileId: resolveComposerProfileId(rewriteAgentId),
         message: nextContent,
         attachments: message.attachments?.map((attachment) => ({
           sourcePath: attachment.filePath,
@@ -123,14 +122,13 @@ export function useUserMessageRewrite(message: ConversationMessage) {
       useComposerSessionContextStore.getState().setRealTurnId(
         turnOwnership,
         result.userMessage.turnId,
-        result.session?.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId,
+        result.session?.record.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId,
       );
 
       await applyConversationTurnResult({
         electronAPI,
         result,
         currentProject,
-        setCurrentSession,
         setSessions,
         setCurrentRun,
         setRuns,
@@ -163,7 +161,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     setConversationMessages,
     setConversationSnapshot,
     setCurrentRun,
-    setCurrentSession,
     setRuns,
     setSessions,
     setTracePresentation,

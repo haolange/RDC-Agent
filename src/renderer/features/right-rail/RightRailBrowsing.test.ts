@@ -6,7 +6,7 @@ import { RightRailArtifactList } from './RightRailArtifactList';
 import { RightRailContext } from './RightRailContext';
 import type { InvestigationArtifactRow, InvestigationListPage, TaskContextPanelViewModel } from '@shared/types/trace';
 const data = vi.hoisted(() => ({ sessionId: 'session', list: vi.fn(), read: vi.fn(), copy: vi.fn(), open: vi.fn() }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentSession: { sessionId: data.sessionId, projectId: 'project' } }) }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (state: unknown) => unknown) => select({ currentProject: { projectId: 'project' }, currentSessionId: data.sessionId }) }));
 vi.mock('../../hooks/appShellBridge', () => ({ openAppPath: data.open }));
 vi.mock('../../lib/clipboard', () => ({ useCopyText: () => async (text: string) => {
   try { await data.copy(text); return true; } catch { return false; }

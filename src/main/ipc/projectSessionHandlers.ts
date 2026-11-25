@@ -4,7 +4,7 @@ import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/session
 import { conversationService } from '../conversation/ConversationService';
 import { traceService } from '../agent-trace/TraceService';
 import { applyDeclaredHandoff } from '../conversation/applyDeclaredHandoff';
-import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
+import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
 import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
@@ -43,7 +43,7 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 import type {
   ProjectInputRecord,
   RunSummary,
-  SessionRecord,
+  SessionRecordSnapshot,
 } from '@shared/types/session';
 
 const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
@@ -75,6 +75,7 @@ async function recoverStaleRunOnSelection(run: RunSummary | null): Promise<RunSu
 export function registerProjectSessionHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
   registerProjectInputLifecycleHandlers(context);
+  sessionRevisions.subscribe((snapshot) => context.broadcastToRenderer('session:recordChanged', snapshot));
 
   ipcMain.handle('project:list', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'project:list', maxBytes: 1024 });
@@ -108,9 +109,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       return {
         success: true,
         project: selection.project,
-        currentSession: selection.currentSession
-          ? projectSessionForClient(selection.currentSession)
-          : null,
+        currentSession: selection.currentSession,
         currentRun: selection.currentRun,
       };
     } catch (err) {
@@ -231,9 +230,9 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     });
     const resolvedProjectId = projectId || state.currentProjectId;
     if (!resolvedProjectId) {
-      return { sessions: [] as SessionRecord[] };
+      return { sessions: [] as SessionRecordSnapshot[] };
     }
-    return { sessions: storageAdapter.listSessions(resolvedProjectId).map(projectSessionForClient) };
+    return { sessions: storageAdapter.listSessions(resolvedProjectId).map((session) => sessionRevisions.snapshot(session)) };
   });
 
   ipcMain.handle('session:create', async (_event, ...rawArgs: unknown[]) => {
@@ -248,7 +247,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       state.currentSessionId = session.sessionId;
       state.currentRunId = null;
       storageAdapter.setCurrentSessionId(session.sessionId);
-      return { success: true, session };
+      return { success: true, session: sessionRevisions.snapshot(session) };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -270,7 +269,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         return { success: false, error: `Session not found: ${id}` };
       }
 
-      return { success: true, session };
+      return { success: true, session: sessionRevisions.snapshot(session) };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -309,12 +308,12 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       agentOrchestrator.releaseSessionToolState(id);
       const remainingSessions = storageAdapter.listSessions(session.projectId);
       const nextSession = remainingSessions[0]
-        ? projectSessionForClient(remainingSessions[0])
+        ? sessionRevisions.snapshot(remainingSessions[0])
         : null;
       let nextRun: RunSummary | null = null;
       if (state.currentSessionId === id) {
-        state.currentSessionId = nextSession?.sessionId || null;
-        state.currentRunId = nextSession?.lastRunId || null;
+        state.currentSessionId = nextSession?.record.sessionId || null;
+        state.currentRunId = nextSession?.record.lastRunId || null;
         state.currentProjectId = session.projectId;
         if (state.currentSessionId) {
           storageAdapter.setCurrentSessionId(state.currentSessionId);
@@ -343,6 +342,8 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
+      // Paired before any await: a later write reaches the renderer as a newer session:recordChanged.
+      const opened = sessionRevisions.snapshot(session);
 
       state.currentSessionId = id;
       state.currentProjectId = session.projectId;
@@ -352,7 +353,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       const [history, trace] = await Promise.all([conversationService.getHistory(id), traceService.getSession(id)]);
       return {
         success: true,
-        session: projectSessionForClient(session),
+        session: opened,
         currentRun,
         runs: storageAdapter.listRuns(id),
         history,
@@ -395,7 +396,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         }
       }
       const updated = storageAdapter.updateSession(id, { modelOverride, ...(turnControls ? { turnControls } : {}) });
-      return { success: true, session: updated };
+      return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -418,7 +419,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         return { success: false, error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${agentId}\` is not enabled.` };
       }
       const updated = storageAdapter.updateSession(id, { agentId });
-      return { success: true, session: updated };
+      return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }

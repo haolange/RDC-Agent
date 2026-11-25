@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../../stores/projectStore';
+import { getCurrentSessionView } from '../../../stores/sessionRecordStore';
 import {
   handleAddProjectOp,
   handleOpenExplorerOp,
@@ -39,7 +40,7 @@ export function useProjectSelection({
   const projects = useProjectStore((state) => state.projects);
   const sessions = useProjectStore((state) => state.sessions);
   const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
+  const currentSessionId = useProjectStore((state) => state.currentSessionId);
   const rightRailTarget = useProjectStore((state) => state.rightRailTarget);
 
   const loaders = useProjectSelectionLoaders({
@@ -72,7 +73,7 @@ export function useProjectSelection({
     loadSessions: loaders.loadSessions,
     selectSession: loaders.selectSession,
     getCurrentProject: () => useProjectStore.getState().currentProject,
-    getCurrentSession: () => useProjectStore.getState().currentSession,
+    getCurrentSession: getCurrentSessionView,
     getRightRailTarget: () => useProjectStore.getState().rightRailTarget,
     projectMenuOpen,
     onCloseProjectMenu,
@@ -125,7 +126,7 @@ export function useProjectSelection({
     projects,
     sessions,
     currentProject,
-    currentSession,
+    currentSessionId,
     rightRailTarget,
     beginSelectionRequest,
     loadProjects,

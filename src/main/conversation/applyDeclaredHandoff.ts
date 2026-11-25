@@ -5,12 +5,13 @@ import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/typ
 import { AppError } from '@shared/errors/appError';
 import { dispatchRuntimeHooks } from '../hooks/runtimeHookDispatch';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { assertDeclaredHandoffSkillCompatibility } from '../sessions/run/handoffSkillCompatibility';
 import { planArtifactWriter } from '../sessions/run/sessionPlanArtifact';
 import { resolveEnabledAgentDefinition } from './ConversationRoutePreflight';
 import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
-import type { SessionRecord } from '@shared/types/session';
+import type { SessionRecordSnapshot } from '@shared/types/session';
 
 export interface ApplyDeclaredHandoffInput {
   sessionId: string;
@@ -22,7 +23,7 @@ export interface ApplyDeclaredHandoffInput {
 export interface ApplyDeclaredHandoffResult {
   success: boolean;
   error?: string;
-  session?: SessionRecord;
+  session?: SessionRecordSnapshot;
   suggestion?: PlanReviewHandoffSuggestion;
 }
 
@@ -124,13 +125,13 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
       approvedAt: approved.updatedAt,
     });
   }
-  const updated = storageAdapter.updateSession(input.sessionId, { agentId: input.agent });
+  const updated = sessionRevisions.snapshot(storageAdapter.updateSession(input.sessionId, { agentId: input.agent }) ?? session);
   if (!await dispatchRuntimeHooks('agent.after-handoff', hookContext)) {
     return { success: false, error: 'HOOK_DENIED: agent.after-handoff' };
   }
   return {
     success: true,
-    session: updated ?? session,
+    session: updated,
     suggestion: {
       label: declared.label,
       ...(declared.labelTranslations ? { labelTranslations: { ...declared.labelTranslations } } : {}),

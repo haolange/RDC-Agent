@@ -17,7 +17,7 @@ import type {
 } from '@shared/types/knowledge';
 
 export function useKnowledgeCenter(open: boolean) {
-  const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
+  const sessionId = useProjectStore((state) => state.currentSessionId);
   const querySeq = useRef(createRequestSeq());
   const overviewSeq = useRef(createRequestSeq());
   const rebuildSeq = useRef(createRequestSeq());

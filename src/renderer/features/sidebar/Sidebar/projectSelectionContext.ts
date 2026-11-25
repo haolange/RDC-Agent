@@ -24,14 +24,15 @@ export interface ProjectSelectionLoaderOpsContext {
   setProjects: ReturnType<typeof useProjectStore.getState>['setProjects'];
   setSessions: ReturnType<typeof useProjectStore.getState>['setSessions'];
   setCurrentProject: ReturnType<typeof useProjectStore.getState>['setCurrentProject'];
-  setCurrentSession: ReturnType<typeof useProjectStore.getState>['setCurrentSession'];
+  setCurrentSessionId: ReturnType<typeof useProjectStore.getState>['setCurrentSessionId'];
   setProjectInputs: ReturnType<typeof useProjectStore.getState>['setProjectInputs'];
   updateProjectInputs: ReturnType<typeof useProjectStore.getState>['updateProjectInputs'];
   setRightRailTarget: ReturnType<typeof useProjectStore.getState>['setRightRailTarget'];
   setCurrentRun: ReturnType<typeof useSessionStore.getState>['setCurrentRun'];
   setRuns: ReturnType<typeof useSessionStore.getState>['setRuns'];
   setCaptures: ReturnType<typeof useCaptureStore.getState>['setCaptures'];
-  getCurrentSession: () => ReturnType<typeof useProjectStore.getState>['currentSession'];
+  /** The current session's record view; the sidebar reads only its id and project. */
+  getCurrentSession: () => SessionRecord | null;
   /** Brings the settings view to the Agents of `projectId` (null: no project); reads only when they differ. */
   reloadSettings: (projectId: string | null) => Promise<unknown>;
 }
@@ -71,7 +72,7 @@ export function captureSelectionSnapshot(): SelectionSnapshot {
   const capture = useCaptureStore.getState();
   return {
     currentProject: project.currentProject,
-    currentSession: project.currentSession,
+    currentSessionId: project.currentSessionId,
     rightRailTarget: project.rightRailTarget,
     currentRun: session.currentRun,
     captures: capture.captures,
@@ -84,13 +85,13 @@ export function restoreSelectionSnapshot(
   snapshot: SelectionSnapshot,
 ) {
   ctx.setCurrentProject(snapshot.currentProject);
-  ctx.setCurrentSession(snapshot.currentSession);
+  ctx.setCurrentSessionId(snapshot.currentSessionId);
   ctx.setRightRailTarget(snapshot.rightRailTarget);
   ctx.setCurrentRun(snapshot.currentRun);
   ctx.setCaptures(snapshot.captures);
   ctx.setRuns(snapshot.runs);
-  if (snapshot.currentSession) {
-    useSessionProjectionStore.getState().activateSession(snapshot.currentSession.sessionId);
+  if (snapshot.currentSessionId) {
+    useSessionProjectionStore.getState().activateSession(snapshot.currentSessionId);
   }
 }
 

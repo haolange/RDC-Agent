@@ -66,8 +66,9 @@ function ScopedArtifactList({ artifacts, projectId, sessionId }: {
 }
 
 export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifactsPanelViewModel }> = ({ artifacts }) => {
-  const session = useProjectStore(state => state.currentSession);
-  return session ? <ScopedArtifactList key={`${session.projectId}:${session.sessionId}`} artifacts={artifacts}
-    projectId={session.projectId} sessionId={session.sessionId} /> : null;
+  const projectId = useProjectStore(state => state.currentProject?.projectId);
+  const sessionId = useProjectStore(state => state.currentSessionId);
+  return projectId && sessionId ? <ScopedArtifactList key={`${projectId}:${sessionId}`} artifacts={artifacts}
+    projectId={projectId} sessionId={sessionId} /> : null;
 };
 export default RightRailArtifactList;

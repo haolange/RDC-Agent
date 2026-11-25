@@ -201,7 +201,10 @@ describe('session:remove slot sync', () => {
     const result = await handler!({}, 'sess_1');
     expect(result).toMatchObject({
       success: true,
-      session: expect.objectContaining({ sessionId: 'sess_1', agentId: 'general' }),
+      session: {
+        record: expect.objectContaining({ sessionId: 'sess_1', agentId: 'general' }),
+        revision: { epoch: expect.any(String), n: expect.any(Number) },
+      },
       runs: [],
       history: { messages: [], planReview: null },
       trace: { success: true, sessionId: 'sess_1' },

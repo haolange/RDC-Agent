@@ -3,7 +3,8 @@
 `useAppBootstrap` 负责启动加载。`useIpcEventBridge` 是事件安装与释放的唯一协调入口，保持显式的订阅顺序，卸载时先丢弃会话消息批次，再释放订阅。切会话和 StrictMode 重装复用同一路径。
 
 - `conversationSubscriptions`：流式消息、handoff、工具完成；高频 patch 使用 `conversationEventBatcher`，terminal 先刷新对应消息。
-- `sessionSubscriptions`：usage、trace、Agent、证据、run 与项目输入；当前会话写活动 store，后台投影只写所属会话缓存。
+- `sessionSubscriptions`：会话记录、usage、trace、Agent、证据、run 与项目输入；会话记录按 revision 进 `sessionRecordStore`（按会话分键，不经 gate），其余当前会话写活动 store，后台投影只写所属会话缓存。
+- `useSessionSurfaceBootstrap`：按 session id 加载当前会话的 history、trace、证据链与 workflow 状态，会话记录变化不重拉。
 - `captureSubscriptions`：冻结 scope 的 context/opened-capture 投影、设备事件和首次查询；异步返回重新核对活动 scope，不能污染新会话。
 - `shellSubscriptions`：Terminal 日志、主题和窗口菜单命令；新工作区仍调用统一的 `resetWorkbenchStores`。
 

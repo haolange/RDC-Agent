@@ -13,13 +13,13 @@ vi.mock('../../stores/conversationSendApply', () => ({ applyConversationTurnResu
 const send = vi.fn(); const history = vi.fn(); const prompt = vi.fn(); const attachments = vi.fn(); const skills = vi.fn();
 function options(preserveDraft = true): Parameters<typeof sendComposerConversationTurn>[0] {
   return { electronAPI: { settings: { getEffectiveCatalog: vi.fn() }, conversation: { sendMessage: send, getHistory: history } } as never,
-    trimmed: 'confirmed handoff prompt', pendingAttachments: [], pendingSkillIds: [], currentMode: 'general',
+    trimmed: 'confirmed handoff prompt', pendingAttachments: [], pendingSkillIds: [],
     currentProject: { projectId: 'p' } as never, currentSession: { sessionId: 's', projectId: 'p' } as never,
     currentRun: null, selectedAgentId: 'general', selectedDeviceEntry: undefined, preserveDraft,
     setPromptValue: prompt, setPendingAttachments: attachments, setPendingSkillIds: skills,
     setConversationMessages: useConversationStore.getState().setConversationMessages,
     upsertConversationMessages: useConversationStore.getState().upsertConversationMessages,
-    setBranchState: vi.fn(), setCurrentSession: vi.fn(), setSessions: vi.fn(), setCurrentRun: vi.fn(), setRuns: vi.fn(),
+    setBranchState: vi.fn(), setSessions: vi.fn(), setCurrentRun: vi.fn(), setRuns: vi.fn(),
     setTracePresentation: vi.fn(), t: (key: string) => key };
 }
 beforeEach(() => {
@@ -27,7 +27,7 @@ beforeEach(() => {
   mock.apply.mockResolvedValue(undefined);
   context.setState({ activeTurn: null, lastSent: null });
   useConversationStore.getState().setConversationMessages([]);
-  useProjectStore.setState({ currentProject: { projectId: 'p' } as never, currentSession: { sessionId: 's' } as never });
+  useProjectStore.setState({ currentProject: { projectId: 'p' } as never, currentSessionId: 's' });
   send.mockResolvedValue({ status: 'accepted', preparedContext: null, turn: { userMessage: { turnId: 't', sessionId: 's' }, assistantDraftMessage: { sessionId: 's' } } });
   history.mockResolvedValue({ messages: [] });
 });

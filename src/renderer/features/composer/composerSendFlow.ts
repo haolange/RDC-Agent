@@ -27,7 +27,6 @@ import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
-import type { AgentMode } from '@shared/types/layout';
 import type { Translator } from '../../i18n/messages';
 
 export { createConversationRequestId };
@@ -37,7 +36,6 @@ export async function sendComposerConversationTurn(options: {
   trimmed: string;
   pendingAttachments: PendingAttachmentDraft[];
   pendingSkillIds: string[];
-  currentMode: AgentMode;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -53,7 +51,6 @@ export async function sendComposerConversationTurn(options: {
     branchState?: ConversationBranchState | null,
   ) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
-  setCurrentSession: (session: SessionRecord | null) => void;
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentRun: (run: RunSummary | null) => void;
   setRuns: (runs: RunSummary[]) => void;
@@ -67,7 +64,6 @@ export async function sendComposerConversationTurn(options: {
     trimmed,
     pendingAttachments,
     pendingSkillIds,
-    currentMode,
     currentProject,
     currentSession,
     currentRun,
@@ -80,7 +76,6 @@ export async function sendComposerConversationTurn(options: {
     setBranchState,
     setConversationSnapshot,
     upsertConversationMessages,
-    setCurrentSession,
     setSessions,
     setCurrentRun,
     setRuns,
@@ -98,8 +93,8 @@ export async function sendComposerConversationTurn(options: {
   const owningSessionId = currentSession?.sessionId ?? null;
   const isOwningSelectionActive = (sessionId: string | null) => {
     const selection = useProjectStore.getState();
-    return selection.currentSession?.sessionId
-      ? selection.currentSession.sessionId === sessionId
+    return selection.currentSessionId
+      ? selection.currentSessionId === sessionId
       : (selection.currentProject?.projectId ?? null) === (currentProject?.projectId ?? null);
   };
   let turnOwnership = {
@@ -113,7 +108,6 @@ export async function sendComposerConversationTurn(options: {
   const optimistic = buildOptimisticConversationTurn({
     requestId,
     trimmed: sentPrompt,
-    currentMode,
     currentProject,
     currentSession,
     currentRun,
@@ -149,7 +143,7 @@ export async function sendComposerConversationTurn(options: {
 
   const restoreComposerDraft = () => {
     if (preserveDraft) return;
-    const activeSessionId = useProjectStore.getState().currentSession?.sessionId ?? null;
+    const activeSessionId = useProjectStore.getState().currentSessionId;
     if (owningSessionId && activeSessionId !== owningSessionId) {
       return;
     }
@@ -187,7 +181,7 @@ export async function sendComposerConversationTurn(options: {
         currentProject?.projectId,
       ),
     });
-    const profileId = resolveComposerProfileId(currentMode, selectedAgentId);
+    const profileId = resolveComposerProfileId(selectedAgentId);
     const turnControls = { ...useTurnControlsStore.getState().turnControls };
     dispatchStarted = true;
     const result = await electronAPI.conversation.sendMessage({
@@ -242,7 +236,7 @@ export async function sendComposerConversationTurn(options: {
     rollbackOptimistic();
 
     const turn = result.turn;
-    const committedSessionId = turn.session?.sessionId
+    const committedSessionId = turn.session?.record.sessionId
       ?? turn.userMessage.sessionId
       ?? turn.assistantDraftMessage.sessionId
       ?? turnOwnership.sessionId;
@@ -261,7 +255,6 @@ export async function sendComposerConversationTurn(options: {
       electronAPI,
       result: turn,
       currentProject,
-      setCurrentSession,
       setSessions,
       setCurrentRun,
       setRuns,
@@ -272,7 +265,7 @@ export async function sendComposerConversationTurn(options: {
       upsertConversationMessages,
     });
     if (!preserveDraft) await persistComposerDraftToSession(
-      turn.session?.sessionId ?? committedSessionId,
+      turn.session?.record.sessionId ?? committedSessionId,
       currentProject?.projectId,
     );
 

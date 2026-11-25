@@ -17,6 +17,7 @@ import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as pe
 import { renameWithRetrySync } from '../../platform/fileRename';
 import { ActionEventSchema, SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
+import { sessionRevisions } from './SessionRevisionRegistry';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -54,6 +55,7 @@ export class SessionRecordStore {
     if (fs.existsSync(location.sessionPath)) {
       fs.rmSync(location.sessionPath, { recursive: true, force: true });
     }
+    sessionRevisions.forget(sessionId);
 
     const selection = this.host.projects.readSelection();
     if (selection.sessionId === sessionId) {
@@ -101,7 +103,7 @@ export class SessionRecordStore {
     if (!project) return [];
     return reconcileProjectSessionTitles(this.host, project, (session, sessionPath) => (
       this.normalizeSessionRecord(session, sessionPath)
-    ))
+    ), (rewritten) => sessionRevisions.written(rewritten))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
@@ -142,6 +144,7 @@ export class SessionRecordStore {
     this.host.projects.touchProject(project.projectId, session.sessionId, timestamp);
     this.host.projects.setCurrentProjectId(projectId);
     this.host.projects.setCurrentSessionId(session.sessionId);
+    sessionRevisions.written(session);
 
     return session;
   }
@@ -257,6 +260,7 @@ export class SessionRecordStore {
     this.host.projects.touchProject(commit.session.projectId, commit.session.sessionId, commit.session.updatedAt);
     this.host.projects.setCurrentProjectId(commit.session.projectId);
     this.host.projects.setCurrentSessionId(commit.session.sessionId);
+    sessionRevisions.written(commit.session);
     return commit.session;
   }
 
@@ -269,7 +273,7 @@ export class SessionRecordStore {
     if (!location) return null;
     const sessions = reconcileProjectSessionTitles(this.host, location.project, (session, sessionPath) => (
       this.normalizeSessionRecord(session, sessionPath)
-    ));
+    ), (rewritten) => sessionRevisions.written(rewritten));
     return sessions.find((session) => session.sessionId === sessionId) ?? null;
   }
 
@@ -291,6 +295,7 @@ export class SessionRecordStore {
 
     this.host.io.writeJsonAtomic(path.join(location.sessionPath, 'session.json'), nextSession);
     this.host.projects.touchProject(existing.projectId, nextSession.sessionId, nextSession.updatedAt);
+    sessionRevisions.written(nextSession);
     return nextSession;
   }
 

@@ -79,6 +79,21 @@ export interface SessionRecord {
   agentId?: string;
 }
 
+/**
+ * The order in which main wrote a session record. `epoch` names the main process run; `n` counts session writes in
+ * it. Held in memory only, never persisted: a newer epoch always supersedes, within one epoch the larger `n` does.
+ */
+export interface SessionRevision {
+  epoch: string;
+  n: number;
+}
+
+/** A session record as main last wrote it, with the revision of that write. Every response carrying a session uses it. */
+export interface SessionRecordSnapshot {
+  record: SessionRecord;
+  revision: SessionRevision;
+}
+
 /** Explicit project/session ownership for stateful RDC operations and events. */
 export interface SessionScope {
   projectId: string;

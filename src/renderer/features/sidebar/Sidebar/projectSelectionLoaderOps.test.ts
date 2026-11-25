@@ -13,7 +13,7 @@ vi.mock('../../../stores/conversationStore', () => ({
 }));
 vi.mock('../../../stores/sessionProjectionHydration', () => ({ hydrateLoadedSessionSurface: vi.fn() }));
 vi.mock('../../../stores/projectStore', () => ({
-  useProjectStore: { getState: () => ({ currentProject: null, currentSession: null, rightRailTarget: 'project' }) },
+  useProjectStore: { getState: () => ({ currentProject: null, currentSessionId: null, rightRailTarget: 'project' }) },
 }));
 vi.mock('../../../stores/sessionStore', () => ({
   useSessionStore: { getState: () => ({ currentRun: null, runs: [], clearUsageSnapshot: vi.fn() }) },
@@ -47,10 +47,10 @@ function project(projectId: string): ProjectRecord {
 it.each([false, true])('preserves review and handoff state on same-session revalidation (optimistic=%s)', async optimistic => {
   vi.mocked(applySessionSwitchHygiene).mockClear();
   const session = { sessionId: 'session-a', projectId: 'proj_a', agentId: 'general' } as never;
-  vi.stubGlobal('window', { electronAPI: { session: { open: async () => ({ success: true, session, currentRun: null, runs: [],
+  vi.stubGlobal('window', { electronAPI: { session: { open: async () => ({ success: true, session: { record: session, revision: { epoch: 'e', n: 1 } }, currentRun: null, runs: [],
     history: { messages: [], planReview: null, branchState: null }, trace: { success: true, presentation: null } }) } } });
   const ctx = { getCurrentSession: () => session, isLatestSelectionRequest: () => true,
-    setCurrentSession: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
+    setCurrentSessionId: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
   } as unknown as ProjectSelectionLoaderOpsContext;
   try {
     expect(await selectSessionOp(ctx, 'session-a', optimistic ? { optimisticSession: session } : {})).toBe(true);
@@ -102,7 +102,7 @@ describe('loadSessionsOp project-aware settings refresh', () => {
       setProjects: vi.fn(),
       setSessions: vi.fn(),
       setCurrentProject,
-      setCurrentSession: vi.fn(),
+      setCurrentSessionId: vi.fn(),
       setProjectInputs: vi.fn(),
       updateProjectInputs: vi.fn(),
       setRightRailTarget: vi.fn(),
@@ -122,7 +122,7 @@ describe('loadSessionsOp project-aware settings refresh', () => {
   });
 
   it('clears the former session projection when project-only selection crosses projects', async () => {
-    const setCurrentSession = vi.fn();
+    const setCurrentSessionId = vi.fn();
     const ctx = {
       t: (key: string) => key,
       setSidebarError: vi.fn(),
@@ -131,7 +131,7 @@ describe('loadSessionsOp project-aware settings refresh', () => {
       isLatestSelectionRequest: () => true,
       setSessions: vi.fn(),
       setCurrentProject: vi.fn(),
-      setCurrentSession,
+      setCurrentSessionId,
       updateProjectInputs: vi.fn(),
       setRightRailTarget: vi.fn(),
       setCurrentRun: vi.fn(),
@@ -144,7 +144,7 @@ describe('loadSessionsOp project-aware settings refresh', () => {
     await loadSessionsOp(ctx, project('proj_b'), { autoSelectSession: false, requestId: 1 });
 
     expect(applySessionSwitchHygiene).toHaveBeenCalledWith({ previousSessionId: 'session-a', nextSessionId: null });
-    expect(setCurrentSession).toHaveBeenCalledWith(null);
+    expect(setCurrentSessionId).toHaveBeenCalledWith(null);
   });
 });
 
@@ -155,7 +155,7 @@ it('clears the active session before projecting another project root', async () 
     setSidebarError: vi.fn(),
     beginSelectionRequest: () => 1,
     getCurrentSession: () => ({ sessionId: 'session-a', projectId: 'proj_a' }),
-    setCurrentSession: () => { order.push('clearSession'); },
+    setCurrentSessionId: () => { order.push('clearSession'); },
     setCurrentRun: vi.fn(),
     setCaptures: vi.fn(),
     setRuns: vi.fn(),
@@ -182,7 +182,7 @@ it('clears the former session before projecting a session in another project', a
     getCurrentProject: () => project('proj_a'),
     getCurrentSession: () => ({ sessionId: 'session-a', projectId: 'proj_a' }),
     setCurrentProject: () => { order.push('setProject'); },
-    setCurrentSession: () => { order.push('setSession'); },
+    setCurrentSessionId: () => { order.push('setSession'); },
     setRightRailTarget: vi.fn(),
     setCurrentRun: vi.fn(),
     setCaptures: vi.fn(),
@@ -204,7 +204,7 @@ it('restores the former selection when cross-project activation is rejected', as
   const formerProject = project('proj_a');
   const formerSession = { sessionId: 'session-a', projectId: 'proj_a' } as Parameters<typeof handleSessionActivateOp>[2];
   const setCurrentProject = vi.fn();
-  const setCurrentSession = vi.fn();
+  const setCurrentSessionId = vi.fn();
   vi.stubGlobal('window', {
     electronAPI: { project: { select: async () => ({ success: false, error: 'rejected' }) } },
   });
@@ -213,7 +213,7 @@ it('restores the former selection when cross-project activation is rejected', as
     setSidebarError: vi.fn(),
     isLatestSelectionRequest: () => true,
     setCurrentProject,
-    setCurrentSession,
+    setCurrentSessionId,
     setRightRailTarget: vi.fn(),
     setCurrentRun: vi.fn(),
     setCaptures: vi.fn(),
@@ -224,7 +224,7 @@ it('restores the former selection when cross-project activation is rejected', as
   await loadSessionsOp(ctx, project('proj_b'), {
     rollbackState: {
       currentProject: formerProject,
-      currentSession: formerSession,
+      currentSessionId: formerSession.sessionId,
       rightRailTarget: 'session',
       currentRun: null,
       captures: [],
@@ -234,7 +234,7 @@ it('restores the former selection when cross-project activation is rejected', as
 
   expect(ctx.setSidebarError).toHaveBeenCalledWith({ contextKey: 'sidebar.selectProjectFailed', detail: 'rejected' });
   expect(setCurrentProject).toHaveBeenLastCalledWith(formerProject);
-  expect(setCurrentSession).toHaveBeenLastCalledWith(formerSession);
+  expect(setCurrentSessionId).toHaveBeenLastCalledWith('session-a');
   expect(activateSession).toHaveBeenCalledWith('session-a');
   vi.unstubAllGlobals();
 });
@@ -278,7 +278,7 @@ describe('loadProjectsOp listing gate', () => {
       setProjects,
       setSessions: vi.fn(),
       setCurrentProject: vi.fn(),
-      setCurrentSession: vi.fn(),
+      setCurrentSessionId: vi.fn(),
       setProjectInputs: vi.fn(),
       updateProjectInputs: vi.fn(),
       setRightRailTarget: vi.fn(),
@@ -301,17 +301,17 @@ it('creates a session in the current project with one open request and no projec
   const created = { sessionId: 'session-new', projectId: 'proj_a' } as never;
   const calls: string[] = [];
   vi.stubGlobal('window', { electronAPI: { session: {
-    create: async () => { calls.push('create'); return { success: true, session: created }; },
+    create: async () => { calls.push('create'); return { success: true, session: { record: created, revision: { epoch: 'e', n: 1 } } }; },
     open: async () => {
       calls.push('open');
-      return { success: true, session: created, currentRun: null, runs: [],
+      return { success: true, session: { record: created, revision: { epoch: 'e', n: 1 } }, currentRun: null, runs: [],
         history: { messages: [], planReview: null, branchState: null }, trace: { success: true, presentation: null } };
     },
   } } });
   const ctx = {
     setSidebarError: vi.fn(), getCurrentProject: () => current, projectMenuOpen: false, beginSelectionRequest: () => 1,
     setIsBusy: vi.fn(), isLatestSelectionRequest: () => true, getCurrentSession: () => null, setCurrentProject: vi.fn(),
-    setCurrentSession: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
+    setCurrentSessionId: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
     ensureProjectExpanded: vi.fn(), loadProjects: vi.fn(), setSessions: vi.fn(),
     loadProjectSessionList: vi.fn(async () => { calls.push('list'); return [created]; }),
   } as unknown as ProjectSelectionHandlerOpsContext;

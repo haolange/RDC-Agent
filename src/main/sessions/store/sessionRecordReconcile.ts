@@ -44,6 +44,7 @@ export function reconcileProjectSessionTitles(
   host: StorageHost,
   project: ProjectRecord,
   normalizeSessionRecord: (session: SessionRecord, sessionPath?: string) => SessionRecord,
+  onRewritten: (session: SessionRecord) => void,
 ): SessionRecord[] {
   const storedSessions = readProjectSessions(host, project);
   const normalizedSessions = storedSessions.map(({ session, sessionPath }) => (
@@ -87,6 +88,7 @@ export function reconcileProjectSessionTitles(
         title: nextTitle,
       };
       host.io.writeJsonAtomic(path.join(sessionPath, 'session.json'), rewrittenSession);
+      onRewritten(rewrittenSession);
       rewrittenBySessionId.set(session.sessionId, rewrittenSession);
       didRewrite = true;
       continue;

@@ -20,8 +20,9 @@ export function DeviceSelector() {
   const { t } = useI18n();
   const { devices, discovery, refreshDevices, startDeviceWatch, stopDeviceWatch } = useDeviceStore();
   const project = useProjectStore((state) => state.currentProject);
-  const session = useProjectStore((state) => state.currentSession);
-  const scope = useMemo(() => project && session ? { projectId: project.projectId, sessionId: session.sessionId } : null, [project, session]);
+  const projectId = project?.projectId;
+  const sessionId = useProjectStore((state) => state.currentSessionId);
+  const scope = useMemo(() => projectId && sessionId ? { projectId, sessionId } : null, [projectId, sessionId]);
   const { state, error, actionFailure } = useSessionDevicePreparation(scope);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

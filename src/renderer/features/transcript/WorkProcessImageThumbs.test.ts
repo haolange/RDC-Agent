@@ -9,7 +9,7 @@ vi.mock('../../lib/useUiLabels', () => ({ useUiLabels: () => ({ imageViewer: {
   close: 'close', previous: 'previous', next: 'next', zoomIn: 'zoomIn', zoomOut: 'zoomOut', reset: 'reset', openOriginal: 'open',
   position: (current: number, total: number) => `${current}/${total}`,
 } }) }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (pick: (s: unknown) => unknown) => pick({ currentSession: { sessionId: state.session } }) }));
+vi.mock('../../stores/projectStore', () => ({ useProjectStore: (pick: (s: unknown) => unknown) => pick({ currentSessionId: state.session }) }));
 vi.mock('../../hooks/useToolImagePreviews', () => ({ useToolImagePreviews: () => ({
   values: {
     image: state.failed ? { failed: true } : { url: 'data:image/png;base64,AA==' },

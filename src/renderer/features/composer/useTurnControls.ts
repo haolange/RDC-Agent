@@ -60,7 +60,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     setSaveState({ sessionId, saving: true });
     try {
       const result = await persistSessionTurnControls(sessionId, controls);
-      if (revision === saveRevision.current && useProjectStore.getState().currentSession?.sessionId === sessionId) {
+      if (revision === saveRevision.current && useProjectStore.getState().currentSessionId === sessionId) {
         setSaveState({ sessionId, saving: false, error: result.ok ? undefined : result.error });
       }
     } finally { pendingSaves.current--; }

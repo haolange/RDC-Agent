@@ -4,6 +4,7 @@ import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useCaptureStore } from '../../stores/captureStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
 
 import { notify } from '../../stores/notificationStore';
@@ -16,6 +17,7 @@ import {
   subscribeProjectInputsError,
   subscribeRunStatusChanged,
   subscribeRunUsageChanged,
+  subscribeSessionRecordChanged,
   subscribeTraceProjectionChanged,
 } from './sessionSubscriptions';
 import { subscribePermissionState } from './permissionSubscriptions';
@@ -47,8 +49,8 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
 
   const setSystemTheme = useAppSettingsStore((state) => state.setSystemTheme);
   const addActionEvent = useEvidenceStore((state) => state.addActionEvent);
-  const activeSessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
-  const handoffNotice = useProjectStore((state) => state.currentSession?.handoffNotice);
+  const activeSessionId = useProjectStore((state) => state.currentSessionId);
+  const handoffNotice = useCurrentSessionView()?.handoffNotice;
   const shownHandoffNotices = useRef(new Set<string>());
   useEffect(() => {
     if (!activeSessionId || !handoffNotice) return;
@@ -64,6 +66,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
 
 
     const unsubscribePermissionState = subscribePermissionState(electronAPI);
+    const unsubscribeSessionRecordChanged = subscribeSessionRecordChanged(electronAPI);
     const unsubscribeRunUsageChanged = subscribeRunUsageChanged(electronAPI);
     const unsubscribeTraceProjectionChanged = subscribeTraceProjectionChanged(electronAPI);
 
@@ -92,6 +95,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
 
     return () => {
       unsubscribePermissionState();
+      unsubscribeSessionRecordChanged();
       conversation.disposeBatcher();
       unsubscribeRunUsageChanged();
       unsubscribeTraceProjectionChanged();

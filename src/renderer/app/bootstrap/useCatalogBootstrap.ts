@@ -6,7 +6,7 @@ import { useProjectStore } from '../../stores/projectStore';
 
 export function useCatalogBootstrap(): void {
   const settings = useAppSettingsStore((state) => state.settings);
-  const currentSessionId = useProjectStore((state) => state.currentSession?.sessionId);
+  const currentSessionId = useProjectStore((state) => state.currentSessionId);
 
   // Model choices follow the effective catalog in the renderer; a catalog change needs no settings read.
   useEffect(() => startCatalogProjection(), []);

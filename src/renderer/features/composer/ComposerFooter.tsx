@@ -33,7 +33,7 @@ type ComposerFooterProps = Pick<ComposerController,
   | 'handlePrimaryStop'
   | 'handleAttachmentSelect'
   | 'handlePromptSend'> & Pick<React.ComponentProps<typeof ComposerAgentMenu>,
-  'selectedAgentDefinition' | 'selectedAgentCapability' | 'activeAgentId' | 'setCurrentMode'> & {
+  'selectedAgentDefinition' | 'selectedAgentCapability' | 'activeAgentId'> & {
   currentSession: React.ComponentProps<typeof ComposerModelEffortControl>['currentSession'];
   transitionLabel: string;
 };
@@ -60,7 +60,7 @@ export function ComposerFooter({
   conversationPreparationPhase, selectedContextProfile, isComposerBusy, stopPending, attachButtonLabel,
   primaryButtonDisabled, primaryButtonDescription, handlePrimaryStop, handleAttachmentSelect,
   handlePromptSend, transitionLabel,
-  selectedAgentDefinition, selectedAgentCapability, activeAgentId, setCurrentMode, currentSession,
+  selectedAgentDefinition, selectedAgentCapability, activeAgentId, currentSession,
 }: ComposerFooterProps) {
   const handingOff = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
   // From the Stop click until main answers, the button stays Stop and shows that it is stopping.
@@ -91,7 +91,6 @@ export function ComposerFooter({
             userInvocableAgents={userInvocableAgents}
             activeAgentId={activeAgentId}
             setSelectedAgentId={setSelectedAgentId}
-            setCurrentMode={setCurrentMode}
           />
           <PermissionModeSelector />
         </div>

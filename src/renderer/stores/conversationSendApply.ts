@@ -1,6 +1,7 @@
 import { stopWorkTrace } from '../lib/stopWorkTrace';
 import { useConversationStore } from './conversationStore';
 import { useProjectStore } from './projectStore';
+import { acceptSessionSnapshot, receiveSessionList } from './sessionRecordStore';
 import { getActiveSessionId, isActiveSessionEvent } from './sessionEventGate';
 import { useSessionProjectionStore } from './sessionProjectionStore';
 import type { ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
@@ -33,7 +34,6 @@ export async function applyConversationTurnResult(options: {
   electronAPI: NonNullable<Window['electronAPI']>;
   result: ConversationTurnResult;
   currentProject: ProjectRecord | null;
-  setCurrentSession: (session: SessionRecord | null) => void;
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentRun: (run: RunSummary | null) => void;
   setRuns: (runs: RunSummary[]) => void;
@@ -50,7 +50,6 @@ export async function applyConversationTurnResult(options: {
     electronAPI,
     result,
     currentProject,
-    setCurrentSession,
     setSessions,
     setCurrentRun,
     setRuns,
@@ -64,7 +63,7 @@ export async function applyConversationTurnResult(options: {
   const requestId = result.userMessage.requestId
     ?? result.assistantDraftMessage.requestId
     ?? null;
-  const turnSessionId = result.session?.sessionId
+  const turnSessionId = result.session?.record.sessionId
     ?? result.userMessage.sessionId
     ?? result.assistantDraftMessage.sessionId
     ?? null;
@@ -99,6 +98,8 @@ export async function applyConversationTurnResult(options: {
   const backgroundTurn = activeSessionId
     ? !isActiveSessionEvent(turnSessionId)
     : selectedProjectId !== sendingProjectId;
+  // Records are keyed by session and kept by revision, so a background turn's session is current data too.
+  if (result.session) acceptSessionSnapshot(result.session);
   if (turnSessionId && backgroundTurn) {
     for (const message of forceStoppedMessages(result.messages ?? [
       result.userMessage,
@@ -112,23 +113,24 @@ export async function applyConversationTurnResult(options: {
     return;
   }
 
-  if (result.session?.projectId && currentProject?.projectId !== result.session.projectId) {
+  const turnSession = result.session?.record;
+  if (turnSession && currentProject?.projectId !== turnSession.projectId) {
     refreshTasks.push(electronAPI.project.list().then((projectsResult) => {
       const nextProjects = projectsResult.projects ?? [];
       useProjectStore.getState().setProjects(nextProjects);
-      const matchedProject = nextProjects.find((project) => project.projectId === result.session?.projectId) ?? null;
+      const matchedProject = nextProjects.find((project) => project.projectId === turnSession.projectId) ?? null;
       useProjectStore.getState().setCurrentProject(matchedProject);
     }));
   }
 
-  if (result.session?.sessionId) {
-    setCurrentSession(result.session);
+  if (turnSession) {
+    useProjectStore.getState().setCurrentSessionId(turnSession.sessionId);
     // A composer turn can create the first session while the project rail is selected.
     // The authoritative result now owns a session, so the rail must immediately show
     // the session inspector instead of leaving the project import surface visible.
     useProjectStore.getState().setRightRailTarget('session');
-    refreshTasks.push(electronAPI.session.list(result.session.projectId).then((sessionsResult) => {
-      setSessions(sessionsResult.sessions ?? []);
+    refreshTasks.push(electronAPI.session.list(turnSession.projectId).then((sessionsResult) => {
+      setSessions(receiveSessionList(sessionsResult.sessions ?? []));
     }));
   }
 

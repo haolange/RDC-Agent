@@ -6,7 +6,7 @@ describe('sessionEventGate', () => {
   beforeEach(() => {
     useProjectStore.setState({
       currentProject: null,
-      currentSession: null,
+      currentSessionId: null,
     });
   });
 
@@ -17,15 +17,7 @@ describe('sessionEventGate', () => {
   });
 
   it('accepts only the active session id', () => {
-    useProjectStore.setState({
-      currentSession: {
-        sessionId: 'session-a',
-        projectId: 'project-1',
-        title: 'A',
-        createdAt: 1,
-        updatedAt: 1,
-      } as never,
-    });
+    useProjectStore.setState({ currentSessionId: 'session-a' });
     expect(isActiveSessionEvent('session-a')).toBe(true);
     expect(isActiveSessionEvent('session-b')).toBe(false);
     expect(getActiveSessionId()).toBe('session-a');

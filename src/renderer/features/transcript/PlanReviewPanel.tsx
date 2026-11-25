@@ -27,7 +27,7 @@ export const PlanReviewPanel: React.FC<{
 }> = ({ open, onExited, plan, onClose }) => {
   const { t } = useI18n();
   const api = useElectronApi();
-  const sessionId = useProjectStore((state) => state.currentSession?.sessionId);
+  const sessionId = useProjectStore((state) => state.currentSessionId);
   const projection = usePlanReviewStore(state => sessionId ? state.bySession[sessionId] : undefined);
   const canReopen = projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
   const { readPlan, copyPlan, saveToProject, exportPlan } = usePlanReviewActions();

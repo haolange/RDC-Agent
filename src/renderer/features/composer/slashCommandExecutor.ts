@@ -1,6 +1,7 @@
 import { translate, type TranslationKey } from '../../i18n';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { acceptSessionSnapshot, receiveSessionList } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { applySessionSwitchHygiene } from '../../stores/sessionSwitchHygiene';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
@@ -18,7 +19,6 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { CommandUiAction } from '@shared/types/command';
 import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { AgentMode } from '@shared/types/layout';
 
 const currentText = (key: TranslationKey, params?: Record<string, string | number>) => translate(useAppSettingsStore.getState().settings.appearance.language, key, params);
 
@@ -27,7 +27,6 @@ interface SlashCommandContext {
   currentProject: ProjectRecord | null;
   selectedAgentId: string;
   setSelectedAgentId: (agentId: string) => void;
-  setCurrentMode: (mode: AgentMode) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   openSettings: (section?: string) => void;
@@ -67,30 +66,32 @@ const downloadTextFile = (fileName: string, content: string, mimeType: string): 
 async function loadSession(sessionId: string): Promise<void> {
   const electronAPI = window.electronAPI;
   const projectStore = useProjectStore.getState();
-  const previousSessionId = projectStore.currentSession?.sessionId ?? null;
+  const previousSessionId = projectStore.currentSessionId;
   const result = await electronAPI.session.open(sessionId);
   if (!result.success) {
     notify.failure(result.error, currentText, 'composer.commandSessionMissing');
     return;
   }
 
-  if (previousSessionId !== result.session.sessionId) {
-    applySessionSwitchHygiene({ previousSessionId, nextSessionId: result.session.sessionId });
+  const opened = result.session.record;
+  if (previousSessionId !== opened.sessionId) {
+    applySessionSwitchHygiene({ previousSessionId, nextSessionId: opened.sessionId });
   }
-  projectStore.setCurrentSession(result.session);
+  acceptSessionSnapshot(result.session);
+  projectStore.setCurrentSessionId(opened.sessionId);
   const sessionStore = useSessionStore.getState();
   sessionStore.setCurrentRun(result.currentRun);
   sessionStore.setRuns(result.runs);
   hydrateLoadedSessionSurface({
-    sessionId: result.session.sessionId,
+    sessionId: opened.sessionId,
     messages: result.history.messages,
     branchState: result.history.branchState ?? null,
     planReview: result.history.planReview,
     tracePresentation: result.trace.presentation ?? null,
     applyTrace: Boolean(result.trace.presentation),
   });
-  const sessionsResult = await electronAPI.session.list(result.session.projectId);
-  projectStore.setSessions(sessionsResult.sessions);
+  const sessionsResult = await electronAPI.session.list(opened.projectId);
+  projectStore.setSessions(receiveSessionList(sessionsResult.sessions));
 }
 
 async function switchModel(modelId: string, context: SlashCommandContext): Promise<void> {
@@ -140,7 +141,6 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       const agentId = getPayloadString(action, 'agentId');
       if (!agentId) return;
       context.setSelectedAgentId(agentId);
-      context.setCurrentMode(agentId as AgentMode);
       return;
     }
     case 'switch-model': {

@@ -54,7 +54,7 @@ export async function loadSessionsOp(
     ctx.setRightRailTarget(options.rightRailTarget ?? 'project');
     if (currentSession?.projectId && currentSession.projectId !== selectedProject.projectId) {
       applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
-      ctx.setCurrentSession(null);
+      ctx.setCurrentSessionId(null);
       ctx.setCurrentRun(null);
       ctx.setCaptures([]);
       ctx.setRuns([]);
@@ -79,7 +79,7 @@ export async function loadSessionsOp(
       applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
     }
     ctx.setRightRailTarget(options.rightRailTarget ?? 'project');
-    ctx.setCurrentSession(null);
+    ctx.setCurrentSessionId(null);
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
     ctx.setRuns([]);
@@ -122,7 +122,7 @@ export async function loadProjectsOp(
     }
     ctx.setCurrentProject(null);
     useSessionStore.getState().clearUsageSnapshot();
-    ctx.setCurrentSession(null);
+    ctx.setCurrentSessionId(null);
     ctx.setRightRailTarget('project');
     ctx.setCurrentRun(null);
     ctx.setProjectInputs([]);
@@ -195,7 +195,7 @@ export async function handleProjectSelectOp(
   const currentSession = ctx.getCurrentSession();
   if (currentSession?.projectId && currentSession.projectId !== project.projectId) {
     applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
-    ctx.setCurrentSession(null);
+    ctx.setCurrentSessionId(null);
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
     ctx.setRuns([]);

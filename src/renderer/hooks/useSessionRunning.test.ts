@@ -7,14 +7,13 @@ import { useProjectStore } from '../stores/projectStore';
 import { useSessionProjectionStore } from '../stores/sessionProjectionStore';
 import { useSessionRunning } from './useSessionRunning';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { SessionRecord } from '@shared/types/session';
 
 const reply = (status: ConversationMessage['status'], sessionId = 'other'): ConversationMessage => ({
   id: 'm', sessionId, projectId: 'p', turnId: 't', role: 'assistant', status, content: '', createdAt: 1,
 });
 
 afterEach(() => {
-  useProjectStore.setState({ currentSession: null });
+  useProjectStore.setState({ currentSessionId: null });
   useConversationStore.setState({ allConversationMessages: [] });
   useSessionProjectionStore.getState().reset();
   vi.unstubAllGlobals();
@@ -24,7 +23,7 @@ it('reads the open session live and other sessions from their projection', async
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const seen: Record<string, boolean> = {};
   const Probe = ({ id }: { id: string }) => { seen[id] = useSessionRunning(id); return null; };
-  useProjectStore.setState({ currentSession: { sessionId: 'open' } as SessionRecord });
+  useProjectStore.setState({ currentSessionId: 'open' });
   useConversationStore.setState({ allConversationMessages: [reply('streaming', 'open')] });
   useSessionProjectionStore.getState().projectConversationMessage('other', reply('complete'));
   const host = document.createElement('div');

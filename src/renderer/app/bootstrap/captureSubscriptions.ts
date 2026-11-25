@@ -45,9 +45,9 @@ export function createCaptureProjection(electronAPI: ElectronAPI, syncCapturesFr
     projectScopedContext, projectScopedOpenedCapture, hydrate() {
       void useDeviceStore.getState().loadDevices();
       const initialProject = useProjectStore.getState().currentProject;
-      const initialSession = useProjectStore.getState().currentSession;
-      if (initialProject && initialSession) {
-        const scope = { projectId: initialProject.projectId, sessionId: initialSession.sessionId };
+      const initialSessionId = useProjectStore.getState().currentSessionId;
+      if (initialProject && initialSessionId) {
+        const scope = { projectId: initialProject.projectId, sessionId: initialSessionId };
         void electronAPI.capture.getOpenedState(scope)
           .then((payload) => projectScopedOpenedCapture({ ...scope, payload }))
           .catch (() => undefined);

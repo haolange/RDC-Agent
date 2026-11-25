@@ -14,7 +14,7 @@ export const useToolApprovalSubmit = () => useCallback(async (
 
   const current = () => {
     const pending = findPendingToolApproval(useConversationStore.getState().conversationMessages);
-    return useProjectStore.getState().currentSession?.sessionId === request.sessionId && pending?.turnId === request.turnId && pending.approvalId === request.approvalId;
+    return useProjectStore.getState().currentSessionId === request.sessionId && pending?.turnId === request.turnId && pending.approvalId === request.approvalId;
   };
   if (!current()) return;
   const result = await electronAPI.conversation.answerToolApproval({

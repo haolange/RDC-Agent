@@ -578,7 +578,7 @@ export async function startProfileTurn(
 
   return {
     requestId,
-    session: workingSession,
+    session: workingSession ? storageAdapter.readSessionSnapshot(workingSession.sessionId) : null,
     mode: 'talk',
     userMessage,
     assistantDraftMessage,

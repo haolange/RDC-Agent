@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useCaptureStore } from '../../../stores/captureStore';
 import { useProjectStore } from '../../../stores/projectStore';
+import { getCurrentSessionView } from '../../../stores/sessionRecordStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useI18n } from '../../../i18n';
 import {
@@ -45,7 +46,7 @@ export function useProjectSelectionLoaders({
   const setProjects = useProjectStore((state) => state.setProjects);
   const setSessions = useProjectStore((state) => state.setSessions);
   const setCurrentProject = useProjectStore((state) => state.setCurrentProject);
-  const setCurrentSession = useProjectStore((state) => state.setCurrentSession);
+  const setCurrentSessionId = useProjectStore((state) => state.setCurrentSessionId);
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setRuns = useSessionStore((state) => state.setRuns);
   const setCaptures = useCaptureStore((state) => state.setCaptures);
@@ -73,14 +74,14 @@ export function useProjectSelectionLoaders({
     setProjects,
     setSessions,
     setCurrentProject,
-    setCurrentSession,
+    setCurrentSessionId,
     setProjectInputs,
     updateProjectInputs,
     setRightRailTarget,
     setCurrentRun,
     setRuns,
     setCaptures,
-    getCurrentSession: () => useProjectStore.getState().currentSession,
+    getCurrentSession: getCurrentSessionView,
     reloadSettings: (projectId) => useAppSettingsStore.getState().reloadSettings(projectId),
   }), [
     t,
@@ -93,7 +94,7 @@ export function useProjectSelectionLoaders({
     setProjects,
     setSessions,
     setCurrentProject,
-    setCurrentSession,
+    setCurrentSessionId,
     setProjectInputs,
     updateProjectInputs,
     setRightRailTarget,
