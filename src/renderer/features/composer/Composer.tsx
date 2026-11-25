@@ -136,8 +136,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const handoffPhase = composer.handoff?.phase;
   const transitionLabel = conversationPreparationPhase === 'preparing' || handoffPhase === 'preparing'
     ? t('composer.handoff.preparing')
-    : handoffPhase === 'confirming' ? t('composer.handoff.confirming')
-      : handoffPhase ? t('composer.handoff.switching') : '';
+    : handoffPhase ? t('composer.handoff.switching') : '';
   return (
     <ComposerTurnControlsProvider agentId={selectedAgentId} currentSession={currentSession}>
     {/* A session switch starts a fresh Composer; a request arriving or settling only changes which menus may be open. */}

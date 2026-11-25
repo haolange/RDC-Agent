@@ -171,7 +171,9 @@ export async function sendComposerConversationTurn(options: {
   };
 
   try {
-    const configuration = await buildConversationConfigurationCommit({
+    // A handoff runs on the session's committed Agent, model and controls (main wrote them with the handoff or the
+    // approval), so only a person's own send freezes the Composer's configuration for main to check.
+    const configuration = preserveDraft ? null : await buildConversationConfigurationCommit({
       selectedAgentId,
       currentProjectId: currentProject?.projectId,
       getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
@@ -197,7 +199,7 @@ export async function sendComposerConversationTurn(options: {
       preloadSkillIds: sentSkillIds,
       ...(options.planReference ? { planReference: options.planReference } : {}),
       turnControls,
-      configurationCommit: configuration.configurationCommit,
+      ...(configuration ? { configurationCommit: configuration.configurationCommit } : {}),
     });
 
     if (finishRevokedOrCancelled()) {

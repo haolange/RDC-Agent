@@ -41,6 +41,13 @@ export function sectionsFromMarkdown(markdown: string): PlanReviewSection[] {
   });
 }
 
+export interface StagedFrozenPlan {
+  uri: string;
+  markdown: string;
+  hash: string;
+  taskRequirements: PlanTaskRequirement[];
+}
+
 export class PlanArtifactWriter {
   constructor(private readonly resolver: SessionArtifactResolver = sessionArtifactResolver) {}
 
@@ -48,13 +55,25 @@ export class PlanArtifactWriter {
     return this.resolver.write(sessionId, LIVE_PLAN_URI, markdown);
   }
 
-  freezeApprovedPlan(sessionId: string, expectedHash: string): SessionArtifactWriteResult & { taskRequirements: PlanTaskRequirement[] } {
+  /** Reads and checks the live plan the person approved and names its frozen copy; nothing is written yet. */
+  stageFrozenPlan(sessionId: string, expectedHash: string): StagedFrozenPlan {
     const { markdown, hash } = this.readMarkdown(sessionId, LIVE_PLAN_URI, expectedHash);
     parseInvestigationPlanContract(markdown);
-    const taskRequirements = parsePlanTaskRequirements(markdown);
     const stamp = new Date().toISOString().replace(/[:.]/g, '');
-    const frozenUri = formatSessionArtifactUri('plans', `plan-${stamp}-${shortArtifactHash(hash)}.md`);
-    return { ...this.resolver.write(sessionId, frozenUri, markdown), taskRequirements };
+    const uri = formatSessionArtifactUri('plans', `plan-${stamp}-${shortArtifactHash(hash)}.md`);
+    return { uri, markdown, hash, taskRequirements: parsePlanTaskRequirements(markdown) };
+  }
+
+  writeFrozenPlan(sessionId: string, staged: StagedFrozenPlan): void {
+    if (this.resolver.write(sessionId, staged.uri, staged.markdown).hash === staged.hash) return;
+    this.discardFrozenPlan(sessionId, staged.uri);
+    throw new AppError('PLAN_WRITE_VERIFY_FAILED', 'the frozen copy differs from the reviewed plan.');
+  }
+
+  /** Rollback of `writeFrozenPlan`: the copy of an approval that did not commit is not history. */
+  discardFrozenPlan(sessionId: string, uri: string): void {
+    fs.rmSync(this.resolver.resolve(sessionId, uri).absolutePath, { force: true });
+    this.resolver.reconcileUsage(sessionId);
   }
 
   readMarkdown(sessionId: string, uri: string, expectedHash: string): { markdown: string; hash: string; uri: string } {

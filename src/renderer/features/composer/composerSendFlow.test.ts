@@ -56,7 +56,14 @@ it('checks history after an ambiguous transport error and never resends', async 
 });
 it('only exposes retry for a confirmed pre-dispatch failure', async () => {
   mock.configure.mockRejectedValueOnce(new Error('save failed'));
-  expect((await sendComposerConversationTurn(options())).status).toBe('rejected'); expect(send).not.toHaveBeenCalled();
+  expect((await sendComposerConversationTurn(options(false))).status).toBe('rejected'); expect(send).not.toHaveBeenCalled();
+});
+it('sends a handoff on the session\'s committed configuration, freezing none of its own', async () => {
+  await sendComposerConversationTurn(options());
+  expect(mock.configure).not.toHaveBeenCalled();
+  expect(send.mock.calls[0]![0]).not.toHaveProperty('configurationCommit');
+  await sendComposerConversationTurn(options(false));
+  expect(send.mock.calls[1]![0]).toMatchObject({ configurationCommit: { agentId: 'general' } });
 });
 it('does not restore the handoff payload into the composer when Stop revokes preparation', () => {
   context.getState().setLastSent({ sessionId: 's', projectId: 'p', prompt: 'handoff', attachments: [], skillIds: [], preserveDraft: true });

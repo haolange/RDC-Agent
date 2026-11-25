@@ -1,5 +1,4 @@
 import { dialog, ipcMain } from 'electron';
-import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
 import { conversationService } from '../conversation/ConversationService';
 import { traceService } from '../agent-trace/TraceService';
@@ -12,9 +11,7 @@ import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { nativeMessage } from '../window/nativeI18n';
-import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
-import { resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
-import { settingsService } from '../settings/settings-core/SettingsService';
+import { assertSessionModelExecutable } from '../conversation/sessionModelGate';
 import { rdcSessionService } from '../sessions';
 import {
   ProjectAddArgsSchema,
@@ -375,26 +372,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
-      if (modelOverride) {
-        await loadProviderSurface(modelOverride.providerId);
-        const model = resolveEffectiveModel(
-          modelOverride.providerId,
-          modelOverride.modelId,
-          settingsService.providerConnections,
-        );
-        if (!model || !isAgentToolExecutableModel(model)) {
-          const eligibility = model
-            ? classifyAgentToolEligibility(model)
-            : 'unavailable';
-          const detail = eligibility === 'executable'
-            ? `MODEL_UNAVAILABLE: ${modelOverride.providerId}:${modelOverride.modelId}`
-            : describeAgentToolIneligibility(eligibility, modelOverride.providerId, modelOverride.modelId).technicalMessage;
-          return {
-            success: false,
-            error: detail,
-          };
-        }
-      }
+      if (modelOverride) await assertSessionModelExecutable(modelOverride);
       const updated = storageAdapter.updateSession(id, { modelOverride, ...(turnControls ? { turnControls } : {}) });
       return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };
     } catch (err) {

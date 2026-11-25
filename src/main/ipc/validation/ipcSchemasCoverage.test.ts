@@ -20,11 +20,16 @@ describe('IPC schema coverage', () => {
   it('accepts only declared handoff identity in plan approval, never display translations', () => {
     const request = { sessionId: 'session', reviewId: 'review', decision: {
       kind: 'approve', handoff: { agent: 'general', label: 'Implement Plan' },
-    } };
+    }, expectedPlanHash: 'a'.repeat(64), model: { providerId: 'p', modelId: 'm' },
+    controls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false }, baseRevision: { epoch: 'run-1', n: 3 } };
     expect(parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [request])).toEqual([request]);
     expect(() => parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [{ ...request, decision: {
       ...request.decision, handoff: { ...request.decision.handoff, labelTranslations: { 'zh-CN': '执行计划' } },
     } }])).toThrow();
+    const { baseRevision: _omitted, ...withoutRevision } = request;
+    expect(() => parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [withoutRevision])).toThrow();
+    expect(() => parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [{ sessionId: 'session', reviewId: 'review',
+      decision: { kind: 'reject', feedback: '   ' } }])).toThrow();
   });
   it('enumerates every IPC handler module and requires parseIpcArgs wiring', () => {
     expect(HANDLER_FILES.length).toBeGreaterThan(10);

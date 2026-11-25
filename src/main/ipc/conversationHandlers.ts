@@ -37,7 +37,6 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 import type { ConversationSwitchBranchRequest } from '@shared/types/conversationBranch';
 import type {
   ConversationAnswerToolApprovalRequest,
-  ConversationAnswerPlanReviewRequest,
   ConversationAnswerUserInputRequest,
   ConversationCancelActiveTurnRequest,
   ConversationRewriteFromMessageRequest,
@@ -209,11 +208,12 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
     return conversationService.answerUserInput({ ...request, sessionId });
   });
 
+  // Failures leave through the IPC error exit as registered codes; a returned value is a committed decision.
   ipcMain.handle('conversation:answerPlanReview', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, rawArgs, {
       label: 'conversation:answerPlanReview',
       maxBytes: 32 * 1024,
-    }) as [ConversationAnswerPlanReviewRequest];
+    });
     if (request.sessionId !== state.currentSessionId) throw new AppError('PLAN_SESSION_DENIED');
     return conversationService.answerPlanReview(request);
   });

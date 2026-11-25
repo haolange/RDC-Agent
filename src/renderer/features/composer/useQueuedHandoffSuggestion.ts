@@ -17,13 +17,13 @@ function current(request: HandoffSuggestionRequest): boolean {
   if (useComposerSessionContextStore.getState().handoffSuggestionRequest !== request
     || useProjectStore.getState().currentSessionId !== request.sessionId) return false;
   if (request.approvedPlan) return usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash === request.approvedPlan.hash;
-  if (!request.sourcePlan) return true;
-  return isCurrentPlanReview({ sessionId: request.sessionId, reviewId: request.sourcePlan.reviewId }, 'approve');
+  if (!request.approval) return true;
+  return isCurrentPlanReview({ sessionId: request.sessionId, reviewId: request.approval.reviewId }, 'approve');
 }
 
 /** A handoff that executes a reviewed plan says so, and main verifies the claim before accepting the message. */
 function executionReference(request: HandoffSuggestionRequest): Pick<HandoffSendPayload, 'planReference'> {
-  const plan = request.sourcePlan ?? request.approvedPlan;
+  const plan = request.approval ?? request.approvedPlan;
   return plan ? { planReference: { intent: 'execute', sessionId: request.sessionId, planId: plan.planId, revision: plan.revision, expectedHash: plan.hash } } : {};
 }
 
@@ -35,7 +35,7 @@ export function useQueuedHandoffSuggestion(input: {
   inspectRequest: (sessionId: string, requestId: string) => Promise<ComposerSendOutcome>;
 }) {
   const request = useComposerSessionContextStore(state => state.handoffSuggestionRequest);
-  const review = usePlanReviewStore(state => request?.sourcePlan ? state.bySession[request.sessionId] : undefined);
+  const review = usePlanReviewStore(state => request?.approval ? state.bySession[request.sessionId] : undefined);
   const activeTurn = useComposerSessionContextStore(state => state.activeTurn);
   const isPromptSending = useComposerSessionContextStore(state => state.isPromptSending);
   const [ready, setReady] = useState<Delivery | null>(null);
@@ -44,25 +44,29 @@ export function useQueuedHandoffSuggestion(input: {
   const callbacks = useRef(input);
   callbacks.current = input;
   useEffect(() => {
-    if (request?.sourcePlan && !current(request)
+    if (request?.approval && !current(request)
       && useComposerSessionContextStore.getState().handoffSuggestionRequest === request) {
       useComposerSessionContextStore.getState().clearHandoffSuggestion();
       setReady(null);
     }
   }, [request, review]);
   useEffect(() => {
-    if (!request || request.phase === 'confirming' || request.sessionId !== input.sessionId || !current(request)) { setReady(null); return; }
-    let mounted = true;
-    const live = () => mounted && current(request);
-    void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label, live, request.approvedPlan?.hash ?? request.sourcePlan?.hash).then(result => {
-      if (!live()) return;
-      if (!result.ok) throw new Error(result.error || 'Agent switch failed.');
-      const prompt = result.suggestion?.prompt || request.prompt;
+    if (!request || request.sessionId !== input.sessionId || !current(request)) { setReady(null); return; }
+    const deliver = (prompt: string) => {
       if (request.send) setReady({ request, payload: { sessionId: request.sessionId, agentId: request.agentId, prompt, ...executionReference(request) } });
       else {
         callbacks.current.setPromptValue(prompt);
         useComposerSessionContextStore.getState().clearHandoffSuggestion();
       }
+    };
+    // An approval already committed the switch in main; only suggestion rows and recovery apply it here.
+    if (request.approval) { deliver(request.prompt); return; }
+    let mounted = true;
+    const live = () => mounted && current(request);
+    void applyDeclaredHandoffOnClient(request.sessionId, request.agentId, request.label, live, request.approvedPlan?.hash).then(result => {
+      if (!live()) return;
+      if (!result.ok) throw new Error(result.error || 'Agent switch failed.');
+      deliver(result.suggestion?.prompt || request.prompt);
     }).catch((error: unknown) => {
       if (!live()) return;
       setReady({ request, payload: { sessionId: request.sessionId, agentId: request.agentId, prompt: '' },
@@ -102,6 +106,6 @@ export function useQueuedHandoffSuggestion(input: {
       } else { claimed.current = null; setReady({ ...ready, error: undefined, outcome: undefined }); }
     } finally { retrying.current = false; }
   };
-  return { phase: request ? request.phase === 'confirming' ? 'confirming' as const : claimed.current?.request === request ? 'preparing' as const : 'handoff' as const : undefined, error: ready && request === ready.request ? ready.error : undefined,
+  return { phase: request ? claimed.current?.request === request ? 'preparing' as const : 'handoff' as const : undefined, error: ready && request === ready.request ? ready.error : undefined,
     checking: ready?.outcome?.status === 'unknown', retry };
 }

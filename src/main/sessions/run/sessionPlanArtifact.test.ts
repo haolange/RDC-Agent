@@ -41,9 +41,13 @@ describe('PlanArtifactWriter', () => {
     expect(first.uri).toBe(LIVE_PLAN_URI);
     expect(second.uri).toBe(LIVE_PLAN_URI);
     expect(first.hash).not.toBe(second.hash);
-    const frozen = writer.freezeApprovedPlan('sess', second.hash);
+    const frozen = writer.stageFrozenPlan('sess', second.hash);
     expect(frozen.uri).toMatch(/^session:\/\/plans\/plan-\d{4}-\d{2}-\d{2}T\d+Z-[a-f0-9]{8}\.md$/);
     expect(frozen.hash).toBe(second.hash);
+    writer.writeFrozenPlan('sess', frozen);
+    expect(writer.readMarkdown('sess', frozen.uri, second.hash).markdown).toContain('## Goal\ntwo');
+    writer.discardFrozenPlan('sess', frozen.uri);
+    expect(() => writer.readMarkdown('sess', frozen.uri, second.hash)).toThrow('PLAN_NOT_FOUND');
     const live = writer.readMarkdown('sess', LIVE_PLAN_URI, second.hash);
     expect(live.markdown).toContain('## Goal\ntwo');
   });

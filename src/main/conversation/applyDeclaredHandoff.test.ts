@@ -37,7 +37,7 @@ vi.mock('../hooks/runtimeHookDispatch', () => ({
 vi.mock('../sessions/run/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: mocks.compatibility }));
 vi.mock('../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: () => ({ markdown: '# Approved plan' }) } }));
 
-import { applyDeclaredHandoff, writeExecutionOfferFromApproval } from './applyDeclaredHandoff';
+import { applyDeclaredHandoff } from './applyDeclaredHandoff';
 
 const declared = {
   agent: 'general',
@@ -184,29 +184,5 @@ describe('applyDeclaredHandoff', () => {
     expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).error).toContain('TARGET_MISMATCH');
     expect(mocks.updateSession).not.toHaveBeenCalled();
     expect(mocks.offerWrite).not.toHaveBeenCalled();
-  });
-});
-
-describe('writeExecutionOfferFromApproval', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.resolveEnabled.mockReturnValue({ id: 'debugger', handoffs: [declared] });
-  });
-
-  it('writes requiredSkillIds from the matching Mission declaration', () => {
-    const suggestion = writeExecutionOfferFromApproval({
-      sessionId: 'sess',
-      sourceAgentId: 'debugger',
-      projectRoot: null,
-      handoff: { label: 'Execute with General', agent: 'general' },
-      plan: { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) },
-      approvedAt: 1234,
-    });
-    expect(suggestion?.send).toBe(true);
-    expect(mocks.offerWrite).toHaveBeenCalledWith('sess', expect.objectContaining({
-      requiredSkillIds: ['renderdoc-execution'],
-      targetAgentId: 'general',
-      approvedAt: 1234,
-    }));
   });
 });

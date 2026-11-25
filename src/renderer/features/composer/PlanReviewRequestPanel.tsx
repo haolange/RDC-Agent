@@ -29,9 +29,9 @@ export const PlanReviewRequestPanel: React.FC<{
   const submit = usePlanReviewSubmit(onReplan);
   const transition = useComposerSessionContextStore(state => {
     const queued = state.handoffSuggestionRequest;
-    return queued?.sessionId === request.sessionId && queued.sourcePlan?.reviewId === request.reviewId && queued.sourcePlan.turnId === request.turnId
-      && queued.sourcePlan.toolCallId === request.toolCallId && queued.sourcePlan.planId === request.planReview.planId
-      && queued.sourcePlan.revision === request.planReview.revision && queued.sourcePlan.hash === request.planReview.hash ? queued : null;
+    return queued?.sessionId === request.sessionId && queued.approval?.reviewId === request.reviewId
+      && queued.approval.planId === request.planReview.planId && queued.approval.revision === request.planReview.revision
+      && queued.approval.hash === request.planReview.hash ? queued : null;
   });
   const { capabilityState, retryCapability } = useComposerTurnControls();
   const modelAvailable = capabilityState.status === 'ready' || capabilityState.status === 'refreshing';
@@ -132,7 +132,7 @@ export const PlanReviewRequestPanel: React.FC<{
       </div>
       {modelSave.error ? <InlineError detail={modelSave.error} onRetry={modelSave.retry ?? undefined} retryLabel={t('composer.model.retrySave')}>{t('app.error.saveFailed')}</InlineError> : null}
       <span className="composer-transition-announcement" role="status">
-        {isSubmitting || transition ? t(transition?.phase === 'handoff' ? 'composer.handoff.switching' : 'composer.handoff.confirming') : ''}
+        {isSubmitting || transition ? t(transition ? 'composer.handoff.switching' : 'composer.handoff.confirming') : ''}
       </span>
       {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
       {modelStatus.labelKey && (capabilityState.status === 'error' || capabilityState.status === 'unavailable') ? (

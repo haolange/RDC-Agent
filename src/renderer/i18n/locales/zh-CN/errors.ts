@@ -21,6 +21,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.PLAN_REVIEW_BUSY': '另一份计划审阅正在处理，请稍后重试。',
   'errors.PLAN_REVIEW_SCOPE_CHANGED': '计划在展示后已变更，请审阅最新版本。',
   'errors.PLAN_HASH_MISMATCH': '计划与你审阅的版本不一致，请重新审阅。',
+  'errors.SESSION_REVISION_STALE': '选择期间对话已变更，请核对 Agent、模型与参数后重试。',
   'errors.APPROVED_PLAN_CHANGED': '已批准的计划发生了变化，请重新批准当前计划。',
   'errors.PLAN_NOT_FOUND': '找不到该计划。',
   'errors.PROJECT_NOT_FOUND': '该项目已不可用。',

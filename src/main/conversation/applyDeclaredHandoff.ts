@@ -10,6 +10,8 @@ import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { assertDeclaredHandoffSkillCompatibility } from '../sessions/run/handoffSkillCompatibility';
 import { planArtifactWriter } from '../sessions/run/sessionPlanArtifact';
 import { resolveEnabledAgentDefinition } from './ConversationRoutePreflight';
+import type { AgentHandoffDefinition } from '@shared/types/agentManifest';
+import type { ExecutionOffer } from '@shared/types/executionOffer';
 import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 import type { SessionRecordSnapshot } from '@shared/types/session';
 
@@ -25,6 +27,38 @@ export interface ApplyDeclaredHandoffResult {
   error?: string;
   session?: SessionRecordSnapshot;
   suggestion?: PlanReviewHandoffSuggestion;
+}
+
+/** The offer a declared handoff of an approved plan writes; the approval decision's time is the offer's time. */
+export function declaredExecutionOffer(input: {
+  offerId: string;
+  sourceAgentId: string;
+  declared: AgentHandoffDefinition;
+  plan: { uri: string; hash: string };
+  approvedAt: number;
+}): ExecutionOffer {
+  return {
+    schemaVersion: EXECUTION_OFFER_SCHEMA,
+    offerId: input.offerId,
+    sourceAgentId: input.sourceAgentId,
+    targetAgentId: input.declared.agent,
+    plan: { ...input.plan },
+    requiredSkillIds: [...(input.declared.requiredSkillIds ?? [])],
+    requiredToolIds: [...(input.declared.requiredToolIds ?? [])],
+    label: input.declared.label,
+    prompt: input.declared.prompt,
+    approvedAt: input.approvedAt,
+  };
+}
+
+export function declaredHandoffSuggestion(declared: AgentHandoffDefinition): PlanReviewHandoffSuggestion {
+  return {
+    label: declared.label,
+    ...(declared.labelTranslations ? { labelTranslations: { ...declared.labelTranslations } } : {}),
+    agent: declared.agent,
+    prompt: declared.prompt,
+    send: declared.send === true,
+  };
 }
 
 function findDeclaredHandoff(
@@ -112,18 +146,13 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
   }
   if (approvalChanged()) return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
-    storageAdapter.executionOffers.write(input.sessionId, {
-      schemaVersion: EXECUTION_OFFER_SCHEMA,
+    storageAdapter.executionOffers.write(input.sessionId, declaredExecutionOffer({
       offerId: randomUUID(),
       sourceAgentId,
-      targetAgentId: input.agent,
+      declared,
       plan: { uri: approved.frozenUri, hash: approved.approvedHash },
-      requiredSkillIds: [...(declared.requiredSkillIds ?? [])],
-      requiredToolIds: [...(declared.requiredToolIds ?? [])],
-      label: declared.label,
-      prompt: declared.prompt,
       approvedAt: approved.updatedAt,
-    });
+    }));
   }
   const updated = sessionRevisions.snapshot(storageAdapter.updateSession(input.sessionId, { agentId: input.agent }) ?? session);
   if (!await dispatchRuntimeHooks('agent.after-handoff', hookContext)) {
@@ -132,46 +161,6 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
   return {
     success: true,
     session: updated,
-    suggestion: {
-      label: declared.label,
-      ...(declared.labelTranslations ? { labelTranslations: { ...declared.labelTranslations } } : {}),
-      agent: declared.agent,
-      prompt: declared.prompt,
-      send: declared.send === true,
-    },
-  };
-}
-
-export function writeExecutionOfferFromApproval(input: {
-  sessionId: string;
-  sourceAgentId: string;
-  projectRoot: string | null;
-  handoff: { label: string; agent: string };
-  plan: { uri: string; hash: string };
-  approvedAt: number;
-}): PlanReviewHandoffSuggestion | null {
-  const declared = findDeclaredHandoff(input.sourceAgentId, input.projectRoot, input.handoff.agent, input.handoff.label);
-  if (!declared) return null;
-  const existing = storageAdapter.executionOffers.read(input.sessionId);
-  const sameApproval = existing?.plan.uri === input.plan.uri && existing.plan.hash === input.plan.hash
-    && existing.sourceAgentId === input.sourceAgentId && existing.targetAgentId === declared.agent;
-  storageAdapter.executionOffers.write(input.sessionId, {
-    schemaVersion: EXECUTION_OFFER_SCHEMA,
-    offerId: (sameApproval && existing.offerId) || randomUUID(),
-    sourceAgentId: input.sourceAgentId,
-    targetAgentId: declared.agent,
-    plan: input.plan,
-    requiredSkillIds: [...(declared.requiredSkillIds ?? [])],
-    requiredToolIds: [...(declared.requiredToolIds ?? [])],
-    label: declared.label,
-    prompt: declared.prompt,
-    approvedAt: input.approvedAt,
-  });
-  return {
-    label: declared.label,
-    ...(declared.labelTranslations ? { labelTranslations: { ...declared.labelTranslations } } : {}),
-    agent: declared.agent,
-    prompt: declared.prompt,
-    send: declared.send === true,
+    suggestion: declaredHandoffSuggestion(declared),
   };
 }

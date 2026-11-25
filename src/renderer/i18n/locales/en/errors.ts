@@ -24,6 +24,7 @@ export const enErrors = {
   'errors.PLAN_REVIEW_BUSY': 'Another plan review is being processed. Try again in a moment.',
   'errors.PLAN_REVIEW_SCOPE_CHANGED': 'The plan changed after it was shown. Review the latest version.',
   'errors.PLAN_HASH_MISMATCH': 'The plan no longer matches the version you reviewed. Review it again.',
+  'errors.SESSION_REVISION_STALE': 'This conversation changed while you were choosing. Check the Agent, model and settings, then try again.',
   'errors.APPROVED_PLAN_CHANGED': 'The approved plan has changed. Approve the current plan again.',
   'errors.PLAN_NOT_FOUND': "This plan can't be found.",
   'errors.PROJECT_NOT_FOUND': 'This project is no longer available.',

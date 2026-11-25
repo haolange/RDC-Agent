@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
+import { isPlanApprovalRequest } from '@shared/types/planReview';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
-import { assertDeclaredHandoffForPlan, writeExecutionOfferFromApproval } from '../../conversation/applyDeclaredHandoff';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { resolveRecoverablePlan } from '../../sessions/run/planReviewRecovery';
 import { resolveApprovedHandoff } from '../../sessions/run/approvedHandoffRecovery';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
+import { runPlanApprovalTransaction } from './PlanApprovalTransaction';
 import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, ConversationAnswerPlanReviewRequest, ConversationAnswerPlanReviewResult } from '@shared/types/planReview';
 import type { PlanTaskRequirement } from '@shared/types/taskExecution';
 import type { TurnHandle } from '../orchestration/TurnCoordinator';
@@ -233,29 +234,18 @@ export class AgentPlanReviewRequestService {
 
   async answer(input: AgentPlanReviewAnswerInput): Promise<AgentPlanReviewAnswerResult> {
     const pending = this.pending.get(input.reviewId);
-    if (!pending) {
-      return { success: false, error: 'No pending plan review request was found for this turn.' };
+    if (!pending) throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'no pending plan review has this id.');
+    if (input.sessionId !== (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId)) {
+      throw new AppError('PLAN_SESSION_DENIED', 'the pending plan review belongs to a different session.');
     }
-    if ((input.sessionId ?? null) !== (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId)) {
-      return { success: false, error: 'Pending plan review request belongs to a different session.' };
-    }
-    if (pending.answering) return { success: false, error: 'Plan review answer is already committing.' };
-    if (pending.recovered) {
-      try {
-        this.verifyRecoveredReview(pending);
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
-    }
+    if (pending.answering) throw new AppError('PLAN_REVIEW_BUSY', 'an answer to this review is already committing.');
+    if (pending.recovered) this.verifyRecoveredReview(pending);
 
-    if (input.decision.kind === 'reject') {
+    if (!isPlanApprovalRequest(input)) {
       const feedback = input.decision.feedback.trim();
-      if (!feedback) {
-        return { success: false, error: 'Rejecting a plan requires non-empty feedback.' };
-      }
       const sessionId = pending.sessionId;
       if (sessionId) {
-        this.store.markDecision(sessionId, 'rejected', { turnId: pending.turnId,
+        this.store.markRejected(sessionId, { turnId: pending.turnId,
           planId: pending.planReview.planId, revision: pending.planReview.revision });
       }
       const decision = { kind: 'reject' as const, feedback };
@@ -271,92 +261,71 @@ export class AgentPlanReviewRequestService {
         decision,
       });
       pending.resolve?.(formatRejectedResult(feedback));
-      this.project(input.sessionId, null, null, undefined, { reviewId: pending.reviewId, kind: 'reject' });
-      return { success: true, ...(pending.recovered ? { replan: { agentId: pending.agentId,
+      const planReview = this.project(input.sessionId, null, null, undefined, { reviewId: pending.reviewId, kind: 'reject' });
+      return { decision: 'reject', planReview, ...(pending.recovered ? { replan: { agentId: pending.agentId,
         source: { sessionId: input.sessionId, planId: pending.planReview.planId, revision: pending.planReview.revision,
           uri: pending.planReview.uri, expectedHash: pending.planReview.hash }, feedback } } : {}) };
     }
 
-    const handoff = input.decision.handoff;
-    const allowed = pending.planReview.handoffOptions.some(
-      (option) => option.agent === handoff.agent && option.label === handoff.label,
-    );
-    if (!allowed) {
-      return { success: false, error: 'Approved handoff is not one of the declared continue actions.' };
-    }
     const sessionId = pending.sessionId;
-    if (!sessionId) {
-      return { success: false, error: 'Plan review approve requires a session-owned turn.' };
-    }
+    if (!sessionId) throw new AppError('PLAN_SESSION_NOT_FOUND', 'approving a plan requires a session-owned turn.');
+    const handoff = input.decision.handoff;
     pending.answering = true;
-    let decisionCommitted = false;
     try {
-    const frozen = this.writer.freezeApprovedPlan(sessionId, pending.planReview.hash);
-    const session = storageAdapter.readSession(sessionId);
-    const projectRoot = session ? storageAdapter.getProjectById(session.projectId)?.rootPath ?? null : null;
-    assertDeclaredHandoffForPlan({ sourceAgentId: pending.agentId, projectRoot, handoff, tasks: frozen.taskRequirements });
-    if (frozen.taskRequirements.length) await this.installTaskRevisions(sessionId, frozen.taskRequirements, ({ task, snapshot }) => {
-      traceProjectionRefreshService.schedule(sessionId);
-      pending.onEvent?.(buildSharedAgentEvent('task.updated', {
-        taskId: task.id, title: task.subject, status: task.status, statusReason: task.statusReason, snapshot,
-      }, pending.context));
-    });
-    if (this.pending.get(input.reviewId) !== pending || pending.signal?.aborted) {
-      return { success: false, error: 'Plan review was cancelled while committing.' };
-    }
-    const approved = this.store.markDecision(sessionId, 'approved', { turnId: pending.turnId,
-      planId: pending.planReview.planId, revision: pending.planReview.revision }, {
-      approvedHash: frozen.hash,
-      frozenUri: frozen.uri,
-      approvedHandoff: input.decision.handoff,
-    });
-    decisionCommitted = true;
-    if (pending.turnHandle) {
-      pending.turnHandle.approvedPlan = {
-        toolCallId: pending.toolCallId,
-        hash: frozen.hash,
-        target: input.decision.handoff.agent,
-        frozenUri: frozen.uri,
-        planId: pending.planReview.planId,
-      };
-    }
-    writeExecutionOfferFromApproval({
-      sessionId,
-      sourceAgentId: pending.agentId,
-      projectRoot,
-      handoff: input.decision.handoff,
-      plan: { uri: frozen.uri, hash: frozen.hash },
-      approvedAt: approved.updatedAt,
-    });
-    const decision = { kind: 'approve' as const, handoff: input.decision.handoff };
-    this.deletePending(pending);
-    this.emit(pending, 'approval.answered', {
-      approvalId: pending.approvalId,
-      title: 'Plan review approved',
-      status: 'approved',
-      kind: 'plan_review',
-      toolCallId: pending.toolCallId,
-      toolName: 'plan_artifact',
-      planReview: {
-        ...pending.planReview,
-        status: 'approved',
-        uri: frozen.uri,
-        hash: frozen.hash,
-        decision,
-      },
-      decision,
-    });
-    pending.resolve?.(formatApprovedResult(input.decision.handoff, frozen.uri, frozen.hash));
-    this.project(input.sessionId, null, null, undefined, { reviewId: pending.reviewId, kind: 'approve' });
-    return { success: true };
-    } catch (error) {
-      if (decisionCommitted) {
-        this.deletePending(pending);
-        pending.reject?.(error instanceof Error ? error : new Error(String(error)));
-        this.project(input.sessionId, null, null, error instanceof Error ? error.message : String(error),
-          { reviewId: pending.reviewId, kind: 'approve' });
+      const committed = await runPlanApprovalTransaction({
+        sessionId,
+        turnId: pending.turnId,
+        sourceAgentId: pending.agentId,
+        planReview: pending.planReview,
+        handoff,
+        expectedPlanHash: input.expectedPlanHash,
+        model: input.model,
+        controls: input.controls,
+        baseRevision: input.baseRevision,
+      }, {
+        writer: this.writer,
+        store: this.store,
+        installTaskRevisions: (owner, tasks) => this.installTaskRevisions(owner, tasks, ({ task, snapshot }) => {
+          traceProjectionRefreshService.schedule(owner);
+          pending.onEvent?.(buildSharedAgentEvent('task.updated', {
+            taskId: task.id, title: task.subject, status: task.status, statusReason: task.statusReason, snapshot,
+          }, pending.context));
+        }),
+        isCurrent: () => this.pending.get(input.reviewId) === pending && !pending.signal?.aborted,
+        onDiagnostic: (message) => runtimeLogService.log({
+          scope: 'session', namespace: 'agent', severity: 'warning', sessionId,
+          title: 'Plan approval diagnostic', summary: message,
+        }),
+      });
+      if (pending.turnHandle) {
+        pending.turnHandle.approvedPlan = {
+          toolCallId: pending.toolCallId,
+          hash: committed.frozen.hash,
+          target: handoff.agent,
+          frozenUri: committed.frozen.uri,
+          planId: pending.planReview.planId,
+        };
       }
-      throw error;
+      const decision = { kind: 'approve' as const, handoff };
+      this.deletePending(pending);
+      this.emit(pending, 'approval.answered', {
+        approvalId: pending.approvalId,
+        title: 'Plan review approved',
+        status: 'approved',
+        kind: 'plan_review',
+        toolCallId: pending.toolCallId,
+        toolName: 'plan_artifact',
+        planReview: { ...pending.planReview, status: 'approved', uri: committed.frozen.uri, hash: committed.frozen.hash, decision },
+        decision,
+      });
+      pending.resolve?.(formatApprovedResult(handoff, committed.frozen.uri, committed.frozen.hash));
+      const planReview = this.project(input.sessionId, null, null, undefined, { reviewId: pending.reviewId, kind: 'approve' });
+      return {
+        decision: 'approve',
+        session: committed.session,
+        planReview,
+        handoff: { prompt: committed.handoff.prompt, send: committed.handoff.send },
+      };
     } finally { pending.answering = false; }
   }
 

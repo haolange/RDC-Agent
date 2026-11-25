@@ -208,8 +208,8 @@ it('submits Enter once while Shift+Enter and IME remain editing input', async ()
 it('retains acknowledgement and locks decisions until the approval projection catches up, without locking a new revision', async () => {
   await render();
   await act(async () => useComposerSessionContextStore.getState().queueHandoffSuggestion({
-    sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true, phase: 'handoff',
-    sourcePlan: { reviewId: 'review', turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' },
+    sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true,
+    approval: { reviewId: 'review', planId: 'p', revision: 1, hash: 'h' },
   }));
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
   expect(host.querySelector('[role="status"]')?.textContent).toBe('composer.handoff.switching');

@@ -22,7 +22,6 @@ export interface LastSentPrompt {
 }
 
 export interface HandoffSuggestionRequest {
-  phase?: 'confirming' | 'handoff';
   sessionId: string;
   agentId: string;
   label: string;
@@ -30,7 +29,11 @@ export interface HandoffSuggestionRequest {
   send: boolean;
   /** Recovery path: the approved, still-unsent plan revision this handoff executes. */
   approvedPlan?: { planId: string; revision: number; hash: string };
-  sourcePlan?: { reviewId: string; turnId: string; toolCallId: string; planId: string; revision: number; hash: string };
+  /**
+   * Plan approval: main committed the Agent switch, model and controls with the approval, so only the execute turn is
+   * left; it is delivered while that approval decision is still the current one.
+   */
+  approval?: { reviewId: string; planId: string; revision: number; hash: string };
 }
 
 interface ComposerSessionContextState {

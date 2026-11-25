@@ -84,6 +84,7 @@
 | 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | JSONL 末尾残行（追加中断） | Integrity | 读取时作为 `tornTail` 返回，之前的完整记录照常可读，会话不因此打不开；下一次追加或回合终态提交前，残行字节原样移入同目录 `<file>.torn-<ts>`（fsync 后）再截断，并经运行日志报告 `JSONL_TORN_TAIL`；只缺换行的完整记录补换行保留 |
+| 计划批准事务：旧 `expectedPlanHash` / 旧会话 revision / `agent.before-handoff` 否决 / 提交中途失败 | Integrity | 分别报 `PLAN_HASH_MISMATCH`、`SESSION_REVISION_STALE`、`HOOK_DENIED`，或原样抛出提交步骤的错误；提交前任一拒绝都没有副作用，提交中途失败按前像日志逆序撤销已写步骤，会话 Agent、模型、参数、计划状态与 offer 保持原值。`agent.after-handoff` 失败只写会话运行日志诊断，不回滚，与其它 after 事件一致 |
 | 审计决定记录写入失败 | Security | `AUDIT_WRITE_FAILED`；记录在动作之前写，写失败则动作不发生（IPC 不执行、工具不执行、批准不生效、权限设置不写盘） |
 | 工具写入应用自有文件（凭据、设置、trust、`state/**`） | Security | 任何挡位 `FILE_WRITE_PROTECTED`；仅 `sessions/**/artifacts/**` 可写 |
 | Storage schema 损坏 | Integrity | 每次读报 `STORAGE_CORRUPT`，原件留在原处并旁存一份损坏副本（见「存储原语」） |

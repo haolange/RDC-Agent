@@ -187,7 +187,7 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
 
 ### D. Declared Continue and Execution Offer
 
-`AgentHandoffDefinition` 是 UI 声明（label / labelTranslations / agent / prompt / send / surface / requiredSkillIds / requiredToolIds）。`surface` 省略等于 `turn-end`；`plan-gate` 只出现在计划门；`hidden` 不出现。旧字段 `showContinueOn` 解析即失败，不静默映射。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。人点建议行或计划门后，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。交接发送与修订请求带 `planReference`（`execute` / `revise`），主进程在接受消息前经 `planReferenceResolution` 核验：execute 必须是已批准、未消费的冻结版本，目标 Agent 与声明一致且正文就是声明的交接 prompt；revise 必须是当前被拒版本且由原规划 Agent 发起。核验通过的引用持久化在该用户消息上，转录仍按普通用户消息显示交接 prompt，只隐藏编辑重发；没有引用的旧消息照原文显示，不推断。General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。预载规则见「Plan 与 generation」。
+`AgentHandoffDefinition` 是 UI 声明（label / labelTranslations / agent / prompt / send / surface / requiredSkillIds / requiredToolIds）。`surface` 省略等于 `turn-end`；`plan-gate` 只出现在计划门；`hidden` 不出现。旧字段 `showContinueOn` 解析即失败，不静默映射。计划批准写入 offer（source / target / 冻结 plan.uri+hash / 声明 requiredSkillIds）。人点建议行（或重启后继续已批准未发送的计划）时，主进程 `applyDeclaredHandoff` 触发 `agent.before-handoff` / `after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`；计划门的批准与交接由 `PlanApprovalTransaction` 在一次主进程事务内完成（见「Plan 与 generation」）。`send: true` 表示声明交接确认后显式载荷经同一 Composer 链自动发送，`send: false` 才预填。交接发送与修订请求带 `planReference`（`execute` / `revise`），主进程在接受消息前经 `planReferenceResolution` 核验：execute 必须是已批准、未消费的冻结版本，目标 Agent 与声明一致且正文就是声明的交接 prompt；revise 必须是当前被拒版本且由原规划 Agent 发起。核验通过的引用持久化在该用户消息上，转录仍按普通用户消息显示交接 prompt，只隐藏编辑重发；没有引用的旧消息照原文显示，不推断。General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。空 `handoffs` 合法（General 无按钮）。`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。预载规则见「Plan 与 generation」。
 
 ### E. Investigation Vertical Schema
 
@@ -310,7 +310,7 @@ General 为默认通用工作身份。核心正文只负责可信上下文、授
 
 独立审查结论、父级记录更新与最终接受是不同责任：通过现有 Task 与 Investigation 版本化交付，不建立额外结算状态机。工具正文投影已存的版本关系而不扩展读取授权。审批主进程来源/故障元数据仅解释结果，不改变授权或领域证明。
 
-`handoffs` 只驱动建议行和计划门按钮。按钮名称来自声明的 `label` 与可选 `labelTranslations`，UI 不按 Agent 身份改写动作语义；译文只负责展示，批准和交接身份为 `agent + label`。人点后主进程 `applyDeclaredHandoff` 校验声明属于当前（或刚批准的）profile，写入/确认 session execution offer，触发 `before-handoff` / `after-handoff`，并 persist `session.agentId`（字段与状态见裁决 D）。
+`handoffs` 只驱动建议行和计划门按钮。按钮名称来自声明的 `label` 与可选 `labelTranslations`，UI 不按 Agent 身份改写动作语义；译文只负责展示，批准和交接身份为 `agent + label`。人点建议行（或重启后继续已批准未发送的计划）时，主进程 `applyDeclaredHandoff` 校验声明属于当前（或提出 offer 的）profile，写入/确认 session execution offer，触发 `before-handoff` / `after-handoff`，并 persist `session.agentId`（字段与状态见裁决 D）。计划门的批准是一次主进程事务 `PlanApprovalTransaction`：核对审批、owning turn、计划 hash 与会话 revision，校验模型与参数，`before-handoff` 可否决，再按前像日志依序提交冻结计划、plan-state、execution offer 与会话的 Agent／模型／参数，任一步失败全部撤销；提交后 `after-handoff` 失败只留诊断。renderer 只发一次调用，并按返回的 `send` 排队一个执行回合。
 
 Plan 经 session artifact plans 类别版本化：同意前覆盖活文件，同意后冻结副本，历史文件不迁移或删除。prepareTurn 仅当本回合 `agentId === targetAgentId`、批准 handoff target 与本 Agent 相同、批准计划与 offer 的 URI/hash 一致时，预载声明 Skill，并向 PromptPlan 的 volatile runtime fact 写入已批准的交接身份和冻结计划引用。该事实用于区分历史规划消息与当前执行阶段，不授权工具或设备；权限走冻结 catalog 与交集。通用 turn 仅调用 TurnCompletionValidator。Big Loop 由 General 终答写缺口、用户切回 Mission、新计划、再批准、再点 Execute 组成；runtime 不按身份 / depth / 正文开下一轮。
 
@@ -339,4 +339,4 @@ Android 设备选择立即进入当前会话的准备生命周期：冻结同安
 
 ### 自动审查与计划交接
 
-计划批准由宿主确认的工具边界正常结束 owning 规划回合，不再请求规划模型补终答；已启动执行仍须 join，未开始调用 skipped。Conversation 验证同回合冻结计划和 execution offer 后接受该计划门退出，不冒充 Mission 完成或放宽普通 canonical final_answer 合同。交接沿声明按钮、offer 和发送队列，无新增持久状态机。审批授权来自 main-owned PlanReviewProjection 与运行时 reviewId，以持久 plan-state/历史/文件证明来源，不依赖仍存活的 Promise 或历史 streaming。正常、重开和重启恢复共用决定链，不自动执行或复活旧回合；活跃反馈返回原循环，恢复反馈是携带已核验计划引用的新用户规划请求。恢复边界见 session-projection 契约。
+计划批准由宿主确认的工具边界正常结束 owning 规划回合，不再请求规划模型补终答；已启动执行仍须 join，未开始调用 skipped。Conversation 验证同回合冻结计划和 execution offer 后接受该计划门退出，不冒充 Mission 完成或放宽普通 canonical final_answer 合同。批准与交接是同一主进程事务，执行回合沿发送队列只发一次，无新增持久状态机。审批授权来自 main-owned PlanReviewProjection 与运行时 reviewId，以持久 plan-state/历史/文件证明来源，不依赖仍存活的 Promise 或历史 streaming。正常、重开和重启恢复共用决定链，不自动执行或复活旧回合；活跃反馈返回原循环，恢复反馈是携带已核验计划引用的新用户规划请求。恢复边界见 session-projection 契约。

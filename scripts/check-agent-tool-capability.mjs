@@ -21,9 +21,17 @@ if (!preflight.includes('CONVERSATION_LLM_TOOLS_UNAVAILABLE') || !preflight.incl
   fail('Route preflight must fail closed through the shared Agent tool-eligibility gate');
 }
 
+const sessionModelGate = fs.readFileSync(path.join(repoRoot, 'src/main/conversation/sessionModelGate.ts'), 'utf8');
+if (!sessionModelGate.includes('isAgentToolExecutableModel')) {
+  fail('The session model gate must use the shared Agent tool-eligibility gate');
+}
 const sessionHandler = fs.readFileSync(path.join(repoRoot, 'src/main/ipc/projectSessionHandlers.ts'), 'utf8');
-if (!sessionHandler.includes('isAgentToolExecutableModel')) {
-  fail('session:setModelOverride must use the shared Agent tool-eligibility gate');
+if (!sessionHandler.includes('assertSessionModelExecutable')) {
+  fail('session:setModelOverride must use the session model gate');
+}
+const planApproval = fs.readFileSync(path.join(repoRoot, 'src/main/agent-runtime/interactions/PlanApprovalTransaction.ts'), 'utf8');
+if (!planApproval.includes('assertSessionModelAndControls')) {
+  fail('Plan approval must check the approved model through the session model gate');
 }
 
 const resolveOverride = fs.readFileSync(

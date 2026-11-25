@@ -204,24 +204,42 @@ export const ConversationAnswerUserInputArgsSchema = z.tuple([
  * User's approve/reject answer for an in-turn tool approval prompt.
  * This is not a self-asserted IPC mutation bypass (unlike memory write `approved`).
  */
+const PlanReviewAnswerTargetSchema = {
+  sessionId: ipcId(128, 'sessionId'),
+  reviewId: ipcNonEmptyString(128, 'reviewId'),
+};
+
+/** An approval carries the whole decision main commits: the reviewed hash, the handoff, model, controls and base revision. */
 export const ConversationAnswerPlanReviewArgsSchema = z.tuple([
-  z.object({
-    sessionId: ipcId(128, 'sessionId'),
-    reviewId: ipcNonEmptyString(128, 'reviewId'),
-    decision: z.discriminatedUnion('kind', [
-      z.object({
+  z.union([
+    z.object({
+      ...PlanReviewAnswerTargetSchema,
+      decision: z.object({
         kind: z.literal('approve'),
         handoff: z.object({
           label: ipcNonEmptyString(200, 'label'),
           agent: ipcNonEmptyString(200, 'agent'),
         }).strict(),
       }).strict(),
-      z.object({
-        kind: z.literal('reject'),
-        feedback: ipcNonEmptyString(20_000, 'feedback'),
+      expectedPlanHash: ipcNonEmptyString(128, 'expectedPlanHash'),
+      model: z.object({
+        providerId: ipcNonEmptyString(128, 'providerId'),
+        modelId: ipcNonEmptyString(256, 'modelId'),
       }).strict(),
-    ]),
-  }).strict(),
+      controls: ConversationTurnControlsSchema,
+      baseRevision: z.object({
+        epoch: ipcNonEmptyString(128, 'epoch'),
+        n: z.number().int().nonnegative(),
+      }).strict(),
+    }).strict(),
+    z.object({
+      ...PlanReviewAnswerTargetSchema,
+      decision: z.object({
+        kind: z.literal('reject'),
+        feedback: ipcNonEmptyString(20_000, 'feedback').refine((value) => value.trim().length > 0, 'feedback is required'),
+      }).strict(),
+    }).strict(),
+  ]),
 ]);
 
 export const ConversationAnswerToolApprovalArgsSchema = z.tuple([

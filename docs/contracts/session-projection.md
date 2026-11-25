@@ -44,7 +44,7 @@
 
 ## Active Turn Context
 
-计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。审批区复用 SessionRecord.modelOverride 与 turnControls，模型和参数保存串行提交；保存中或失败阻止批准但允许停止，批准前等待最新保存。排队保存离开所属会话后失效，不能切回时重新投影。覆盖只影响之后的新请求，不能改动已冻结的当前请求；批准交接沿原队列使用新配置，拒绝后仍恢复原冻结请求。进入审批不改变 Composer 的配置来源，无覆盖时沿用当前对话的有效模型；审批与胶囊共用同一能力状态，加载、读取失败和明确不可用分别表达。批准前将继承模型与全部回合参数经既有会话保存接口一并落地，保存和目录校验期间选择发生变化则拒绝旧决定。计划选项及建议行冻结声明的 label 与可选 labelTranslations；通用组件按当前语言展示对应译文，未声明译文时使用 label，不按目标身份统一改名。批准和交接仅提交 agent+label，不把译文写入批准身份或 execution offer。历史不因当前声明变化而重写；声明改名使旧计划不再匹配时须重新修订并批准，不匹配旧名称别名。
+计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。审批区复用 SessionRecord.modelOverride 与 turnControls，模型和参数保存串行提交；保存中或失败阻止批准但允许停止，批准前等待最新保存。排队保存离开所属会话后失效，不能切回时重新投影。覆盖只影响之后的新请求，不能改动已冻结的当前请求；拒绝后仍恢复原冻结请求。进入审批不改变 Composer 的配置来源，无覆盖时沿用当前对话的有效模型；审批与胶囊共用同一能力状态，加载、读取失败和明确不可用分别表达。批准前等待排队中的模型与参数保存落地，再以一次 `answerPlanReview` 把计划 hash、声明交接、当前有效模型（含继承的对话模型）、全部回合参数和所读会话记录的 revision 交给主进程；主进程在同一事务内校验并提交它们与 Agent 切换，期间会话记录变化则以 `SESSION_REVISION_STALE` 拒绝旧决定。计划选项及建议行冻结声明的 label 与可选 labelTranslations；通用组件按当前语言展示对应译文，未声明译文时使用 label，不按目标身份统一改名。批准和交接仅提交 agent+label，不把译文写入批准身份或 execution offer。历史不因当前声明变化而重写；声明改名使旧计划不再匹配时须重新修订并批准，不匹配旧名称别名。
 
 执行准备期间保留本次提交的模型/参数作为待确认选择，阶段提示与模型身份分开；不得将旧请求配置标为本轮事实；主进程返回 PreparedTurnContextSummary 后，禁用的 Composer 从其 route 与 controls 显示实际请求。provider 停用/断连、模型不可执行时，保存的引用保持不变，选择区明确不可用，发送与批准均阻止；恢复可用后原引用可继续使用，在途请求不读取可变设置。
 
@@ -148,7 +148,7 @@ Composer 与计划审批使用同一目录能力状态解析：尚在加载/刷�
 
 ### 计划审批恢复投影
 
-主进程以 plan-state.json 加持久历史、可见分支和计划 hash 验证归属，签发 PlanReviewProjection 与运行时 reviewId；getHistory 和 plan:reviewChanged 共用同一投影。Renderer 不从 streaming 或工具历史重建审批权限。answerPlanReview 仅接受 sessionId/reviewId/decision；reopenReview 与 cancelReview 共用来源和决定处理链。
+主进程以 plan-state.json 加持久历史、可见分支和计划 hash 验证归属，签发 PlanReviewProjection 与运行时 reviewId；getHistory 和 plan:reviewChanged 共用同一投影。Renderer 不从 streaming 或工具历史重建审批权限。answerPlanReview 的拒绝只带 sessionId/reviewId/decision；批准另带 expectedPlanHash、model、controls 与 baseRevision，由 `PlanApprovalTransaction` 一次提交（见 runtime-kernel「Declared Continue and Execution Offer」），失败经 IPC 统一错误出口返回登记码；reopenReview 与 cancelReview 共用来源和决定处理链。
 
 Stop 后 cancelled 只提供阅读器“重新审批”，有效 awaiting 在进入所属 session 时恢复原 Composer 审批区，不执行模型。approved/rejected/superseded、草稿不自动恢复；文件、hash、owner 或分支证明无效时拒绝恢复。存在其他请求禁止重开，重复或旧 reviewId 不能提交。重开不改旧历史；批准沿既有冻结、Task、offer 与声明 handoff，恢复不重启旧循环。决定响应不确定时读取当前状态，不自动重发或执行。
 
@@ -168,7 +168,7 @@ TaskRailItem 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、
 
 ### 计划批准与交接
 
-Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。准备时保留本次选择并标待确认，不能投影旧请求模型/参数。
+Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。批准是一次 renderer→main 调用：返回的会话记录（含 revision）与审批投影先被接受，Agent 胶囊随会话视图变为声明目标；`send: true` 时只排队一个带 `planReference: execute` 的执行回合，待规划回合释放后发送一次，`send: false` 只预填。该执行回合不再调用 `applyDeclaredHandoff`，也不附配置提交；回合结束的建议行与重启后的已批准交接仍经 `applyDeclaredHandoff`。批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。准备时保留本次选择并标待确认，不能投影旧请求模型/参数。
 
 
 ## 权限挡位事实与审批换代
