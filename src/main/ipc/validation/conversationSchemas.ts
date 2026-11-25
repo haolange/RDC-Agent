@@ -130,6 +130,7 @@ export const ConversationRewriteFromMessageArgsSchema = z.tuple([
 ]);
 
 export const ConversationGetHistoryArgsSchema = SessionIdArgsSchema;
+export const ConversationGetMessageSnapshotArgsSchema = z.tuple([ipcId(200, 'sessionId'), ipcId(200, 'messageId')]);
 export const ConversationGetDelegationTraceArgsSchema = z.tuple([
   z.object({
     sessionId: ipcId(128, 'sessionId'),

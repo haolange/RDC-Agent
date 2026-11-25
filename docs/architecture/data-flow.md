@@ -25,8 +25,10 @@ sequenceDiagram
   Tools-->>Runtime: tool result / policy denial
   Runtime-->>Conversation: streamed assistant events
   Conversation-->>IPC: conversation events
-  IPC-->>UI: message patches and trace projection
+  IPC-->>UI: message deltas, terminal messages and trace projection
 ```
+
+Streaming updates of a message leave main as deltas (`src/shared/conversation/messageDelta.ts`): `WorkflowProjectionPublisher` turns each `message_patched` into a `message_delta` carrying only the fields and work-trace blocks that changed since its previous update of the same message, numbered by `seq`/`baseSeq`; the first update (`baseSeq: 0`) is complete. `message_completed` / `message_errored` stay whole and end the stream. The renderer's `conversationMessageAssembler` rebuilds the whole message before any store sees it; a delta that does not build on the last applied update (reload mid-turn, dropped event) is discarded and the stream resumes from `conversation:getMessageSnapshot`. One update therefore costs the same at step 300 as at step 3, instead of carrying the whole trace each time.
 
 `.agent.md` is the source for instructions, model, tools, agent handoffs, skills, MCP servers, and invocability. `plan_artifact` is a human-in-the-loop pause with a live session plan and a frozen approved copy; it is not a Right Rail output.
 

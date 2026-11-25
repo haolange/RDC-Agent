@@ -65,6 +65,7 @@ export function createConversationApi(transport: RendererApiTransport): Conversa
     answerToolApproval: (request) => transport.invoke(INVOKE.conversation.answerToolApproval, request),
     answerPlanReview: (request) => transport.invoke(INVOKE.conversation.answerPlanReview, request),
     getHistory: (sessionId) => transport.invoke(INVOKE.conversation.getHistory, sessionId),
+    getMessageSnapshot: (sessionId, messageId) => transport.invoke(INVOKE.conversation.getMessageSnapshot, sessionId, messageId),
     getDelegationTrace: (request) => transport.invoke(INVOKE.conversation.getDelegationTrace, request),
     getDelegationContent: (request) => transport.invoke(INVOKE.conversation.getDelegationContent, request),
     switchBranch: (request) => transport.invoke(INVOKE.conversation.switchBranch, request),

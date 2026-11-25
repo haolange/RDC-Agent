@@ -3,8 +3,8 @@ import type { ConversationMessage, ConversationStreamEvent } from '../types/conv
 export type MessageUpdateType = 'message_patched' | 'message_completed' | 'message_errored';
 
 /**
- * The event main sends the renderer when an assistant message changes. It currently carries the whole message, so
- * each step's update grows with the length of the work trace; the budget test pins that until updates become deltas.
+ * A whole-message update inside main. Streaming (`message_patched`) updates leave main as deltas
+ * (`WorkflowProjectionPublisher`, `messageDelta.ts`); terminal updates are sent whole.
  */
 export function buildMessageUpdateEvent(
   type: MessageUpdateType,

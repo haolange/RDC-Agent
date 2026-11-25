@@ -15,6 +15,7 @@ import type {
   SessionAttachmentRecord,
   SessionRecord,
 } from './session';
+import type { ConversationMessageDelta } from '../conversation/messageDelta';
 
 export type ConversationMode = 'talk';
 
@@ -615,6 +616,18 @@ export interface ConversationMessageErroredEvent {
   message: ConversationMessage;
 }
 
+/**
+ * A streaming update of one message as the change since the previous update of the same message
+ * (`src/shared/conversation/messageDelta.ts`). Main sends these instead of whole-message `message_patched` events;
+ * the renderer rebuilds the message, and asks for `conversation:getMessageSnapshot` when it missed one.
+ */
+export interface ConversationMessageDeltaEvent {
+  type: 'message_delta';
+  sessionId: string;
+  turnId: string;
+  delta: ConversationMessageDelta;
+}
+
 export interface ConversationRunLinkedEvent {
   type: 'run_linked';
   sessionId: string;
@@ -633,5 +646,6 @@ export type ConversationStreamEvent =
   | ConversationMessagePatchedEvent
   | ConversationMessageCompletedEvent
   | ConversationMessageErroredEvent
+  | ConversationMessageDeltaEvent
   | ConversationRunLinkedEvent
   | ConversationAgentEvent;

@@ -205,6 +205,8 @@ export interface ElectronAPI {
       planReview: PlanReviewProjection | null;
       branchState?: import('./conversationBranch').ConversationBranchState | null;
     }>;
+    /** The last streamed state of a message; `null` when it is not streaming (any more). */
+    getMessageSnapshot: (sessionId: string, messageId: string) => Promise<{ seq: number; message: ConversationMessage } | null>;
     getDelegationTrace: (request: { sessionId: string; parentToolCallId: string; cursor: number; pageSize: number; sinceRevision?: number }) => Promise<import('./delegationTrace').DelegationTracePage>;
     getDelegationContent: (request: import('./delegationTrace').DelegationContentRequest) => Promise<import('./delegationTrace').DelegationContentPage>;
     switchBranch: (request: import('./conversationBranch').ConversationSwitchBranchRequest) => Promise<import('./conversationBranch').ConversationSwitchBranchResult>;

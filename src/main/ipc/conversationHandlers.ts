@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { AppError } from '@shared/errors/appError';
+import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { conversationService } from '../conversation/ConversationService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
@@ -20,6 +21,7 @@ import {
   ConversationClearHistoryArgsSchema,
   ConversationGetAttachmentPreviewArgsSchema,
   ConversationGetHistoryArgsSchema,
+  ConversationGetMessageSnapshotArgsSchema,
   ConversationGetDelegationTraceArgsSchema,
   ConversationGetDelegationContentArgsSchema,
   ConversationGetToolImagePreviewArgsSchema,
@@ -119,6 +121,16 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       return { messages: [], branchState: null, planReview: null };
     }
     return conversationService.getHistory(sessionId);
+  });
+
+  // The renderer missed a streamed update of a message (reload, dropped event); it resumes from the last sent state.
+  ipcMain.handle('conversation:getMessageSnapshot', (_event, ...rawArgs: unknown[]) => {
+    const [sessionId, messageId] = parseIpcArgs(ConversationGetMessageSnapshotArgsSchema, rawArgs, {
+      label: 'conversation:getMessageSnapshot',
+      maxBytes: 1024,
+    });
+    const snapshot = workflowProjectionPublisher.conversationMessageSnapshot(messageId);
+    return snapshot?.message.sessionId === sessionId ? snapshot : null;
   });
 
   ipcMain.handle('conversation:getDelegationTrace', async (_event, ...rawArgs: unknown[]) => {

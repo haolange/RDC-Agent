@@ -6,6 +6,7 @@ import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { notify } from '../../stores/notificationStore';
 import { createConversationEventBatcher } from './conversationEventBatcher';
+import { createConversationMessageAssembler } from './conversationMessageAssembler';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 
@@ -134,7 +135,22 @@ export function subscribeConversation(electronAPI: ElectronAPI, t: EventBridgeOp
     conversationEventBatcher.handle(event);
   };
 
-  electronAPI.conversation.onEvent(handleConversationEvent);
+  // Streamed updates arrive as deltas; everything below handles the whole messages the assembler rebuilds.
+  const assembler = createConversationMessageAssembler({
+    requestSnapshot: (sessionId, messageId) => electronAPI.conversation.getMessageSnapshot(sessionId, messageId),
+    deliver: handleConversationEvent,
+  });
+  const handleStreamEvent = (event: ConversationStreamEvent) => {
+    const assembled = assembler.accept(event);
+    if (assembled) handleConversationEvent(assembled);
+  };
+  electronAPI.conversation.onEvent(handleStreamEvent);
 
-  return { disposeBatcher: () => conversationEventBatcher.dispose(), unsubscribe: () => electronAPI.conversation.offEvent(handleConversationEvent) };
+  return {
+    disposeBatcher: () => {
+      conversationEventBatcher.dispose();
+      assembler.dispose();
+    },
+    unsubscribe: () => electronAPI.conversation.offEvent(handleStreamEvent),
+  };
 }
