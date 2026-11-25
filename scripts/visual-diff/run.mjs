@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Differential rendering harness.
 //   node scripts/visual-diff/run.mjs record [id...]   record scenarios against a disposable Browser QA instance
+//     (scenarios whose setup connects Ollama expect `node scripts/qa-ollama-stub.mjs` to be running)
 //   node scripts/visual-diff/run.mjs capture <dir> [--build <root>]   replay every scenario and write L1/L2 results
 //   node scripts/visual-diff/run.mjs compare <base-dir> <head-dir>   fail on differences not declared by Visual-Diff-Allow
 // Recordings live in scripts/visual-diff/scenarios; responses larger than 4 KiB are stored once in shared.json.
@@ -111,7 +112,8 @@ async function record(ids) {
       const definitionPath = path.join(workDir, 'definition.json');
       const recordedPath = path.join(workDir, 'recorded.json');
       writeJson(definitionPath, definition);
-      runHost(['--mode', 'record', '--scenario', definitionPath, '--bridge', url, '--out', recordedPath, '--build', repoRoot]);
+      runHost(['--mode', 'record', '--scenario', definitionPath, '--bridge', url, '--out', recordedPath, '--build', repoRoot,
+        '--userdata', userData]);
       // The disposable instance's directories and the checkout's location differ per run and machine; fixed
       // placeholders keep machine paths out of the recordings and let identical answers dedupe.
       const recorded = JSON.parse(fs.readFileSync(recordedPath, 'utf8')

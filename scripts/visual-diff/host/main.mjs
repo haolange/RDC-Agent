@@ -159,6 +159,15 @@ async function runStep(window, step) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
+  // Setup only: a small project inside the instance's disposable userData (recordings name it /visual-diff/...).
+  if (step.project) {
+    const projectRoot = path.join(argv.userdata, 'visual-diff-project');
+    fs.mkdirSync(path.join(projectRoot, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, 'docs', 'notes.md'), '# Notes\n\n- One draw call in this frame.\n');
+    await contents.executeJavaScript(`window.electronAPI.project.add(${JSON.stringify(projectRoot)})`);
+  }
+  // The host forwards no main-process events, so setup reloads to read what a step changed (a saved provider, a turn).
+  if (step.project || step.reload) contents.reload();
   if (step.click) {
     const clicked = await contents.executeJavaScript(`(() => { const el = document.querySelector(${selector}); el?.click(); return Boolean(el); })()`);
     if (!clicked) throw new Error(`nothing to click for ${selectorOf(step)}`);

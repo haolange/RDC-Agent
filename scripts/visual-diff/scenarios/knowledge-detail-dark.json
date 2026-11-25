@@ -1,0 +1,368 @@
+{
+ "id": "knowledge-detail-dark",
+ "viewport": [
+  1440,
+  900
+ ],
+ "theme": "dark",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-knowledge-center-trigger",
+   "waitMs": 800
+  },
+  {
+   "waitFor": ".knowledge-center-card-button"
+  },
+  {
+   "click": true,
+   "selector": ".knowledge-center-card-button",
+   "waitMs": 600
+  },
+  {
+   "waitFor": "[data-testid=\"knowledge-center-detail\"]",
+   "waitMs": 600
+  }
+ ],
+ "settleMs": 1500,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "34f45dbaee40cea6ecbc3e8a"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-f80e6098ebe1-1795634430648",
+       "timestamp": 1795634430648,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-ac0074e2406c-1795634430677",
+       "timestamp": 1795634430677,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-e1ca454d07d9-1795634430678",
+       "timestamp": 1795634430678,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-b1cdce36c1a2-1795634430689",
+       "timestamp": 1795634430689,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      },
+      {
+       "id": "rlog-a9634fb9548c-1795634434671",
+       "timestamp": 1795634434671,
+       "scope": "app",
+       "namespace": "context",
+       "severity": "warning",
+       "title": "Browser QA confirmation auto-accepted",
+       "summary": "knowledge.write was auto-confirmed because Browser QA full access is explicitly enabled.",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "action": "knowledge.write",
+        "detail": "user / 粘贴的文本（387 个字符）"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ],
+  "knowledge:overview": [
+   {
+    "result": {
+     "spaces": [
+      {
+       "spaceId": "user",
+       "kind": "user",
+       "label": "User",
+       "rootPath": "/visual-diff/.rdc-agent/knowledge"
+      }
+     ],
+     "index": {
+      "revision": "373bbdcea78e4d74d946b81df7ee7296e153be57c02275058bec8a97bd97e876",
+      "builtAt": "2026-11-25T19:20:34.686Z",
+      "cardCount": 1,
+      "cardsBySpace": {
+       "user": 1
+      }
+     }
+    }
+   }
+  ],
+  "knowledge:query": [
+   {
+    "result": {
+     "hits": [
+      {
+       "cardId": "user:cases/qa-hair-darkening.md",
+       "contentHash": "7adb97cbf1ca49c08925b4df067a8fbecc030306a7c3d9e0da3df5c77174ed86",
+       "spaceId": "user",
+       "relativePath": "cases/qa-hair-darkening.md",
+       "title": "Adreno 740 头发偏暗 / KajiyaDiffuse",
+       "type": "case",
+       "lifecycle": "draft",
+       "preview": "调整能量项并在同一 capture 上复核。",
+       "updatedAt": 1795634434677,
+       "score": 2,
+       "lanes": [
+        "Lexical",
+        "Structural"
+       ],
+       "relations": [],
+       "scope": {
+        "api": "Vulkan",
+        "platform": "Android",
+        "gpuVendor": "Qualcomm"
+       }
+      }
+     ],
+     "lanes": [
+      {
+       "lane": "Identity/Path",
+       "hits": []
+      },
+      {
+       "lane": "Scope/Metadata",
+       "hits": []
+      },
+      {
+       "lane": "Lexical",
+       "hits": [
+        {
+         "cardId": "user:cases/qa-hair-darkening.md",
+         "contentHash": "7adb97cbf1ca49c08925b4df067a8fbecc030306a7c3d9e0da3df5c77174ed86",
+         "spaceId": "user",
+         "relativePath": "cases/qa-hair-darkening.md",
+         "title": "Adreno 740 头发偏暗 / KajiyaDiffuse",
+         "type": "case",
+         "lifecycle": "draft",
+         "preview": "调整能量项并在同一 capture 上复核。",
+         "updatedAt": 1795634434677,
+         "score": 2,
+         "lanes": [
+          "Lexical",
+          "Structural"
+         ],
+         "relations": [],
+         "scope": {
+          "api": "Vulkan",
+          "platform": "Android",
+          "gpuVendor": "Qualcomm"
+         }
+        }
+       ]
+      },
+      {
+       "lane": "Structural",
+       "hits": [
+        {
+         "cardId": "user:cases/qa-hair-darkening.md",
+         "contentHash": "7adb97cbf1ca49c08925b4df067a8fbecc030306a7c3d9e0da3df5c77174ed86",
+         "spaceId": "user",
+         "relativePath": "cases/qa-hair-darkening.md",
+         "title": "Adreno 740 头发偏暗 / KajiyaDiffuse",
+         "type": "case",
+         "lifecycle": "draft",
+         "preview": "调整能量项并在同一 capture 上复核。",
+         "updatedAt": 1795634434677,
+         "score": 1,
+         "lanes": [
+          "Structural"
+         ],
+         "relations": [],
+         "scope": {
+          "api": "Vulkan",
+          "platform": "Android",
+          "gpuVendor": "Qualcomm"
+         }
+        }
+       ]
+      },
+      {
+       "lane": "Relation/Graph",
+       "hits": []
+      },
+      {
+       "lane": "Temporal/Version",
+       "hits": []
+      }
+     ],
+     "revision": "623ae31ca1b663d0f6c92bfb63423d815f3807df7c5f19453af7c3518829913b",
+     "total": 1,
+     "queryFingerprint": "df655964509fd4ab3e2a30029a6420050466b5070be6b55e99c483b73156f0aa"
+    }
+   }
+  ],
+  "knowledge:compile": [
+   {
+    "result": {
+     "packId": "pack:c5b16ce6bc61e0fa",
+     "compiledAt": "2026-11-25T19:20:39.168Z",
+     "hits": [
+      {
+       "cardId": "user:cases/qa-hair-darkening.md",
+       "contentHash": "7adb97cbf1ca49c08925b4df067a8fbecc030306a7c3d9e0da3df5c77174ed86",
+       "spaceId": "user",
+       "relativePath": "cases/qa-hair-darkening.md",
+       "title": "Adreno 740 头发偏暗 / KajiyaDiffuse",
+       "type": "case",
+       "lifecycle": "draft",
+       "preview": "调整能量项并在同一 capture 上复核。",
+       "updatedAt": 1795634434677,
+       "score": 2,
+       "lanes": [
+        "Lexical",
+        "Structural"
+       ],
+       "relations": [],
+       "scope": {
+        "api": "Vulkan",
+        "platform": "Android",
+        "gpuVendor": "Qualcomm"
+       },
+       "reasons": [
+        "Lexical:2",
+        "Structural:1"
+       ]
+      }
+     ],
+     "conflicts": []
+    }
+   }
+  ],
+  "knowledge:card": [
+   {
+    "result": {
+     "card": {
+      "cardId": "user:cases/qa-hair-darkening.md",
+      "spaceId": "user",
+      "relativePath": "cases/qa-hair-darkening.md",
+      "title": "Adreno 740 头发偏暗 / KajiyaDiffuse",
+      "preview": "调整能量项并在同一 capture 上复核。",
+      "updatedAt": 1795634434677,
+      "type": "case",
+      "lifecycle": "draft",
+      "content": "---\ncardId: \"user:cases/qa-hair-darkening.md\"\ntype: \"case\"\nlifecycle: \"draft\"\ntitle: \"Adreno 740 头发偏暗 / KajiyaDiffuse\"\nscope: {\"platform\":\"Android\",\"api\":\"Vulkan\",\"gpuVendor\":\"Qualcomm\"}\nrelations: []\nsourceStatus: \"fixed\"\ncaseId: \"qa-hair-darkening\"\npreview: \"头发比参考静帧暗一档，只在 Adreno 740 上出现。\"\nsourceHash: \"30f178aa31d826fc0a375e512466f631fd5b9f6226f467bfc4b8098997f53df6\"\nsourceSize: 493\nchapters: {\"claim\":\"Adreno 740 头发偏暗 / KajiyaDiffuse\",\"scopeExclusions\":\"{\\\"platform\\\":\\\"Android\\\",\\\"api\\\":\\\"Vulkan\\\",\\\"gpuVendor\\\":\\\"Qualcomm\\\"}\",\"symptoms\":\"{\\\"visual\\\":\\\"头发比参考静帧暗一档，只在 Adreno 740 上出现。\\\"}\",\"rootCause\":\"{\\\"phenomenon\\\":\\\"输出偏暗\\\",\\\"first_bad_event\\\":\\\"着色阶段\\\",\\\"responsible_layer\\\":\\\"shader\\\"}\",\"experimentVerification\":\"[\\\"回放相同 pass 并与参考图对比\\\"]\",\"fix\":\"调整能量项并在同一 capture 上复核。\",\"derived\":\"{}\"}\n---\n\n# Adreno 740 头发偏暗 / KajiyaDiffuse\n\n## Claim\n\nAdreno 740 头发偏暗 / KajiyaDiffuse\n\n## Scope + Exclusions\n\n{\"platform\":\"Android\",\"api\":\"Vulkan\",\"gpuVendor\":\"Qualcomm\"}\n\n## Symptoms\n\n{\"visual\":\"头发比参考静帧暗一档，只在 Adreno 740 上出现。\"}\n\n## RootCause\n\n{\"phenomenon\":\"输出偏暗\",\"first_bad_event\":\"着色阶段\",\"responsible_layer\":\"shader\"}\n\n## Experiment + Verification\n\n[\"回放相同 pass 并与参考图对比\"]\n\n## Fix\n\n调整能量项并在同一 capture 上复核。\n\n## Derived\n\n{}\n",
+      "body": "# Adreno 740 头发偏暗 / KajiyaDiffuse\n\n## Claim\n\nAdreno 740 头发偏暗 / KajiyaDiffuse\n\n## Scope + Exclusions\n\n{\"platform\":\"Android\",\"api\":\"Vulkan\",\"gpuVendor\":\"Qualcomm\"}\n\n## Symptoms\n\n{\"visual\":\"头发比参考静帧暗一档，只在 Adreno 740 上出现。\"}\n\n## RootCause\n\n{\"phenomenon\":\"输出偏暗\",\"first_bad_event\":\"着色阶段\",\"responsible_layer\":\"shader\"}\n\n## Experiment + Verification\n\n[\"回放相同 pass 并与参考图对比\"]\n\n## Fix\n\n调整能量项并在同一 capture 上复核。\n\n## Derived\n\n{}",
+      "scope": {
+       "api": "Vulkan",
+       "platform": "Android",
+       "gpuVendor": "Qualcomm"
+      },
+      "relations": [],
+      "sourceStatus": "fixed",
+      "caseId": "qa-hair-darkening",
+      "chapters": {
+       "claim": "Adreno 740 头发偏暗 / KajiyaDiffuse",
+       "scopeExclusions": "{\"platform\":\"Android\",\"api\":\"Vulkan\",\"gpuVendor\":\"Qualcomm\"}",
+       "symptoms": "{\"visual\":\"头发比参考静帧暗一档，只在 Adreno 740 上出现。\"}",
+       "rootCause": "{\"phenomenon\":\"输出偏暗\",\"first_bad_event\":\"着色阶段\",\"responsible_layer\":\"shader\"}",
+       "experimentVerification": "[\"回放相同 pass 并与参考图对比\"]",
+       "fix": "调整能量项并在同一 capture 上复核。",
+       "derived": "{}"
+      },
+      "sourceHash": "30f178aa31d826fc0a375e512466f631fd5b9f6226f467bfc4b8098997f53df6",
+      "sourceSize": 493,
+      "contentHash": "7adb97cbf1ca49c08925b4df067a8fbecc030306a7c3d9e0da3df5c77174ed86"
+     }
+    }
+   }
+  ]
+ }
+}
