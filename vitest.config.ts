@@ -49,6 +49,8 @@ const coverageExclude = [
   'src/main/rdc/RdcTurnBindings.ts',
   'src/main/rdc/RdcValidatedEvidence.ts',
   'src/main/rdc/RdcSessionService.ts',
+  'src/main/rdc/RdcSessionBindings.ts',
+  'src/main/rdc/RdcDevicePreparation.ts',
   'src/main/sessions/store/SessionResumeService.ts',
   'src/main/settings/provider-auth/oauth/**',
   'src/main/settings/provider-auth/ProviderAccountAuthService.ts',

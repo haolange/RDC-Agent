@@ -96,7 +96,7 @@ shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身�
 
 项目输入支持 `project_resource` 与显式登记的 `external_reference`。后者由 Capture 面板「引用外部抓帧（只读）」经 `project:inputs:reference` 登记单个绝对路径，不复制 RDC、不扫描父目录、不扩展 Project Scope。登记保留 canonical 路径、文件身份与完整内容 hash；刷新、重启、打开前后与重绑定均复验，替换或内容变化须显式重新登记。移除引用沿同一审批与绑定释放路径解除登记及项目内足迹，永不删除或修改外部原件；原件缺失也能移除引用。原项目内输入的导入、删除与存储格式保持原语义，不批量迁移已有项目。
 
-应用生命周期的唯一入口为 session-scoped `RdcSessionService`，每个 binding 持有 `RdcSessionRuntime`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，先 `daemon start --owner-pid <App pid>` 再通过固定原生 argv 传递。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。`ShutdownCoordinator` 在 `release_owned_runtimes` 完成 clear+stop 与归属收割后，才进入 `terminate_processes` 的 `ProcessSupervisor.joinAll`。归属记录落在 `userData/state/owned-rdc-daemons.json`，不是全局 lease 镜像。收割只停有归属记录的 daemon：中间目录里有 daemon 状态但没有归属记录的 context 可能属于另一实例（例如自带 userData 的 Browser QA），记为 `unconfirmed` 并写运行日志，不停止；归属记录读不出时一个都不动，报告失败，启动其余初始化照常进行。
+应用生命周期的唯一入口为 session-scoped `RdcSessionService`，每个 binding 持有 `RdcSessionRuntime`；binding、交互锁、代际校验、状态发布与每会话串行队列在 `RdcSessionBindings`，设备准备与取消在 `RdcDevicePreparation`。Open 对原文件计算完整 SHA-256，main 分配 UUID daemon context，先 `daemon start --owner-pid <App pid>` 再通过固定原生 argv 传递。只接受匹配的 native identity，关闭失败保留原 owning context。Android 设备预留先于连接，另一 session 不能抢占。`ShutdownCoordinator` 在 `release_owned_runtimes` 完成 clear+stop 与归属收割后，才进入 `terminate_processes` 的 `ProcessSupervisor.joinAll`。归属记录落在 `userData/state/owned-rdc-daemons.json`，不是全局 lease 镜像。收割只停有归属记录的 daemon：中间目录里有 daemon 状态但没有归属记录的 context 可能属于另一实例（例如自带 userData 的 Browser QA），记为 `unconfirmed` 并写运行日志，不停止；归属记录读不出时一个都不动，报告失败，启动其余初始化照常进行。
 
 切换 capture 时先关 replay 再关文件，两步都经原生观测确认后才释放 lease；任一步未确认就在仍持有的 lease 上 quarantine，现场进入受控恢复，不会出现文件仍开着而 lease 已释放的状态。
 

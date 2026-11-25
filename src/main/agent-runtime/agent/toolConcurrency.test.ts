@@ -6,7 +6,9 @@ import { createTaskCreateTool, createTaskStopTool, createTaskUpdateTool } from '
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
 import { RDC_PROBE_TOOL_SPEC } from '../orchestration/RdcProbeTool';
-import { RUNTIME_CONTEXT_TOOL_SPEC, RuntimeToolAssembly } from '../orchestration/RuntimeToolAssembly';
+import { RuntimeToolAssembly } from '../orchestration/RuntimeToolAssembly';
+import { RUNTIME_CONTEXT_TOOL_SPEC } from '../orchestration/TurnControlTools';
+import { createAskUserTool } from '../orchestration/WorkbenchTools';
 import { MCP_TOOL_SPEC } from './MCPManager';
 import {
   countSubagentDispatches,
@@ -48,7 +50,7 @@ describe('toolConcurrency', () => {
       ['task_stop', createTaskStopTool({} as never).spec],
       ['runtime_context', RUNTIME_CONTEXT_TOOL_SPEC],
       ['rdc_probe', RDC_PROBE_TOOL_SPEC],
-      ['ask_user', assembly.createAskUserTool('general').spec],
+      ['ask_user', createAskUserTool('general').spec],
       ['plan_artifact', assembly.createPlanArtifactTool('session').spec],
       ['output_register', createOutputRegistrationTool({ sessionId: 'session', runId: undefined, projectRootPath: undefined }).spec],
       ['investigation_write', investigationWrite?.spec],

@@ -1,7 +1,7 @@
 import { subagentScopeId } from '@shared/utils/executionScope';
 import { AppError } from '@shared/errors/appError';
 import { delegationCapsuleArtifactRefs } from '../prompt/DelegationCapsuleCompiler';
-import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, registerTaskExecutionCancellationOwner, type TaskExecutionRecord } from '../tasks';
+import { TaskRegistry, createSessionTaskStore, registerTaskExecutionCancellationOwner, type TaskExecutionRecord } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { requestSnapshotStore } from '../prompt';
 import { grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
@@ -9,6 +9,7 @@ import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
 import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bounded, normalizeSubagentResult, persistSubagentResult, projectSubagentExecution, type DelegationSourceFailure } from './SubagentResultEnvelope';
 import { bindTaskRootBudget } from './TaskRootBudget';
+import { createBackgroundTaskTools } from './BackgroundTaskTools';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
@@ -389,40 +390,15 @@ export class BackgroundSubagentService {
   }
 
   createTools(_parentAgentId: AgentRole, sessionId?: string | null, _turn?: TurnHandle | null): AgentTool[] {
-    const delegatedScope = sessionId ? getDelegatedTaskScope(sessionId) : null;
-    const requireSession = () => { if (!sessionId) throw new AppError('BACKGROUND_SESSION_REQUIRED', 'durable execution requires a parent session.'); return delegatedScope?.ownerSessionId ?? sessionId; };
-    const requireOwned = async (args: Record<string, unknown>) => {
-      const id = executeId(args); const execution = await this.requireOwned(requireSession(), id);
-      if (delegatedScope) {
-        const tasks = await this.registry(requireSession()).listTasks();
-        let taskId: string | undefined = execution.taskId; let inScope = false;
-        while (taskId) { if (taskId === delegatedScope.rootTaskId) { inScope = true; break; } taskId = tasks.find((task) => task.id === taskId)?.parentTaskId; }
-        if (!inScope) throw new AppError('BACKGROUND_EXECUTION_NOT_FOUND', 'execution is outside this delegated Task subtree.');
-      }
-      return id;
-    };
-    const executeId = (args: Record<string, unknown>) => String(args.executionId ?? '').trim();
-    const common = { permissionHint: 'readonly' as const, spec: { isReadOnly: true, concurrency: 'shared' as const, isDestructive: false, sideEffect: 'session' as const, category: 'task' as const, requiresApproval: false } };
-    const orchestration = { ...common, spec: { ...common.spec, concurrency: 'orchestration-parallel' as const } };
-    return [{
-      name: 'background_query', label: 'Query Background Task', description: 'Read durable execution status once. Do not repeatedly poll; use background_wait when awaiting a live execution.', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' } } }, ...common,
-      execute: async (_id, args) => { const execution = await this.query(requireSession(), await requireOwned(args)); const projection = projectSubagentExecution(execution); return { content: [{ type: 'text', text: JSON.stringify(projection) }], details: projection }; },
-    }, {
-      name: 'background_wait', label: 'Wait Background Task', description: 'Event-driven join of a live background execution, then returns its durable result.', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' } } }, ...orchestration,
-      execute: async (_id, args, signal) => { const id = await requireOwned(args); if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); let listener: (() => void) | undefined; try { await Promise.race([this.join(id), new Promise<void>((_, reject) => { listener = () => reject(new DOMException('Aborted', 'AbortError')); signal?.addEventListener('abort', listener, { once: true }); })]); } finally { if (listener) signal?.removeEventListener('abort', listener); } const projection = projectSubagentExecution(await this.query(requireSession(), id)); return { content: [{ type: 'text', text: JSON.stringify(projection) }], details: projection }; },
-    }, {
-      name: 'background_result', label: 'Background Result', description: 'Read the bounded structured result and durable message cursor. Pass the executionId returned by subagent (execution_...), not the resultRef artifact filename (subagent-execution_...json).', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' }, cursor: { type: 'number' } } }, ...common,
-      execute: async (_id, args) => { const id = await requireOwned(args); const [execution, mailbox] = await Promise.all([this.query(requireSession(), id), this.messages(requireSession(), id, Number(args.cursor ?? 0))]); const result = projectSubagentExecution(execution)?.result; return { content: [{ type: 'text', text: JSON.stringify({ result, ...mailbox }) }], details: { executionId: execution?.id, result, mailbox } }; },
-    }, {
-      name: 'background_message', label: 'Message Background Task', description: 'Append bounded untrusted owner data to the durable execution mailbox. It never mutates an in-flight frozen prompt.', parameters: { type: 'object', required: ['executionId', 'generation', 'body'], properties: { executionId: { type: 'string' }, generation: { type: 'number' }, body: { type: 'string', maxLength: 8000 } } }, ...common,
-      execute: async (_id, args) => { const id = await requireOwned(args); const message = await this.postMessage(requireSession(), id, Number(args.generation), String(args.body ?? '')); return { content: [{ type: 'text', text: `Message queued at sequence ${message.sequence}.` }], details: { message } }; },
-    }, {
-      name: 'background_cancel', label: 'Cancel Background Task', description: 'Abort and join the live execution before returning.', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' } } }, ...orchestration,
-      execute: async (_id, args) => { const id = await requireOwned(args); await this.cancel(requireSession(), id); return { content: [{ type: 'text', text: `Background execution stopped and joined: ${id}` }], details: { executionId: id } }; },
-    }, {
-      name: 'background_join', label: 'Join Background Task', description: 'Join a live execution without cancelling it, then return its durable state.', parameters: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' } } }, ...orchestration,
-      execute: async (_id, args) => { const id = await requireOwned(args); await this.join(id); const projection = projectSubagentExecution(await this.query(requireSession(), id)); return { content: [{ type: 'text', text: JSON.stringify(projection) }], details: projection }; },
-    }];
+    return createBackgroundTaskTools({
+      requireOwned: (owner, executionId) => this.requireOwned(owner, executionId),
+      listTasks: (owner) => this.registry(owner).listTasks(),
+      query: (owner, executionId) => this.query(owner, executionId),
+      join: (executionId) => this.join(executionId),
+      messages: (owner, executionId, cursor) => this.messages(owner, executionId, cursor),
+      postMessage: (owner, executionId, generation, body) => this.postMessage(owner, executionId, generation, body),
+      cancel: (owner, executionId) => this.cancel(owner, executionId),
+    }, sessionId);
   }
 }
 

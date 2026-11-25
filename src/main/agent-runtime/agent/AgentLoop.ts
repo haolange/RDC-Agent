@@ -26,7 +26,7 @@ import {
   LoopProgressGuard,
   RUNTIME_NO_PROGRESS_INSTRUCTION,
 } from './LoopProgressGuard';
-import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
+import { executeToolCalls } from './ToolCallDispatch';
 import { RuntimeContinuationGuard } from './RuntimeContinuation';
 import { recoveryStartMessage } from './RecoveryDiagnosticText';
 import type { CompressResult } from './ContextManager';
@@ -143,11 +143,6 @@ export interface ToolExecutor {
   isConcurrencySafe?(toolCall: ToolCall): boolean;
   /** Atomically reserve shared budget for a dispatch group. Failure means the group does not start. */
   reserveDispatchBudget?(toolCalls: ToolCall[]): { ok: true } | { ok: false; limit: string };
-}
-
-/** 内层循环工具执行结果。 */
-interface ExecuteToolCallsResult {
-  results: ToolResultMessage[];
 }
 
 // =====================================================================
@@ -767,110 +762,6 @@ async function streamAssistantResponse(
     if (partialIndex >= 0) context.messages.splice(partialIndex, 1);
     throw error;
   }
-}
-
-// =====================================================================
-// 工具执行
-// =====================================================================
-
-function createToolCallFailure(
-  toolCall: ToolCall,
-  text: string,
-  details?: Record<string, unknown>,
-): ToolResultMessage {
-  return {
-    role: 'toolResult',
-    toolCallId: toolCall.id,
-    toolName: toolCall.name,
-    content: [{ type: 'text', text }],
-    isError: true,
-    ...(details ? { details } : {}),
-    timestamp: Date.now(),
-  };
-}
-
-/**
- * 执行助手消息中的工具调用。
- * 只并发连续 isConcurrencySafe 组；缺省与 unsafe 一律串行。
- * maxToolConcurrency 不再决定分组，仅保留配置位。
- */
-async function executeToolCalls(
-  assistantMessage: AssistantMessage,
-  toolExecutor: ToolExecutor | undefined,
-  stream: EventStream<AgentEvent, Message[]>,
-  _maxConcurrency?: number,
-): Promise<ExecuteToolCallsResult> {
-  const toolCalls = assistantMessage.content.filter(
-    (c): c is ToolCall => c.type === 'toolCall',
-  );
-
-  const executeOne = async (toolCall: ToolCall, index: number): Promise<ToolResultMessage> => {
-    void index;
-    let startTime: number | undefined;
-    const onExecutionStart = (permissionState?: RuntimePermissionState) => {
-      if (startTime !== undefined) return;
-      startTime = Date.now();
-      stream.push({ type: 'tool_execution_start', toolCallId: toolCall.id, toolName: toolCall.name, args: toolCall.arguments, permissionState });
-    };
-
-    let result: ToolResultMessage;
-    if (toolExecutor) {
-      try {
-        result = await toolExecutor.execute(
-          toolCall,
-          stream.signal,
-          (partial) => {
-            stream.push({
-              type: 'tool_execution_update',
-              toolCallId: toolCall.id,
-              toolName: toolCall.name,
-              partialResult: partial,
-            });
-          },
-          onExecutionStart,
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        result = createToolCallFailure(toolCall, `Error: ${message}`);
-      }
-    } else {
-      result = createToolCallFailure(
-        toolCall,
-        `Tool "${toolCall.name}" not available (no executor configured)`,
-      );
-    }
-
-    stream.push({
-      type: 'tool_execution_end',
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      result,
-      durationMs: startTime === undefined ? 0 : Date.now() - startTime,
-    });
-    return result;
-  };
-
-  const results = await executeConcurrentToolGroups({
-    calls: toolCalls,
-    isSafe: (toolCall) => toolExecutor?.isConcurrencySafe?.(toolCall) === true,
-    reserve: (group) => toolExecutor?.reserveDispatchBudget?.([...group]) ?? { ok: true },
-    executeOne,
-    createBudgetFailure: (toolCall, _index, limit) => createToolCallFailure(
-      toolCall,
-      `POLICY_LIMIT_EXCEEDED: ${limit}; tool execution was not started.`,
-      { code: 'POLICY_LIMIT_EXCEEDED', limit },
-    ),
-    createNotStarted: (toolCall, _index, reason) => createToolCallFailure(
-      toolCall,
-      `TOOL_GROUP_NOT_STARTED: ${reason}`,
-      { code: 'TOOL_GROUP_NOT_STARTED', reason },
-    ),
-    isErrorResult: (result) => result.isError === true,
-    shouldStopAfterResult: (result) => toolExecutor?.shouldEndTurnAfterToolResult?.(result) === true,
-    signal: stream.signal,
-  });
-
-  return { results };
 }
 
 async function applyTransformContext(

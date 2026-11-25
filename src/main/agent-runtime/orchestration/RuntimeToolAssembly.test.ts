@@ -50,6 +50,8 @@ import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
 import { TurnHandle } from './TurnCoordinator';
 import { ToolExecutorFactory } from './ToolExecutorFactory';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
+import { createRuntimeContextTool, createTurnCompletionTool } from './TurnControlTools';
+import { createAskUserTool, createSkillReadTool, createSkillsCatalogTool } from './WorkbenchTools';
 import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './RuntimeToolPolicy';
 import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
 import type { SkillLoadResult } from '@shared/types/rdcRuntime';
@@ -88,10 +90,9 @@ describe('RuntimeToolAssembly', () => {
     try {
       const registry = new TaskRegistry(new FileTaskStore(path.join(root, 'tasks')));
       const task = await registry.createTask('Compare the claims', { description: 'Read document-review and its terminology before use.', completionRequirements: ['comparison'] });
-      const assembly = createAssembly();
-      const index = await assembly.createSkillsCatalogTool('general').execute('discover', { query: 'document' }, undefined, undefined, context);
+      const index = await createSkillsCatalogTool('general').execute('discover', { query: 'document' }, undefined, undefined, context);
       expect(JSON.stringify(index.content)).toContain('document-review');
-      const reader = assembly.createSkillReadTool('general');
+      const reader = createSkillReadTool('general');
       expect((await reader.execute('read', { skill_id: 'document-review' }, undefined, undefined, context)).isError).not.toBe(true);
       const terms = await reader.execute('reference', { skill_id: 'document-review', reference: 'references/terms.md' }, undefined, undefined, context);
       expect(JSON.stringify(terms.content)).toContain('bounded claim');
@@ -111,10 +112,9 @@ describe('RuntimeToolAssembly', () => {
     const reads = new Set<string>();
     const context = { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', successfulFileReads: reads };
     try {
-      const assembly = createAssembly();
-      const index = await assembly.createSkillsCatalogTool(mission).execute('discover', { query: 'rdc' }, undefined, undefined, context);
+      const index = await createSkillsCatalogTool(mission).execute('discover', { query: 'rdc' }, undefined, undefined, context);
       expect(index.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'text', text: expect.stringContaining(`${mission}-rdc-tools`) })]));
-      const tool = assembly.createSkillReadTool(mission);
+      const tool = createSkillReadTool(mission);
       const shared = await tool.execute('shared', { skill_id: 'rdc-tool-shell' }, undefined, undefined, context);
       expect(shared.isError).not.toBe(true);
       const page = await tool.execute('method', { skill_id: `${mission}-rdc-tools`, reference: 'references/tools.md', offset: 1, limit: 30 }, undefined, undefined, context);
@@ -154,7 +154,7 @@ describe('RuntimeToolAssembly', () => {
     const reads = new Set<string>();
     const context = { workspaceRoot: path.join(root, 'workspace'), projectRootPath: '/project', projectId: 'p', sessionId: 's', successfulFileReads: reads };
     try {
-      const tool = createAssembly().createSkillReadTool('general');
+      const tool = createSkillReadTool('general');
       const args = toolValidator.validate(toolToDefinition(tool), { skill_id: 'fixture', reference: 'references/tools.md', offset: 2, limit: 1 });
       const page = await tool.execute('reference', args, undefined, undefined, context);
       expect(page.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('2→second') });
@@ -183,7 +183,7 @@ describe('RuntimeToolAssembly', () => {
       sourceHash: 'skill-source', scope: 'builtin', effectiveStatus: 'effective', allowedTools: [],
     } as SkillLoadResult);
     try {
-      const tool = createAssembly().createSkillReadTool('general');
+      const tool = createSkillReadTool('general');
       for (const reference of ['../outside/secret.md', 'references/../outside/secret.md', path.join(root, 'outside', 'secret.md'), 'scripts/run.py', 'references/secret.md:stream']) {
         await expect(tool.execute('denied', { skill_id: 'fixture', reference })).rejects.toThrow('SKILL_REFERENCE_PATH_DENIED');
       }
@@ -244,7 +244,7 @@ describe('RuntimeToolAssembly', () => {
 
   it('validates structured completion through the actual executor schema boundary', async () => {
     const turn = { completionDeclaration: undefined } as unknown as TurnHandle;
-    const tool = createAssembly().createTurnCompletionTool(turn);
+    const tool = createTurnCompletionTool(turn);
     const args = {
       disposition: 'completed',
       result: { summary: 'Verified', outputs: { analysis: 'Scoped evidence' }, counterevidence: [], unresolved: [], scope: 'fixture', sideEffects: [], recoveryState: [] },
@@ -263,7 +263,7 @@ describe('RuntimeToolAssembly', () => {
   it('returns the review of a recorded partial declaration in the same tool result', async () => {
     const review = vi.fn(async () => '# Approved Goal Reassessment\nOne approved check remains.');
     const turn = { completionDeclaration: undefined, reviewCompletionDeclaration: review } as unknown as TurnHandle;
-    const tool = createAssembly().createTurnCompletionTool(turn);
+    const tool = createTurnCompletionTool(turn);
     const result = await tool.execute('partial', toolValidator.validate(toolToDefinition(tool), { disposition: 'partial',
       result: { summary: 'Half done', outputs: {}, counterevidence: [], scope: 'fixture', sideEffects: [], recoveryState: [],
         unresolved: [{ gap: 'Second check', attempted: 'First check only.', blocker: 'external', resumeWhen: 'Input arrives.' }] } }));
@@ -275,7 +275,7 @@ describe('RuntimeToolAssembly', () => {
 
   it('returns domain rejection before recording completion so the model can correct its declaration', async () => {
     const turn = { completionDeclaration: undefined } as unknown as TurnHandle;
-    const tool = createAssembly().createTurnCompletionTool(turn, async value => {
+    const tool = createTurnCompletionTool(turn, async value => {
       await Promise.resolve();
       if (value.disposition === 'completed') throw new Error('REPORT_REQUIRED');
     });
@@ -405,7 +405,7 @@ describe('RuntimeToolAssembly', () => {
   it('invalidates a declaration if its report reference is no longer valid', async () => {
     const sessionId = `completion-final-${randomUUID()}`;
     const turn = new TurnHandle({ sessionKey: sessionId, turnId: `turn-${randomUUID()}`, generation: 1 });
-    const tool = createAssembly().createTurnCompletionTool(turn);
+    const tool = createTurnCompletionTool(turn);
     const approvedGoalContinuation = createApprovedGoalContinuation(turn, sessionId);
     try {
       await tool.execute('first-declaration', { disposition: 'completed' });
@@ -476,16 +476,14 @@ describe('RuntimeToolAssembly', () => {
   });
 
   it('createAskUserTool rejects empty questions', async () => {
-    const assembly = createAssembly();
-    const tool = assembly.createAskUserTool('ask');
+    const tool = createAskUserTool('ask');
     const result = await tool.execute('tc-1', { questions: [] });
     expect(result.isError).toBe(true);
     expect(result.details?.questions).toEqual([]);
   });
 
   it('createRuntimeContextTool reports missing lease', async () => {
-    const assembly = createAssembly();
-    const tool = assembly.createRuntimeContextTool('sess-1', 'proj-1');
+    const tool = createRuntimeContextTool('sess-1', 'proj-1');
     const result = await tool.execute('tc-1', {});
     expect(result.details).toEqual({ available: false, requiresRecovery: false });
     expect(assertRdcContextLeaseOwnership).toHaveBeenCalled();
@@ -495,7 +493,7 @@ describe('RuntimeToolAssembly', () => {
     vi.mocked(getRdcContextLease).mockReturnValueOnce({
       ownerSessionId: 'sess-1', ownerProjectId: 'proj-1', quarantineReason: 'uncertain native result',
     } as never);
-    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('tc-1', {});
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('tc-1', {});
     expect(result.details).toEqual({ available: false, requiresRecovery: true });
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Close it in Capture') });
     expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('not open') });
@@ -505,7 +503,7 @@ describe('RuntimeToolAssembly', () => {
     vi.mocked(getRdcContextLease).mockReturnValueOnce({
       ownerSessionId: 'sess-1', ownerProjectId: 'other-project', quarantineReason: 'uncertain native result',
     } as never);
-    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('tc-1', {});
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('tc-1', {});
     expect(result.details).toEqual({ available: false, requiresRecovery: false });
     expect(result.content[0]).toMatchObject({ text: expect.stringContaining('not open') });
   });
@@ -517,7 +515,7 @@ describe('RuntimeToolAssembly', () => {
     vi.mocked(rdcSessionService.snapshotReplayForSession).mockReturnValueOnce({ replayDeviceId: null,
       preparation: { targetDeviceId: 'android-1', phase: 'ready', issue: null } } as never);
     try {
-      const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('inventory', {});
+      const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('inventory', {});
       const body = JSON.parse((result.content[0] as { text: string }).text);
       expect(body.capturePlanning).toEqual({ inputs: [{ inputId: 'capture-1', fileName: 'one.rdc', source: 'external_reference', contentSha256: 'a'.repeat(64) }],
         deviceId: 'android-1', devicePreparation: 'ready' });
@@ -529,8 +527,7 @@ describe('RuntimeToolAssembly', () => {
     vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({
       runtimeContext: { capture: 'demo.rdc' },
     } as never);
-    const assembly = createAssembly();
-    const tool = assembly.createRuntimeContextTool('sess-1', 'proj-1');
+    const tool = createRuntimeContextTool('sess-1', 'proj-1');
     const result = await tool.execute('tc-1', {});
     expect(result.details).toEqual({ available: true });
     expect(result.content[0]).toMatchObject({ type: 'text' });
@@ -544,7 +541,7 @@ describe('RuntimeToolAssembly', () => {
       receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'a'.repeat(64)}` } }));
     const context = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
       turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } } as never;
-    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
     const body = JSON.parse((result.content[0] as { text: string }).text);
     expect(body.rdc).not.toHaveProperty('raw');
     expect(body.captureRestoration).toMatchObject({ available: true, original: { native: { eventId: 14 } },
@@ -554,7 +551,7 @@ describe('RuntimeToolAssembly', () => {
 
   it('does not expose a controller baseline to an unrelated or offline tool context', async () => {
     const restorationBaselineFor = vi.fn(() => ({ available: true, original: null }));
-    const tool = createAssembly().createRuntimeContextTool('sess-1', 'proj-1');
+    const tool = createRuntimeContextTool('sess-1', 'proj-1');
     const base = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'foreign',
       turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } };
     for (const context of [base, { ...base, sessionId: 'sess-1', excludeRdcLeaseTools: true }]) {
@@ -568,7 +565,7 @@ describe('RuntimeToolAssembly', () => {
     const restorationBaselineFor = vi.fn(() => ({ available: true, original: null, receipt: { uri: 'session://tool-outputs/baseline.json' } }));
     const context = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
       turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } } as never;
-    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
     expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({
       captureRestoration: { available: true, original: null }, rdc: { available: false },
     });
@@ -586,7 +583,7 @@ describe('RuntimeToolAssembly', () => {
       remaining: { bytes: 22, toolOutputFiles: 1 }, isReservation: false,
     });
     try {
-      const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('controls', {}, undefined, undefined, {
+      const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('controls', {}, undefined, undefined, {
         workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
         rdcBinding: freezeRdcTurnBinding({ enabled: true, command: 'private-command', argsPrefix: ['private-entry'],
           workingDirectory: 'private-directory', env: { SECRET: 'private-secret' }, timeoutMs: 20000 }, [], {
@@ -610,7 +607,7 @@ describe('RuntimeToolAssembly', () => {
       scope: { projectId: 'proj-1', sessionId: ownerSession }, phase: 'ready', contextId: 'ctx', captureHash: 'a'.repeat(64),
     }] as never);
     vi.mocked(rdcSessionService.snapshotOpenedCaptureForSession).mockReturnValueOnce({ ...runtimeContext, status: 'open' } as never);
-    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('hash', {});
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('hash', {});
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining(`"captureContentSha256": "${'a'.repeat(64)}"`) });
     expect(rdcSessionService.snapshotOpenedCaptureForSession).toHaveBeenLastCalledWith({ projectId: 'proj-1', sessionId: ownerSession });
   });
@@ -625,7 +622,7 @@ describe('RuntimeToolAssembly', () => {
     vi.mocked(rdcSessionService.snapshotOpenedCaptureForSession).mockReturnValueOnce({
       ...runtimeContext, status: mismatch === 'status' ? 'error' : 'open', ...(mismatch in runtimeContext ? { [mismatch]: 'foreign' } : {}),
     } as never);
-    const result = await createAssembly().createRuntimeContextTool('sess-1', 'proj-1').execute('hash', {});
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('hash', {});
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('"captureContentSha256": null') });
   });
 

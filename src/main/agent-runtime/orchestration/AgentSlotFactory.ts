@@ -18,7 +18,8 @@ import { runtimePermissionStateService } from '../permissions/RuntimePermissionS
 import { requestEnvelopeBuilder, requestSnapshotStore } from '../prompt';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
 import { configuredRuntimeProvider, encodeAgentModel } from '../providers/ConfiguredRuntimeProvider';
-import { recordResponseReceipt, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import { resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import { recordResponseReceipt } from '../../settings/provider-catalog/ObservedModelEvidence';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
 import { requireExecutionScopeId } from './executionScope';

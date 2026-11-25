@@ -10,7 +10,7 @@ import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import {
   recordObservedToolCallingSupport,
   recordObservedToolCallingUnsupported,
-} from '../../settings/provider-catalog/EffectiveModelResolver';
+} from '../../settings/provider-catalog/ObservedModelEvidence';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import type { AgentTurnRun } from './AgentTurnRunner';
 

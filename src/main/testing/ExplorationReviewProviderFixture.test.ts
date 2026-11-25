@@ -6,7 +6,7 @@ import { expect, it, vi } from 'vitest';
 import { EventStream } from '../agent-runtime/core/EventStream';
 import { agentLoop } from '../agent-runtime/agent/AgentLoop';
 import { PromptPlanBuilder } from '../agent-runtime/prompt/PromptPlanBuilder';
-import { RuntimeToolAssembly } from '../agent-runtime/orchestration/RuntimeToolAssembly';
+import { createTurnCompletionTool } from '../agent-runtime/orchestration/TurnControlTools';
 import { SubagentRunner } from '../agent-runtime/orchestration/SubagentRunner';
 import { TurnHandle } from '../agent-runtime/orchestration/TurnCoordinator';
 import { settingsService } from '../settings/settings-core/SettingsService';
@@ -79,7 +79,6 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mis
   vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValue(profiles as never);
   vi.spyOn(sessionArtifactResolver, 'read').mockImplementation(resolver.read.bind(resolver));
   vi.spyOn(sessionArtifactResolver, 'write').mockImplementation(resolver.write.bind(resolver));
-  const assembly = new RuntimeToolAssembly({ mcp: { getConnectedTools: () => [], getAgentTools: () => [] }, getActiveTurn: () => null, getMemoryStore: () => ({}), createSubagentTools: () => [], getMcpServerStatusSummary: () => [] } as never);
   const rawText = Array.from({ length: 200 }, (_, i) => `Source ${i}: hypothesis only, capture A, fixed camera; negative path valid only for driver X.
 `).join('');
   const raw = resolver.write(SESSION_ID, 'session://tool-outputs/scout-source.txt', Buffer.from(rawText), { mimeType: 'text/plain' });
@@ -121,7 +120,7 @@ it('isolates Scout and Skeptic provider inputs, preserves evidence, and lets Mis
     const split = /^---\r?\n([\s\S]*?)\r?\n---([\s\S]*)$/u.exec(source)!;
     const meta = YAML.parse(split[1]!);
     const handle = new TurnHandle({ sessionKey: sessionId, turnId: sessionId, generation: 1, policyBudget: options!.policyBudget });
-    const tools = [artifactReadTool as unknown as AgentTool, assembly.createTurnCompletionTool(handle), ...createInvestigationTools(sessionId, { service })].filter((tool) => meta['allowed-tools'].includes(tool.name));
+    const tools = [artifactReadTool as unknown as AgentTool, createTurnCompletionTool(handle), ...createInvestigationTools(sessionId, { service })].filter((tool) => meta['allowed-tools'].includes(tool.name));
     const plan = new PromptPlanBuilder().build({ profile: profiles[0]!, scopedInstructions: { sources: [], diagnostics: [], totalBytes: 0 }, preloadedSkills: [{ id: skillId, name: skillId, description: meta.description, allowedTools: meta['allowed-tools'], scope: 'builtin', sourcePath, sourceHash: createHash('sha256').update(source).digest('hex'), effectiveStatus: 'effective', instructions: split[2]! }], skillCatalog: [], tools: tools.map((tool) => tool.name), workDir: harness.sessionPath, routeCapability: { visionInputMode: 'native' } as never, permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }, currentDate: '2026-09-10', timeZone: 'Asia/Shanghai', extraSegments: [...(options!.extraPromptSegments ?? [])] });
     const steps: Step[] = [() => ({ name: 'artifact_read', args: { uri: raw.uri, expectedHash: raw.hash } }), () => ({ name: 'artifact_read', args: { uri: image.uri, expectedHash: image.hash } })];
     if (skillId === 'skeptic-review') steps.push(() => ({ name: 'investigation_write', args: { kind: 'challenge', mission: 'debugger', title: 'Independent challenge', summary: 'Driver condition is unresolved', record: sampleChallenge({ targetId: 'claim-hyp', requiredFollowUp: 'Check driver Y with fixed camera' }) } }));

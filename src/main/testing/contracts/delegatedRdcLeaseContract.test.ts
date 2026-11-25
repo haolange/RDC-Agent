@@ -8,7 +8,7 @@ import { executeConcurrentToolGroups } from '../../agent-runtime/agent/Concurren
 import { isConcurrencySafeSpec, partitionConsecutiveSafeGroups } from '../../agent-runtime/agent/toolConcurrency';
 import { readFileTool } from '../../agent-runtime/tools/primitives/ReadFileTool';
 import { RDC_PROBE_TOOL_SPEC } from '../../agent-runtime/orchestration/RdcProbeTool';
-import { RUNTIME_CONTEXT_TOOL_SPEC } from '../../agent-runtime/orchestration/RuntimeToolAssembly';
+import { RUNTIME_CONTEXT_TOOL_SPEC } from '../../agent-runtime/orchestration/TurnControlTools';
 import { buildEffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 import { compileFixturePolicy } from '../policyFixture';
 import {

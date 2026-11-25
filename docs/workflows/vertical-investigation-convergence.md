@@ -411,7 +411,7 @@ M1–M3 通过后，调查方法不再改动。本节处理五个遗留问题：
 
 | 部分 | 来源 | 回合内会变吗 |
 |---|---|---|
-| tools | `RuntimeToolAssembly.ts:642-734` 的装配顺序；已激活的 deferred 工具追加在末尾（`deferredTools.ts:79-108`） | `tool_search` 激活新工具时变（`ToolExecutorFactory.ts:396-400`）；只剩一次请求时发空工具表（`AgentLoop.ts:323`） |
+| tools | `RuntimeToolAssembly.ts` 中 `resolveRuntimeTools` 的装配顺序；已激活的 deferred 工具追加在末尾（`deferredTools.ts:79-108`） | `tool_search` 激活新工具时变（`ToolExecutorFactory.ts:396-400`）；只剩一次请求时发空工具表（`AgentLoop.ts:323`） |
 | instructions：core 四份文本、文件工具路由、Agent 正文、项目指令、预载 Skill、Skill 目录、工具能力表 | `PromptPlanBuilder.ts:100-177`，回合开始时冻结 | 不变 |
 | instructions：`runtime:facts`、`runtime:profile-limits`、`runtime:approved-execution-offer`、`runtime:request-plan`、`runtime:execution-limits` | `PromptPlanBuilder.ts:179-266`、`TurnPreparationService.ts:189` | 不变 |
 | instructions：`runtime:identity` | `PromptPlanRuntimeIdentity.ts:8-17` | 获批的 capture 切换或现场恢复后变，之后保持 |

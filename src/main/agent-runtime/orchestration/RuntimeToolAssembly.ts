@@ -1,28 +1,18 @@
-import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
 /**
- * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
+ * RuntimeToolAssembly — resolveRuntimeTools: the runtime allowlist, the workbench tool set and
+ * the turn's tool map. Tool declarations live in TurnControlTools, WorkbenchTools and the tool modules.
  */
 
-import { UNRESOLVED_BLOCKERS, parseUnresolvedItems } from '@shared/types/unresolvedWork';
-import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
-import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { toolToDefinition } from '../agent/AgentTool';
 import { createToolSearchTool, getPrimitiveTools } from '../tools';
-import { readFileTool } from '../tools/primitives/ReadFileTool';
 import { MemoryStore } from '../memory/MemoryStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
-import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
-import { rdcSessionService } from '../../sessions';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
-import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
-import { readRdcHostControls } from '../../rdc/RdcHostControls';
 import {
   expandCanonicalToolToken,
   isToolAllowedByFrozenAllowlist,
@@ -30,22 +20,26 @@ import {
 } from './RuntimeToolPolicy';
 import { createRdcProbeTool } from './RdcProbeTool';
 import { createTaskRuntimeTools as assembleTaskRuntimeTools } from './TaskRuntimeTools';
+import { createRuntimeContextTool, createTurnCompletionTool } from './TurnControlTools';
+import {
+  createAskUserTool,
+  createMcpCatalogTool,
+  createMemoryDeleteTool,
+  createMemoryReadTool,
+  createMemorySearchTool,
+  createMemoryWriteTool,
+  createSkillReadTool,
+  createSkillsCatalogTool,
+} from './WorkbenchTools';
 import { listActiveDelegations, listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 import { completionBudgetEvidence } from './CompletionBudgetEvidence';
-import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';
+import type { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 import type { ToolDefinition } from '../core/types';
-import type { AgentTool, AgentToolSpec } from '../agent/AgentTool';
-import type { ConversationAskUserQuestion } from '@shared/types/conversation';
+import type { AgentTool } from '../agent/AgentTool';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { AgentRole } from '@shared/types/agent';
-
-/** Main-owned context controls: small results still keep a durable URI/hash as evidence. */
-export const RUNTIME_CONTEXT_TOOL_SPEC: AgentToolSpec = {
-  isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false,
-  presentation: { pinEvidence: () => true },
-};
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
@@ -94,213 +88,6 @@ export class RuntimeToolAssembly {
 
   createTaskRuntimeTools(sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
     return assembleTaskRuntimeTools({ sessionId, turnHandle, getActiveTurn: this.deps.getActiveTurn });
-  }
-
-  createTurnCompletionTool(turnHandle?: TurnHandle | null, validate?: (value: TurnCompletionDeclaration) => void | Promise<void>): AgentTool {
-    return {
-      name: 'turn_complete',
-      label: 'Complete Turn',
-      description: 'Declare structured turn completion. For partial or blocked work, identify the remaining checks and the actual reason they cannot proceed now; an unknown or unfinished result alone is not a blocker. Continue useful, authorized checks when possible. Preserve genuine cancellation, limits, failures, and no-progress stops.',
-      parameters: {
-        type: 'object',
-        required: ['disposition'],
-        properties: {
-          disposition: { type: 'string', enum: ['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'] },
-          evidenceRefs: {
-            type: 'array', description: 'Exact URI and hash of artifacts supporting this declaration; use the values returned by the artifact tools.',
-            items: { type: 'object', required: ['uri', 'hash'], properties: { uri: { type: 'string' }, hash: { type: 'string' } } },
-          },
-          result: {
-            type: 'object', required: ['summary', 'outputs', 'counterevidence', 'unresolved', 'scope', 'sideEffects', 'recoveryState'], additionalProperties: false,
-            properties: {
-              summary: { type: 'string', maxLength: 4000 }, outputs: { type: 'object', description: 'Named string outputs matching the Task completion requirements. Serialize structured values as strings.' },
-              counterevidence: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
-              unresolved: { type: 'array', maxItems: 32, description: 'One item per remaining piece of work. An item with no real blocker is work to continue now, not a reason to stop; use not_required only for work outside what the goal needs.',
-                items: { type: 'object', required: ['gap', 'attempted', 'blocker', 'resumeWhen'], additionalProperties: false, properties: {
-                  gap: { type: 'string', maxLength: 1000, description: 'What remains unknown or undone.' },
-                  attempted: { type: 'string', maxLength: 1000, description: 'What was tried, including failed attempts, or that nothing was tried and why.' },
-                  blocker: { type: 'string', enum: [...UNRESOLVED_BLOCKERS], description: 'What prevents it now: capability, permission, budget (limit or deadline), strategy (outside the approved strategy or scope), external (input, device or condition outside this session), or not_required.' },
-                  resumeWhen: { type: 'string', maxLength: 1000, description: 'The concrete condition under which it can proceed.' },
-                } } },
-              scope: { type: 'string', maxLength: 4000 }, sideEffects: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
-              recoveryState: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 2000 } },
-            },
-          },
-        },
-      },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
-      async execute(_toolCallId, args) {
-        const disposition = args.disposition;
-        if (!['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'].includes(String(disposition))) {
-          throw new AppError('TURN_COMPLETION_INVALID', 'disposition is not supported.');
-        }
-        const refs = Array.isArray(args.evidenceRefs) ? args.evidenceRefs : [];
-        const evidenceRefs = refs.filter((ref): ref is { uri: string; hash: string } => (
-          !!ref && typeof ref === 'object' && typeof (ref as Record<string, unknown>).uri === 'string'
-            && typeof (ref as Record<string, unknown>).hash === 'string'
-        ));
-        if (turnHandle) {
-          const supplied = args.result as (Omit<NonNullable<TurnCompletionDeclaration['result']>, 'unresolved'> & { unresolved?: unknown }) | undefined;
-          if (supplied && Object.values(supplied.outputs ?? {}).some((value) => typeof value !== 'string')) {
-            throw new AppError('TURN_COMPLETION_INVALID', 'result.outputs values must be strings.');
-          }
-          const rawResult = supplied ? { ...supplied, unresolved: parseUnresolvedItems(supplied.unresolved ?? []) } : undefined;
-          const declaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
-          await validate?.(declaration);
-          turnHandle.completionDeclaration = declaration;
-          const review = await turnHandle.reviewCompletionDeclaration?.(declaration);
-          return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.${review ? `\n\n${review}` : ''}` }],
-            details: { disposition, unresolved: declaration.result?.unresolved ?? [] } };
-        }
-        return { content: [{ type: 'text', text: `Turn completion recorded: ${String(disposition)}.` }] };
-      },
-    };
-  }
-
-  createRuntimeContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
-    return {
-      name: 'runtime_context',
-      label: 'Runtime Context',
-      description: 'Read this execution\'s session, scope, working directory, and live permission mode and revision. The owning session can see registered capture IDs and its selected device for a plan. When it owns a capture lease, rdc contains replay identity, captureContentSha256, artifact capacity, and frozen CLI deadline controls. An approved owning General turn may also see captureRestoration, its signed frozen entry baseline, which is not the live replay position. Use rdc_probe for current observations. Offline children omit rdc and the baseline. Capacity is a point-in-time snapshot, not a future reservation.',
-      pollable: true,
-      parameters: {
-        type: 'object',
-        properties: {},
-      },
-      permissionHint: 'readonly',
-      spec: RUNTIME_CONTEXT_TOOL_SPEC,
-      async execute(_toolCallId, _args, _signal, _onUpdate, executionContext) {
-        const permission = runtimePermissionStateService.getSnapshot();
-        const scopeId = sessionId ?? null;
-        const identity = {
-          sessionId: scopeId,
-          scopeId,
-          scopeKind: !scopeId ? 'none' : isSubagentScopeId(scopeId) ? 'subagent' : isEphemeralScopeId(scopeId) ? 'ephemeral' : 'session',
-          projectId: projectId ?? null,
-          cwd: executionContext?.workspaceRoot ?? null,
-          permissionMode: permission.mode,
-          permissionRevision: permission.revision,
-        };
-        if (executionContext?.excludeRdcLeaseTools) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify(identity, null, 2) }], details: { available: true } };
-        }
-        const baseline = executionContext?.sessionId === sessionId && executionContext?.projectId === projectId
-          ? executionContext?.captureControl?.restorationBaselineFor(executionContext) : null;
-        const captureRestoration = baseline ? { captureRestoration: baseline } : {};
-        const ownedProject = sessionId && projectId && !isSubagentScopeId(sessionId)
-          && storageAdapter.sessions.readSession(sessionId)?.projectId === projectId
-          ? storageAdapter.getProjectById(projectId) : null;
-        const state = ownedProject && sessionId && projectId
-          ? rdcSessionService.snapshotReplayForSession({ sessionId, projectId }) : null;
-        const capturePlanning = ownedProject ? {
-          inputs: ownedProject.inputs.map(input => ({ inputId: input.inputId, fileName: input.fileName,
-            contentSha256: input.contentSha256 ?? null, source: input.source })),
-          deviceId: state?.replayDeviceId ?? state?.preparation.targetDeviceId ?? null,
-          devicePreparation: state?.preparation.phase ?? 'idle',
-        } : null;
-        const lease = assertRdcContextLeaseOwnership({
-          sessionId,
-          projectId,
-        });
-        const runtimeContext = lease?.runtimeContext ?? null;
-        if (!runtimeContext || !lease) {
-          const retainedLease = sessionId ? getRdcContextLease(sessionId) : null;
-          const requiresRecovery = !!retainedLease && retainedLease.ownerSessionId === sessionId
-            && retainedLease.ownerProjectId === projectId && !!retainedLease.quarantineReason;
-          const note = requiresRecovery
-            ? 'The capture is open, but replay requires controlled recovery. Close it in Capture, confirm that close succeeds, then reopen before further RDC operations. Preserve the confirmed goal and earlier evidence.'
-            : sessionId
-              ? 'The capture is not open in this session. Ask the user to select the capture and click Open in the Capture section. Preserve the confirmed goal; do not describe internal leases or diagnose a rendering cause.'
-              : 'RDC replay identity requires an owning sessionId (no global fallback).';
-          return {
-            content: [{ type: 'text', text: JSON.stringify({ ...identity, capturePlanning, ...captureRestoration, rdc: { available: false, requiresRecovery, note } }, null, 2) }],
-            details: { available: false, requiresRecovery },
-          };
-        }
-        const ownerSessionId = lease?.delegatedFrom ?? sessionId;
-        const scope = ownerSessionId && projectId ? { sessionId: ownerSessionId, projectId } : null;
-        const opened = scope ? rdcSessionService.snapshotOpenedCaptureForSession(scope) : null;
-        const binding = scope ? rdcSessionService.listBindingsForProject(scope.projectId).find(item =>
-          item.scope.sessionId === scope.sessionId && item.scope.projectId === scope.projectId
-          && item.contextId === runtimeContext.contextId) : undefined;
-        const captureContentSha256 = opened?.status === 'open' && binding && ['ready', 'applying'].includes(binding.phase)
-          && runtimeContext.captureFileId && runtimeContext.replaySessionId
-          && opened.contextId === runtimeContext.contextId && opened.captureFileId === runtimeContext.captureFileId
-          && opened.replaySessionId === runtimeContext.replaySessionId && /^[a-f0-9]{64}$/.test(binding?.captureHash ?? '')
-          ? binding!.captureHash : null;
-        const { raw: _openTimePayload, ...runtimeIdentity } = runtimeContext;
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ ...identity, capturePlanning, ...captureRestoration, rdc: { ...runtimeIdentity, captureContentSha256,
-            hostControls: ownerSessionId && projectId ? readRdcHostControls({ sessionId: ownerSessionId,
-              projectId, contextId: runtimeContext.contextId, leaseVersion: lease.version }, executionContext) : null,
-          } }, null, 2) }],
-          details: { available: true },
-        };
-      },
-    };
-  }
-
-  createAskUserTool(agentId: AgentRole): AgentTool<
-    { questions?: unknown[] },
-    { agentId: AgentRole; questions: ConversationAskUserQuestion[] }
-  > {
-    return {
-      name: 'ask_user',
-      label: 'Ask User',
-      description: 'Help form the user goal, scope, expected result and acceptance criteria, or request information that materially changes the plan. Read available materials first; ask a few progressive questions without requiring a diagnosis. Unknown and optional skip are supported. Answers do not grant approval.',
-      parameters: {
-        type: 'object',
-        required: ['questions'],
-        properties: {
-          questions: {
-            type: 'array',
-            minItems: 1,
-            description: 'Ask one to three questions per round when useful; continue progressively after answers instead of front-loading a questionnaire. A single question is an array with one item.',
-            items: {
-              type: 'object',
-              required: ['prompt'],
-              properties: {
-                questionId: { type: 'string', description: 'Optional stable question id. Runtime generates one when omitted.' },
-                prompt: { type: 'string', description: 'The concise question to ask the user.' },
-                description: { type: 'string', description: 'Optional supporting context shown below the question title.' },
-                allowFreeform: { type: 'boolean', description: 'Whether the user may type a custom answer. Defaults to true.' },
-                required: { type: 'boolean', description: 'Set false for questions the user may explicitly skip. Unknown is always available. Answers form requirements, never mutation approval.' },
-                options: {
-                  type: 'array',
-                  description: 'Optional mutually exclusive SINGLE-SELECT choices. Never say multiple selection is available; the user can supplement freely.',
-                  items: {
-                    type: 'object',
-                    required: ['label'],
-                    properties: {
-                      optionId: { type: 'string', description: 'Optional stable option id. Runtime generates one when omitted.' },
-                      label: { type: 'string', description: 'Short option label.' },
-                      description: { type: 'string', description: 'Optional one-line option detail.' },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false,
-        interaction: 'user-input' },
-      async execute(_toolCallId, args) {
-        const questions = normalizeAskUserQuestions(args);
-        return {
-          content: [{
-            type: 'text',
-            text: questions.length > 0
-              ? 'ask_user requires the conversation interaction bridge.'
-              : 'ask_user requires at least one canonical questions[] entry with a prompt.',
-          }],
-          isError: true,
-          details: { agentId, questions },
-        };
-      },
-    };
   }
 
   createPlanArtifactTool(sessionId?: string | null): AgentTool<
@@ -355,300 +142,22 @@ export class RuntimeToolAssembly {
     };
   }
 
-  createMemorySearchTool(sessionId?: string | null): AgentTool<
-    { scope: 'user' | 'project'; query?: string; limit?: number },
-    { sessionId: string | null; scope: 'user' | 'project'; count: number }
-  > {
-    const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => this.deps.getMemoryStore(scope, projectRootPath);
-    return {
-      name: 'memory_search',
-      label: 'Search Memory',
-      description: 'Search explicitly saved memories in one declared scope. Memory is never injected automatically.',
-      parameters: { type: 'object', required: ['scope'], properties: {
-        scope: { type: 'string', enum: ['user', 'project'] },
-        query: { type: 'string' },
-        limit: { type: 'number' },
-      } },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
-      async execute(_id, args, _signal, _update, context) {
-        const records = await resolveStore(args.scope, context?.projectRootPath).searchMemories(args.query ?? '', args.limit ?? 20);
-        return { content: [{ type: 'text', text: records.length ? records.map((record) => `- ${record.displayName}: ${record.description}`).join('\n') : 'No matching memories were found.' }], details: { sessionId: sessionId ?? null, scope: args.scope, count: records.length } };
-      },
-    };
-  }
-
-  createMemoryReadTool(sessionId?: string | null): AgentTool<
-    { scope: 'user' | 'project'; name: string },
-    { sessionId: string | null; scope: 'user' | 'project'; count: number }
-  > {
-    const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => this.deps.getMemoryStore(scope, projectRootPath);
-    return {
-      name: 'memory_read',
-      label: 'Read Memory',
-      description: 'Read one explicitly saved memory by exact name and scope.',
-      parameters: { type: 'object', required: ['scope', 'name'], properties: {
-        scope: { type: 'string', enum: ['user', 'project'] },
-        name: { type: 'string' },
-      } },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
-      async execute(_id, args, _signal, _update, context) {
-        const record = await resolveStore(args.scope, context?.projectRootPath).getMemory(args.name);
-        return { content: [{ type: 'text', text: record ? `# ${record.displayName}\n\n${record.description}\n\n${record.content}` : `No memory named "${args.name}" was found.` }], details: { sessionId: sessionId ?? null, scope: args.scope, count: record ? 1 : 0 } };
-      },
-    };
-  }
-
-  createMemoryWriteTool(): AgentTool<
-    { scope: 'user' | 'project'; name: string; description: string; type: string; content: string; tags?: string[]; approved: boolean },
-    { scope: 'user' | 'project'; name: string; created: boolean }
-  > {
-    const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => this.deps.getMemoryStore(scope, projectRootPath);
-    const validTypes = new Set(['user', 'feedback', 'project', 'reference']);
-    return {
-      name: 'memory_write',
-      label: 'Write Memory',
-      description: 'Persist a memory only after explicit user intent or interactive approval. Scope must be declared. type must be user, feedback, project, or reference; other types are rejected.',
-      parameters: {
-        type: 'object',
-        required: ['scope', 'name', 'description', 'type', 'content', 'approved'],
-        properties: {
-          scope: { type: 'string', enum: ['user', 'project'] },
-          name: { type: 'string', description: 'Kebab-case memory name (unique key).' },
-          description: { type: 'string', description: 'One-line summary.' },
-          type: { type: 'string', description: 'user | feedback | project | reference' },
-          content: { type: 'string', description: 'Full Markdown body.' },
-          tags: { type: 'array', items: { type: 'string' } },
-          approved: { type: 'boolean', description: 'True only after the user explicitly requested or approved this write.' },
-        },
-      },
-      permissionHint: 'mutation',
-      spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem' },
-      async execute(_toolCallId, args, _signal, _update, context) {
-        if (args.approved !== true) {
-          return { content: [{ type: 'text', text: 'Memory write requires explicit user approval.' }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
-        }
-        if (!validTypes.has(args.type)) {
-          return { content: [{ type: 'text', text: `Memory type must be one of ${[...validTypes].join(', ')}.` }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
-        }
-        const type = args.type as 'user' | 'feedback' | 'project' | 'reference';
-        const record = await resolveStore(args.scope, context?.projectRootPath).writeMemory({
-          name: args.name.trim(),
-          description: args.description.trim(),
-          type,
-          content: args.content,
-          tags: Array.isArray(args.tags) ? args.tags : undefined,
-        });
-        return {
-          content: [{ type: 'text', text: `Memory saved: ${record.displayName} (${record.type})` }],
-          details: { scope: args.scope, name: record.displayName, storageKey: record.name, created: true },
-        };
-      },
-    };
-  }
-
-  createMemoryDeleteTool(): AgentTool<
-    { scope: 'user' | 'project'; name: string; confirmed: boolean },
-    { scope: 'user' | 'project'; name: string; deleted: boolean }
-  > {
-    const resolveStore = (scope: 'user' | 'project', projectRootPath?: string | null) => this.deps.getMemoryStore(scope, projectRootPath);
-    return {
-      name: 'memory_delete',
-      label: 'Delete Memory',
-      description: 'Delete one scoped memory only after explicit confirmation.',
-      parameters: {
-        type: 'object',
-        required: ['scope', 'name', 'confirmed'],
-        properties: {
-          scope: { type: 'string', enum: ['user', 'project'] },
-          name: { type: 'string', description: 'Memory name to delete.' },
-          confirmed: { type: 'boolean' },
-        },
-      },
-      permissionHint: 'mutation',
-      spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem' },
-      async execute(_toolCallId, args, _signal, _update, context) {
-        if (args.confirmed !== true) {
-          return { content: [{ type: 'text', text: 'Memory deletion requires explicit confirmation.' }], isError: true, details: { scope: args.scope, name: args.name, deleted: false } };
-        }
-        const deleted = await resolveStore(args.scope, context?.projectRootPath).deleteMemory(args.name.trim());
-        return {
-          content: [{
-            type: 'text',
-            text: deleted ? `Memory deleted: ${args.name}` : `No memory named "${args.name}" was found.`,
-          }],
-          details: { scope: args.scope, name: args.name, deleted },
-        };
-      },
-    };
-  }
-
-  createSkillsCatalogTool(agentId: AgentRole): AgentTool<
-    { query?: string },
-    { count: number }
-  > {
-    return {
-      name: 'skills',
-      label: 'List Skills',
-      description: 'List reusable skills configured for the current workspace.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Optional case-insensitive filter.' },
-        },
-      },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
-      async execute(_toolCallId, args, _signal, _onUpdate, context) {
-        const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const skills = agentRuntimeConfigService.listSkills(context?.projectRootPath ?? undefined, agentId)
-          .filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
-        const lines = skills.map((skill) => (
-          `${skill.id}: ${skill.label || skill.name} (${skill.source})`
-        ));
-        return {
-          content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured skills matched the query.' }],
-          details: { count: skills.length },
-        };
-      },
-    };
-  }
-
-  createSkillReadTool(agentId: AgentRole): AgentTool<
-    { skill_id?: string; reference?: string; offset?: number; limit?: number },
-    { skillId: string; agentId: AgentRole }
-  > {
-    return {
-      name: 'skill_read',
-      label: 'Read Skill',
-      description: 'Read one discovered effective Skill. Without reference, returns the full SKILL.md. To read a linked method reference, pass its Skill-relative references/... path plus optional 1-based offset/limit; returns whole-file SHA-256 and truncation metadata. This reads knowledge only and never changes frozen tool permissions or grants editing access. Do not resolve Skill links relative to the project workspace.',
-      parameters: {
-        type: 'object',
-        required: ['skill_id'],
-        properties: {
-          skill_id: { type: 'string', description: 'Skill id, for example rdc-context.' },
-          reference: { type: 'string', description: 'Exact Skill-relative text path under references/, for example references/tools.md. No absolute paths, traversal or symlinks.' },
-          offset: { type: 'integer', minimum: 1, description: 'Reference start line, 1-based; only valid with reference.' },
-          limit: { type: 'integer', minimum: 1, maximum: 5000, description: 'Reference line window; defaults to 2000, at most 5000.' },
-        },
-      },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
-      async execute(_toolCallId, args, signal, _onUpdate, context) {
-        const skillKey = typeof args.skill_id === 'string' ? args.skill_id.trim() : '';
-        if (!skillKey) {
-          return {
-            content: [{ type: 'text', text: 'skill_id is required.' }],
-            isError: true,
-            details: { skillId: '', agentId },
-          };
-        }
-
-        const skill = agentRuntimeConfigService.loadSkill(skillKey, context?.projectRootPath ?? undefined, agentId);
-        if (!skill) {
-          return {
-            content: [{ type: 'text', text: `Skill is not configured: ${skillKey}` }],
-            isError: true,
-            details: { skillId: skillKey, agentId },
-          };
-        }
-
-        if (args.reference !== undefined) {
-          const reference = args.reference;
-          const parts = typeof reference === 'string' ? reference.replace(/\\/gu, '/').split('/') : [];
-          if (parts[0] !== 'references' || parts.length < 2
-            || parts.some((part) => !part || part === '.' || part === '..' || part.includes(':')
-              || [...part].some((char) => char.charCodeAt(0) < 32))) {
-            throw new AppError('SKILL_REFERENCE_PATH_DENIED', 'use an exact relative path under this Skill references/ directory.');
-          }
-          // Reuse canonical file guards/windowing, but never inherit workspace
-          // roots or successfulFileReads: method knowledge cannot grant edits.
-          const root = path.dirname(skill.sourcePath);
-          const result = await readFileTool.execute(_toolCallId, {
-            path: parts.join('/'), offset: args.offset, limit: args.limit,
-          }, signal, undefined, { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null });
-          return {
-            content: result.content,
-            details: { skillId: skill.id, agentId, sourcePath: skill.sourcePath, sourceHash: skill.sourceHash, scope: skill.scope, reference: result.details },
-          };
-        }
-        if (args.offset !== undefined || args.limit !== undefined) {
-          throw new AppError('SKILL_REFERENCE_REQUIRED', 'offset/limit require a reference path.');
-        }
-
-        return {
-          content: [{ type: 'text', text: skill.instructions }],
-          details: {
-            skillId: skill.id,
-            agentId,
-            name: skill.name,
-            description: skill.description,
-            sourcePath: skill.sourcePath,
-          },
-        };
-      },
-    };
-  }
-
-  createMcpCatalogTool(): AgentTool<
-    { query?: string },
-    { count: number; servers: MCPServerStatusSummary[] }
-  > {
-    const getMcpServerStatusSummary = this.deps.getMcpServerStatusSummary;
-    return {
-      name: 'mcp',
-      label: 'List MCP Services',
-      description: 'List MCP services configured for the current workspace, including connection status and tools.',
-      pollable: true,
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Optional case-insensitive filter.' },
-        },
-      },
-      permissionHint: 'readonly',
-      spec: { isReadOnly: true, concurrency: 'exclusive', isDestructive: false, sideEffect: 'none' },
-      async execute(_toolCallId, args, _signal, _onUpdate, context) {
-        const query = typeof args.query === 'string' ? args.query : undefined;
-        const servers = getMcpServerStatusSummary(context?.projectRootPath ?? null, query);
-        const lines = servers.map((server) => {
-          const toolNames = (server.tools ?? []).slice(0, 12);
-          const toolsLabel = toolNames.length > 0
-            ? toolNames.join(', ') + ((server.tools?.length ?? 0) > toolNames.length ? ', …' : '')
-            : '(none)';
-          const errorLine = server.lastError ? `\n  lastError: ${server.lastError}` : '';
-          return [
-            `${server.id}: ${server.name}`,
-            `  connectionStatus: ${server.connectionStatus}`,
-            `  toolCount: ${server.toolCount}`,
-            `  tools: ${toolsLabel}${errorLine}`,
-          ].join('\n');
-        });
-        return {
-          content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured MCP services matched the query.' }],
-          details: { count: servers.length, servers },
-        };
-      },
-    };
-  }
-
   createWorkbenchTools(agentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
     return [
-      this.createAskUserTool(agentId),
-      this.createMemorySearchTool(sessionId),
-      this.createMemoryReadTool(sessionId),
-      this.createMemoryWriteTool(),
-      this.createMemoryDeleteTool(),
+      createAskUserTool(agentId),
+      createMemorySearchTool(this.deps.getMemoryStore, sessionId),
+      createMemoryReadTool(this.deps.getMemoryStore, sessionId),
+      createMemoryWriteTool(this.deps.getMemoryStore),
+      createMemoryDeleteTool(this.deps.getMemoryStore),
       this.createPlanArtifactTool(sessionId),
       createOutputRegistrationTool({
         sessionId,
         runId: turnHandle?.runId,
         projectRootPath: turnHandle?.eventSink?.projectRootPath,
       }) as unknown as AgentTool,
-      this.createSkillsCatalogTool(agentId),
-      this.createSkillReadTool(agentId),
-      this.createMcpCatalogTool(),
+      createSkillsCatalogTool(agentId),
+      createSkillReadTool(agentId),
+      createMcpCatalogTool(this.deps.getMcpServerStatusSummary),
       ...createKnowledgeTools(sessionId),
       ...createInvestigationTools(sessionId),
       ...this.deps.createSubagentTools(agentId, sessionId, turnHandle),
@@ -677,7 +186,7 @@ export class RuntimeToolAssembly {
     for (const tool of this.createTaskRuntimeTools(sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    const turnCompletionTool = this.createTurnCompletionTool(turnHandle, async declaration => {
+    const turnCompletionTool = createTurnCompletionTool(turnHandle, async declaration => {
       if (turnHandle) {
         const unfinished = await listUnfinishedDirectTasks({
           sessionId,
@@ -712,7 +221,7 @@ export class RuntimeToolAssembly {
       await turnHandle?.validateCompletionReadiness?.(declaration);
     });
     availableTools.set(turnCompletionTool.name, turnCompletionTool);
-    const runtimeContextTool = this.createRuntimeContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
+    const runtimeContextTool = createRuntimeContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
     availableTools.set(runtimeContextTool.name, runtimeContextTool);
     if (!excludeRdcLeaseTools) {
       const rdcProbeTool = createRdcProbeTool(
