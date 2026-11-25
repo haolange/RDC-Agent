@@ -56,7 +56,13 @@ Conclusion
 
 ## 一份调查，一份回指证据的报告
 
-最终结果不应只是一段聊天终答。调查的 Report 是调查记录的一部分，在右栏 Artifacts 里按文档阅读：问了什么、发现了什么、怎样验证、边界在哪、结论是什么，每条 Claim 带一个验证等级。Report 由 Report Writer 从合格的 Claim 与 Evidence 整理而成，不升级它们的资格，也不隐藏局限；每个关键判断都回指可解引用的 Claim、Evidence 和验证状态，所以可读性不会跑在可信度前面。
+最终结果不应只是一段聊天终答。调查的 Report 是调查记录的一部分，在右栏 Artifacts 里按文档阅读：
+
+- 依次是目标、计划、证据与发现、Claim（结论与根因）、实验与验证、审查与未解问题、结论；
+- 每条 Claim 带一个验证等级，有裁决时另标裁决；
+- 记录标识只经「复制诊断信息」进入剪贴板，不出现在正文里。
+
+Report 由 Report Writer 从合格的 Claim 与 Evidence 整理而成，不升级它们的资格，也不隐藏局限；每个关键判断都回指可解引用的 Claim、Evidence 和验证状态，所以可读性不会跑在可信度前面。
 
 ![RDC-Agent workbench preview](docs/media/rdc-agent-workbench-preview.png)
 
@@ -75,7 +81,7 @@ Conclusion
 ## 事实上的能力边界
 
 - **Capture 工作流**：管理项目内 `.rdc` 输入，打开、切换和诊断 capture；RDC / RenderDoc 能力来自用户配置的外部 RDC-Tool CLI。
-- **Agent 工作流**：支持阅读、规划、编辑、搜索、Shell、工具调用、handoff、memory 和 subagent 编排；执行权限由主进程和冻结的运行计划控制。
+- **Agent 工作流**：支持阅读、规划、编辑、搜索、Shell、工具调用、handoff、memory 和 subagent 编排；执行权限由主进程和冻结的运行计划控制。官方 Agent、Skill 与 Hook 随应用打包在 `resources/agent-runtime`，不复制到用户空间。
 - **可审计资源**：用户资源位于 `~/.rdc-agent`，项目资源位于 `<project-root>/.rdc-agent`；Agent、Skill、MCP、Hook、Policy、Knowledge 和显式 Memory 有清晰的 scope。
 - **真实运行过程**：Work Process 展示实际执行过程和 provider reasoning 语义；不伪造隐藏思维链，也不把模型自报当成证据。
 - **设备与回放**：本地回放与 Android 设备路径由 RDC / RenderDoc 环境决定；“已连接”不等于每一种 capture 都能在每一台 GPU 上成功 replay。
@@ -91,11 +97,17 @@ Conclusion
 
 ## 5 分钟开始
 
-发行包用户：安装 `*-setup.exe`，或完整解压 Windows zip 后运行 `RdcAgent.exe`（保留同目录资源）。不需要 Node.js/pnpm。首次上手指南也可从标题栏问号重开；自行配置 Provider/Model 和项目即可使用 General。
+发行包用户：安装 `*-setup.exe`，或完整解压 Windows zip 后运行 `RdcAgent.exe`（保留同目录资源）。不需要 Node.js/pnpm。
+
+首次启动不弹引导对话框：空工作台列出仍缺的准备项（RDC 工具、模型服务、项目），每项直达对应设置，全部完成后清单消失；标题栏的「?」随时重开这份清单。自行配置 Provider/Model 和项目即可使用 General，未配置 RDC 不影响 General。
 
 当前源码版本 **0.6.0-rc.8 按未签名预发布通道交付**；可下载版本以 [Releases](https://github.com/haolange/RDC-Agent/releases) 为准。Windows 可能提示未知发布者，受管理电脑可能阻止运行。仅从本仓库 Releases 下载并核对 SHA-256；不要关闭安全防护。稳定正式版仍保留签名要求。
 
-RDC 调查另从 [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases) 下载自包含 zip，解压后在 Settings → Tools 检测安装或选择 `rdc-tool` 根目录，再验证并应用；不需要另装 Python。Windows 默认安装目录为 `%LOCALAPPDATA%/Programs/rdc-tool`；Linux 上选择解压后的根目录。通用 Code Interpreter 是单独的可选配置。
+RDC 调查另从 [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases) 下载自包含 zip，解压后在 Settings → Tools 检测安装或选择目录，再验证并应用：
+
+- 选择包含捆绑 Python 与 CLI 的 `rdc-tool` 根目录，而不是 Python 可执行文件；不需要另装 Python，装入 PATH 是可选的。
+- 检测只看已配置的位置，Windows 另看默认安装目录 `%LOCALAPPDATA%/Programs/rdc-tool`；Linux 上选择解压后的根目录。
+- 通用 Code Interpreter 是单独的可选配置。
 
 以下命令只供源码开发：
 
@@ -130,7 +142,7 @@ pnpm run build
 
 ## 公开仓库说明
 
-这是一个仍在快速收敛中的工程项目。README 展示已经落地的产品边界与真实验证过的工作流；完整平台、Provider、GPU、Android 和发布验收矩阵请查看 [Acceptance Ledger](./docs/product/acceptance-ledger.md)。不具备对应环境的验证，不会在这里被包装成“全平台保证”。
+这是一个仍在快速收敛中的工程项目。README 展示已经落地的产品边界与真实验证过的工作流；各平台、Provider、GPU、Android 与发布的真实验证记录及未验证边界见 [Acceptance Ledger](./docs/product/acceptance-ledger.md)。不具备对应环境的验证，不会在这里被包装成“全平台保证”。
 
 欢迎提交 issue、改进文档或针对具体 capture 的可复现问题。请不要在 issue 中上传私有 `.rdc`、Provider 密钥、用户数据或包含敏感路径的日志。
 
@@ -145,16 +157,16 @@ pnpm run build
 - [UI Design System](./docs/ui/design-system.md)
 - [验收记录](./docs/product/acceptance-ledger.md)
 
+## RenderDoc 运行时基线
+
+当前组装并验证的基线是 **RenderDoc 1.45**。RDC-Tool 不追随上游的每个小版本：新的运行时只有在对应的运行时打包、catalog 检查、测试与发布门禁全部通过后才成为基线。RenderDoc 1.44 及更早的官方 GUI 版本不是单独的组装目标。请使用与捆绑运行时匹配的回放路径；capture 格式兼容性以上游 RenderDoc 为准。
+
+RDC-Agent **0.6.x** 已对照 RDC-Tool **1.1.2**（当前稳定版）与 RenderDoc **1.45** 运行时验证。授权操作的是 catalog 定义与指纹，不是包版本号。本地 PNG 导出不能证明 Android 设备已呈现。
+
+## 安全地报告问题
+
+不要上传私有 capture、Provider 密钥或含本机绝对路径的完整日志。日志先脱敏，再使用安装或缺陷报告模板。
+
 ## License
 
 See [LICENSE](./LICENSE).
-
-## RenderDoc runtime baseline
-
-The current assembled and verified baseline is **RenderDoc 1.45**. RDC-Tool does not track every upstream minor release: a newer runtime becomes the baseline only after matching runtime packaging, catalog checks, tests and release gates pass. RenderDoc 1.44 and earlier official GUI releases are not separate assembly targets. Use the replay path matching this bundled runtime. Capture-format compatibility follows upstream RenderDoc.
-
-RDC-Agent **0.6.x** is verified against RDC-Tool **1.1.2** (the current stable release) and the RenderDoc **1.45** runtime. Catalog definitions and fingerprints, not package version numbers, authorize operations. Local PNG export does not prove Android device presentation.
-
-## Reporting safely
-
-Do not upload private captures, provider keys or full logs containing local absolute paths. Redact logs and use the installation or bug-report template.

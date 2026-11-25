@@ -56,7 +56,13 @@ That is also why several boundaries are intentional: MCP is not RDC-Agent's runt
 
 ## One investigation, one report that points back to its evidence
 
-The result should not be only a chat answer. An investigation's Report is part of its record and reads as a document in the right rail's Artifacts: what was asked, what was found, how it was checked, where it stops and what it concludes, with one verification label per claim. Report Writer assembles it from eligible claims and evidence without upgrading their qualification or hiding limitations; every important statement points back to referenceable Claims, Evidence and verification state, so readability never outruns trustworthiness.
+The result should not be only a chat answer. An investigation's Report is part of its record and reads as a document in the right rail's Artifacts:
+
+- it runs through goal, plan, evidence and findings, claims (conclusions and root cause), experiments and verification, review and open questions, and conclusion;
+- each claim carries one verification label, plus its verdict when one was decided;
+- record identifiers reach the clipboard only through "Copy diagnostics" and are not part of the text.
+
+Report Writer assembles it from eligible claims and evidence without upgrading their qualification or hiding limitations; every important statement points back to referenceable Claims, Evidence and verification state, so readability never outruns trustworthiness.
 
 ![RDC-Agent workbench preview](docs/media/rdc-agent-workbench-preview.png)
 
@@ -72,21 +78,32 @@ These are not three isolated chat personas. They share the same agent loop, proj
 
 ## What is real, and where the boundary is
 
-- Capture management, diagnostics, and RDC / RenderDoc operations are driven by the external RDC-Tool CLI configured on the host.
-- Agent work includes reading, planning, editing, searching, shell commands, tool calls, handoffs, memory, and subagent orchestration.
-- User resources live under `~/.rdc-agent`; project resources live under `<project-root>/.rdc-agent`.
-- Work Process reflects actual execution and provider reasoning semantics. It does not fabricate hidden chain-of-thought or treat model self-report as evidence.
-- Local replay and Android presentation depend on the installed RDC / RenderDoc environment and the target GPU. A connected device is not a promise that every capture replays everywhere.
+- **Capture workflow**: manage the project's `.rdc` inputs, open, switch and diagnose captures; RDC / RenderDoc operations come from the external RDC-Tool CLI configured on the host.
+- **Agent workflow**: reading, planning, editing, searching, shell commands, tool calls, handoffs, memory, and subagent orchestration; execution permissions are enforced by the main process and the frozen run plan. Official Agents, Skills and Hooks are bundled under `resources/agent-runtime` and are not copied into user space.
+- **Auditable resources**: user resources live under `~/.rdc-agent`, project resources under `<project-root>/.rdc-agent`; Agents, Skills, MCP, Hooks, Policies, Knowledge and explicit Memory each have a clear scope.
+- **Real execution**: Work Process reflects actual execution and provider reasoning semantics. It does not fabricate hidden chain-of-thought or treat model self-report as evidence.
+- **Devices and replay**: local replay and Android presentation depend on the installed RDC / RenderDoc environment and the target GPU. A connected device is not a promise that every capture replays everywhere.
 
 The release surface is **Windows-only**; the source runs on Windows and Linux (x64) (host differences: [`docs/architecture/host-platform.md`](docs/architecture/host-platform.md)). RDC-Agent does not bundle your captures, provider keys, or RenderDoc installation. Configure the RDC-Tool CLI, provider / model, and device environment yourself.
+
+## Why it fits serious graphics debugging
+
+- **Context does not drift**: capture, replay, context and session identity are frozen when a turn starts, so the investigation cannot silently switch objects halfway.
+- **Permissions do not rely on prompts**: Skills provide method knowledge and cannot widen tool permissions; Shell, RDC, IPC and secret boundaries are enforced by the main process.
+- **Failures are explainable**: security refusals, integrity degradation and recoverable errors are reported separately; a failure is never masked by an empty result or a fixed success value.
+- **Results can be reviewed**: investigation material, capture evidence and run records have explicit sources and boundaries, ready for review and handover.
 
 ## Download and first use
 
 Windows releases provide an NSIS installer (`*-setup.exe`) and a portable zip. Extract the whole zip before running `RdcAgent.exe`; Node.js and pnpm are only needed for source development. Source version **0.6.0-rc.8 targets the unsigned prerelease channel**; see [Releases](https://github.com/haolange/RDC-Agent/releases) for available downloads. Windows may warn about an unknown publisher or block execution under managed security policies. Download only from this repository and verify SHA-256; do not disable security protections. Stable releases still require signing.
 
-The four-step guide appears on first launch and can be reopened from the titlebar question mark. Configure your own provider/API key and model in Settings, then create a Project and import a capture. Official Agents, Skills and Hooks are bundled under `resources/agent-runtime` and are not copied into user space.
+First launch opens no guide dialog: the empty workbench lists the setup steps still missing (RDC tool, model service, project), each step links straight to its setting, and the list disappears once everything is done. The title bar's question mark reopens the same list at any time. Configure your own provider/API key and model in Settings to use General; General works without RDC.
 
-Download the independent [RDC-Tool release](https://github.com/haolange/RDC-Tool/releases), extract it, then use Settings → Tools → Detect installation / Select folder → Verify and apply. Select the `rdc-tool` root containing its bundled Python and CLI, not the Python executable. Detection checks the configured location, plus `%LOCALAPPDATA%/Programs/rdc-tool` on Windows; on Linux select the extracted root. Installing into PATH is optional. General use can start without RDC. Code Interpreter remains a separate environment.
+For RenderDoc investigations, download the self-contained zip from [RDC-Tool Releases](https://github.com/haolange/RDC-Tool/releases), extract it, then use Settings → Tools → Detect installation / Select folder → Verify and apply:
+
+- Select the `rdc-tool` root containing its bundled Python and CLI, not the Python executable; no separate Python install is needed, and installing into PATH is optional.
+- Detection checks the configured location, plus the default install folder `%LOCALAPPDATA%/Programs/rdc-tool` on Windows; on Linux select the extracted root.
+- Code Interpreter remains a separate, optional configuration.
 
 ## Source development
 
@@ -112,13 +129,29 @@ pnpm run check:gates
 pnpm run build
 ```
 
-Start from the [documentation index](./docs/README.md); the [RenderDoc Agent design book](<docs/product/RenderDoc Agent 完整设计书.md>) (Chinese) is the domain authority. Read the [design and architecture guide](./ARCHITECTURE.md) for the product boundary, the [RDC runtime contract](./docs/architecture/rdc-runtime.md) for native operations, and the [acceptance ledger](./docs/product/acceptance-ledger.md) for evidence and unverified boundaries.
+Then, in the app:
 
-This repository is evolving quickly. Please report reproducible problems with the smallest safe reproduction you can share. Never upload private `.rdc` captures, provider keys, user data, or logs containing sensitive paths.
+1. Add a Project.
+2. Put `.rdc` files into `<project-root>/.rdc-agent/inputs/`, or import them from the Capture panel.
+3. Configure the RDC-Tool CLI and a provider / model.
+4. Describe the goal to General; enter Debugger, Analyzer or Optimizer when the problem needs a graphics investigation.
 
-## License
+## About this public repository
 
-See [LICENSE](./LICENSE).
+This repository is evolving quickly. The README shows the product boundaries that have landed and the workflows that were verified for real; the per-platform, provider, GPU, Android and release verification records, together with what is still unverified, are in the [acceptance ledger](./docs/product/acceptance-ledger.md). Verification without the matching environment is never presented here as an all-platform guarantee.
+
+Please report reproducible problems with the smallest safe reproduction you can share. Never upload private `.rdc` captures, provider keys, user data, or logs containing sensitive paths.
+
+## Documentation
+
+- [Documentation index](./docs/README.md)
+- [Product and architecture rulings](./ARCHITECTURE.md)
+- [RenderDoc Agent design book](<docs/product/RenderDoc Agent 完整设计书.md>) (Chinese; the domain authority)
+- [Runtime and permission contracts](./docs/contracts/runtime-kernel.md)
+- [RDC runtime](./docs/architecture/rdc-runtime.md)
+- [Workbench / Transcript / Composer](./docs/ui/workbench-and-transcript.md)
+- [UI Design System](./docs/ui/design-system.md)
+- [Acceptance ledger](./docs/product/acceptance-ledger.md)
 
 ## RenderDoc runtime baseline
 
@@ -129,3 +162,7 @@ RDC-Agent **0.6.x** is verified against RDC-Tool **1.1.2** (the current stable r
 ## Reporting safely
 
 Do not upload private captures, provider keys or full logs containing local absolute paths. Redact logs and use the installation or bug-report template.
+
+## License
+
+See [LICENSE](./LICENSE).
