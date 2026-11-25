@@ -44,6 +44,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.KNOWLEDGE_ZIP_INVALID': '无法读取该压缩包。',
   'errors.KNOWLEDGE_IMAGE_INVALID': '其中有图片不是有效的图片文件。',
   'errors.KNOWLEDGE_TOPICS_BUSY': '主题正在整理，请稍后重试。',
+  'errors.KNOWLEDGE_OPERATION_CANCELLED': '知识任务已取消。',
   'errors.KNOWLEDGE_ASSETS_MISSING': '这张卡片声明的部分附件缺失，请补齐后重试。',
   'errors.KNOWLEDGE_EXPORT_EMPTY_RESULT': '所选范围没有可导出的卡片。请补齐缺失附件，或移除敏感内容和非法路径。',
   'errors.AGENT_MANIFEST_INVALID': 'Agent 定义有误，请修正后重新保存。',

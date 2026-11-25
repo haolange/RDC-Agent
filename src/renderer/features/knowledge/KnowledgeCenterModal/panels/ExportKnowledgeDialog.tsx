@@ -7,7 +7,7 @@ import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { knowledgeCardKey } from '../knowledgeImportExportModel';
-import { KnowledgeTaskProgress } from '../parts/KnowledgeTaskProgress';
+import { KnowledgeTaskCancelled, KnowledgeTaskProgress } from '../parts/KnowledgeTaskProgress';
 import type { KnowledgeExportFormat, KnowledgeExportScope } from '@shared/types/knowledgeExport';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeExport } from '../useKnowledgeExport';
@@ -69,10 +69,20 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
         <Button variant="primary" onClick={exporter.close}>{t('knowledgeCenter.importDone')}</Button>
       ) : (
         <>
-          {exporter.busy ? <KnowledgeTaskProgress label={t('knowledgeCenter.progressExporting')} /> : null}
-          <Button variant="ghost" disabled={exporter.busy} onClick={exporter.close}>
-            {t('knowledgeCenter.confirmCancel')}
-          </Button>
+          {exporter.operation.running ? <KnowledgeTaskProgress operation="export" progress={exporter.operation.progress} />
+            : exporter.busy ? <KnowledgeTaskProgress label={t('knowledgeCenter.progressExporting')} />
+              : exporter.cancelled ? <KnowledgeTaskCancelled label={t('knowledgeCenter.exportCancelled')} />
+                : null}
+          {exporter.operation.running ? (
+            <Button variant="secondary" loading={exporter.operation.cancelling} data-testid="knowledge-center-export-cancel"
+              onClick={exporter.cancelExport}>
+              {t('knowledgeCenter.cancelTask')}
+            </Button>
+          ) : (
+            <Button variant="ghost" disabled={exporter.busy} onClick={exporter.close}>
+              {t('knowledgeCenter.confirmCancel')}
+            </Button>
+          )}
           <Button
             variant="primary"
             disabled={exporter.busy || exporter.pendingCount === 0}

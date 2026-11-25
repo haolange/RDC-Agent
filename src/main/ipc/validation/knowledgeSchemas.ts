@@ -10,6 +10,8 @@ import { KnowledgeTopicChangesSchema } from '../../knowledge/KnowledgeTopicStore
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 const KnowledgeSpaceIdSchema = ipcNonEmptyString(200, 'spaceId');
+/** Names one long operation (import, export, rebuild) so its progress and cancellation reach the right run. */
+const KnowledgeOperationIdSchema = ipcId(128, 'operationId');
 const KnowledgePermissionModeSchema = z.enum(['default', 'auto-review', 'full-access', 'custom']);
 const KnowledgeConfirmationSchema = z.object({
   explicitHumanConfirmation: z.literal(true),
@@ -60,7 +62,9 @@ export const KnowledgeCompileArgsSchema = z.tuple([
   }).strict(),
 ]);
 
-export const KnowledgeIndexRebuildArgsSchema = z.tuple([]);
+export const KnowledgeIndexRebuildArgsSchema = z.tuple([z.object({ operationId: KnowledgeOperationIdSchema }).strict()]);
+
+export const KnowledgeCancelArgsSchema = z.tuple([z.object({ operationId: KnowledgeOperationIdSchema }).strict()]);
 
 export const KnowledgeCandidatesArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
@@ -82,7 +86,7 @@ const knowledgeImportSource = {
 const hasImportSource = (value: { source?: string; filePath?: string }) => Boolean(value.source?.trim() || value.filePath?.trim());
 
 export const KnowledgeImportArgsSchema = z.tuple([
-  z.object({ ...knowledgeImportSource, sessionId: ipcId(128, 'sessionId').optional() }).strict()
+  z.object({ ...knowledgeImportSource, sessionId: ipcId(128, 'sessionId').optional(), operationId: KnowledgeOperationIdSchema }).strict()
     .refine(hasImportSource, { message: 'source or filePath is required' }),
 ]);
 
@@ -126,6 +130,7 @@ export const KnowledgeExportArgsSchema = z.tuple([
       relativePath: ipcNonEmptyString(1024, 'relativePath'),
     }).strict()).max(2000).optional(),
     spaceId: KnowledgeSpaceIdSchema.optional(),
+    operationId: KnowledgeOperationIdSchema,
   }).strict(),
 ]);
 

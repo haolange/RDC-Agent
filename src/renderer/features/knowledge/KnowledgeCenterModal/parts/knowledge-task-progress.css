@@ -3,3 +3,13 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* The bar takes the footer's free width, under one line naming the phase and its counts. */
+.knowledge-task-progress.is-determinate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1 1 auto;
+  gap: var(--space-1);
+  align-content: center;
+  min-width: 0;
+}

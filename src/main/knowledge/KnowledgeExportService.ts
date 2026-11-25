@@ -18,13 +18,15 @@ import {
   utf8ToZip,
   zipKnowledgeFiles,
 } from './knowledgeZip';
+import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type { KnowledgeCardDetail, KnowledgeImageRef, KnowledgeSpace } from '@shared/types/knowledge';
 
 export interface KnowledgeExportDependencies {
   getCard(spaceId: string, relativePath: string): Promise<KnowledgeCardDetail | null>;
   listCards(spaceId: string): Promise<Array<{ spaceId: string; relativePath: string }>>;
   readImage(spaceId: string, relativePath: string): Promise<Uint8Array | null>;
-  writeBytes(targetPath: string, contents: Uint8Array): Promise<void>;
+  /** Replaces `targetPath` atomically; an aborted `signal` stops it before the target changes and removes its temp file. */
+  writeBytes(targetPath: string, contents: Uint8Array, signal?: AbortSignal): Promise<void>;
 }
 
 function omitUndefined<T extends object>(value: T): T {
@@ -94,8 +96,36 @@ export class KnowledgeExportService {
     return request.cardRefs;
   }
 
-  /** `targetPath` is the destination the person chose in main's save dialog; the renderer never supplies it. */
-  async export(request: KnowledgeExportRequest, targetPath: string): Promise<KnowledgeExportResult> {
+  /** One card as the package carries it, with its images; `excluded` when it may not leave this machine. */
+  private async collectCard(ref: { spaceId: string; relativePath: string }): Promise<
+    { card: KnowledgePackageCard; images: Map<string, Uint8Array> } | 'excluded' | null
+  > {
+    const card = await this.deps.getCard(ref.spaceId, ref.relativePath);
+    if (!card) return null;
+    if (!isExportable(card)) return 'excluded';
+    const present: KnowledgeImageRef[] = [];
+    const images = new Map<string, Uint8Array>();
+    for (const image of card.images ?? []) {
+      if (!isSafeKnowledgeImageRelative(image.relativePath)) continue;
+      const bytes = await this.deps.readImage(card.spaceId, image.relativePath);
+      if (!bytes || bytes.byteLength === 0 || bytes.byteLength > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
+      present.push(image);
+      images.set(image.relativePath, bytes);
+    }
+    if (present.length !== (card.images?.length ?? 0)) return 'excluded';
+    return { card: toPackageCard(card, present.length > 0 ? present : undefined), images };
+  }
+
+  /**
+   * `targetPath` is the destination the person chose in main's save dialog; the renderer never supplies it. Cards are
+   * read one at a time with the signal checked between them, and the file is written once at the end: a cancelled
+   * export leaves no file and no temp file behind.
+   */
+  async export(
+    request: KnowledgeExportRequest,
+    targetPath: string,
+    { signal, onProgress }: KnowledgeOperationOptions = {},
+  ): Promise<KnowledgeExportResult> {
     if (!path.isAbsolute(targetPath)) {
       throw new AppError('KNOWLEDGE_EXPORT_TARGET_INVALID');
     }
@@ -103,40 +133,30 @@ export class KnowledgeExportService {
     const cards: KnowledgePackageCard[] = [];
     const imageFiles = new Map<string, Uint8Array>();
     let excludedCount = 0;
-    for (const ref of refs) {
-      const card = await this.deps.getCard(ref.spaceId, ref.relativePath);
-      if (!card) continue;
-      if (!isExportable(card)) {
-        excludedCount += 1;
-        continue;
+    onProgress?.('reading', 0, refs.length);
+    for (const [index, ref] of refs.entries()) {
+      signal?.throwIfAborted();
+      const collected = await this.collectCard(ref);
+      if (collected === 'excluded') excludedCount += 1;
+      else if (collected) {
+        for (const [relativePath, bytes] of collected.images) {
+          if (!imageFiles.has(relativePath)) imageFiles.set(relativePath, bytes);
+        }
+        cards.push(collected.card);
       }
-      const present: KnowledgeImageRef[] = [];
-      const cardImages = new Map<string, Uint8Array>();
-      for (const image of card.images ?? []) {
-        if (!isSafeKnowledgeImageRelative(image.relativePath)) continue;
-        const bytes = await this.deps.readImage(card.spaceId, image.relativePath);
-        if (!bytes || bytes.byteLength === 0 || bytes.byteLength > KNOWLEDGE_IMAGE_MAX_BYTES) continue;
-        present.push(image);
-        cardImages.set(image.relativePath, bytes);
-      }
-      if (present.length !== (card.images?.length ?? 0)) {
-        excludedCount += 1;
-        continue;
-      }
-      for (const [relativePath, bytes] of cardImages) {
-        if (!imageFiles.has(relativePath)) imageFiles.set(relativePath, bytes);
-      }
-      cards.push(toPackageCard(card, present.length > 0 ? present : undefined));
+      onProgress?.('reading', index + 1, refs.length);
     }
     if (cards.length === 0) throw new AppError('KNOWLEDGE_EXPORT_EMPTY_RESULT');
 
+    onProgress?.('writing', 0, 1);
     const payload = request.format === 'package'
       ? zipKnowledgeFiles([
         { name: KNOWLEDGE_PACKAGE_MANIFEST, data: utf8ToZip(serializePackage(cards, new Date().toISOString())) },
         ...[...imageFiles.entries()].map(([name, data]) => ({ name, data })),
       ])
       : new TextEncoder().encode(serializeMarkdown(cards));
-    await this.deps.writeBytes(targetPath, payload);
+    await this.deps.writeBytes(targetPath, payload, signal);
+    onProgress?.('writing', 1, 1);
     return {
       cardCount: cards.length,
       excludedCount,
@@ -165,6 +185,6 @@ export function createDefaultExportDependencies(services: {
         return null;
       }
     },
-    writeBytes: (targetPath, contents) => writeFileAtomic(targetPath, contents),
+    writeBytes: (targetPath, contents, signal) => writeFileAtomic(targetPath, contents, signal ? { signal } : {}),
   };
 }

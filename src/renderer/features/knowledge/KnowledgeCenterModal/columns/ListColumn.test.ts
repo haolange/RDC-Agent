@@ -15,7 +15,7 @@ describe('Knowledge list empty actions', () => {
     const state = { spaces, searchQuery, viewMode: 'cards', index: { cardCount: 0 }, hits: [],
       loadingQuery: false, loadingOverview: false, setSearchQuery: vi.fn(), pack: null, page: {},
     } as unknown as Parameters<typeof ListColumn>[0]['state'];
-    const html = renderToStaticMarkup(createElement(ListColumn, { state, inbox: null, onImport: vi.fn() }));
+    const html = renderToStaticMarkup(createElement(ListColumn, { state, inbox: null, onImport: vi.fn(), onRebuildIndex: vi.fn() }));
     expect(html).toContain(reason);
     expect(html.includes('knowledge-center-empty-import')).toBe(reason === 'knowledgeCenter.emptyNoCards');
     expect(html).toContain('knowledge-center-search');
@@ -30,7 +30,7 @@ describe('Knowledge list empty actions', () => {
           type: 'fact', lifecycle: 'candidate', scope: {}, relations: [] },
       })),
     };
-    const html = renderToStaticMarkup(createElement(ListColumn, { state, inbox, onImport: vi.fn() }));
+    const html = renderToStaticMarkup(createElement(ListColumn, { state, inbox, onImport: vi.fn(), onRebuildIndex: vi.fn() }));
     expect(html).toContain('knowledgeCenter.candidatesHint');
     expect(html).toContain('knowledge-candidate-First');
     expect(html).toContain('knowledge-candidate-Second');

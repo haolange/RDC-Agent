@@ -152,6 +152,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 1. **单条 JSONL 损坏**：Integrity — 报告 diagnostics，保留可读行；全文件不可读才抛文件级错误。
 2. **单个 scoped 资源文件损坏**：Integrity — 该资源 `invalid`，其它资源继续列出。
 3. **用户主动取消 turn**：Availability — abort-and-join 后允许下一 turn，不把 session 标为不可信。
+   知识导入、导出与重建索引的取消同属 Availability：`KNOWLEDGE_OPERATION_CANCELLED` 在两项之间生效、不打断写入，主进程先把状态恢复到操作之前（导入删除本次写入的卡片，导出删除临时文件，重建保留旧快照）再拒绝；renderer 把它当作中性结果，不显示错误。
 4. **Mermaid/KaTeX 渲染失败**：Integrity/Availability（UI）— 该块 fail-closed 展示错误，不影响整条消息其它块。
 5. **Reasoning `unknown`**：不是 Security 拒绝发送；UI 呈现与关档相同的 `Disabled` / `禁用`（灰掉不可调），控件不发明档位。
 
@@ -161,7 +162,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 
 - Provider 失败保真：`ErrorRecovery.test.ts`、`ConversationTurnDiagnostic.test.ts`、`providers/internal/http.test.ts`、`OpenAIResponsesProvider.test.ts`、`AgentLoop.recoveryDiagnostic.test.ts`
 - Integrity 存储：`src/main/runtime/jsonl.test.ts`、`src/main/testing/contracts/storageFaultContract.test.ts`
-- Availability 取消：`TurnCoordinator.test.ts`、`ProcessSupervisor.test.ts`、`cancellationContract.test.ts`
+- Availability 取消：`TurnCoordinator.test.ts`、`ProcessSupervisor.test.ts`、`cancellationContract.test.ts`、`KnowledgeImportService.test.ts` / `KnowledgeExportService.test.ts` / `KnowledgeIndexService.test.ts`（知识长任务取消）
 - Security 矩阵：`securityContract.test.ts`
 
 ## Capture 分阶段失败

@@ -1,12 +1,14 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
+import { AppError } from '@shared/errors/appError';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from '@shared/types/knowledgeExport';
+import { expectMonotonicProgress } from '../testing/knowledgeProgress';
 import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
-import { KnowledgeExportService, isExportable, toPackageCard } from './KnowledgeExportService';
+import { createDefaultExportDependencies, KnowledgeExportService, isExportable, toPackageCard } from './KnowledgeExportService';
 import {
   KNOWLEDGE_PACKAGE_MANIFEST,
   unzipKnowledgeFiles,
@@ -218,6 +220,44 @@ describe('KnowledgeExportService', () => {
     const reimported = ingestKnowledge(contents, { spaceId: 'user' });
     expect(reimported.items[0]?.status).toBe('quarantine');
     expect(reimported.items[0]?.reason).toBe('yaml-broken');
+  });
+
+  it('cancelled while reading cards or before the file replaces the target, leaves no file and no temp file', async () => {
+    const cards = [detail(), detail({ cardId: 'user:cases/aird-2.md', relativePath: 'cases/aird-2.md', caseId: 'aird-2' })];
+    const deps = createDefaultExportDependencies({
+      getCard: async (spaceId, relativePath) => cards.find((card) => card.spaceId === spaceId && card.relativePath === relativePath) ?? null,
+      listCards: async () => cards,
+      listSpaces: () => [],
+    });
+    const writeBytes = vi.fn(deps.writeBytes);
+    const service = new KnowledgeExportService({ ...deps, writeBytes });
+    const exportUntil = async (targetPath: string, stopAt: (phase: string, done: number) => boolean) => {
+      const controller = new AbortController();
+      const events: Array<{ phase: 'reading' | 'writing' | 'indexing'; done: number; total: number }> = [];
+      await expect(service.export({ format: 'package', scope: 'space', spaceId: 'user' }, targetPath, {
+        signal: controller.signal,
+        onProgress: (phase, done, total) => {
+          events.push({ phase, done, total });
+          if (stopAt(phase, done)) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
+        },
+      })).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+      expectMonotonicProgress(events);
+      return events;
+    };
+
+    const fresh = absoluteTarget('knowledge.zip');
+    expect((await exportUntil(fresh, (phase, done) => phase === 'reading' && done === 1)).at(-1))
+      .toEqual({ phase: 'reading', done: 1, total: 2 });
+    expect(writeBytes).not.toHaveBeenCalled();
+    expect(readdirSync(path.dirname(fresh))).toEqual([]);
+
+    // The person chose to replace an existing file: the temp file is written, then removed, and the old file stays.
+    const existing = absoluteTarget('knowledge.zip');
+    writeFileSync(existing, 'previous export');
+    expect((await exportUntil(existing, (phase) => phase === 'writing')).at(-1)).toEqual({ phase: 'writing', done: 0, total: 1 });
+    expect(writeBytes).toHaveBeenCalledOnce();
+    expect(readdirSync(path.dirname(existing))).toEqual(['knowledge.zip']);
+    expect(readFileSync(existing, 'utf8')).toBe('previous export');
   });
 
   it('fails closed on a relative target path and on an empty selection', async () => {

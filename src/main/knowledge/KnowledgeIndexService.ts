@@ -13,6 +13,7 @@ import {
   type KnowledgeIndexSnapshot,
 } from './knowledgeLanes';
 import { extractPreview, toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
+import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
 
 export interface KnowledgeIndexDependencies {
@@ -102,23 +103,13 @@ export class KnowledgeIndexService {
     return this.resolved;
   }
 
-  async rebuild(): Promise<KnowledgeIndexSnapshot> {
-    const cards: KnowledgeIndexEntry[] = [];
-    for (const space of this.dependencies.listSpaces()) {
-      const { realRoot, files } = await walkMarkdownFiles(space.rootPath);
-      for (const absolutePath of files) {
-        const relativePath = toPosixRelative(path.relative(realRoot, absolutePath));
-        if (!relativePath || relativePath.startsWith('..')) continue;
-        try {
-          const source = await this.dependencies.readFile(absolutePath);
-          const updatedAt = await this.dependencies.statMtime(absolutePath);
-          cards.push(toEntry(space, relativePath, source, updatedAt));
-        } catch {
-          // skip unreadable files
-        }
-      }
-    }
-    cards.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  /**
+   * Reads every card in every space and replaces the snapshot. The snapshot is written once, atomically, after the
+   * last card: a rebuild that fails or is cancelled (checked between cards) leaves the previous snapshot in use.
+   */
+  async rebuild(options: KnowledgeOperationOptions = {}): Promise<KnowledgeIndexSnapshot> {
+    const cards = await this.collectEntries(options);
+    options.signal?.throwIfAborted();
     const snapshot: KnowledgeIndexSnapshot = {
       schemaVersion: KNOWLEDGE_INDEX_SCHEMA_VERSION,
       revision: knowledgeCorpusHash(cards),
@@ -139,23 +130,35 @@ export class KnowledgeIndexService {
   }
 
   async computeLiveRevision(): Promise<string> {
-    const cards: KnowledgeIndexEntry[] = [];
+    return knowledgeCorpusHash(await this.collectEntries());
+  }
+
+  /** Every readable card of every space, sorted by path; unreadable files are skipped. */
+  private async collectEntries({ signal, onProgress }: KnowledgeOperationOptions = {}): Promise<KnowledgeIndexEntry[]> {
+    const sources: Array<{ space: KnowledgeSpace; relativePath: string; absolutePath: string }> = [];
     for (const space of this.dependencies.listSpaces()) {
+      signal?.throwIfAborted();
       const { realRoot, files } = await walkMarkdownFiles(space.rootPath);
       for (const absolutePath of files) {
         const relativePath = toPosixRelative(path.relative(realRoot, absolutePath));
-        if (!relativePath || relativePath.startsWith('..')) continue;
-        try {
-          const source = await this.dependencies.readFile(absolutePath);
-          const updatedAt = await this.dependencies.statMtime(absolutePath);
-          cards.push(toEntry(space, relativePath, source, updatedAt));
-        } catch {
-          // skip unreadable files
-        }
+        if (relativePath && !relativePath.startsWith('..')) sources.push({ space, relativePath, absolutePath });
       }
     }
+    const cards: KnowledgeIndexEntry[] = [];
+    onProgress?.('indexing', 0, sources.length);
+    for (const [index, { space, relativePath, absolutePath }] of sources.entries()) {
+      signal?.throwIfAborted();
+      try {
+        const source = await this.dependencies.readFile(absolutePath);
+        const updatedAt = await this.dependencies.statMtime(absolutePath);
+        cards.push(toEntry(space, relativePath, source, updatedAt));
+      } catch {
+        // skip unreadable files
+      }
+      onProgress?.('indexing', index + 1, sources.length);
+    }
     cards.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
-    return knowledgeCorpusHash(cards);
+    return cards;
   }
 
   async isSnapshotStale(snapshot: KnowledgeIndexSnapshot | null = this.getSnapshot()): Promise<boolean> {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { IpcValidationError, parseIpcArgs } from './IpcPayloadGuard';
 import {
+  KnowledgeCancelArgsSchema,
   KnowledgeCandidateCreateArgsSchema,
   KnowledgeCardArgsSchema,
+  KnowledgeExportArgsSchema,
+  KnowledgeIndexRebuildArgsSchema,
   KnowledgeImageArgsSchema,
   KnowledgeImportArgsSchema,
   KnowledgeCompileArgsSchema,
@@ -96,9 +99,26 @@ describe('knowledge IPC schemas', () => {
     const [request] = parseIpcArgs(KnowledgeImportArgsSchema, [{
       spaceId: 'user',
       source: 'case_id: a\ntitle: A\nsymptoms: darker',
+      operationId: 'op-1',
     }], { label: 'knowledge:import', maxBytes: 16 * 1024 });
     expect(request.spaceId).toBe('user');
     expect(request.sessionId).toBeUndefined();
+  });
+
+  it('runs import, export and rebuild only under a well-formed operation id, which cancel names too', () => {
+    const source = 'case_id: a\ntitle: A\nsymptoms: darker';
+    expect(() => parseIpcArgs(KnowledgeImportArgsSchema, [{ spaceId: 'user', source }], { label: 'knowledge:import' }))
+      .toThrow(IpcValidationError);
+    expect(() => parseIpcArgs(KnowledgeExportArgsSchema, [{ format: 'markdown', scope: 'space', spaceId: 'user' }],
+      { label: 'knowledge:export' })).toThrow(IpcValidationError);
+    expect(() => parseIpcArgs(KnowledgeIndexRebuildArgsSchema, [], { label: 'knowledge:index:rebuild' })).toThrow(IpcValidationError);
+    expect(() => parseIpcArgs(KnowledgeCancelArgsSchema, [{ operationId: '../op' }], { label: 'knowledge:cancel' }))
+      .toThrow(IpcValidationError);
+    const operationId = '7d0c0c56-5b1e-4f7a-9c1e-2f4d1f0b9a11';
+    expect(parseIpcArgs(KnowledgeIndexRebuildArgsSchema, [{ operationId }], { label: 'knowledge:index:rebuild' })).toEqual([{ operationId }]);
+    expect(parseIpcArgs(KnowledgeCancelArgsSchema, [{ operationId }], { label: 'knowledge:cancel' })).toEqual([{ operationId }]);
+    expect(parseIpcArgs(KnowledgeExportArgsSchema, [{ format: 'markdown', scope: 'space', spaceId: 'user', operationId }],
+      { label: 'knowledge:export' })[0].operationId).toBe(operationId);
   });
 
   it('rejects knowledge image lookup with empty relativePath', () => {

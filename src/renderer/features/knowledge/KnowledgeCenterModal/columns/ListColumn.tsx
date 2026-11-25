@@ -22,6 +22,8 @@ interface ListColumnProps {
   inboxError?: string | null;
   /** Opens the import dialog; an empty card list offers it where the cards would be. */
   onImport: () => void;
+  /** Opens the rebuild dialog; the list offers it only when the index could not be built. */
+  onRebuildIndex: () => void;
 }
 
 /** The card type as a small icon before the title; its name is the tooltip. */
@@ -95,7 +97,7 @@ function RecordRow({
   );
 }
 
-export function ListColumn({ state, inbox, inboxError, onImport }: ListColumnProps) {
+export function ListColumn({ state, inbox, inboxError, onImport, onRebuildIndex }: ListColumnProps) {
   const { t } = useI18n();
   const reason = emptyReason(state, inbox);
   const loading = state.loadingQuery || state.loadingOverview;
@@ -118,13 +120,13 @@ export function ListColumn({ state, inbox, inboxError, onImport }: ListColumnPro
             clearLabel={t('app.clearSearch')}
           />
           <KnowledgeFilters state={state} />
-          {/* The index keeps itself current; only when it could not be built does the list ask for a rebuild. */}
+          {/* The index keeps itself current; only when it could not be built does the list ask for a rebuild, which
+              opens the rebuild dialog so its progress, Cancel and any failure have one place. */}
           {state.spaces.length > 0 && !state.index && !state.loadingOverview ? (
             <div className="knowledge-center-index-notice" role="status" data-testid="knowledge-center-index-notice">
               <span>{t('knowledgeCenter.indexMissing')}</span>
-              <Button variant="secondary" size="sm" disabled={state.rebuilding} onClick={() => void state.rebuildIndex()}
-                data-testid="knowledge-center-rebuild">
-                {state.rebuilding ? t('knowledgeCenter.indexRebuilding') : t('knowledgeCenter.indexRebuild')}
+              <Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={onRebuildIndex} data-testid="knowledge-center-rebuild">
+                {t('knowledgeCenter.indexRebuild')}
               </Button>
             </div>
           ) : null}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Button, Input, Textarea, Select, Switch, Checkbox, Tabs, Details, Popover, TaskDialog, EmptyState, OverflowFade, ActiveSignalText } from '../../src/renderer/ui';
+import { Button, Input, Textarea, Select, Switch, Checkbox, Tabs, Details, Popover, TaskDialog, EmptyState, OverflowFade, ActiveSignalText, ProgressBar } from '../../src/renderer/ui';
 import { ReadingSample } from './readingSample';
 import { TaskStatusMarker } from '../../src/renderer/ui/TaskStatusMarker';
 import { createDefaultUiPreferences } from '../../src/shared/theme/uiPreferences';
@@ -44,6 +44,7 @@ export default function Preview() {
     { name: 'OverflowFade / EmptyState', group: '内容', usage: '单行真实溢出才渐隐；空态区分空内容和读取错误。', api: 'text / title / description / variant', keyboard: '完整标题提示；操作继续用 Button', source: 'ui/OverflowFade.tsx', sample: <><OverflowFade text={long?'很长的资源名称与路径，用于检查父容器收缩之后的渐隐及完整提示内容'.repeat(4):'资源名称'}/><EmptyState title="没有匹配内容"/><EmptyState variant="panel" title="还没有技能" description="新建一个技能，或从文件导入。" actions={<Button size="sm">新建技能</Button>}/><EmptyState variant="page" title="选择一项查看详情" description="左侧列表中的条目会在这里展开。"/></> },
     { name: 'ReadingSheet / Disclosure', group: '浮层', usage: '计划与上下文用量共用的阅读面板，以及受控披露。', api: 'ReadingSheet title / meta / actions / status / onClose；Disclosure open / onOpenChange / summary / trailing', keyboard: 'Escape 关闭顶层、焦点返回；Disclosure Enter/Space', source: 'ui/ReadingSheet.tsx', sample: <ReadingSample /> },
     { name: 'ActiveSignalText / TaskStatusMarker', group: '运行状态', usage: '生产组件展示样本，不代表真实 Agent 执行。状态由调用方投影，不由动画推断。', api: 'active / tone / status / label / size', keyboard: '状态不抢夺焦点', source: 'ui/ActiveSignalText.tsx', sample: <div className="catalog-row"><ActiveSignalText active>正在工作</ActiveSignalText>{([['pending','待开始'],['in_progress','进行中'],['blocked','受阻'],['completed','已完成'],['cancelled','已取消'],['failed','执行失败']] as const).map(([status,label])=><TaskStatusMarker key={status} status={status} label={label}/>)}</div> },
+    { name: 'ProgressBar', group: '运行状态', usage: '总量已知的确定进度：调用方报告真实计数，条不自行推进，也不编造比例。', api: 'value / max / label / valueText / tone / standalone', keyboard: '旁边有文字时不抢焦点；standalone 可聚焦，悬停提示与读屏读出计数', source: 'ui/ProgressBar.tsx', sample: <div className="catalog-row"><ProgressBar value={3} max={10} label="正在索引卡片" valueText="3/10" /><ProgressBar value={4} max={6} tone="done" standalone label="已完成 4/6" /></div> },
   ];
   const visible = entries.filter(e => (category === 'all' || (category === 'domain' ? e.group === '领域组合' : e.group !== '领域组合')) && (e.name + e.group + e.usage).toLowerCase().includes(query.toLowerCase()));
   return <main className={`catalog ${narrow?'is-narrow':''}`}><header><h1>RDC-Agent 组件目录</h1><p>生产组件活文档 · 所有内容均为本地展示样本，不连接账户或执行工具。</p></header>

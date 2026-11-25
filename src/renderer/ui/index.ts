@@ -27,6 +27,7 @@ export { OverflowFade, type OverflowFadeProps } from './OverflowFade';
 export { Panel, type PanelProps } from './Panel';
 export { Pill, type PillProps, type PillSize } from './Pill';
 export { Popover, type PopoverProps } from './Popover';
+export { ProgressBar, type ProgressBarProps, type ProgressBarTone } from './ProgressBar';
 export { ReadingSheet, type ReadingSheetProps } from './ReadingSheet';
 export { SearchField, type SearchFieldProps } from './SearchField';
 export { SearchMultiSelect, type SearchMultiSelectProps, type SearchMultiSelectOption } from './SearchMultiSelect';

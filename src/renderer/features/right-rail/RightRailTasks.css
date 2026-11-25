@@ -16,24 +16,6 @@
   padding: var(--space-1) var(--space-1) var(--space-3);
 }
 
-.right-rail-task-progress-track {
-  position: relative;
-  flex: 1 1 auto;
-  height: var(--space-1);
-  overflow: hidden;
-  border-radius: var(--radius-full);
-  background: var(--token-interactive-hover);
-}
-
-.right-rail-task-progress-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--right-rail-task-progress, 0%);
-  border-radius: inherit;
-  background: var(--token-task-done);
-  transition: width var(--motion-indicator);
-}
-
 .right-rail-task-fold {
   display: inline-flex;
   align-items: center;

@@ -1,7 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { writeFileAtomic } from '../runtime/atomicFile';
 import { StorageIo } from '../sessions/store/StorageIo';
 import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
+import { assertSafeKnowledgeWriteTarget } from './knowledgeFs';
+import { isKnowledgeImagePathAllowed } from './knowledgeImages';
 import {
   hashKnowledgeImportBytes,
   ingestKnowledge,
@@ -18,6 +21,7 @@ import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeQueryService, knowledgeQueryService } from './KnowledgeQueryService';
 import { knowledgeWriteService, KnowledgeWriteService } from './KnowledgeWriteService';
 import type { KnowledgeDurableDraft } from './knowledgeStateSchema';
+import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type {
   KnowledgeCardDetail,
   KnowledgeCardRecord,
@@ -163,6 +167,38 @@ function spaceConflictItem(
 }
 
 /**
+ * The files an import's writes replace, captured before each card is written, so a cancelled import can put the
+ * space back exactly as it was: a file the import created is removed, a file it replaced gets its bytes back. Readers
+ * of the index rebuild it on their own once it no longer matches the cards.
+ */
+class KnowledgeImportRollback {
+  private readonly saved = new Map<string, Buffer | null>();
+
+  constructor(private readonly rootPath: string) {}
+
+  async capture(card: KnowledgeCardRecord): Promise<void> {
+    // The same files the write replaces: the card, and each declared image the write is allowed to place.
+    const images = (card.images ?? []).map((image) => image.relativePath)
+      .filter((relativePath) => isKnowledgeImagePathAllowed(card.relativePath, relativePath, card.caseId));
+    for (const relativePath of [card.relativePath, ...images]) {
+      const absolutePath = await assertSafeKnowledgeWriteTarget(this.rootPath, relativePath);
+      if (this.saved.has(absolutePath)) continue;
+      this.saved.set(absolutePath, await fs.readFile(absolutePath).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      }));
+    }
+  }
+
+  async restore(): Promise<void> {
+    for (const [absolutePath, previous] of [...this.saved].reverse()) {
+      if (previous === null) await fs.rm(absolutePath, { force: true });
+      else await writeFileAtomic(absolutePath, previous);
+    }
+  }
+}
+
+/**
  * The one judgment of an import against a space: quarantined items stay as they are, an item whose identity is
  * already in the space is either the same source (already present) or a different one (conflict), and every other
  * card is new. New cards become occupants as they are planned, so a package cannot add the same identity twice.
@@ -214,27 +250,51 @@ export class KnowledgeImportService {
   }
 
   /**
-   * Import writes draft cards into the chosen space. This method never creates a Candidate.
+   * Import writes draft cards into the chosen space. This method never creates a Candidate. The signal is checked
+   * between cards, never inside a write; a cancelled import removes the cards it already wrote, so the space keeps
+   * either the whole import or none of it.
    */
-  async importToSpace(request: KnowledgeImportRequest): Promise<KnowledgeImportResult> {
+  async importToSpace(request: KnowledgeImportRequest, options: KnowledgeOperationOptions = {}): Promise<KnowledgeImportResult> {
+    const { signal, onProgress } = options;
     const ingested = await this.ingest(request);
-    const planned = planKnowledgeImport(request.spaceId, ingested, await this.listOccupants(request.spaceId));
+    signal?.throwIfAborted();
+    const occupants = await this.listOccupants(request.spaceId, options);
+    const planned = planKnowledgeImport(request.spaceId, ingested, occupants);
+    const total = planned.filter((entry) => entry.write).length;
+    const rollback = new KnowledgeImportRollback(this.spaceRoot(request.spaceId));
     const items: KnowledgeImportItem[] = [];
-    for (const entry of planned) {
-      if (!entry.write) {
-        items.push(entry.item);
-        continue;
+    let done = 0;
+    onProgress?.('writing', 0, total);
+    try {
+      for (const entry of planned) {
+        if (!entry.write) {
+          items.push(entry.item);
+          continue;
+        }
+        signal?.throwIfAborted();
+        await rollback.capture(entry.write.card);
+        const written = await this.deps.write.write({
+          spaceId: request.spaceId,
+          card: entry.write.card,
+          permissionMode: 'default',
+          confirmation: { explicitHumanConfirmation: true },
+          ...(entry.write.stagedImages ? { stagedImages: entry.write.stagedImages } : {}),
+        });
+        items.push({ ...entry.item, record: written });
+        done += 1;
+        onProgress?.('writing', done, total);
       }
-      const written = await this.deps.write.write({
-        spaceId: request.spaceId,
-        card: entry.write.card,
-        permissionMode: 'default',
-        confirmation: { explicitHumanConfirmation: true },
-        ...(entry.write.stagedImages ? { stagedImages: entry.write.stagedImages } : {}),
-      });
-      items.push({ ...entry.item, record: written });
+    } catch (error) {
+      if (signal?.aborted) await rollback.restore();
+      throw error;
     }
     return publicResult(ingested, items);
+  }
+
+  private spaceRoot(spaceId: string): string {
+    const space = this.deps.listSpaces().find((entry) => entry.spaceId === spaceId);
+    if (!space) throw new Error(`Unknown knowledge space: ${spaceId}`);
+    return space.rootPath;
   }
 
   private async ingest(request: KnowledgeImportRequest): Promise<KnowledgeImportPathResult> {
@@ -291,11 +351,14 @@ export class KnowledgeImportService {
     }
   }
 
-  private async listOccupants(spaceId: string): Promise<KnowledgeSpaceOccupant[]> {
+  /** The cards already in the space, read one at a time; an import reports this as its reading phase. */
+  private async listOccupants(spaceId: string, { signal, onProgress }: KnowledgeOperationOptions = {}): Promise<KnowledgeSpaceOccupant[]> {
     if (!this.deps.listSpaces().some((entry) => entry.spaceId === spaceId)) return [];
     const summaries = await this.deps.listCards(spaceId);
     const occupants: KnowledgeSpaceOccupant[] = [];
+    onProgress?.('reading', 0, summaries.length);
     for (const summary of summaries) {
+      signal?.throwIfAborted();
       const detail = await this.deps.getCard(spaceId, summary.relativePath);
       occupants.push({
         cardId: summary.cardId,
@@ -305,6 +368,7 @@ export class KnowledgeImportService {
         ...(detail?.caseId ? { caseId: detail.caseId } : {}),
         ...(detail?.sourceHash ? { sourceHash: detail.sourceHash } : {}),
       });
+      onProgress?.('reading', occupants.length, summaries.length);
     }
     return occupants;
   }

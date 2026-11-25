@@ -16,7 +16,7 @@
 
 「主题与同义词」是 `TaskDialog`：由 `knowledge:topics:suggest` 根据用户空间原文给出主题建议，用户勾选要分类的卡片并编辑同义词、合并目标或新增主题，先经 `knowledge:topics:preview` 显示完整预览（受影响卡片与差异，原始 Markdown 不改写），确认后才由 `knowledge:topics:apply` 应用；预览页以主题和卡片名称分组，分别展示同义词、合并目标与变更前后的分类，可返回修改。写入确认内的冲突以静态卡片标题成对展示，冲突列表则提供进入对照页的行操作。
 
-导入、导出、写入确认与上述主题弹窗都是 `TaskDialog`（见 `docs/ui/design-system.md`「任务子弹窗」），叠在三列之上：背景空间、筛选、选择与滚动位置保留，关闭后恢复原阅读状态；Escape 只作用最上层。读取来源、导入、导出与重建索引运行时，弹窗操作区左侧用一行状态（`KnowledgeTaskProgress`）说明正在做什么；主进程不报告完成比例，界面不编造百分比。重建索引失败时弹窗保持打开，显示一句原因、重试与「复制详情」，成功才关闭。
+导入、导出、写入确认与上述主题弹窗都是 `TaskDialog`（见 `docs/ui/design-system.md`「任务子弹窗」），叠在三列之上：背景空间、筛选、选择与滚动位置保留，关闭后恢复原阅读状态；Escape 只作用最上层。读取来源时，弹窗操作区左侧用一行状态（`KnowledgeTaskProgress`，Spinner + 文字）说明正在读取；读取不报告计数，界面不编造百分比。导入、导出与重建索引是可跟踪的长任务：renderer 为每次运行生成 `operationId`，操作区左侧是一行阶段文字（「正在写入卡片 3/10」这类真实计数）与一条确定进度条（`ui/ProgressBar`，计数来自主进程 `knowledge:progress`，第一条报告到达前为空轨）；原本的「取消 / 返回」位置换成「取消」，点击后按钮停在原位显示等待（`loading`），直到主进程答复。用户取消是中性结果：操作区左侧写一句「已取消导入，没有写入任何卡片」/「已取消导出，没有保存文件」/「已取消重建，搜索仍使用原来的索引」，不出错误提示；导入停在预览、导出停在表单，可直接再试。重建索引失败时弹窗保持打开，显示一句原因、重试与「复制详情」，成功才关闭；列表顶部「索引建不起来」提示里的「重建」打开同一个弹窗。
 
 导入是同一个弹窗里的三个时刻，不逐层叠窗：
 - **选来源**：一句说明；多于一个空间时选目标空间；「文件 / 粘贴」分段控件。文件模式是一块放置区：把知识包拖进来（经 preload 的 `getPathForFile` 取路径，取不到就提示改用「选择文件」），或点「选择文件」；选定即自动预览。粘贴模式是「知识内容 (YAML)」输入框，点「预览」。
@@ -40,6 +40,7 @@
 - 导出经 `KnowledgeExportService`，格式二选一：**知识包**（标准 zip 载体，内含 `knowledge.yaml` 的 `rdc.knowledge-package/1` 与声明对照图，可再导入）与 **Markdown**（阅读用途，不可再导入，不夹图）。范围为选择的卡片 / 当前筛选结果 / 指定空间；`filtered`/`selected` 用当前列表（`selected` 是选卡清单里勾选的卡片，经 `cardRefs` 传给主进程），`space` 计数必须问该 `spaceId` 的 `listCards`/`query`，不得用当前 Cards `hits.filter`。导出包剔除 `sourceHash` / `sourceMtimeMs` / `sourceSize` 与任何绝对路径，复用导入同一套 secret 扫描；磁盘上不存在的图不写入 yaml 的 `images[]`；绝不导出凭据、provider 配置或会话数据。导出包的 `lifecycle` 只是元数据，再导入一律落目标空间 draft（`verified: false`）。保存位置由系统保存对话框选定（知识包扩展名为 zip），取消不产生半成品。
 - 禁止声称语义检索。Semantic lane 开关与 Settings > Models Embedding 重建入口已删除。
 - Center 的 Rebuild Index 只重建 `KnowledgeIndexService` 结构索引。
+- 导入、导出与重建索引带 renderer 生成的 `operationId`。主进程在逐项循环里报告 `knowledge:progress {operationId, phase, done, total}`（`phase` 依次为 `reading` / `writing` / `indexing` 中用到的阶段，`done` 不回退；每个操作每秒至多约 10 条，最后一条总会发出），`knowledge:cancel({operationId})` 经 AbortSignal 在两项之间停止，从不打断一次写入，被取消的调用以 `KNOWLEDGE_OPERATION_CANCELLED`（availability）拒绝：导入删除本次已写入的卡片并恢复被替换的文件，空间保持导入前的样子；导出在临时文件替换目标前停止并删除临时文件，原有目标文件不变；重建索引只在最后一次性原子写快照，取消后旧索引照常使用。退出应用时主进程取消所有运行中的操作并等待其收尾。
 - `change reason` 与 `rollback basis` 只做确认门禁，不落盘。
 - 不做 Repo Wiki、Memory 页签、自动生成、重新生成或有用/无用反馈。
 
@@ -49,10 +50,10 @@
 |----|------|
 | 入口 | `src/renderer/app/WorkbenchShell.tsx`（`sidebar-knowledge-center-trigger`） |
 | 模态 | `src/renderer/features/knowledge/KnowledgeCenterModal/` |
-| 主进程 | `src/main/knowledge/` 五服务 + `KnowledgeImportService` + `KnowledgeExportService`；IPC `src/main/ipc/knowledgeHandlers.ts` |
+| 主进程 | `src/main/knowledge/` 五服务 + `KnowledgeImportService` + `KnowledgeExportService`；长任务进度与取消 `src/main/knowledge/knowledgeOperations.ts`；IPC `src/main/ipc/knowledgeHandlers.ts` |
 | Renderer API | `src/shared/renderer-api/core.ts`（Desktop / Browser 共用） |
-| 类型 | `src/shared/types/knowledge.ts`、`src/shared/types/knowledgeExport.ts` |
+| 类型 | `src/shared/types/knowledge.ts`、`src/shared/types/knowledgeExport.ts`、`src/shared/types/knowledgeOperation.ts` |
 
-IPC 通道：`knowledge:overview` / `knowledge:topics:suggest` / `knowledge:topics:preview` / `knowledge:topics:apply` / `query` / `card` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `previewImport` / `import` / `image` / `issueApprovalToken` / `write` / `promote` / `export`。写/提升必须消费 Main 签发的 `approvalToken`，并带 `explicitHumanConfirmation`；`knowledge:previewImport` 读取 renderer 指定的文件，在 Browser QA 能力表里与导入同为 `high-impact`；`knowledge:export` 为 `high-impact`，由主进程在同一次调用里弹系统保存对话框并写出（知识包扩展名 zip，Markdown 为 md），renderer 不传目标路径；用户取消对话框时返回 `null`，导出面板保持原样。知识导入选文件走 `dialog:selectKnowledgeImport`（zip / yaml / yml），不走 `dialog:selectFiles`。已删除 browse-only 的 `knowledge:listSpaces` / `listCards` / `getCard`。
+IPC 通道：`knowledge:overview` / `knowledge:topics:suggest` / `knowledge:topics:preview` / `knowledge:topics:apply` / `query` / `card` / `compile` / `index:rebuild` / `candidates` / `candidateCreate` / `previewImport` / `import` / `image` / `issueApprovalToken` / `write` / `promote` / `export` / `cancel`，事件 `knowledge:progress`。`index:rebuild` / `import` / `export` 必须带 `operationId`；`knowledge:cancel` 在 Browser QA 能力表里是 `mutation`，进度事件经 `broadcastToRenderer` 同时送到桌面窗口与 Browser QA 事件流。写/提升必须消费 Main 签发的 `approvalToken`，并带 `explicitHumanConfirmation`；`knowledge:previewImport` 读取 renderer 指定的文件，在 Browser QA 能力表里与导入同为 `high-impact`；`knowledge:export` 为 `high-impact`，由主进程在同一次调用里弹系统保存对话框并写出（知识包扩展名 zip，Markdown 为 md），renderer 不传目标路径；用户取消对话框时返回 `null`，导出面板保持原样。知识导入选文件走 `dialog:selectKnowledgeImport`（zip / yaml / yml），不走 `dialog:selectFiles`。已删除 browse-only 的 `knowledge:listSpaces` / `listCards` / `getCard`。
 
 权威产品边界见根目录 `ARCHITECTURE.md`「G. Knowledge」。

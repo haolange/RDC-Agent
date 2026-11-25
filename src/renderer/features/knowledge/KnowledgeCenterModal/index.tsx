@@ -200,7 +200,8 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
           )}
           <div className="knowledge-center-grid" ref={bodyRef}>
             {showSpaces && <SpacesColumn state={state} candidateCount={candidates.inbox?.candidates.length} />}
-            {showList && <ListColumn state={state} inbox={candidates.inbox} inboxError={candidates.error} onImport={importer.openPanel} />}
+            {showList && <ListColumn state={state} inbox={candidates.inbox} inboxError={candidates.error} onImport={importer.openPanel}
+              onRebuildIndex={() => setRebuildOpen(true)} />}
             {showDetail && (
               <DetailColumn
                 state={state}
@@ -223,7 +224,8 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
       <WriteConfirmDialog write={write} spaces={state.spaces} />
       <KnowledgeTopicsDialog topics={topics} />
       <RebuildIndexDialog open={rebuildOpen} index={state.index} rebuilding={state.rebuilding}
-        onRebuild={state.rebuildIndex} onClose={() => setRebuildOpen(false)} />
+        progress={state.rebuildProgress} cancelling={state.rebuildCancelling}
+        onRebuild={state.rebuildIndex} onCancel={state.cancelRebuild} onClose={() => setRebuildOpen(false)} />
     </>,
     document.body,
   );

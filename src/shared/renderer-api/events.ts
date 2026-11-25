@@ -37,6 +37,8 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
     ),
     onProbeBatchChanged: callback => transport.subscribe(EVENT.llm.probeBatchChanged,
       payload => callback(payload as Parameters<typeof callback>[0])),
+    onKnowledgeProgress: callback => transport.subscribe(EVENT.knowledge.progress,
+      payload => callback(payload as Parameters<typeof callback>[0])),
     onEffectiveCatalogChanged: (callback) => (
       transport.subscribe(EVENT.llm.effectiveCatalogChanged, (change) => (
         callback(change as Parameters<typeof callback>[0])

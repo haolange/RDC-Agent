@@ -120,6 +120,13 @@ export const contracts = {
     motion: '冻结现有从左到右 active-signal-shimmer；进行中标记只旋转一段弧线，系统减少动效时静止。',
     consumers: 'Transcript 工作过程、TaskSnapshotCard、RightRailTaskList。',
   },
+  ProgressBar: {
+    avoid: '不用于总量未知的等待（用 Spinner）；不按时间或动画自行推进；旁边已写出计数时不再重复。',
+    states: 'value/max（max 为 0 时是空轨）；active 进行中强调色，done 完成绿；standalone 可聚焦并带悬停提示。',
+    layout: '在 flex 父级中占满剩余宽度；高度 --space-1 的全圆角细轨。',
+    motion: '宽度随真实计数以 --motion-indicator 过渡；系统减少动效时直接到新值。',
+    consumers: 'RightRailTaskList、Knowledge 导入 / 导出 / 重建索引的任务进度。',
+  },
   ColorField: {
     avoid: '不恢复系统原生取色弹窗。',
     states: 'grid/inline、合法/未提交 HEX 草稿、取色浮层、键盘色面与色相。',

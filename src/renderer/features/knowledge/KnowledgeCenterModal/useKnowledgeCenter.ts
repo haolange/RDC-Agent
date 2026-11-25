@@ -11,6 +11,7 @@ import { useKnowledgeViewport } from './useKnowledgeViewport';
 import { useKnowledgeFilters } from './useKnowledgeFilters';
 import { useKnowledgeLoadMore } from './useKnowledgeLoadMore';
 import { useKnowledgeQueryRunner } from './useKnowledgeQueryRunner';
+import { useKnowledgeOperation } from './useKnowledgeOperation';
 import type {
   KnowledgeCardDetail, KnowledgeIndexOverview, KnowledgeLaneHit, KnowledgePack, KnowledgeSpace,
 } from '@shared/types/knowledge';
@@ -36,6 +37,7 @@ export function useKnowledgeCenter(open: boolean) {
   const [loadingOverview, setLoadingOverview] = useState(false);
   const [loadingQuery, setLoadingQuery] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
+  const { run: runRebuild, cancel: cancelRebuild, progress: rebuildProgress, cancelling: rebuildCancelling } = useKnowledgeOperation();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,20 +87,25 @@ export function useKnowledgeCenter(open: boolean) {
     setViewMode('cards');
     void selectCard(card.spaceId, card.relativePath, card.cardId);
   }, [clearConflict, selectCard]);
-  /** Resolves once the rebuilt index is shown; a failure rejects, so the dialog that asked keeps it in view. */
-  const rebuildIndex = useCallback(async () => {
+  /**
+   * Resolves `rebuilt` once the rebuilt index is shown, or `cancelled` when the person stopped it (the previous index
+   * stays in use). A failure rejects, so the dialog that asked keeps it in view.
+   */
+  const rebuildIndex = useCallback(async (): Promise<'rebuilt' | 'cancelled'> => {
     const seq = rebuildSeq.current.next();
     setRebuilding(true);
     try {
-      await window.electronAPI.knowledge.indexRebuild();
-      if (!rebuildSeq.current.isCurrent(seq)) return;
+      const outcome = await runRebuild((operationId) => window.electronAPI.knowledge.indexRebuild({ operationId }));
+      if (outcome.cancelled) return 'cancelled';
+      if (!rebuildSeq.current.isCurrent(seq)) return 'rebuilt';
       await refreshOverview();
-      if (!rebuildSeq.current.isCurrent(seq)) return;
+      if (!rebuildSeq.current.isCurrent(seq)) return 'rebuilt';
       await refreshQuery();
+      return 'rebuilt';
     } finally {
       if (rebuildSeq.current.isCurrent(seq)) setRebuilding(false);
     }
-  }, [refreshOverview, refreshQuery]);
+  }, [refreshOverview, refreshQuery, runRebuild]);
   useEffect(() => {
     if (!open) {
       querySeq.current.next();
@@ -158,7 +165,8 @@ export function useKnowledgeCenter(open: boolean) {
     selectedSpaceIds, types, lifecycles,
     searchQuery, setSearchQuery, hits, page, loadingMore, loadMore, pack, packQueryKey, selectedCardId, selectedCard, loadingOverview,
     loadingQuery, loadingDetail, rebuilding, error, setError, toggleSpace, toggleType,
-    toggleLifecycle, selectCard, selectRecord, rebuildIndex, refreshOverview, refreshQuery, queryRequest,
+    toggleLifecycle, selectCard, selectRecord, rebuildIndex, rebuildProgress, rebuildCancelling, cancelRebuild,
+    refreshOverview, refreshQuery, queryRequest,
     selectedConflict, conflictCards, selectConflict, openRelatedCard, revealImportedCard,
   };
 }

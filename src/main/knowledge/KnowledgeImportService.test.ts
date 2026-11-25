@@ -3,6 +3,8 @@ import { rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { AppError } from '@shared/errors/appError';
+import { expectMonotonicProgress } from '../testing/knowledgeProgress';
 import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
 import { createDisposableImportService } from './KnowledgeImportService';
 import { hashKnowledgeContent } from './KnowledgeDurableStore';
@@ -29,6 +31,30 @@ function caseYaml(caseId: string, title: string, extra = 'darker than reference'
     '  status: fixed',
     `symptoms: ${extra}`,
   ].join('\n');
+}
+
+function packageYaml(titles: string[]): string {
+  return [
+    'schema: rdc.knowledge-package/1',
+    'cards:',
+    ...titles.flatMap((title, index) => [
+      `  - relativePath: facts/package-${index}.md`,
+      `    title: ${title}`,
+      '    type: fact',
+      `    body: ${title} body`,
+    ]),
+  ].join('\n');
+}
+
+/** Every card file in the space with its bytes; the index snapshot is derived and left out. */
+function cardFiles(root: string, dir = root): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const absolute = path.join(dir, entry.name);
+    if (entry.isDirectory()) Object.assign(files, cardFiles(root, absolute));
+    else if (entry.name.endsWith('.md')) files[path.relative(root, absolute)] = readFileSync(absolute, 'utf8');
+  }
+  return files;
 }
 
 function leftoverCard(caseId: string, sourceHash: string): KnowledgeCardRecord {
@@ -113,6 +139,36 @@ describe('KnowledgeImportService', () => {
     expect(readdirSync(path.join(spaceRoot, 'cases')).sort()).toEqual(before);
     const imported = await importer.importToSpace({ spaceId: 'user', source: caseYaml('new-case', 'New card') });
     expect(imported.items.map((item) => [item.status, item.reason])).toEqual(fresh.items.map((item) => [item.status, item.reason]));
+  });
+
+  it('cancelled between cards, removes the cards it already wrote and leaves the space as it was', async () => {
+    const spaceRoot = tempRoot('rdc-know-import-cancel-');
+    const importer = createDisposableImportService({ spaceRoot });
+    await importer.importToSpace({ spaceId: 'user', source: caseYaml('kept-case', 'Kept') });
+    const before = cardFiles(spaceRoot);
+    const controller = new AbortController();
+    const events: Array<{ phase: 'reading' | 'writing' | 'indexing'; done: number; total: number }> = [];
+    const source = packageYaml(['One', 'Two', 'Three']);
+
+    await expect(importer.importToSpace({ spaceId: 'user', source }, {
+      signal: controller.signal,
+      onProgress: (phase, done, total) => {
+        events.push({ phase, done, total });
+        if (phase === 'writing' && done === 2) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
+      },
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+
+    expect(cardFiles(spaceRoot)).toEqual(before);
+    expectMonotonicProgress(events);
+    expect(events[0]).toEqual({ phase: 'reading', done: 0, total: 1 });
+    expect(events.at(-1)).toEqual({ phase: 'writing', done: 2, total: 3 });
+    // Nothing was left half-imported: the same package imports whole afterwards.
+    const again = await importer.importToSpace({ spaceId: 'user', source });
+    expect(again.items.map((item) => [item.status, item.reason])).toEqual([['draft', undefined], ['draft', undefined], ['draft', undefined]]);
+    expect(Object.keys(cardFiles(spaceRoot)).sort()).toEqual([
+      path.join('cases', 'kept-case.md'),
+      ...[0, 1, 2].map((index) => path.join('facts', `package-${index}.md`)),
+    ]);
   });
 
   it('quarantines secrets and absolute paths without writing the space', async () => {

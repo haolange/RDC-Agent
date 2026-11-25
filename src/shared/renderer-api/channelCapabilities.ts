@@ -81,6 +81,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'knowledge:write': 'high-impact',
   'knowledge:promote': 'high-impact',
   'knowledge:export': 'high-impact',
+  'knowledge:cancel': 'mutation',
   'rdc-runtime:overview': 'read',
   'rdc-runtime:validate': 'read',
   'rdc-runtime:upsert': 'high-impact',

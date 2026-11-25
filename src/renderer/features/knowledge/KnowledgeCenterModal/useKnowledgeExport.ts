@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorDetail } from '../../../lib/errorDetail';
+import { useKnowledgeOperation } from './useKnowledgeOperation';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { beginSynchronousFlight, filterPickableCards, knowledgeCardKey, knowledgeExportScopeCounts } from './knowledgeImportExportModel';
 import type {
@@ -28,6 +29,9 @@ export function useKnowledgeExport(options: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<KnowledgeExportResult | null>(null);
+  // The person stopped the last export; main wrote no file, so the panel says so instead of showing an error.
+  const [cancelled, setCancelled] = useState(false);
+  const { run: runOperation, cancel: cancelExport, ...operation } = useKnowledgeOperation();
   // The picker chooses among the cards the list has loaded; the selected card starts picked.
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [pickerQuery, setPickerQuery] = useState('');
@@ -61,6 +65,7 @@ export function useKnowledgeExport(options: {
     setOpen(false);
     setError(null);
     setResult(null);
+    setCancelled(false);
   }, [request]);
 
   useEffect(() => { if (!options.active) close(); }, [close, options.active]);
@@ -84,6 +89,7 @@ export function useKnowledgeExport(options: {
     setSpaceId(options.spaces[0]?.spaceId ?? 'user');
     setResult(null);
     setError(null);
+    setCancelled(false);
     setOpen(true);
   }, [options.selected, options.spaces]);
 
@@ -91,6 +97,7 @@ export function useKnowledgeExport(options: {
     if (!beginSynchronousFlight(inFlight)) return;
     const seq = request.next();
     setError(null);
+    setCancelled(false);
     setBusy(true);
     try {
       const filtered = scope === 'filtered'
@@ -100,20 +107,23 @@ export function useKnowledgeExport(options: {
       const cardRefs = scope === 'selected'
         ? options.hits.filter((hit) => picked.has(knowledgeCardKey(hit))).map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }))
         : (filtered?.hits ?? []).map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }));
-      const exported = await window.electronAPI.knowledge.export({
+      const outcome = await runOperation((operationId) => window.electronAPI.knowledge.export({
+        operationId,
         format,
         scope,
         ...(scope === 'space' ? { spaceId } : { cardRefs }),
-      });
-      // `null`: the person cancelled main's save dialog; the panel stays as it was.
-      if (exported && request.isCurrent(seq)) setResult(exported);
+      }));
+      if (!request.isCurrent(seq)) return;
+      if (outcome.cancelled) setCancelled(true);
+      // `null`: the person dismissed main's save dialog; the panel stays as it was.
+      else if (outcome.value) setResult(outcome.value);
     } catch (err) {
       if (request.isCurrent(seq)) setError(errorDetail(err));
     } finally {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [format, options.hits, options.queryRequest, options.queryRevision, picked, request, scope, spaceId]);
+  }, [format, options.hits, options.queryRequest, options.queryRevision, picked, request, runOperation, scope, spaceId]);
 
   return {
     open,
@@ -137,6 +147,10 @@ export function useKnowledgeExport(options: {
     canExport,
     busy,
     error,
+    cancelled,
+    /** The export that is running right now: its progress, and Cancel while main has not answered it yet. */
+    operation,
+    cancelExport,
     result,
     run,
   };

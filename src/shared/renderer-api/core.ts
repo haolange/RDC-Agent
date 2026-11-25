@@ -122,7 +122,7 @@ export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeAp
     query: (request) => transport.invoke(INVOKE.knowledge.query, request),
     card: (spaceId, relativePath) => transport.invoke(INVOKE.knowledge.card, spaceId, relativePath),
     compile: (request) => transport.invoke(INVOKE.knowledge.compile, request),
-    indexRebuild: () => transport.invoke(INVOKE.knowledge.indexRebuild),
+    indexRebuild: (request) => transport.invoke(INVOKE.knowledge.indexRebuild, request),
     candidates: (sessionId) => transport.invoke(INVOKE.knowledge.candidates, sessionId),
     candidateCreate: (request) => transport.invoke(INVOKE.knowledge.candidateCreate, request),
     previewImport: (request) => transport.invoke(INVOKE.knowledge.previewImport, request),
@@ -132,6 +132,7 @@ export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeAp
     write: (request) => transport.invoke(INVOKE.knowledge.write, request),
     promote: (request) => transport.invoke(INVOKE.knowledge.promote, request),
     export: (request) => transport.invoke(INVOKE.knowledge.export, request),
+    cancel: (request) => transport.invoke(INVOKE.knowledge.cancel, request),
   };
 }
 

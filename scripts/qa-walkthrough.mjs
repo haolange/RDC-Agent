@@ -129,7 +129,9 @@ try {
     if (!knowledgePackages.length) return;
     // The import channel is high-impact: the QA instance runs with full access and confirms in the main process.
     for (const filePath of knowledgePackages) {
-      const result = await page.evaluate((file) => window.electronAPI.knowledge.import({ spaceId: 'user', filePath: file }), filePath);
+      const result = await page.evaluate((file) => window.electronAPI.knowledge.import({
+        operationId: crypto.randomUUID(), spaceId: 'user', filePath: file,
+      }), filePath);
       console.log(`[walkthrough] knowledge package ${path.basename(filePath)}: ${JSON.stringify(result?.items?.map((item) => item.status) ?? result)}`);
     }
     await page.getByTestId('sidebar-knowledge-center-trigger').click();

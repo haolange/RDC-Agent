@@ -20,6 +20,11 @@ import { renameWithRetry, renameWithRetrySync, syncDirectory, syncDirectorySync 
 export interface AtomicWriteOptions {
   /** File mode for a newly created file, for example 0o600 for credentials. */
   mode?: number;
+  /**
+   * Checked once the temp file is written and synced, before it replaces the target: an aborted write removes its
+   * temp file, leaves the target as it was and throws the signal's reason.
+   */
+  signal?: AbortSignal;
 }
 
 const temporaryPathFor = (filePath: string): string => `${filePath}.${process.pid}.${generateShortId()}.tmp`;
@@ -36,6 +41,7 @@ export function writeFileAtomicSync(filePath: string, content: string | Uint8Arr
     } finally {
       fs.closeSync(fd);
     }
+    options.signal?.throwIfAborted();
     renameWithRetrySync(temporaryPath, filePath);
   } catch (error) {
     fs.rmSync(temporaryPath, { force: true });
@@ -56,6 +62,7 @@ export async function writeFileAtomic(filePath: string, content: string | Uint8A
     } finally {
       await handle.close();
     }
+    options.signal?.throwIfAborted();
     await renameWithRetry(temporaryPath, filePath);
   } catch (error) {
     await fs.promises.rm(temporaryPath, { force: true });

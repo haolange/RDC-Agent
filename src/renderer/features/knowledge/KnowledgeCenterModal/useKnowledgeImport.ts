@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../../i18n';
 import { humanizeError } from '../../../i18n/humanizeError';
 import { errorDetail } from '../../../lib/errorDetail';
+import { useKnowledgeOperation } from './useKnowledgeOperation';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { beginSynchronousFlight } from './knowledgeImportExportModel';
 import type { KnowledgeImportResult, KnowledgeSpace } from '@shared/types/knowledge';
@@ -30,6 +31,9 @@ export function useKnowledgeImport(options: {
   const [result, setResult] = useState<KnowledgeImportResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<KnowledgeImportError | null>(null);
+  // The person stopped the last import; main removed what it had written, so this is said plainly, not as an error.
+  const [cancelled, setCancelled] = useState(false);
+  const { run: runOperation, cancel: cancelImport, ...operation } = useKnowledgeOperation();
   const fail = useCallback((err: unknown) => setError({ message: humanizeError(err, t, 'app.error.actionFailed'), detail: errorDetail(err) }), [t]);
 
   const close = useCallback(() => {
@@ -43,6 +47,7 @@ export function useKnowledgeImport(options: {
     setPreview(null);
     setResult(null);
     setError(null);
+    setCancelled(false);
   }, [request]);
 
   useEffect(() => {
@@ -124,7 +129,10 @@ export function useKnowledgeImport(options: {
   }, [t, takeFile]);
 
   const previewPasted = useCallback(() => previewSource({ source }), [previewSource, source]);
-  const back = useCallback(() => setPreview(null), []);
+  const back = useCallback(() => {
+    setPreview(null);
+    setCancelled(false);
+  }, []);
 
   const importSource = useCallback(async () => {
     if (!spaceId) {
@@ -135,13 +143,21 @@ export function useKnowledgeImport(options: {
     const seq = request.next();
     setBusy(true);
     setError(null);
+    setCancelled(false);
     try {
-      const imported = await window.electronAPI.knowledge.import({
+      const outcome = await runOperation((operationId) => window.electronAPI.knowledge.import({
+        operationId,
         spaceId,
         ...(options.sessionId ? { sessionId: options.sessionId } : {}),
         ...(filePath ? { filePath } : { source }),
-      });
-      if (!request.isCurrent(seq) || 'cancelled' in imported) return;
+      }));
+      if (!request.isCurrent(seq)) return;
+      if (outcome.cancelled) {
+        setCancelled(true);
+        return;
+      }
+      const imported = outcome.value;
+      if ('cancelled' in imported) return;
       setPreview(null);
       setResult(imported);
       await options.onImported(imported);
@@ -151,7 +167,7 @@ export function useKnowledgeImport(options: {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [fail, filePath, options, request, source, spaceId, t]);
+  }, [fail, filePath, options, request, runOperation, source, spaceId, t]);
 
   return {
     open,
@@ -172,6 +188,10 @@ export function useKnowledgeImport(options: {
     result,
     busy,
     error,
+    cancelled,
+    /** The import that is writing right now: its progress, and Cancel while main has not answered it yet. */
+    operation,
+    cancelImport,
     selectFile,
     importSource,
   };

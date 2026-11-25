@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useI18n } from '../../i18n';
-import { useDynStyle } from '../../lib/useDynStyle';
 import { WORK_PROCESS_LOCATE_TASK_EVENT, type WorkProcessTaskLocationRequest } from '../../lib/workProcessTaskLocation';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
 import { Chevron } from '../../ui/Chevron';
+import { ProgressBar } from '../../ui/ProgressBar';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import type { TaskRailItem } from '@shared/types/trace';
 import './RightRailTasks.css';
@@ -25,14 +25,9 @@ const focusWorkProcessTask = (taskId: string): void => {
 /** The bar is the count: done / total is read on hover and by screen readers, never repeated as text beside it. */
 const TaskProgress: React.FC<{ done: number; total: number }> = ({ done, total }) => {
   const { t } = useI18n();
-  const fill = useDynStyle({ '--right-rail-task-progress': `${total ? (done / total) * 100 : 0}%` });
-  const label = t('control.rightRail.tasks.count', { done, total });
   return (
     <div className="right-rail-task-progress">
-      <span className="right-rail-task-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}
-        aria-label={label} tabIndex={0} data-tooltip={label}>
-        <span className="right-rail-task-progress-fill" {...fill} />
-      </span>
+      <ProgressBar value={done} max={total} tone="done" standalone label={t('control.rightRail.tasks.count', { done, total })} />
     </div>
   );
 };

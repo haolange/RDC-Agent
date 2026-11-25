@@ -47,6 +47,7 @@ export const enErrors = {
   'errors.KNOWLEDGE_ZIP_INVALID': "The archive can't be read.",
   'errors.KNOWLEDGE_IMAGE_INVALID': "One of the images isn't a valid image file.",
   'errors.KNOWLEDGE_TOPICS_BUSY': 'Topics are being reorganized. Try again in a moment.',
+  'errors.KNOWLEDGE_OPERATION_CANCELLED': 'The knowledge task was cancelled.',
   'errors.KNOWLEDGE_ASSETS_MISSING': 'Some attachments this card declares are missing. Provide them and try again.',
   'errors.KNOWLEDGE_EXPORT_EMPTY_RESULT': 'No cards in this selection can be exported. Provide missing attachments or remove sensitive content and invalid paths.',
   'errors.AGENT_MANIFEST_INVALID': 'The agent definition has errors. Fix them and save again.',

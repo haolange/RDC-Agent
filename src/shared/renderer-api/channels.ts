@@ -81,6 +81,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     write: 'knowledge:write',
     promote: 'knowledge:promote',
     export: 'knowledge:export',
+    cancel: 'knowledge:cancel',
   },
   rdcRuntime: {
     getOverview: 'rdc-runtime:overview',
@@ -229,6 +230,9 @@ export const RENDERER_EVENT_CHANNEL = {
   llm: {
     effectiveCatalogChanged: 'llm:effectiveCatalogChanged',
     probeBatchChanged: 'llm:probeBatchChanged',
+  },
+  knowledge: {
+    progress: 'knowledge:progress',
   },
   agent: {
     statusChanged: 'agent:statusChanged',

@@ -114,6 +114,7 @@ import type {
   SessionKnowledgeCandidate,
 } from './knowledge';
 import type { KnowledgeExportRequest, KnowledgeExportResult } from './knowledgeExport';
+import type { KnowledgeOperationProgress, KnowledgeOperationRef } from './knowledgeOperation';
 import type {
   InvestigationReadIpcResult,
   InvestigationReadRequest,
@@ -311,7 +312,7 @@ export interface ElectronAPI {
     query: (request: KnowledgeQueryRequest) => Promise<KnowledgeQueryResult>;
     card: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
     compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
-    indexRebuild: () => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
+    indexRebuild: (request: KnowledgeOperationRef) => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
     candidates: (sessionId: string) => Promise<KnowledgeCandidatesResult>;
     candidateCreate: (request: {
       sessionId: string;
@@ -324,7 +325,7 @@ export interface ElectronAPI {
       source?: string;
       filePath?: string;
     }) => Promise<KnowledgeImportResult>;
-    import: (request: {
+    import: (request: KnowledgeOperationRef & {
       spaceId: string;
       sessionId?: string;
       source?: string;
@@ -355,7 +356,9 @@ export interface ElectronAPI {
       approvalToken: string;
     }) => Promise<{ card: KnowledgeCardRecord }>;
     /** Main shows the save dialog; `null` when the person cancels it. */
-    export: (request: KnowledgeExportRequest) => Promise<KnowledgeExportResult | null>;
+    export: (request: KnowledgeExportRequest & KnowledgeOperationRef) => Promise<KnowledgeExportResult | null>;
+    /** Stops a running import, export or rebuild between items; `false` when that operation already settled. */
+    cancel: (request: KnowledgeOperationRef) => Promise<{ cancelled: boolean }>;
   };
 
   rdcRuntime: {
@@ -609,6 +612,7 @@ export interface ElectronAPI {
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
     onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
     onProbeBatchChanged: (callback: (batch: ProviderProbeBatch) => void) => () => void;
+    onKnowledgeProgress: (callback: (progress: KnowledgeOperationProgress) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (change: EffectiveCatalogChange) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;

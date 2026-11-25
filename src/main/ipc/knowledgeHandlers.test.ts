@@ -36,6 +36,7 @@ vi.mock('electron', () => ({
   },
   dialog: {
     showMessageBox: vi.fn(async () => ({ response: 0 })),
+    showSaveDialog: vi.fn(async () => ({ canceled: true })),
   },
   ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => Promise<unknown>) => {
@@ -86,7 +87,12 @@ vi.mock('../runtime/RuntimeLogService', () => ({
 }));
 
 import { knowledgeImportService } from '../knowledge/KnowledgeImportService';
+import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { registerKnowledgeHandlers } from './knowledgeHandlers';
+import type { KnowledgeOperationOptions } from '../knowledge/knowledgeOperations';
+
+const broadcastToRenderer = vi.fn();
+const context = { broadcastToRenderer } as never;
 
 const sampleCard = {
   cardId: 'project:a:facts/same.md',
@@ -113,7 +119,8 @@ describe('knowledge mutation approval boundaries', () => {
     delete process.env.RDC_AGENT_BROWSER_QA;
     delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
     electronState.focused = undefined;
-    registerKnowledgeHandlers({} as never);
+    broadcastToRenderer.mockClear();
+    registerKnowledgeHandlers(context);
   });
 
   it('requires a matching preview and main-process human confirmation before applying topic changes', async () => {
@@ -236,7 +243,8 @@ describe('knowledge mutation approval boundaries', () => {
       }],
     };
     vi.mocked(knowledgeImportService.importToSpace).mockResolvedValueOnce(imported);
-    const request = { spaceId: 'user', source: 'case_id: same\ntitle: Same\nsymptoms: darker' };
+    const source = { spaceId: 'user', source: 'case_id: same\ntitle: Same\nsymptoms: darker' };
+    const request = { ...source, operationId: 'op-import' };
 
     // No window to confirm in: nothing is written.
     await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual({ cancelled: true });
@@ -250,7 +258,7 @@ describe('knowledge mutation approval boundaries', () => {
     vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 0, checkboxChecked: false });
     await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual(imported);
     expect(knowledgeImportService.migrateSessionDrafts).not.toHaveBeenCalled();
-    expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith(request);
+    expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith(source, expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(writeMocks.write).not.toHaveBeenCalled();
   });
 
@@ -265,9 +273,64 @@ describe('knowledge mutation approval boundaries', () => {
   });
 });
 
+describe('knowledge operation progress and cancellation', () => {
+  beforeEach(() => {
+    handlers.clear();
+    broadcastToRenderer.mockClear();
+    vi.mocked(knowledgeImportService.importToSpace).mockClear();
+    electronState.focused = {};
+    registerKnowledgeHandlers(context);
+  });
+
+  it('reports rebuild progress on knowledge:progress and rejects a cancelled rebuild with the registered code', async () => {
+    let reached!: () => void;
+    const atSecondCard = new Promise<void>((resolve) => { reached = resolve; });
+    vi.mocked(knowledgeIndexService.rebuild).mockImplementationOnce(async (options: KnowledgeOperationOptions = {}) => {
+      for (let done = 0; done < 3; done += 1) {
+        options.signal?.throwIfAborted();
+        options.onProgress?.('indexing', done, 3);
+        if (done === 1) {
+          reached();
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+      throw new Error('a cancelled rebuild must not finish');
+    });
+    const running = handlers.get('knowledge:index:rebuild')!({}, { operationId: 'op-rebuild' });
+    await atSecondCard;
+    await expect(handlers.get('knowledge:cancel')!({}, { operationId: 'op-rebuild' })).resolves.toEqual({ cancelled: true });
+    await expect(running).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+    const events = broadcastToRenderer.mock.calls.filter(([channel]) => channel === 'knowledge:progress').map(([, event]) => event);
+    expect(events[0]).toEqual({ operationId: 'op-rebuild', phase: 'indexing', done: 0, total: 3 });
+    // The report that waited for its window is still delivered when the run settles.
+    expect(events.at(-1)).toEqual({ operationId: 'op-rebuild', phase: 'indexing', done: 1, total: 3 });
+    await expect(handlers.get('knowledge:cancel')!({}, { operationId: 'op-rebuild' })).resolves.toEqual({ cancelled: false });
+  });
+
+  it('cancels an export after the save dialog without writing, and a cancelled save dialog stays a plain null', async () => {
+    const request = { format: 'markdown', scope: 'space', spaceId: 'user', operationId: 'op-export' };
+    await expect(handlers.get('knowledge:export')!({}, request)).resolves.toBeNull();
+    let choose!: (value: { canceled: boolean; filePath: string }) => void;
+    vi.mocked(dialog.showSaveDialog).mockImplementationOnce(() => new Promise((resolve) => { choose = resolve as typeof choose; }));
+    const running = handlers.get('knowledge:export')!({}, request);
+    await vi.waitFor(() => expect(choose).toBeTypeOf('function'));
+    await expect(handlers.get('knowledge:cancel')!({}, { operationId: 'op-export' })).resolves.toEqual({ cancelled: true });
+    choose({ canceled: false, filePath: '/exports/knowledge-export.md' });
+    await expect(running).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+  });
+
+  it('refuses a long operation without an operation id', async () => {
+    const rebuilds = vi.mocked(knowledgeIndexService.rebuild).mock.calls.length;
+    await expect(handlers.get('knowledge:index:rebuild')!({})).rejects.toThrow();
+    await expect(handlers.get('knowledge:import')!({}, { spaceId: 'user', source: 'case_id: a\ntitle: A' })).rejects.toThrow();
+    expect(vi.mocked(knowledgeIndexService.rebuild).mock.calls.length).toBe(rebuilds);
+    expect(knowledgeImportService.importToSpace).not.toHaveBeenCalled();
+  });
+});
+
 it.each([['zh-CN', '确认更改知识', '取消'], ['en', 'Confirm knowledge change', 'Cancel']])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
   delete process.env.RDC_AGENT_BROWSER_QA;
-  registerKnowledgeHandlers({} as never);
+  registerKnowledgeHandlers(context);
   electronState.focused = {};
   electronState.language = language;
   vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false });
