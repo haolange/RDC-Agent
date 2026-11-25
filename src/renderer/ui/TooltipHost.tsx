@@ -28,13 +28,13 @@ const normalized = (text: string) => text.replace(/\s+/gu, ' ').trim();
  * when the visible text is cut off and the tooltip is the way to read all of it.
  */
 const repeatsVisibleText = (target: HTMLElement, text: string): boolean => {
-  if (normalized(target.textContent ?? '') !== normalized(text)) return false;
+  if (normalized(target.textContent) !== normalized(text)) return false;
   return ![target, ...target.querySelectorAll<HTMLElement>('*')]
     .some((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1);
 };
 
 /** The accessible name a tooltip would repeat; describing an element with its own name adds nothing. */
-const accessibleName = (element: HTMLElement) => (element.getAttribute('aria-label') ?? element.textContent ?? '').trim();
+const accessibleName = (element: HTMLElement) => (element.getAttribute('aria-label') ?? element.textContent).trim();
 
 /**
  * The one tooltip surface. Any element with `data-tooltip` gets it on pointer hover (after a short delay) or keyboard

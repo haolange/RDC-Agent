@@ -11,7 +11,7 @@ export function extractMermaidStyles(svg: string, scopeId: string): { svg: strin
   if (root.nodeName !== 'svg') return { svg, css: '' };
   const rules: string[] = [];
   for (const style of [...root.querySelectorAll('style')]) {
-    rules.push(style.textContent ?? '');
+    rules.push(style.textContent);
     style.remove();
   }
   let index = 0;

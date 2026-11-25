@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
+import { documentFonts } from '../../lib/documentFonts';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
 import { useDismissable } from '../../lib/useDismissable';
@@ -73,11 +74,11 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
     const observer = new ResizeObserver(position);
     observer.observe(menu);
     window.addEventListener('resize', position);
-    document.fonts?.addEventListener('loadingdone', position);
+    documentFonts()?.addEventListener('loadingdone', position);
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', position);
-      document.fonts?.removeEventListener('loadingdone', position);
+      documentFonts()?.removeEventListener('loadingdone', position);
     };
   }, [x, y, items, menuRef]);
 

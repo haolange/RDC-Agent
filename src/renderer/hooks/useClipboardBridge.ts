@@ -3,8 +3,8 @@ import { useCallback } from 'react';
 export function useClipboardBridge() {
   const copyText = useCallback(async (text: string): Promise<boolean> => {
     try {
-      const result = await window.electronAPI?.appShell.copyText(text);
-      if (result?.success) return true;
+      const result = await window.electronAPI.appShell.copyText(text);
+      if (result.success) return true;
     } catch {
       // Fall through to the renderer clipboard API.
     }
@@ -18,8 +18,8 @@ export function useClipboardBridge() {
 
   const readText = useCallback(async (): Promise<string> => {
     try {
-      const result = await window.electronAPI?.appShell.readClipboardText();
-      if (result?.success) return result.text ?? '';
+      const result = await window.electronAPI.appShell.readClipboardText();
+      if (result.success) return result.text;
     } catch {
       return '';
     }

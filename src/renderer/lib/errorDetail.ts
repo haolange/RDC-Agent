@@ -4,5 +4,6 @@
  */
 export function errorDetail(reason: unknown): string {
   if (reason instanceof Error) return reason.message;
-  return typeof reason === 'string' ? reason : JSON.stringify(reason) ?? 'unknown';
+  // JSON.stringify returns undefined for undefined, functions and symbols, though its type says string.
+  return typeof reason === 'string' ? reason : (JSON.stringify(reason) as string | undefined) ?? 'unknown';
 }

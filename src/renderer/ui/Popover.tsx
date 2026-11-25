@@ -16,6 +16,7 @@ import { createPortal, flushSync } from 'react-dom';
 import { cn } from '../lib/cn';
 import { placeAnchoredSurface } from '../lib/anchoredSurface';
 import { useDynStyle } from '../lib/useDynStyle';
+import { documentFonts } from '../lib/documentFonts';
 import { isTopOverlayLayer, useOverlayLayer } from '../lib/overlayStack';
 import { useDismissable } from '../lib/useDismissable';
 import { getModalFocusableElements } from '../lib/useModalFocus';
@@ -131,12 +132,12 @@ export function Popover({
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onReposition);
     if (contentRef.current) observer?.observe(contentRef.current);
     if (triggerRef.current) observer?.observe(triggerRef.current);
-    document.fonts?.addEventListener('loadingdone', onReposition);
+    documentFonts()?.addEventListener('loadingdone', onReposition);
     window.addEventListener('resize', onReposition);
     window.addEventListener('scroll', onReposition, true);
     return () => {
       observer?.disconnect();
-      document.fonts?.removeEventListener('loadingdone', onReposition);
+      documentFonts()?.removeEventListener('loadingdone', onReposition);
       window.removeEventListener('resize', onReposition);
       window.removeEventListener('scroll', onReposition, true);
     };

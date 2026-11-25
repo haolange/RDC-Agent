@@ -1,6 +1,7 @@
 import { createRendererApi } from '@shared/renderer-api';
 import { createDesktopTransport } from './desktopTransport';
 import { installBrowserAppBridge } from './browserAppBridge/BrowserAppBridge';
+import { getElectronApi } from './getElectronApi';
 
 export { browserAppBridgeInstalled } from './browserAppBridge/BrowserAppBridge';
 
@@ -9,7 +10,7 @@ export { browserAppBridgeInstalled } from './browserAppBridge/BrowserAppBridge';
  * bridge when the page is served by it.
  */
 export function installRendererApi(): void {
-  if (typeof window === 'undefined' || window.electronAPI) return;
+  if (typeof window === 'undefined' || getElectronApi()) return;
   if (window.rdcIpc) {
     window.electronAPI = createRendererApi(window.rdcIpc.platform, createDesktopTransport(window.rdcIpc));
     return;

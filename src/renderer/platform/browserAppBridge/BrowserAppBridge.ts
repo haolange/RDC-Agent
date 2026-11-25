@@ -6,6 +6,7 @@ import {
   type RendererInvokeChannel,
 } from '@shared/renderer-api';
 import { AppError, IPC_ERROR_KEY, type IpcErrorPayload } from '@shared/errors/appError';
+import { getElectronApi } from '../getElectronApi';
 import { connectBrowserEventStream } from './browserEventStream';
 import type { ElectronAPI } from '@shared/types/electron';
 
@@ -117,7 +118,7 @@ export function installBrowserAppBridge(): void {
   if (typeof window === 'undefined') return;
 
   const target = window as BrowserBridgeWindow;
-  if (window.electronAPI || target[BRIDGE_MARKER]) return;
+  if (getElectronApi() || target[BRIDGE_MARKER]) return;
 
   const client = new BrowserAppBridgeClient();
   window.electronAPI = client.api;

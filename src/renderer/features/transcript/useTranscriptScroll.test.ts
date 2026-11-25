@@ -60,7 +60,8 @@ it('observes virtual row growth after slice changes without forcing a reader bac
     unobserve(target: Element) { this.targets.delete(target); }
     disconnect() { this.targets.clear(); this.disconnected = true; }
     resize(target: Element) {
-      if (this.targets.has(target)) this.callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      // Chromium always reports borderBoxSize; an empty one leaves the row's measured height to getBoundingClientRect.
+      if (this.targets.has(target)) this.callback([{ target, borderBoxSize: [] } as unknown as ResizeObserverEntry], this as unknown as ResizeObserver);
     }
   }
   vi.stubGlobal('ResizeObserver', TestObserver);

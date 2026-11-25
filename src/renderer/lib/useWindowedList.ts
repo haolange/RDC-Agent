@@ -135,7 +135,7 @@ export function useWindowedList<T extends HTMLElement>(options: WindowedListOpti
             const index = state.rows.get(entry.target);
             const key = index === undefined ? undefined : latest.current.keys[index];
             if (index === undefined || key === undefined) continue;
-            const height = entry.borderBoxSize?.[0]?.blockSize ?? entry.target.getBoundingClientRect().height;
+            const height = entry.borderBoxSize[0]?.blockSize ?? entry.target.getBoundingClientRect().height;
             if (!Number.isFinite(height) || height <= 0) continue;
             const prior = heights.current.get(key);
             if (prior !== undefined && Math.abs(prior - height) < 1) continue;

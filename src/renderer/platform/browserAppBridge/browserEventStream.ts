@@ -76,9 +76,11 @@ export function connectBrowserEventStream(
   fetchImpl: typeof fetch = fetch,
 ): () => void {
   const controller = new AbortController();
+  // Read afresh at every check: abort() lands while a fetch, a read or a delay is awaited.
+  const stopped = (): boolean => controller.signal.aborted;
   void (async () => {
     let retryDelay = 250;
-    while (!controller.signal.aborted) {
+    while (!stopped()) {
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       try {
         const response = await fetchImpl(url, {
@@ -96,19 +98,19 @@ export function connectBrowserEventStream(
         reader = response.body.getReader();
         const decoder = new TextDecoder();
         const parser = createEventStreamParser();
-        while (!controller.signal.aborted) {
+        while (!stopped()) {
           const chunk = await reader.read();
-          if (controller.signal.aborted) break;
+          if (stopped()) break;
           if (chunk.done) break;
           for (const event of parser.push(decoder.decode(chunk.value, { stream: true }))) {
-            if (controller.signal.aborted) break;
+            if (stopped()) break;
             try { onEvent(event); } catch (error) {
               console.error('[BrowserAppBridge] Event listener failed:', error);
             }
           }
         }
       } catch (error) {
-        if (controller.signal.aborted) break;
+        if (stopped()) break;
         console.warn('[BrowserAppBridge] Event stream disconnected:', error);
       } finally {
         if (reader) {

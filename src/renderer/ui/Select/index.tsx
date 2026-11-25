@@ -3,6 +3,7 @@ import { useUiLabels } from '../../lib/useUiLabels';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
 import { useDismissable } from '../../lib/useDismissable';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
+import { documentFonts } from '../../lib/documentFonts';
 import { usePresence } from '../usePresence';
 import {
   ANCHOR_GAP,
@@ -201,12 +202,12 @@ export const Select: React.FC<SelectProps> = ({
     }
 
     if (triggerRef.current) resizeObserver?.observe(triggerRef.current);
-    document.fonts?.addEventListener('loadingdone', handleViewportChange);
+    documentFonts()?.addEventListener('loadingdone', handleViewportChange);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     return () => {
       resizeObserver?.disconnect();
-      document.fonts?.removeEventListener('loadingdone', handleViewportChange);
+      documentFonts()?.removeEventListener('loadingdone', handleViewportChange);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };

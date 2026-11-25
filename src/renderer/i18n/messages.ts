@@ -97,7 +97,8 @@ export const chineseTranslations: Record<TranslationKey, string> = {
   ...zhUserMenu,
 };
 
-const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
+// Keys also arrive through template casts (`settings.kind.${kind}` as TranslationKey), so a lookup can miss.
+const translations: Record<AppLanguage, Readonly<Partial<Record<string, string>>>> = {
   'zh-CN': chineseTranslations,
   en: englishTranslations,
 };
