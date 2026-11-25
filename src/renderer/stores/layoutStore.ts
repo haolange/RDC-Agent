@@ -51,8 +51,9 @@ const persistLayout = async (state: Pick<
   const api = window.electronAPI;
   if (!api) return;
   try {
-    await api.settings.set({
-      layout: {
+    await api.settings.patch([{
+      op: 'layout',
+      value: {
         leftSidebar: {
           collapsed: state.leftSidebarCollapsed,
           width: state.leftSidebarWidth,
@@ -67,7 +68,7 @@ const persistLayout = async (state: Pick<
           height: state.terminalHeight,
         },
       },
-    });
+    }]);
   } catch {
     // Browser QA intentionally denies settings writes; keep this in-memory layout usable.
   }

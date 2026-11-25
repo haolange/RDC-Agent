@@ -2,10 +2,9 @@ import { resolveAgentWriteTargetFromDraft, toAgentManifestEditorDraft } from '@s
 import { applyAgentDefinitionSaveResults, selectSubmittableAgentManifestDrafts } from './agentManifestAutosaveState';
 import { getErrorMessage } from './utils';
 import type {
-  AgentModelSettings,
   AppSettings,
-  AppSettingsPatch,
   LlmProviderEntry,
+  SettingsPatchOp,
 } from '@shared/types/settings';
 import type {
   AgentDefinitionSaveRequest,
@@ -26,7 +25,7 @@ interface SettingsModalActionsOptions {
   modalState: ModalState;
   providerConnection: ProviderConnection;
   updateProfile: (profile: Partial<AppSettings['profile']>) => Promise<void>;
-  patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
+  patchSettings: (ops: SettingsPatchOp[]) => Promise<AppSettings>;
   saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
   currentProjectId?: string | null;
   t: Translate;
@@ -147,9 +146,9 @@ export function createSettingsModalActions({
     }
   };
 
-  /** Model choices live in Settings, so they commit immediately rather than through manifest autosave. */
-  const handleAgentModelsChange = async (agentModels: AgentModelSettings): Promise<void> => {
-    await patchSettings({ agentModels });
+  /** Model choices live in Settings, so they commit immediately (one field per op) rather than through manifest autosave. */
+  const handleAgentModelOps = async (ops: SettingsPatchOp[]): Promise<void> => {
+    await patchSettings(ops);
   };
 
   const previewAgentModelMigration = (sourcePath: string) => (
@@ -184,13 +183,14 @@ export function createSettingsModalActions({
   };
 
   const handleSaveToolsConfig = async () => {
-    const nextSettings = await patchSettings({
-      tooling: {
+    const nextSettings = await patchSettings([{
+      op: 'tooling',
+      value: {
         rdcCli: modalState.rdcCliDraft,
         codeInterpreter: modalState.codeInterpreterDraft,
         shell: modalState.shellDraft,
       },
-    });
+    }]);
     modalState.setRdcCliDraft(nextSettings.tooling.rdcCli);
     modalState.setCodeInterpreterDraft(nextSettings.tooling.codeInterpreter);
     modalState.setShellDraft(nextSettings.tooling.shell);
@@ -198,11 +198,7 @@ export function createSettingsModalActions({
 
   const handleSavePersonalization = async () => {
     const submitted = modalState.globalInstructionsDraft;
-    const nextSettings = await patchSettings({
-      agents: {
-        globalInstructions: submitted,
-      },
-    });
+    const nextSettings = await patchSettings([{ op: 'globalInstructions', value: submitted }]);
     // Autosave runs while the user may still be typing: adopt the saved text only if the draft is unchanged,
     // so newer input survives and is saved by the next idle tick.
     modalState.setGlobalInstructionsDraft((current) => (current === submitted ? nextSettings.agents.globalInstructions : current));
@@ -214,7 +210,7 @@ export function createSettingsModalActions({
     handleDisconnectProvider,
     handleSaveAgentManifests,
     handleImportAgentManifest,
-    handleAgentModelsChange,
+    handleAgentModelOps,
     previewAgentModelMigration,
     handleCommitAgentOverrideFile,
     previewProjectAgentTrust,

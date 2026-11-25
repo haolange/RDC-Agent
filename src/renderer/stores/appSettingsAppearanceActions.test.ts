@@ -1,26 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
+import type { SettingsPatchOp } from '@shared/types/settings';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 
-describe('Appearance persistence ordering', () => {
-  it('merges consecutive edits after the preceding save, without losing the other theme', async () => {
+describe('Appearance persistence', () => {
+  it('commits each edit as its own op computed from the settings shown, without waiting for the previous save', async () => {
     let settings = structuredClone(DEFAULT_SETTINGS);
-    let release!: () => void;
-    const first = new Promise<void>((resolve) => { release = resolve; });
-    const patchSettings = vi.fn(async (patch) => {
-      if (patchSettings.mock.calls.length === 1) await first;
-      settings = { ...settings, appearance: { ...settings.appearance, ...patch.appearance } };
+    const patchSettings = vi.fn(async (ops: SettingsPatchOp[]) => {
+      for (const op of ops) if (op.op === 'appearance') settings = { ...settings, appearance: { ...settings.appearance, ...op.value } };
       return settings;
     });
-    const actions = createAppSettingsAppearanceActions(() => ({ settings, patchSettings }), vi.fn(), vi.fn());
+    const actions = createAppSettingsAppearanceActions(() => ({ settings, patchSettings }), vi.fn());
     const accent = actions.setChromeTheme('light', { accent: '#bf4c22' });
     const surface = actions.setChromeTheme('light', { surface: '#f8eee8' });
     const dark = actions.setChromeTheme('dark', { accent: '#33d1ff' });
-    await Promise.resolve();
-    expect(patchSettings).toHaveBeenCalledTimes(1);
-    release();
+    expect(patchSettings).toHaveBeenCalledTimes(3);
     await Promise.all([accent, surface, dark]);
     expect(settings.appearance.chromeThemes.light).toMatchObject({ accent: '#bf4c22', surface: '#f8eee8' });
     expect(settings.appearance.chromeThemes.dark.accent).toBe('#33d1ff');
@@ -28,29 +24,28 @@ describe('Appearance persistence ordering', () => {
 
   it('reports a failed save and continues with subsequent edits', async () => {
     const patchSettings = vi.fn().mockRejectedValueOnce(new Error('write failed')).mockResolvedValue(DEFAULT_SETTINGS);
-    const actions = createAppSettingsAppearanceActions(() => ({ settings: DEFAULT_SETTINGS, patchSettings }), vi.fn(), vi.fn());
+    const actions = createAppSettingsAppearanceActions(() => ({ settings: DEFAULT_SETTINGS, patchSettings }), vi.fn());
     await expect(actions.setTheme('light')).rejects.toThrow('write failed');
     await actions.setTheme('dark');
-    expect(patchSettings).toHaveBeenLastCalledWith({ appearance: { theme: 'dark' } });
+    expect(patchSettings).toHaveBeenLastCalledWith([{ op: 'appearance', value: { theme: 'dark' } }]);
   });
 
   it('keeps disclosure intent immediate when a stale save fails and reports only the latest failure', async () => {
     let rejectFirst!: (error: Error) => void;
     const first = new Promise<void>((_resolve, reject) => { rejectFirst = reject; });
     const display = vi.fn();
-    const persist = vi.fn().mockReturnValueOnce(first).mockResolvedValueOnce(undefined)
+    const patchSettings = vi.fn().mockReturnValueOnce(first).mockResolvedValueOnce(DEFAULT_SETTINGS)
       .mockRejectedValueOnce(new Error('disk full'));
-    const actions = createAppSettingsAppearanceActions(
-      () => ({ settings: DEFAULT_SETTINGS, patchSettings: vi.fn() }), display, persist,
-    );
+    const actions = createAppSettingsAppearanceActions(() => ({ settings: DEFAULT_SETTINGS, patchSettings }), display);
     const expanding = actions.setContextBreakdownExpanded(true);
     const collapsing = actions.setContextBreakdownExpanded(false);
     expect(display.mock.calls).toEqual([[{ expanded: true }], [{ expanded: false }]]);
-    await Promise.resolve();
-    expect(persist.mock.calls).toEqual([[true]]);
+    expect(patchSettings.mock.calls).toEqual([
+      [[{ op: 'appearance', value: { contextBreakdownExpanded: true } }]],
+      [[{ op: 'appearance', value: { contextBreakdownExpanded: false } }]],
+    ]);
     rejectFirst(new Error('stale write failed'));
     await Promise.all([expanding, collapsing]);
-    expect(persist.mock.calls).toEqual([[true], [false]]);
     expect(display).toHaveBeenCalledTimes(2);
     await actions.setContextBreakdownExpanded(true);
     expect(display).toHaveBeenLastCalledWith({ expanded: true, error: 'disk full' });

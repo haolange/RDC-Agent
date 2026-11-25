@@ -17,17 +17,22 @@ export interface AgentModelFallback {
   reasoningLevel?: ReasoningSelection;
 }
 
+/** One field set (or cleared, with no value) on a binding. */
+export type AgentModelFieldChange =
+  | { field: 'model'; value?: string }
+  | { field: 'reasoningLevel'; value?: ReasoningSelection };
+
 interface AgentModelBindingFieldsProps {
   binding: AgentModelBinding;
   options: AgentModelOption[];
   /** Present for one Agent: an empty field means "use the default". Absent for the default itself. */
   fallback?: AgentModelFallback;
-  onChange: (binding: AgentModelBinding) => void;
+  onChange: (change: AgentModelFieldChange) => void;
   testIdPrefix: string;
   t: Translate;
 }
 
-/** Model and reasoning level, edited together so each field can be set or left to the fallback. */
+/** Model and reasoning level; each field is set or left to the fallback on its own. */
 export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = ({
   binding,
   options,
@@ -45,13 +50,6 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
   ])];
   const fallbackModelLabel = modelOptionLabel(fallback?.model, options) ?? t('settings.agentModelNotSet');
   const levelLabel = (level: string): string => (isReasoningLevelLabel(level) ? t(EFFORT_LABEL_KEYS[level]) : level);
-  const update = (patch: AgentModelBinding) => {
-    const next = { ...binding, ...patch };
-    onChange({
-      ...(next.model ? { model: next.model } : {}),
-      ...(next.reasoningLevel ? { reasoningLevel: next.reasoningLevel } : {}),
-    });
-  };
 
   return (
     <div className="settings-agent-route-grid">
@@ -60,7 +58,7 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
           value={binding.model ?? ''}
           options={options}
           followDefaultLabel={fallback ? t('settings.agentModelUseDefault', { model: fallbackModelLabel }) : undefined}
-          onChange={(model) => update({ model: model || undefined })}
+          onChange={(model) => onChange({ field: 'model', value: model || undefined })}
           t={t}
         />
       </SettingsField>
@@ -69,7 +67,7 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
           ariaLabel={t('settings.agentReasoningLevel')}
           dataTestId={`${testIdPrefix}-reasoning-level`}
           value={binding.reasoningLevel ?? ''}
-          onChange={(value) => update({ reasoningLevel: value ? value as ReasoningSelection : undefined })}
+          onChange={(value) => onChange({ field: 'reasoningLevel', value: value ? value as ReasoningSelection : undefined })}
           options={[
             {
               value: '',

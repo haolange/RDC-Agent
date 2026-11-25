@@ -1,8 +1,8 @@
 import { InlineError } from '../../../../ui/InlineError';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { SettingsField } from '../parts';
-import { AgentModelBindingFields } from './AgentModelBindingFields';
-import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
+import { AgentModelBindingFields, type AgentModelFieldChange } from './AgentModelBindingFields';
+import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -11,7 +11,7 @@ type Translate = ReturnType<typeof useI18n>['t'];
 export function AgentDefaultModelSection({ settings, error, onChange, t }: {
   settings: AppSettings;
   error: string | null;
-  onChange: (binding: AgentModelBinding) => void;
+  onChange: (change: AgentModelFieldChange) => void;
   t: Translate;
 }) {
   return (

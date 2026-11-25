@@ -215,6 +215,44 @@ export interface EffectiveCatalogSnapshot {
   lastRefreshError?: string;
 }
 
+/** Names the snapshot a catalog change applies to. */
+export interface EffectiveCatalogBase {
+  scopeGeneration: string;
+  projectionVersion: number;
+  catalogRevision: string;
+}
+
+/**
+ * `llm:effectiveCatalogChanged`: one scope's catalog as a change against the snapshot main last handed out for that
+ * scope. A reader holding that snapshot applies it; any other reader reads the catalog again.
+ */
+export interface EffectiveCatalogChange {
+  /** The snapshot this change applies to; null when main handed out none, and `models.upsert` is the whole list. */
+  base: EffectiveCatalogBase | null;
+  /** The new snapshot's header. */
+  snapshot: Omit<EffectiveCatalogSnapshot, 'models'>;
+  models: {
+    /** Models the base does not have, whole. */
+    add: EffectiveModel[];
+    /** Models of the base that changed, as the values that changed. A new `catalogRevision` alone is not a change. */
+    update: EffectiveModelUpdate[];
+    remove: string[];
+    /** Every model id in order; present only when the order is not the base order without the removed ids, new ids last. */
+    order?: string[];
+  };
+}
+
+/** One changed value inside a model: the path to it and its new value; without a value the path is removed. */
+export interface EffectiveModelValueChange {
+  path: Array<string | number>;
+  value?: unknown;
+}
+
+export interface EffectiveModelUpdate {
+  modelId: string;
+  changes: EffectiveModelValueChange[];
+}
+
 export type ProviderStateMode = 'local-stateless' | 'provider-managed';
 export type ToolLoopPhase = 'top-level' | 'assistant-tool-call' | 'tool-result' | 'terminal';
 

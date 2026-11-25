@@ -38,8 +38,8 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
     onProbeBatchChanged: callback => transport.subscribe(EVENT.llm.probeBatchChanged,
       payload => callback(payload as Parameters<typeof callback>[0])),
     onEffectiveCatalogChanged: (callback) => (
-      transport.subscribe(EVENT.llm.effectiveCatalogChanged, (snapshot) => (
-        callback(snapshot as Parameters<typeof callback>[0])
+      transport.subscribe(EVENT.llm.effectiveCatalogChanged, (change) => (
+        callback(change as Parameters<typeof callback>[0])
       ))
     ),
     onAgentStatusChanged: (callback) => (

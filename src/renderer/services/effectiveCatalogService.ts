@@ -1,4 +1,4 @@
-import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
+import type { EffectiveCatalogChange, EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import type { ElectronAPI } from '@shared/types/electron';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 
@@ -13,6 +13,6 @@ export async function refreshEffectiveCatalog(api: ElectronAPI | undefined, prov
   if (!result.success) throw new Error(result.error || 'The model catalog could not be refreshed.');
 }
 
-export function observeEffectiveCatalog(api: ElectronAPI | undefined, listener: (snapshot: EffectiveCatalogSnapshot) => void): () => void {
+export function observeEffectiveCatalog(api: ElectronAPI | undefined, listener: (change: EffectiveCatalogChange) => void): () => void {
   return api?.events.onEffectiveCatalogChanged(listener) ?? (() => undefined);
 }

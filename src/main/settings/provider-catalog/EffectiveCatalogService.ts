@@ -1,16 +1,16 @@
-import fs from 'fs';
 import path from 'path';
+import { errorCodeOf } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
-import { writeFileAtomicSync } from '../../runtime/atomicFile';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../../runtime/atomicFile';
 import { CatalogProjectionClock } from './CatalogProjectionClock';
 import {
   cloneJson,
   enforceDiscoveryAdmission,
-  isObject,
   mergeEffectiveCatalog,
   revisionFor,
 } from './effectiveCatalogMerge';
+import { parsePersistedCatalogState } from './persistedCatalogStateSchema';
 import {
   DISCOVERY_TTL_MS,
   EFFECTIVE_CATALOG_SCHEMA_VERSION,
@@ -436,6 +436,11 @@ export class EffectiveCatalogService {
     ].join('\u0000');
   }
 
+  /** Tells subscribers about a snapshot a caller resolved (after a settings commit); an unchanged one is not repeated. */
+  announce(snapshot: EffectiveCatalogSnapshot): void {
+    this.emit(snapshot);
+  }
+
   private emit(snapshot: EffectiveCatalogSnapshot): void {
     const key = cacheKey(snapshot.providerId, snapshot.accountId, snapshot.protocol);
     const fingerprint = this.snapshotFingerprint(snapshot);
@@ -485,23 +490,17 @@ export class EffectiveCatalogService {
     this.lastEmitFingerprints.delete(key);
   }
 
+  /**
+   * The catalog state is a cache of upstream evidence, rebuilt by the next refresh. A file from another schema
+   * version or a damaged one (whose bytes `readValidatedSync` keeps beside it) starts empty and is rewritten;
+   * an unreadable one starts empty and is left as it is.
+   */
   private readState(): PersistedCatalogState {
     try {
-      if (!fs.existsSync(this.statePath)) {
-        return cloneJson(EMPTY_STATE);
-      }
-      const parsed = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as Partial<PersistedCatalogState>;
-      if (
-        parsed.schemaVersion !== EFFECTIVE_CATALOG_SCHEMA_VERSION
-        || !isObject(parsed.discoveries)
-        || !isObject(parsed.entitlements)
-        || !isObject(parsed.observed)
-      ) {
-        this.stateNeedsRewrite = true;
-        return cloneJson(EMPTY_STATE);
-      }
-      return parsed as PersistedCatalogState;
-    } catch {
+      return readValidatedSync(this.statePath, parseJsonWith(parsePersistedCatalogState)) ?? cloneJson(EMPTY_STATE);
+    } catch (error) {
+      const code = errorCodeOf(error);
+      if (code === 'STORAGE_SCHEMA_UNSUPPORTED' || code === 'STORAGE_CORRUPT') this.stateNeedsRewrite = true;
       return cloneJson(EMPTY_STATE);
     }
   }

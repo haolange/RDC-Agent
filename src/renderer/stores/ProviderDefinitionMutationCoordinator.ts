@@ -29,7 +29,7 @@ const superseded = (
   snapshot: ProviderDefinitionCommitSnapshot | null,
 ): ProviderDefinitionSaveResult => ({
   clientRevision: request.clientRevision,
-  providerId: request.provider.id,
+  providerId: request.providerId,
   status: 'superseded',
   commitHash: snapshot?.commitHash ?? null,
   provider: snapshot?.provider ?? null,
@@ -46,7 +46,7 @@ export class ProviderDefinitionMutationCoordinator {
   ) {}
 
   enqueue(request: ProviderDefinitionSaveRequest): Promise<ProviderDefinitionSaveResult> {
-    const lane = this.getLane(request.provider.id);
+    const lane = this.getLane(request.providerId);
     if (request.clientRevision < lane.latestRevision) {
       return Promise.resolve(superseded(request, lane.lastSuccessful));
     }
@@ -55,7 +55,7 @@ export class ProviderDefinitionMutationCoordinator {
     if (lane.timer) clearTimeout(lane.timer);
     lane.timer = setTimeout(() => {
       lane.timer = null;
-      void this.runLane(request.provider.id);
+      void this.runLane(request.providerId);
     }, this.debounceMs);
     return new Promise((resolve) => lane.waiters.push({ request, resolve }));
   }
@@ -103,7 +103,7 @@ export class ProviderDefinitionMutationCoordinator {
       .catch((error: unknown): ProviderDefinitionSaveResult => {
         const previous = lane.lastSuccessful;
         const lastSuccessful = previous?.provider
-          && providerConnectionIdentity(previous.provider) === providerConnectionIdentity(request.provider)
+          && providerConnectionIdentity(previous.provider) === request.connectionIdentity
           ? previous : null;
         return {
           ...superseded(request, lastSuccessful),

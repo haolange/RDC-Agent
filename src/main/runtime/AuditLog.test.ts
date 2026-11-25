@@ -38,7 +38,7 @@ describe('audit log failure', () => {
     fs.writeFileSync(path.join(root, 'state'), 'not a directory');
     const log = new AuditLog(path.join(root, 'state', 'audit.jsonl'));
 
-    expect(() => log.record({ kind: 'ipc', channel: 'settings:set', argumentsSha256: 'x', outcome: 'requested' }))
+    expect(() => log.record({ kind: 'ipc', channel: 'settings:patch', argumentsSha256: 'x', outcome: 'requested' }))
       .toThrow(AuditWriteFailedError);
   });
 });

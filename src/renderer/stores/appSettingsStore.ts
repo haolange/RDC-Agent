@@ -17,10 +17,7 @@ import {
   settleProviderDefinitionSave,
 } from './providerDefinitionSettings';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
-import {
-  withCompactionThresholdPercent,
-  withPermissionMode,
-} from './appSettingsRuntimePatch';
+import { SettingsPatchIntents } from './settingsPatchIntents';
 import type { AppSettingsState } from './appSettingsStoreState';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
@@ -30,19 +27,28 @@ const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
 );
 
 
+const patchIntents = new SettingsPatchIntents();
+
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: createDefaultAppSettings(),
   contextBreakdownPreference: null,
   hydrated: false,
   systemTheme: 'dark',
-  hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true }),
+  hydrate: (settings, systemTheme) => set({ settings: patchIntents.rebase(settings), systemTheme, hydrated: true }),
   setSystemTheme: (systemTheme) => set({ systemTheme }),
-  patchSettings: async (patch) => {
-    const nextSettings = await window.electronAPI.settings.set(patch);
-    set({ settings: nextSettings, hydrated: true });
-    return nextSettings;
+  patchSettings: async (ops) => {
+    const intent = patchIntents.begin(get().settings, ops);
+    set({ settings: intent.settings });
+    try {
+      const result = await window.electronAPI.settings.patch(ops);
+      set((state) => ({ settings: patchIntents.settle(state.settings, intent.id, result.changed), hydrated: true }));
+      return get().settings;
+    } catch (error) {
+      set((state) => ({ settings: patchIntents.fail(state.settings, intent.id) }));
+      throw error;
+    }
   },
-  replaceSettings: (settings) => set({ settings, hydrated: true }),
+  replaceSettings: (settings) => set({ settings: patchIntents.rebase(settings), hydrated: true }),
   saveAgentDefinition: async (request) => {
     const agentId = request.draft.id;
     const optimistic = beginAgentDefinitionSave(get().settings, request);
@@ -77,24 +83,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   },
   reloadSettings: async () => {
     const nextSettings = await window.electronAPI.settings.get();
-    set({ settings: nextSettings, hydrated: true });
-    return nextSettings;
+    set({ settings: patchIntents.rebase(nextSettings), hydrated: true });
+    return get().settings;
   },
-  ...createAppSettingsAppearanceActions(
-    get,
-    (contextBreakdownPreference) => set({ contextBreakdownPreference }),
-    async (expanded) => {
-      const saved = await window.electronAPI.settings.set({ appearance: { contextBreakdownExpanded: expanded } });
-      // Merge only the persisted preference. Unrelated saves can advance while this IPC returns.
-      set(({ settings }) => ({
-        settings: { ...settings, appearance: {
-          ...settings.appearance, contextBreakdownExpanded: saved.appearance.contextBreakdownExpanded,
-        } },
-      }));
-    },
-  ),
+  ...createAppSettingsAppearanceActions(get, (contextBreakdownPreference) => set({ contextBreakdownPreference })),
   updateProfile: async (profile) => {
-    await get().patchSettings({ profile });
+    await get().patchSettings([{ op: 'profile', value: profile }]);
   },
   saveProvider: async (provider) => {
     const clientRevision = beginProviderDefinitionSave(provider.id);
@@ -116,40 +110,25 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   flushProviderSaves: async (providerId) => {
     return flushProviderDefinitionSaves(providerId);
   },
-  removeProvider: async (providerId) => {
-    await get().patchSettings({
-      llm: {
-        providers: get().settings.llm.providers.filter((entry) => entry.id !== providerId),
-      },
-    });
-  },
   setAgentPermissionMode: async (mode) => {
     try {
       await useRuntimePermissionStore.getState().saveMode(mode);
     } finally {
       const snapshot = useRuntimePermissionStore.getState().snapshot;
-      if (snapshot) set((state) => ({ settings: withPermissionMode(state.settings, snapshot.mode) }));
+      if (snapshot) {
+        set((state) => ({ settings: patchIntents.confirm(state.settings, (view) => ({
+          ...view, agentRuntime: { ...view.agentRuntime, permissions: { ...view.agentRuntime.permissions, mode: snapshot.mode } },
+        })) }));
+      }
     }
   },
   setCustomPermissionRules: async (rules) => {
-    const nextSettings = await window.electronAPI.settings.set({
-      agentRuntime: { permissions: rules },
-    });
-    set({ settings: nextSettings, hydrated: true });
+    await get().patchSettings([{ op: 'agentRuntime', value: { permissions: rules } }]);
   },
   setCompactionThresholdPercent: async (percent) => {
     const previous = get().settings.agentRuntime?.context?.compactionThresholdPercent
       ?? DEFAULT_AGENT_RUNTIME.context.compactionThresholdPercent;
     if (previous === percent) return;
-    set((state) => ({ settings: withCompactionThresholdPercent(state.settings, percent), hydrated: true }));
-    try {
-      const nextSettings = await window.electronAPI.settings.set({
-        agentRuntime: { context: { compactionThresholdPercent: percent } },
-      });
-      set({ settings: nextSettings, hydrated: true });
-    } catch (error) {
-      set((state) => ({ settings: withCompactionThresholdPercent(state.settings, previous) }));
-      throw error;
-    }
+    await get().patchSettings([{ op: 'agentRuntime', value: { context: { compactionThresholdPercent: percent } } }]);
   },
 }));

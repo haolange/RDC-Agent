@@ -373,7 +373,8 @@ export type {
 } from './session';
 export type {
   AppSettings,
-  AppSettingsPatch,
+  SettingsPatchOp,
+  SettingsPatchResult,
   LlmAgentRoute,
   LlmProviderAuthMode,
   LlmProviderCapability,

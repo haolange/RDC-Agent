@@ -102,7 +102,8 @@ describe('canonical renderer API', () => {
   it('keeps invoke and event manifests unique', () => {
     expect(new Set(RENDERER_INVOKE_CHANNELS).size).toBe(RENDERER_INVOKE_CHANNELS.length);
     expect(new Set(RENDERER_EVENT_CHANNELS).size).toBe(RENDERER_EVENT_CHANNELS.length);
-    expect(isRendererInvokeChannel('settings:set')).toBe(true);
+    expect(isRendererInvokeChannel('settings:patch')).toBe(true);
+    expect(isRendererInvokeChannel('settings:set')).toBe(false);
     expect(isRendererInvokeChannel('settings:getProviderSecret')).toBe(false);
     expect(isRendererEventChannel('conversation:event')).toBe(true);
     expect(isRendererEventChannel('internal:event')).toBe(false);
@@ -169,7 +170,7 @@ describe('canonical renderer API', () => {
 
     await api.appShell.copyText('copied');
     await api.appShell.readClipboardText();
-    await api.settings.set({ appearance: { language: 'en' } });
+    await api.settings.patch([{ op: 'appearance', value: { language: 'en' } }]);
     await api.settings.getModelsOverride();
     await api.settings.setModelsOverride({ schemaVersion: 1, providers: {} });
     await api.memory.issueApprovalToken({ action: 'memory.write', scope: 'user' });
@@ -191,7 +192,7 @@ describe('canonical renderer API', () => {
     expect(transport.invocations.map(({ channel }) => channel)).toEqual([
       'app:copyText',
       'app:readClipboardText',
-      'settings:set',
+      'settings:patch',
       'settings:getModelsOverride',
       'settings:setModelsOverride',
       'memory:issueApprovalToken',

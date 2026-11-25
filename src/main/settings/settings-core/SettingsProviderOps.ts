@@ -1,10 +1,10 @@
+import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import {
   createProviderEntryFromCatalog,
   getProviderDefaultBaseUrl,
   isBuiltinProviderId,
 } from '../../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../../runtime/AppPathService';
-import { providerConnectionRevision } from '../provider-catalog/effectiveCatalogMerge';
 import { normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
 import { providerConnectionError } from '../provider-auth/providerConnectionErrors';
@@ -25,7 +25,7 @@ import {
   nowIso,
 } from './settingsServiceHelpers';
 import type { ProviderConnections } from './providerUserState';
-import type { LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
+import type { LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult, ProviderModelChoice } from '@shared/types/settings';
 
 export interface SettingsProviderOpsHost {
   readonly providerConnections: ProviderConnections;
@@ -48,7 +48,7 @@ export class SettingsProviderOps {
   ): ProviderDefinitionSaveResult {
     return {
       clientRevision: request.clientRevision,
-      providerId: request.provider.id,
+      providerId: request.providerId,
       status,
       commitHash: snapshot?.commitHash ?? null,
       provider: snapshot?.provider ?? null,
@@ -75,11 +75,21 @@ export class SettingsProviderOps {
     return snapshot;
   }
 
-  private persistProviderDefinition(provider: LlmProviderEntry): LlmProviderEntry {
-    const current = this.host.providerConnections.get(provider.id);
-    if (!current) throw new Error(`Unknown provider: ${provider.id}`);
-    // Only the model choices change; the commit keeps the user's part of the rows (see toUserProviderState).
-    return this.host.commitProvider({ ...current, models: provider.models });
+  /**
+   * Only the model choices change: a row main has takes the choices, a row it does not have yet (one the dialog
+   * shows from the effective catalog) is added, and every other row and field stays as committed.
+   */
+  private persistModelChoices(providerId: string, choices: readonly ProviderModelChoice[]): LlmProviderEntry {
+    const current = this.host.providerConnections.get(providerId);
+    if (!current) throw new Error(`Unknown provider: ${providerId}`);
+    const known = new Set(current.models.map((model) => model.id));
+    const added = choices.filter((choice) => !known.has(choice.id)).map((choice) => ({
+      id: choice.id,
+      label: choice.label ?? choice.id,
+      enabled: choice.enabled,
+      ...(choice.aliases?.length ? { aliases: [...choice.aliases] } : {}),
+    }));
+    return this.host.commitProvider({ ...current, models: applyModelPreferences([...current.models, ...added], choices) });
   }
 
   async getProviderDefinitionCommit(providerIdDraft: string): Promise<ProviderDefinitionCommitSnapshot | null> {
@@ -94,7 +104,7 @@ export class SettingsProviderOps {
   }
 
   async saveProviderDefinition(request: ProviderDefinitionSaveRequest): Promise<ProviderDefinitionSaveResult> {
-    const providerId = request.provider.id.trim();
+    const providerId = request.providerId.trim();
     if (!providerId || !Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
       return this.providerSaveResult(request, 'failed', this.readProviderDefinitionCommit(providerId), 'clientRevision must be a positive safe integer.');
     }
@@ -106,11 +116,11 @@ export class SettingsProviderOps {
     await Promise.resolve();
     const previous = this.readProviderDefinitionCommit(providerId);
     if (this.providerDefinitionRevisions.get(providerId) !== request.clientRevision
-      || (previous?.provider && providerConnectionRevision(previous.provider) !== providerConnectionRevision(request.provider))) {
+      || (previous?.provider && providerConnectionIdentity(previous.provider) !== request.connectionIdentity)) {
       return this.providerSaveResult(request, 'superseded', previous);
     }
     try {
-      const provider = this.persistProviderDefinition(request.provider);
+      const provider = this.persistModelChoices(providerId, request.models);
       const snapshot: ProviderDefinitionCommitSnapshot = {
         clientRevision: request.clientRevision,
         providerId,

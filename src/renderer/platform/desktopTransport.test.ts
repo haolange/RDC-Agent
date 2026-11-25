@@ -35,9 +35,9 @@ describe('desktop renderer API', () => {
     expect(failure).toMatchObject({ code: 'CONVERSATION_BUSY', params: { sessions: 1 }, category: 'availability', channel: 'session:list' });
   });
 
-  it('routes settings mutations through the canonical settings:set channel', async () => {
+  it('routes settings mutations through the canonical settings:patch channel', async () => {
     const { ipc, api } = fakeIpc({ appearance: { language: 'en' } });
-    await api.settings.set({ appearance: { language: 'en' } });
-    expect(ipc.invoke).toHaveBeenCalledWith('settings:set', { appearance: { language: 'en' } });
+    await api.settings.patch([{ op: 'appearance', value: { language: 'en' } }]);
+    expect(ipc.invoke).toHaveBeenCalledWith('settings:patch', [{ op: 'appearance', value: { language: 'en' } }]);
   });
 });

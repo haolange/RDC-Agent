@@ -15,7 +15,7 @@ describe('main-owned permission state', () => {
   it('keeps the confirmed mode while saving and accepts the committed snapshot', async () => {
     const save = deferred<unknown>();
     const getPermissionState = vi.fn().mockResolvedValue({ mode: 'full-access', revision: 2 });
-    vi.stubGlobal('window', { electronAPI: { settings: { set: () => save.promise }, runtime: { getPermissionState } } });
+    vi.stubGlobal('window', { electronAPI: { settings: { patch: () => save.promise }, runtime: { getPermissionState } } });
     const result = store.getState().saveMode('full-access');
     expect(store.getState().snapshot?.mode).toBe('default');
     expect(store.getState().pendingMode).toBe('full-access');
@@ -27,7 +27,7 @@ describe('main-owned permission state', () => {
 
   it('does not roll back a committed mode when the settings response is lost', async () => {
     vi.stubGlobal('window', { electronAPI: {
-      settings: { set: vi.fn().mockRejectedValue(new Error('response lost')) },
+      settings: { patch: vi.fn().mockRejectedValue(new Error('response lost')) },
       runtime: { getPermissionState: vi.fn().mockResolvedValue({ mode: 'full-access', revision: 2 }) },
     } });
     await expect(store.getState().saveMode('full-access')).resolves.toEqual({ mode: 'full-access', revision: 2 });
@@ -36,7 +36,7 @@ describe('main-owned permission state', () => {
 
   it('preserves the authoritative mode on a failed save', async () => {
     vi.stubGlobal('window', { electronAPI: {
-      settings: { set: vi.fn().mockRejectedValue(new Error('disk full')) },
+      settings: { patch: vi.fn().mockRejectedValue(new Error('disk full')) },
       runtime: { getPermissionState: vi.fn().mockResolvedValue({ mode: 'default', revision: 1 }) },
     } });
     await expect(store.getState().saveMode('full-access')).rejects.toThrow('disk full');
@@ -50,9 +50,9 @@ describe('main-owned permission state', () => {
   it('rejects old snapshots and never lets a late request clear a newer pending choice', async () => {
     const first = deferred<unknown>();
     const second = deferred<unknown>();
-    const set = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const patch = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const getPermissionState = vi.fn().mockResolvedValue({ mode: 'full-access', revision: 2 });
-    vi.stubGlobal('window', { electronAPI: { settings: { set }, runtime: { getPermissionState } } });
+    vi.stubGlobal('window', { electronAPI: { settings: { patch }, runtime: { getPermissionState } } });
     const a = store.getState().saveMode('full-access');
     const b = store.getState().saveMode('default');
     first.resolve({});

@@ -58,7 +58,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   ...modelCommands
 }) => {
   const [scope, setScope] = useState<AgentScope>('user');
-  const models = useAgentModelControls(settings, modelCommands);
+  const models = useAgentModelControls(modelCommands);
   const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
   const clearAgentRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
   const [missingAgentId, setMissingAgentId] = useState<string | null>(null);
@@ -164,7 +164,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       <AgentDefaultModelSection
         settings={settings}
         error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
-        onChange={models.setDefaultBinding}
+        onChange={models.setDefaultField}
         t={t}
       />
       <div className="settings-manifest-toolbar settings-manifest-page-toolbar" data-testid="settings-agents-toolbar">
@@ -256,7 +256,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               builtinUpdate={builtinUpdate}
               description={displayDescription(selectedAgent)}
               onUpdateAgent={updateAgent}
-              onModelBindingChange={(binding) => models.setAgentBinding(selectedAgent.id, binding)}
+              onModelFieldChange={(change) => models.setAgentField(selectedAgent.id, change)}
               modelError={models.modelError?.target === selectedAgent.id ? models.modelError.message : null}
               onDuplicateAgent={duplicateAgent}
               onDeleteAgent={deleteAgent}

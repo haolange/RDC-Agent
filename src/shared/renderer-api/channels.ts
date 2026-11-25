@@ -144,7 +144,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     getModelsOverride: 'settings:getModelsOverride',
     setModelsOverride: 'settings:setModelsOverride',
     getResolvedShell: 'settings:getResolvedShell',
-    set: 'settings:set',
+    patch: 'settings:patch',
   },
   project: {
     list: 'project:list',

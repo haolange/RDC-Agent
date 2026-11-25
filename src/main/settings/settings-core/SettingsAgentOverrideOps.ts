@@ -9,7 +9,7 @@ import { projectAgentTrust } from '../agent-manifests/ProjectAgentTrust';
 import { writeFileAtomic } from '../../runtime/atomicFile';
 import { resolveRegisteredProjectRoot, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
 import type { SettingsSnapshot } from './settingsStore';
-import type { AppSettingsPatch } from '@shared/types/settings';
+import type { SettingsPatchOp, SettingsPatchResult } from '@shared/types/settings';
 import type {
   AgentBuiltinComparison,
   AgentDefinitionCommitQuery,
@@ -20,7 +20,7 @@ import type {
 
 interface SettingsAccess {
   snapshot(): SettingsSnapshot;
-  update(patch: AppSettingsPatch): SettingsSnapshot;
+  update(ops: readonly SettingsPatchOp[]): SettingsPatchResult;
 }
 
 /** User-triggered actions on override files that do not apply as written. */
@@ -67,13 +67,12 @@ export class SettingsAgentOverrideOps {
       throw new AppError('AGENT_MODEL_MIGRATION_STILL_INVALID', migrated.reason);
     }
     await writeFileAtomic(`${target.sourcePath}.bak`, raw);
-    const agentModels = this.settings.snapshot().user.agentModels;
-    this.settings.update({
-      agentModels: {
-        ...agentModels,
-        byAgent: { ...agentModels.byAgent, [target.agentId]: { ...agentModels.byAgent[target.agentId], ...plan.binding } },
-      },
-    });
+    const fields: SettingsPatchOp[] = [];
+    if (plan.binding.model) fields.push({ op: 'agentModels.setAgentField', agentId: target.agentId, field: 'model', value: plan.binding.model });
+    if (plan.binding.reasoningLevel) {
+      fields.push({ op: 'agentModels.setAgentField', agentId: target.agentId, field: 'reasoningLevel', value: plan.binding.reasoningLevel });
+    }
+    if (fields.length > 0) this.settings.update(fields);
     await writeFileAtomic(target.sourcePath, plan.content);
     agentManifestService.invalidate();
   }

@@ -18,9 +18,18 @@ describe('settingsLlmSchemas clientRevision / modelPreferences', () => {
     }]).success).toBe(true);
 
     expect(SettingsSaveProviderDefinitionArgsSchema.safeParse([{
-      provider: { id: 'openai' },
+      providerId: 'openai',
+      connectionIdentity: '["openai"]',
+      models: [{ id: 'gpt-6', enabled: false }],
       clientRevision: revision,
     }]).success).toBe(true);
+  });
+
+  it('takes only model choices in a provider definition save', () => {
+    const save = { providerId: 'openai', connectionIdentity: '["openai"]', clientRevision: 1 };
+    expect(SettingsSaveProviderDefinitionArgsSchema.safeParse([{ ...save, models: [{ id: 'gpt-6', enabled: true, label: 'GPT-6' }] }]).success).toBe(true);
+    expect(SettingsSaveProviderDefinitionArgsSchema.safeParse([{ ...save, models: [{ id: 'gpt-6', enabled: true, contextWindow: 1 }] }]).success).toBe(false);
+    expect(SettingsSaveProviderDefinitionArgsSchema.safeParse([{ ...save, models: [], provider: { id: 'openai' } }]).success).toBe(false);
   });
 
   it('rejects non-positive or non-safe-integer revisions', () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import { ProviderDefinitionMutationCoordinator } from './ProviderDefinitionMutationCoordinator';
 import type {
   LlmProviderEntry,
@@ -28,13 +29,18 @@ const provider = (modelId: string): LlmProviderEntry => ({
   models: [{ id: modelId, label: modelId, enabled: true }],
 });
 
+/** The model choices of `entry` as the store sends them. */
+const save = (entry: LlmProviderEntry, clientRevision: number): ProviderDefinitionSaveRequest => ({
+  providerId: entry.id, connectionIdentity: providerConnectionIdentity(entry), models: entry.models, clientRevision,
+});
+
 const committed = (request: ProviderDefinitionSaveRequest): ProviderDefinitionSaveResult => {
-  const modelId = request.provider.models[0]?.id ?? 'unknown';
+  const modelId = request.models[0]?.id ?? 'unknown';
   const snapshot = {
     clientRevision: request.clientRevision,
-    providerId: request.provider.id,
+    providerId: request.providerId,
     commitHash: `commit-${modelId}`,
-    provider: request.provider,
+    provider: provider(modelId),
     catalogRevision: `catalog-${modelId}`,
   };
   return {
@@ -48,9 +54,9 @@ describe('ProviderDefinitionMutationCoordinator', () => {
   it('debounces A -> B -> C and lets the flush barrier commit only C', async () => {
     const commit = vi.fn(async (request: ProviderDefinitionSaveRequest) => committed(request));
     const coordinator = new ProviderDefinitionMutationCoordinator(commit, 60_000);
-    const a = coordinator.enqueue({ provider: provider('a'), clientRevision: 1 });
-    const b = coordinator.enqueue({ provider: provider('b'), clientRevision: 2 });
-    const c = coordinator.enqueue({ provider: provider('c'), clientRevision: 3 });
+    const a = coordinator.enqueue(save(provider('a'), 1));
+    const b = coordinator.enqueue(save(provider('b'), 2));
+    const c = coordinator.enqueue(save(provider('c'), 3));
 
     const barrier = await coordinator.flush('provider-under-test');
     const results = await Promise.all([a, b, c]);
@@ -80,7 +86,7 @@ describe('ProviderDefinitionMutationCoordinator', () => {
       error: 'disk full',
     };
     const coordinator = new ProviderDefinitionMutationCoordinator(async () => failed, 60_000);
-    const pending = coordinator.enqueue({ provider: provider('d'), clientRevision: 4 });
+    const pending = coordinator.enqueue(save(provider('d'), 4));
 
     await expect(coordinator.flush('provider-under-test')).rejects.toThrow('disk full');
     await expect(pending).resolves.toMatchObject({ status: 'failed', lastSuccessful });
@@ -90,13 +96,13 @@ describe('ProviderDefinitionMutationCoordinator', () => {
   it('reports a transport failure only to the current revision and retains the committed baseline', async () => {
     const commit = vi.fn(async (request: ProviderDefinitionSaveRequest) => committed(request));
     const coordinator = new ProviderDefinitionMutationCoordinator(commit, 60_000);
-    const baseline = coordinator.enqueue({ provider: provider('baseline'), clientRevision: 1 });
+    const baseline = coordinator.enqueue(save(provider('baseline'), 1));
     await coordinator.flush('provider-under-test');
     const { lastSuccessful } = await baseline;
 
     commit.mockRejectedValueOnce(new Error('Connection lost'));
-    const old = coordinator.enqueue({ provider: provider('old-choice'), clientRevision: 2 });
-    const latest = coordinator.enqueue({ provider: provider('latest-choice'), clientRevision: 3 });
+    const old = coordinator.enqueue(save(provider('old-choice'), 2));
+    const latest = coordinator.enqueue(save(provider('latest-choice'), 3));
 
     await expect(coordinator.flush('provider-under-test')).rejects.toThrow('Connection lost');
     await expect(old).resolves.toMatchObject({ status: 'superseded', clientRevision: 2, lastSuccessful });
@@ -106,16 +112,12 @@ describe('ProviderDefinitionMutationCoordinator', () => {
   it('does not roll back to another account when a newly connected account cannot save', async () => {
     const commit = vi.fn(async (request: ProviderDefinitionSaveRequest) => committed(request));
     const coordinator = new ProviderDefinitionMutationCoordinator(commit, 60_000);
-    const previous = coordinator.enqueue({
-      provider: { ...provider('previous'), activeAccountId: 'previous-account' }, clientRevision: 1,
-    });
+    const previous = coordinator.enqueue(save({ ...provider('previous'), activeAccountId: 'previous-account' }, 1));
     await coordinator.flush('provider-under-test');
     await previous;
 
     commit.mockRejectedValueOnce(new Error('Connection lost'));
-    const next = coordinator.enqueue({
-      provider: { ...provider('next'), activeAccountId: 'next-account' }, clientRevision: 2,
-    });
+    const next = coordinator.enqueue(save({ ...provider('next'), activeAccountId: 'next-account' }, 2));
     await expect(coordinator.flush('provider-under-test')).rejects.toThrow('Connection lost');
     await expect(next).resolves.toMatchObject({ status: 'failed', provider: null, lastSuccessful: null });
   });

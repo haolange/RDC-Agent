@@ -8,6 +8,14 @@ const LlmProviderAuthModeSchema = z.enum(['none', 'api-key', 'local', 'account',
 /** Matches renderer `Date.now() * 1000` revision clocks (safe-integer domain). */
 const ClientRevisionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 
+const modelPreferenceShape = {
+  id: ipcNonEmptyString(256, 'id'),
+  enabled: z.boolean(),
+  defaultReasoningSelection: ipcString(64, 'defaultReasoningSelection').optional(),
+  defaultBudgetTokens: z.number().int().positive().optional(),
+  preferredRouteOptionId: ipcString(200, 'preferredRouteOptionId').optional(),
+};
+
 export const LlmProviderDraftArgsSchema = z.tuple([
   z.object({
     providerId: ipcNonEmptyString(200, 'providerId'),
@@ -17,13 +25,7 @@ export const LlmProviderDraftArgsSchema = z.tuple([
     protocol: ipcString(64, 'protocol').optional(),
     connectionValues: z.record(z.string().max(200), ipcString(16_000, 'connectionValue')).optional(),
     // Large catalogs (OpenRouter etc.) routinely exceed 512; keep a hard cap for IPC DoS only.
-    modelPreferences: z.array(z.object({
-      id: ipcNonEmptyString(256, 'id'),
-      enabled: z.boolean(),
-      defaultReasoningSelection: ipcString(64, 'defaultReasoningSelection').optional(),
-      defaultBudgetTokens: z.number().int().positive().optional(),
-      preferredRouteOptionId: ipcString(200, 'preferredRouteOptionId').optional(),
-    }).strict()).max(10_000).optional(),
+    modelPreferences: z.array(z.object(modelPreferenceShape).strict()).max(10_000).optional(),
   }).strict(),
 ]);
 
@@ -110,7 +112,13 @@ export const SettingsSaveAgentDefinitionArgsSchema = z.tuple([
 
 export const SettingsSaveProviderDefinitionArgsSchema = z.tuple([
   z.object({
-    provider: z.record(z.string().max(200), z.unknown()),
+    providerId: ipcNonEmptyString(200, 'providerId'),
+    connectionIdentity: ipcString(64 * 1024, 'connectionIdentity'),
+    models: z.array(z.object({
+      ...modelPreferenceShape,
+      label: ipcString(256, 'label').optional(),
+      aliases: z.array(ipcString(256, 'alias')).max(32).optional(),
+    }).strict()).max(10_000),
     clientRevision: ClientRevisionSchema,
   }).strict(),
 ]);

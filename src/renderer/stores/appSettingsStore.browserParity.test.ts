@@ -17,47 +17,38 @@ describe('app settings browser parity', () => {
     vi.unstubAllGlobals();
   });
 
-  it('persists a language change once and updates the hydrated store', async () => {
-    const persisted = {
-      ...DEFAULT_SETTINGS,
-      appearance: { ...DEFAULT_SETTINGS.appearance, language: 'en' as const },
-    };
-    const setSettings = vi.fn().mockResolvedValue(persisted);
+  it('persists a language change once as one op and updates the hydrated store', async () => {
+    const appearance = { ...DEFAULT_SETTINGS.appearance, language: 'en' as const };
+    const patch = vi.fn().mockResolvedValue({ revision: 2, changed: { appearance } });
     vi.stubGlobal('window', {
-      electronAPI: { settings: { set: setSettings } },
+      electronAPI: { settings: { patch } },
     });
     useAppSettingsStore.getState().hydrate(DEFAULT_SETTINGS, 'dark');
 
     await useAppSettingsStore.getState().setLanguage('en');
 
-    expect(setSettings).toHaveBeenCalledTimes(1);
-    expect(setSettings).toHaveBeenCalledWith({ appearance: { language: 'en' } });
+    expect(patch).toHaveBeenCalledExactlyOnceWith([{ op: 'appearance', value: { language: 'en' } }]);
     expect(useAppSettingsStore.getState().settings.appearance.language).toBe('en');
     expect(useAppSettingsStore.getState().hydrated).toBe(true);
   });
 
-  it('adopts only the saved context preference when an older settings snapshot arrives', async () => {
-    let resolveSave!: (settings: typeof DEFAULT_SETTINGS) => void;
-    const reply = new Promise<typeof DEFAULT_SETTINGS>((resolve) => { resolveSave = resolve; });
-    const setSettings = vi.fn().mockReturnValue(reply);
-    vi.stubGlobal('window', { electronAPI: { settings: { set: setSettings } } });
+  it('keeps an in-flight preference over an older settings snapshot that arrives meanwhile', async () => {
+    let resolveSave!: (result: unknown) => void;
+    const patch = vi.fn().mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
+    vi.stubGlobal('window', { electronAPI: { settings: { patch } } });
     const store = useAppSettingsStore;
     store.getState().hydrate(DEFAULT_SETTINGS, 'dark');
 
     const saving = store.getState().setContextBreakdownExpanded(true);
     expect(store.getState().contextBreakdownPreference).toEqual({ expanded: true });
-    expect(store.getState().settings.appearance.contextBreakdownExpanded).toBe(false);
-    store.getState().replaceSettings({
-      ...DEFAULT_SETTINGS,
-      appearance: { ...DEFAULT_SETTINGS.appearance, theme: 'light' },
-    });
-    resolveSave({
-      ...DEFAULT_SETTINGS,
-      appearance: { ...DEFAULT_SETTINGS.appearance, contextBreakdownExpanded: true },
-    });
+    expect(store.getState().settings.appearance.contextBreakdownExpanded).toBe(true);
+    const older = { ...DEFAULT_SETTINGS.appearance, theme: 'light' as const };
+    store.getState().replaceSettings({ ...DEFAULT_SETTINGS, appearance: older });
+    expect(store.getState().settings.appearance).toMatchObject({ theme: 'light', contextBreakdownExpanded: true });
+    resolveSave({ revision: 3, changed: { appearance: { ...older, contextBreakdownExpanded: true } } });
     await saving;
 
-    expect(setSettings).toHaveBeenCalledExactlyOnceWith({ appearance: { contextBreakdownExpanded: true } });
+    expect(patch).toHaveBeenCalledExactlyOnceWith([{ op: 'appearance', value: { contextBreakdownExpanded: true } }]);
     expect(store.getState().settings.appearance).toMatchObject({ theme: 'light', contextBreakdownExpanded: true });
   });
 

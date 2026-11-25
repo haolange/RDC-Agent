@@ -3,8 +3,14 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APPEARANCE, DEFAULT_LAYOUT } from '@shared/constants/appSettingsDefaults';
+import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import { isolateHome } from '../../testing/isolatedHome';
-import type { AppSettings } from '@shared/types/settings';
+import type { AppSettings, LlmProviderEntry, LlmProviderModel, ProviderDefinitionSaveRequest } from '@shared/types/settings';
+
+/** A model-choice save for `provider` as the renderer sends it. */
+const modelChoices = (provider: LlmProviderEntry, models: LlmProviderModel[], clientRevision: number): ProviderDefinitionSaveRequest => ({
+  providerId: provider.id, connectionIdentity: providerConnectionIdentity(provider), models, clientRevision,
+});
 
 const electronMock = vi.hoisted(() => ({
   userDataRoot: '',
@@ -96,13 +102,13 @@ describe('SettingsService provider persistence', () => {
     const notifications = vi.fn(); const stop = runtimePermissionStateService.subscribe(notifications);
     const rename = vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => { throw new Error('permission commit failed'); });
     try {
-      expect(() => service.update({ agentRuntime: { permissions: { mode: 'full-access' } } })).toThrow('permission commit failed');
+      expect(() => service.update([{ op: 'agentRuntime', value: { permissions: { mode: 'full-access' } } }])).toThrow('permission commit failed');
       expect(runtimePermissionStateService.getSnapshot()).toBe(before);
       expect(notifications).not.toHaveBeenCalled();
     } finally { rename.mockRestore(); }
     const stopBroken = runtimePermissionStateService.subscribe(() => { throw new Error('notification failed'); });
     try {
-      expect(service.update({ agentRuntime: { permissions: { mode: 'full-access' } } }).user.agentRuntime.permissions.mode).toBe('full-access');
+      expect(service.update([{ op: 'agentRuntime', value: { permissions: { mode: 'full-access' } } }]).changed.agentRuntime?.permissions.mode).toBe('full-access');
       expect(runtimePermissionStateService.getSnapshot()).toEqual({ mode: 'full-access', revision: before.revision + 1 });
       expect(notifications).toHaveBeenCalledOnce();
       expect(service.rendererSettingsDto().agentRuntime.permissions.mode).toBe('full-access');
@@ -147,12 +153,17 @@ describe('SettingsService provider persistence', () => {
     expect(Object.isFrozen(initial.user.appearance)).toBe(true);
     expect(service.providerConnections.list()).toBe(service.providerConnections.list());
 
-    service.update({ appearance: { theme: initial.user.appearance.theme } });
+    expect(service.update([{ op: 'appearance', value: { theme: initial.user.appearance.theme } }])).toEqual({ revision: initial.revision, changed: {} });
     expect(service.snapshot()).toBe(initial);
     expect(changes).toEqual([]);
 
-    const next = service.update({ appearance: { theme: 'light' }, agentModels: { default: { model: 'deepseek:deepseek-flash' }, byAgent: {} } });
+    const next = service.update([
+      { op: 'appearance', value: { theme: 'light' } },
+      { op: 'agentModels.setDefault', field: 'model', value: 'deepseek:deepseek-flash' },
+    ]);
     expect(next.revision).toBe(initial.revision + 1);
+    expect(next.changed).toEqual({ appearance: service.snapshot().user.appearance, agentModels: { default: { model: 'deepseek:deepseek-flash' } } });
+    expect(JSON.stringify(next).length, 'a patch answers with what changed only').toBeLessThan(2048);
     expect(changes).toEqual([{ revision: next.revision, sections: ['appearance', 'agentModels'] }]);
     expect(service.agentModelRoutes.resolve('general')).toEqual({ agentId: 'general', providerId: 'deepseek', modelId: 'deepseek-flash' });
   });
@@ -184,9 +195,9 @@ describe('SettingsService provider persistence', () => {
     expect(runtime.appearance.theme).toBe('dark');
     expect(runtime.llm.providers.length).toBeGreaterThan(0);
     expect(fs.existsSync(settingsPathFor())).toBe(false);
-    service.update({ appearance: { theme: 'dark' } });
+    service.update([{ op: 'appearance', value: { theme: 'dark' } }]);
     expect(fs.existsSync(settingsPathFor()), 'an unchanged patch writes nothing').toBe(false);
-    service.update({ appearance: { theme: 'light' } });
+    service.update([{ op: 'appearance', value: { theme: 'light' } }]);
     const written = fs.readFileSync(settingsPathFor(), 'utf8');
     expect(written).not.toContain('\n');
     expect(JSON.parse(written)).toMatchObject({ schemaVersion: 9, appearance: { theme: 'light' }, providers: {} });
@@ -199,7 +210,7 @@ describe('SettingsService provider persistence', () => {
 
     service.initialize();
     const providersBefore = (JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: unknown }).providers;
-    service.update({ appearance: { theme: 'light' } });
+    service.update([{ op: 'appearance', value: { theme: 'light' } }]);
 
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { appearance: { theme: string }; providers: unknown };
     expect(persisted.appearance.theme).toBe('light');
@@ -217,30 +228,10 @@ describe('SettingsService provider persistence', () => {
     expect(runtime.resourceCatalog.diagnostics).toContainEqual(expect.objectContaining({
       code: 'settings_provider_not_in_catalog', severity: 'warning', path: settingsPath,
     }));
-    service.update({ appearance: { theme: 'light' } });
+    service.update([{ op: 'appearance', value: { theme: 'light' } }]);
     service.saveProviderConnection('deepseek', 'sk-deepseek', [{ id: 'deepseek-flash', label: 'Flash', enabled: true }]);
     expect((JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, unknown> }).providers['retired-provider'])
       .toEqual(orphan);
-  });
-
-  it('applies a provider list patch to changed providers only and resets the ones left out', async () => {
-    const { settingsPath } = await createVerifiedPersistedSettings();
-    const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    const providers = started(service).llm.providers;
-    const longcat = providers.find((entry) => entry.id === 'longcat')!;
-    const target = longcat.models[0]!;
-
-    service.update({ llm: { providers: providers.map((entry) => entry.id === 'longcat'
-      ? { ...entry, models: entry.models.map((model) => model.id === target.id ? { ...model, enabled: false } : model) }
-      : entry) } });
-    const afterEdit = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, { models?: Record<string, unknown> }> };
-    expect(Object.keys(afterEdit.providers).sort()).toEqual(['deepseek', 'longcat']);
-    expect(afterEdit.providers.longcat?.models?.[target.id]).toEqual({ enabled: false });
-
-    service.update({ llm: { providers: service.rendererSettingsDto().llm.providers.filter((entry) => entry.id !== 'deepseek') } });
-    const afterRemove = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, unknown> };
-    expect(Object.keys(afterRemove.providers)).toEqual(['longcat']);
   });
 
   it.each([
@@ -287,10 +278,11 @@ describe('SettingsService provider persistence', () => {
       JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-size', accessToken: 'token' }),
       getProviderModelSummaries('chatgpt-account'),
     );
-    service.update({
-      appearance: { theme: 'light' },
-      agentModels: { default: { model: 'deepseek:deepseek-flash', reasoningLevel: 'high' }, byAgent: {} },
-    });
+    service.update([
+      { op: 'appearance', value: { theme: 'light' } },
+      { op: 'agentModels.setDefault', field: 'model', value: 'deepseek:deepseek-flash' },
+      { op: 'agentModels.setDefault', field: 'reasoningLevel', value: 'high' },
+    ]);
 
     const raw = fs.readFileSync(settings.paths.settingsPath, 'utf8');
     expect(raw.length).toBeLessThan(8 * 1024);
@@ -519,20 +511,30 @@ describe('SettingsService provider persistence', () => {
     const provider = initialized.llm.providers.find((entry) => entry.id === 'longcat');
     expect(provider).toBeDefined();
 
-    const result = await service.saveProviderDefinition({
-      provider: {
-        ...provider!,
-        models: provider!.models.map((model) => model.id === 'LongCat-2.0'
-          ? { ...model, preferredRouteOptionId: 'AnthropicMessages' }
-          : model),
-      },
-      clientRevision: 1,
-    });
+    const result = await service.saveProviderDefinition(modelChoices(provider!, provider!.models.map((model) => model.id === 'LongCat-2.0'
+      ? { ...model, preferredRouteOptionId: 'AnthropicMessages' }
+      : model), 1));
 
     expect(result.status).toBe('committed');
     expect(service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'longcat')
       ?.models.find((model) => model.id === 'LongCat-2.0')?.preferredRouteOptionId)
       .toBe('AnthropicMessages');
+  });
+
+  it('commits only the model choices a save carries and keeps every other row', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const provider = started(service).llm.providers.find((entry) => entry.id === 'longcat')!;
+    expect(provider.models.length).toBeGreaterThan(1);
+    const [first, ...rest] = provider.models;
+
+    const result = await service.saveProviderDefinition(modelChoices(provider, [{ ...first!, enabled: false }], 1));
+
+    expect(result.status).toBe('committed');
+    const saved = service.providerConnections.get('longcat')!;
+    expect(saved.models.find((model) => model.id === first!.id)?.enabled).toBe(false);
+    expect(saved.models.filter((model) => model.id !== first!.id)).toEqual(rest);
+    expect(providerConnectionIdentity(saved)).toBe(providerConnectionIdentity(provider));
   });
 
   it('keeps a verified account and its discovery identity after the last model is disabled', async () => {
@@ -548,19 +550,13 @@ describe('SettingsService provider persistence', () => {
     const openRouter = () => service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter')!;
     const connected = openRouter();
     const model = connected.models.find((entry) => entry.enabled)!;
-    const result = await service.saveProviderDefinition({
-      provider: { ...connected, models: connected.models.map((entry) => ({ ...entry, enabled: false })) },
-      clientRevision: 1,
-    });
+    const result = await service.saveProviderDefinition(modelChoices(connected, connected.models.map((entry) => ({ ...entry, enabled: false })), 1));
     expect(result.status).toBe('committed');
     expect(openRouter()).toMatchObject({ enabled: false, isConfigured: true, status: 'verified', activeAccountId: 'account-under-test' });
     expect(buildEffectiveCatalogRequest(openRouter()).configurationRevision)
       .toBe(buildEffectiveCatalogRequest(connected).configurationRevision);
 
-    await service.saveProviderDefinition({
-      provider: { ...openRouter(), models: openRouter().models.map((entry) => ({ ...entry, enabled: entry.id === model.id })) },
-      clientRevision: 2,
-    });
+    await service.saveProviderDefinition(modelChoices(openRouter(), openRouter().models.map((entry) => ({ ...entry, enabled: entry.id === model.id })), 2));
     expect(openRouter()).toMatchObject({ enabled: true, isConfigured: true, status: 'verified', activeAccountId: 'account-under-test' });
   });
 
@@ -570,16 +566,13 @@ describe('SettingsService provider persistence', () => {
     const settings = started(service);
     const change = (id: string) => {
       const provider = settings.llm.providers.find((entry) => entry.id === id)!;
-      return service.saveProviderDefinition({
-        provider: { ...provider, models: provider.models.map((model) => ({ ...model, enabled: false })) },
-        clientRevision: 1,
-      });
+      return service.saveProviderDefinition(modelChoices(provider, provider.models.map((model) => ({ ...model, enabled: false })), 1));
     };
     const first = change('deepseek');
     const second = change('longcat');
     const window = { width: 1600, height: 1000, x: 10, y: 20, isMaximized: true };
     service.persistWindowLayout(window);
-    service.update({ appearance: { contextBreakdownExpanded: true } });
+    service.update([{ op: 'appearance', value: { contextBreakdownExpanded: true } }]);
 
     expect((await Promise.all([first, second])).map((item) => item.status)).toEqual(['committed', 'committed']);
     const persisted = service.rendererSettingsDto();
@@ -602,10 +595,7 @@ describe('SettingsService provider persistence', () => {
       [{ id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', enabled: true }],
     );
     const connected = service.rendererSettingsDto().llm.providers.find((entry) => entry.id === 'openrouter')!;
-    const pending = service.saveProviderDefinition({
-      provider: { ...connected, models: connected.models.map((model) => ({ ...model, enabled: false })) },
-      clientRevision: 1,
-    });
+    const pending = service.saveProviderDefinition(modelChoices(connected, connected.models.map((model) => ({ ...model, enabled: false })), 1));
     const disconnected = service.disconnectProvider('openrouter', 'account');
 
     await expect(pending).resolves.toMatchObject({ status: 'superseded' });
@@ -616,17 +606,14 @@ describe('SettingsService provider persistence', () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     service.initialize();
-    service.update({ appearance: { theme: 'light' } });
+    service.update([{ op: 'appearance', value: { theme: 'light' } }]);
     const settings = service.rendererSettingsDto();
     const provider = settings.llm.providers.find((entry) => entry.id === 'deepseek')!;
     const filePath = path.join(settings.paths.userRdcRoot, 'config.json');
     const before = fs.readFileSync(filePath, 'utf8');
     const rename = vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => { throw new Error('model preference commit failed'); });
     try {
-      const result = await service.saveProviderDefinition({
-        provider: { ...provider, models: provider.models.map((model) => ({ ...model, enabled: false })) },
-        clientRevision: 1,
-      });
+      const result = await service.saveProviderDefinition(modelChoices(provider, provider.models.map((model) => ({ ...model, enabled: false })), 1));
       expect(result).toMatchObject({ status: 'failed', error: 'model preference commit failed', lastSuccessful: { provider } });
       expect(fs.readFileSync(filePath, 'utf8')).toBe(before);
       expect(fs.readdirSync(settings.paths.userRdcRoot).some((name) => name.endsWith('.tmp'))).toBe(false);
@@ -644,7 +631,7 @@ describe('SettingsService provider persistence', () => {
     ]);
 
     expect(initialized.agents.definitions.some((definition) => definition.id === 'general')).toBe(true);
-    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'volcengine-coding-plan:glm-5.2' } } } });
+    service.update([{ op: 'agentModels.setAgentField', agentId: 'general', field: 'model', value: 'volcengine-coding-plan:glm-5.2' }]);
 
     expect(service.rendererSettingsDto().llm.agentRoutes).toContainEqual({
       agentId: 'general',
@@ -702,7 +689,7 @@ describe('SettingsService provider persistence', () => {
     const service = new SettingsService();
     const initialized = started(service);
     expect(initialized.agents.definitions.some((definition) => definition.id === 'general')).toBe(true);
-    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'missing-provider:missing-model' } } } });
+    service.update([{ op: 'agentModels.setAgentField', agentId: 'general', field: 'model', value: 'missing-provider:missing-model' }]);
     expect(service.rendererSettingsDto().llm.agentRoutes).toContainEqual({
       agentId: 'general', providerId: 'missing-provider', modelId: 'missing-model',
     });
@@ -715,7 +702,7 @@ describe('SettingsService provider persistence', () => {
     const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
-    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
+    service.update([{ op: 'agentModels.setAgentField', agentId: 'general', field: 'model', value: 'deepseek:model-c' }]);
     const settingsBeforeSave = fs.readFileSync(initialized.paths.settingsPath, 'utf8');
 
     const first = service.saveAgentDefinition({
@@ -771,7 +758,7 @@ describe('SettingsService provider persistence', () => {
     const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
-    service.update({ agentModels: { default: {}, byAgent: { general: { model: 'deepseek:model-c' } } } });
+    service.update([{ op: 'agentModels.setAgentField', agentId: 'general', field: 'model', value: 'deepseek:model-c' }]);
     const committed = await service.saveAgentDefinition({
       draft: {
         ...draft,

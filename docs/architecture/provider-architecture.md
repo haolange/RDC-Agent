@@ -285,7 +285,7 @@ Grok 订阅使用 xAI 公共 native-client + PKCE，仅保留系统默认浏览�
 
 Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/account/protocol 为 scope，合并在途请求，逐 provider 呈现结果；配置和账号变化精确失效，迟到响应不得覆盖新 scope 或较新事件。service 通过注入的 ElectronAPI 读取；组件不直调 IPC。Composer、能力控件和 Settings 共用该投影；菜单重挂载不重读完整 settings，也不等待全部 provider。后台刷新保持已有内容，错误单独呈现并允许重试。主进程的执行前权限与 route 校验仍为唯一权威。
 
-目录运行时顺序独立于语义 revision：scopeGeneration 代表规范化配置代次，projectionVersion 在代次内递增，generatedAt 只审计，两字段不落目录缓存。刷新登记在途后才产生首次快照；完成前复核代次和当前连接配置，旧任务不能持久化发现、广播或清除新任务状态。账号 discovery 只返回贡献，不写设置；凭据续期独立核对原账号所有权。Renderer 的 IPC 与事件共用版本接收器；配置失效后由有效读取绑定新代次，早到事件只暂存并匹配代次。菜单/会话进入只读重验证，显式 Retry 使用上述同一刷新链；不新增轮询。
+目录运行时顺序独立于语义 revision：scopeGeneration 代表规范化配置代次，projectionVersion 在代次内递增，generatedAt 只审计，两字段不落目录缓存。刷新登记在途后才产生首次快照；完成前复核代次和当前连接配置，旧任务不能持久化发现、广播或清除新任务状态。账号 discovery 只返回贡献，不写设置；凭据续期独立核对原账号所有权。`llm:effectiveCatalogChanged` 只发差异：每个 scope 相对 main 最近一次交给 renderer 的快照（事件或 `settings:getEffectiveCatalog` 读取）给出新头部、新增模型、变化模型中变了的值（按路径）与移除的模型 id；只有 `catalogRevision` 变化不算模型变化。renderer 只把差异应用到它持有的那个快照（代次、版本与 catalogRevision 都相同），否则重读；读取在途时到达的差异在读取返回后按同一规则应用。模型开关不再触发目录重读，变化随差异到达；连接身份变化才使该 scope 的目录失效。菜单/会话进入只读重验证，显式 Retry 使用上述同一刷新链；不新增轮询。
 
 
 ## 显式能力探测与批量生命周期

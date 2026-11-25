@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { diffEffectiveCatalog } from '@shared/utils/effectiveCatalogChange';
 import { catalogScopeKey, reconcileCatalogProviders, resetCatalogProjection, useEffectiveCatalogStore } from './effectiveCatalogStore';
-import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
 
 const { read, refresh } = vi.hoisted(() => ({ read: vi.fn(), refresh: vi.fn() }));
@@ -13,27 +14,43 @@ const snapshot = (accountId = 'a', generatedAt = '2026-10-25T01:00:00Z'): Effect
   models: [], generatedAt, stale: false, refreshing: false,
 });
 const store = () => useEffectiveCatalogStore.getState();
+const model = (modelId: string): EffectiveModel => ({ modelId, label: modelId, catalogRevision: 'revision' } as EffectiveModel);
 describe('effective catalog projection', () => {
-  it('keeps a completed event over an older response in the same millisecond and revalidates on demand', async () => {
-    let finish!: (value: EffectiveCatalogSnapshot) => void;
-    read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
-    const pending = store().load(scope);
-    store().accept({ ...snapshot(), projectionVersion: 2, catalogRevision: 'completed' });
-    finish({ ...snapshot(), projectionVersion: 1 }); await pending;
-    expect(store().entries[catalogScopeKey(scope)].snapshot?.catalogRevision).toBe('completed');
-    read.mockResolvedValueOnce({ ...snapshot(), projectionVersion: 3 });
-    await store().load(scope, false, true);
+  it('applies a change to the snapshot it names and rereads when it names another', async () => {
+    const held = { ...snapshot(), projectionVersion: 1, models: [model('a')] };
+    read.mockResolvedValueOnce(held);
+    await store().load(scope);
+    const next = { ...held, projectionVersion: 2, catalogRevision: 'next', models: [model('a'), model('b')] };
+    store().accept(diffEffectiveCatalog(held, next));
+    expect(store().entries[catalogScopeKey(scope)].snapshot).toEqual({ ...next, models: next.models.map((entry) => ({ ...entry, catalogRevision: 'next' })) });
+    expect(read).toHaveBeenCalledTimes(1);
+
+    read.mockResolvedValueOnce({ ...next, projectionVersion: 4 });
+    store().accept(diffEffectiveCatalog({ ...held, projectionVersion: 3 }, { ...next, projectionVersion: 4 }));
+    await store().load(scope);
     expect(read).toHaveBeenCalledTimes(2);
+    expect(store().entries[catalogScopeKey(scope)].snapshot?.projectionVersion).toBe(4);
   });
-  it('binds a fresh generation from the read and ignores an old configuration event', async () => {
-    read.mockResolvedValueOnce(snapshot()); await store().load(scope); store().invalidate(scope);
+  it('ignores a change that is not newer than the held snapshot and one for another account', async () => {
+    const held = { ...snapshot(), projectionVersion: 5 };
+    read.mockResolvedValueOnce(held);
+    await store().load(scope);
+    store().accept(diffEffectiveCatalog({ ...held, projectionVersion: 3 }, { ...held, projectionVersion: 4 }));
+    store().accept(diffEffectiveCatalog(null, { ...snapshot('other'), projectionVersion: 9 }));
+    expect(store().entries[catalogScopeKey(scope)].snapshot).toBe(held);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+  it('applies a change that names the snapshot a pending read returns, even when it arrives first', async () => {
     let finish!: (value: EffectiveCatalogSnapshot) => void;
     read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
     const pending = store().load(scope);
-    store().accept({ ...snapshot(), projectionVersion: Number.MAX_SAFE_INTEGER });
-    finish({ ...snapshot(), scopeGeneration: 'scope-b', projectionVersion: 1 }); await pending;
-    store().accept({ ...snapshot(), projectionVersion: Number.MAX_SAFE_INTEGER });
-    expect(store().entries[catalogScopeKey(scope)].snapshot?.scopeGeneration).toBe('scope-b');
+    const response = { ...snapshot(), projectionVersion: 1, models: [model('a')] };
+    const later = { ...response, projectionVersion: 2, catalogRevision: 'later', models: [model('a'), model('b')] };
+    store().accept(diffEffectiveCatalog({ ...response, projectionVersion: 0 }, { ...response, projectionVersion: 1 }));
+    store().accept(diffEffectiveCatalog(response, later));
+    finish(response); await pending;
+    expect(store().entries[catalogScopeKey(scope)].snapshot?.catalogRevision).toBe('later');
+    expect(store().entries[catalogScopeKey(scope)].snapshot?.models.map((entry) => entry.modelId)).toEqual(['a', 'b']);
   });
   beforeEach(() => { resetCatalogProjection(); read.mockReset(); refresh.mockReset().mockResolvedValue(undefined); });
   it('explicit retry refreshes the provider directory instead of rereading the same rejected snapshot', async () => {
@@ -63,19 +80,11 @@ describe('effective catalog projection', () => {
     expect(store().entries[catalogScopeKey(scope)].snapshot).not.toBeNull();
     expect(store().entries[catalogScopeKey({ ...scope, id: 'slow' })].loading).toBe(true);
   });
-  it('does not let an initial response replace a newer event', async () => {
-    let finish!: (value: EffectiveCatalogSnapshot) => void;
-    read.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
-    const pending = store().load(scope);
-    store().accept(snapshot('a', '2026-10-25T02:00:00Z'));
-    finish(snapshot()); await pending;
-    expect(store().entries[catalogScopeKey(scope)].snapshot?.generatedAt).toContain('02:00');
-  });
   it('isolates cancelled scopes and mismatched accounts', async () => {
     let finish!: (value: EffectiveCatalogSnapshot) => void;
     read.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     const pending = store().load(scope); store().invalidate(scope);
-    finish(snapshot()); await pending; store().accept(snapshot());
+    finish(snapshot()); await pending; store().accept(diffEffectiveCatalog(null, snapshot()));
     expect(store().entries[catalogScopeKey(scope)]).toBeUndefined();
     read.mockResolvedValueOnce(snapshot('other'));
     await store().load(scope);
@@ -89,37 +98,22 @@ describe('effective catalog projection', () => {
     await store().load(scope, true);
     expect(store().entries[catalogScopeKey(scope)].error).toBeUndefined();
   });
-  it('refreshes changed route preferences without reloading for identical settings', async () => {
-    read.mockResolvedValue(snapshot());
-    const provider = { ...scope, enabled: true, isConfigured: true, models: [
-      { id: 'grok-4.7', enabled: true, preferredRouteOptionId: 'responses' },
-    ] } as LlmProviderEntry;
-    reconcileCatalogProviders([provider]); await store().load(scope);
-    reconcileCatalogProviders([{ ...provider, models: [...provider.models], lastTestedAt: '2026-10-25T03:00:00Z' }]); await store().load(scope);
-    expect(read).toHaveBeenCalledTimes(1);
-    reconcileCatalogProviders([{ ...provider, models: [{ ...provider.models[0], preferredRouteOptionId: 'chat' }] }]);
-    await store().load(scope);
-    expect(read).toHaveBeenCalledTimes(2);
-  });
-  it('keeps discovery during the last model toggle and discards it for an endpoint change', async () => {
+  it('reads nothing for a model choice of the same connection and discards the catalog for a new endpoint', async () => {
     const initial = snapshot();
     read.mockResolvedValueOnce(initial);
     const provider = { ...scope, enabled: true, isConfigured: true, baseUrl: 'https://example.test', models: [
-      { id: 'model-a', enabled: true },
+      { id: 'model-a', enabled: true, preferredRouteOptionId: 'responses' },
     ] } as LlmProviderEntry;
     const key = catalogScopeKey(provider);
     reconcileCatalogProviders([provider]);
     await store().load(scope);
 
-    let finish!: (value: EffectiveCatalogSnapshot) => void;
-    read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
-    const disabled = { ...provider, enabled: false, models: [{ ...provider.models[0], enabled: false }] };
+    // The model choice arrives as a catalog change; settings only carry the new rows.
+    const disabled = { ...provider, enabled: false, models: [{ ...provider.models[0], enabled: false, preferredRouteOptionId: 'chat' }] };
     reconcileCatalogProviders([disabled], new Set());
-    expect(store().entries[key].snapshot).toBe(initial);
-    const updated = { ...initial, scopeGeneration: 'updated', catalogRevision: 'disabled' };
-    finish(updated);
     await store().load(scope);
-    expect(store().entries[key].snapshot).toBe(updated);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(store().entries[key].snapshot).toBe(initial);
 
     read.mockResolvedValueOnce({ ...initial, scopeGeneration: 'new-endpoint' });
     reconcileCatalogProviders([{ ...disabled, baseUrl: 'https://second.test' }], new Set());

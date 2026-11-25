@@ -10,6 +10,7 @@ import { providerConnectionService } from '../settings/provider-auth/ProviderCon
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { buildEffectiveCatalogRequest, resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/provider-catalog/EffectiveCatalogService';
+import { CatalogChangePublisher } from '../settings/provider-catalog/catalogChangePublisher';
 import { providerCapabilityProbeService } from '../settings/provider-catalog/ProviderCapabilityProbeService';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -25,7 +26,7 @@ import {
   SettingsHasProviderSecretArgsSchema,
   SettingsImportAgentManifestArgsSchema,
   SettingsProviderIdArgsSchema,
-  SettingsSetArgsSchema,
+  SettingsPatchArgsSchema,
   SettingsAgentIdArgsSchema,
 } from './validation/ipcSchemas';
 import {
@@ -49,13 +50,13 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
 import type {
   AppSettings,
-  AppSettingsPatch,
   LlmModelCapabilityProbeRequest,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountLoginFinishRequest,
   LlmProviderDraftRequest,
   LlmProviderId,
   ProviderDefinitionSaveRequest,
+  SettingsPatchOp,
 } from '@shared/types/settings';
 
 /** Observers of committed settings may fail; the saved file stays authoritative. */
@@ -79,9 +80,8 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
     providerConnectionService.createEffectiveCatalogDiscoveryLoader(request)
   ));
-  effectiveCatalogService.subscribe((snapshot) => {
-    context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
-  });
+  const catalogChanges = new CatalogChangePublisher((change) => context.broadcastToRenderer('llm:effectiveCatalogChanged', change));
+  effectiveCatalogService.subscribe((snapshot) => catalogChanges.publish(snapshot));
 
   const withEffectiveAgentModelOptions = async (settings: AppSettings): Promise<AppSettings> => {
     const catalogProviderIds = agentManifestService.modelOptionCatalogProviderIds(
@@ -111,7 +111,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   const broadcastCatalog = async (providerId: string): Promise<void> => {
     await loadProviderSurface(providerId);
     const snapshot = resolveEffectiveCatalog(providerId, settingsService.providerConnections);
-    if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
+    if (snapshot) effectiveCatalogService.announce(snapshot);
   };
   ipcMain.handle('llm:testProviderDraft', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(LlmProviderDraftArgsSchema, rawArgs, {
@@ -266,12 +266,14 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       padTo: 2,
     });
     await loadProviderSurface(providerId);
-    return resolveEffectiveCatalog(
+    const snapshot = resolveEffectiveCatalog(
       providerId,
       settingsService.providerConnections,
       undefined,
       accountId ?? undefined,
     );
+    if (snapshot) catalogChanges.delivered(snapshot);
+    return snapshot;
   });
 
   ipcMain.handle('settings:hasProviderSecret', async (_event, ...rawArgs: unknown[]) => {
@@ -368,7 +370,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const [request] = parseIpcArgs(SettingsSaveProviderDefinitionArgsSchema, rawArgs, {
       label: 'settings:saveProviderDefinition',
       maxBytes: 2 * 1024 * 1024,
-    }) as unknown as [ProviderDefinitionSaveRequest];
+    }) as [ProviderDefinitionSaveRequest];
     const result = await settingsService.saveProviderDefinition(request);
     if (result.status !== 'committed' || !result.provider) return result;
     context.applyCurrentLlmConfig();
@@ -376,7 +378,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const snapshot = resolveEffectiveCatalog(result.provider.id, settingsService.providerConnections);
     const catalogRevision = snapshot?.catalogRevision ?? null;
     settingsService.setProviderDefinitionCatalogRevision(result.provider.id, catalogRevision);
-    if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
+    if (snapshot) effectiveCatalogService.announce(snapshot);
     const lastSuccessful = result.lastSuccessful
       ? { ...result.lastSuccessful, catalogRevision }
       : null;
@@ -397,31 +399,21 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return { ...commit, catalogRevision };
   });
 
-  ipcMain.handle('settings:set', async (_event, ...rawArgs: unknown[]) => {
-    const [settings] = parseIpcArgs(SettingsSetArgsSchema, rawArgs, {
-      label: 'settings:set',
-      maxBytes: 2 * 1024 * 1024,
-    });
-    const patch = settings as AppSettingsPatch;
-    const previous = settingsService.snapshot().user;
-    const previousProviders = settingsService.providerConnections.list();
-    const next = settingsService.update(patch).user;
-    if (patch.appearance?.theme !== undefined || patch.appearance?.chromeThemes !== undefined) {
+  ipcMain.handle('settings:patch', async (_event, ...rawArgs: unknown[]) => {
+    const [ops] = parseIpcArgs(SettingsPatchArgsSchema, rawArgs, {
+      label: 'settings:patch',
+      maxBytes: 1024 * 1024,
+    }) as [SettingsPatchOp[]];
+    const previousLanguage = settingsService.snapshot().user.appearance.language;
+    const result = settingsService.update(ops);
+    const { appearance, agentModels } = result.changed;
+    if (appearance && ops.some((op) => op.op === 'appearance' && (op.value.theme !== undefined || op.value.chromeThemes !== undefined))) {
       await notifyCommitted(applyProductIcon);
       await notifyCommitted(applyWindowBackgrounds);
     }
-    if (previous.appearance.language !== next.appearance.language) await notifyCommitted(refreshApplicationMenu);
-    if (patch.llm?.providers || patch.agentModels) await notifyCommitted(() => context.applyCurrentLlmConfig());
-    const changedProviderIds = patch.llm?.providers
-      ? settingsService.providerConnections.list()
-        .filter((provider) => {
-          const before = previousProviders.find((entry) => entry.id === provider.id);
-          return !before || JSON.stringify(before) !== JSON.stringify(provider);
-        })
-        .map((provider) => provider.id)
-      : [];
-    for (const providerId of changedProviderIds) await notifyCommitted(() => broadcastCatalog(providerId));
-    return rendererSettings();
+    if (appearance && appearance.language !== previousLanguage) await notifyCommitted(refreshApplicationMenu);
+    if (agentModels) await notifyCommitted(() => context.applyCurrentLlmConfig());
+    return result;
   });
 
   ipcMain.handle('settings:getResolvedShell', async (_event, ...rawArgs: unknown[]) => {

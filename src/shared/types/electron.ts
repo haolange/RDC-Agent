@@ -49,14 +49,15 @@ import type {
   PlanSaveToProjectRequest,
   PlanSaveToProjectResult,
 } from './planReview';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
+import type { EffectiveCatalogChange, EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
 import type { ModelsOverride } from '../provider-catalog/modelsOverrideSchema';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type { RuntimePermissionState } from './runtimePermission';
 import type {
   AgentPermissionMode,
   AppSettings,
-  AppSettingsPatch,
+  SettingsPatchOp,
+  SettingsPatchResult,
   ResolvedShellSnapshot,
   LlmProviderAccountStatus,
   LlmProviderAccountLoginStartRequest,
@@ -438,7 +439,8 @@ export interface ElectronAPI {
     getModelsOverride: () => Promise<ModelsOverride>;
     setModelsOverride: (overrides: ModelsOverride) => Promise<ModelsOverride>;
     getResolvedShell: (executable: string) => Promise<ResolvedShellSnapshot>;
-    set: (settings: AppSettingsPatch) => Promise<AppSettings>;
+    /** Applies the ops in order and commits once; the result names only what changed. */
+    patch: (ops: SettingsPatchOp[]) => Promise<SettingsPatchResult>;
   };
 
   project: {
@@ -607,7 +609,7 @@ export interface ElectronAPI {
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
     onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
     onProbeBatchChanged: (callback: (batch: ProviderProbeBatch) => void) => () => void;
-    onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
+    onEffectiveCatalogChanged: (callback: (change: EffectiveCatalogChange) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;

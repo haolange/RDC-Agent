@@ -444,8 +444,18 @@ export interface LlmProviderEntry {
   capabilities?: LlmProviderCapability[];
 }
 
+/** A model row as the user owns it: the choices, plus the label and aliases of a row the catalog does not list. */
+export interface ProviderModelChoice extends LlmProviderModelPreference {
+  label?: string;
+  aliases?: string[];
+}
+
+/** The model choices of one provider; the connection and every other field stay as main has them. */
 export interface ProviderDefinitionSaveRequest {
-  provider: LlmProviderEntry;
+  providerId: LlmProviderId;
+  /** `providerConnectionIdentity` of the connection the choices were made on; another connection supersedes them. */
+  connectionIdentity: string;
+  models: ProviderModelChoice[];
   clientRevision: number;
 }
 
@@ -580,33 +590,65 @@ export interface AppSettings {
   paths: AppRuntimePaths;
 }
 
-export type AppSettingsPatch = Partial<{
-  appearance: Partial<UiPreferences>;
-  layout: Partial<{
+/** The fields of one Agent model binding, each set and cleared on its own. */
+export type AgentModelBindingField =
+  | { field: 'model'; value: string }
+  | { field: 'reasoningLevel'; value: ReasoningSelection };
+
+/**
+ * One change `settings:patch` applies. A section op merges its partial value into that section (nested objects one
+ * level down); Agent model ops change one field of one binding, so concurrent edits of different fields never
+ * overwrite each other.
+ */
+export type SettingsPatchOp =
+  | { op: 'appearance'; value: Partial<UiPreferences> }
+  | { op: 'layout'; value: Partial<{
     leftSidebar: Partial<SidebarLayoutPreference>;
     rightPanel: Partial<SidebarLayoutPreference>;
     terminal: Partial<TerminalLayoutPreference>;
     window: Partial<WindowLayoutPreference>;
-  }>;
-  profile: Partial<ProfileSettings>;
-  tooling: Partial<{
+  }> }
+  | { op: 'profile'; value: Partial<ProfileSettings> }
+  | { op: 'tooling'; value: Partial<{
     rdcCli: Partial<RdcCliInvokerSettings>;
     codeInterpreter: Partial<CodeInterpreterSettings>;
     shell: Partial<AgentShellSettings>;
-  }>;
-  agentRuntime: Partial<{
+  }> }
+  | { op: 'agentRuntime'; value: Partial<{
     permissions: Partial<AgentPermissionSettings>;
     context: Partial<AgentRuntimeContextSettings>;
-  }>;
-  llm: Partial<{
-    providers: LlmProviderEntry[];
-  }>;
-  agents: Partial<{
-    globalInstructions: string;
-  }>;
-  /** Replaces the whole Agent model settings. */
-  agentModels: AgentModelSettings;
-}>;
+  }> }
+  | { op: 'globalInstructions'; value: string }
+  /** Sets one field of the default binding; null clears it. */
+  | ({ op: 'agentModels.setDefault' } & (
+    | { field: 'model'; value: string | null }
+    | { field: 'reasoningLevel'; value: ReasoningSelection | null }))
+  | ({ op: 'agentModels.setAgentField'; agentId: string } & AgentModelBindingField)
+  | { op: 'agentModels.clearAgentField'; agentId: string; field: AgentModelBindingField['field'] };
+
+/** The Agent model bindings a patch changed; null means the Agent no longer has its own binding. */
+export interface AgentModelChanges {
+  default?: AgentModelBinding;
+  byAgent?: Record<string, AgentModelBinding | null>;
+}
+
+/** What `settings:patch` committed: each changed section as stored, and only the Agent model bindings it changed. */
+export interface SettingsPatchChanges {
+  appearance?: UiPreferences;
+  layout?: LayoutPreferences;
+  profile?: ProfileSettings;
+  tooling?: ToolingSettings;
+  agentRuntime?: AgentRuntimeSettings;
+  agentModels?: AgentModelChanges;
+  /** The instructions are stored as sent, trimmed; the text is not echoed back. */
+  globalInstructions?: true;
+}
+
+export interface SettingsPatchResult {
+  /** The settings revision after the commit; unchanged when the ops changed nothing. */
+  revision: number;
+  changed: SettingsPatchChanges;
+}
 
 export interface LlmProviderDraftRequest {
   providerId: LlmProviderId;

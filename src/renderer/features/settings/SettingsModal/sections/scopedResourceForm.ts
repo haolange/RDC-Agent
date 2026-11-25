@@ -1,4 +1,16 @@
+import { z } from 'zod';
 import type { ScopedResourceKind } from '@shared/types/rdcRuntime';
+
+/** The MCP server fields the form edits; the body keeps every other field as written. */
+const McpServerFormSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  transport: z.string().optional(),
+  url: z.string().optional(),
+  command: z.string().optional(),
+  args: z.array(z.unknown()).optional(),
+  enabledByDefault: z.boolean().optional(),
+}).passthrough();
 
 export type ResourceFormState = {
   id: string;
@@ -38,30 +50,27 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
     return { ...base, id, body: content };
   }
   if (kind === 'mcp') {
+    // A body that is not an MCP server object opens as raw text, the editor's not-yet-structured state.
+    let value: unknown;
     try {
-      const parsed = JSON.parse(content) as {
-        id?: string;
-        name?: string;
-        transport?: string;
-        url?: string;
-        command?: string;
-        args?: unknown[];
-        enabledByDefault?: boolean;
-      };
-      return {
-        ...base,
-        id: String(parsed.id ?? id),
-        name: String(parsed.name ?? parsed.id ?? id),
-        transport: String(parsed.transport ?? 'stdio'),
-        url: String(parsed.url ?? ''),
-        command: String(parsed.command ?? ''),
-        argsText: JSON.stringify(Array.isArray(parsed.args) ? parsed.args : [], null, 2),
-        enabled: parsed.enabledByDefault !== false,
-        body: content,
-      };
+      value = JSON.parse(content);
     } catch {
       return { ...base, id, body: content };
     }
+    const parsed = McpServerFormSchema.safeParse(value);
+    if (!parsed.success) return { ...base, id, body: content };
+    const server = parsed.data;
+    return {
+      ...base,
+      id: server.id ?? id,
+      name: server.name ?? server.id ?? id,
+      transport: server.transport ?? 'stdio',
+      url: server.url ?? '',
+      command: server.command ?? '',
+      argsText: JSON.stringify(server.args ?? [], null, 2),
+      enabled: server.enabledByDefault !== false,
+      body: content,
+    };
   }
   if (kind === 'hook') {
     try {

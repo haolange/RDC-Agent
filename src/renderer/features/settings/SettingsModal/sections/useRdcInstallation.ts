@@ -53,7 +53,7 @@ export function useRdcInstallation(draft: RdcCliInvokerSettings, onApplied: (set
     apply: () => run('apply', async (current) => {
       const result = await validateRdcInstallation({ root, timeoutMs: draft.timeoutMs, env: draft.env });
       if (!current()) return;
-      const saved = await useAppSettingsStore.getState().patchSettings({ tooling: { rdcCli: result.settings } });
+      const saved = await useAppSettingsStore.getState().patchSettings([{ op: 'tooling', value: { rdcCli: result.settings } }]);
       if (!current()) return;
       onApplied(saved.tooling.rdcCli);
       setSummary(result.summary);

@@ -2,6 +2,7 @@
 import { act, createElement as h, Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { diffEffectiveCatalog } from '@shared/utils/effectiveCatalogChange';
 import { resetCatalogProjection, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
@@ -44,7 +45,7 @@ it('keeps a configured Grok subscription visible while its models refresh and af
     await act(async () => root.render(h(Consumer, { name: 'picker', connections: [providers[0], grok] })));
     expect(host.textContent).toContain('fast');
     expect(host.querySelector('[data-pending-provider="grok-account"]')?.textContent).toBe('Grok Subscription:true');
-    await act(async () => useEffectiveCatalogStore.getState().accept({ ...catalog(grok.id), projectionVersion: 2, models: [], generatedAt: '2026-11-02T00:00:00Z' }));
+    await act(async () => useEffectiveCatalogStore.getState().accept(diffEffectiveCatalog(null, { ...catalog(grok.id), projectionVersion: 2, models: [], generatedAt: '2026-11-02T00:00:00Z' })));
     expect(host.querySelector('[data-pending-provider="grok-account"]')?.textContent).toBe('Grok Subscription:false');
   } finally { await act(async () => root.unmount()); resetCatalogProjection(); vi.unstubAllGlobals(); }
 });

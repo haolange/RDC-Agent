@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
-import type { AppSettings } from '@shared/types/settings';
+import type { SettingsPatchResult } from '@shared/types/settings';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 
@@ -31,9 +31,11 @@ vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
     list: () => structuredClone(fixture.settings.llm.providers),
   },
   rendererSettingsDto: () => structuredClone(fixture.settings),
-  update: (patch: { appearance: { theme: string } }) => {
-    fixture.settings.appearance = { ...fixture.settings.appearance, ...patch.appearance };
-    return { revision: 2, user: structuredClone(fixture.settings) };
+  update: (ops: Array<{ op: string; value: Record<string, unknown> }>) => {
+    const before = JSON.stringify(fixture.settings.appearance);
+    for (const op of ops) fixture.settings.appearance = { ...fixture.settings.appearance, ...op.value };
+    const changed = JSON.stringify(fixture.settings.appearance) === before ? {} : { appearance: structuredClone(fixture.settings.appearance) };
+    return { revision: 2, changed };
   },
 } }));
 vi.mock('../settings/agent-manifests/AgentManifestService', () => ({ agentManifestService: {
@@ -56,35 +58,43 @@ vi.mock('../window/applicationMenu', () => ({ refreshApplicationMenu: fixture.re
 vi.mock('../window/productIcon', () => ({ applyProductIcon: fixture.applyIcon }));
 vi.mock('../window/appearanceChrome', () => ({ applyWindowBackgrounds: fixture.applyBackgrounds }));
 
-describe('appearance settings response', () => {
-  it('keeps executable Agent choices after saving appearance without changing providers', async () => {
+describe('settings:patch response', () => {
+  it('answers with what changed only and refreshes native chrome only for a theme change', async () => {
     const broadcastToRenderer = vi.fn();
     const applyCurrentLlmConfig = vi.fn();
     registerSettingsLlmHandlers({ broadcastToRenderer, applyCurrentLlmConfig } as unknown as WorkbenchIpcContext);
-    const handle = fixture.handlers.get('settings:set')!;
+    const handle = fixture.handlers.get('settings:patch')!;
     for (const theme of ['light', 'dark']) {
-      const result = await handle({}, { appearance: { theme } }) as AppSettings;
-      expect(result.appearance.theme).toBe(theme);
-      expect(result.agents.modelOptions).toEqual([fixture.modelOption]);
+      const result = await handle({}, [{ op: 'appearance', value: { theme } }]) as SettingsPatchResult;
+      expect(result.changed.appearance?.theme).toBe(theme);
+      expect(Object.keys(result.changed)).toEqual(['appearance']);
     }
     expect(fixture.applyIcon).toHaveBeenCalledTimes(2);
-    await handle({}, {});
+    await handle({}, [{ op: 'appearance', value: { theme: 'dark' } }]);
     expect(fixture.applyIcon).toHaveBeenCalledTimes(2);
-    expect(fixture.load).toHaveBeenCalledWith('deepseek');
+    expect(fixture.load).not.toHaveBeenCalled();
     expect(broadcastToRenderer).not.toHaveBeenCalled();
     expect(applyCurrentLlmConfig).not.toHaveBeenCalled();
+  });
+
+  it('rejects provider state and whole-section agent models', async () => {
+    registerSettingsLlmHandlers({ broadcastToRenderer: vi.fn(), applyCurrentLlmConfig: vi.fn() } as unknown as WorkbenchIpcContext);
+    const handle = fixture.handlers.get('settings:patch')!;
+    await expect(Promise.resolve().then(() => handle({}, [{ op: 'llm', value: { providers: [] } }]))).rejects.toThrow();
+    await expect(Promise.resolve().then(() => handle({}, [{ op: 'agentModels', value: { default: {}, byAgent: {} } }]))).rejects.toThrow();
+    await expect(Promise.resolve().then(() => handle({}, { appearance: { theme: 'light' } }))).rejects.toThrow();
   });
 });
 
 it('refreshes native menus only after a committed language change', async () => {
   registerSettingsLlmHandlers({ broadcastToRenderer: vi.fn(), applyCurrentLlmConfig: vi.fn() } as unknown as WorkbenchIpcContext);
-  const handle = fixture.handlers.get('settings:set')!;
+  const handle = fixture.handlers.get('settings:patch')!;
   for (const language of ['en', 'zh-CN']) {
-    const result = await handle({}, { appearance: { language } }) as AppSettings;
-    expect(result.appearance.language).toBe(language);
+    const result = await handle({}, [{ op: 'appearance', value: { language } }]) as SettingsPatchResult;
+    expect(result.changed.appearance?.language).toBe(language);
   }
   expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
-  await handle({}, { appearance: { language: 'zh-CN' } });
+  await handle({}, [{ op: 'appearance', value: { language: 'zh-CN' } }]);
   expect(fixture.refreshMenu).toHaveBeenCalledTimes(2);
 });
 
@@ -92,18 +102,18 @@ it('saves the context details preference without refreshing native chrome', asyn
   fixture.applyIcon.mockClear();
   fixture.applyBackgrounds.mockClear();
   registerSettingsLlmHandlers({ broadcastToRenderer: vi.fn(), applyCurrentLlmConfig: vi.fn() } as unknown as WorkbenchIpcContext);
-  const result = await fixture.handlers.get('settings:set')!({}, {
-    appearance: { contextBreakdownExpanded: true },
-  }) as AppSettings;
-  expect(result.appearance.contextBreakdownExpanded).toBe(true);
+  const result = await fixture.handlers.get('settings:patch')!({}, [
+    { op: 'appearance', value: { contextBreakdownExpanded: true } },
+  ]) as SettingsPatchResult;
+  expect(result.changed.appearance?.contextBreakdownExpanded).toBe(true);
   expect(fixture.applyIcon).not.toHaveBeenCalled();
   expect(fixture.applyBackgrounds).not.toHaveBeenCalled();
 });
 
-it('returns committed settings when a native notification fails', async () => {
+it('returns the committed change when a native notification fails', async () => {
   fixture.applyIcon.mockImplementationOnce(() => { throw new Error('native observer failed'); });
   registerSettingsLlmHandlers({ broadcastToRenderer: vi.fn(), applyCurrentLlmConfig: vi.fn() } as unknown as WorkbenchIpcContext);
-  const result = await fixture.handlers.get('settings:set')!({}, { appearance: { theme: 'light' } }) as AppSettings;
-  expect(result.appearance.theme).toBe('light');
+  const result = await fixture.handlers.get('settings:patch')!({}, [{ op: 'appearance', value: { theme: 'light' } }]) as SettingsPatchResult;
+  expect(result.changed.appearance?.theme).toBe('light');
   expect(fixture.log).toHaveBeenCalledWith(expect.objectContaining({ raw: { code: 'SETTINGS_COMMITTED_NOTIFICATION_FAILED' } }));
 });

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { modelsOverrideService } from '../settings-core/ModelsOverrideService';
 import { parseCopilotBillingContribution } from '../provider-auth/CopilotBilling';
@@ -203,22 +204,27 @@ export function buildCatalogModelContribution(
 /** Context tiers an account's own billing data grants, when its sign-in stored any. */
 function accountBillingEntitlement(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
   if (provider.authMode !== 'account') return undefined;
+  let value: unknown;
   try {
-    const raw = settingsService.getProviderOAuthSecret(provider.id);
-    const bundle = JSON.parse(raw) as { copilotModelBilling?: Record<string, unknown> };
-    const models = Object.entries(bundle.copilotModelBilling ?? {})
-      .flatMap(([modelId, billing]) => parseCopilotBillingContribution(modelId, billing) ?? []);
-    if (models.length === 0) return undefined;
-    return {
-      source: 'entitlement',
-      observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
-      detail: `${provider.label} account billing context tiers`,
-      models,
-    };
+    value = JSON.parse(settingsService.getProviderOAuthSecret(provider.id));
   } catch {
     return undefined;
   }
+  // A sign-in that stored no billing data (or no bundle at all) grants nothing.
+  const bundle = AccountBillingBundleSchema.safeParse(value);
+  if (!bundle.success) return undefined;
+  const models = Object.entries(bundle.data.copilotModelBilling ?? {})
+    .flatMap(([modelId, billing]) => parseCopilotBillingContribution(modelId, billing) ?? []);
+  if (models.length === 0) return undefined;
+  return {
+    source: 'entitlement',
+    observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
+    detail: `${provider.label} account billing context tiers`,
+    models,
+  };
 }
+
+const AccountBillingBundleSchema = z.object({ copilotModelBilling: z.record(z.string(), z.unknown()).optional() });
 
 function catalogContribution(provider: LlmProviderEntry, requestedModelId?: string): CatalogLayerContribution {
   const surface = getLoadedProviderSurface(provider.id);

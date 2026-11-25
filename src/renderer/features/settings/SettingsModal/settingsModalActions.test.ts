@@ -178,8 +178,8 @@ describe('settingsModalActions personalization autosave', () => {
       draft = typeof next === 'function' ? next(draft) : next;
     });
     let release: () => void = () => undefined;
-    const patchSettings = vi.fn((patch: { agents?: { globalInstructions?: string } }) => new Promise((resolve) => {
-      release = () => resolve({ agents: { globalInstructions: patch.agents?.globalInstructions?.trim() } });
+    const patchSettings = vi.fn((ops: Array<{ op: string; value: string }>) => new Promise((resolve) => {
+      release = () => resolve({ agents: { globalInstructions: ops.find((op) => op.op === 'globalInstructions')?.value.trim() } });
     }));
     const modalState = { get globalInstructionsDraft() { return draft; }, setGlobalInstructionsDraft };
     const actions = createSettingsModalActions({

@@ -1,8 +1,9 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { applyAgentModelOp, isAgentModelPatchOp } from '@shared/utils/settingsPatch';
 import { useAgentModelControls } from './useAgentModelControls';
-import type { AgentModelSettings, AppSettings } from '@shared/types/settings';
+import type { AgentModelSettings, SettingsPatchOp } from '@shared/types/settings';
 
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -13,29 +14,47 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
 /**
- * Two Agents edited before the first save returns: each edit is computed from the settings the page last received,
- * so the second write carries a byAgent map without the first edit and replaces it. Known loss until model routes are
- * written as field-level patches; the test turns green then and `it.fails` reports it.
+ * Two Agents edited before the first save returns: each control commits only the field it changed, so neither
+ * write carries — or replaces — the other Agent's binding.
  */
-it.fails('keeps both Agents when their models are changed before the first save returns', async () => {
-  const writes: AgentModelSettings[] = [];
-  const settings = { agentModels: { default: {}, byAgent: {} } } as unknown as AppSettings;
+it('keeps both Agents when their models are changed before the first save returns', async () => {
+  const writes: SettingsPatchOp[][] = [];
   let controls!: ReturnType<typeof useAgentModelControls>;
   const Probe = () => {
-    controls = useAgentModelControls(settings, {
-      onAgentModelsChange: async (agentModels: AgentModelSettings) => { writes.push(agentModels); },
+    controls = useAgentModelControls({
+      onAgentModelOps: async (ops: SettingsPatchOp[]) => { writes.push(ops); },
     } as never);
     return null;
   };
   await act(async () => root.render(createElement(Probe)));
 
   await act(async () => {
-    controls.setAgentBinding('debugger', { model: 'ollama:local-model' });
-    controls.setAgentBinding('analyzer', { model: 'ollama:other-model' });
+    controls.setAgentField('debugger', { field: 'model', value: 'ollama:local-model' });
+    controls.setAgentField('analyzer', { field: 'model', value: 'ollama:other-model' });
   });
 
-  expect(writes.at(-1)?.byAgent).toEqual({
+  const committed = writes.flat().filter(isAgentModelPatchOp)
+    .reduce<AgentModelSettings>(applyAgentModelOp, { default: {}, byAgent: {} });
+  expect(committed.byAgent).toEqual({
     debugger: { model: 'ollama:local-model' },
     analyzer: { model: 'ollama:other-model' },
   });
+});
+
+it('clears an Agent field and the default field instead of writing whole bindings', async () => {
+  const writes: SettingsPatchOp[][] = [];
+  let controls!: ReturnType<typeof useAgentModelControls>;
+  const Probe = () => {
+    controls = useAgentModelControls({ onAgentModelOps: async (ops: SettingsPatchOp[]) => { writes.push(ops); } } as never);
+    return null;
+  };
+  await act(async () => root.render(createElement(Probe)));
+  await act(async () => {
+    controls.setAgentField('debugger', { field: 'reasoningLevel' });
+    controls.setDefaultField({ field: 'model' });
+  });
+  expect(writes).toEqual([
+    [{ op: 'agentModels.clearAgentField', agentId: 'debugger', field: 'reasoningLevel' }],
+    [{ op: 'agentModels.setDefault', field: 'model', value: null }],
+  ]);
 });

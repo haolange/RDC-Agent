@@ -134,7 +134,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'settings:getModelsOverride': 'read',
   'settings:setModelsOverride': 'high-impact',
   'settings:getResolvedShell': 'read',
-  'settings:set': 'high-impact',
+  'settings:patch': 'high-impact',
   'project:list': 'read',
   'project:add': 'mutation',
   'project:select': 'mutation',

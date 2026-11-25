@@ -2,13 +2,13 @@ import type {
   AppLanguage,
   AgentPermissionMode,
   AppSettings,
-  AppSettingsPatch,
   AppTheme,
   FontScale,
   LlmProviderEntry,
   ProviderDefinitionCommitSnapshot,
   ProviderDefinitionSaveResult,
   ProfileSettings,
+  SettingsPatchOp,
   ResolvedTheme,
   ThemeChromeConfig,
   ThemeVariant,
@@ -27,8 +27,12 @@ export interface AppSettingsState {
   systemTheme: ResolvedTheme;
   hydrate: (settings: AppSettings, systemTheme: ResolvedTheme) => void;
   setSystemTheme: (systemTheme: ResolvedTheme) => void;
-  patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
-  /** Adopts a snapshot main returned from a settings command other than `settings:set`. */
+  /**
+   * Applies the ops optimistically and commits them with `settings:patch`; resolves to the settings once main
+   * confirmed them. A failure rolls back what these ops changed, unless a later intent changed it again.
+   */
+  patchSettings: (ops: SettingsPatchOp[]) => Promise<AppSettings>;
+  /** Adopts a snapshot main returned from a settings command other than `settings:patch`. */
   replaceSettings: (settings: AppSettings) => void;
   saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
   flushAgentDefinitionSaves: (
@@ -45,7 +49,6 @@ export interface AppSettingsState {
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
   saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>;
   flushProviderSaves: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
-  removeProvider: (providerId: string) => Promise<void>;
   setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
   setCompactionThresholdPercent: (percent: number) => Promise<void>;
   setCustomPermissionRules: (rules: {

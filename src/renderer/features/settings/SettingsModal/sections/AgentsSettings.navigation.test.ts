@@ -27,7 +27,7 @@ it('waits for drafts, opens the target scope once, and reports a missing target 
     onAgentManifestDraftsChange: () => undefined, onRetrySaveAgentManifests: () => undefined,
     onImportAgentManifest: () => undefined, agentManifestSaveState: 'idle', agentManifestSaveMessage: '',
     canProject: true, currentProjectId: 'project-a', t,
-    onAgentModelsChange: vi.fn(async () => undefined), onPreviewAgentModelMigration: vi.fn(), onCommitAgentOverrideFile: vi.fn(), onLoadAgentBuiltinComparison: vi.fn(),
+    onAgentModelOps: vi.fn(async () => undefined), onPreviewAgentModelMigration: vi.fn(), onCommitAgentOverrideFile: vi.fn(), onLoadAgentBuiltinComparison: vi.fn(),
     onPreviewProjectAgentTrust: vi.fn(), onTrustProjectAgent: vi.fn() }));
   try {
     useSettingsNavigationStore.getState().openAgent('target');

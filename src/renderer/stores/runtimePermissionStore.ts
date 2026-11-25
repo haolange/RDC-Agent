@@ -43,7 +43,7 @@ export const useRuntimePermissionStore = create<RuntimePermissionStore>((set, ge
     const request = ++requestRevision;
     set({ pendingMode: mode, error: false, failedSwitch: null });
     try {
-      await window.electronAPI.settings.set({ agentRuntime: { permissions: { mode } } });
+      await window.electronAPI.settings.patch([{ op: 'agentRuntime', value: { permissions: { mode } } }]);
       get().applySnapshot(await window.electronAPI.runtime.getPermissionState());
       if (request === requestRevision) set({ pendingMode: null, error: false });
       return get().snapshot!;

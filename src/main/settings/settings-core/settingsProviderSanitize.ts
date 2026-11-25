@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { z } from 'zod';
 import { isReasoningSelection } from '@shared/types/modelCapability';
 import { TOP_LEVEL_AGENT_IDS, isSafeAgentProfileId } from '@shared/types/agent';
 import {
@@ -42,16 +43,28 @@ export function createLocalAccountId(): string {
   return `account-${randomUUID()}`;
 }
 
-export function extractOAuthBundleAccountId(raw: string): string | undefined {
-  if (!raw) {
-    return undefined;
-  }
+/** A stored OAuth bundle as far as Settings reads it: string fields by name; anything else is not a bundle. */
+const OAuthBundleFieldsSchema = z.record(z.string(), z.unknown());
+
+function readOAuthBundle(raw: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  let value: unknown;
   try {
-    const accountId = (JSON.parse(raw) as { accountId?: unknown }).accountId;
-    return typeof accountId === 'string' && accountId.trim() ? accountId.trim() : undefined;
+    value = JSON.parse(raw);
   } catch {
-    return undefined;
+    return null;
   }
+  const parsed = OAuthBundleFieldsSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+const bundleText = (value: unknown): string | undefined => (
+  typeof value === 'string' && value.trim() ? value.trim() : undefined
+);
+
+/** The upstream account id an OAuth bundle names; undefined when the payload is not a bundle or names none. */
+export function extractOAuthBundleAccountId(raw: string): string | undefined {
+  return bundleText(readOAuthBundle(raw)?.accountId);
 }
 
 export function getProviderAccountSecretRef(
@@ -104,26 +117,17 @@ export function resolveAccountRuntimeCredential(
     getProviderAccountSecretRef(providerId, provider.activeAccountId, 'oauth'),
     workspaceRoot,
   );
-  if (!raw) {
+  // A stored credential that is not a bundle leaves the account unconfigured.
+  const bundle = readOAuthBundle(raw);
+  if (!bundle) {
     return { apiKey: '' };
   }
-  try {
-    const bundle = JSON.parse(raw) as Partial<Record<
-      'accessToken' | 'apiKey' | 'copilotToken' | 'copilotApiBaseUrl' | 'resourceUrl' | 'accountId',
-      unknown
-    >>;
-    const readField = (value: unknown): string | undefined => (
-      typeof value === 'string' && value.trim() ? value.trim() : undefined
-    );
-    const { tokenFields, baseUrlField } = accountAuth.credential;
-    return {
-      apiKey: tokenFields.map((field) => readField(bundle[field])).find(Boolean) ?? '',
-      baseUrl: (baseUrlField ? readField(bundle[baseUrlField]) : undefined) ?? getProviderDefaultBaseUrl(providerId),
-      accountId: readField(bundle.accountId),
-    };
-  } catch {
-    return { apiKey: '' };
-  }
+  const { tokenFields, baseUrlField } = accountAuth.credential;
+  return {
+    apiKey: tokenFields.map((field) => bundleText(bundle[field])).find(Boolean) ?? '',
+    baseUrl: (baseUrlField ? bundleText(bundle[baseUrlField]) : undefined) ?? getProviderDefaultBaseUrl(providerId),
+    accountId: bundleText(bundle.accountId),
+  };
 }
 
 export function sanitizeModels(models: unknown): LlmProviderModel[] {

@@ -504,6 +504,24 @@ describe('EffectiveCatalogService', () => {
     expect(persisted.discoveries).toEqual({});
   });
 
+  it('starts a damaged catalog state empty, rewrites it and keeps the damaged bytes beside it', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const damagedPath = path.join(root, 'damaged', 'catalog-v4.json');
+    fs.mkdirSync(path.dirname(damagedPath), { recursive: true });
+    const damaged = JSON.stringify({
+      schemaVersion: 9,
+      discoveries: { broken: { source: 'discovery', observedAt: '2026-01-02T00:00:00.000Z', models: [{ label: 'no id' }] } },
+      entitlements: {},
+      observed: {},
+    });
+    fs.writeFileSync(damagedPath, damaged, 'utf8');
+    new EffectiveCatalogService({ statePath: damagedPath });
+    expect(JSON.parse(fs.readFileSync(damagedPath, 'utf8'))).toEqual({ schemaVersion: 9, discoveries: {}, entitlements: {}, observed: {} });
+    const kept = fs.readdirSync(path.dirname(damagedPath)).filter((name) => name.includes('.corrupt-'));
+    expect(kept).toHaveLength(1);
+    expect(fs.readFileSync(path.join(path.dirname(damagedPath), kept[0]!), 'utf8')).toBe(damaged);
+  });
+
   it('keeps compiled positive budgets when a context-less discovery row reports zero', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({

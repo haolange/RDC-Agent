@@ -18,7 +18,7 @@ type PageState = Pick<ReturnType<typeof useSettingsModal>,
   'setChromeTheme' | 'accountProviders' | 'providerCatalog' | 'providerCatalogCategories' | 'getResolvedProviderLabel' |
   'openProviderConnection' | 'handleDisconnectProvider' | 'agentManifestDrafts' | 'setAgentManifestDrafts' | 'agentManifestContextReady' |
   'handleSaveAgentManifests' | 'handleImportAgentManifest' | 'agentManifestSaveState' | 'agentManifestSaveMessage' | 'agentManifestSaveBlocked' |
-  'handleAgentModelsChange' | 'previewAgentModelMigration' | 'handleCommitAgentOverrideFile' | 'loadAgentBuiltinComparison' |
+  'handleAgentModelOps' | 'previewAgentModelMigration' | 'handleCommitAgentOverrideFile' | 'loadAgentBuiltinComparison' |
   'previewProjectAgentTrust' | 'handleTrustProjectAgent' |
   'rdcCliDraft' | 'codeInterpreterDraft' | 'shellDraft' | 'setRdcCliDraft' |
   'setCodeInterpreterDraft' | 'setShellDraft' | 'handleSaveToolsConfig' | 'dirty'>;
@@ -62,7 +62,7 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
     agentManifestSaveState,
     agentManifestSaveMessage,
     agentManifestSaveBlocked,
-    handleAgentModelsChange,
+    handleAgentModelOps,
     previewAgentModelMigration,
     handleCommitAgentOverrideFile,
     previewProjectAgentTrust,
@@ -136,7 +136,7 @@ export function SettingsPageContent({ modal, settings, runtime, resourceScope, s
         agentManifestSaveState={agentManifestSaveState}
         agentManifestSaveMessage={agentManifestSaveMessage}
         agentManifestSaveBlocked={agentManifestSaveBlocked}
-        onAgentModelsChange={handleAgentModelsChange}
+        onAgentModelOps={handleAgentModelOps}
         onPreviewAgentModelMigration={previewAgentModelMigration}
         onCommitAgentOverrideFile={handleCommitAgentOverrideFile}
         onPreviewProjectAgentTrust={previewProjectAgentTrust}

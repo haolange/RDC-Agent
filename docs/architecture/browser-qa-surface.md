@@ -38,7 +38,7 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | Hook/MCP trust / revoke / test | ✅ | ✅ |
 | Electron 原生窗口 chrome | ✅ | 浏览器标签页容器 |
 
-上述 Browser 能力仍受 main-owned Zod、PermissionPolicy、approval token、MCP trust、`safeStorage`、session ownership 与 shell policy 约束；parity 不等于绕过权限。`command:execute`、`settings:set`、`rdc-runtime:trustMcp`、`rdc-runtime:revokeMcp` 仅在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时开放，否则 fail-closed。
+上述 Browser 能力仍受 main-owned Zod、PermissionPolicy、approval token、MCP trust、`safeStorage`、session ownership 与 shell policy 约束；parity 不等于绕过权限。`command:execute`、`settings:patch`、`rdc-runtime:trustMcp`、`rdc-runtime:revokeMcp` 仅在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时开放，否则 fail-closed。
 
 隔离 QA 若经用户授权复制加密 Provider 凭据，须连同同源 Electron `Local State` 一起复制，否则 `safeStorage` 无法解密；可用性以真实模型请求确认，结束后清除隔离副本，不触碰原件。
 

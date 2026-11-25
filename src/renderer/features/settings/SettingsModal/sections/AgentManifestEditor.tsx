@@ -17,13 +17,13 @@ import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
 import { AgentHandoffEditor } from './AgentHandoffEditor';
-import { AgentModelBindingFields } from './AgentModelBindingFields';
+import { AgentModelBindingFields, type AgentModelFieldChange } from './AgentModelBindingFields';
 import { configStatus, provenanceLabel } from './agentConfigStatus';
 import { agentPanelSummary, type AgentPanel } from './agentPanelSummary';
 import { AgentExecutionLimitField } from './AgentExecutionLimitField';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
 import type { useI18n } from '../../../../i18n';
-import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
+import type { AppSettings } from '@shared/types/settings';
 import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance } from '@shared/types/agentManifest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -38,7 +38,7 @@ interface AgentManifestEditorProps {
   /** The description in the interface language; a builtin's stored text is translated, an edited one is shown as written. */
   description: string;
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
-  onModelBindingChange: (binding: AgentModelBinding) => void;
+  onModelFieldChange: (change: AgentModelFieldChange) => void;
   modelError: string | null;
   onDuplicateAgent: () => void;
   /** Deletes a custom Agent, or removes an override so the builtin applies again. */
@@ -64,7 +64,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   builtinUpdate,
   description,
   onUpdateAgent,
-  onModelBindingChange,
+  onModelFieldChange,
   modelError,
   onDuplicateAgent,
   onDeleteAgent,
@@ -200,7 +200,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               binding={settings.agentModels.byAgent[selectedAgent.id] ?? {}}
               options={settings.agents.modelOptions}
               fallback={settings.agentModels.default}
-              onChange={onModelBindingChange}
+              onChange={onModelFieldChange}
               testIdPrefix="settings-agent"
               t={t}
             />

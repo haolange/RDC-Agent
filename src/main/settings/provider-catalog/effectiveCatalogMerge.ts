@@ -19,8 +19,21 @@ import type {
   PartialContextTier,
 } from './effectiveCatalogTypes';
 
+function cloneJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => (item === undefined ? null : cloneJsonValue(item)));
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([, child]) => child !== undefined)
+    .map(([key, child]) => [key, cloneJsonValue(child)]));
+}
+
+/**
+ * A deep copy of catalog JSON data with JSON's meaning: an undefined property is left out (so spreading a copy never
+ * clears a field) and an undefined list item becomes null. `structuredClone` keeps undefined properties, which the
+ * merge would then spread over defined ones.
+ */
 export function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return cloneJsonValue(value) as T;
 }
 
 function stableJson(value: unknown): string {
