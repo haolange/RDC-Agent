@@ -1,4 +1,5 @@
 import { AppError } from '@shared/errors/appError';
+import { assertNever } from '@shared/utils/assertNever';
 import { appendRuntimePermissionContext } from '../permissions/RuntimePermissionContext';
 /**
  * AgentLoop — transition 状态机式 Agent 主循环。
@@ -32,7 +33,7 @@ import { recoveryStartMessage } from './RecoveryDiagnosticText';
 import type { CompressResult } from './ContextManager';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
-  AgentEvent,
+  AgentLoopEvent,
   AgentMessage,
   AssistantMessage,
   Context,
@@ -50,7 +51,7 @@ export type TransformContextResult = AgentMessage[] | CompressResult;
 
 /** Handle returned by agentLoop: stream for consumers + producerCompletion for join. */
 export interface AgentLoopHandle {
-  stream: EventStream<AgentEvent, Message[]>;
+  stream: EventStream<AgentLoopEvent, Message[]>;
   producerCompletion: Promise<void>;
 }
 
@@ -68,7 +69,7 @@ export interface AgentLoopConfig {
   transformContext?: (
     messages: AgentMessage[],
     signal?: AbortSignal,
-    onProgress?: (progress: import('../core/types').CompactionProgress) => void,
+    onProgress?: (progress: import('@shared/types/agentRuntime').AgentContextCompactedPayload) => void,
   ) => Promise<TransformContextResult>;
   /** LLM 调用选项（temperature/maxTokens 等）。 */
   streamOptions: StreamOptions;
@@ -166,7 +167,7 @@ export function agentLoop(
   providerStrategy: ProviderStrategy,
   toolExecutor?: ToolExecutor,
 ): AgentLoopHandle {
-  const stream = new EventStream<AgentEvent, Message[]>();
+  const stream = new EventStream<AgentLoopEvent, Message[]>();
   let settleProducer!: () => void;
   const producerCompletion = new Promise<void>((resolve) => {
     settleProducer = resolve;
@@ -221,7 +222,7 @@ async function runAgentLoop(
   config: AgentLoopConfig,
   providerStrategy: ProviderStrategy,
   toolExecutor: ToolExecutor | undefined,
-  stream: EventStream<AgentEvent, Message[]>,
+  stream: EventStream<AgentLoopEvent, Message[]>,
 ): Promise<void> {
   const newMessages: Message[] = [];
   const maxTurns = config.maxTurns ?? Infinity;
@@ -409,7 +410,7 @@ function recoveryDiagnosticCode(action: RecoveryAction): string {
 }
 
 function emitRecoveryDiagnostic(
-  stream: EventStream<AgentEvent, Message[]>,
+  stream: EventStream<AgentLoopEvent, Message[]>,
   action: RecoveryAction,
   phase: 'started' | 'completed',
   attempt = 1,
@@ -440,7 +441,7 @@ async function streamAssistantResponseWithRecovery(
   context: AgentContext,
   config: AgentLoopConfig,
   provider: ProviderStrategy,
-  stream: EventStream<AgentEvent, Message[]>,
+  stream: EventStream<AgentLoopEvent, Message[]>,
   ephemeralInstruction?: string,
   allowToolUse = true,
 ): Promise<{ message: AssistantMessage }> {
@@ -617,7 +618,7 @@ async function streamAssistantResponse(
   context: AgentContext,
   config: AgentLoopConfig,
   provider: ProviderStrategy,
-  stream: EventStream<AgentEvent, Message[]>,
+  stream: EventStream<AgentLoopEvent, Message[]>,
   ephemeralInstruction?: string,
   allowToolUse = true,
 ): Promise<AssistantMessage> {
@@ -732,15 +733,8 @@ async function streamAssistantResponse(
           }
           throw event.error;
         }
-        default: {
-          // 其它事件透传给 UI
-          stream.push({
-            type: 'message_update',
-            assistantMessageEvent: event as never,
-            message: (event as { partial: AssistantMessage }).partial,
-          });
-          break;
-        }
+        default:
+          assertNever(event);
       }
     }
 
@@ -767,7 +761,7 @@ async function streamAssistantResponse(
 async function applyTransformContext(
   currentMessages: AgentMessage[],
   config: AgentLoopConfig,
-  stream: EventStream<AgentEvent, Message[]>,
+  stream: EventStream<AgentLoopEvent, Message[]>,
 ): Promise<AgentMessage[]> {
   if (!config.transformContext) {
     return currentMessages;

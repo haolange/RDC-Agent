@@ -17,8 +17,8 @@ function makeEvent(id: string, sessionId: string): AgentEvent {
     timestamp: Date.now(),
     sessionId,
     agentId: 'ask',
-    payload: { text: id },
-  } as AgentEvent;
+    payload: { text: id, providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 } },
+  };
 }
 
 describe('concurrencyContract: dual session turns', () => {

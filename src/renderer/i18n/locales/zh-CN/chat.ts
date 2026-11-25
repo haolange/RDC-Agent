@@ -80,7 +80,6 @@ export const zhChat = {
   'chat.rewriteFailed': '编辑后的消息没有发出，修改仍保留。',
   'chat.workProcessStatusPending': '等待中',
   'chat.workProcessStatusRunning': '进行中',
-  'chat.handoffRestartDegraded': '重启后未自动续跑交接，请手动切换到目标 Agent 继续。',
   'chat.workProcessStatusError': '失败',
   'chat.workProcessStatusSkipped': '已跳过',
   'chat.workProcessThinkingStreaming': '正在思考…',

@@ -13,7 +13,7 @@ import { createDelegatedProjectionState, projectDelegatedEvent, type DelegatedPr
 import type { ConversationWorkBlock } from '@shared/types/conversation';
 import type { DelegationTaskBody } from '@shared/types/delegationTrace';
 import type { DelegationContentKind, DelegationContentPage, DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
-import type { AgentAssistantDeltaPayload, AgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent, AgentEventOf } from '@shared/types/agentRuntime';
 
 type TraceEntry =
   | { kind: 'start'; header: DelegationTraceHeader }
@@ -25,7 +25,7 @@ interface ActiveTrace {
   header: DelegationTraceHeader;
   projection: DelegatedProjectionState;
   blocks: Map<string, DelegationTraceStep>;
-  pendingDelta?: AgentEvent;
+  pendingDelta?: AgentEventOf<'assistant.delta'>;
   pendingTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -211,10 +211,7 @@ function persistBlocks(record: ActiveTrace, target: string): void {
 
 function persistProjectedEvent(sessionId: string, record: ActiveTrace, target: string, event: AgentEvent): void {
   if (event.type === 'tool.completed') {
-    const payload = event.payload as { toolCallId?: string; result?: unknown };
-    if (payload.toolCallId && payload.result !== undefined) {
-      writeBody(target, 'tool_receipt', safeText(payload.result), payload.toolCallId);
-    }
+    writeBody(target, 'tool_receipt', safeText(event.payload.result), event.payload.toolCallId);
   }
   record.projection = projectDelegatedEvent(record.projection, event);
   const before = record.header.revision;
@@ -275,13 +272,13 @@ export const delegationTraceStore = {
     const target = location(sessionId, callId);
     if (!record || record.identity !== childIdentity || !target) return;
     if (event.type === 'assistant.delta') {
-      const payload = event.payload as AgentAssistantDeltaPayload;
+      const { payload } = event;
       if (!payload.text) return;
-      const previous = record.pendingDelta?.payload as AgentAssistantDeltaPayload | undefined;
+      const previous = record.pendingDelta?.payload;
       if (previous && (JSON.stringify(previous.providerOutputRef) !== JSON.stringify(payload.providerOutputRef)
         || previous.phase !== payload.phase)) flushDelta(sessionId, record, target);
       if (record.pendingDelta) {
-        const queued = record.pendingDelta.payload as AgentAssistantDeltaPayload;
+        const queued = record.pendingDelta.payload;
         record.pendingDelta = { ...record.pendingDelta, payload: { ...queued, text: queued.text + payload.text } };
       } else record.pendingDelta = event;
       if (!record.pendingTimer) {

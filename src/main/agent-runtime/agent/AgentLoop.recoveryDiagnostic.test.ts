@@ -6,7 +6,7 @@ import { agentLoop, type AgentContext } from './AgentLoop';
 import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
-  AgentEvent,
+  AgentLoopEvent,
   AssistantMessage,
   AssistantMessageEvent,
   Message,
@@ -154,7 +154,7 @@ describe('AgentLoop recovery diagnostics', () => {
       },
     };
 
-    const events: AgentEvent[] = [];
+    const events: AgentLoopEvent[] = [];
     const context: AgentContext = {
       messages: [{
         role: 'user',
@@ -198,7 +198,7 @@ describe('AgentLoop recovery diagnostics', () => {
       stream: () => makeProviderStream(async () => makeAssistantMessage('ok')),
     };
 
-    const events: AgentEvent[] = [];
+    const events: AgentLoopEvent[] = [];
     const context: AgentContext = {
       messages: [{
         role: 'user',

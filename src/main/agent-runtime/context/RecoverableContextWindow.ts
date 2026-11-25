@@ -31,7 +31,7 @@ export class RecoverableContextWindow {
 
   private get tokenLimit(): number { return typeof this.options.tokenLimit === 'function' ? this.options.tokenLimit() : this.options.tokenLimit; }
 
-  async prepare(messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('../core/types').CompactionProgress) => void): Promise<CompressResult> {
+  async prepare(messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('@shared/types/agentRuntime').AgentContextCompactedPayload) => void): Promise<CompressResult> {
     signal?.throwIfAborted();
     if (!this.restoreChecked) {
       this.restoreChecked = true;

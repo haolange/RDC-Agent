@@ -166,12 +166,12 @@ describe('BackgroundSubagentService', () => {
   it('persists waiting and running around a delegated approval request', async () => {
     let observedWaiting = false;
     const { service, registry } = harness(async (input) => {
-      input.parentOnEvent?.({ id: 'approval-1', type: 'approval.requested', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', toolCallId: 't1', toolName: 'shell', args: {} } });
+      input.parentOnEvent?.({ id: 'approval-1', type: 'approval.requested', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', title: 'Approve shell', status: 'pending', toolCallId: 't1', toolName: 'shell' } });
       await vi.waitFor(async () => {
         expect((await registry('s1').listExecutions()).at(-1)?.status).toBe('waiting');
       });
       observedWaiting = true;
-      input.parentOnEvent?.({ id: 'approval-2', type: 'approval.answered', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', toolCallId: 't1', toolName: 'shell', approved: true } as never });
+      input.parentOnEvent?.({ id: 'approval-2', type: 'approval.answered', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', title: 'Approve shell', status: 'approved', toolCallId: 't1', toolName: 'shell' } });
       return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } };
     });
     await service.query('s1', 'missing');

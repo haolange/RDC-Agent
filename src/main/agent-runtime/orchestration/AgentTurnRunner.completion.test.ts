@@ -21,7 +21,7 @@ import { AgentTurnRunner, type AgentTurnRunnerDeps } from './AgentTurnRunner';
 import { turnCoordinator, type TurnHandle } from './TurnCoordinator';
 import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 import type { AgentSlot } from './AgentSlotRegistry';
-import type { AgentEvent, AssistantMessage } from '../core/types';
+import type { AgentLoopEvent, AssistantMessage } from '../core/types';
 import type { PreparedAgentRuntime } from './orchestratorTypes';
 import type { AgentSlotRequest } from './AgentSlotFactory';
 import type { TurnCompletionReadinessValidator, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
@@ -29,7 +29,7 @@ import type { TurnCompletionReadinessValidator, TurnCompletionValidator } from '
 function harness(scope: string, validateCompletion: TurnCompletionValidator, approvedPlan = false,
   validateCompletionReadiness: TurnCompletionReadinessValidator = () => undefined,
   onPrompt?: (turn: TurnHandle, request: AgentSlotRequest) => Promise<void>,
-  onEvents?: (turn: TurnHandle, emit: (event: AgentEvent) => void, assistant: (text: string, withTool?: boolean) => AssistantMessage, messages: AssistantMessage[]) => void) {
+  onEvents?: (turn: TurnHandle, emit: (event: AgentLoopEvent) => void, assistant: (text: string, withTool?: boolean) => AssistantMessage, messages: AssistantMessage[]) => void) {
   const terminal = vi.fn();
   const preparedRuntime = {
     promptPlan: { systemPrompt: 'Frozen instructions', segments: [] },
@@ -41,7 +41,7 @@ function harness(scope: string, validateCompletion: TurnCompletionValidator, app
       policy: { maxTurns: 5, maxToolCalls: 5, maxSubagents: 1, maxChildDepth: 1, maxWallTimeMs: 10_000 },
     },
   } as unknown as PreparedAgentRuntime;
-  let emit: (event: AgentEvent) => void = () => undefined;
+  let emit: (event: AgentLoopEvent) => void = () => undefined;
   let slotRequest: AgentSlotRequest;
   const messages: AssistantMessage[] = [];
   const assistant = (text: string, withTool = false): AssistantMessage => ({

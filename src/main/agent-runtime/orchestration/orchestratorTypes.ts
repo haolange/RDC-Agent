@@ -3,7 +3,7 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentRouteCapability, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
 import type {
   ConversationTurnControls,
   ResolvedReasoningSelection,
@@ -52,7 +52,7 @@ export interface AgentTurnOptions {
   onTaskPreparation?: (preparation: import('@shared/types/taskExecution').TaskExecutionPreparation) => Promise<void>;
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   reasoning?: ResolvedReasoningSelection;
   turnControls?: ConversationTurnControls;
   requestPlan?: RequestPlan;
@@ -185,7 +185,7 @@ export interface ToolExecutorRuntimeContext {
   runId?: string;
   turnId?: string;
   eventContext?: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   /** 当前激活项目根目录，用于把工具执行 base 对齐到 project root 而非 process.cwd()。 */
   projectRootPath?: string | null;
   /** Exact MCP pool leased by this turn; never resolve tools from a mutable active-project pointer. */

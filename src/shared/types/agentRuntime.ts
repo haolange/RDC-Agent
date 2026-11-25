@@ -1,11 +1,11 @@
 /**
  * Shared Agent Runtime event types for the IPC contract.
  *
- * Core runtime events are translated into this shared shape by
- * src/main/agent-runtime/AgentEventBridge.ts before renderer projection.
+ * Main's loop events are translated into this shared shape by
+ * src/main/agent-runtime/AgentEventBridge.ts before conversation and renderer projection.
  */
 import type { AgentRole } from './agent';
-import type { LLMStreamEvent, ToolCall } from './llm';
+import type { ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
@@ -16,6 +16,8 @@ import type {
   ConversationAskUserQuestion,
   ConversationDiagnosticSeverity,
   ConversationLoopStopReason,
+  ConversationTaskSnapshotItem,
+  ConversationTaskStatus,
 } from './conversation';
 import type { ConversationPlanReview, PlanReviewDecision } from './planReview';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
@@ -46,53 +48,27 @@ export interface AgentRouteCapability {
   structuredOutputMode: 'native' | 'prompt-fallback';
 }
 
-export type AgentEventType =
-  | 'run.started'
-  | 'assistant.delta'
-  | 'assistant.text_end'
-  | 'assistant.thinking_delta'
-  | 'assistant.thinking_end'
-  | 'assistant.completed'
-  | 'tool.requested'
-  | 'tool.started'
-  | 'tool.completed'
-  | 'tool.denied'
-  | 'task.created'
-  | 'task.updated'
-  | 'approval.requested'
-  | 'approval.answered'
-  | 'diagnostic'
-  | 'run.completed'
-  | 'run.failed'
-  | 'run.cancelled'
-  | 'context.compacted'
-  | 'handoff.requested'
-  | 'handoff.consumed'
-  | 'handoff.cancelled';
-
-export interface AgentEventBasePayload {
-  [key: string]: unknown;
-}
-
-export interface AgentRunStartedPayload extends AgentEventBasePayload {
+export interface AgentRunStartedPayload {
   profileId: string;
   providerId: string;
   modelId: string;
   toolAllowlist: string[];
+  routeCapability?: AgentRouteCapability;
 }
 
-export interface AgentAssistantDeltaPayload extends AgentEventBasePayload {
+export interface AgentAssistantDeltaPayload {
   text: string;
   phase?: 'commentary' | 'final_answer';
   providerOutputRef: ProviderOutputRef;
 }
 
-export interface AgentAssistantThinkingPayload extends AgentEventBasePayload {
+export interface AgentAssistantThinkingPayload {
   text: string;
   thinking?: ThinkingArtifact;
+  providerOutputRef: ProviderOutputRef;
 }
 
-export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
+export interface AgentAssistantCompletedPayload {
   text: string;
   textItems?: Array<{ text: string; phase?: 'commentary' | 'final_answer'; providerOutputRef: ProviderOutputRef }>;
   thinking?: ThinkingArtifact[];
@@ -104,41 +80,41 @@ export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
   };
 }
 
-export interface AgentToolRequestedPayload extends AgentEventBasePayload {
+export interface AgentToolRequestedPayload {
   toolCall: ToolCall;
   providerOutputRef: ProviderOutputRef;
-  streamEvent?: LLMStreamEvent;
 }
 
-export interface AgentToolStartedPayload extends AgentEventBasePayload {
+export interface AgentToolStartedPayload {
   permissionState?: import('./runtimePermission').RuntimePermissionState;
   toolCallId: string;
   toolName: string;
   args: Record<string, unknown>;
 }
 
-export interface AgentToolCompletedPayload extends AgentEventBasePayload {
+export interface AgentToolCompletedPayload {
   toolCallId: string;
   toolName: string;
   result: ToolCallResult;
 }
 
-export interface AgentToolDeniedPayload extends AgentEventBasePayload {
+export interface AgentToolDeniedPayload {
   toolCallId: string;
   toolName: string;
   reason: string;
   result?: ToolCallResult;
 }
 
-export interface AgentTaskEventPayload extends AgentEventBasePayload {
+export interface AgentTaskEventPayload {
   taskId: string;
   title: string;
-  status?: 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+  status?: ConversationTaskStatus;
   statusReason?: string;
-  parentTaskId?: string;
+  /** The session's projected Task list after this change. */
+  snapshot?: ConversationTaskSnapshotItem[];
 }
 
-export interface AgentApprovalEventPayload extends AgentEventBasePayload {
+export interface AgentApprovalEventPayload {
   reviewMethod?: 'rule' | 'model';
   errorCode?: string;
   delegatedRequest?: { executionId: string; childSessionId: string; turnId: string };
@@ -149,6 +125,8 @@ export interface AgentApprovalEventPayload extends AgentEventBasePayload {
   kind?: 'tool' | 'ask_user' | 'run_start' | 'plan_review';
   toolCallId?: string;
   toolName?: string;
+  risk?: 'low' | 'medium' | 'high';
+  reviewer?: 'auto_review';
   question?: string;
   options?: string[];
   questions?: ConversationAskUserQuestion[];
@@ -158,7 +136,7 @@ export interface AgentApprovalEventPayload extends AgentEventBasePayload {
   answer?: unknown;
 }
 
-export interface AgentDiagnosticPayload extends AgentEventBasePayload {
+export interface AgentDiagnosticPayload {
   code: string;
   severity: ConversationDiagnosticSeverity;
   message: string;
@@ -169,7 +147,7 @@ export interface AgentDiagnosticPayload extends AgentEventBasePayload {
   phase?: 'started' | 'completed';
 }
 
-export interface AgentRunFinalPayload extends AgentEventBasePayload {
+export interface AgentRunFinalPayload {
   status: 'complete' | 'failed' | 'cancelled';
   text?: string;
   error?: string;
@@ -179,71 +157,60 @@ export interface AgentRunFinalPayload extends AgentEventBasePayload {
   };
 }
 
-export interface AgentContextCompactedPayload extends AgentEventBasePayload {
+/** Automatic compaction progress; one compaction reports `running` and then `complete` or `error`. */
+export interface AgentContextCompactedPayload {
   summary: string;
+  usage?: { inputTokens: number; outputTokens: number };
+  compactionId?: string;
+  status?: 'running' | 'complete' | 'error';
+  tokensBefore?: number;
+  tokensAfter?: number;
+  sourceUri?: string;
+  sourceHash?: string;
 }
 
-/**
- * Historical handoff event payload retained for old transcripts.
- * Live continue actions persist session.agentId through applyDeclaredHandoff.
- */
-export interface AgentHandoffRequestedPayload extends AgentEventBasePayload {
-  /** 源 profile。 */
-  fromAgentId: string;
-  /** 目标 profile。 */
-  toProfile: string;
-  toAgentId?: string;
-  handoffId?: string;
-  send?: boolean;
-  /** 移交后注入的 prompt（缺省时从目标 profile handoffs 定义取）。 */
-  prompt: string;
-  /** handoff 标签。 */
-  label?: string;
+/** The payload each runtime event type carries; the event union below is derived from it. */
+export interface AgentEventPayloadMap {
+  'run.started': AgentRunStartedPayload;
+  'assistant.delta': AgentAssistantDeltaPayload;
+  'assistant.text_end': AgentAssistantDeltaPayload;
+  'assistant.thinking_delta': AgentAssistantThinkingPayload;
+  'assistant.thinking_end': AgentAssistantThinkingPayload;
+  'assistant.completed': AgentAssistantCompletedPayload;
+  'tool.requested': AgentToolRequestedPayload;
+  'tool.started': AgentToolStartedPayload;
+  'tool.completed': AgentToolCompletedPayload;
+  'tool.denied': AgentToolDeniedPayload;
+  'task.created': AgentTaskEventPayload;
+  'task.updated': AgentTaskEventPayload;
+  'approval.requested': AgentApprovalEventPayload;
+  'approval.answered': AgentApprovalEventPayload;
+  diagnostic: AgentDiagnosticPayload;
+  'run.completed': AgentRunFinalPayload;
+  'run.failed': AgentRunFinalPayload;
+  'run.cancelled': AgentRunFinalPayload;
+  'context.compacted': AgentContextCompactedPayload;
 }
 
-export interface AgentHandoffConsumedPayload extends AgentEventBasePayload {
-  handoffId: string;
-  fromAgentId: string;
-  toAgentId: string;
-  toProfile: string;
-}
+export type AgentEventType = keyof AgentEventPayloadMap;
 
-export interface AgentHandoffCancelledPayload extends AgentEventBasePayload {
-  handoffId: string;
-  fromAgentId: string;
-  toAgentId: string;
-  toProfile: string;
-  cancelReason: string;
-}
-
-export type AgentEventPayload =
-  | AgentRunStartedPayload
-  | AgentAssistantDeltaPayload
-  | AgentAssistantThinkingPayload
-  | AgentAssistantCompletedPayload
-  | AgentToolRequestedPayload
-  | AgentToolStartedPayload
-  | AgentToolCompletedPayload
-  | AgentToolDeniedPayload
-  | AgentTaskEventPayload
-  | AgentApprovalEventPayload
-  | AgentDiagnosticPayload
-  | AgentRunFinalPayload
-  | AgentContextCompactedPayload
-  | AgentHandoffRequestedPayload
-  | AgentHandoffConsumedPayload
-  | AgentHandoffCancelledPayload;
-
-export interface AgentEvent {
+/** One runtime event of type `T`; `AgentEvent` is the union over every type. */
+export interface AgentEventOf<T extends AgentEventType> {
   id: string;
-  type: AgentEventType;
+  type: T;
   timestamp: number;
   runId?: string;
   turnId?: string;
   sessionId?: string | null;
   agentId?: AgentRole;
-  payload: AgentEventPayload;
+  payload: AgentEventPayloadMap[T];
 }
+
+/**
+ * A runtime event as the conversation, the delegation trace and the renderer (`agent_event`) receive it, discriminated
+ * by `type`. Main's loop events (`AgentLoopEvent`) are translated into it by src/main/agent-runtime/AgentEventBridge.ts.
+ */
+export type AgentEvent = { [T in AgentEventType]: AgentEventOf<T> }[AgentEventType];
 
 export interface AgentRuntimeSkillDescriptor {
   id: string;

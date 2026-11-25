@@ -8,7 +8,7 @@ import { AgentToolApprovalRequestService } from '../../agent-runtime/permissions
 import { OllamaProvider } from '../../agent-runtime/providers/OllamaProvider';
 import { createTestRequestPlan } from '../createTestRequestPlan';
 import type { AddressInfo } from 'node:net';
-import type { AgentEvent, AssistantMessage, Message, Model, ToolResultMessage } from '../../agent-runtime/core/types';
+import type { AgentLoopEvent, AssistantMessage, Message, Model, ToolResultMessage } from '../../agent-runtime/core/types';
 
 vi.mock('../../runtime/AuditLog', () => ({ auditLog: { record: vi.fn() } }));
 
@@ -116,7 +116,7 @@ describe('one turn across the wire, loop, approval and final answer', () => {
           onEvent: (event) => {
             order.push(event.type);
             if (event.type !== 'approval.requested') return;
-            const approvalId = String((event.payload as { approvalId: string }).approvalId);
+            const { approvalId } = event.payload;
             queueMicrotask(() => expect(approvals.answer({ sessionId: 'session-wire', turnId: 'turn-wire', approvalId, approved })).toEqual({ success: true }));
           },
         });
@@ -134,7 +134,7 @@ describe('one turn across the wire, loop, approval and final answer', () => {
     }, new OllamaProvider({ baseUrl: wire.baseUrl }), executor);
 
     let final: AssistantMessage | undefined;
-    for await (const event of stream as AsyncIterable<AgentEvent>) {
+    for await (const event of stream as AsyncIterable<AgentLoopEvent>) {
       if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'thinking_delta') order.push('thinking');
       if (event.type === 'tool_execution_end') order.push('tool_result');
       if (event.type === 'message_end' && event.message.role === 'assistant') final = event.message as AssistantMessage;

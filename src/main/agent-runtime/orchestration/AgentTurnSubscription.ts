@@ -20,7 +20,7 @@ import type { AgentTurnRun, AgentTurnSetup } from './AgentTurnRunner';
 import type { AgentSlot } from './AgentSlotRegistry';
 import type { TurnCompletionDeclaration } from './TurnCoordinator';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { AgentEvent as CoreAgentEvent, AgentMessage, AssistantMessage, ToolDefinition } from '../core/types';
+import type { AgentLoopEvent, AgentMessage, AssistantMessage, ToolDefinition } from '../core/types';
 import type { ContextUsageBreakdownEntry } from '@shared/types/session';
 
 /** What the subscription observes for the prompt phase and the completion receipt. */
@@ -43,7 +43,7 @@ export function subscribeAgentTurnEvents(run: AgentTurnRun, setup: AgentTurnSetu
     sawStructuredToolCall: false,
     structuredToolCallingEvidenceGate: { recorded: false },
   };
-  run.unsubscribe = activeSlot.agent.subscribe((event: CoreAgentEvent) => handleAgentEvent(run, setup, output, event));
+  run.unsubscribe = activeSlot.agent.subscribe((event: AgentLoopEvent) => handleAgentEvent(run, setup, output, event));
 
   // abort 信号桥接到 Agent.abort()；同时注册为 turn producer。
   run.unregisterAgentProducer = turnHandle.registerProducer({
@@ -71,7 +71,7 @@ export function subscribeAgentTurnEvents(run: AgentTurnRun, setup: AgentTurnSetu
   return output;
 }
 
-function handleAgentEvent(run: AgentTurnRun, setup: AgentTurnSetup, output: AgentTurnOutput, event: CoreAgentEvent): void {
+function handleAgentEvent(run: AgentTurnRun, setup: AgentTurnSetup, output: AgentTurnOutput, event: AgentLoopEvent): void {
   const { input, turnHandle } = run;
   const { routeCapability } = run.preparedRuntime;
   if (event.type === 'message_update') {

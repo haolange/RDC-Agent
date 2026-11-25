@@ -32,7 +32,7 @@ The turn path runs in named phases over typed inputs.
 
 - `startProfileTurn` (`ConversationTurnStarter.ts`) takes one `ProfileTurnStart` and resolves the Agent, freezes the route and the credential lease, plans the attachments and user input, prepares the runtime (`prepareTurnContext`), commits the turn (session, messages, branch, run; rolled back on failure) and starts it.
 - `completeProfileTurn` (`ConversationTurnRunner.ts`) runs the committed turn as a `ConversationTurnCompletion`: begin (turn controls, patch scheduler, active-turn registration), run the Agent turn through `sendProfileMessage`, commit the outcome, and finish (stop commit, terminal transaction, run status, lease release).
-- Agent events update that turn through `createAgentEventHandler`, one phase per event type.
+- Agent events update that turn through `createAgentEventHandler`, one phase per event type. `AgentEvent` (`src/shared/types/agentRuntime.ts`) is a union discriminated by `type`, each type carrying its own payload, which `src/main/agent-runtime/AgentEventBridge.ts` translates from main's private `AgentLoopEvent`. Every dispatch over either union is an exhaustive `switch` ending in `assertNever` (`src/shared/utils/assertNever.ts`), so a new event type fails to compile until each consumer handles it.
 - The turn reaches the renderer and the session files through the `ConversationTurnOutput` port (`conversationTurnOutput`) and the conversation's turn registry through `ActiveConversationTurns` (ConversationService).
 - In the agent runtime, `sendProfileMessage` only receives a prepared turn; `ProfileTurnRunner` resolves the profile and route, plans the request and prompt, prepares a child turn's runtime (subagents only), runs the turn and releases what it owns.
 

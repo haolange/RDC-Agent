@@ -11,7 +11,7 @@ import type { UnresolvedItem } from '@shared/types/unresolvedWork';
  * task registry hook, agent slot key, cancellation scope, generation token, producers.
  */
 
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { ToolDefinition } from '../core/types';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
@@ -29,7 +29,7 @@ export type AbortReason =
   | 'unknown';
 
 export interface TurnEventSink {
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   sessionId?: string | null;
   requestId?: string | null;
   projectRootPath?: string | null;
@@ -400,7 +400,7 @@ export class TurnHandle {
    * Emit an event only if the turn is still live (generation token guard).
    * Returns false when the write was dropped as late.
    */
-  emitEvent(event: SharedAgentEvent, expectedGeneration?: number): boolean {
+  emitEvent(event: AgentEvent, expectedGeneration?: number): boolean {
     if (this.closed) return false;
     if (expectedGeneration != null && expectedGeneration !== this.generation) return false;
     if (this.aborted) return false;

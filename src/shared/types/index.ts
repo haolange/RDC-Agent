@@ -71,7 +71,7 @@ export type {
   TraceStatus,
   VisibleReasoningPacket,
 } from './agenticTrace';
-export type { AgentEvent, AgentEventPayload, AgentEventType } from './agentRuntime';
+export type { AgentEvent, AgentEventType } from './agentRuntime';
 export type {
   AgentRuntimeCatalog,
   AgentRuntimeMcpDescriptor,

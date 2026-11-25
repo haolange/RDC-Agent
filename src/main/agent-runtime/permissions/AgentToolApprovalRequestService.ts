@@ -6,7 +6,7 @@ import { PermissionModeChangedError } from '../../runtime/RuntimePermissionState
 import { PermissionReviewError } from './PermissionReviewRuntime';
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentTool } from '../agent/AgentTool';
 
 export interface ToolApprovalRequestInput {
@@ -20,7 +20,7 @@ export interface ToolApprovalRequestInput {
   reason: string;
   risk: 'low' | 'medium' | 'high';
   context: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
 }
 
@@ -93,7 +93,7 @@ export class AgentToolApprovalRequestService {
         question: input.reason,
         options: ['Approve once', 'Deny'],
         risk: input.risk,
-      } as AgentApprovalEventPayload);
+      });
     });
   }
 
@@ -123,7 +123,7 @@ export class AgentToolApprovalRequestService {
       risk: input.risk,
       reviewer: 'auto_review',
       reviewMethod,
-    } as AgentApprovalEventPayload);
+    });
     let verdict: PermissionReviewVerdict;
     let settledRejection = false;
     let modeCancelled = false;
@@ -173,7 +173,7 @@ export class AgentToolApprovalRequestService {
       reviewer: 'auto_review',
       reviewMethod,
       errorCode,
-    } as AgentApprovalEventPayload);
+    });
     if (modeCancelled) throw new PermissionModeChangedError();
     return verdict;
   }
@@ -208,7 +208,7 @@ export class AgentToolApprovalRequestService {
       toolName: pending.toolName,
       answer: input.approved ? '已批准一次' : '用户已拒绝',
       risk: pending.risk,
-    } as AgentApprovalEventPayload);
+    });
     pending.resolve(input.approved);
     return { success: true };
   }
@@ -237,7 +237,7 @@ export class AgentToolApprovalRequestService {
       answer: reason,
       errorCode: reason === 'PERMISSION_MODE_CHANGED' ? reason : undefined,
       risk: pending.risk,
-    } as AgentApprovalEventPayload);
+    });
     pending.reject(pending.signal?.reason instanceof PermissionModeChangedError ? pending.signal.reason : new Error(reason));
   }
 

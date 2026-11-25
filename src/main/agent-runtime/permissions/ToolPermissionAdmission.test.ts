@@ -7,6 +7,11 @@ import type { AgentPermissionMode } from '@shared/types/settings';
 import type { AgentPermissionDecision } from './AgentPermissionPolicy';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
+/** The approval payloads among the events an approval service emitted. */
+const approvalPayloads = (events: AgentEvent[]) => events.flatMap((event) => (
+  event.type === 'approval.requested' || event.type === 'approval.answered' ? [event.payload] : []
+));
+
 function deferred<T = void>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>(done => { resolve = done; });
@@ -89,11 +94,11 @@ describe('final tool permission admission', () => {
         if (!approved) throw new Error('USER_DENIED'); return allow;
       } });
     await requested.promise;
-    const approvalId = (events[0].payload as { approvalId: string }).approvalId;
+    const approvalId = approvalPayloads(events)[0].approvalId;
     state.commitMode('full-access');
     expect(approvals.answer({ sessionId: 'owner', turnId: 'turn', approvalId, approved: true }).success).toBe(false);
     expect(await result).toBe('executed'); expect(effect).toHaveBeenCalledOnce();
-    expect(events.some(event => (event.payload as { errorCode?: string }).errorCode === 'PERMISSION_MODE_CHANGED')).toBe(true);
+    expect(approvalPayloads(events).some(payload => payload.errorCode === 'PERMISSION_MODE_CHANGED')).toBe(true);
 
     state.commitMode('default'); const deniedRequested = deferred();
     const denied = executeWithPermissionAdmission({ state, assertLive: () => {}, beforeExecute: async () => {}, withResource: operation => operation(), execute: effect,
@@ -103,7 +108,7 @@ describe('final tool permission admission', () => {
         if (!approved) throw new Error('USER_DENIED'); return allow;
       } });
     await deniedRequested.promise;
-    const pending = events.at(-1)!.payload as { approvalId: string };
+    const pending = approvalPayloads(events).at(-1)!;
     approvals.answer({ sessionId: 'owner', turnId: 'deny-turn', approvalId: pending.approvalId, approved: false });
     state.commitMode('full-access');
     await expect(denied).rejects.toThrow('USER_DENIED'); expect(effect).toHaveBeenCalledOnce();

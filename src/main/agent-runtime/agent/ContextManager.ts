@@ -9,7 +9,7 @@ export interface ContextManagerConfig {
   contextTokenLimit: number;
   tokenizer?: TokenizerService;
   modelId?: string;
-  compact?: (messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('../core/types').CompactionProgress) => void) => Promise<CompressResult>;
+  compact?: (messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('@shared/types/agentRuntime').AgentContextCompactedPayload) => void) => Promise<CompressResult>;
 }
 export interface CompressResult { messages: AgentMessage[]; summary?: string }
 export const estimateImageTokensFromBase64Length = (base64Length: number): number => {
@@ -32,7 +32,7 @@ export class ContextManager {
   convertToLlm(messages: AgentMessage[]): Message[] {
     return convertAgentMessagesToLlm(messages);
   }
-  async compress(messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('../core/types').CompactionProgress) => void): Promise<CompressResult> {
+  async compress(messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('@shared/types/agentRuntime').AgentContextCompactedPayload) => void): Promise<CompressResult> {
     signal?.throwIfAborted();
     // The coordinator can reuse a verified window even when canonical history is large.
     if (this.config.compact) {

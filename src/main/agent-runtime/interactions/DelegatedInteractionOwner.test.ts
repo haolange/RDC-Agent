@@ -4,6 +4,11 @@ import { AgentUserInputRequestService } from './AgentUserInputRequestService';
 import { withDelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
+/** The approval payloads among the events an approval service emitted. */
+const approvalPayloads = (events: AgentEvent[]) => events.flatMap((event) => (
+  event.type === 'approval.requested' || event.type === 'approval.answered' ? [event.payload] : []
+));
+
 const owner = { ownerSessionId: 'parent', childSessionId: 'child', executionId: 'execution-1' };
 const context = { sessionId: 'child', turnId: 'child-turn', agentId: 'general' as const };
 describe('delegated controlled interactions', () => {
@@ -11,7 +16,7 @@ describe('delegated controlled interactions', () => {
     const service = new AgentToolApprovalRequestService(); const events: AgentEvent[] = [];
     const pending = withDelegatedInteractionOwner(owner, () => service.request({ agentId: 'general', sessionId: 'child', turnId: 'child-turn', toolCallId: 'tool', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'run scoped command', risk: 'high', context, onEvent: (event) => events.push(event) }));
     expect(events[0]).toMatchObject({ sessionId: 'parent', turnId: 'child-turn', payload: { delegatedRequest: { executionId: 'execution-1', childSessionId: 'child', turnId: 'child-turn' } } });
-    const approvalId = (events[0].payload as { approvalId: string }).approvalId;
+    const { approvalId } = approvalPayloads(events)[0];
     expect(approvalId).toMatch(/^tool-approval-tool-.+/);
     for (const sessionId of ['other', 'child', null]) expect(service.answer({ sessionId, turnId: 'child-turn', approvalId, approved: true }).success).toBe(false);
     expect(service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId, approved: true }).success).toBe(true);

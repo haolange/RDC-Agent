@@ -6,7 +6,7 @@ import {
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
 import type {
   ConversationAskUserAnswer,
   ConversationAskUserQuestion,
@@ -22,7 +22,7 @@ interface PendingUserInputRequest {
   approvalId: string;
   questions: ConversationAskUserQuestion[];
   context: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   resolve: (answer: string) => void;
   reject: (error: Error) => void;
   abortListener?: () => void;
@@ -36,7 +36,7 @@ export interface AgentUserInputRequestInput {
   toolCallId: string;
   questions: ConversationAskUserQuestion[];
   context: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
 }
 

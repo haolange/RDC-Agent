@@ -7,7 +7,7 @@ vi.mock('../../sessions/store/sessionStores', () => ({
 }));
 
 import { AgentPlanReviewRequestService } from './AgentPlanReviewRequestService';
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationPlanReview, PlanApprovalRequest } from '@shared/types/planReview';
 import type { PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import type { TurnHandle } from '../orchestration/TurnCoordinator';
@@ -40,7 +40,7 @@ function approval(service: AgentPlanReviewRequestService, sessionId = 'sess'): P
   };
 }
 
-function open(service: AgentPlanReviewRequestService, turnHandle?: TurnHandle, onEvent?: (event: SharedAgentEvent) => void) {
+function open(service: AgentPlanReviewRequestService, turnHandle?: TurnHandle, onEvent?: (event: AgentEvent) => void) {
   return service.request({ agentId: 'debugger', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, onEvent,
     context: { runId: 'run', turnId: 'turn', sessionId: 'sess', agentId: 'debugger' } });
 }
@@ -51,7 +51,7 @@ describe('AgentPlanReviewRequestService', () => {
     const store = { cancelReview } as unknown as PlanReviewStateStore;
     const service = new AgentPlanReviewRequestService(undefined, store);
     const controller = new AbortController();
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     if (alreadyAborted) controller.abort();
     const pending = service.request({ agentId: 'custom-planner', sessionId: 'sess', turnId: 'turn-c',
       toolCallId: 'call-c', planReview, signal: controller.signal,
@@ -80,7 +80,7 @@ describe('AgentPlanReviewRequestService', () => {
 
   it('publishes an approval only after the transaction committed it, and answers with the committed record', async () => {
     transaction.mockReset().mockResolvedValue(committed);
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnHandle = { approvedPlan: null } as TurnHandle;
     const service = new AgentPlanReviewRequestService();
     const pending = open(service, turnHandle, (event) => events.push(event));

@@ -114,11 +114,12 @@ describe('AgentEventBridge semantic channel refs', () => {
       message,
     }, {});
 
-    expect(textShared?.payload.providerOutputRef).toEqual(textRef);
-    expect((thinkingShared?.payload.thinking as { providerOutputRef?: ProviderOutputRef }).providerOutputRef).toEqual(thinkingRef);
-    expect(toolShared?.payload.providerOutputRef).toEqual(toolRef);
-    expect(completedShared?.payload.providerOutputRefs).toEqual([textRef]);
-    expect((completedShared?.payload.thinking as Array<{ providerOutputRef?: ProviderOutputRef }>)[0]?.providerOutputRef)
-      .toEqual(thinkingRef);
+    expect(textShared).toMatchObject({ type: 'assistant.delta', payload: { providerOutputRef: textRef } });
+    expect(thinkingShared).toMatchObject({ type: 'assistant.thinking_end', payload: { thinking: { providerOutputRef: thinkingRef } } });
+    expect(toolShared).toMatchObject({ type: 'tool.requested', payload: { providerOutputRef: toolRef } });
+    expect(completedShared).toMatchObject({
+      type: 'assistant.completed',
+      payload: { providerOutputRefs: [textRef], thinking: [{ providerOutputRef: thinkingRef }] },
+    });
   });
 });

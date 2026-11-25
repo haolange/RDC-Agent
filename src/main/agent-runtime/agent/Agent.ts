@@ -4,7 +4,7 @@
  * 状态机：idle → streaming → idle
  *  - prompt(): 在 idle 状态发起一次新的 agent 循环。
  *  - abort(): 中止当前流。
- *  - subscribe(): 订阅所有 AgentEvent。
+ *  - subscribe(): 订阅所有 AgentLoopEvent。
  *
  * 该类是对 `agentLoop()` 的封装，负责：
  *  - 管理 model / systemPrompt；tools 经 LoopRuntimeState 修订（COW）；
@@ -26,7 +26,7 @@ import {
   type TransformContextResult,
 } from './AgentLoop';
 import type {
-  AgentEvent,
+  AgentLoopEvent,
   AgentMessage,
   AssistantMessage,
   Message,
@@ -41,7 +41,7 @@ import type {
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 
 /** Agent 事件订阅者签名。 */
-export type AgentEventSubscriber = (event: AgentEvent) => void;
+export type AgentLoopEventSubscriber = (event: AgentLoopEvent) => void;
 
 export type { LoopRuntimeState };
 
@@ -83,7 +83,7 @@ export interface AgentOptions {
   transformContext?: (
     messages: AgentMessage[],
     signal?: AbortSignal,
-    onProgress?: (progress: import('../core/types').CompactionProgress) => void,
+    onProgress?: (progress: import('@shared/types/agentRuntime').AgentContextCompactedPayload) => void,
   ) => Promise<TransformContextResult>;
   /** 动态 API key 获取（支持 OAuth token 刷新）。 */
   getApiKey?: (provider: string) => Promise<string | undefined>;
@@ -114,8 +114,8 @@ export class Agent {
   /** Shared ref so AgentLoop re-reads tools each LLM round after COW revision bumps. */
   private readonly _runtimeRef: { current: LoopRuntimeState };
   private _isStreaming = false;
-  private _subscribers: AgentEventSubscriber[] = [];
-  private _currentStream: EventStream<AgentEvent, Message[]> | null = null;
+  private _subscribers: AgentLoopEventSubscriber[] = [];
+  private _currentStream: EventStream<AgentLoopEvent, Message[]> | null = null;
   private _activeLoopPromise: Promise<Message[]> | null = null;
   private _activeProducerCompletion: Promise<void> | null = null;
   private readonly _provider: ProviderStrategy;
@@ -186,7 +186,7 @@ export class Agent {
    * 订阅事件。
    * @returns 解除订阅的函数。
    */
-  subscribe(subscriber: AgentEventSubscriber): () => void {
+  subscribe(subscriber: AgentLoopEventSubscriber): () => void {
     this._subscribers.push(subscriber);
     return () => {
       const idx = this._subscribers.indexOf(subscriber);
@@ -352,7 +352,7 @@ export class Agent {
     }
   }
 
-  private emit(event: AgentEvent): void {
+  private emit(event: AgentLoopEvent): void {
     const subs = [...this._subscribers];
     for (const sub of subs) {
       try {

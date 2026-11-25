@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { delegationTraceStore } from './DelegationTraceStore';
-import type { AgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEventOf, AgentEventPayloadMap, AgentEventType } from '@shared/types/agentRuntime';
 
 const fixture = vi.hoisted(() => ({ root: '', publish: vi.fn() }));
 vi.mock('../../sessions/store/sessionStores', () => ({
@@ -17,8 +17,8 @@ afterEach(() => {
   fixture.publish.mockClear();
 });
 
-const event = (type: AgentEvent['type'], payload: object, timestamp: number): AgentEvent => ({
-  id: `event-${timestamp}`, type, timestamp, payload: payload as AgentEvent['payload'],
+const event = <T extends AgentEventType>(type: T, payload: AgentEventPayloadMap[T], timestamp: number): AgentEventOf<T> => ({
+  id: `event-${timestamp}`, type, timestamp, payload,
 });
 
 it('batches child text without combining distinct provider output items', () => {
@@ -58,7 +58,7 @@ it('stores a single owned child process with revision updates and separate final
     code: 'IGNORED', severity: 'error', message: 'stale',
   }, 4));
   delegationTraceStore.event('owner', 'parent-call', id, event('tool.completed', {
-    toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done', password: 'private' } },
+    toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done', password: 'private' }, duration_ms: 1 },
   }, 5));
   delegationTraceStore.event('owner', 'parent-call', id, event('assistant.completed', {
     text: 'Inspected the configuration.', stopReason: 'end_turn',
@@ -138,7 +138,7 @@ it('marks unfinished records interrupted after restart and refuses old records w
     childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1,
   });
   delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('assistant.thinking_delta', { text: 'Visible work' , providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 } }, 2));
-  delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('tool.started', { toolCallId: 'running', toolName: 'read_file' }, 3));
+  delegationTraceStore.event('owner', 'unfinished', 'child\u0000\u0000', event('tool.started', { toolCallId: 'running', toolName: 'read_file', args: {} }, 3));
   const target = path.join(fixture.root, 'delegations', 'old.jsonl');
   fs.writeFileSync(target, '{ old record }\n');
   // No active producer exists after a restart; a persisted running record is interrupted.
@@ -186,8 +186,8 @@ it.each(['complete', 'failed', 'cancelled'] as const)('settles every owned step 
   delegationTraceStore.start('owner', { parentToolCallId: call, task: 'Inspect', profile: 'general', mode: 'wait',
     childSessionId: 'child', invocation: '{}', status: 'running', startedAt: 1 });
   delegationTraceStore.event('owner', call, identity, event('assistant.thinking_delta', { text: 'Visible thought' , providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 } }, 2));
-  delegationTraceStore.event('owner', call, identity, event('tool.requested', { toolCall: { id: 'pending', name: 'turn_complete', arguments: {} } }, 3));
-  delegationTraceStore.event('owner', call, identity, event('tool.started', { toolCallId: 'started', toolName: 'read_file' }, 4));
+  delegationTraceStore.event('owner', call, identity, event('tool.requested', { toolCall: { id: 'pending', name: 'turn_complete', arguments: {} }, providerOutputRef: { protocol: 'test', providerBlockKey: 'tool:1', contentIndex: 1 } }, 3));
+  delegationTraceStore.event('owner', call, identity, event('tool.started', { toolCallId: 'started', toolName: 'read_file', args: {} }, 4));
   const before = delegationTraceStore.read('owner', call, 0, 0).revision;
   delegationTraceStore.finish('owner', call, identity, status, 'Ended');
   const page = delegationTraceStore.read('owner', call, 0, 40, before);

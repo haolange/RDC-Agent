@@ -19,7 +19,7 @@ import {
   RUNTIME_NO_PROGRESS_INSTRUCTION,
 } from './LoopProgressGuard';
 import type {
-  AgentEvent,
+  AgentLoopEvent,
   AssistantMessage,
   AssistantMessageEvent,
   Context,
@@ -111,7 +111,7 @@ function textFromContext(context: Context): string {
   }).join('\n');
 }
 
-async function consume(stream: AsyncIterable<AgentEvent>): Promise<void> {
+async function consume(stream: AsyncIterable<AgentLoopEvent>): Promise<void> {
   for await (const _event of stream) {
     // Drain the complete event stream so terminal errors surface to the caller.
   }
@@ -173,7 +173,7 @@ describe('AgentLoop progress termination', () => {
     let entered!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const waiting = new Promise<void>((resolve) => { entered = resolve; });
-    const events: AgentEvent[] = [];
+    const events: AgentLoopEvent[] = [];
     let calls = 0;
     const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: () => providerStream(++calls === 1
       ? toolUseMessage(1)
@@ -432,7 +432,7 @@ it('ends at a host-confirmed tool boundary without another provider request or l
   const source = toolUseMessage(1);
   source.content.push({ type: 'toolCall', id: 'later', name: 'read_file', arguments: {} });
   const provider: ProviderStrategy = { api: TEST_MODEL.api, stream: () => { requests++; return providerStream(source); } };
-  const events: AgentEvent[] = [];
+  const events: AgentLoopEvent[] = [];
   const handle = agentLoop([], createContext(), { model: TEST_MODEL, convertToLlm: messages => messages as Message[],
     streamOptions: { requestPlan: TEST_REQUEST_PLAN } }, provider, {
     execute, shouldEndTurnAfterToolResult: result => result.toolCallId === 'call-1' && !result.isError,

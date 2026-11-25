@@ -6,7 +6,7 @@
 import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
 import type { ToolExecutor } from './AgentLoop';
 import type { EventStream } from '../core/EventStream';
-import type { AgentEvent, AssistantMessage, Message, ToolCall, ToolResultMessage } from '../core/types';
+import type { AgentLoopEvent, AssistantMessage, Message, ToolCall, ToolResultMessage } from '../core/types';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
 /** 内层循环工具执行结果。 */
@@ -38,7 +38,7 @@ function createToolCallFailure(
 export async function executeToolCalls(
   assistantMessage: AssistantMessage,
   toolExecutor: ToolExecutor | undefined,
-  stream: EventStream<AgentEvent, Message[]>,
+  stream: EventStream<AgentLoopEvent, Message[]>,
   _maxConcurrency?: number,
 ): Promise<ExecuteToolCallsResult> {
   const toolCalls = assistantMessage.content.filter(

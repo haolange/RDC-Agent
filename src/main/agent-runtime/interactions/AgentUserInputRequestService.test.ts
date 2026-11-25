@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { agentUserInputRequestService } from './AgentUserInputRequestService';
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 
 const eventContext = {
@@ -31,7 +31,7 @@ const questions: ConversationAskUserQuestion[] = [
 
 describe('AgentUserInputRequestService', () => {
   it('resolves a batch request with structured answers and numbered Q/A text', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-ask-user-batch';
     const requestPromise = agentUserInputRequestService.request({
       agentId: 'debugger',

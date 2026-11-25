@@ -285,11 +285,13 @@ export type AssistantMessageEvent =
   | { type: 'error'; error: Error; message: AssistantMessage };
 
 // =====================================================================
-// Agent 事件（AgentEvent）
+// Agent loop 事件（AgentLoopEvent）
 // =====================================================================
 
-/** Agent 调度器/Runtime 层面的事件。 */
-export type AgentEvent =
+/**
+ * Agent loop 层面的事件，只在主进程内流转；AgentEventBridge 把它翻译成跨进程的 shared `AgentEvent`。
+ */
+export type AgentLoopEvent =
   | { type: 'agent_start' }
   | { type: 'agent_end'; messages: Message[] }
   | { type: 'turn_start'; turn: number }
@@ -333,7 +335,7 @@ export type AgentEvent =
       args: Record<string, unknown>;
     }
   | { type: 'approval_resolved'; toolCallId: string; approved: boolean }
-  | ({ type: 'compaction' } & CompactionProgress)
+  | ({ type: 'compaction' } & AgentContextCompactedPayload)
   | {
       type: 'diagnostic';
       code: string;
@@ -348,7 +350,7 @@ export type AgentEvent =
 // Stream 选项
 // =====================================================================
 
-import type { ReasoningVisibility } from '@shared/types/agentRuntime';
+import type { AgentContextCompactedPayload, ReasoningVisibility } from '@shared/types/agentRuntime';
 import type { ResolvedReasoningSelection } from '@shared/types/modelCapability';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
@@ -397,14 +399,3 @@ export interface CustomAgentMessage {
 
 /** Runtime 与应用层共同消费的消息类型。 */
 export type AgentMessage = Message | CustomAgentMessage;
-
-export interface CompactionProgress {
-  usage?: { inputTokens: number; outputTokens: number };
-  summary: string;
-  compactionId?: string;
-  status?: "running" | "complete" | "error";
-  tokensBefore?: number;
-  tokensAfter?: number;
-  sourceUri?: string;
-  sourceHash?: string;
-}

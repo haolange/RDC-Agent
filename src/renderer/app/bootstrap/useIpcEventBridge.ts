@@ -72,7 +72,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     const { projectScopedContext, projectScopedOpenedCapture } = captureProjection;
     const unsubscribeContextChanged = electronAPI.events.onContextChanged(projectScopedContext);
 
-    const conversation = subscribeConversation(electronAPI, t);
+    const conversation = subscribeConversation(electronAPI);
     const unsubscribeToolExecutionComplete = subscribeToolExecutionComplete(electronAPI);
     const unsubscribeCaptureStatusChanged = subscribeCaptureStatusChanged(electronAPI, projectScopedContext);
     const unsubscribeEvidenceEventAdded = subscribeEvidenceEventAdded(electronAPI);

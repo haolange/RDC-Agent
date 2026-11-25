@@ -23,8 +23,8 @@ function makeEvent(id: string): AgentEvent {
     timestamp: Date.now(),
     sessionId: 's1',
     agentId: 'ask',
-    payload: { text: id },
-  } as AgentEvent;
+    payload: { text: id, providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 } },
+  };
 }
 
 describe('cancellationContract: process abort', () => {

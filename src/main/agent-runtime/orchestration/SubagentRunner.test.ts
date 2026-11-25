@@ -141,7 +141,7 @@ describe('SubagentRunner', () => {
           timestamp: Date.now(),
           sessionId: 's',
           agentId: 'ask',
-          payload: { text: 'partial' },
+          payload: { text: 'partial', providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 } },
         });
         options?.onEvent?.({
           id: 'e2',
@@ -812,7 +812,7 @@ it('forwards a child approval with its actual execution identity and controlled 
   const result = await runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', parentToolCallId: 'dispatch-tool', executionId: 'durable-execution-7', parentSessionId: 'parent', capsule: testCapsule(), parentOnEvent: (event) => {
     events.push(event);
     if (event.type === 'approval.requested') {
-      const approvalId = (event.payload as { approvalId: string }).approvalId;
+      const { approvalId } = event.payload;
       expect(approvalId).toMatch(/^tool-approval-mutation-.+/);
       expect(approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId, approved: true }).success).toBe(true);
     }

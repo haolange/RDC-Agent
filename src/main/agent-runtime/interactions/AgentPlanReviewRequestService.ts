@@ -15,7 +15,7 @@ import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, Conversa
 import type { PlanTaskRequirement } from '@shared/types/taskExecution';
 import type { TurnHandle } from '../orchestration/TurnCoordinator';
 import type { ConversationPlanReview, PlanReviewHandoffIdentity } from '@shared/types/planReview';
-import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 
 interface PendingPlanReviewRequest {
@@ -31,7 +31,7 @@ interface PendingPlanReviewRequest {
   planReview: ConversationPlanReview;
   turnHandle?: TurnHandle | null;
   context: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   resolve?: (answer: string) => void;
   reject?: (error: Error) => void;
   abortListener?: () => void;
@@ -46,7 +46,7 @@ export interface AgentPlanReviewRequestInput {
   planReview: ConversationPlanReview;
   turnHandle?: TurnHandle | null;
   context: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
 }
 

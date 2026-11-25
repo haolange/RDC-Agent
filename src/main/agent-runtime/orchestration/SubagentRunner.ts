@@ -53,7 +53,7 @@ import type { ActiveTurnLookup, AgentProfileTurnOptions } from './orchestratorTy
 import type { ProfileTurnRequest } from './ProfileTurnRunner';
 import type { AgentTool } from '../agent/AgentTool';
 import type {
-  AgentEvent as SharedAgentEvent,
+  AgentEvent,
 } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 
@@ -96,7 +96,7 @@ export class SubagentRunner implements SubagentToolHost {
     targetProfile: AgentRole;
     capsule: DelegationCapsule;
     parentSessionId?: string | null;
-    parentOnEvent?: (event: SharedAgentEvent) => void;
+    parentOnEvent?: (event: AgentEvent) => void;
     projectRootPath?: string | null;
     projectId?: string | null;
     parentTurn?: TurnHandle | null;
@@ -366,7 +366,7 @@ export class SubagentRunner implements SubagentToolHost {
           onProviderRequestCommitted: input.onProviderRequestCommitted,
           excludeRdcLeaseTools: !rdcDelegation.requiresLease,
           onTerminalContext: (terminal) => { completionDeclaration = terminal.completionDeclaration ?? null; },
-          onEvent: (event: SharedAgentEvent) => {
+          onEvent: (event: AgentEvent) => {
             if (event.type === 'approval.requested' || event.type === 'approval.answered') {
               if (ownerSessionId) delegationTraceStore.event(ownerSessionId, input.parentToolCallId, traceIdentity, event);
               input.parentOnEvent?.(event);
@@ -377,14 +377,13 @@ export class SubagentRunner implements SubagentToolHost {
             }
             if (ownerSessionId) delegationTraceStore.event(ownerSessionId, input.parentToolCallId, traceIdentity, event);
             if (ownerSessionId && event.type === 'tool.completed') {
-              const completed = event.payload as { toolCallId?: string; toolName?: string; result?: unknown };
-              if (completed.toolName === 'subagent' && completed.toolCallId && completed.result !== undefined) {
+              const completed = event.payload;
+              if (completed.toolName === 'subagent' && completed.toolCallId) {
                 delegationTraceStore.setParentReceipt(ownerSessionId, completed.toolCallId, completed.result);
               }
             }
             if (event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.denied') {
-              const toolPayload = event.payload as { toolCallId?: string };
-              const toolCallId = typeof toolPayload.toolCallId === 'string' ? toolPayload.toolCallId.trim() : '';
+              const toolCallId = event.payload.toolCallId.trim();
               // Count once per unique toolCallId; skip events without a stable id.
               if (toolCallId && !seenToolCallIds.has(toolCallId)) {
                 seenToolCallIds.add(toolCallId);

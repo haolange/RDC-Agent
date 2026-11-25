@@ -1,14 +1,16 @@
 import { AppError } from '@shared/errors/appError';
 /**
- * AgentEventBridge translates core runtime events into the shared AgentEvent
+ * AgentEventBridge translates main's loop events (`AgentLoopEvent`) into the shared AgentEvent
  * contract consumed by IPC, Trace, and ConversationService.
  */
 
+import { assertNever } from '@shared/utils/assertNever';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { toSharedThinkingArtifact } from './reasoning/ReasoningArtifacts';
 import type {
-  AgentEvent as SharedAgentEvent,
-  AgentEventPayload,
+  AgentEvent,
+  AgentEventOf,
+  AgentEventPayloadMap,
   AgentEventType,
   AgentRouteCapability,
 } from '@shared/types/agentRuntime';
@@ -16,7 +18,7 @@ import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { ConversationLoopStopReason } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
 import type {
-  AgentEvent as CoreAgentEvent,
+  AgentLoopEvent,
   AssistantMessage,
   AssistantMessageEvent,
   Message,
@@ -39,11 +41,11 @@ export interface AgentEventBridgeContext {
 }
 
 /** Creates a shared AgentEvent with normalized runtime context. */
-export function buildSharedAgentEvent(
-  type: AgentEventType,
-  payload: AgentEventPayload,
+export function buildSharedAgentEvent<T extends AgentEventType>(
+  type: T,
+  payload: AgentEventPayloadMap[T],
   context: AgentEventBridgeContext,
-): SharedAgentEvent {
+): AgentEventOf<T> {
   return {
     id: generateEventId('agent-event'),
     type,
@@ -65,7 +67,7 @@ export function buildDiagnosticAgentEvent(
     technicalMessage?: string;
     toolCallId?: string;
   },
-): SharedAgentEvent {
+): AgentEventOf<'diagnostic'> {
   return buildSharedAgentEvent(
     'diagnostic',
     {
@@ -84,9 +86,9 @@ export function mentionsTextualToolCall(text: string): boolean {
 }
 
 export function translateCoreToSharedAgentEvent(
-  event: CoreAgentEvent,
+  event: AgentLoopEvent,
   context: AgentEventBridgeContext,
-): SharedAgentEvent | null {
+): AgentEvent | null {
   switch (event.type) {
     case 'agent_start': {
       const profileId = context.profileId ?? context.agentId;
@@ -114,53 +116,8 @@ export function translateCoreToSharedAgentEvent(
         context,
       );
     }
-    case 'message_update': {
-      const ev = event.assistantMessageEvent as AssistantMessageEvent;
-      if (ev.type === 'text_delta') {
-        return buildSharedAgentEvent(
-          'assistant.delta',
-          { text: ev.delta, phase: ev.phase, providerOutputRef: { ...ev.providerOutputRef } },
-          context,
-        );
-      }
-      if (ev.type === 'text_end') {
-        return buildSharedAgentEvent('assistant.text_end', {
-          text: ev.content, phase: ev.phase, providerOutputRef: { ...ev.providerOutputRef },
-        }, context);
-      }
-      if (ev.type === 'thinking_delta') {
-        return buildSharedAgentEvent(
-          'assistant.thinking_delta',
-          { text: ev.delta, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
-          context,
-        );
-      }
-      if (ev.type === 'thinking_end') {
-        return buildSharedAgentEvent(
-          'assistant.thinking_end',
-          { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
-          context,
-        );
-      }
-      if (ev.type === 'thinking_start') {
-        return null;
-      }
-      if (ev.type === 'toolcall_end') {
-        return buildSharedAgentEvent(
-          'tool.requested',
-          {
-            toolCall: {
-              id: ev.toolCall.id,
-              name: ev.toolCall.name,
-              arguments: ev.toolCall.arguments,
-            },
-            providerOutputRef: { ...ev.providerOutputRef },
-          },
-          context,
-        );
-      }
-      return null;
-    }
+    case 'message_update':
+      return translateAssistantMessageEvent(event.assistantMessageEvent, context);
     case 'message_end': {
       if (event.message.role === 'assistant') {
         const text = extractAssistantTextFromContent(event.message.content);
@@ -308,8 +265,67 @@ export function translateCoreToSharedAgentEvent(
         context,
       );
     }
-    default:
+    case 'turn_start':
+    case 'turn_end':
+    case 'message_start':
+    case 'tool_execution_update':
       return null;
+    default:
+      return assertNever(event);
+  }
+}
+
+/** Streamed assistant output; only the semantic boundaries and deltas the conversation projects cross over. */
+function translateAssistantMessageEvent(
+  ev: AssistantMessageEvent,
+  context: AgentEventBridgeContext,
+): AgentEvent | null {
+  switch (ev.type) {
+    case 'text_delta':
+      return buildSharedAgentEvent(
+        'assistant.delta',
+        { text: ev.delta, phase: ev.phase, providerOutputRef: { ...ev.providerOutputRef } },
+        context,
+      );
+    case 'text_end':
+      return buildSharedAgentEvent('assistant.text_end', {
+        text: ev.content, phase: ev.phase, providerOutputRef: { ...ev.providerOutputRef },
+      }, context);
+    case 'thinking_delta':
+      return buildSharedAgentEvent(
+        'assistant.thinking_delta',
+        { text: ev.delta, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
+        context,
+      );
+    case 'thinking_end':
+      return buildSharedAgentEvent(
+        'assistant.thinking_end',
+        { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
+        context,
+      );
+    case 'toolcall_end':
+      return buildSharedAgentEvent(
+        'tool.requested',
+        {
+          toolCall: {
+            id: ev.toolCall.id,
+            name: ev.toolCall.name,
+            arguments: ev.toolCall.arguments,
+          },
+          providerOutputRef: { ...ev.providerOutputRef },
+        },
+        context,
+      );
+    case 'start':
+    case 'text_start':
+    case 'thinking_start':
+    case 'toolcall_start':
+    case 'toolcall_delta':
+    case 'done':
+    case 'error':
+      return null;
+    default:
+      return assertNever(ev);
   }
 }
 

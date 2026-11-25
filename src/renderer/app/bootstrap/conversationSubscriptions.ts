@@ -3,14 +3,12 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
-import { notify } from '../../stores/notificationStore';
 import { createConversationEventBatcher } from './conversationEventBatcher';
 import { createConversationMessageAssembler } from './conversationMessageAssembler';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 
 import type { ElectronAPI } from '@shared/types/electron';
-import type { EventBridgeOptions } from './eventBridgeOptions';
 const projection = () => useSessionProjectionStore.getState();
 
 export function subscribeToolExecutionComplete(electronAPI: ElectronAPI) {
@@ -53,7 +51,7 @@ function resolveMessageSessionId(message: { sessionId?: string | null }): string
   return message.sessionId ?? null;
 }
 
-export function subscribeConversation(electronAPI: ElectronAPI, t: EventBridgeOptions['t']) {
+export function subscribeConversation(electronAPI: ElectronAPI) {
   const conversationEventBatcher = createConversationEventBatcher({
     applyMessage: (event) => {
       const sessionId = resolveMessageSessionId(event.message) ?? event.sessionId;
@@ -96,26 +94,12 @@ export function subscribeConversation(electronAPI: ElectronAPI, t: EventBridgeOp
       return;
     }
     if (event.type === 'agent_event') {
-      if (
-        event.event.type === 'handoff.requested'
-        || event.event.type === 'handoff.consumed'
-        || event.event.type === 'handoff.cancelled'
-      ) {
-        // The Agent a handoff selects arrives as the session record main wrote; this event does not set it.
-        if (
-          event.event.type === 'handoff.cancelled'
-          && event.event.payload.cancelReason === 'restart_degrade'
-        ) {
-          notify.warning(t('chat.handoffRestartDegraded'));
-        }
-        return;
-      }
       if (event.event.type === 'diagnostic') {
         conversation.addTimelineEntry({
           id: event.event.id,
           type: 'agent',
           agentRole: event.event.agentId,
-          content: String(event.event.payload.message ?? ''),
+          content: event.event.payload.message,
           timestamp: event.event.timestamp,
         });
       }

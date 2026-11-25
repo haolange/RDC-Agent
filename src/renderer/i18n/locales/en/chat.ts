@@ -80,7 +80,6 @@ export const enChat = {
   'chat.rewriteFailed': "Couldn't send the edited message. Your edit is kept.",
   'chat.workProcessStatusPending': 'Pending',
   'chat.workProcessStatusRunning': 'Running',
-  'chat.handoffRestartDegraded': 'Handoff was not resumed after restart. Continue manually with the target Agent.',
   'chat.workProcessStatusError': 'Failed',
   'chat.workProcessStatusSkipped': 'Skipped',
   'chat.workProcessThinkingStreaming': 'Thinking…',

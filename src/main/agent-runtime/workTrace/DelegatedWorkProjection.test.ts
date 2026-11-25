@@ -1,19 +1,19 @@
 import { expect, it } from 'vitest';
 import { createDelegatedProjectionState, projectDelegatedEvent } from './DelegatedWorkProjection';
-import type { AgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEventOf, AgentEventPayloadMap, AgentEventType } from '@shared/types/agentRuntime';
 
-const event = (id: string, type: AgentEvent['type'], payload: object, timestamp: number): AgentEvent => ({
-  id, type, timestamp, payload: payload as AgentEvent['payload'],
+const event = <T extends AgentEventType>(id: string, type: T, payload: AgentEventPayloadMap[T], timestamp: number): AgentEventOf<T> => ({
+  id, type, timestamp, payload,
 });
 
 it('preserves the host-selected approval method and failure code in child work projection', () => {
   let state = createDelegatedProjectionState();
   state = projectDelegatedEvent(state, event('request', 'approval.requested', {
-    approvalId: 'auto-review-child', kind: 'tool', toolCallId: 'child', toolName: 'shell', status: 'pending',
+    approvalId: 'auto-review-child', title: 'Auto-review shell', kind: 'tool', toolCallId: 'child', toolName: 'shell', status: 'pending',
     reviewer: 'auto_review', reviewMethod: 'model',
   }, 1));
   state = projectDelegatedEvent(state, event('answer', 'approval.answered', {
-    approvalId: 'auto-review-child', kind: 'tool', toolCallId: 'child', toolName: 'shell', status: 'rejected',
+    approvalId: 'auto-review-child', title: 'Auto-review shell', kind: 'tool', toolCallId: 'child', toolName: 'shell', status: 'rejected',
     reviewer: 'auto_review', reviewMethod: 'model', errorCode: 'PERMISSION_REVIEW_TIMEOUT', reason: 'No verdict.',
   }, 2));
   expect(state.trace.blocks.flatMap(block => block.toolCalls).find(call => call.id === 'child')).toMatchObject({
@@ -24,6 +24,7 @@ it('preserves the host-selected approval method and failure code in child work p
 it('projects visible loop and tool status while excluding hidden reasoning and credentials', () => {
   let state = createDelegatedProjectionState();
   state = projectDelegatedEvent(state, event('hidden', 'assistant.thinking_delta', {
+    text: 'secret thought',
     thinking: { kind: 'raw', source: 'unknown', visibility: 'hidden', text: 'secret thought' },
     providerOutputRef: { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
   }, 1));
@@ -32,9 +33,10 @@ it('projects visible loop and tool status while excluding hidden reasoning and c
     providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 } }, 2));
   state = projectDelegatedEvent(state, event('requested', 'tool.requested', {
     toolCall: { id: 'read', name: 'read_file', arguments: { path: 'config', password: 'private' } },
+    providerOutputRef: { protocol: 'test', providerBlockKey: 'tool:1', contentIndex: 1 },
   }, 3));
   state = projectDelegatedEvent(state, event('completed', 'tool.completed', {
-    toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done' } },
+    toolCallId: 'read', toolName: 'read_file', result: { ok: true, data: { content: 'done' }, duration_ms: 1 },
   }, 4));
   const block = state.trace.blocks[0];
   expect(block?.items?.map((item) => item.kind)).toEqual(['text']);
@@ -51,9 +53,9 @@ it('keeps child text identities, task snapshots and tools in first-visible order
     taskId: 'task', title: 'Inspect', status: 'pending',
   }, 2));
   state = projectDelegatedEvent(state, event('requested', 'tool.requested', {
-    toolCall: { id: 'read', name: 'read_file', arguments: {} },
+    toolCall: { id: 'read', name: 'read_file', arguments: {} }, providerOutputRef: ref(2),
   }, 3));
-  state = projectDelegatedEvent(state, event('started', 'tool.started', { toolCallId: 'read', toolName: 'read_file' }, 4));
+  state = projectDelegatedEvent(state, event('started', 'tool.started', { toolCallId: 'read', toolName: 'read_file', args: {} }, 4));
   state = projectDelegatedEvent(state, event('second', 'assistant.delta', {
     text: 'Details', phase: 'commentary', providerOutputRef: ref(1),
   }, 5));
@@ -69,7 +71,7 @@ it('places tool Hook events on their exact call and keeps unowned diagnostics in
   let state = createDelegatedProjectionState();
   for (const [id, timestamp] of [['a', 1], ['b', 2]] as const) {
     state = projectDelegatedEvent(state, event(`start-${id}`, 'tool.started', {
-      toolCallId: id, toolName: 'shell.command',
+      toolCallId: id, toolName: 'shell.command', args: {},
     }, timestamp));
   }
   for (const [id, toolCallId, code, severity] of [

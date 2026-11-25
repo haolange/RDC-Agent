@@ -3,7 +3,7 @@ import { translateCoreToSharedAgentEvent } from '../agent-runtime/AgentEventBrid
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const eventContext = {
   runId: 'run-cancel-test',
@@ -14,7 +14,7 @@ const eventContext = {
 
 describe('cancel turn stability', () => {
   it('emits cancelled approval.answered when a pending tool approval is cancelled', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-approval-cancel';
     const requestPromise = agentToolApprovalRequestService.request({
       agentId: 'debugger',
@@ -43,7 +43,7 @@ describe('cancel turn stability', () => {
   });
 
   it('emits cancelled approval.answered when a pending ask_user request is cancelled', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-ask-user-cancel';
     const requestPromise = agentUserInputRequestService.request({
       agentId: 'debugger',
@@ -77,7 +77,7 @@ describe('cancel turn stability', () => {
   });
 
   it('emits cancelled approval.answered when a pending plan review is cancelled', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-plan-review-cancel';
     const requestPromise = agentPlanReviewRequestService.request({
       agentId: 'debugger',

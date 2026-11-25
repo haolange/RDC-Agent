@@ -19,7 +19,7 @@ function setup() {
   let event!: (value: ConversationStreamEvent) => void;
   const offEvent = vi.fn();
   const api = { conversation: { onEvent: (callback: typeof event) => { event = callback; }, offEvent } };
-  const subscription = subscribeConversation(api as unknown as ElectronAPI, (key) => key);
+  const subscription = subscribeConversation(api as unknown as ElectronAPI);
   return { event, offEvent, subscription };
 }
 const message: ConversationMessage = {
