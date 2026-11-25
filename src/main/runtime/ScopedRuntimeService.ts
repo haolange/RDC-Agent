@@ -22,6 +22,11 @@ const assertInside = (root: string, target: string): void => {
   if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Resource path escaped its scope root.');
 };
 
+/** File types each resource kind can be imported from; knowledge and memory are not file-imported. */
+export const SCOPED_IMPORT_EXTENSIONS: Partial<Record<ScopedResourceKind, readonly string[]>> = {
+  agent: ['md'], skill: ['md'], mcp: ['json'], hook: ['yml', 'yaml'], policy: ['yml', 'yaml'],
+};
+
 export class ScopedRuntimeService {
   constructor(private readonly hooks = hookEngine) {}
 
@@ -222,13 +227,7 @@ export class ScopedRuntimeService {
     }
     const basename = path.basename(filePath);
     const lower = basename.toLowerCase();
-    const allowed = (() => {
-      if (request.kind === 'skill') return lower.endsWith('.md');
-      if (request.kind === 'mcp') return lower.endsWith('.json');
-      if (request.kind === 'hook' || request.kind === 'policy') return lower.endsWith('.yml') || lower.endsWith('.yaml');
-      if (request.kind === 'agent') return lower.endsWith('.agent.md') || lower.endsWith('.md');
-      return false;
-    })();
+    const allowed = SCOPED_IMPORT_EXTENSIONS[request.kind]?.some((extension) => lower.endsWith(`.${extension}`)) ?? false;
     if (!allowed) throw new Error(`Unsupported file type for ${request.kind} import.`);
     const content = fs.readFileSync(filePath, 'utf8');
     let id = path.basename(filePath, path.extname(filePath));

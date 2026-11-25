@@ -92,8 +92,9 @@ export class KnowledgeExportService {
     return request.cardRefs;
   }
 
-  async export(request: KnowledgeExportRequest): Promise<KnowledgeExportResult> {
-    if (!path.isAbsolute(request.targetPath)) {
+  /** `targetPath` is the destination the person chose in main's save dialog; the renderer never supplies it. */
+  async export(request: KnowledgeExportRequest, targetPath: string): Promise<KnowledgeExportResult> {
+    if (!path.isAbsolute(targetPath)) {
       throw new Error('KNOWLEDGE_EXPORT_TARGET_INVALID');
     }
     const refs = await this.resolveRefs(request);
@@ -133,12 +134,12 @@ export class KnowledgeExportService {
         ...[...imageFiles.entries()].map(([name, data]) => ({ name, data })),
       ])
       : new TextEncoder().encode(serializeMarkdown(cards));
-    await this.deps.writeBytes(request.targetPath, payload);
+    await this.deps.writeBytes(targetPath, payload);
     return {
       cardCount: cards.length,
       excludedCount,
       bytes: payload.byteLength,
-      targetPath: request.targetPath,
+      targetPath,
     };
   }
 }

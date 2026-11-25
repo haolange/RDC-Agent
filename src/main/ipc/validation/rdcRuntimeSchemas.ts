@@ -34,7 +34,6 @@ export const ScopedResourceImportArgsSchema = z.tuple([
   z.object({
     kind: ScopedResourceKindSchema,
     scope: ResourceScopeMutableSchema,
-    filePath: ipcNonEmptyString(4096, 'filePath'),
     projectRoot: ipcString(4096, 'projectRoot').optional(),
   }).strict(),
 ]);

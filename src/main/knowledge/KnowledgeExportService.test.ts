@@ -109,8 +109,7 @@ describe('KnowledgeExportService', () => {
       format: 'package',
       scope: 'space',
       spaceId: 'user',
-      targetPath,
-    });
+    }, targetPath);
 
     expect(result.cardCount).toBe(1);
     expect(result.excludedCount).toBe(0);
@@ -154,8 +153,7 @@ describe('KnowledgeExportService', () => {
       format: 'package',
       scope: 'space',
       spaceId: 'user',
-      targetPath,
-    });
+    }, targetPath);
     const parsed = parseYaml(packageYaml(written.get(targetPath)!)) as {
       cards: Array<{ images?: unknown }>;
     };
@@ -171,8 +169,8 @@ describe('KnowledgeExportService', () => {
       detail({ missingAssets: ['asset-12345678'] }),
     ]);
     await expect(service.export({
-      format: 'package', scope: 'space', spaceId: 'user', targetPath,
-    })).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_RESULT');
+      format: 'package', scope: 'space', spaceId: 'user',
+    }, targetPath)).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_RESULT');
     expect(written.has(targetPath)).toBe(false);
   });
 
@@ -183,8 +181,7 @@ describe('KnowledgeExportService', () => {
       format: 'package',
       scope: 'space',
       spaceId: 'user',
-      targetPath,
-    });
+    }, targetPath);
     const conflict = ingestKnowledge(packageYaml(written.get(targetPath)!), {
       spaceId: 'user',
       existingCaseIds: ['user:cases/aird-1.md'],
@@ -202,8 +199,7 @@ describe('KnowledgeExportService', () => {
       format: 'package',
       scope: 'space',
       spaceId: 'user',
-      targetPath: absoluteTarget('knowledge.zip'),
-    });
+    }, absoluteTarget('knowledge.zip'));
     expect(result.cardCount).toBe(1);
     expect(result.excludedCount).toBe(1);
   });
@@ -215,8 +211,7 @@ describe('KnowledgeExportService', () => {
       format: 'markdown',
       scope: 'selected',
       cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
-      targetPath,
-    });
+    }, targetPath);
     const contents = new TextDecoder().decode(written.get(targetPath));
     expect(contents).toContain('# Material sampling triage');
     expect(contents).not.toContain(KNOWLEDGE_PACKAGE_SCHEMA);
@@ -231,14 +226,12 @@ describe('KnowledgeExportService', () => {
       format: 'package',
       scope: 'selected',
       cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
-      targetPath: 'relative/knowledge.zip',
-    })).rejects.toThrow('KNOWLEDGE_EXPORT_TARGET_INVALID');
+    }, 'relative/knowledge.zip')).rejects.toThrow('KNOWLEDGE_EXPORT_TARGET_INVALID');
 
     await expect(service.export({
       format: 'package',
       scope: 'selected',
       cardRefs: [],
-      targetPath: absoluteTarget('knowledge.zip'),
-    })).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_SELECTION');
+    }, absoluteTarget('knowledge.zip'))).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_SELECTION');
   });
 });

@@ -12,7 +12,6 @@ export const RENDERER_INVOKE_CHANNEL = {
     selectRdcFiles: 'dialog:selectRdcFiles',
     selectKnowledgeImport: 'dialog:selectKnowledgeImport',
     selectDirectory: 'dialog:selectDirectory',
-    saveFile: 'dialog:saveFile',
     minimizeWindow: 'window:minimize',
     toggleMaximizeWindow: 'window:toggleMaximize',
     closeWindow: 'window:close',

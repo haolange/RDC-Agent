@@ -10,11 +10,6 @@ import type {
 } from '@shared/types/knowledgeExport';
 import type { KnowledgeLaneHit, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
 
-const EXTENSION: Record<KnowledgeExportFormat, string> = {
-  package: 'zip',
-  markdown: 'md',
-};
-
 export function useKnowledgeExport(options: {
   active: boolean;
   spaces: KnowledgeSpace[];
@@ -100,12 +95,6 @@ export function useKnowledgeExport(options: {
     setError(null);
     setBusy(true);
     try {
-      // The native picker can fail or be cancelled before export starts.
-      const targetPath = await window.electronAPI.saveFile({
-        defaultFileName: `knowledge-export.${EXTENSION[format]}`,
-        extension: EXTENSION[format],
-      });
-      if (!targetPath || !request.isCurrent(seq)) return;
       const filtered = scope === 'filtered'
         ? await window.electronAPI.knowledge.query({ ...options.queryRequest, ...(options.queryRevision ? { expectedRevision: options.queryRevision } : {}) })
         : null;
@@ -116,10 +105,10 @@ export function useKnowledgeExport(options: {
       const exported = await window.electronAPI.knowledge.export({
         format,
         scope,
-        targetPath,
         ...(scope === 'space' ? { spaceId } : { cardRefs }),
       });
-      if (request.isCurrent(seq)) setResult(exported);
+      // `null`: the person cancelled main's save dialog; the panel stays as it was.
+      if (exported && request.isCurrent(seq)) setResult(exported);
     } catch (err) {
       if (request.isCurrent(seq)) {
         const raw = knowledgeErrorMessage(err);

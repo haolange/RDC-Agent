@@ -10,6 +10,8 @@ export const KNOWLEDGE_PACKAGE_SCHEMA = 'rdc.knowledge-package/1';
 export const KNOWLEDGE_EXPORT_FORMATS = ['package', 'markdown'] as const;
 export type KnowledgeExportFormat = (typeof KNOWLEDGE_EXPORT_FORMATS)[number];
 
+export const KNOWLEDGE_EXPORT_EXTENSION: Record<KnowledgeExportFormat, string> = { package: 'zip', markdown: 'md' };
+
 export const KNOWLEDGE_EXPORT_SCOPES = ['selected', 'filtered', 'space'] as const;
 export type KnowledgeExportScope = (typeof KNOWLEDGE_EXPORT_SCOPES)[number];
 
@@ -43,8 +45,6 @@ export interface KnowledgePackage {
 export interface KnowledgeExportRequest {
   format: KnowledgeExportFormat;
   scope: KnowledgeExportScope;
-  /** Absolute destination chosen through the native save dialog. */
-  targetPath: string;
   /** `selected` scope: exactly these cards. */
   cardRefs?: Array<{ spaceId: string; relativePath: string }>;
   /** `space` scope: every card in this space. */

@@ -121,7 +121,6 @@ export const KnowledgeExportArgsSchema = z.tuple([
   z.object({
     format: z.enum(KNOWLEDGE_EXPORT_FORMATS),
     scope: z.enum(KNOWLEDGE_EXPORT_SCOPES),
-    targetPath: ipcNonEmptyString(4096, 'targetPath'),
     cardRefs: z.array(z.object({
       spaceId: KnowledgeSpaceIdSchema,
       relativePath: ipcNonEmptyString(1024, 'relativePath'),

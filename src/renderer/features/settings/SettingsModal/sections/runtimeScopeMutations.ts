@@ -1,4 +1,3 @@
-import { selectFiles } from '../../../../hooks/appShellBridge';
 import { contentFromForm, type ResourceFormState } from './scopedResourceForm';
 import { importScopedResource, upsertScopedResource, validateScopedResource } from './runtimeScopeActions';
 import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
@@ -67,13 +66,9 @@ export async function importScopedResourceFromPicker(input: {
   scope: 'user' | 'project';
   projectRoot?: string;
 }): Promise<{ overview: RdcRuntimeOverview; imported: ScopedResourceDocument | null } | null> {
-  const paths = await selectFiles();
-  const filePath = paths?.[0];
-  if (!filePath) return null;
   const result = await importScopedResource({
     kind: input.kind,
     scope: input.scope,
-    filePath,
     ...(input.projectRoot ? { projectRoot: input.projectRoot } : {}),
   });
   if (!result) return null;

@@ -44,7 +44,6 @@ export function createDialogApi(transport: RendererApiTransport): DialogApi {
     selectRdcFiles: () => transport.invoke(INVOKE.shell.selectRdcFiles),
     selectKnowledgeImport: () => transport.invoke(INVOKE.shell.selectKnowledgeImport),
     selectDirectory: () => transport.invoke(INVOKE.shell.selectDirectory),
-    saveFile: (request) => transport.invoke(INVOKE.shell.saveFile, request),
   };
 }
 

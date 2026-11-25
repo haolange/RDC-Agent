@@ -246,7 +246,6 @@ export interface ElectronAPI {
   selectRdcFiles: () => Promise<string[] | null>;
   selectKnowledgeImport: () => Promise<string | null>;
   selectDirectory: () => Promise<string | null>;
-  saveFile: (request: { defaultFileName: string; extension: string }) => Promise<string | null>;
 
   workflow: {
     getState: () => Promise<WorkflowState>;
@@ -338,14 +337,16 @@ export interface ElectronAPI {
       confirmation: KnowledgeHumanConfirmation;
       approvalToken: string;
     }) => Promise<{ card: KnowledgeCardRecord }>;
-    export: (request: KnowledgeExportRequest) => Promise<KnowledgeExportResult>;
+    /** Main shows the save dialog; `null` when the person cancels it. */
+    export: (request: KnowledgeExportRequest) => Promise<KnowledgeExportResult | null>;
   };
 
   rdcRuntime: {
     getOverview: (projectRoot?: string) => Promise<RdcRuntimeOverview>;
     validateResource: (request: ScopedResourceWriteRequest) => Promise<{ valid: boolean; diagnostics: string[] }>;
     upsertResource: (request: ScopedResourceWriteRequest) => Promise<RdcRuntimeOverview>;
-    importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdcRuntimeOverview; id: string }>;
+    /** `null` when the person cancels main's file picker. */
+    importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdcRuntimeOverview; id: string } | null>;
     deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdcRuntimeOverview>;
     revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
     trustHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdcRuntimeOverview>;

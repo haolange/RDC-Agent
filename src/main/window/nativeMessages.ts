@@ -9,7 +9,7 @@ export const nativeEnglish = {
   session: 'Session {id}',
   captureFilter: 'RenderDoc captures', knowledgeFilter: 'Knowledge packages', caseFilter: 'Case YAML', imageFilter: 'Images',
   selectCaptures: 'Select RenderDoc captures', selectKnowledge: 'Select a knowledge package', selectFiles: 'Select files',
-  selectDirectory: 'Select a folder', saveFile: 'Save file', selectAvatar: 'Select an avatar', exportPlan: 'Export plan',
+  selectDirectory: 'Select a folder', exportKnowledge: 'Export knowledge', importResource: 'Import a resource file', selectAvatar: 'Select an avatar', exportPlan: 'Export plan',
   file: 'File', openCapture: 'Open .rdc File', newCase: 'New Case', settings: 'Settings', edit: 'Edit', view: 'View', help: 'Help',
   documentation: 'Documentation', reportIssue: 'Report Issue', about: 'About RDC-Agent', version: 'Version: {version}',
   selectedCaptures: 'Selected {count} external .rdc files.',
@@ -17,6 +17,8 @@ export const nativeEnglish = {
   trust: 'Trust', trustTitle: 'Trust a project resource',
   trustHook: 'Let hook "{id}" run on Agent events?', trustMcp: 'Let MCP server "{id}" start and give the Agent its tools?',
   trustAgent: 'Use project Agent "{id}" in this project?',
+  mcpSource: 'Defined in: {value}', mcpTransport: 'Transport: {value}', mcpCommand: 'Runs: {value}', mcpUrl: 'Connects to: {value}',
+  mcpEnvKeys: 'Environment variables it receives: {value}',
 } as const;
 
 export type NativeMessageKey = keyof typeof nativeEnglish;
@@ -30,7 +32,7 @@ export const nativeChinese: Record<NativeMessageKey, string> = {
   session: '会话 {id}',
   captureFilter: 'RenderDoc 抓帧', knowledgeFilter: '知识包', caseFilter: '案例 YAML', imageFilter: '图片',
   selectCaptures: '选择 RenderDoc 抓帧', selectKnowledge: '选择知识包', selectFiles: '选择文件',
-  selectDirectory: '选择文件夹', saveFile: '保存文件', selectAvatar: '选择头像', exportPlan: '导出计划',
+  selectDirectory: '选择文件夹', exportKnowledge: '导出知识', importResource: '导入资源文件', selectAvatar: '选择头像', exportPlan: '导出计划',
   file: '文件', openCapture: '打开 .rdc 文件', newCase: '新建案例', settings: '设置', edit: '编辑', view: '视图', help: '帮助',
   documentation: '使用文档', reportIssue: '报告问题', about: '关于 RDC-Agent', version: '版本：{version}',
   selectedCaptures: '已选择 {count} 个外部 .rdc 文件。',
@@ -38,6 +40,8 @@ export const nativeChinese: Record<NativeMessageKey, string> = {
   trust: '信任', trustTitle: '信任项目资源',
   trustHook: '允许钩子「{id}」在智能体事件上运行？', trustMcp: '允许 MCP 服务「{id}」启动并向智能体提供工具？',
   trustAgent: '在这个项目里使用项目智能体「{id}」？',
+  mcpSource: '定义文件：{value}', mcpTransport: '连接方式：{value}', mcpCommand: '运行命令：{value}', mcpUrl: '连接地址：{value}',
+  mcpEnvKeys: '传入的环境变量：{value}',
 };
 
 export function nativeText(language: AppLanguage, key: NativeMessageKey, params?: Record<string, string | number>): string {

@@ -46,7 +46,6 @@ export function createRendererApi(platform: NodeJS.Platform, transport: Renderer
     selectRdcFiles: dialog.selectRdcFiles,
     selectKnowledgeImport: dialog.selectKnowledgeImport,
     selectDirectory: dialog.selectDirectory,
-    saveFile: dialog.saveFile,
     workflow: createWorkflowApi(transport),
     trace: createTraceApi(transport),
     memory: createMemoryApi(transport),

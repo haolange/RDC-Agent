@@ -130,7 +130,8 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - Project MCP 与 user 同 ID 时，不可覆盖 user 的 `command` / `args` / `url` / `env`。
 - Project MCP trust fingerprint 与 hook 同构：descriptor + 声明文件 realpath + PATH 解析后的 executable identity + 参数所指文件的 bytes（相对参数按项目真实路径解析）。任一变化 → `needsRetrust`；`assertConnectAllowed` 在连接时重新计算，不信任设置快照。记录存于 `mcp-trust.json`，形状不符读作无信任。
 - MCP 连接池按 `realpath(projectRoot) + projectId + descriptorHash` 分组；失败缓存指数退避（retryable→permanent）；orphan process quarantine 至 supervised.exit。Transport 仅 `stdio` / `streamable-http`；`sse` → `MCP_TRANSPORT_UNSUPPORTED`。
-- Settings 提供显式 trust 面板；Browser 与 Desktop 均通过相同 `rdc-runtime:trustMcp` handler 和主进程 trust 校验。
+- Settings 提供显式 trust 面板；Browser 与 Desktop 均通过相同 `rdc-runtime:trustMcp` handler 和主进程 trust 校验。信任对话框列出定义文件、连接方式、完整命令与参数、连接地址和传入的环境变量名（不显示变量值），用户看到的就是将要运行的东西。
+- **路径归属**：`rdc-runtime:*` 收到的 `projectRoot` 必须是已登记的项目根，否则以 `PROJECT_ROOT_UNKNOWN` 拒绝，主进程不在任意目录下读取、建脚手架或授予信任。需要文件路径的写出与导入由主进程自己弹对话框取得：`knowledge:export` 弹保存对话框，`rdc-runtime:import` 弹打开对话框（按资源类型过滤扩展名），renderer 只提出请求，不提供路径；取消时返回 `null`。
 
 ## Shell 分析
 

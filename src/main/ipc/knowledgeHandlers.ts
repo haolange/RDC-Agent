@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
+import { KNOWLEDGE_EXPORT_EXTENSION } from '@shared/types/knowledgeExport';
 import { nativeMessage } from '../window/nativeI18n';
 import { confirmInMainProcess } from '../window/mainConfirmation';
 import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
@@ -439,7 +440,16 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
         ? [input.spaceId].filter((value): value is string => Boolean(value))
         : (input.cardRefs ?? []).map((ref) => ref.spaceId);
       assertKnownSpaces([...new Set(spaceIds)]);
-      return await knowledgeExportService.export(input);
+      // Main owns the destination: the renderer asks to export, the person picks where in a native dialog.
+      const extension = KNOWLEDGE_EXPORT_EXTENSION[input.format];
+      const picked = await dialog.showSaveDialog({
+        title: nativeMessage('exportKnowledge'),
+        defaultPath: `knowledge-export.${extension}`,
+        filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+        properties: ['createDirectory', 'showOverwriteConfirmation'],
+      });
+      if (picked.canceled || !picked.filePath) return null;
+      return await knowledgeExportService.export(input, picked.filePath);
     } catch (error) {
       rethrowKnowledgeError(error);
     }

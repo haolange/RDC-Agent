@@ -288,10 +288,10 @@ export interface ScopedResourceWriteRequest {
   projectRoot?: string;
 }
 
+/** Main shows the file picker; the request only names what is imported and where it lands. */
 export interface ScopedResourceImportRequest {
   kind: ScopedResourceKind;
   scope: 'user' | 'project';
-  filePath: string;
   projectRoot?: string;
 }
 
