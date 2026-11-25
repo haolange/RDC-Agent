@@ -11,7 +11,7 @@ description: Compose an Investigation report as a View that must not raise Claim
 
 报告和终答都按同一顺序：
 
-1. **结论**（`reportContract.conclusion`）：第一句写证据支持的最强结论，后面跟一个等级标签，取自结论所依 Claim 的 `verification`：`[Observed]`、`[Reconstructed]`、`[Differential-Supported]`、`[Replay-Counterfactual]`；未经验证的陈述标 `[Inferred]` 或 `[Unresolved]`。实验五份回执齐全、干预改变了结果且撤销后复原时，结论写成因果，不加"支持""可能"之类的限定。一条结论一个标签，正文不再重复限定语。
+1. **结论**（`reportContract.conclusion`）：第一句写证据支持的最强结论，后面跟一个等级标签，取自结论所依 Claim 的 `verification`：`[Observed]`、`[Reconstructed]`、`[Differential-Supported]`、`[Replay-Counterfactual]`；未经验证的陈述标 `[Inferred]` 或 `[Unresolved]`。实验合格（定义见 $debugger-causal-method）时，结论写成因果，不加"支持""可能"之类的限定。一条结论一个标签，正文不再重复限定语。
 2. **证据**（`evidence`）与**验证覆盖**（`verification`）：关键读数、实验前后、独立审查读过什么。
 3. **未知项与未覆盖的范围**（`limitations`）：单独成段。审查结果里标 `not_required` 的备注放在这里，不改结论措辞。
 

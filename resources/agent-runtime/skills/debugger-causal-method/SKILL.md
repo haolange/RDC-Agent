@@ -5,7 +5,7 @@ description: Write Debugger First Bad Event, Hypothesis Matrix, and Counterfactu
 
 # Debugger Causal Method
 
-Debugger 执行时用这份方法把三件事写进调查记录：首次异常在哪（First Bad Event）、有哪些可区分的解释（Hypothesis Matrix）、哪项可恢复的实验证明了因果（Counterfactual）。只用现有的 `rdc.investigation.v1` kind，不造新 kind。
+Debugger 执行时用这份方法把三件事写进调查记录：首次异常在哪（First Bad Event）、有哪些可区分的解释（Hypothesis Matrix）、哪项可恢复的实验证明了因果（Counterfactual）。
 
 ## First Bad Event
 
@@ -13,7 +13,7 @@ Debugger 执行时用这份方法把三件事写进调查记录：首次异常�
 
 1. 用同一 capture 里的目标区与控制区、以及更早的写入，找到最早出现症状的区域；没有参考图也可以做。记录外观和覆盖范围，不预设什么是正确的。
 2. 观察取自 $rdc-tool-shell、$pixel-forensics 和 $capture-facts。解释逐片元数值或测试标志前先读 $pixel-forensics：原生历史可能是重建的，也可能受格式限制。
-3. 按 $artifact-provenance 的顺序先写 WorldState，再写 Evidence：`mission: debugger`、`epistemicStatus: observed`、`region.kind` 取 `event` 或 `pixel`、`artifactRefs` 带实际内容 hash、`worldStateId` 可解析。
+3. 按 $artifact-provenance 的顺序先写 WorldState，再写 Evidence：`mission: debugger`、`epistemicStatus: observed`、`region.kind` 取 `event` 或 `pixel`。
 4. 配套 Claim 可以在 `scope.eventId` 里重复事件号，保持 `observed_fact`，不设 `declaresCounterfactual`，不带因果的 `experimentId`。
 
 ## Hypothesis Matrix
@@ -30,10 +30,10 @@ Debugger 执行时用这份方法把三件事写进调查记录：首次异常�
 
 形状：一条合格的 Experiment，加一条 `causal_conclusion`（或 `declaresCounterfactual: true`）的 Claim。
 
-1. 针对已持久化的矩阵行（`hypothesisClaimId`）设计实验，`intervention.type` 不能是 `none`；引用的写入顺序见 $artifact-provenance。
-2. 经配置的 RDC-Tool CLI 执行干预，记录指标和前后对比图。
-3. Rollback 写 `executed === true`、`baselineRestored === true`，`verifyEvidenceIds` 至少一条且可解析；状态为 `recorded` 或 `rolled_back`。
-4. 然后写引用该 `experimentId` 的因果 Claim。根因 Claim 填七元组 `rootCause`：Trigger、Fault Location、Failure Mechanism、Propagation、Manifestation、Scope、Counterfactual Evidence。
+1. 针对已持久化的矩阵行（`hypothesisClaimId`）设计实验；引用的写入顺序见 $artifact-provenance。联合干预只支持联合范围的结论；要归因到其中一项，拆分或二分后分别干预。
+2. 经配置的 RDC-Tool CLI 执行干预，记录指标和前后对比图。干预途径本身可能改变输出时（重新装配、编译、替换），经同一途径再做内容不变的空干预作对照；没有对照，结论停在"所执行的干预"。
+3. Rollback 写 `executed`、`baselineRestored` 和可解析的 `verifyEvidenceIds`；状态为 `recorded` 或 `rolled_back`。五份回执齐全、干预改变结果、撤销后复原，加上前两条，才是合格的实验。
+4. 然后写引用该 `experimentId` 的因果 Claim，根因 Claim 填七元组 `rootCause`。
 5. 因果成立后，原因若指向一个可以直接读到的输入（一张贴图、一个常量），读出它并把读数写进结论。
 
-`S-CAUSAL-01` 与 `S-RDC-01` 由机器检查：没有合格实验的 Claim 不能 ready。不写 Knowledge，不调用 `memory_write`。
+不写 Knowledge，不调用 `memory_write`。
