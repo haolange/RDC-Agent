@@ -20,6 +20,7 @@
 - 每个携带会话的响应都附带该会话最后一次写入的 revision，形状是 `SessionRecordSnapshot { record, revision }`：`project:select`、`session:list/create/rename/remove/open/setModelOverride/setAgentId/applyDeclaredHandoff`，以及 `conversation:sendMessage` / `rewriteFromMessage` 的 `turn.session`。记录与 revision 在同一同步段内配对，中间不跨 await；之后的写入经新的广播到达。
 - Renderer `sessionRecordStore.records` 按会话只接受更新的 revision：epoch 不同（主进程已重启）一律接受，同 epoch 只接受更大的 `n`；迟到的旧响应或旧事件不覆盖新记录。该 store 按会话分键，后台会话的记录也是当前事实，`session:recordChanged` 不经 active-session gate。
 - `pending` 是在途意图的覆盖层：人改 Agent 或模型时先 `beginIntent`，界面立刻显示；主进程应答（无论是否被接受）后 `settleIntent`。同一字段的后一个意图替换前一个，前一个的迟到应答不再影响显示；失败只移除覆盖层，视图回到主进程持有的记录。`useSessionView(id)` 返回 record 加覆盖层；`useCurrentSessionView()` 是当前会话的视图。
+- 模型覆盖与回合参数是会话的两条 revision lane（`src/renderer/lib/revisionLanes.ts`）：每次选择立即以该 lane 的下一个客户端 revision 发 `session:setModelOverride(sessionId, { modelOverride? | turnControls?, clientRevision })`，只带自己改的字段，renderer 不排队。主进程 `SessionModelLanes` 按字段记住已写入的最新 revision，在模型校验的 await 之后、同步写入前比较，较旧的意图不覆盖较新的写入；两条 lane 互不覆盖。回合参数的保存状态只由该 lane 最新的一次保存决定。
 - `projectStore` 只保留 `currentSessionId` 与侧栏列表行；`layoutStore` 不镜像 Agent。Composer 的 Agent 胶囊由 `useComposerAgentId` 从会话视图派生；会话尚不存在时用该项目 Composer 的草稿 Agent，首轮发送后由主进程写入新会话。没有任何其它位置整体覆写会话对象或另存 Agent。
 
 ## IPC 门控
@@ -44,7 +45,7 @@
 
 ## Active Turn Context
 
-计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。审批区复用 SessionRecord.modelOverride 与 turnControls，模型和参数保存串行提交；保存中或失败阻止批准但允许停止，批准前等待最新保存。排队保存离开所属会话后失效，不能切回时重新投影。覆盖只影响之后的新请求，不能改动已冻结的当前请求；拒绝后仍恢复原冻结请求。进入审批不改变 Composer 的配置来源，无覆盖时沿用当前对话的有效模型；审批与胶囊共用同一能力状态，加载、读取失败和明确不可用分别表达。批准前等待排队中的模型与参数保存落地，再以一次 `answerPlanReview` 把计划 hash、声明交接、当前有效模型（含继承的对话模型）、全部回合参数和所读会话记录的 revision 交给主进程；主进程在同一事务内校验并提交它们与 Agent 切换，期间会话记录变化则以 `SESSION_REVISION_STALE` 拒绝旧决定。计划选项及建议行冻结声明的 label 与可选 labelTranslations；通用组件按当前语言展示对应译文，未声明译文时使用 label，不按目标身份统一改名。批准和交接仅提交 agent+label，不把译文写入批准身份或 execution offer。历史不因当前声明变化而重写；声明改名使旧计划不再匹配时须重新修订并批准，不匹配旧名称别名。
+计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。审批区复用 SessionRecord.modelOverride 与 turnControls，模型和参数保存按会话 lane 的客户端 revision 立即提交（见「Session 记录与 revision」）；保存中或失败阻止批准但允许停止，批准前等待该会话所有在途保存落地，最新一次失败则不批准。迟到的保存应答按 revision 落到所属会话的记录，不回填新面板。覆盖只影响之后的新请求，不能改动已冻结的当前请求；拒绝后仍恢复原冻结请求。进入审批不改变 Composer 的配置来源，无覆盖时沿用当前对话的有效模型；审批与胶囊共用同一能力状态，加载、读取失败和明确不可用分别表达。批准前等待排队中的模型与参数保存落地，再以一次 `answerPlanReview` 把计划 hash、声明交接、当前有效模型（含继承的对话模型）、全部回合参数和所读会话记录的 revision 交给主进程；主进程在同一事务内校验并提交它们与 Agent 切换，期间会话记录变化则以 `SESSION_REVISION_STALE` 拒绝旧决定。计划选项及建议行冻结声明的 label 与可选 labelTranslations；通用组件按当前语言展示对应译文，未声明译文时使用 label，不按目标身份统一改名。批准和交接仅提交 agent+label，不把译文写入批准身份或 execution offer。历史不因当前声明变化而重写；声明改名使旧计划不再匹配时须重新修订并批准，不匹配旧名称别名。
 
 执行准备期间保留本次提交的模型/参数作为待确认选择，阶段提示与模型身份分开；不得将旧请求配置标为本轮事实；主进程返回 PreparedTurnContextSummary 后，禁用的 Composer 从其 route 与 controls 显示实际请求。provider 停用/断连、模型不可执行时，保存的引用保持不变，选择区明确不可用，发送与批准均阻止；恢复可用后原引用可继续使用，在途请求不读取可变设置。
 
@@ -94,7 +95,7 @@ interface ActiveTurnContext {
 
 ## 验证
 
-- 单元：`sessionEventGate`、`sessionRecordStore`（revision 次序、覆盖层）、Agent 切换迟到应答与失败回退、composer restore session bind、monotonic requestId、projection cache activate。
+- 单元：`sessionEventGate`、`sessionRecordStore`（revision 次序、覆盖层）、Agent 切换迟到应答与失败回退、会话模型 lane（renderer 与主进程 `SessionModelLanes`）、composer restore session bind、monotonic requestId、projection cache activate。
 - 静态：`pnpm run check:session-projection`。
 - Browser QA：删尽 QA project sessions → 新建隔离 session → 多 session 串台 / Stop / Rewrite 矩阵（见 `AGENTS.md`）。
 

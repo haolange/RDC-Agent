@@ -1,5 +1,6 @@
 import React from 'react';
 import { useElectronApi } from '../../hooks/useElectronApi';
+import { RevisionLanes } from '../../lib/revisionLanes';
 import type { DelegationTraceHeader, DelegationTracePage, DelegationTraceStep } from '@shared/types/delegationTrace';
 
 const empty: DelegationTracePage = { header: null, steps: [], nextCursor: null, total: 0, revision: 0 };
@@ -47,16 +48,19 @@ export function useDelegationTrace(sessionId: string | null | undefined, parentT
     return unsubscribe;
   }, [api, sessionId, parentToolCallId]);
 
+  // Each load (identity, history state, trace revision) is a read revision; a superseded one stops applying pages.
+  const [reads] = React.useState(() => new RevisionLanes());
   React.useEffect(() => {
     if (!sessionId || !api) return;
-    let cancelled = false;
+    const read = reads.begin('trace');
+    const superseded = () => !reads.isLatest('trace', read);
     const identity = `${sessionId}\u0000${parentToolCallId}`;
     if (loadedIdentity.current !== identity || !state.current.page.header) setHeaderLoading(true);
     loadedIdentity.current = identity;
     setLoading(historyOpen);
     void (async () => {
       const head = await api.conversation.getDelegationTrace({ sessionId, parentToolCallId, cursor: 0, pageSize: 0 });
-      if (cancelled) return;
+      if (superseded()) return;
       setHeaderLoading(false);
       const previous = state.current.page;
       const identityChanged = previous.header && head.header && !sameIdentity(previous.header, head.header);
@@ -68,29 +72,29 @@ export function useDelegationTrace(sessionId: string | null | undefined, parentT
       const next = await api.conversation.getDelegationTrace({ sessionId, parentToolCallId,
         cursor: start, pageSize: loaded ? 120 : PAGE_SIZE,
         ...(loaded ? { sinceRevision: previous.revision } : {}) });
-      if (cancelled || !sameIdentity(head.header, next.header)) return;
+      if (superseded() || !sameIdentity(head.header, next.header)) return;
       if (loaded) {
         const updates = [...next.steps];
         let cursor = next.nextCursor;
-        while (cursor !== null && !cancelled) {
+        while (cursor !== null && !superseded()) {
           const remaining = await api.conversation.getDelegationTrace({ sessionId, parentToolCallId,
             cursor, pageSize: 120, sinceRevision: previous.revision });
           updates.push(...remaining.steps);
           cursor = remaining.nextCursor;
         }
-        if (!cancelled) setPage((current) => ({ ...next, steps: mergeSteps(current.steps, updates, false) }));
+        if (!superseded()) setPage((current) => ({ ...next, steps: mergeSteps(current.steps, updates, false) }));
       } else {
         setPage(next);
         setEarliest(start);
       }
-      if (!cancelled) setLoading(false);
-    })().catch(() => { if (!cancelled) {
+      if (!superseded()) setLoading(false);
+    })().catch(() => { if (!superseded()) {
       setHeaderLoading(false);
       setLoading(false);
       setPage((current) => ({ ...current, error: 'DELEGATION_TRACE_READ_FAILED' }));
     } });
-    return () => { cancelled = true; };
-  }, [api, sessionId, parentToolCallId, historyOpen, revision]);
+    return () => { reads.forget('trace'); };
+  }, [reads, api, sessionId, parentToolCallId, historyOpen, revision]);
 
   const loadEarlier = React.useCallback(async () => {
     if (!api || !sessionId || earliest === null || earliest <= 0 || loading) return;

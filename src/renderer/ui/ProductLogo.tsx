@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { maskLogoCircleRgba, recolorLogoRgba } from '@shared/theme/recolorLogo';
 import logoUrl from '../../../resources/brand/rdc-agent-logo.png';
+import { useAsyncValue } from '../lib/useAsyncValue';
 import './ProductLogo.css';
 
 const LOGO_SIZE = 128;
@@ -17,24 +18,23 @@ function loadLogo(): Promise<HTMLImageElement> {
 
 export function ProductLogo({ accent, className = '' }: { accent: string; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const logo = useAsyncValue('logo', loadLogo);
+  useEffect(() => {
+    if (logo.status === 'error') console.error(logo.error);
+  }, [logo]);
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    let cancelled = false;
-    void loadLogo().then((image) => {
-      if (cancelled) return;
-      canvas.width = LOGO_SIZE;
-      canvas.height = LOGO_SIZE;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      if (!context) return;
-      context.imageSmoothingQuality = 'high';
-      context.drawImage(image, 0, 0, LOGO_SIZE, LOGO_SIZE);
-      const frame = context.getImageData(0, 0, canvas.width, canvas.height);
-      recolorLogoRgba(frame.data, accent);
-      maskLogoCircleRgba(frame.data, canvas.width, canvas.height);
-      context.putImageData(frame, 0, 0);
-    }).catch((error: unknown) => { if (!cancelled) console.error(error); });
-    return () => { cancelled = true; };
-  }, [accent]);
+    if (!canvas || logo.status !== 'ready') return;
+    canvas.width = LOGO_SIZE;
+    canvas.height = LOGO_SIZE;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(logo.value, 0, 0, LOGO_SIZE, LOGO_SIZE);
+    const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+    recolorLogoRgba(frame.data, accent);
+    maskLogoCircleRgba(frame.data, canvas.width, canvas.height);
+    context.putImageData(frame, 0, 0);
+  }, [accent, logo]);
   return <canvas ref={canvasRef} className={`product-logo ${className}`.trim()} aria-hidden="true" />;
 }

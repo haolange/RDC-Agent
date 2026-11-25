@@ -57,7 +57,7 @@ describe('app settings browser parity', () => {
     expect(store.getState().contextBreakdownPreference).toEqual({ expanded: true });
     expect(store.getState().settings.appearance.contextBreakdownExpanded).toBe(true);
     const older = { ...DEFAULT_SETTINGS.appearance, theme: 'light' as const };
-    store.getState().replaceSettings(viewOf({ ...DEFAULT_SETTINGS, appearance: older }, 2)[0]);
+    store.getState().adoptView(viewOf({ ...DEFAULT_SETTINGS, appearance: older }, 2)[0]);
     expect(store.getState().settings.appearance).toMatchObject({ theme: 'light', contextBreakdownExpanded: true });
     resolveSave({ revision: 3, changed: { appearance: { ...older, contextBreakdownExpanded: true } } });
     await saving;
@@ -72,9 +72,10 @@ describe('app settings browser parity', () => {
       models: [{ id: 'model-a', label: 'Model A', enabled: true }],
     } as LlmProviderEntry;
     const getCommit = vi.fn().mockResolvedValue({ commitHash: 'last-committed-provider', provider });
+    let failSave!: (error: Error) => void;
     vi.stubGlobal('window', { electronAPI: { settings: {
       getAgentDefinitionCommit: vi.fn().mockResolvedValue(null),
-      saveProviderDefinition: vi.fn().mockRejectedValue(new Error('Model preference write failed')),
+      saveProviderDefinition: vi.fn(() => new Promise((_resolve, reject) => { failSave = reject; })),
       getProviderDefinitionCommit: getCommit,
     } } });
     const store = useAppSettingsStore.getState();
@@ -87,7 +88,11 @@ describe('app settings browser parity', () => {
         catalogRevision: 'catalog-current', models: [{ modelId: 'model-a', routeRevision: 'route-current' }],
       }),
     });
-    await expect(attempt()).rejects.toThrow('Model preference write failed');
+    // The send waits for the preference write in flight and fails with it.
+    const first = attempt();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    failSave(new Error('Model preference write failed'));
+    await expect(first).rejects.toThrow('Model preference write failed');
     await expect(saving).resolves.toMatchObject({ status: 'failed' });
     expect(getCommit).not.toHaveBeenCalled();
 
@@ -116,7 +121,7 @@ describe('app settings browser parity', () => {
     const pending = store.saveProvider(edit);
     const flush = store.flushProviderSaves(provider.id);
     const next = { ...provider, activeAccountId: 'current' };
-    store.replaceSettings(viewOf(stored(next), 2)[0]);
+    store.adoptView(viewOf(stored(next), 2)[0]);
     const receipt = {
       clientRevision: save.mock.calls[0][0].clientRevision,
       providerId: provider.id, provider: edit, commitHash: 'previous-account', catalogRevision: null,

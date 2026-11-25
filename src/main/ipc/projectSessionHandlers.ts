@@ -35,6 +35,7 @@ import {
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { requireActiveSessionOwner } from './sessionOwnerGate';
+import { SessionModelLanes } from './sessionModelLanes';
 import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import type {
@@ -73,6 +74,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
   const { state } = context;
   registerProjectInputLifecycleHandlers(context);
   sessionRevisions.subscribe((snapshot) => context.broadcastToRenderer('session:recordChanged', snapshot));
+  const sessionModelLanes = new SessionModelLanes();
 
   ipcMain.handle('project:list', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'project:list', maxBytes: 1024 });
@@ -363,7 +365,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
 
   ipcMain.handle('session:setModelOverride', async (_event, ...rawArgs: unknown[]) => {
     try {
-      const [id, modelOverride, turnControls] = parseIpcArgs(SessionSetModelOverrideArgsSchema, rawArgs, {
+      const [id, request] = parseIpcArgs(SessionSetModelOverrideArgsSchema, rawArgs, {
         label: 'session:setModelOverride',
         maxBytes: 4 * 1024,
       });
@@ -372,8 +374,11 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       if (!session) {
         return { success: false, error: `Session not found: ${id}` };
       }
-      if (modelOverride) await assertSessionModelExecutable(modelOverride);
-      const updated = storageAdapter.updateSession(id, { modelOverride, ...(turnControls ? { turnControls } : {}) });
+      if (request.modelOverride) await assertSessionModelExecutable(request.modelOverride);
+      // Checked after the await and written in the same synchronous step: a newer intent's field is never overwritten.
+      const fields = sessionModelLanes.newer(id, request);
+      const updated = Object.keys(fields).length > 0 ? storageAdapter.updateSession(id, fields) : storageAdapter.readSession(id);
+      if (updated) sessionModelLanes.wrote(id, request.clientRevision, fields);
       return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };

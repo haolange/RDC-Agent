@@ -1,3 +1,4 @@
+import { RevisionLanes } from '../lib/revisionLanes';
 import type {
   AppLanguage,
   AppTheme,
@@ -24,7 +25,8 @@ export function createAppSettingsAppearanceActions(
   | 'setContextBreakdownExpanded'
   | 'setWorkProcessExpansion'
 > {
-  let contextBreakdownRevision = 0;
+  // Only the newest preference shows its save failure.
+  const preferenceLanes = new RevisionLanes();
   // Each change is applied at once and committed as its own op; an earlier one still in flight is never overwritten.
   const save = async (value: Partial<UiPreferences>): Promise<void> => {
     await get().patchSettings([{ op: 'appearance', value }]);
@@ -42,12 +44,12 @@ export function createAppSettingsAppearanceActions(
       } } });
     },
     setContextBreakdownExpanded: async (expanded: boolean) => {
-      const revision = ++contextBreakdownRevision;
+      const revision = preferenceLanes.begin('contextBreakdown');
       setContextBreakdownPreference({ expanded });
       try {
         await save({ contextBreakdownExpanded: expanded });
       } catch (error) {
-        if (revision === contextBreakdownRevision) {
+        if (preferenceLanes.isLatest('contextBreakdown', revision)) {
           setContextBreakdownPreference({ expanded, error: error instanceof Error ? error.message : String(error) });
         }
       }

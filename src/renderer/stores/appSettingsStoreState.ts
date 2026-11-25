@@ -17,6 +17,7 @@ import type {
   ThemeVariant,
 } from '@shared/types/settings';
 import type {
+  AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
@@ -37,14 +38,17 @@ export interface AppSettingsState {
    * confirmed them. A failure rolls back what these ops changed, unless a later intent changed it again.
    */
   patchSettings: (ops: SettingsPatchOp[]) => Promise<AppSettings>;
-  /** Adopts a view main returned from a settings command other than `settings:patch`. */
-  replaceSettings: (view: SettingsView) => void;
+  /**
+   * Adopts a view main returned from a settings command other than `settings:patch` (Agent import, migration, trust).
+   * It replaces the confirmed settings only when its revision is not older than theirs; intents in flight stay on top.
+   */
+  adoptView: (view: SettingsView) => void;
   /** `settings:changed`: reads the view again for a change this renderer did not make (see `SettingsViewSync`). */
   adoptSettingsChange: (change: SettingsChangedPayload) => void;
-  saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
-  flushAgentDefinitionSaves: (
-    query: import('@shared/types/agentManifest').AgentDefinitionCommitQuery,
-  ) => Promise<AgentDefinitionCommitSnapshot | null>;
+  /** Saves one Agent definition on its revision lane (the store takes the lane's next client revision). */
+  saveAgentDefinition: (request: Omit<AgentDefinitionSaveRequest, 'clientRevision'>) => Promise<AgentDefinitionSaveResult>;
+  /** Waits for the Agent file's saves in flight (failing if the newest failed) and reads main's commit. */
+  flushAgentDefinitionSaves: (query: AgentDefinitionCommitQuery) => Promise<AgentDefinitionCommitSnapshot | null>;
   /**
    * Reads the view only when it may be out of date: a change this renderer did not make, or Agents of another project
    * than `forProjectId` (default: the selected project).
@@ -60,7 +64,9 @@ export interface AppSettingsState {
   setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
   setWorkProcessExpansion: (workProcessExpansion: import('@shared/types/settings').WorkProcessExpansion) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
+  /** Saves the provider's model choices on its revision lane; a later choice or another connection supersedes it. */
   saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>;
+  /** Waits for the provider's saves in flight (failing if the newest failed) and reads main's commit. */
   flushProviderSaves: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
   setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
   setCompactionThresholdPercent: (percent: number) => Promise<void>;

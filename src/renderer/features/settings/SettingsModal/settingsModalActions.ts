@@ -27,19 +27,19 @@ interface SettingsModalActionsOptions {
   providerConnection: ProviderConnection;
   updateProfile: (profile: Partial<AppSettings['profile']>) => Promise<void>;
   patchSettings: (ops: SettingsPatchOp[]) => Promise<AppSettings>;
-  saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
+  saveAgentDefinition: (request: Omit<AgentDefinitionSaveRequest, 'clientRevision'>) => Promise<AgentDefinitionSaveResult>;
   currentProjectId?: string | null;
   t: Translate;
   blockSubmit?: (draft: AgentManifestDraft) => string | null;
   blockProjectedSubmit?: (projectedDrafts: AgentManifestDraft[]) => string | null;
-  replaceSettings: (view: SettingsView) => void;
+  adoptView: (view: SettingsView) => void;
   /** Makes definitions main committed outside autosave the autosave baseline. */
   rebaseAgentDrafts: (definitions: AgentManifestDefinition[]) => void;
 }
 
+/** One autosave batch; each draft is saved on its own Agent file's revision lane. */
 export interface AgentManifestSaveBatch {
   drafts: AgentManifestDraft[];
-  clientRevision: number;
 }
 
 export function createSettingsModalActions({
@@ -52,12 +52,12 @@ export function createSettingsModalActions({
   t,
   blockSubmit,
   blockProjectedSubmit,
-  replaceSettings,
+  adoptView,
   rebaseAgentDrafts,
 }: SettingsModalActionsOptions) {
-  /** Settings main committed outside autosave (import, migration) replace the store and the Agent drafts. */
+  /** Settings main committed outside autosave (import, migration) become the store's view and the Agent drafts. */
   const adoptAgentSettings = (view: SettingsView) => {
-    replaceSettings(view);
+    adoptView(view);
     rebaseAgentDrafts(view.agents.definitions);
     modalState.setAgentManifestDrafts(view.agents.definitions.map((definition) => (
       toAgentManifestEditorDraft(definition, currentProjectId)
@@ -114,7 +114,6 @@ export function createSettingsModalActions({
       const write = resolveAgentWriteTargetFromDraft(draft, currentProjectId);
       return saveAgentDefinition({
         draft,
-        clientRevision: batch.clientRevision,
         scope: write.scope,
         projectId: write.projectId,
         sourceHash: draft.sourceHash,

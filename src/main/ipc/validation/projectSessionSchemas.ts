@@ -44,13 +44,20 @@ export const SessionIdOnlyArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
 ]);
 
+/** One intent on the session's model lanes: the fields it sets, with its client revision (see SessionModelLanes). */
 export const SessionSetModelOverrideArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
   z.object({
-    providerId: ipcNonEmptyString(128, 'providerId'),
-    modelId: ipcNonEmptyString(256, 'modelId'),
-  }).nullable(),
-  ConversationTurnControlsSchema.optional(),
+    modelOverride: z.object({
+      providerId: ipcNonEmptyString(128, 'providerId'),
+      modelId: ipcNonEmptyString(256, 'modelId'),
+    }).nullable().optional(),
+    turnControls: ConversationTurnControlsSchema.optional(),
+    clientRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  }).strict().refine(
+    (request) => request.modelOverride !== undefined || request.turnControls !== undefined,
+    'set at least the model override or the turn controls',
+  ),
 ]);
 
 export const SessionSetAgentIdArgsSchema = z.tuple([

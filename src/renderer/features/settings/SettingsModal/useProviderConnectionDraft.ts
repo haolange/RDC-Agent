@@ -1,4 +1,5 @@
-import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { RevisionLanes } from '../../../lib/revisionLanes';
 import {
   createProviderConnectionDraft,
   getConnectionDraftSignature,
@@ -35,6 +36,7 @@ export const useProviderConnectionDraft = ({
   reloadSettings,
   t,
 }: UseProviderConnectionDraftOptions) => {
+  const [accountPolls] = useState(() => new RevisionLanes());
   const connectionProvider = useMemo(() => {
     const provider = providerDrafts.find((entry) => entry.id === connectionDraft?.providerId) ?? null;
     return projectConnectionProvider(provider, connectionDraft);
@@ -64,18 +66,16 @@ export const useProviderConnectionDraft = ({
       return;
     }
 
-    let cancelled = false;
+    // Each sign-in wait is one revision of the poll lane; a poll answering after the wait ended changes nothing.
+    const poll = accountPolls.begin('status');
+    const current = () => accountPolls.isLatest('status', poll);
     const timer = window.setInterval(() => {
       void (async () => {
         const status = await window.electronAPI.llm.getProviderAccountStatus(connectionDraft.providerId);
-        if (cancelled) {
-          return;
-        }
+        if (!current()) return;
         if (status.connected) {
           const nextSettings = await reloadSettings();
-          if (cancelled) {
-            return;
-          }
+          if (!current()) return;
           const nextProviders = nextSettings.llm.providers.map(cloneProvider);
           setProviderDrafts(nextProviders);
           setSelectedProviderId(
@@ -104,10 +104,11 @@ export const useProviderConnectionDraft = ({
     }, 1200);
 
     return () => {
-      cancelled = true;
+      accountPolls.forget('status');
       window.clearInterval(timer);
     };
   }, [
+    accountPolls,
     connectionDraft,
     connectionProvider?.authMode,
     open,

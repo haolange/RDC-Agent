@@ -51,7 +51,7 @@ describe('mounted settings state and autosave close lifecycle', () => {
         writes.push({ ...target, instructions: draft.instructions });
         const entry = { ...definition(scope), instructions: draft.instructions };
         settings = makeSettings(entry);
-        return { clientRevision: batch.clientRevision, status: 'committed', commitHash: 'saved',
+        return { clientRevision: 1, status: 'committed', commitHash: 'saved',
           definition: entry, route: null, lastSuccessful: null };
       });
     });

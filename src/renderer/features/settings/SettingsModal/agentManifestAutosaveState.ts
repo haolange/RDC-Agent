@@ -95,13 +95,13 @@ export function selectSubmittableAgentManifestDrafts(
   return { drafts: [], blockedReason: projectedReason };
 }
 
+/** A failed batch rolls back only when it is the newest one and the editor still shows what it submitted. */
 export function shouldRollbackFailedAgentManifestSave(
-  revision: number,
-  latestRevision: number,
+  latest: boolean,
   submitted: AgentManifestDraft[],
   current: AgentManifestDraft[],
 ): boolean {
-  if (revision !== latestRevision) return false;
+  if (!latest) return false;
   const currentById = new Map(current.map((draft) => [draft.id, serializeAgentManifestDraft(draft)]));
   return submitted.every((draft) => currentById.get(draft.id) === serializeAgentManifestDraft(draft));
 }

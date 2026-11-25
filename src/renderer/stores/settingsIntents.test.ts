@@ -2,7 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { providerConnectionState } from '@shared/utils/providerEntryView';
 import { useAppSettingsStore } from './appSettingsStore';
-import type { AppSettings, LlmProviderCatalogResponse, SettingsPatchOp, SettingsPatchResult, SettingsView } from '@shared/types/settings';
+import type {
+  AppSettings,
+  LlmProviderCatalogResponse,
+  LlmProviderEntry,
+  ProviderDefinitionSaveRequest,
+  ProviderDefinitionSaveResult,
+  SettingsPatchOp,
+  SettingsPatchResult,
+  SettingsView,
+} from '@shared/types/settings';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 
@@ -78,5 +87,60 @@ describe('optimistic settings patches', () => {
     const layout = { ...DEFAULT_SETTINGS.layout, leftSidebar: { ...DEFAULT_SETTINGS.layout.leftSidebar, width: 240 } };
     calls[0]!.resolve({ revision: 2, changed: { layout } });
     await expect(saving).resolves.toMatchObject({ layout });
+  });
+});
+
+describe('provider model choices on their revision lane', () => {
+  afterEach(() => {
+    useAppSettingsStore.setState({ settings: DEFAULT_SETTINGS, hydrated: false });
+    vi.unstubAllGlobals();
+  });
+
+  const provider = {
+    id: 'lane-provider', activeAccountId: 'account', enabled: true, isConfigured: true,
+    models: [{ id: 'a', label: 'A', enabled: true }, { id: 'b', label: 'B', enabled: true }],
+  } as LlmProviderEntry;
+  const withChoices = (enabled: [boolean, boolean]): LlmProviderEntry => ({
+    ...provider, models: provider.models.map((model, index) => ({ ...model, enabled: enabled[index]! })),
+  });
+  const enabledShown = () => useAppSettingsStore.getState().settings.llm.providers[0]!.models.map((model) => model.enabled);
+
+  function deferredSaves() {
+    const calls: Array<{ request: ProviderDefinitionSaveRequest; resolve: (result: ProviderDefinitionSaveResult) => void }> = [];
+    const saveProviderDefinition = vi.fn((request: ProviderDefinitionSaveRequest) => new Promise<ProviderDefinitionSaveResult>((resolve) => {
+      calls.push({ request, resolve });
+    }));
+    vi.stubGlobal('window', { electronAPI: { settings: { saveProviderDefinition } } });
+    useAppSettingsStore.getState().hydrate(...viewOf({ ...DEFAULT_SETTINGS, llm: { ...DEFAULT_SETTINGS.llm, providers: [provider] } }), 'dark');
+    return calls;
+  }
+  const answer = (call: { request: ProviderDefinitionSaveRequest }, entry: LlmProviderEntry, status: 'committed' | 'failed'): ProviderDefinitionSaveResult => {
+    const snapshot = { clientRevision: call.request.clientRevision, providerId: entry.id, commitHash: 'hash', provider: entry, catalogRevision: null };
+    return status === 'committed'
+      ? { ...snapshot, status, lastSuccessful: snapshot }
+      : { ...snapshot, status, provider: null, lastSuccessful: null, error: 'disk full' };
+  };
+
+  it('shows each choice at once and never lets the late answer to an earlier one undo a later one', async () => {
+    const calls = deferredSaves();
+    const first = useAppSettingsStore.getState().saveProvider(withChoices([false, true]));
+    const second = useAppSettingsStore.getState().saveProvider(withChoices([false, false]));
+    expect(enabledShown()).toEqual([false, false]);
+    expect(calls[1]!.request.clientRevision).toBeGreaterThan(calls[0]!.request.clientRevision);
+
+    calls[1]!.resolve(answer(calls[1]!, withChoices([false, false]), 'committed'));
+    await expect(second).resolves.toMatchObject({ status: 'committed' });
+    calls[0]!.resolve(answer(calls[0]!, withChoices([false, true]), 'committed'));
+    await expect(first).resolves.toMatchObject({ status: 'superseded' });
+    expect(enabledShown()).toEqual([false, false]);
+  });
+
+  it('drops only the failed choice and keeps a later one in flight', async () => {
+    const calls = deferredSaves();
+    const failed = useAppSettingsStore.getState().saveProvider(withChoices([false, true]));
+    void useAppSettingsStore.getState().saveProvider(withChoices([false, false]));
+    calls[0]!.resolve(answer(calls[0]!, provider, 'failed'));
+    await failed;
+    expect(enabledShown()).toEqual([false, false]);
   });
 });

@@ -13,6 +13,7 @@ import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
 import { errorDetail } from '../../lib/errorDetail';
+import { useAsyncValue } from '../../lib/useAsyncValue';
 import { Skeleton } from '../../ui/Skeleton';
 import { usePlanReviewActions } from './usePlanReviewActions';
 import { planAppendixMarkdown } from './planPreview';
@@ -31,42 +32,32 @@ export const PlanReviewPanel: React.FC<{
   const projection = usePlanReviewStore(state => sessionId ? state.bySession[sessionId] : undefined);
   const canReopen = projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
   const { readPlan, copyPlan, saveToProject, exportPlan } = usePlanReviewActions();
-  const [markdown, setMarkdown] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const initialSession = useRef(sessionId);
+  // The panel belongs to the session it opened in; switching away closes it.
+  const ownSession = Boolean(sessionId) && initialSession.current === sessionId;
+  useEffect(() => { if (!ownSession) onClose(); }, [ownSession, onClose]);
+  const planRead = useAsyncValue(
+    ownSession ? JSON.stringify([sessionId, plan.planId, plan.revision, plan.uri, plan.hash]) : null,
+    () => readPlan({ sessionId: sessionId!, planId: plan.planId, revision: plan.revision, uri: plan.uri, expectedHash: plan.hash }),
+  );
+  const markdown = planRead.status === 'ready' ? planRead.value.markdown : '';
+  const loading = planRead.status === 'loading';
+  const error = actionError ?? (planRead.status === 'error' ? errorDetail(planRead.error) : null);
   const parts = useMemo(() => splitPlanAppendix(markdown), [markdown]);
   const reference = { sessionId: sessionId!, planId: plan.planId, revision: plan.revision, uri: plan.uri, expectedHash: plan.hash };
-
-  useEffect(() => {
-    if (!sessionId || initialSession.current !== sessionId) { onClose(); return; }
-    setMarkdown('');
-    setError(null);
-    setLoading(true);
-    let cancelled = false;
-    void readPlan({ sessionId, planId: plan.planId, revision: plan.revision, uri: plan.uri, expectedHash: plan.hash })
-      .then((result) => {
-        if (!cancelled) setMarkdown(result.markdown);
-      })
-      .catch((reason: unknown) => {
-        if (!cancelled) setError(errorDetail(reason));
-      }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, plan.planId, plan.revision, plan.uri, plan.hash, readPlan, onClose]);
 
   const runAction = async (action: () => Promise<boolean>, message: string) => {
     if (!sessionId || busy) return;
     setBusy(true);
-    setError(null);
+    setActionError(null);
     setNotice(null);
     try {
       if (await action()) setNotice(message);
     } catch (reason) {
-      setError(errorDetail(reason));
+      setActionError(errorDetail(reason));
     } finally {
       setBusy(false);
     }

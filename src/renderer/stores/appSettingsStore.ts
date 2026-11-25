@@ -1,44 +1,24 @@
 import { create } from 'zustand';
 import { DEFAULT_AGENT_RUNTIME, createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
-import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import { useRuntimePermissionStore } from './runtimePermissionStore';
-import {
-  beginAgentDefinitionSave,
-  isLatestAgentDefinitionRevision,
-  rollbackAgentDefinitionSave,
-  settleAgentDefinitionSave,
-} from './agentDefinitionSettings';
-import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
-import {
-  beginProviderDefinitionSave,
-  enqueueProviderDefinitionSave,
-  flushProviderDefinitionSaves,
-  isLatestProviderDefinitionRevision,
-  settleProviderDefinitionSave,
-} from './providerDefinitionSettings';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
-import { SettingsPatchIntents } from './settingsPatchIntents';
+import { createSettingsDefinitionActions } from './appSettingsDefinitionActions';
+import { SettingsIntents, patchCommit, patchOverlay } from './settingsIntents';
 import { SettingsViewSync, joinSettingsView } from './settingsViewSync';
 import { useProjectStore } from './projectStore';
-import type { LlmProviderCatalogResponse, SettingsView } from '@shared/types/settings';
+import type { AppSettings, LlmProviderCatalogResponse, SettingsView } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
 
-export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
-
-const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
-  (request) => window.electronAPI.settings.saveAgentDefinition(request),
-);
-
-
-const patchIntents = new SettingsPatchIntents();
 const EMPTY_PROVIDER_CATALOG: LlmProviderCatalogResponse = { categories: [], protocols: [], providers: [] };
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
-  /** Joins a view main sent whole and adopts it; ops in flight stay on top. */
+  /** Confirmed settings plus every intent in flight; the store's `settings` is always its projection. */
+  const intents = new SettingsIntents(createDefaultAppSettings());
+  const join = (view: SettingsView): AppSettings => joinSettingsView(view, get().providerCatalog ?? EMPTY_PROVIDER_CATALOG);
+  /** Joins a view main sent whole and adopts it by revision; intents in flight stay on top. */
   const adoptView = (view: SettingsView): void => {
     viewSync.adopted(view);
-    const joined = joinSettingsView(view, get().providerCatalog ?? EMPTY_PROVIDER_CATALOG);
-    set({ settings: patchIntents.rebase(joined, view.revision), hydrated: true });
+    set({ settings: intents.rebase(join(view), view.revision), hydrated: true });
   };
   const viewSync = new SettingsViewSync(async () => {
     const api = window.electronAPI;
@@ -46,6 +26,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
     if (!get().providerCatalog) set({ providerCatalog: catalog });
     adoptView(view);
   });
+  const show = (settings: AppSettings, confirmed = false): void => set(confirmed ? { settings, hydrated: true } : { settings });
   return {
     settings: createDefaultAppSettings(),
     providerCatalog: null,
@@ -54,55 +35,25 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
     systemTheme: 'dark',
     hydrate: (view, providerCatalog, systemTheme) => {
       set({ providerCatalog, systemTheme });
-      adoptView(view);
+      viewSync.adopted(view);
+      set({ settings: intents.start(join(view), view.revision), hydrated: true });
     },
     setSystemTheme: (systemTheme) => set({ systemTheme }),
     patchSettings: async (ops) => {
-      const intent = patchIntents.begin(get().settings, ops);
-      set({ settings: intent.settings });
+      const intent = intents.begin(patchOverlay(ops));
+      show(intent.settings);
       try {
         const result = await viewSync.ownWrite(() => window.electronAPI.settings.patch(ops), (committed) => committed.revision);
-        set((state) => ({ settings: patchIntents.settle(state.settings, intent.id, result), hydrated: true }));
+        show(intents.settle(intent.id, patchCommit(ops, result), result.revision), true);
         return get().settings;
       } catch (error) {
-        set((state) => ({ settings: patchIntents.fail(state.settings, intent.id) }));
+        show(intents.fail(intent.id));
         throw error;
       }
     },
-    replaceSettings: adoptView,
+    adoptView,
     adoptSettingsChange: (change) => viewSync.changed(change),
-    saveAgentDefinition: async (request) => {
-      const agentId = request.draft.id;
-      const optimistic = beginAgentDefinitionSave(get().settings, request);
-      set({ settings: optimistic.settings });
-
-      try {
-        const result = await agentDefinitionMutations.enqueue(request);
-        if (!isLatestAgentDefinitionRevision(request.scope, request.projectId, agentId, request.clientRevision)) return result;
-        if (result.status === 'failed') {
-          set((state) => ({ settings: rollbackAgentDefinitionSave(state.settings, agentId, result.lastSuccessful) }));
-          return Promise.reject(new Error(result.error ?? 'Agent definition save failed.'));
-        }
-        if (result.status === 'committed') {
-          set((state) => ({ settings: settleAgentDefinitionSave(state.settings, agentId, result), hydrated: true }));
-        }
-        return result;
-      } catch (error) {
-        if (isLatestAgentDefinitionRevision(request.scope, request.projectId, agentId, request.clientRevision)) {
-          const lastSuccessful = await window.electronAPI.settings.getAgentDefinitionCommit({
-            agentId,
-            scope: request.scope,
-            projectId: request.projectId,
-          }).catch(() => null);
-          set((state) => ({ settings: rollbackAgentDefinitionSave(state.settings, agentId, lastSuccessful) }));
-        }
-        throw error;
-      }
-    },
-    flushAgentDefinitionSaves: async (query) => {
-      await agentDefinitionMutations.flush(query);
-      return window.electronAPI.settings.getAgentDefinitionCommit(query);
-    },
+    ...createSettingsDefinitionActions({ intents, viewSync, settings: () => get().settings, show }),
     reloadSettings: async (forProjectId) => {
       // Without a project named, the selected one; with none selected yet there is no project to compare.
       const projectId = forProjectId !== undefined ? forProjectId : useProjectStore.getState().currentProject?.projectId;
@@ -117,35 +68,16 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
     updateProfile: async (profile) => {
       await get().patchSettings([{ op: 'profile', value: profile }]);
     },
-    saveProvider: async (provider) => {
-      const clientRevision = beginProviderDefinitionSave(provider.id);
-      const result = await viewSync.ownWrite(() => enqueueProviderDefinitionSave(provider, clientRevision), (saved) => saved.revision);
-      const current = get().settings.llm.providers.find((entry) => entry.id === provider.id);
-      if (!isLatestProviderDefinitionRevision(provider.id, clientRevision)
-        || !current || providerConnectionIdentity(current) !== providerConnectionIdentity(provider)) {
-        return { ...result, status: 'superseded' };
-      }
-      const confirmed = result.status === 'committed' ? result.provider : result.lastSuccessful?.provider;
-      if (confirmed) {
-        set((state) => ({
-          settings: settleProviderDefinitionSave(state.settings, confirmed),
-          hydrated: true,
-        }));
-      }
-      return result;
-    },
-    flushProviderSaves: async (providerId) => {
-      return flushProviderDefinitionSaves(providerId);
-    },
     setAgentPermissionMode: async (mode) => {
       try {
         await useRuntimePermissionStore.getState().saveMode(mode);
       } finally {
         const snapshot = useRuntimePermissionStore.getState().snapshot;
         if (snapshot) {
-          set((state) => ({ settings: patchIntents.confirm(state.settings, (view) => ({
-            ...view, agentRuntime: { ...view.agentRuntime, permissions: { ...view.agentRuntime.permissions, mode: snapshot.mode } },
-          })) }));
+          show(intents.confirm((settings) => ({
+            ...settings,
+            agentRuntime: { ...settings.agentRuntime, permissions: { ...settings.agentRuntime.permissions, mode: snapshot.mode } },
+          })));
         }
       }
     },

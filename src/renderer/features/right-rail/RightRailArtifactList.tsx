@@ -6,6 +6,7 @@ import { InlineError } from '../../ui/InlineError';
 import { TaskDialog } from '../../ui/TaskDialog';
 import { Chevron } from '../../ui/Chevron';
 import { Skeleton } from '../../ui/Skeleton';
+import { RevisionLanes } from '../../lib/revisionLanes';
 import { RightRailArtifactGlyph } from './RightRailArtifactGlyphs';
 import { RightRailInvestigationPreview } from './RightRailInvestigationPreview';
 import { listInvestigationArtifacts } from './investigationPreviewActions';
@@ -34,18 +35,21 @@ function ScopedArtifactList({ artifacts, projectId, sessionId }: {
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [cursor, setCursor] = useState<InvestigationListPage['nextCursor']>();
+  // Each page read is a revision of the list; one superseded by another page, scope or retry changes nothing.
+  const [lanes] = useState(() => new RevisionLanes());
   useEffect(() => {
     if (!all) return;
-    let active = true;
+    const revision = lanes.begin('page');
+    const current = () => lanes.isLatest('page', revision);
     setLoading(true); setError(false);
     void listInvestigationArtifacts({ projectId, sessionId, cursor }).then(next => {
-      if (!active) return;
+      if (!current()) return;
       if (next.storeDegraded) { setError(true); return; }
       setPage(previous => ({ ...next, rows: cursor && previous
         ? [...previous.rows, ...next.rows.filter(row => !previous.rows.some(old => old.artifactId === row.artifactId))] : next.rows }));
-    }).catch(() => { if (active) setError(true); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [all, projectId, sessionId, cursor, attempt]);
+    }).catch(() => { if (current()) setError(true); }).finally(() => { if (current()) setLoading(false); });
+    return () => { lanes.forget('page'); };
+  }, [lanes, all, projectId, sessionId, cursor, attempt]);
   return <>
     <ArtifactRows rows={artifacts.rows} select={setPreview} />
     {artifacts.totalCount > 5 && <Button variant="ghost" size="sm" className="right-rail-browse-all"

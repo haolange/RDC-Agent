@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { isSessionArtifactUri } from '@shared/types/sessionArtifact';
 import { fetchRemoteImage } from '../../hooks/appShellBridge';
 import { resolveConversationMedia } from '../../hooks/conversationPreview';
+import { useAsyncValue } from '../../lib/useAsyncValue';
 
 export type MarkdownMediaKind = 'image' | 'video';
 export type MarkdownMediaState =
@@ -49,51 +50,36 @@ const toObjectUrl = (dataUrl: string): string => {
   return URL.createObjectURL(new Blob([bytes], { type: mime }));
 };
 
+const UNAVAILABLE: MarkdownMediaState = { status: 'unavailable' };
+const LOADING: MarkdownMediaState = { status: 'loading' };
+const revokeShown = (state: MarkdownMediaState) => { if (state.status === 'ready') URL.revokeObjectURL(state.url); };
+
 export function useMarkdownMedia(src: string | undefined, sessionId: string | null): {
   media: MarkdownMediaState;
   /** Loads an unverified remote image because the person asked for it. */
   loadRequested: () => void;
 } {
-  const [state, setState] = useState<MarkdownMediaState>({ status: 'loading' });
   const [requested, setRequested] = useState(false);
-  useEffect(() => {
-    const route = src ? markdownMediaRoute(src) : null;
-    if (!src || !route || !sessionId) {
-      setState({ status: 'unavailable' });
-      return undefined;
-    }
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    setState({ status: 'loading' });
-    const load = route === 'remote'
+  const route = src ? markdownMediaRoute(src) : null;
+  // The object URL lives while it shows: replaced, unmounted or late, it is revoked (a superseded read makes none).
+  const read = useAsyncValue(src && route && sessionId ? JSON.stringify([sessionId, src, requested]) : null, async (signal) => {
+    const resolved = await (route === 'remote'
       ? remember(`remote|${sessionId}|${src}`, async () => {
         // Asked for or not, a loaded image is remembered under the same key, so remounts reuse it.
-        const result = await fetchRemoteImage({ sessionId, url: src, intent: requested ? 'click' : 'auto' });
+        const result = await fetchRemoteImage({ sessionId: sessionId!, url: src!, intent: requested ? 'click' : 'auto' });
         if (!result) return null;
         return 'unverified' in result ? result : { dataUrl: result.dataUrl, kind: 'image' };
       })
       : remember(`${sessionId}|${src}`, async () => {
-        const result = await resolveConversationMedia({ sessionId, src });
+        const result = await resolveConversationMedia({ sessionId: sessionId!, src: src! });
         return result?.dataUrl ? { dataUrl: result.dataUrl, kind: result.kind } : null;
-      });
-    void load.then((resolved) => {
-      if (cancelled) return;
-      if (!resolved) {
-        setState({ status: 'unavailable' });
-        return;
-      }
-      if ('unverified' in resolved) {
-        setState({ status: 'unverified', host: new URL(src).host });
-        return;
-      }
-      objectUrl = toObjectUrl(resolved.dataUrl);
-      setState({ status: 'ready', url: objectUrl, kind: resolved.kind });
-    });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [src, sessionId, requested]);
+      }));
+    signal.throwIfAborted();
+    if (!resolved) return UNAVAILABLE;
+    if ('unverified' in resolved) return { status: 'unverified', host: new URL(src!).host } satisfies MarkdownMediaState;
+    return { status: 'ready', url: toObjectUrl(resolved.dataUrl), kind: resolved.kind } satisfies MarkdownMediaState;
+  }, { dispose: revokeShown });
+  const media = read.status === 'ready' ? read.value : read.status === 'loading' ? LOADING : UNAVAILABLE;
   const loadRequested = useCallback(() => setRequested(true), []);
-  return { media: state, loadRequested };
+  return { media, loadRequested };
 }

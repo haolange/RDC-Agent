@@ -86,7 +86,7 @@ import type {
   RunContextUsageRequest,
   RunContextUsageSummary,
   RunSummary,
-  SessionRecord,
+  SessionModelWriteRequest,
   SessionRecordSnapshot,
   SessionScope,
   SessionScopedPayload,
@@ -521,10 +521,10 @@ export interface ElectronAPI {
     }>;
     /** Makes the session current and returns what its surfaces show. */
     open: (id: string) => Promise<SessionOpenResult>;
+    /** Sets the session's model override and/or turn controls on their revision lanes. */
     setModelOverride: (
       id: string,
-      modelOverride: SessionRecord['modelOverride'],
-      turnControls?: import('./modelCapability').ConversationTurnControls,
+      request: SessionModelWriteRequest,
     ) => Promise<{
       success: boolean;
       session?: SessionRecordSnapshot;

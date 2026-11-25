@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { RevisionLanes } from '../../lib/revisionLanes';
 import { hydrateMessagesWithActionEvents, mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useConversationStore } from '../../stores/conversationStore';
@@ -11,6 +12,12 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { WorkflowState } from '@shared/types/workflow';
+
+/**
+ * The surface load and the usage read are revision lanes of the one app-level bootstrap: a read for a session that is
+ * no longer current changes nothing.
+ */
+const reads = new RevisionLanes();
 
 function applyEvidence(events: ActionEvent[], messagesFrom: () => ConversationMessage[]): ConversationMessage[] {
   useEvidenceStore.getState().setActionEvents(events);
@@ -50,8 +57,8 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
     }
     if (!shellReady) return;
 
-    let cancelled = false;
-    const live = () => !cancelled && useProjectStore.getState().currentSessionId === sessionId;
+    const read = reads.begin('surface');
+    const live = () => reads.isLatest('surface', read) && useProjectStore.getState().currentSessionId === sessionId;
     void electronAPI.workflow.getState().then((state) => {
       if (!live()) return;
       const workflow = state as WorkflowState | null;
@@ -78,7 +85,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
           evidence,
           electronAPI.trace.getProjection(sessionId).catch(() => ({ success: false, presentation: null })),
         ]);
-        if (cancelled) return;
+        if (!reads.isLatest('surface', read)) return;
         useConversationStore.getState().setHistoryLoadingSessionId(null);
         hydrateLoadedSessionSurface({
           sessionId,
@@ -91,7 +98,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
       })();
     }
     return () => {
-      cancelled = true;
+      reads.forget('surface');
       // A switch may already have marked the next session as being opened; only this load's own mark is cleared.
       if (useConversationStore.getState().historyLoadingSessionId === sessionId) {
         useConversationStore.getState().setHistoryLoadingSessionId(null);
@@ -105,14 +112,14 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
       clearUsageSnapshot();
       return undefined;
     }
-    let cancelled = false;
+    const read = reads.begin('usage');
     void electronAPI.workflow.getRunUsage({
       sessionId,
       ...(currentRunId ? { runId: currentRunId } : {}),
     }).then((result) => {
-      if (cancelled || useProjectStore.getState().currentSessionId !== sessionId) return;
+      if (!reads.isLatest('usage', read) || useProjectStore.getState().currentSessionId !== sessionId) return;
       useSessionStore.getState().setCurrentRunUsage(result.usage, result.stale);
     }).catch(() => undefined);
-    return () => { cancelled = true; };
+    return () => { reads.forget('usage'); };
   }, [clearUsageSnapshot, currentRunId, sessionId]);
 }

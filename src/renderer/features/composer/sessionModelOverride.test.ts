@@ -41,7 +41,7 @@ import {
   writeComposerDraftModel,
 } from '../../stores/composerModelDraftStore';
 import { getSessionView, useSessionRecordStore } from '../../stores/sessionRecordStore';
-import { clearComposerModelChoice, commitComposerModelChoice, persistSessionModelOverride, persistSessionTurnControls, flushSessionModelSaves } from './sessionModelOverride';
+import { clearComposerModelChoice, commitComposerModelChoice, persistSessionTurnControls, flushSessionModelSaves } from './sessionModelOverride';
 
 beforeEach(() => {
   projection.projectId = 'project-a'; projection.sessionId = 'session-a';
@@ -49,54 +49,53 @@ beforeEach(() => {
   useSessionRecordStore.getState().reset();
 });
 
-it('serializes controls after the model save and holds approval until all fields commit', async () => {
-  let finish!: (value: unknown) => void;
-  persistInvoke.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+it('sends controls at once beside a model save and holds approval until both have landed', async () => {
+  let finishModel!: (value: unknown) => void;
+  persistInvoke.mockReset().mockImplementationOnce(() => new Promise((resolve) => { finishModel = resolve; }))
     .mockResolvedValueOnce(saved());
   const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
   const controls = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
   const second = persistSessionTurnControls('session-a', controls);
-  const barrier = flushSessionModelSaves('session-a');
-  expect(persistInvoke).toHaveBeenCalledTimes(1);
-  finish(saved());
-  await Promise.all([first, second, barrier]);
-  expect(persistInvoke).toHaveBeenLastCalledWith('session-a', null, controls);
+  let flushed = false;
+  const barrier = flushSessionModelSaves('session-a').then(() => { flushed = true; });
+  // Main orders each field by revision, so nothing waits in a renderer queue.
+  expect(persistInvoke).toHaveBeenCalledTimes(2);
+  const [[, modelWrite], [, controlsWrite]] = persistInvoke.mock.calls as Array<[string, { clientRevision: number }]>;
+  expect(modelWrite).toEqual({ modelOverride: { providerId: 'p', modelId: 'm' }, clientRevision: expect.any(Number) });
+  expect(controlsWrite).toEqual({ turnControls: controls, clientRevision: expect.any(Number) });
+  expect(controlsWrite.clientRevision).toBeGreaterThan(modelWrite.clientRevision);
+  await second;
+  expect(flushed).toBe(false);
+  finishModel(saved());
+  await Promise.all([first, barrier]);
+  expect(flushed).toBe(true);
 });
 
-it('atomically saves an explicit inherited model together with every turn control', async () => {
-  persistInvoke.mockReset().mockResolvedValue(saved());
-  const model = { providerId: 'p', modelId: 'inherited' };
-  const controls = { reasoningLevel: 'high' as const, fastModel: true, maxContextMode: true };
-  expect(await persistSessionModelOverride('session-a', model, controls)).toEqual({ ok: true });
-  expect(persistInvoke).toHaveBeenCalledExactlyOnceWith('session-a', model, controls);
-});
-
-it('includes later queued controls in an already waiting approval barrier', async () => {
+it('includes a save begun while approval already waits, and fails approval when the newest save failed', async () => {
   let finishFirst!: (value: unknown) => void;
   let finishSecond!: (value: unknown) => void;
   persistInvoke.mockReset().mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve; }))
     .mockImplementationOnce(() => new Promise(resolve => { finishSecond = resolve; }));
   const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
   let flushed = false;
-  const barrier = flushSessionModelSaves('session-a')!.then(() => { flushed = true; });
+  const barrier = flushSessionModelSaves('session-a').then(() => { flushed = true; }, (error: Error) => error.message);
   const second = persistSessionTurnControls('session-a', { reasoningLevel: 'low', fastModel: true, maxContextMode: true });
   finishFirst(saved()); await first;
   expect(flushed).toBe(false);
-  finishSecond(saved());
-  await Promise.all([second, barrier]); expect(flushed).toBe(true);
+  finishSecond({ success: false, error: 'MODEL_UNAVAILABLE' });
+  expect(await second).toEqual({ ok: false, error: 'MODEL_UNAVAILABLE', latest: true });
+  await expect(barrier).resolves.toBe('MODEL_UNAVAILABLE');
 });
 
-it('cancels queued saves after leaving and returning to the session', async () => {
-  let finish!: (value: unknown) => void;
-  persistInvoke.mockReset().mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-  const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
-  const second = persistSessionTurnControls('session-a', { reasoningLevel: 'low', fastModel: false, maxContextMode: false });
-  projection.sessionId = null; projection.listeners.forEach((listener) => listener());
-  projection.sessionId = 'session-a'; projection.listeners.forEach((listener) => listener());
-  finish(saved());
-  await first;
-  expect(await second).toEqual({ ok: false, error: 'MODEL_SAVE_CANCELLED' });
-  expect(persistInvoke).toHaveBeenCalledTimes(1);
+it('reports a save as no longer the latest once a later choice of the same field began', async () => {
+  let finishFirst!: (value: unknown) => void;
+  persistInvoke.mockReset().mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }))
+    .mockResolvedValueOnce(saved());
+  const first = persistSessionTurnControls('session-a', { reasoningLevel: 'low', fastModel: false, maxContextMode: false });
+  const second = persistSessionTurnControls('session-a', { reasoningLevel: 'high', fastModel: false, maxContextMode: false });
+  expect(await second).toEqual({ ok: true, latest: true });
+  finishFirst(saved());
+  expect(await first).toEqual({ ok: true, latest: false });
 });
 
 it('shows a chosen model while it saves and returns to the saved model when main refuses it', async () => {
@@ -106,7 +105,7 @@ it('shows a chosen model while it saves and returns to the saved model when main
   const pending = commitComposerModelChoice({ providerId: 'p', modelId: 'new' }, 'session-a', 'project-a');
   expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'p', modelId: 'new' });
   finish({ success: false, error: 'MODEL_UNAVAILABLE' });
-  expect(await pending).toEqual({ ok: false, error: 'MODEL_UNAVAILABLE' });
+  expect(await pending).toEqual({ ok: false, error: 'MODEL_UNAVAILABLE', latest: true });
   expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'p', modelId: 'old' });
 });
 
@@ -143,7 +142,6 @@ it.each(['project', 'no-session', 'switch-back'])('keeps a late model save on it
   await pending;
   expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'openai', modelId: 'model' });
   expect(useSessionRecordStore.getState().pending).toEqual({});
-  expect(projection.listeners.size).toBe(0);
 });
 
 describe('clearComposerModelChoice', () => {
@@ -155,8 +153,8 @@ describe('clearComposerModelChoice', () => {
   it('persists a null session override when a session exists', async () => {
     persistInvoke.mockResolvedValue(saved({ modelOverride: null }));
     const result = await clearComposerModelChoice('session-a', 'project-a');
-    expect(result).toEqual({ ok: true });
-    expect(persistInvoke).toHaveBeenCalledWith('session-a', null);
+    expect(result).toEqual({ ok: true, latest: true });
+    expect(persistInvoke).toHaveBeenCalledWith('session-a', { modelOverride: null, clientRevision: expect.any(Number) });
   });
 
   it('clears the no-session draft and does not invoke IPC', async () => {

@@ -11,7 +11,7 @@ import {
 import { resolvedCapability } from '../../lib/capabilityResolution';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { useEffectiveModelCapability } from './useEffectiveModelCapability';
-import { persistSessionTurnControls } from './sessionModelOverride';
+import { isSessionTurnControlsSaving, persistSessionTurnControls } from './sessionModelOverride';
 import type { SessionRecord } from '@shared/types/session';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 
@@ -45,25 +45,15 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
   const [saveState, setSaveState] = useState<{ sessionId: string | null; saving: boolean; error?: string }>({ sessionId, saving: false });
-  const pendingSaves = useRef(0);
-  const saveRevision = useRef(0);
-  const invalidateSave = useCallback(() => { saveRevision.current++; }, []);
-  useEffect(() => {
-    invalidateSave();
-    setSaveState({ sessionId, saving: false });
-    return invalidateSave;
-  }, [sessionId, invalidateSave]);
+  useEffect(() => { setSaveState({ sessionId, saving: false }); }, [sessionId]);
   const saveControls = useCallback(async (controls: ConversationTurnControls) => {
     if (!sessionId) return;
-    const revision = ++saveRevision.current;
-    pendingSaves.current++;
     setSaveState({ sessionId, saving: true });
-    try {
-      const result = await persistSessionTurnControls(sessionId, controls);
-      if (revision === saveRevision.current && useProjectStore.getState().currentSessionId === sessionId) {
-        setSaveState({ sessionId, saving: false, error: result.ok ? undefined : result.error });
-      }
-    } finally { pendingSaves.current--; }
+    const result = await persistSessionTurnControls(sessionId, controls);
+    // Only the newest save of the session's controls (its revision lane) speaks for them, while that session shows.
+    if (result.latest && useProjectStore.getState().currentSessionId === sessionId) {
+      setSaveState({ sessionId, saving: false, error: result.ok ? undefined : result.error });
+    }
   }, [sessionId]);
   const sessionControls = currentSession?.turnControls ?? null;
   const capability = resolvedCapability(capabilityState);
@@ -97,7 +87,8 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     const sessionChanged = lastSessionIdRef.current !== sessionId;
     const agentChanged = lastAgentRef.current !== agentId;
     const agentReasoningChanged = lastAgentReasoningRef.current !== agentReasoning;
-    const sessionControlsChanged = lastSessionControlsKeyRef.current !== sessionControlsKey && pendingSaves.current === 0;
+    const sessionControlsChanged = lastSessionControlsKeyRef.current !== sessionControlsKey
+      && !(sessionId && isSessionTurnControlsSaving(sessionId));
     const previousCapabilityKey = lastCapabilityKeyRef.current;
     const store = useTurnControlsStore.getState();
 

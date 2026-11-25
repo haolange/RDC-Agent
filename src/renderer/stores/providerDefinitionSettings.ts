@@ -1,35 +1,13 @@
 import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
-import { ProviderDefinitionMutationCoordinator } from './ProviderDefinitionMutationCoordinator';
+import { errorDetail } from '../lib/errorDetail';
 import type {
-  AppSettings,
   LlmProviderEntry,
   LlmProviderModel,
   ProviderModelChoice,
-  ProviderDefinitionCommitSnapshot,
+  ProviderDefinitionSaveRequest,
   ProviderDefinitionSaveResult,
 } from '@shared/types/settings';
-
-const mutations = new ProviderDefinitionMutationCoordinator(
-  (request) => window.electronAPI.settings.saveProviderDefinition(request),
-);
-const revisions = new Map<string, number>();
-let lastRevision = 0;
-
-const upsert = (providers: LlmProviderEntry[], provider: LlmProviderEntry): LlmProviderEntry[] => (
-  providers.some((entry) => entry.id === provider.id)
-    ? providers.map((entry) => entry.id === provider.id ? provider : entry)
-    : [...providers, provider]
-);
-
-export function beginProviderDefinitionSave(providerId: string): number {
-  lastRevision = Math.max(Date.now() * 1_000, lastRevision + 1);
-  revisions.set(providerId, lastRevision);
-  return lastRevision;
-}
-
-export const isLatestProviderDefinitionRevision = (providerId: string, revision: number): boolean => (
-  revisions.get(providerId) === revision
-);
+import type { SettingsOverlay } from './settingsIntents';
 
 /** The user's part of each model row; label and aliases only matter for a row the catalog does not list. */
 const modelChoices = (models: readonly LlmProviderModel[]): ProviderModelChoice[] => models.map((model) => ({
@@ -43,27 +21,48 @@ const modelChoices = (models: readonly LlmProviderModel[]): ProviderModelChoice[
 }));
 
 /** Sends only the model choices, with the connection they were made on; main keeps every other field. */
-export const enqueueProviderDefinitionSave = (
-  provider: LlmProviderEntry,
-  clientRevision: number,
-): Promise<ProviderDefinitionSaveResult> => mutations.enqueue({
+export const providerDefinitionRequest = (provider: LlmProviderEntry, clientRevision: number): ProviderDefinitionSaveRequest => ({
   providerId: provider.id,
   connectionIdentity: providerConnectionIdentity(provider),
   models: modelChoices(provider.models),
   clientRevision,
 });
 
-export const settleProviderDefinitionSave = (
-  settings: AppSettings,
-  provider: LlmProviderEntry,
-): AppSettings => ({
-  ...settings,
-  llm: { ...settings.llm, providers: upsert(settings.llm.providers, provider) },
+/** `provider` in place of the entry of the same connection; another connection of that provider stays. */
+const onSameConnection = (provider: LlmProviderEntry, next: (current: LlmProviderEntry) => LlmProviderEntry): SettingsOverlay => (settings) => {
+  const identity = providerConnectionIdentity(provider);
+  let changed = false;
+  const providers = settings.llm.providers.map((entry) => {
+    if (entry.id !== provider.id || providerConnectionIdentity(entry) !== identity) return entry;
+    changed = true;
+    return next(entry);
+  });
+  return changed ? { ...settings, llm: { ...settings.llm, providers } } : settings;
+};
+
+/** The model choices shown while their save is in flight. */
+export const providerChoicesOverlay = (provider: LlmProviderEntry): SettingsOverlay => (
+  onSameConnection(provider, (entry) => ({ ...entry, models: provider.models }))
+);
+
+/** The provider as main committed it. */
+export const providerCommit = (provider: LlmProviderEntry): SettingsOverlay => onSameConnection(provider, () => provider);
+
+/** A request that never reached main reads as a failed save with no commit to fall back to. */
+export const failedProviderSave = (request: ProviderDefinitionSaveRequest, error: unknown): ProviderDefinitionSaveResult => ({
+  clientRevision: request.clientRevision,
+  providerId: request.providerId,
+  status: 'failed',
+  commitHash: null,
+  provider: null,
+  catalogRevision: null,
+  lastSuccessful: null,
+  error: errorDetail(error),
 });
 
-export async function flushProviderDefinitionSaves(
-  providerId: string,
-): Promise<ProviderDefinitionCommitSnapshot | null> {
-  await mutations.flush(providerId);
-  return window.electronAPI.settings.getProviderDefinitionCommit(providerId);
-}
+/** What `flushProviderSaves` waits on: a save main refused counts as failed, like one that never arrived. */
+export const providerSaveOutcome = (save: Promise<ProviderDefinitionSaveResult>): Promise<ProviderDefinitionSaveResult> => (
+  save.then((result) => (result.status === 'failed'
+    ? Promise.reject(new Error(result.error ?? 'Provider settings save failed.'))
+    : result))
+);

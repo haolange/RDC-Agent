@@ -6,6 +6,7 @@ import { Input } from '../../../../ui/Input';
 import { InlineError } from '../../../../ui/InlineError';
 import { SettingsField } from '../parts';
 import { errorDetail } from '../../../../lib/errorDetail';
+import { abortableDelay, useAsyncValue } from '../../../../lib/useAsyncValue';
 import { getResolvedShell } from './shellSettingsActions';
 import type { useI18n } from '../../../../i18n';
 import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
@@ -28,29 +29,16 @@ const shellPlaceholder = (api: { isWindows: boolean; isMac: boolean } | undefine
 
 export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft, onChange, t }) => {
   const api = useElectronApi();
+  // The detection follows the executable after a pause in typing; the last result stays until the next one lands.
+  const detection = useAsyncValue(draft.executable, async (signal) => {
+    await abortableDelay(400, signal);
+    return (await getResolvedShell(draft.executable)) ?? null;
+  });
   const [resolved, setResolved] = useState<ResolvedShellSnapshot | null>(null);
-
   useEffect(() => {
-    let cancelled = false;
-    const handle = window.setTimeout(() => {
-      void getResolvedShell(draft.executable)
-        ?.then((snapshot) => {
-          if (!cancelled) setResolved(snapshot ?? null);
-        })
-        .catch((error: unknown) => {
-          if (!cancelled) {
-            setResolved({
-              ok: false,
-              error: errorDetail(error),
-            });
-          }
-        });
-    }, 400);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(handle);
-    };
-  }, [draft.executable]);
+    if (detection.status === 'ready') setResolved(detection.value);
+    if (detection.status === 'error') setResolved({ ok: false, error: errorDetail(detection.error) });
+  }, [detection]);
 
   const browse = async () => {
     const paths = await selectFiles();

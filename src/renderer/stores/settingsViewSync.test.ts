@@ -73,7 +73,7 @@ describe('settings view reads', () => {
     await settle();
     expect(get).not.toHaveBeenCalled();
 
-    store().replaceSettings(view(1));
+    store().adoptView(view(1));
     expect(store().settings.agentModels.default).toEqual({ model: 'p:m' });
   });
 

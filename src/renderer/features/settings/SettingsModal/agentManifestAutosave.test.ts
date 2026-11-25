@@ -236,7 +236,7 @@ describe('agent manifest scoped autosave helpers', () => {
     const inFlight = new Promise<void>((_, reject) => {
       setTimeout(() => reject(new Error('save failed')), 20);
     }).catch(() => {
-      if (!shouldRollbackFailedAgentManifestSave(submittedRevision, latestRevision, submitted, current)) {
+      if (!shouldRollbackFailedAgentManifestSave(submittedRevision === latestRevision, submitted, current)) {
         return;
       }
       onRollback(submitted, [saved]);
@@ -248,6 +248,6 @@ describe('agent manifest scoped autosave helpers', () => {
     await inFlight;
     expect(onRollback).not.toHaveBeenCalled();
     expect(current).toEqual([illegal]);
-    expect(shouldRollbackFailedAgentManifestSave(1, 1, submitted, submitted)).toBe(true);
+    expect(shouldRollbackFailedAgentManifestSave(true, submitted, submitted)).toBe(true);
   });
 });

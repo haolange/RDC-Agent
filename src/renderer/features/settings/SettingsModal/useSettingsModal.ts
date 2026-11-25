@@ -28,7 +28,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setChromeTheme = useAppSettingsStore((state) => state.setChromeTheme);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
-  const replaceSettings = useAppSettingsStore((state) => state.replaceSettings);
+  const adoptView = useAppSettingsStore((state) => state.adoptView);
   const saveProvider = useAppSettingsStore((state) => state.saveProvider);
   const saveAgentDefinition = useAppSettingsStore((state) => state.saveAgentDefinition);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
@@ -112,7 +112,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     t,
     blockSubmit,
     blockProjectedSubmit,
-    replaceSettings,
+    adoptView,
     rebaseAgentDrafts: (definitions) => rebaseAgentDraftsRef.current(definitions),
   });
   const agentManifestAutosave = useAgentManifestAutosave({

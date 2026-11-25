@@ -2,19 +2,6 @@ import type { SkillSelectionOption, SkillSelectionProjection } from '@shared/typ
 
 export type SkillSelectionScope = 'user' | 'project';
 
-/** Every effect owns one request; cleanup fences both success and rejection callbacks. */
-export function observeScopedRequest<T>(
-  request: Promise<T>,
-  onSuccess: (value: T) => void,
-  onError: (reason: unknown) => void,
-) {
-  let active = true;
-  void request.then((value) => { if (active) onSuccess(value); }, (reason: unknown) => {
-    if (active) onError(reason);
-  });
-  return () => { active = false; };
-}
-
 export function resolveSkillSelectionRequest(scope: SkillSelectionScope, projectRoot?: string) {
   return { enabled: scope === 'user' || Boolean(projectRoot), projectRoot: scope === 'project' ? projectRoot : undefined };
 }

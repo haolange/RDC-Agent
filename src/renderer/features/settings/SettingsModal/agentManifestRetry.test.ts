@@ -8,9 +8,8 @@ import type { AgentDefinitionSaveRequest, AgentManifestDefinition } from '@share
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), revision: 0 }));
+const mocks = vi.hoisted(() => ({ save: vi.fn() }));
 vi.mock('../../../stores/appSettingsStore', () => ({
-  nextAgentDefinitionClientRevision: () => ++mocks.revision,
   useAppSettingsStore: (select: (state: object) => unknown) => select({ saveAgentDefinition: mocks.save, refreshSettings: async () => undefined }),
 }));
 vi.mock('../../../stores/projectStore', () => ({ useProjectStore: (select: (state: object) => unknown) => select({ currentProject: null }) }));
@@ -29,7 +28,7 @@ let host: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('electronAPI', undefined);
-  mocks.save.mockReset(); mocks.revision = 0;
+  mocks.save.mockReset();
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -40,14 +39,14 @@ function harness() {
   const disk = new Map(entries.map(entry => [entry.id, entry]));
   let failure = false;
   let editor!: ReturnType<typeof useSettingsModal>;
-  mocks.save.mockImplementation(async (request: AgentDefinitionSaveRequest) => {
+  mocks.save.mockImplementation(async (request: Omit<AgentDefinitionSaveRequest, 'clientRevision'>) => {
     const current = disk.get(request.draft.id)!;
     if (request.sourceHash !== current.provenance!.sourceHash) throw new Error('AGENT_MANIFEST_SOURCE_HASH_CONFLICT');
     if (failure && request.draft.id === 'general') throw new Error('EPERM: rename');
     const next = { ...current, ...request.draft, builtin: false,
       provenance: { scope: 'user' as const, sourcePath: `/user/${current.fileName}`, sourceHash: `${current.id}:${request.draft.maxTurns}` } };
     disk.set(current.id, next);
-    return { clientRevision: request.clientRevision, status: 'committed', commitHash: next.provenance.sourceHash,
+    return { clientRevision: 1, status: 'committed', commitHash: next.provenance.sourceHash,
       definition: next, route: null, lastSuccessful: null };
   });
   function Probe() { editor = useSettingsModal(true, settings); return null; }

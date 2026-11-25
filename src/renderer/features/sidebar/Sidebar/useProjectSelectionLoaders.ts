@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RevisionLanes } from '../../../lib/revisionLanes';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useCaptureStore } from '../../../stores/captureStore';
 import { useProjectStore } from '../../../stores/projectStore';
@@ -40,7 +41,8 @@ export function useProjectSelectionLoaders({
   const { t } = useI18n();
   const [isLoading, setIsLoading] = useState(true);
 
-  const selectionRequestRef = useRef(0);
+  // The sidebar selection is one revision lane: a project or session load applies only while it is the newest one.
+  const [selectionLane] = useState(() => new RevisionLanes());
   const didRunInitialLoadRef = useRef(false);
 
   const setProjects = useProjectStore((state) => state.setProjects);
@@ -54,14 +56,11 @@ export function useProjectSelectionLoaders({
   const updateProjectInputs = useProjectStore((state) => state.updateProjectInputs);
   const setRightRailTarget = useProjectStore((state) => state.setRightRailTarget);
 
-  const beginSelectionRequest = useCallback(() => {
-    selectionRequestRef.current += 1;
-    return selectionRequestRef.current;
-  }, []);
+  const beginSelectionRequest = useCallback(() => selectionLane.begin('selection'), [selectionLane]);
 
   const isLatestSelectionRequest = useCallback((requestId?: number) => (
-    requestId === undefined || selectionRequestRef.current === requestId
-  ), []);
+    requestId === undefined || selectionLane.isLatest('selection', requestId)
+  ), [selectionLane]);
 
   const loaderCtx = useMemo((): ProjectSelectionLoaderOpsContext => ({
     t,
@@ -139,7 +138,6 @@ export function useProjectSelectionLoaders({
   }, [loadProjects]);
 
   return {
-    selectionRequestRef,
     didRunInitialLoadRef,
     isLoading,
     beginSelectionRequest,

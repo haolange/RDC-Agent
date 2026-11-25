@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { RevisionLanes } from '../lib/revisionLanes';
 import { getToolImagePreview } from './conversationPreview';
 import type { ConversationToolImagePreviewRef } from '@shared/types/conversation';
 
@@ -19,8 +20,11 @@ export function useToolImagePreviews(sessionId: string | undefined, previews: Co
   const retryId = useRef<string | null>(null);
   const [state, setState] = useState<{ scope?: string; values: Record<string, ImagePreviewState> }>({ values: {} });
   const ids = previews.map(preview => preview.previewId).join('\0');
+  // Each session and preview set is one read revision; queued and late reads of a superseded one change nothing.
+  const [lanes] = useState(() => new RevisionLanes());
   useEffect(() => {
-    let cancelled = false;
+    const revision = lanes.begin('previews');
+    const current = () => lanes.isLatest('previews', revision);
     const only = retryId.current;
     retryId.current = null;
     setState(previous => ({ scope: sessionId, values: previous.scope === sessionId ? previous.values : {} }));
@@ -28,17 +32,17 @@ export function useToolImagePreviews(sessionId: string | undefined, previews: Co
     for (const id of ids.split('\0').filter(Boolean)) {
       if (only && id !== only) continue;
       schedule(async () => {
-        if (cancelled) return;
+        if (!current()) return;
         let value: ImagePreviewState;
         try {
           const result = await getToolImagePreview({ sessionId, previewId: id });
           value = result?.dataUrl ? { url: result.dataUrl } : { failed: true };
         } catch { value = { failed: true }; }
-        if (!cancelled) setState(previous => ({ scope: sessionId, values: { ...previous.values, [id]: value } }));
+        if (current()) setState(previous => ({ scope: sessionId, values: { ...previous.values, [id]: value } }));
       });
     }
-    return () => { cancelled = true; };
-  }, [sessionId, ids, attempt]);
+    return () => { lanes.forget('previews'); };
+  }, [lanes, sessionId, ids, attempt]);
   return { values: state.scope === sessionId ? state.values : {}, retry: (id: string) => {
     retryId.current = id;
     setAttempt(value => value + 1);

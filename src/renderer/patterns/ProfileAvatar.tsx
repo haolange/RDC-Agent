@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useElectronApi } from '../hooks/useElectronApi';
+import { useAsyncValue } from '../lib/useAsyncValue';
 
 import './ProfileAvatar.css';
 
@@ -25,34 +26,14 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
 }) => {
   const electronAPI = useElectronApi();
   const normalizedAvatarPath = avatarPath?.trim() ?? '';
-  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setAvatarDataUrl(null);
-
-    if (!normalizedAvatarPath) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void electronAPI?.appShell.getAvatarDataUrl(normalizedAvatarPath)
-      .then((dataUrl) => {
-        if (!cancelled) {
-          setAvatarDataUrl(dataUrl);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAvatarDataUrl(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [electronAPI, normalizedAvatarPath]);
+  const avatar = useAsyncValue(
+    electronAPI && normalizedAvatarPath ? normalizedAvatarPath : null,
+    async () => (await electronAPI?.appShell.getAvatarDataUrl(normalizedAvatarPath)) ?? null,
+  );
+  // An image the browser could not decode falls back to the initials until the avatar changes.
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
+  const loaded = avatar.status === 'ready' ? avatar.value : null;
+  const avatarDataUrl = loaded && loaded !== brokenUrl ? loaded : null;
 
   if (avatarDataUrl) {
     return (
@@ -61,7 +42,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
         src={avatarDataUrl}
         alt={alt}
         data-avatar-kind="image"
-        onError={() => setAvatarDataUrl(null)}
+        onError={() => setBrokenUrl(avatarDataUrl)}
       />
     );
   }

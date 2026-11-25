@@ -94,6 +94,17 @@ export interface SessionRecordSnapshot {
   revision: SessionRevision;
 }
 
+/**
+ * One intent on a session's model lanes (`session:setModelOverride`). It sets only the fields it carries; an absent
+ * field stays as written. Main writes each field only for a `clientRevision` newer than the last one it wrote for that
+ * field of the session, so a late intent never overwrites a later one.
+ */
+export interface SessionModelWriteRequest {
+  modelOverride?: SessionModelOverride | null;
+  turnControls?: ConversationTurnControls;
+  clientRevision: number;
+}
+
 /** Explicit project/session ownership for stateful RDC operations and events. */
 export interface SessionScope {
   projectId: string;
