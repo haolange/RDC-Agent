@@ -9,7 +9,7 @@
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 .settings-capability-group {
@@ -60,7 +60,7 @@
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-normal);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-normal);
 }
 
 .settings-capability-options {

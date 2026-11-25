@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from '../../i18n';
-import { useOverlayDismiss } from '../../lib/overlayStack';
+import { isImeComposing } from '../../lib/ime';
+import { useOverlayLayer } from '../../lib/overlayStack';
+import { useModalFocus } from '../../lib/useModalFocus';
 import { Icon, type IconName } from '../../ui/Icon';
 import { InlineError } from '../../ui/InlineError';
 import { Skeleton } from '../../ui/Skeleton';
@@ -33,14 +35,17 @@ const CATEGORY_ICONS: Record<string, IconName> = {
 /**
  * Ctrl/Cmd+K: a centered panel with its own search line and the commands grouped by category, each row an icon,
  * the command and one line of what it does. Arrow keys move, Enter runs, Escape closes; it fades in and out.
+ * It is a modal layer: focus starts in the search line, Tab stays inside, and closing returns focus to where it was.
  */
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ commands, loading, error, open, close, query, setQuery, onExecute }) => {
   const { t } = useI18n();
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const presence = usePresence(open, overlayRef);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  useOverlayDismiss(open, close);
+  const { layerId } = useOverlayLayer(open, 'layout');
+  useModalFocus({ open, containerRef: dialogRef, onClose: close, layerId });
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase().replace(/^\//u, '');
@@ -67,7 +72,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ commands, loadin
     close();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.nativeEvent.isComposing) return;
+    if (isImeComposing(event)) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       const step = event.key === 'ArrowDown' ? 1 : -1;
@@ -80,12 +85,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ commands, loadin
 
   return createPortal(
     <div ref={overlayRef} className="command-palette-overlay" data-state={presence.state} onClick={close} data-testid="command-palette">
-      <div className="command-palette" role="dialog" aria-modal="true" aria-label={t('app.commandPaletteInput')} onClick={(event) => event.stopPropagation()}>
+      <div ref={dialogRef} className="command-palette" role="dialog" aria-modal="true" aria-label={t('app.commandPaletteInput')} onClick={(event) => event.stopPropagation()}>
         <div className="command-palette-search">
           <Icon name="search" size={16} />
           <input
             className="command-palette-input"
-            autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}

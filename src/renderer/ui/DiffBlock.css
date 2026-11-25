@@ -37,7 +37,7 @@
   background: var(--token-bg-panel);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   overflow: auto;

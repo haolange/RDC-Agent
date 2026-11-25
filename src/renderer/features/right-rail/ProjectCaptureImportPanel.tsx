@@ -33,10 +33,11 @@ const InputRow: React.FC<{ input: ProjectInputRecord; remove: () => void; disabl
     aria-label={`${input.fileName}, ${size}. ${input.filePath}`}
     data-tooltip={input.filePath}
     role="listitem"
+    tabIndex={0}
   >
     <CaptureFileIcon />
     <span className="project-capture-input-copy">
-      <strong data-tooltip={`${input.fileName}\n${input.filePath}`}>{input.fileName}</strong>
+      <strong>{input.fileName}</strong>
       {input.source === 'external_reference' ? <span>{referenceLabel}</span> : null}
     </span>
     <span className="project-capture-input-actions"><span className="project-capture-input-size">{size}</span><Button variant="ghost" size="sm" aria-label={`${removeLabel} ${input.fileName}`} disabled={disabled} onClick={remove}><Icon name="close" size={14} /></Button></span>

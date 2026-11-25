@@ -85,7 +85,7 @@
 .knowledge-center-list-count {
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  font-weight: var(--font-regular);
+  font-weight: var(--font-normal);
   font-variant-numeric: tabular-nums;
 }
 

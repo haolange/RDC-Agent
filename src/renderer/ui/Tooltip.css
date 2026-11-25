@@ -23,3 +23,9 @@
 .ui-tooltip[data-ready='false'] {
   visibility: hidden;
 }
+
+/* Static text that carries a tooltip takes keyboard focus so the tooltip is reachable, and shows the shared ring. */
+[data-tooltip][tabindex='0']:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}

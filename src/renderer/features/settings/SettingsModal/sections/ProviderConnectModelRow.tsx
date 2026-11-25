@@ -79,7 +79,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
           <span className="settings-model-row-label">{model.label}</span>
           {effectiveModel ? <span className="settings-model-row-context">{formatContextCapability(effectiveModel, t)}</span> : null}
         </span>
-        <span className={`settings-model-row-check is-${badge}`} data-tooltip={statusTitle}>{statusLabel}</span>
+        <span className={`settings-model-row-check is-${badge}`} tabIndex={statusTitle ? 0 : undefined} data-tooltip={statusTitle}>{statusLabel}</span>
         <span className="settings-model-row-capabilities"><ProviderModelCapabilityIcons model={effectiveModel} t={t} /></span>
         <Switch
           checked={model.enabled}

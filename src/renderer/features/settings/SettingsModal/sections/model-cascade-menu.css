@@ -30,7 +30,7 @@
   padding: var(--space-4);
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.6;
+  line-height: var(--type-body-line);
 }
 
 .settings-model-empty p {
@@ -124,8 +124,8 @@
   border-radius: var(--radius-sm);
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
-  letter-spacing: 0.04em;
+  line-height: var(--type-meta-line);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -149,7 +149,7 @@
   color: var(--token-accent-primary);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 720px) {
   .settings-model-cascade-menu {
     max-height: min(36rem, 78vh);
   }

@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '../../../lib/cn';
+import { isImeComposing } from '../../../lib/ime';
+import { motionScrollBehavior } from '../../../lib/motion';
 import { SearchField } from '../../../ui/SearchField';
 import { SettingsNavIcon } from './SettingsNavIcon';
 import {
@@ -27,7 +29,7 @@ export function focusSettingsSearchTarget(target: string): void {
   if (!node) return;
   node.scrollIntoView({
     block: 'center',
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    behavior: motionScrollBehavior(),
   });
   node.classList.add('is-settings-search-hit');
   window.setTimeout(() => node.classList.remove('is-settings-search-hit'), 1600);
@@ -83,6 +85,7 @@ export const SettingsCenterNav: React.FC<{
 
   // The field keeps focus; arrows move the active result, Enter opens it, Escape clears the search.
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isImeComposing(event)) return;
     if (event.key === 'Escape' && query) { event.preventDefault(); event.stopPropagation(); setQuery(''); return; }
     if (results.length === 0) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {

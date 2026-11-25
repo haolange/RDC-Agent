@@ -123,8 +123,9 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
         { label: t('control.replay.inputPath'), value: selectedInput?.filePath },
       ]} />
     </div>
-    <div className="capture-replay-file-row" data-tooltip={selectedInput ? `${selectedInput.fileName} · ${formatBytes(selectedInput.sizeBytes, language)}` : undefined}>
+    <div className="capture-replay-file-row">
       <Select dataTestId="right-rail-capture-input" ariaLabel={t('control.rightRail.capture.title')} value={selectedInput?.inputId ?? ''}
+        tooltip={selectedInput ? `${selectedInput.fileName} · ${formatBytes(selectedInput.sizeBytes, language)}` : undefined}
         options={capture.availableCaptures.map((input) => ({ value: input.inputId, label: input.fileName }))} disabled={disabled}
         onChange={(inputId) => setDraft({ ...chosen, inputId })} />
     </div>

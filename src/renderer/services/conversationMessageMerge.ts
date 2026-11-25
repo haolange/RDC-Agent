@@ -67,7 +67,6 @@ export const applyToolTraceToMessage = (message: ConversationMessage, trace: Too
     title: 'LLM turn',
     stage: 'runtime',
     status: trace.result.ok ? 'running' : 'error',
-    summary: trace.result.ok ? 'Recording tool execution.' : 'Tool execution failed.',
   });
   const block = nextTrace.blocks.find((entry) => entry.id === 'tool-execution');
   if (block) {

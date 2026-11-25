@@ -47,7 +47,7 @@
 .knowledge-center-meta dt {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-weight: var(--font-regular);
+  font-weight: var(--font-normal);
 }
 
 .knowledge-center-meta dd {

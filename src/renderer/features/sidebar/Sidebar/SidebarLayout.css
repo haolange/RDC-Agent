@@ -80,7 +80,7 @@
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
   color: var(--token-text-secondary);
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -144,7 +144,7 @@
   background: color-mix(in srgb, var(--token-status-error) 10%, transparent);
   color: var(--token-status-error);
   font-size: var(--type-body-size);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 .project-stack-item {

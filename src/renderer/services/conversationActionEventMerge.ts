@@ -29,7 +29,6 @@ export const mergeToolExecutionActionEvent = (
     title: 'LLM turn',
     stage: 'runtime',
     status: event.status === 'error' ? 'error' : 'running',
-    summary: event.status === 'error' ? 'Tool execution failed.' : 'Recording tool execution.',
   });
   const block = stepTrace.blocks.find((entry) => entry.id === 'tool-execution');
   if (block) {

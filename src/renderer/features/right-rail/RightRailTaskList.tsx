@@ -28,9 +28,9 @@ const TaskProgress: React.FC<{ done: number; total: number }> = ({ done, total }
   const fill = useDynStyle({ '--right-rail-task-progress': `${total ? (done / total) * 100 : 0}%` });
   const label = t('control.rightRail.tasks.count', { done, total });
   return (
-    <div className="right-rail-task-progress" data-tooltip={label}>
+    <div className="right-rail-task-progress">
       <span className="right-rail-task-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}
-        aria-label={label}>
+        aria-label={label} tabIndex={0} data-tooltip={label}>
         <span className="right-rail-task-progress-fill" {...fill} />
       </span>
     </div>

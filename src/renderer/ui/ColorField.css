@@ -19,7 +19,7 @@
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-normal);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-normal);
   text-transform: uppercase;
 }
 

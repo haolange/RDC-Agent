@@ -20,7 +20,7 @@ const OutputRow: React.FC<{ artifact: TraceArtifactRecord }> = ({ artifact }) =>
     <article className={`right-rail-artifact-row status-${artifact.status}`}>
       <span className="right-rail-artifact-icon" aria-hidden="true"><Icon name="file" /></span>
       <span className="right-rail-artifact-copy">
-        <strong data-tooltip={[artifact.displayName, size].filter(Boolean).join(' · ')}>{artifact.displayName}</strong>
+        <strong tabIndex={0} data-tooltip={[artifact.displayName, size].filter(Boolean).join(' · ')}>{artifact.displayName}</strong>
       </span>
       <span className="right-rail-output-actions">
         {failed ? <span className="right-rail-output-missing">{t('control.rightRail.outputs.missing')}</span> : (

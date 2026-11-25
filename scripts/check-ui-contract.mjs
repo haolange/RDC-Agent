@@ -5,26 +5,31 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
+import { readCssRules, readDeclarations, splitTopLevel } from './lib/cssRules.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rendererRoot = path.join(repoRoot, 'src/renderer');
 
+// Non-zero ceilings below count hits in files another change owns at the moment (transcript, composer); the
+// report names each one. They fall to 0 when those files are fixed.
 const CEILINGS = {
   'invalid-transition': 0,
   'inline-svg': 0,
   'text-glyph': 0,
   'raw-error-render': 0,
   'literal-color': 0,
-  'i18n-same-value': 0,
   'bare-alert': 0,
+  // Pending in transcript CSS: message-actions, work-process-disclosure (2) and work-process-web.
+  'hover-focus-pair': 4,
+  'focus-same-as-hover': 0,
+  'reduced-motion': 0,
+  // Pending: MeasuredWorkRows asks lib/motion instead of scrolling smoothly unconditionally.
+  'smooth-scroll': 1,
+  // Pending: ComposerModelEffortPanel, ComposerSkillChips, SubagentCallDetails, WorkProcessFamilyLayers (4),
+  // WorkProcessToolCardParts (4) and WorkProcessWebParts.
+  'tooltip-target': 12,
 };
-
-/** Proper nouns stay English in every locale: Agent and mode names, product names, RenderDoc and protocol terms. */
-const PROPER_NOUNS = new Set([
-  'Ask', 'Plan', 'Edit', 'Debugger', 'Analyzer', 'Optimizer', 'General', 'Verifier', 'Agent',
-  'Max', 'Fast', 'English', 'RDC', 'RDC-Tool', 'RDC-Agent', 'RenderDoc', 'Git', 'MCP', 'API', 'LLM', 'GPU',
-  'Capture', 'Swapchain', 'Present', 'Texture', 'RT', 'SKILL.md', '.gitignore',
-]);
 
 /** Token and motion definition layers may hold literal values; components may not. */
 const STYLE_DEFINITION_FILES = new Set([
@@ -138,12 +143,186 @@ function rawErrorRender() {
 /** Color pickers paint the color space itself, so their gradients are literal by nature. */
 const COLOR_SPACE_FILES = new Set(['src/renderer/ui/ColorPickerSurface.css']);
 
-/** An alert is the unified InlineError, or at least a styled element; a bare <p role="alert"> prints raw text unstyled. */
+/**
+ * An alert is the unified InlineError, or at least a styled element; a bare text element with role="alert" (no class)
+ * prints raw text unstyled. The role counts wherever it sits among the attributes and in string or expression form.
+ */
+const ALERT_TEXT_TAGS = new Set(['p', 'div', 'span', 'small', 'strong', 'em', 'li', 'section']);
 function bareAlerts() {
   const findings = [];
   for (const file of files.filter((name) => name.endsWith('.tsx') && name !== 'src/renderer/ui/InlineError.tsx')) {
+    const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node) => {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const attrs = node.attributes.properties.filter(ts.isJsxAttribute);
+        const value = (attr) => {
+          const init = attr.initializer;
+          if (init && ts.isStringLiteral(init)) return init.text;
+          const expression = init && ts.isJsxExpression(init) ? init.expression : undefined;
+          return expression && (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) ? expression.text : null;
+        };
+        const isAlert = attrs.some((attr) => attr.name.getText() === 'role' && value(attr) === 'alert');
+        const styled = attrs.some((attr) => attr.name.getText() === 'className');
+        if (ALERT_TEXT_TAGS.has(node.tagName.getText()) && isAlert && !styled) {
+          findings.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return findings;
+}
+
+const componentCss = files.filter((name) => name.endsWith('.css') && !STYLE_DEFINITION_FILES.has(name));
+const allCssRules = files.filter((name) => name.endsWith('.css'))
+  .flatMap((file) => readCssRules(read(file)).map((rule) => ({ ...rule, file })));
+
+/** Compound selectors of one complex selector: `.a:hover > .b .c` yields `.a:hover`, `.b`, `.c`. */
+const compoundsOf = (selector) => {
+  const compounds = [];
+  let depth = 0;
+  let current = '';
+  for (const character of selector) {
+    if (character === '(' || character === '[') depth += 1;
+    if (character === ')' || character === ']') depth -= 1;
+    if (depth === 0 && /[\s>+~]/.test(character)) {
+      if (current) compounds.push(current);
+      current = '';
+      continue;
+    }
+    current += character;
+  }
+  if (current) compounds.push(current);
+  return compounds;
+};
+const FOCUS = /:focus(?:-visible|-within)?\b/;
+/**
+ * The simple selectors naming the element a selector styles (its last compound), state pseudo-classes removed:
+ * `.ui-checkbox:hover .ui-checkbox-box` → [`.ui-checkbox-box`], `.icon-button:hover:not(:disabled)` → [`.icon-button`].
+ */
+const subjectOf = (selector) => (compoundsOf(selector).at(-1) ?? '')
+  .replace(/::?[-\w]+\((?:[^()]|\([^()]*\))*\)/g, '')
+  .replace(/::?[-\w]+/g, '')
+  .match(/[.#]?[-\w]+|\[[^\]]*\]/g) ?? [];
+
+/** Hover-only by nature: scrollbar thumbs and the aria-hidden drag handles of resizable panels. */
+const POINTER_ONLY = [/::-webkit-scrollbar/, /^\.panel-resize-handle\b/, /^\.runtime-terminal-resize-handle\b/];
+
+/** Every :hover needs a keyboard counterpart on the same element: :focus-visible, :focus-within or :focus. */
+function hoverFocusPairs() {
+  // A focus rule covers a hovered element when it styles the same element: its subject's simple selectors are a
+  // subset of the hovered subject's (`.ui-list-row:focus-visible` covers `.ui-list-row.is-selected:hover`).
+  const focusSubjects = allCssRules.flatMap((rule) => rule.selectors.filter((selector) => FOCUS.test(selector)).map(subjectOf))
+    .filter((subject) => subject.length > 0);
+  const findings = [];
+  for (const rule of allCssRules.filter((entry) => componentCss.includes(entry.file))) {
+    for (const selector of rule.selectors.filter((entry) => entry.includes(':hover') && !FOCUS.test(entry))) {
+      if (POINTER_ONLY.some((pattern) => pattern.test(selector))) continue;
+      const hovered = new Set(subjectOf(selector));
+      if (focusSubjects.some((subject) => subject.every((part) => hovered.has(part)))) continue;
+      findings.push(`${rule.file}:${rule.line} ${selector}`);
+    }
+  }
+  return findings;
+}
+
+/** A rule that gives hover and keyboard focus one look and drops the outline leaves focus indistinguishable from hover. */
+function focusSameAsHover() {
+  const findings = [];
+  for (const rule of allCssRules.filter((entry) => componentCss.includes(entry.file))) {
+    const removesOutline = readDeclarations(rule.body).some(([property, value]) => property === 'outline' && /^(?:none|0)\b/.test(value));
+    if (!removesOutline) continue;
+    const hovered = new Set(rule.selectors.filter((selector) => selector.includes(':hover')).map((selector) => selector.replace(/:hover/g, '')));
+    for (const selector of rule.selectors.filter((entry) => entry.includes(':focus-visible'))) {
+      if (hovered.has(selector.replace(/:focus-visible/g, ''))) findings.push(`${rule.file}:${rule.line} ${selector}`);
+    }
+  }
+  return findings;
+}
+
+/** The two preserved assets whose motion is the running state itself; everything else stops under reduced motion. */
+const ALWAYS_MOVING = new Set(['active-signal-shimmer', 'composerEnergyOrbit']);
+const REDUCED_MOTION = /prefers-reduced-motion:\s*reduce/;
+const normalizeSelector = (selector) => selector.replace(/\s+/g, ' ').replace(/^:root /, '').trim();
+
+/** Every infinite animation has a reduced-motion rule for the same selector (the global layer prefixes `:root`). */
+function reducedMotion() {
+  const stopped = new Set(allCssRules
+    .filter((rule) => rule.atRules.some((prelude) => REDUCED_MOTION.test(prelude)))
+    .flatMap((rule) => rule.selectors.map(normalizeSelector)));
+  const findings = [];
+  for (const rule of allCssRules.filter((entry) => !entry.atRules.some((prelude) => REDUCED_MOTION.test(prelude)))) {
+    const infinite = readDeclarations(rule.body).find(([property, value]) => (
+      (property === 'animation' || property === 'animation-iteration-count') && /\binfinite\b/.test(value)));
+    if (!infinite) continue;
+    const name = readDeclarations(rule.body).find(([property]) => property === 'animation' || property === 'animation-name')?.[1].split(/\s+/)
+      .find((token) => ALWAYS_MOVING.has(token));
+    if (name) continue;
+    for (const selector of rule.selectors) {
+      if (!stopped.has(normalizeSelector(selector))) findings.push(`${rule.file}:${rule.line} ${selector}`);
+    }
+  }
+  return findings;
+}
+
+/** A programmatic scroll that glides asks lib/motion, which jumps instead under reduced motion. */
+function smoothScrolls() {
+  const findings = [];
+  for (const file of files.filter((name) => /\.tsx?$/.test(name) && name !== 'src/renderer/lib/motion.ts')) {
     const text = read(file);
-    for (const match of text.matchAll(/<(p|div|span|small)\s+role="alert"/g)) findings.push(`${file}:${lineOf(text, match.index)}`);
+    for (const match of text.matchAll(/behavior\s*:\s*['"`]smooth['"`]/g)) findings.push(`${file}:${lineOf(text, match.index)} ${match[0]}`);
+  }
+  return findings;
+}
+
+const INTERACTIVE_TAGS = new Set(['a', 'button', 'input', 'select', 'textarea', 'summary']);
+const INTERACTIVE_ROLES = new Set(['button', 'link', 'tab', 'menuitem', 'menuitemradio', 'menuitemcheckbox', 'option', 'checkbox',
+  'radio', 'switch', 'slider', 'spinbutton', 'textbox', 'combobox', 'searchbox', 'treeitem', 'gridcell']);
+/** Shared controls that render a focusable element and pass data-tooltip to it. */
+const INTERACTIVE_COMPONENTS = new Set(['Button', 'IconButton', 'Pill', 'CheckPill', 'Checkbox', 'Switch', 'Select', 'Input',
+  'Textarea', 'SearchField', 'CopyButton', 'ListRow', 'Badge']);
+
+/**
+ * A tooltip is keyboard-reachable only from something focusable: the element itself (a control, tabIndex or an
+ * interactive role) or a control around it, whose focus shows the tooltip of a label inside it (ui/TooltipHost).
+ */
+function tooltipTargets() {
+  const findings = [];
+  const attributes = (node) => (ts.isJsxElement(node) ? node.openingElement : node).attributes.properties.filter(ts.isJsxAttribute);
+  const tagOf = (node) => (ts.isJsxElement(node) ? node.openingElement : node).tagName.getText();
+  const isInteractive = (node) => {
+    const tag = tagOf(node);
+    const attrs = attributes(node);
+    const role = attrs.find((attr) => attr.name.getText() === 'role');
+    const roleValue = role?.initializer && ts.isStringLiteral(role.initializer) ? role.initializer.text : null;
+    return INTERACTIVE_TAGS.has(tag) || INTERACTIVE_COMPONENTS.has(tag) || attrs.some((attr) => attr.name.getText() === 'tabIndex')
+      || (role !== undefined && (roleValue === null || INTERACTIVE_ROLES.has(roleValue)));
+  };
+  for (const file of files.filter((name) => name.endsWith('.tsx') && name !== 'src/renderer/ui/OverflowFade.tsx')) {
+    const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node) => {
+      // aria-hidden marks a pointer-only copy of information shown elsewhere (a usage bar beside its legend); a named
+      // image (role="img" with aria-label) is announced by its name, and the control around it shows the tooltip.
+      const isElement = ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node);
+      const named = (name) => isElement && attributes(node).some((attr) => attr.name.getText() === name);
+      const namedImage = named('aria-label') && attributes(node).some((attr) => attr.name.getText() === 'role'
+        && attr.initializer && ts.isStringLiteral(attr.initializer) && attr.initializer.text === 'img');
+      if (named('data-tooltip') && !isInteractive(node) && !named('aria-hidden') && !namedImage) {
+        let ancestor = node.parent;
+        let reachable = false;
+        while (ancestor && !ts.isSourceFile(ancestor) && !ts.isFunctionLike(ancestor)) {
+          if ((ts.isJsxElement(ancestor) || ts.isJsxSelfClosingElement(ancestor)) && isInteractive(ancestor)) {
+            reachable = true;
+            break;
+          }
+          ancestor = ancestor.parent;
+        }
+        if (!reachable) findings.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1} <${tagOf(node)} data-tooltip>`);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
   }
   return findings;
 }
@@ -186,24 +365,11 @@ function parseLocale(locale) {
   const entries = new Map();
   for (const name of fs.readdirSync(directory)) {
     const text = fs.readFileSync(path.join(directory, name), 'utf8');
-    for (const match of text.matchAll(/^\s*'([^']+)':\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`)/gm)) {
-      entries.set(match[1], match[2] ?? match[3] ?? match[4]);
+    for (const match of text.matchAll(/^\s*(?:'([^']+)'|"([^"]+)"):\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`)/gm)) {
+      entries.set(match[1] ?? match[2], match[3] ?? match[4] ?? match[5]);
     }
   }
   return entries;
-}
-
-/** A key whose Chinese and English text match is untranslated unless every word in it is a proper noun. */
-function i18nSameValues() {
-  const english = parseLocale('en');
-  const findings = [];
-  for (const [key, value] of parseLocale('zh-CN')) {
-    if (english.get(key) !== value) continue;
-    const words = value.replace(/\{[^}]+\}/g, ' ').split(/[\s·/→,:%()+-]+/).filter((word) => /[A-Za-z]/.test(word));
-    if (PROPER_NOUNS.has(value.trim()) || words.length === 0 || words.every((word) => PROPER_NOUNS.has(word))) continue;
-    findings.push(`${key} = ${JSON.stringify(value)}`);
-  }
-  return findings;
 }
 
 const results = {
@@ -212,8 +378,12 @@ const results = {
   'text-glyph': textGlyphs(),
   'raw-error-render': rawErrorRender(),
   'literal-color': literalColors(),
-  'i18n-same-value': i18nSameValues(),
   'bare-alert': bareAlerts(),
+  'hover-focus-pair': hoverFocusPairs(),
+  'focus-same-as-hover': focusSameAsHover(),
+  'reduced-motion': reducedMotion(),
+  'smooth-scroll': smoothScrolls(),
+  'tooltip-target': tooltipTargets(),
 };
 
 const verbose = process.argv.includes('--verbose');

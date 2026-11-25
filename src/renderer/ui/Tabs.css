@@ -75,7 +75,7 @@
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 .ui-tabs-tab.is-selected .ui-tabs-count {

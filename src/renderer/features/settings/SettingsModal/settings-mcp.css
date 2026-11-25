@@ -30,7 +30,8 @@
   transition: background var(--transition-fast);
 }
 
-.settings-mcp-row:hover { background: var(--token-interactive-hover); }
+.settings-mcp-row:hover,
+.settings-mcp-row:focus-within { background: var(--token-interactive-hover); }
 .settings-mcp-row.is-selected { background: var(--token-interactive-active); }
 
 .settings-mcp-row-main {

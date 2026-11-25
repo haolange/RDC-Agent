@@ -34,6 +34,7 @@ interface SelectTriggerProps {
   dataTestId: string;
   triggerAriaLabel: string;
   triggerLabel: string;
+  tooltip?: string;
   swatchColor?: string;
   hasSelection: boolean;
   triggerClassName: string;
@@ -49,6 +50,7 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
   dataTestId,
   triggerAriaLabel,
   triggerLabel,
+  tooltip,
   swatchColor,
   hasSelection,
   triggerClassName,
@@ -70,6 +72,7 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-label={triggerAriaLabel}
+    data-tooltip={tooltip}
     onClick={onClick}
     onKeyDown={onKeyDown}
   >

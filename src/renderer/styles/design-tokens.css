@@ -32,6 +32,8 @@
   --color-accent-900: 24 63 76;
   /* Accent as text/icon/outlined CTA; the theme compiler moves it until it reads at 4.5:1 on chrome. */
   --color-accent-ink: var(--color-accent-400);
+  /* Focus ring; the theme compiler moves the accent until it reads at 3:1 on every chrome surface. */
+  --color-focus-ring: var(--color-accent-500);
 
   /* Background Scale - layered graphite surfaces */
   --color-bg-0: 10 11 14;
@@ -62,7 +64,7 @@
   --color-border-subtle: 255 255 255 / 0.06;
   --color-border-default: 255 255 255 / 0.1;
   --color-border-strong: 255 255 255 / 0.15;
-  --color-border-focus: rgb(var(--color-accent-500));
+  --color-border-focus: rgb(var(--color-focus-ring));
   --color-border-primary: 255 255 255 / 0.14;
   --color-border-secondary: 255 255 255 / 0.08;
 
@@ -255,6 +257,7 @@
   --color-accent-800: 30 82 103;
   --color-accent-900: 38 68 84;
   --color-accent-ink: 26 111 142;
+  --color-focus-ring: 24 140 181;
   --color-text-on-accent: 248 251 255;
 
   --color-bg-0: 244 246 249;
@@ -269,6 +272,9 @@
   --color-text-tertiary: 105 117 133;
   --color-text-muted: 132 143 157;
   --color-text-disabled: 164 173 185;
+
+  /* Compiled for the default light chrome: the dark sky blue reads at 1.7:1 on light surfaces. */
+  --color-info: 5 110 156;
 
   --color-border-subtle: 20 30 44 / 0.1;
   --color-border-default: 20 30 44 / 0.15;
@@ -393,7 +399,7 @@
   --token-border-muted:        rgb(var(--color-border-subtle));
   --token-border-default:      rgb(var(--color-border-default));
   --token-border-strong:       rgb(var(--color-border-strong));
-  --token-border-focus:        rgb(var(--color-accent-500));
+  --token-border-focus:        rgb(var(--color-focus-ring));
   --token-border-card:         rgb(var(--color-border-secondary));
   --token-border-input:        rgb(var(--color-border-default));
 

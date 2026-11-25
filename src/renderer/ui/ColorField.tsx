@@ -69,6 +69,7 @@ export function ColorField({
           onOpenChange={setOpen}
           align="start"
           className="color-field-popover"
+          label={pickerTitle}
           trigger={(
             <button
               type="button"

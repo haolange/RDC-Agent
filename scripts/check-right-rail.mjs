@@ -207,8 +207,9 @@ requireText(railShell[0], 'gap: var(--space-3)', '.right-rail shell must keep sp
 forbidText(railShell[0], 'padding: var(--space-2)', '.right-rail shell must not use space-2 padding');
 requireText(read('src/renderer/features/right-rail/RightRail.css'), '.project-capture-rail { gap: 0; }', 'Project rail must keep single-card gap: 0');
 
+// Escape, the Tab trap and focus return come from the shared modal layer, the same as every other modal surface.
 const drawer = read('src/renderer/app/WorkbenchPanelDrawer.tsx');
-for (const requiredDrawerContract of ['role="dialog"', 'aria-modal="true"', "event.key === 'Escape'", 'returnFocusRef']) {
+for (const requiredDrawerContract of ['role="dialog"', 'aria-modal="true"', 'useOverlayLayer(open', 'useModalFocus({']) {
   requireText(drawer, requiredDrawerContract, `WorkbenchPanelDrawer must retain ${requiredDrawerContract}`);
 }
 

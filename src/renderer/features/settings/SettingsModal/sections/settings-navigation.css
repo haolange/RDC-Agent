@@ -71,7 +71,7 @@
   transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
   border: 1px solid transparent;
   font-size: var(--type-body-size);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .settings-center-nav-icon {

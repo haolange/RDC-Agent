@@ -58,6 +58,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
         <span
           className={`settings-provider-auth-state settings-provider-auth-state--${selectedAvailability.state}`}
           data-testid="settings-provider-auth-state"
+          tabIndex={selectedAvailability.reason ? 0 : undefined}
           data-tooltip={selectedAvailability.reason}
         >
           {selectedState}

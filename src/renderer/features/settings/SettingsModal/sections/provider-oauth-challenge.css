@@ -52,7 +52,7 @@
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);
-  line-height: 1.6;
+  line-height: var(--type-body-line);
 }
 
 .settings-oauth-step-description {
@@ -87,7 +87,7 @@
   color: var(--token-text-primary);
   font-family: var(--font-mono);
   font-size: var(--type-body-size);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .settings-oauth-waiting,

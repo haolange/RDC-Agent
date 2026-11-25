@@ -31,3 +31,9 @@
 .ui-popover[data-ready='false'] {
   visibility: hidden;
 }
+
+/* A dialog without controls takes focus itself when it opens. */
+.ui-popover:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
+}

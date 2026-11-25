@@ -19,7 +19,7 @@
   background: color-mix(in srgb, var(--token-bg-raised) 36%, transparent);
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .settings-provider-notice.error {
@@ -99,7 +99,7 @@
   min-width: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
   overflow-wrap: anywhere;
   white-space: normal;
 }

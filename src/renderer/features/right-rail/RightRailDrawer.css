@@ -47,7 +47,7 @@
 /* The sheet enters from its own edge: the right rail from the right, the left navigation from the left. */
 @keyframes right-rail-drawer-enter { from { opacity: 0; transform: translateX(var(--drawer-enter-offset, var(--space-3))); } to { opacity: 1; transform: translateX(0); } }
 
-@media (max-width: 32rem) {
+@media (max-width: 480px) {
   .right-rail-section,
   .project-capture-rail { inline-size: 100%; }
   .project-capture-input-row { grid-template-columns: var(--control-height-sm) minmax(0, 1fr) auto; }

@@ -29,7 +29,7 @@ function ScopedCaptureWorkspace({ scope, state, disabled, receive }: CaptureWork
   const ownership = lock === 'agent_running' || lock === 'delegated_execution' ? 'control.replay.controlAgent'
     : lock ? 'control.replay.controlLocked' : live ? 'control.replay.controlHuman' : 'control.replay.controlClosed';
   return <div className="capture-replay-content" aria-label={t('control.replay.workspace')}>
-    <div className="capture-workspace-toolbar" role="status" data-tooltip={lock ? t(lockReason) : undefined}>
+    <div className="capture-workspace-toolbar" role="status" tabIndex={lock ? 0 : undefined} data-tooltip={lock ? t(lockReason) : undefined}>
       <span className={`capture-workspace-owner${lock ? ' is-locked' : ''}`}>{t(ownership)}</span>
       {live && state?.imageEventId != null && <span className="capture-workspace-eid">{t('control.replay.eventNumber', { id: state.imageEventId })}</span>}
     </div>

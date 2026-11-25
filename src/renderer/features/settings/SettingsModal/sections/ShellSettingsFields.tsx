@@ -85,7 +85,7 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
           <div className="settings-readonly-status" data-testid="settings-agent-shell-diagnostics">
             {resolved?.ok ? (
               <>
-                <strong data-tooltip={resolved.executable}>
+                <strong tabIndex={0} data-tooltip={resolved.executable}>
                   {resolved.label}
                   {resolved.version ? ` ${resolved.version}` : ''}
                 </strong>

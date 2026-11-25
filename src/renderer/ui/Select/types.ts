@@ -16,6 +16,8 @@ export interface SelectProps {
   disabled?: boolean;
   dataTestId: string;
   ariaLabel?: string;
+  /** Hover / focus text on the trigger (`data-tooltip`), e.g. the full name and size of the selected file. */
+  tooltip?: string;
   variant?: 'field' | 'inline';
   /** Menu edge aligned to the trigger: `start` = left, `end` = right (extends left when wider). */
   menuAlign?: 'start' | 'end';

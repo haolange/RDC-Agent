@@ -157,11 +157,16 @@
   transform: rotate(90deg);
 }
 
-.project-item-chevron:hover,
-.project-item-chevron:focus-visible {
+.project-item-chevron:hover {
   background: var(--token-bg-raised);
   color: var(--token-text-primary);
-  outline: none;
+}
+
+/* Keyboard focus draws the ring; hover only lifts the surface, so the two never read alike. */
+.project-item-chevron:focus-visible {
+  color: var(--token-text-primary);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .session-item-gutter {
@@ -187,15 +192,20 @@
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-normal);
   cursor: pointer;
   transition: color var(--duration-base) var(--ease-standard);
 }
 
-.session-list-toggle:hover,
+.session-list-toggle:hover {
+  color: var(--token-text-primary);
+}
+
 .session-list-toggle:focus-visible {
   color: var(--token-text-primary);
-  outline: none;
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .session-item-actions {
@@ -245,11 +255,15 @@
   transform: translateY(0);
 }
 
-.session-item-icon-button:hover,
-.session-item-icon-button:focus-visible {
+.session-item-icon-button:hover {
   background: var(--token-bg-raised);
   color: var(--token-text-primary);
-  outline: none;
+}
+
+.session-item-icon-button:focus-visible {
+  color: var(--token-text-primary);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .session-item-icon-button.danger:hover,
@@ -261,7 +275,7 @@
 .session-item-time {
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 /* A reply in flight: one small accent dot that breathes; still under reduced motion. */

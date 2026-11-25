@@ -8,10 +8,31 @@ import {
   scaleAccentPalette,
   scaleInkPalette,
   scaleSurfacePalette,
+  type Rgb,
 } from './color';
 import type { ResolvedTheme, ThemeChromeConfig } from '../types/settings';
 
 export type CompiledChromeCssVars = Record<string, string>;
+
+/** WCAG AA: body text and status words read at 4.5:1, the focus ring and other component boundaries at 3:1. */
+export const TEXT_CONTRAST = 4.5;
+export const BOUNDARY_CONTRAST = 3;
+
+/** Starting status hues; the compiler moves each only as far as its contrast floor requires on this chrome. */
+const STATUS_SEEDS: Record<ResolvedTheme, Record<'success' | 'warning' | 'error' | 'info', Rgb>> = {
+  dark: {
+    success: { r: 34, g: 197, b: 94 },
+    warning: { r: 251, g: 191, b: 36 },
+    error: { r: 255, g: 138, b: 128 },
+    info: { r: 56, g: 189, b: 248 },
+  },
+  light: {
+    success: { r: 20, g: 108, b: 61 },
+    warning: { r: 122, g: 82, b: 0 },
+    error: { r: 180, g: 35, b: 24 },
+    info: { r: 56, g: 189, b: 248 },
+  },
+};
 
 /**
  * Compile Appearance chrome into CSS custom-property patches applied on :root.
@@ -37,19 +58,23 @@ export function compileThemeChrome(
   for (const [step, rgb] of Object.entries(surfaces)) {
     vars[`--color-bg-${step}`] = rgbToCssTriplet(rgb);
   }
+  const overlay = variant === 'light' ? surfaces['3'] : surfaces['2'];
+  // Text, status words and the focus ring sit on the app canvas, the chrome layers and popovers.
+  const chromeSurfaces = [surfaces['0'], surfaces['1'], surfaces['2'], surfaces['3'], overlay];
   // Accent text, icons and outlined CTAs must stay readable on every chrome surface they sit on, and
   // filled accent surfaces carry whichever of near-black / near-white reads better on that ink.
   const accentInk = readableOn(accents['400'], [surfaces['1'], surfaces['2'], surfaces['3']]);
   vars['--color-accent-ink'] = rgbToCssTriplet(accentInk);
   vars['--color-text-on-accent'] = rgbToCssTriplet(inkOn(accentInk));
-  vars['--color-text-primary'] = rgbToCssTriplet(texts.primary);
-  vars['--color-text-secondary'] = rgbToCssTriplet(texts.secondary);
-  vars['--color-text-tertiary'] = rgbToCssTriplet(texts.tertiary);
-  vars['--color-text-muted'] = rgbToCssTriplet(texts.muted);
+  // Each readable step of the ramp moves only when it misses 4.5:1; disabled text is exempt (WCAG 1.4.3).
+  for (const step of ['primary', 'secondary', 'tertiary', 'muted'] as const) {
+    vars[`--color-text-${step}`] = rgbToCssTriplet(readableOn(texts[step], chromeSurfaces, TEXT_CONTRAST));
+  }
   vars['--color-text-disabled'] = rgbToCssTriplet(texts.disabled);
-  vars['--color-success'] = variant === 'light' ? '20 108 61' : '34 197 94';
-  vars['--color-warning'] = variant === 'light' ? '122 82 0' : '251 191 36';
-  vars['--color-error'] = variant === 'light' ? '180 35 24' : '255 138 128';
+  for (const [status, seed] of Object.entries(STATUS_SEEDS[variant])) {
+    vars[`--color-${status}`] = rgbToCssTriplet(readableOn(seed, chromeSurfaces, TEXT_CONTRAST));
+  }
+  vars['--color-focus-ring'] = rgbToCssTriplet(readableOn(accents['500'], chromeSurfaces, BOUNDARY_CONTRAST));
 
   // Only a chosen font overrides the bundled default stacks owned by design-tokens.css.
   if (chrome.fonts.ui?.trim()) vars['--font-sans'] = chrome.fonts.ui.trim();
@@ -60,11 +85,9 @@ export function compileThemeChrome(
   vars['--surface-panel'] = `rgb(var(--color-bg-2))`;
   vars['--surface-elevated'] = 'rgb(var(--color-bg-2))';
   vars['--surface-active'] = 'rgb(var(--color-accent-500) / 0.1)';
-  vars['--color-border-focus'] = 'rgb(var(--color-accent-500))';
+  vars['--color-border-focus'] = 'rgb(var(--color-focus-ring))';
   // Popover / Context Usage overlay chrome follows Appearance surface (not a fixed slate).
-  vars['--color-surface-overlay'] = rgbToCssTriplet(
-    variant === 'light' ? surfaces['3'] : surfaces['2'],
-  );
+  vars['--color-surface-overlay'] = rgbToCssTriplet(overlay);
 
   if (variant === 'light') {
     vars['--color-border-subtle'] = '20 30 44 / 0.1';

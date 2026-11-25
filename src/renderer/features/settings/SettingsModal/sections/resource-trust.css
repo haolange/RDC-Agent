@@ -42,7 +42,7 @@
 .settings-runtime-detail-title small {
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  font-weight: var(--font-regular);
+  font-weight: var(--font-normal);
 }
 .settings-runtime-detail-grid {
   display: grid;

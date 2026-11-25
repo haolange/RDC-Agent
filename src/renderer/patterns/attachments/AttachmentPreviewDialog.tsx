@@ -70,7 +70,7 @@ export function AttachmentPreviewDialog({ view, items, onSelectImage, onClose, o
       interactive={false} renderImage={({ alt }) => alt ? <span>{alt}</span> : null}
       renderLink={({ href, children }) => href && /^https:\/\//iu.test(href)
         ? <a href={href} target="_blank" rel="noreferrer noopener" data-tooltip={href}>{children}</a>
-        : <span data-tooltip={href}>{children}</span>} /> : null}
+        : <span tabIndex={href ? 0 : undefined} data-tooltip={href}>{children}</span>} /> : null}
     {mode === 'notes' && item.notes ? <AttachmentNotesBody notes={item.notes} /> : null}
   </ReadingSheet>;
 }

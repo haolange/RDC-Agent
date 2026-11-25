@@ -102,7 +102,7 @@
 }
 
 .settings-personalization-textarea {
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
 }
 
 .settings-save-status:empty {

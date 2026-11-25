@@ -5,6 +5,7 @@ import { Button } from '../../ui/Button';
 import { InlineError } from '../../ui/InlineError';
 import { useI18n } from '../../i18n';
 import { errorDetail } from '../../lib/errorDetail';
+import { isImeComposing } from '../../lib/ime';
 import { referenceProjectInput } from './projectCaptureActions';
 import type { ProjectInputRecord } from '@shared/types/session';
 
@@ -35,7 +36,7 @@ export function ProjectCaptureReferenceDialog({ projectId, onClose, onRegistered
     </>}>
     <Input aria-label={t('projectCapture.referencePath')} value={filePath} disabled={busy}
       onChange={event => setFilePath(event.target.value)}
-      onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void submit(); } }} />
+      onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) { event.preventDefault(); void submit(); } }} />
     {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
   </TaskDialog>;
 }

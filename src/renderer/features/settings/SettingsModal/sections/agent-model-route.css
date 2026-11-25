@@ -68,7 +68,7 @@
 .settings-page-agents .settings-agent-route-panel .settings-section-title {
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-normal);
 }
 
 .settings-agent-route-grid {
@@ -141,7 +141,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '../../../../ui/Button';
 import { Input } from '../../../../ui/Input';
+import { isImeComposing } from '../../../../lib/ime';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { SettingsField } from '../parts';
 import { toSlug } from './agentDraftFactory';
@@ -36,7 +37,7 @@ export const NewAgentDialog: React.FC<{
       <SettingsField label={t('settings.agentName')}>
         <Input ref={nameRef} aria-label={t('settings.agentName')} value={name} placeholder={t('settings.agentDefaultName')}
           onChange={(event) => setName(event.currentTarget.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); create(); } }} />
+          onKeyDown={(event) => { if (event.key === 'Enter' && !isImeComposing(event)) { event.preventDefault(); create(); } }} />
       </SettingsField>
     </TaskDialog>
   );

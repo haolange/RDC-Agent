@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useLayoutStore } from '../../../stores/layoutStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { TerminalDrawer } from './index';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
@@ -57,4 +58,20 @@ it('closes only the nested selector on Escape and returns focus through both lay
   act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(document.querySelector('.runtime-terminal-filter-popover')).toBeNull();
   expect(document.activeElement).toBe(filter);
+});
+
+it('ends a resize drag when the pointer is cancelled instead of released', () => {
+  const layout = useLayoutStore.getState();
+  const persistSpy = vi.fn(async () => {});
+  useLayoutStore.setState({ persistLayout: persistSpy });
+  act(() => root.render(createElement(TerminalDrawer)));
+  const handle = host.querySelector<HTMLDivElement>('[data-testid="runtime-terminal-resize-handle"]')!;
+  const workspace = host.querySelector<HTMLElement>('[data-testid="runtime-terminal"]')!;
+  act(() => handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 400 })));
+  expect(workspace.classList.contains('resizing')).toBe(true);
+  act(() => window.dispatchEvent(new PointerEvent('pointercancel')));
+  expect(workspace.classList.contains('resizing')).toBe(false);
+  expect(document.body.classList.contains('terminal-resizing')).toBe(false);
+  expect(persistSpy).toHaveBeenCalledOnce();
+  useLayoutStore.setState(layout, true);
 });

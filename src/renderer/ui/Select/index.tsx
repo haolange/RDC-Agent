@@ -27,6 +27,7 @@ export const Select: React.FC<SelectProps> = ({
   disabled = false,
   dataTestId,
   ariaLabel,
+  tooltip,
   variant = 'field',
   menuAlign = 'start',
   minMenuWidth = DEFAULT_MIN_MENU_WIDTH,
@@ -262,6 +263,7 @@ export const Select: React.FC<SelectProps> = ({
         dataTestId={dataTestId}
         triggerAriaLabel={triggerAriaLabel}
         triggerLabel={triggerLabel}
+        tooltip={tooltip}
         swatchColor={triggerSwatchColor}
         hasSelection={Boolean(selectedOption)}
         triggerClassName={triggerClassName}

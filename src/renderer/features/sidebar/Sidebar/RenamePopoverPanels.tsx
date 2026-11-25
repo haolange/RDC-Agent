@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
+import { isImeComposing } from '../../../lib/ime';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { Button } from '../../../ui/Button';
 import { Icon } from '../../../ui/Icon';
@@ -90,6 +91,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             value={renamePopover.titleDraft}
             onChange={(event) => onRenameDraftChange(event.target.value)}
             onKeyDown={(event) => {
+              if (isImeComposing(event)) return;
               if (event.key === 'Enter') {
                 event.preventDefault();
                 void onCommitSessionRename();
@@ -188,6 +190,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             value={projectRenamePopover.titleDraft}
             onChange={(event) => onProjectRenameDraftChange(event.target.value)}
             onKeyDown={(event) => {
+              if (isImeComposing(event)) return;
               if (event.key === 'Enter') {
                 event.preventDefault();
                 void onCommitProjectRename();

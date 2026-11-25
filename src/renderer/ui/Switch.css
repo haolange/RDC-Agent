@@ -77,7 +77,7 @@
   min-width: 0;
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }
 
 .ui-switch:not(:has(.ui-switch-input:disabled)) {

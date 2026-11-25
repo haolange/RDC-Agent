@@ -49,6 +49,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
       onOpenChange={setOpen}
       align="start"
       className="settings-agent-icon-popover"
+      label={t('settings.chooseAgentIcon')}
       trigger={(
         <Button variant="secondary" className="settings-agent-icon-trigger" aria-haspopup="menu">
           <ModeGlyph mode="general" icon={value} size={16} strokeWidth={1.9} />

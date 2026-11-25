@@ -64,13 +64,13 @@
 .settings-center-brand-title {
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .settings-center-brand-subtitle {
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.4;
+  line-height: var(--leading-snug);
 }
 
 .settings-center-content {

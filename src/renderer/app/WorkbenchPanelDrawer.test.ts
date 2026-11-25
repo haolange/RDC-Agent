@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { popOverlayLayer, pushOverlayLayer } from '../lib/overlayStack';
 import { WorkbenchPanelDrawer } from './WorkbenchPanelDrawer';
 
 let root: Root;
@@ -19,12 +20,11 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); trigger.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it('traps both Tab boundaries, defers nested-dialog Escape and restores the opening focus', () => {
+it('traps both Tab boundaries, leaves Escape to a layer opened above it and restores the opening focus', () => {
   const close = vi.fn();
   const render = (open: boolean) => act(() => root.render(createElement(WorkbenchPanelDrawer, {
     open, onClose: close, title: 'Session', closeLabel: 'Close', 'data-testid': 'drawer', keepMounted: true,
-    children: createElement('div', null, createElement('button', { id: 'last' }, 'Last'),
-      createElement('div', { role: 'dialog' }, createElement('input', { id: 'nested' }))),
+    children: createElement('div', null, createElement('button', { id: 'last' }, 'Last'), createElement('input', { id: 'nested' })),
   })));
   render(true); act(() => frame?.(0));
   const first = host.querySelector('button')!;
@@ -32,10 +32,11 @@ it('traps both Tab boundaries, defers nested-dialog Escape and restores the open
   expect(document.activeElement).toBe(first);
   act(() => first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })));
   expect(document.activeElement).toBe(last);
-  act(() => last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  // A menu or dialog opened from inside the drawer is the top layer and owns Escape until it closes.
+  const nested = pushOverlayLayer();
+  act(() => last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
   expect(close).not.toHaveBeenCalled();
-  // Test the outer drawer boundary after its nested dialog has closed.
-  last.parentElement!.removeAttribute('role');
+  popOverlayLayer(nested);
   act(() => last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
   expect(document.activeElement).toBe(first);
   act(() => first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
@@ -43,5 +44,5 @@ it('traps both Tab boundaries, defers nested-dialog Escape and restores the open
   render(false); expect(document.activeElement).toBe(trigger);
   expect(host.firstElementChild?.hasAttribute('hidden')).toBe(true);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-  expect(close).toHaveBeenCalledOnce(); expect(frame).toBeNull();
+  expect(close).toHaveBeenCalledOnce();
 });

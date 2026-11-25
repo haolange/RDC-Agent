@@ -47,15 +47,15 @@ RDC-Agent 是现代精密工作台，参照 Linear / Raycast / Arc 的完成度�
 
 ## 动效
 
-动效只为可追踪的状态变化和质感服务。微交互 120ms，展开与面板 180–240ms，循环氛围动效 1.5–2.9s；每个进场都有退场，一条 transition 只写一条缓动曲线。保留的核心动效（Active 扫光、Composer 折射边缘 `composerEnergyOrbit`、Max 粒子）由真实运行状态驱动，原样保留，只属于各自的对象：Composer 的边缘光效不搬到工具卡上，Composer 自己也只在聚焦时边缘增亮。子代理点阵、跟随视窗滚动和进出场在系统「减少动效」下停用或直接切换。Working 行的悬停定位只动标题的颜色与字重，只在指针设备上出现，减少动效时去掉过渡。
+动效只为可追踪的状态变化和质感服务。微交互 120ms，展开与面板 180–240ms，循环氛围动效 1.5–2.9s；每个进场都有退场，一条 transition 只写一条缓动曲线。保留的核心动效（Active 扫光、Composer 折射边缘 `composerEnergyOrbit`、Max 粒子）由真实运行状态驱动，原样保留，只属于各自的对象：Composer 的边缘光效不搬到工具卡上，Composer 自己也只在聚焦时边缘增亮。系统「减少动效」下，所有无限循环动效停下，平滑滚动与进出场直接切换。只有 Active 扫光与 Composer 折射边缘例外，它们的运动就是运行状态本身。Working 行的悬停定位只动标题的颜色与字重，只在指针设备上出现，减少动效时去掉过渡。
 
 ## Token 合规
 
-组件 CSS 只使用语义 token 与刻度变量；primitive `--color-*`、hex 与其他字面颜色、px 字号 / 间距 / 圆角、`!important` 与字面量 `blur(...)` 一律禁止，豁免仅限 token 定义层与全局 chrome 层。图标只来自 `ui/Icon`。规则细节见 design-system.md，门禁：`pnpm run check:design-tokens`、`pnpm run check:ui-contract`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。组件结构和依赖方向遵循 ARCHITECTURE.md 的 Renderer 架构。
+组件 CSS 只使用语义 token 与刻度变量；primitive `--color-*`、hex 与其他字面颜色、px 或 em 字号、px 间距 / 圆角、字面量行高与字距、断点表之外的 media 宽度、`!important` 与字面量 `blur(...)` 一律禁止，豁免仅限 token 定义层与全局 chrome 层。引用的每个变量都必须有定义：引用不存在的变量不会报错，只会让整条声明失效并继承父值。图标只来自 `ui/Icon`。规则细节见 design-system.md，门禁：`pnpm run check:design-tokens`、`pnpm run check:ui-contract`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。组件结构和依赖方向遵循 ARCHITECTURE.md 的 Renderer 架构。
 
 ## 浅色主题与多语言
 
-浅色与深色同为一等公民：浅色有自己的中性色阶与表面层级，不做数值反转；两套主题的正文对比度不低于 4.5:1，大字与控件边界不低于 3:1；扫光、靠近高亮、折射边缘、粒子与点阵按主题分别校准。窗口背景与启动画面跟随所选主题，浅色用户不先看到深色。
+浅色与深色同为一等公民：浅色有自己的中性色阶与表面层级，不做数值反转；两套主题的正文对比度不低于 4.5:1，大字与控件边界不低于 3:1，由主题编译器对每个预设与自定义配色保证，不靠人工挑色；扫光、靠近高亮、折射边缘、粒子与点阵按主题分别校准。窗口背景与启动画面跟随所选主题，浅色用户不先看到深色。
 
 界面文字全部走 i18n，零写死文案、零漏译：中英文相同的键只允许专有名词（Agent 名、模型名、RenderDoc 术语）；同一概念全界面只用一个译名（术语表见 design-system.md）。中文用全角标点，日期、数字与大小用 `Intl` 按区域格式化；按钮、标签、胶囊与表头按英文 +40% 长度验证不溢出，长文案渐隐而不是硬切。切换语言立即生效，不改写已生成的历史与模型输出。
 

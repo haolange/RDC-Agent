@@ -28,7 +28,7 @@
   color: var(--token-text-primary);
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
-  line-height: 1.25;
+  line-height: var(--leading-tight);
   overflow-wrap: anywhere;
 }
 
@@ -36,7 +36,7 @@
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;

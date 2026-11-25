@@ -82,7 +82,9 @@ export function readableOn(color: Rgb, backgrounds: readonly Rgb[], minRatio = 4
   const direction = meanLuminance > INK_FLIP_LUMINANCE ? -1 : 1;
   const hsl = rgbToHsl(color);
   for (let lightness = hsl.l + direction; lightness >= 0 && lightness <= 100; lightness += direction) {
-    const candidate = hslToRgb({ ...hsl, l: lightness });
+    // Judge the color CSS will actually paint: the compiler emits whole channel values.
+    const { r, g, b } = hslToRgb({ ...hsl, l: lightness });
+    const candidate = { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
     if (worstRatio(candidate) >= minRatio) return candidate;
   }
   return direction < 0 ? NEAR_BLACK : NEAR_WHITE;

@@ -42,7 +42,7 @@
   color: var(--token-status-error);
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
   overflow-wrap: anywhere;
 }
 

@@ -6,6 +6,7 @@ import { Select } from '../../ui/Select';
 import { Chevron } from '../../ui/Chevron';
 import { InlineError } from '../../ui/InlineError';
 import { errorDetail } from '../../lib/errorDetail';
+import { isImeComposing } from '../../lib/ime';
 import { createReplayApplyQueue } from './replayApplyQueue';
 import { applyReplayEvent, type CaptureScope } from './capturePanelActions';
 import type { CaptureReplayApplyRequest, CaptureReplayState } from '@shared/types/captureReplay';
@@ -59,7 +60,7 @@ export function CaptureReplayControls({ scope, state, disabled, receive }: {
       <label className="capture-event-input">{t('control.replay.eventLabel')} <Input inputSize="sm" aria-label={t('control.replay.eventId')} value={draft} disabled={disabled || !events.length}
         inputMode="numeric" onChange={(event) => setDraft(event.target.value)}
         onBlur={() => { const value = Number(draft); if (events.some((event) => event.eventId === value)) { if (value !== eventId) select(value, true); } else setDraft(String(eventId ?? '')); }}
-        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>
+        onKeyDown={(event) => { if (event.key === 'Enter' && !isImeComposing(event)) event.currentTarget.blur(); }} /></label>
       <Button variant="ghost" size="sm" aria-label={t('control.replay.next')} disabled={disabled || !events.length || position >= events.length - 1} onClick={() => select(events[position + 1].eventId, true)}><Chevron /></Button>
     </div>
     <input className="capture-event-slider" type="range" min={0} max={Math.max(0, events.length - 1)} value={position} disabled={disabled || events.length < 2}

@@ -11,7 +11,10 @@ const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 6;
 
 interface ActiveTooltip {
+  /** The element the bubble points at. */
   target: HTMLElement;
+  /** The element described while the bubble shows: the focused control, which may contain the target. */
+  owner: HTMLElement;
   text: string;
 }
 
@@ -57,16 +60,16 @@ export function TooltipHost() {
     });
   }, []);
 
-  const show = useCallback((target: HTMLElement, immediate: boolean) => {
+  const show = useCallback((target: HTMLElement, immediate: boolean, owner: HTMLElement = target) => {
     const text = target.dataset.tooltip?.trim();
     window.clearTimeout(timer.current);
     if (!text || repeatsVisibleText(target, text)) return;
     const warm = Date.now() - lastHiddenAt.current < WARM_WINDOW_MS;
     if (immediate || warm) {
-      setActive({ target, text });
+      setActive({ target, owner, text });
       return;
     }
-    timer.current = window.setTimeout(() => setActive({ target, text }), HOVER_DELAY_MS);
+    timer.current = window.setTimeout(() => setActive({ target, owner, text }), HOVER_DELAY_MS);
   }, []);
 
   useEffect(() => {
@@ -79,9 +82,13 @@ export function TooltipHost() {
       const target = tooltipTarget(event.target);
       if (target && !target.contains(event.relatedTarget as Node | null)) hide();
     };
+    // Keyboard focus shows the control's own tooltip, or else the one on a label inside it (a truncated row title),
+    // so a tooltip is reachable wherever its text sits within something focusable.
     const onFocusIn = (event: FocusEvent) => {
-      const target = tooltipTarget(event.target);
-      if (target && target.matches(':focus-visible')) show(target, true);
+      const focused = event.target;
+      if (!(focused instanceof HTMLElement) || !focused.matches(':focus-visible')) return;
+      const target = focused.hasAttribute('data-tooltip') ? focused : focused.querySelector<HTMLElement>('[data-tooltip]');
+      if (target) show(target, true, focused);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') hide();
@@ -111,13 +118,13 @@ export function TooltipHost() {
   }, [active]);
 
   useEffect(() => {
-    if (!active || active.text === accessibleName(active.target)) return undefined;
-    const { target } = active;
-    const previous = target.getAttribute('aria-describedby');
-    target.setAttribute('aria-describedby', previous ? `${previous} ${id}` : id);
+    if (!active || active.text === accessibleName(active.owner)) return undefined;
+    const { owner } = active;
+    const previous = owner.getAttribute('aria-describedby');
+    owner.setAttribute('aria-describedby', previous ? `${previous} ${id}` : id);
     return () => {
-      if (previous) target.setAttribute('aria-describedby', previous);
-      else target.removeAttribute('aria-describedby');
+      if (previous) owner.setAttribute('aria-describedby', previous);
+      else owner.removeAttribute('aria-describedby');
     };
   }, [active, id]);
 

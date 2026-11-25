@@ -1,5 +1,6 @@
 export const zhChat = {
   'chat.historyLoading': '正在打开会话',
+  'chat.replyAnnouncement': '回复：{text}',
   'chat.toolOutcomeRecorded': '已记录本轮声明',
   'chat.toolOutcomeRecording': '正在记录本轮声明',
   'chat.toolOutcomeArtifact': '调查产物',
@@ -398,7 +399,7 @@ export const zhChat = {
   "chat.toolDisplay.delete_file.category": "文件删除",
   "chat.toolDisplay.move_file.category": "文件移动",
   "chat.toolDisplay.copy_file.category": "文件复制",
-  "chat.toolDisplay.notebook_edit.category": "Notebook",
+  "chat.toolDisplay.notebook_edit.category": "Notebook 编辑",
   "chat.toolDisplay.git_status.category": "Git 状态",
   "chat.toolDisplay.git_status.groupUnit": "状态",
   "chat.toolDisplay.git_diff.category": "Git 差异",

@@ -76,7 +76,7 @@ RDC-Agent 是 **现代精密工作台**：工作区高密度，其余处从容�
 | 圆角 | `--radius-sm/md/lg/xl/2xl/full` | 6 / 8 / 10 / 14 / 18 / 9999 | 控件、输入与按钮 `md`；卡片 `--radius-card`（lg）；Composer 壳与浮层 `xl`；Sheet 与对话框 `--radius-sheet`（2xl）；pill `full` |
 | 间距 | `--space-*` | 4 基（另有 `--space-0-5` 2px） | panel 内边距 `--space-3`（工作台右栏 inspector 外壳同此）；section 间距 `--space-5`；禁奇数 px |
 | 字号 | `--type-<角色>-size` / `-line` | 见下表 | 只引用四个角色；`data-font-scale` 的 small / large 同时重映射全部角色；meta 是 12px 下限 |
-| 行高 | `--leading-none/tight/snug/normal/relaxed` | 1 / 1.25 / 1.375 / 1.5 / 1.625 | 正文 `normal`，紧凑标题 `tight` |
+| 行高 | `--leading-none/tight/snug/normal/relaxed` | 1 / 1.25 / 1.375 / 1.5 / 1.625 | 正文 `normal`，紧凑标题 `tight`；设了排版角色字号的规则优先用同角色的 `--type-*-line` |
 | 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | `--transition-*` 是 `duration + --ease-standard`；状态动效用 `--motion-disclosure` / `--motion-indicator`（`--ease-emphasized`）与 `--motion-overlay` |
 | 字距 | `--tracking-tight/heading/normal/wide` | -0.02 / -0.011 / 0 / 0.04em | 大标题收紧、标题轻收、正文默认、kbd 等少量标签加宽 |
 | 阴影 | `--token-elevation-1/2/3` | 卡片 / 浮层 / Sheet 与对话框 | 只表达层级；不叠加装饰光晕 |
@@ -132,8 +132,12 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 Settings 页标题与正文共用面板内边距。用途与风险写在所属字段下方，正文说明按阅读行长控制，编辑器、列表与预览按内容需要分配宽度。常规页个人资料集中在一行，语言使用紧凑分段控件，工作过程的两个选项以同一组步骤呈现「跟随最新」的顶部渐隐和「全部展开」的完整时间线，全局指令说明留在编辑框上方。外观页的应用显示模式用「跟随系统 / 浅色 / 深色」分段控件，两张预览选择唯一编辑器的目标，窄容器纵向排列。每张预览使用本身的主题编译结果绘制导航、正文、代码字体和强调色操作。主题预设、配色、字体、对比度、导入与复制都作用于该目标。字号和 Composer Markdown 使用普通设置行。Agent 指令随内容增高，最小两行、最多视口高度 45%，之后内部滚动。独立技能与策略的全文编辑区使用可用空间。
 
 - 状态类一律 `is-*`：`is-active` / `is-selected` / `is-running` / `is-disabled` / `is-error`，并配对应 `aria-*`。禁止裸 `.active` / `.current`。
-- 任何定义了 `:hover` 的可交互选择器必须同时定义 `:focus-visible`（目前没有自动门禁，靠审查与验收）。
+- 任何定义了 `:hover` 的可交互选择器必须同时有键盘对应：同一元素的 `:focus-visible`、`:focus-within` 或 `:focus` 规则（`check:ui-contract` 的 `hover-focus-pair`）。只有滚动条与 aria-hidden 的拖拽手柄是纯指针。
+- 焦点与悬停必须看得出差别：悬停只抬表面或提亮文字，键盘焦点画焦点环。把 `:hover` 与 `:focus-visible` 写进同一条规则再去掉 outline 的写法由 `focus-same-as-hover` 拒绝。
 - 焦点环统一 `--token-border-focus`；禁止 `outline: none` 而不提供等效焦点样式。
+- 在文本框里按 Enter 提交、选中或关闭之前，先用 `lib/ime` 的 `isImeComposing` 排除输入法组字（Chromium 报 `isComposing`，WebKit 报 keyCode 229）。组字时的 Enter 只用来上屏候选词，Escape 只用来取消组字。
+- **Windows 高对比度（forced colors）**：系统会重绘全部作者颜色、去掉阴影并压平底色。`design-base.css` 用系统色补回只靠阴影或底色表达的状态：键盘焦点是 `Highlight` 焦点环，选中项（`aria-selected`、`aria-current`、`is-selected`）是 `Highlight` 底与 `HighlightText` 字，禁用是 `GrayText`。这组规则只在 forced colors 下生效，并有意压过组件规则。
+- **读屏播报**：Transcript 有一个礼貌的 live region（`features/transcript/ReplyAnnouncer`）。每条助手回复在完成时读一次（去掉 Markdown 标点，约 300 字处按词截断），流式输出不逐字播报；打开会话时已有的历史回复不播报。
 - 按压态：可点击控件都有 `:active` 反馈（轻微压暗或 0.98 缩放），时长 `--duration-fast`。
 - 动效由真实交互与运行生命周期驱动，规则见「动效」。
 
@@ -162,6 +166,9 @@ Settings 页标题与正文共用面板内边距。用途与风险写在所属�
 - `--token-*` 完整定义在 `src/renderer/styles/design-tokens.css` 的语义层。
 - 字号只引用排版角色 `var(--type-<角色>-size)` / `var(--type-<角色>-line)`，**禁止** px 字面值与对角色做缩放计算。
 - 间距必须用 `var(--space-*)` 变量，**禁止**奇数像素值（3px、7px、9px）。
+- 行高只用 `var(--type-*-line)` 或 `var(--leading-*)`，字距只用 `var(--tracking-*)`；`0`、`normal`、`inherit` 是复位，不算取值。字号不写 em、rem 或 px，等宽字体也跟随所在角色。
+- media query 只用断点表（`styles/global/breakpoints.css`）里的宽度。
+- 每个没有回退值的 `var(--name)` 都必须有定义（renderer CSS、在运行时设置它的脚本，或 `src/shared/theme`）。引用不存在的变量会让整条声明在计算时失效并继承父值：`--font-regular` 曾让 400 字重继承成 600，`--line-normal` 曾让行高继承父值。
 
 ## 按钮规则
 
@@ -180,6 +187,7 @@ Settings 页标题与正文共用面板内边距。用途与风险写在所属�
 
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
 - 强调文本、图标与描边 CTA 读 `--token-accent-primary`（primitive `--color-accent-ink`）：`ThemeChromeCompiler` 从 accent-400 出发，沿同一色相向远离背景的方向调亮度，直到在 `bg-1…bg-3` 上都达到 4.5:1；实心 accent 面上的文字/图标读 `--token-text-on-accent`（`--color-text-on-accent`），取近黑与近白中对比更高者。Composer Send 同理读 compose 派生的 `--composer-mode-on-accent`。任何主题与自定义 accent 都不再靠人工挑色保证可读。
+- **对比度由编译器保证**：`ThemeChromeCompiler` 对每个读出来的颜色调用 `readableOn`，在 `bg-0…bg-3` 与浮层表面上检查。文字色阶（主文、次要、tertiary、muted）与状态色（success、warning、error、info）要求 4.5:1，焦点环 `--color-focus-ring`（`--token-border-focus` 的来源，起点是 accent-500）要求 3:1。只移动不达标的值，达标的原样输出；禁用文字 `--color-text-disabled` 按 WCAG 豁免。`src/shared/theme/compiler.test.ts` 逐个扫描全部预设的深浅两套。默认 RDC 主题只有浅色的两处被移动：焦点环从 2.5:1 的 `27 157 204` 移到 `24 140 181`，info 从 1.7:1 的天蓝移到 `5 110 156`。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
 - **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框、send、Effort/Max 滑条、Max 字色、Max mode / Fast 角标开态）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
 - Effort 弹层的 Max mode / Fast mode 只在模型支持时出现：unsupported 不占位，fixed 显示为锁定开启，selectable 才允许切换。收起胶囊只在对应模式开启时前置图标。
@@ -308,11 +316,11 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 - 每个进场都有退场：TaskDialog、ReadingSheet、Settings、知识中心、Popover、Select、ContextMenu、Toast、Tooltip 共用 `design-motion.css` 的成对关键帧（`overlay-fade-*`、`surface-rise-*`、`popover-*`），关闭时元素带 `data-state="closing"` 播放退场，`ui/usePresence` 在它自己的 animationend 后卸载；没有退场动画或减少动效时立即卸载。
 - **悬停定位**：Working 内可展开的卡头和子行统一用 `WorkRowTitle`，行根标记 `data-locate`。默认标题为次级色和正常字重，鼠标悬停或键盘聚焦时用主色和半粗字重，保留错误、警告色及运行扫光。嵌套时，鼠标只高亮最内层的可交互标题。隐藏的半粗标题副本预留宽高，长任务标题照常换行。箭头和正文表达开合。静态 Ask、审批和计划卡沿用各自样式。
 - **跟随视窗**：Working 在「跟随最新」偏好下的限高容器，内容增长时用 200ms 缓动滚到底；用户上滚即暂停跟随。
-- 系统 `prefers-reduced-motion: reduce` 时，`design-reduced-motion.css` 把时长 token 置零，停掉 spin、骨架屏、子代理点阵、trace flash、agent 菜单运行点、靠近高亮与跟随缓动（直接跳到最新）；保留资产 Active Signal 与 Composer 折射边缘由真实运行状态驱动，不受系统偏好影响；Max 画布由 `EffortMaxField` 自己收束。
+- 系统 `prefers-reduced-motion: reduce` 时，`design-reduced-motion.css` 把时长 token 置零，并停掉每一个无限循环动画：spin、骨架屏、任务进行中弧线、启动进度条、Working 运行点、子代理点阵、流式光标、trace flash、agent 菜单运行点。这一层在组件 CSS 之前加载，所以每个选择器都加 `:root` 前缀，多一级特异性压过它要停的组件规则。只有两项保留资产不受系统偏好影响，因为它们的运动就是运行状态本身：Active Signal 扫光与 Composer 折射边缘（`composerEnergyOrbit`）。Max 画布由 `EffortMaxField` 自己收束。程序触发的平滑滚动一律经 `lib/motion` 的 `motionScrollBehavior()`，减少动效时直接跳到目标；Working 跟随视窗同样直接跳到最新。`check:ui-contract` 的 `reduced-motion` 与 `smooth-scroll` 拒绝漏掉的无限动画与字面量平滑滚动。
 
 ## 反馈原语
 
-- **提示**：任何元素写 `data-tooltip` 即可获得悬停提示，`ui/TooltipHost`（挂在 `AppProviders`）统一呈现：悬停 450ms 后出现，刚关闭一个后下一个立即出现，键盘聚焦立即出现，Escape、按下指针与离开即消失，触屏不出现；提示文字与元素可访问名称不同时以 `aria-describedby` 关联。组件不写原生 `title`；截断文字用 `OverflowFade`，只在真正溢出时提供完整文字；提示文字与可见文字完全相同且没有截断时，`TooltipHost` 不显示它。
+- **提示**：任何元素写 `data-tooltip` 即可获得悬停提示，`ui/TooltipHost`（挂在 `AppProviders`）统一呈现：悬停 450ms 后出现，刚关闭一个后下一个立即出现，键盘聚焦立即出现，Escape、按下指针与离开即消失，触屏不出现；提示文字与元素可访问名称不同时以 `aria-describedby` 关联。提示必须能用键盘到达：写在可聚焦元素上（控件、`tabIndex={0}` 的静态文字、交互 role），或写在控件内部的标签上；控件获得键盘焦点时，`TooltipHost` 显示它自己的提示，没有就显示内部第一个标签的提示，并用它描述这个控件。`aria-hidden` 的纯指针副本（旁边有图例的用量条）与有 `aria-label` 的 `role="img"` 图标例外；门禁 `check:ui-contract` 的 `tooltip-target`。组件不写原生 `title`；截断文字用 `OverflowFade`，只在真正溢出时提供完整文字；提示文字与可见文字完全相同且没有截断时，`TooltipHost` 不显示它。
 - **Toast**：`ui/Toast` + `NotificationToast` 是唯一的操作结果反馈：语气图标、一句标题、可选一句正文、关闭按钮；信息与成功 4s、警告 6s 自动消失，错误等待用户关闭，悬停或聚焦时暂停计时，最多同时 3 条。来源只有 `notificationStore` 的 `notify.info/success/warning/error`；失败用 `notify.failure(error, t, 情境文案键)`，标题由 `humanizeError` 给出，技术细节不上屏，只在关闭按钮旁的「复制详情」里。
 - **错误**：`ui/InlineError` 是唯一的错误呈现：错误图标 + 一句人话（正文字号）+ 可选「重试」+ 有技术原因时一个「复制详情」图标按钮（经 `lib/clipboard` 的 `ClipboardContext`，由 `AppProviders` 注入）。原始报错经 `lib/errorDetail` 只进复制内容，门禁拒绝在组件里渲染 `String(error)` 或裸 `<p role="alert">`。
 - **复制**：`ui/CopyButton` 是唯一的复制入口：复制图标，成功后 1.6s 内变成绿色对勾，提示同步切换为「已复制」。
@@ -321,7 +329,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 
 ## 浅色主题
 
-浅色不是深色的数值反转：它有自己的中性色阶与表面层级（`ThemeChromeCompiler` 的 light 预设），两套主题都过 WCAG AA（正文 4.5:1，大字与控件边界 3:1）。组件 CSS 不写任何字面颜色（含 `white`、`black`、`rgb(...)`、`rgba(...)`），旧的 `rgb(var(--color-*))` 写法已删除。保留动效按主题校准：扫光在浅色上用略深的光带，折射边缘、Max 粒子与点阵分别校准亮度。窗口背景色与启动画面跟随所选主题。
+浅色不是深色的数值反转：它有自己的中性色阶与表面层级（`ThemeChromeCompiler` 的 light 预设），两套主题都过 WCAG AA（正文 4.5:1，大字与控件边界 3:1），由主题编译器保证，见「颜色使用规则」。组件 CSS 不写任何字面颜色（含 `white`、`black`、`rgb(...)`、`rgba(...)`），旧的 `rgb(var(--color-*))` 写法已删除。保留动效按主题校准：扫光在浅色上用略深的光带，折射边缘、Max 粒子与点阵分别校准亮度。窗口背景色与启动画面跟随所选主题。
 
 ## 多语言与术语表
 
@@ -377,15 +385,14 @@ pnpm run typecheck
 
 | 规则 | gate | 基线 |
 |------|------|------|
-| 语义 token / 禁 primitive、hex、px 字号间距圆角、`!important`、字面量 blur | `check:design-tokens` | 0 |
+| 语义 token / 禁 primitive、hex、px 与 em 字号、px 间距圆角、`!important`、字面量 blur；行高与字距走刻度；断点表外的 media 宽度；没有定义的 `var()` 引用 | `check:design-tokens` | 0 |
 | 层依赖、feature 横向、组件直调 IPC、退役目录、global feature 选择器、`is-*` 状态类 | `check:renderer-structure` | 0 |
 | Appearance 双体系、Select 实色、`ColorField`、组件消费者索引 | `check:appearance` | — |
 | Composer energy orbit、Active Signal 参数 | `check:work-process`（对照 CSS 的角度范围、2.85s、1.6s / 200% / 36%） | — |
 | 右栏五标签单轨 | `check:right-rail` | — |
-| i18n 双语 key 一致、中英同值仅限白名单专有名词 | `check:i18n` | 0 |
-| 无效过渡（一条 transition 两条缓动）、图标只来自 `ui/Icon`、组件不内联 SVG 或文字图标、不把 `String(error)` / `error.message` 直接上屏、组件 CSS 无字面颜色、保留资产回归 | `check:ui-contract` | 0 |
+| i18n 双语 key 一致、中英同值仅限白名单专有名词（按加载后的语言包判断，单双引号的 key 都算）；renderer `.ts` / `.tsx` 不写中文字符串、JSX 文字、可读属性里的字面文案与英文句子（Error 消息、`throw`、`console`、与外部消息的比较，以及 `message` / `detail` / `error` / `reason` 诊断字段只进「复制详情」，不算文案） | `check:i18n` | 0 |
+| 无效过渡（一条 transition 两条缓动）、图标只来自 `ui/Icon`、组件不内联 SVG 或文字图标、不把 `String(error)` / `error.message` 直接上屏、无 class 的 `role="alert"` 文字元素（role 写在任何位置都算）、组件 CSS 无字面颜色、保留资产回归；`:hover` 配键盘焦点、焦点与悬停可区分、无限动画有减少动效规则、平滑滚动经 `lib/motion`、提示可用键盘到达 | `check:ui-contract` | 0（另有其他改动持有的文件里的待修项，按文件计数，只降不升） |
 | 默认画面无 `session://`、长哈希、原始标识、裸状态码、字节数、回执句与「诊断」折叠 | `qa-walkthrough.mjs` 可见文字扫描 | 0 |
-| `:hover` 必配 `:focus-visible`、禁无替代 `outline: none` | 无自动门禁 | — |
 
 `check:design-tokens` 豁免仅限 token 与动效定义层：`design-system.css`、`design-tokens.css`、`design-motion.css`、`design-base.css`、`design-reduced-motion.css`（与脚本的 `EXEMPT_PREFIXES` 一致）。新增豁免必须先改本文件再改脚本。
 
@@ -448,6 +455,8 @@ Work Process 的进度、工具结果摘要与轨道语义归 [`workbench-and-tr
 - `ui/Details` 是普通披露的唯一入口，inline 用于所属详情，panel 用于需要独立边界的内容。沿用原生 summary 的键盘语义；折叠隐藏内容但不卸载草稿，各项独立。Transcript 的受控工作轨道仍由 `WorkCardHeader` / `ScopedWorkDisclosure` 持有时间顺序与会话展开记忆。
 - 表单标签、说明、错误与动作各承担一项职责。标签已经说明的内容不重复写提示；权限、费用、未保存和前置约束不能收进详情。SettingsField 是设置领域组合，不为单一消费者创建新的基础表单框架。
 - Popover、Select、ContextMenu 共用 `lib/anchoredSurface`：安全边距、翻转和视口约束按实测尺寸计算。内容/锚点尺寸变化、窗口缩放、字体加载重新定位；菜单内部负责超高内容滚动。Escape 只消费顶层，关闭后恢复触发焦点。
+- `ui/Popover` 默认是非模态对话框（`role="dialog"`）。它默认以触发器命名；触发器由别的元素命名时，借用那个元素；触发器的名称不能代表浮层时传 `label`。打开并定位后，焦点进入第一个控件，没有控件时进入浮层本身。浮层挂在 document 末尾，所以在触发器上按 Tab 进入浮层；在第一个控件上按 Shift+Tab 回到触发器；在最后一个控件上按 Tab 关闭浮层，并从触发器之后继续。`Menu` 用 `role="presentation"` 包住自己的 `role="menu"`，焦点由 Menu 自己管理。
+- Command palette（Ctrl/Cmd+K）与窄屏工作台抽屉（`WorkbenchPanelDrawer`）是模态层：都经 `useOverlayLayer` 注册，用 `useModalFocus` 管理焦点进入、Tab 循环、Escape 与关闭后回焦；抽屉里打开的菜单或对话框在栈顶时先处理自己的按键。
 - Settings 独立约束宽高，不以宽高比例决定高度。桌面列表与编辑器分配剩余空间；窄容器改为顺序布局时正文由页面滚动，不能再给同一编辑正文独立高度上限。TaskDialog 头部和操作区不收缩，正文负责滚动。
 - 受保护动效包括 ActiveSignalText 左到右扫光、Composer `composerEnergyOrbit` 角度绕光/柔和外沿，以及 Max 档位的 `EffortMaxField` 粒子场、进入/退出与滑杆联动。它们只有一个生产实现；Max 的控制器、时间线和绘制仍归 Composer，基础组件不理解模型档位。活文档可复用效果组件，但不能以展示样例替代真实模型验证。
 

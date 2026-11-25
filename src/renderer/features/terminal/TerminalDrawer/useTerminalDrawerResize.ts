@@ -30,6 +30,7 @@ export function useTerminalDrawerResize() {
       setTerminalHeight(nextHeight);
     };
 
+    // A cancelled pointer (touch taken over by the system, capture lost) ends the drag the same way a release does.
     const handlePointerUp = () => {
       if (!resizeStateRef.current) {
         return;
@@ -42,9 +43,11 @@ export function useTerminalDrawerResize() {
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
       document.body.classList.remove('terminal-resizing');
     };
   }, [persistLayout, setTerminalHeight]);

@@ -46,3 +46,22 @@ it('ignores touch hover', async () => {
   expect(document.querySelector('[role="tooltip"]')).toBeNull();
   await act(async () => root.unmount());
 });
+
+it('shows the tooltip of a label inside a focused control and describes the control', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const row = document.createElement('button');
+  const title = document.createElement('span');
+  title.textContent = 'Shader pass';
+  title.dataset.tooltip = 'Shader pass · 12 draws';
+  row.append(title);
+  document.body.append(row);
+  const root = createRoot(container);
+  await act(async () => root.render(createElement(TooltipHost)));
+  await act(async () => { row.focus(); });
+  const tooltip = document.querySelector<HTMLElement>('[role="tooltip"]')!;
+  expect(tooltip.textContent).toBe('Shader pass · 12 draws');
+  expect(row.getAttribute('aria-describedby')).toBe(tooltip.id);
+  expect(title.hasAttribute('aria-describedby')).toBe(false);
+  await act(async () => root.unmount());
+});

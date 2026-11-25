@@ -1,5 +1,6 @@
 export const enChat = {
   'chat.historyLoading': 'Opening the session',
+  'chat.replyAnnouncement': 'Reply: {text}',
   'chat.toolOutcomeRecorded': 'Recorded turn declaration',
   'chat.toolOutcomeRecording': 'Recording turn declaration',
   'chat.toolOutcomeArtifact': 'Investigation artifact',

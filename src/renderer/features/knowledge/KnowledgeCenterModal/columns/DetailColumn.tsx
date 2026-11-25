@@ -10,6 +10,7 @@ import { Menu } from '../../../../ui/Menu';
 import { Panel } from '../../../../ui/Panel';
 import { Tabs } from '../../../../ui/Tabs';
 import { useCopyDiagnostics } from '../../../../patterns/CopyDiagnostics';
+import { motionScrollBehavior } from '../../../../lib/motion';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { CHAPTER_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
@@ -124,7 +125,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
 
   const jumpTo = (index: number) => {
     textRef.current?.querySelectorAll('h1, h2, h3')[index]
-      ?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+      ?.scrollIntoView({ block: 'start', behavior: motionScrollBehavior() });
   };
   const run = (action: KnowledgeCardAction) => {
     if (!card) return;

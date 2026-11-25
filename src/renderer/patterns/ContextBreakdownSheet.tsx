@@ -39,6 +39,7 @@ const ContextBarSegment: React.FC<{
   return (
     <span
       className="context-breakdown-bar-segment"
+      aria-hidden="true"
       data-segment={id}
       data-tooltip={title}
       {...dynStyle}
@@ -148,7 +149,7 @@ export const ContextBreakdownContent: React.FC<ContextBreakdownContentProps> = (
   return (
     <div className="context-breakdown-content">
         <div className="context-breakdown-hero">
-          <div className="context-breakdown-hero-usage"
+          <div className="context-breakdown-hero-usage" tabIndex={showEstimated || stale ? 0 : undefined}
             data-tooltip={showEstimated ? t('contextBreakdown.projectedNote') : stale ? t('contextBreakdown.staleNote') : undefined}>
             <span className="context-breakdown-pct-large">
               {typeof displayUsagePercent === 'number'

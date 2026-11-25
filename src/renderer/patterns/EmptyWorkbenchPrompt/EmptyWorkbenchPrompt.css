@@ -38,7 +38,7 @@
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   line-height: var(--leading-tight);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-heading);
   text-wrap: balance;
 }
 
@@ -144,7 +144,7 @@
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-normal);
 }
 
 .empty-workbench-tool-subtitle {

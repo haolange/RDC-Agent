@@ -94,7 +94,7 @@
   gap: var(--space-1);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 720px) {
   .settings-mcp-dialog .settings-field:not(.settings-runtime-form-check) {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);

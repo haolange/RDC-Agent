@@ -13,7 +13,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 :is(.markdown-body, .work-process-highlighted-code) .hljs-comment,

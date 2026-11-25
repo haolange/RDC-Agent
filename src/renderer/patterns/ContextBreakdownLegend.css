@@ -65,7 +65,7 @@
   flex: 0 0 auto;
   color: var(--token-text-disabled);
   font-size: var(--type-body-size);
-  line-height: 1;
+  line-height: var(--leading-none);
   white-space: nowrap;
 }
 
@@ -75,7 +75,7 @@
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  line-height: var(--leading-none);
   text-align: right;
   white-space: nowrap;
 }

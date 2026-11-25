@@ -37,7 +37,7 @@
 .settings-model-capability-note {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: var(--line-normal);
+  line-height: var(--type-meta-line);
 }
 
 .settings-model-capability-note--warning {

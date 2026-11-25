@@ -7,6 +7,7 @@ import { InlineError } from '../../../ui/InlineError';
 import { isBrowserAppSession } from '../../../platform/browserSession';
 import { browseProjectDirectory } from '../../../platform/projectDirectory';
 import { errorDetail } from '../../../lib/errorDetail';
+import { isImeComposing } from '../../../lib/ime';
 
 export function ProjectAddDialog({ onAdd, onClose }: { onAdd: (rootPath: string) => Promise<void>; onClose: () => void }) {
   const { t } = useI18n();
@@ -34,7 +35,7 @@ export function ProjectAddDialog({ onAdd, onClose }: { onAdd: (rootPath: string)
     </>}>
     <Input aria-label={t('sidebar.projectPath')} value={rootPath} disabled={busy}
       onChange={event => setRootPath(event.target.value)}
-      onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void submit(); } }} />
+      onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) { event.preventDefault(); void submit(); } }} />
     {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
   </TaskDialog>;
 }

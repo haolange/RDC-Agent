@@ -161,39 +161,32 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     };
     const requestScopeFilter = state.scopeFilter;
     const request = resolveRuntimeLogRequest(requestScopeFilter, requestContext.sessionId);
+    const isCurrent = (latest: TerminalState) => latest.scopeFilter === requestScopeFilter
+      && latest.sessionId === requestContext.sessionId
+      && latest.projectId === requestContext.projectId
+      && latest.runId === requestContext.runId;
+    // Lines that stream in while the list is in flight may be missing from its snapshot; they survive the refresh.
+    const knownAtRequest = new Set(state.entries.map((entry) => entry.id));
+    const appendedSince = (entries: RuntimeLogEntry[], listed: ReadonlySet<string>) => entries
+      .filter((entry) => !knownAtRequest.has(entry.id) && !listed.has(entry.id));
     set({ isLoading: true });
     try {
       const result = await electronAPI.runtimeLog.list(request);
       const latest = get();
-      const requestIsCurrent = latest.scopeFilter === requestScopeFilter
-        && latest.sessionId === requestContext.sessionId
-        && latest.projectId === requestContext.projectId
-        && latest.runId === requestContext.runId;
-      if (!requestIsCurrent) {
+      if (!isCurrent(latest)) {
         return;
       }
-      const context = {
-        sessionId: latest.sessionId,
-        projectId: latest.projectId,
-        runId: latest.runId,
-      };
+      const listed = (result.entries ?? []).filter((entry) => matchesScopeFilter(entry, requestScopeFilter, requestContext));
       set({
-        entries: (result.entries ?? []).filter((entry) => matchesScopeFilter(entry, requestScopeFilter, context)),
+        entries: [...listed, ...appendedSince(latest.entries, new Set(listed.map((entry) => entry.id)))],
         isLoading: false,
       });
     } catch {
       const latest = get();
-      const requestIsCurrent = latest.scopeFilter === requestScopeFilter
-        && latest.sessionId === requestContext.sessionId
-        && latest.projectId === requestContext.projectId
-        && latest.runId === requestContext.runId;
-      if (!requestIsCurrent) {
+      if (!isCurrent(latest)) {
         return;
       }
-      set({
-        entries: [],
-        isLoading: false,
-      });
+      set({ entries: appendedSince(latest.entries, new Set()), isLoading: false });
     }
   },
 }));

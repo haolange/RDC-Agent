@@ -207,7 +207,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             {modelError ? <InlineError detail={modelError}>{humanizeError(modelError, t, 'settings.agentModelSaveFailed')}</InlineError> : null}
             {statusProblem ? (
               <div className="settings-agent-config-status" data-testid="settings-agent-config-status" data-tone={status.tone}
-                role="status" data-tooltip={status.detail}>
+                role="status" tabIndex={status.detail ? 0 : undefined} data-tooltip={status.detail}>
                 <span className="settings-agent-config-status-dot" aria-hidden="true" />
                 {status.label}
               </div>

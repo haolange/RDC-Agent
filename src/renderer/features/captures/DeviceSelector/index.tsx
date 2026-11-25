@@ -43,13 +43,13 @@ export function DeviceSelector() {
   const discoveryMessage = discovery.status === 'scanning' || discovery.status === 'idle' ? t('device.discovery.scanning')
     : devices.some(device => device.type === 'android' && device.adbState !== 'missing') ? null : t('device.discovery.empty');
   return <div className="device-selector-container">
-    <Popover open={open} onOpenChange={setOpen} align="end" className="device-selector-dropdown"
+    <Popover open={open} onOpenChange={setOpen} align="end" className="device-selector-dropdown" label={t('device.discovery.title')}
       trigger={<Button variant="ghost" size="sm" className="device-selector-trigger device-selector-trigger-utility main-utility-toggle"
         data-testid="utility-device-selector-trigger" aria-haspopup="dialog" data-tooltip={t('device.sessionDeviceTitle', { summary: name })}>
         <DeviceTypeIcon type={targetId === 'local' ? 'local' : 'android'} />
         <span className="device-selector-utility-label">{name}</span>
       </Button>}>
-      <div data-testid="utility-device-selector-dropdown" aria-label={t('device.discovery.title')}>
+      <div data-testid="utility-device-selector-dropdown">
         <div className="device-selector-header"><span>{t('device.discovery.title')}</span>
           <IconButton size="sm" label={t('device.discovery.refresh')} disabled={discovery.status === 'scanning'} onClick={() => { void refreshDevices(); }}><Icon name="refresh" size={16} /></IconButton>
         </div>
