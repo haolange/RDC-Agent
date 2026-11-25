@@ -50,15 +50,16 @@ import { createSubagentTools, type SubagentToolHost } from './SubagentTool';
 import type { DelegationSourceFailure } from './SubagentResultEnvelope';
 import type { BackgroundSubagentStart } from './BackgroundSubagentService';
 import type { ActiveTurnLookup, AgentProfileTurnOptions } from './orchestratorTypes';
+import type { ProfileTurnRequest } from './ProfileTurnRunner';
 import type { AgentTool } from '../agent/AgentTool';
 import type {
   AgentEvent as SharedAgentEvent,
 } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 
-/** Runs one child profile turn (the AgentOrchestrator façade). */
+/** Prepares and runs one child profile turn (ProfileTurnRunner). */
 export interface ProfileTurnSender {
-  sendProfileMessage(agentId: AgentRole, content: string, options?: AgentProfileTurnOptions): Promise<string>;
+  runChildTurn(request: ProfileTurnRequest): Promise<string>;
 }
 
 /** The system prompt an Agent runs with when its definition has no instructions (PromptPlanForTurn). */
@@ -80,7 +81,7 @@ export class SubagentRunner implements SubagentToolHost {
     this.activeTurns = deps.activeTurns;
   }
 
-  /** Wired once by the composition root: a child turn runs through the façade whose tools include this runner's. */
+  /** Wired once by the composition root: a child turn runs through the profile-turn runner whose tools include this runner's. */
   bindProfileTurns(profileTurns: ProfileTurnSender): void {
     this.profileTurns = profileTurns;
   }
@@ -329,10 +330,10 @@ export class SubagentRunner implements SubagentToolHost {
           ownerTurnId,
         });
       }
-      childPromise = withDelegatedInteractionOwner({ ownerSessionId: input.parentSessionId ?? subagentSessionId, childSessionId: subagentSessionId, executionId: input.executionId ?? subagentId }, () => this.profileTurns.sendProfileMessage(
-        input.targetProfile,
-        childInput,
+      childPromise = withDelegatedInteractionOwner({ ownerSessionId: input.parentSessionId ?? subagentSessionId, childSessionId: subagentSessionId, executionId: input.executionId ?? subagentId }, () => this.profileTurns.runChildTurn(
         {
+          agentId: input.targetProfile,
+          content: childInput,
           sessionId: subagentSessionId,
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,

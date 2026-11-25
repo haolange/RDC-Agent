@@ -41,10 +41,11 @@ const model = {
 } satisfies EffectiveModel;
 
 beforeEach(() => { fixture.level = 'high'; fixture.model = model; fixture.preparedControls = null; });
-const start = (controls?: { reasoningLevel: 'low'; fastModel: false; maxContextMode: false }) => startProfileTurn(
-  { getPreparingRequestByRequestId: () => undefined } as never, async () => undefined,
-  { projectId: null, session: null } as never, 'general', 'general', 'inspect', [], [], undefined, controls,
-);
+const start = (controls?: { reasoningLevel: 'low'; fastModel: false; maxContextMode: false }) => startProfileTurn({
+  requests: { getPreparingRequestByRequestId: () => undefined }, turns: {} as never, output: {} as never,
+  context: { projectId: null, session: null } as never, requestedProfileId: 'general', requestedAgentId: 'general',
+  rawMessage: 'inspect', pendingAttachments: [], preloadSkillIds: [], requestTurnControls: controls,
+});
 
 it('passes the Agent default to the actual request planner and rejects silent normalization before execution', async () => {
   await expect(start()).rejects.toThrow('AFTER_REQUEST_PLAN');

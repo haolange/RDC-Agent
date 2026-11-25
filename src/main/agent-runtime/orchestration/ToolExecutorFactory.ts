@@ -1,7 +1,6 @@
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { childScopePrefix, rootScopeId } from '@shared/utils/executionScope';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
-import { isHandoffContinueAction } from '@shared/types/planReview';
 import { AppError } from '@shared/errors/appError';
 import { executeWithPermissionAdmission } from '../permissions/ToolPermissionAdmission';
 import { withProcessExecutionOwner } from '../../runtime/ResourceExecutionLifetime';
@@ -15,31 +14,19 @@ import { getRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { getWorkspaceRoot, withTemporaryPathAccess } from '../../runtime/toolFiles';
 import { buildDiagnosticAgentEvent } from '../AgentEventBridge';
 import { agentUserInputRequestService } from '../interactions/AgentUserInputRequestService';
-import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
-import {
-  composePlanMarkdown,
-  planArtifactWriter,
-  sectionsFromMarkdown,
-} from '../../sessions/run/sessionPlanArtifact';
-import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
-import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
-import { preparePlanTaskRequirements } from '../tasks/TaskExecutionRequirements';
-import { prepareInvestigationPlan } from '../../rdc/prepareInvestigationPlan';
-import { rdcSessionService } from '../../rdc/RdcSessionService';
-import { assertDeclaredHandoffForPlan } from '../interactions/applyDeclaredHandoff';
 import { authorizeToolPermission, ToolPermissionDenied } from '../permissions/ToolPermissionAuthorization';
 import { hookEngine } from '../../hooks/HookEngine';
 import { appPathService } from '../../runtime/AppPathService';
 import { countSubagentDispatches, isConcurrencySafeSpec, resourceClaimOf } from '../agent/toolConcurrency';
-import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
+import { sessionRecordStore } from '../../sessions/store/sessionStores';
 import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
 import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
 import { reserveDispatchBudget } from './TurnCoordinator';
 import { normalizeToolName } from './RuntimeToolPolicy';
 import { extractDeferredToolNamesFromToolSearchDetails } from './deferredTools';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
+import { executePlanArtifact, type PlanArtifactToolCall } from './PlanArtifactSubmission';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
-import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 import {
   admitToolCall,
   captureAccessDenial,
@@ -195,7 +182,7 @@ export class ToolExecutorFactory {
       return this.executeAskUserTool({ ...toolCall, arguments: call.args }, agentId, runtimeContext, signal, onExecutionStart);
     }
     if (tool.spec.interaction === 'plan-review') {
-      return this.executePlanArtifactTool({ ...toolCall, arguments: call.args }, agentId, runtimeContext, signal, onExecutionStart);
+      return this.executePlanArtifactTool({ toolCall: { ...toolCall, arguments: call.args }, agentId, runtimeContext, signal, onExecutionStart });
     }
     return this.executeToolEffect(scope, call, denyTool, signal, onUpdate, onExecutionStart);
   }
@@ -421,126 +408,9 @@ export class ToolExecutorFactory {
       : { allowed: true };
   }
 
-  async executePlanArtifactTool(
-    toolCall: ToolCall,
-    agentId: AgentRole,
-    runtimeContext: ToolExecutorRuntimeContext | undefined,
-    signal?: AbortSignal,
-    onExecutionStart?: () => void,
-  ): Promise<ToolResultMessage> {
-    try {
-      const args = toolCall.arguments ?? {};
-      const title = typeof args.title === 'string' ? args.title.trim() : '';
-      const content = typeof args.content === 'string' ? args.content.trim() : '';
-      const summary = Array.isArray(args.summary)
-        ? args.summary.map((line) => typeof line === 'string' ? line.trim() : '').filter(Boolean)
-        : [];
-      if (!title || !content || summary.length < 1 || summary.length > 4) {
-        throw new Error('plan_artifact requires title, 1-4 summary lines, and content.');
-      }
-      if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
-        throw new Error('plan_artifact requires an active conversation interaction bridge.');
-      }
-      const sessionId = runtimeContext.sessionId ?? null;
-      if (!sessionId) {
-        throw new Error('plan_artifact requires an active session.');
-      }
-      const handoffOptions = (runtimeContext.effectivePlan?.profileHandoffs ?? [])
-        .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
-        .map((handoff) => ({ label: handoff.label.trim(), agent: handoff.agent.trim(),
-          ...(handoff.labelTranslations ? { labelTranslations: { ...handoff.labelTranslations } } : {}),
-        }));
-      if (handoffOptions.length === 0) {
-        throw new AppError('PLAN_REVIEW_NO_HANDOFF', 'plan_artifact requires a declared continue handoff on this profile.');
-      }
-      const turnHandle = this.deps.activeTurns.getActiveTurn(sessionId);
-      if (turnHandle) {
-        if (turnHandle.turnId !== runtimeContext.turnId) throw new AppError('PLAN_TURN_CHANGED', 'the planning turn is no longer active.');
-        const unfinished = await listUnfinishedDirectTasks({ sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation });
-        if (unfinished.length) {
-          throw new AppError('PLAN_DIRECT_TASKS_UNSETTLED', `Plan approval ends this planning turn, but direct Tasks are still active: ${unfinished.map(item => item.taskId).join(', ')}. Settle each with its actual result before submitting the plan. Do not claim that approval has already happened; keep work that begins after approval pending, and do not make it depend on a blocked planning task merely waiting for approval.`);
-        }
-      }
-      const requiredTaskIds = args.requiredTaskIds;
-      const delegatedScope = getDelegatedTaskScope(sessionId);
-      if (delegatedScope && (requiredTaskIds !== undefined || args.taskRevisions !== undefined)) {
-        throw new AppError('TASK_SCOPE_DENIED', 'approved Task bindings and revisions belong to the owning planner session, not a delegated Capsule.');
-      }
-      if (requiredTaskIds !== undefined && (!Array.isArray(requiredTaskIds) || requiredTaskIds.length > 128
-        || requiredTaskIds.some(id => typeof id !== 'string' || !id.trim()) || new Set(requiredTaskIds).size !== requiredTaskIds.length)) {
-        throw new AppError('PLAN_TASK_REQUIREMENTS_INVALID', 'requiredTaskIds must be distinct existing Task ids.');
-      }
-      if (turnHandle && !delegatedScope && requiredTaskIds === undefined) {
-        const registry = new TaskRegistry(createSessionTaskStore(sessionId));
-        const turnRef = `turn:${turnHandle.turnId}:generation:${turnHandle.generation}`;
-        const unsettled = (await registry.listTasks()).filter(task => task.creationTurnRef === turnRef
-          && (task.status === 'pending' || task.status === 'blocked'));
-        if (unsettled.length) {
-          throw new AppError('PLAN_TASK_BINDINGS_UNDECLARED', `This planning turn created unfinished Tasks: ${unsettled.map(task => task.id).join(', ')}. Explicitly set requiredTaskIds to the existing Tasks required by this plan, or [] if none are required. Task names or IDs in Markdown do not freeze their requirements.`);
-        }
-      }
-      const registry = Array.isArray(requiredTaskIds) && requiredTaskIds.length ? new TaskRegistry(createSessionTaskStore(sessionId)) : null;
-      if (args.taskRevisions !== undefined && !registry) throw new AppError('PLAN_TASK_REQUIREMENTS_INVALID', 'taskRevisions requires requiredTaskIds.');
-      const taskRequirements = registry ? await preparePlanTaskRequirements(registry, requiredTaskIds as string[], args.taskRevisions) : [];
-      const sourcePlan = runtimeContext.effectivePlan;
-      if (args.captureScope !== undefined && (!sourcePlan || sourcePlan.completionContract !== 'investigation-report')) {
-        throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'capture scope requires an investigation plan.');
-      }
-      const investigation = sourcePlan?.completionContract === 'investigation-report' && sourcePlan.investigationMission
-        ? await prepareInvestigationPlan({ mission: sourcePlan.investigationMission, sessionId,
-          projectId: runtimeContext.projectId ?? sourcePlan.projectId, captureScope: args.captureScope,
-          host: { sessionProjectId: id => sessionRecordStore.readSessionRecord(id)?.projectId ?? null,
-            project: id => projectWorkspaceStore.getProjectById(id),
-            replayState: (owner, projectId) => rdcSessionService.snapshotReplayForSession({ sessionId: owner, projectId }) } })
-        : null;
-      for (const handoff of handoffOptions) assertDeclaredHandoffForPlan({ sourceAgentId: agentId,
-        projectRoot: runtimeContext.projectRootPath ?? runtimeContext.effectivePlan?.projectRootPath ?? null, handoff, tasks: taskRequirements });
-      const markdown = composePlanMarkdown({ title, summary, content, taskRequirements, investigation });
-      if (turnHandle) turnHandle.approvedPlan = null;
-      onExecutionStart?.();
-      const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
-      const revision = planReviewStateStore.beginRevision(sessionId, runtimeContext.turnId);
-      const planReview = {
-        planId: revision.planId,
-        revision: revision.revision,
-        uri: written.uri,
-        hash: written.hash,
-        title,
-        summary,
-        sections: sectionsFromMarkdown(markdown),
-        status: 'awaiting' as const,
-        handoffOptions,
-      };
-      const answer = await agentPlanReviewRequestService.request({
-        agentId,
-        sessionId,
-        turnId: runtimeContext.turnId,
-        toolCallId: toolCall.id,
-        planReview,
-        turnHandle,
-        context: runtimeContext.eventContext,
-        onEvent: runtimeContext.onEvent,
-        signal,
-      });
-      return {
-        role: 'toolResult',
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content: [{ type: 'text', text: answer }],
-        isError: false,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      return {
-        role: 'toolResult',
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-        isError: true,
-        details: error instanceof Error && error.name === 'AbortError' ? { reason: 'abort' } : undefined,
-        timestamp: Date.now(),
-      };
-    }
+  /** Runs a plan_artifact call against this factory's active turns. */
+  executePlanArtifactTool(call: PlanArtifactToolCall): Promise<ToolResultMessage> {
+    return executePlanArtifact({ ...call, activeTurns: this.deps.activeTurns });
   }
 
   async executeAskUserTool(

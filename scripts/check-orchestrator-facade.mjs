@@ -8,9 +8,9 @@ import ts from 'typescript';
 const repoRoot = process.cwd();
 const ORCHESTRATOR_REL = 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts';
 /** Distinct modules the façade imports (value or type). */
-const FAN_OUT_MAX = 34;
+const FAN_OUT_MAX = 12;
 /** Lines of the longest function, method or arrow function in the façade. */
-const FUNCTION_LINES_MAX = 253;
+const FUNCTION_LINES_MAX = 16;
 
 const fail = (message) => {
   console.error(`[orchestrator-facade] ${message}`);

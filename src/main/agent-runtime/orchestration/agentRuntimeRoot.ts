@@ -1,7 +1,7 @@
 /**
  * Composition root of the agent runtime. It constructs every collaborator of the AgentOrchestrator façade once and
  * hands each the narrow interfaces it declares. The one late binding is the subagent runner's profile turns: a child
- * turn runs through the same façade whose tools include the runner's.
+ * turn runs through the same profile-turn runner whose tools include the subagent runner's.
  */
 
 import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../../investigation/missionCompletionContract';
@@ -13,7 +13,8 @@ import { AgentTurnRunner } from './AgentTurnRunner';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
 import { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import { McpConnectionCoordinator } from './McpConnectionCoordinator';
-import { ProfileTurnPreparation } from './ProfileTurnPreparation';
+import { ProfileTurnRunner } from './ProfileTurnRunner';
+import { ProviderRouteCredentials } from './ProviderRouteCredentials';
 import { PromptPlanForTurn } from './PromptPlanForTurn';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
 import { SubagentRunner } from './SubagentRunner';
@@ -59,19 +60,20 @@ export function createAgentOrchestrator(): AgentOrchestrator {
     toolExecutors,
   });
 
-  const orchestrator = new AgentOrchestrator({
+  const credentials = new ProviderRouteCredentials(slots);
+  const profileTurns = new ProfileTurnRunner({ slots, credentials, promptPlan, turnPrep, turnRunner, toolExecutors });
+  subagents.bindProfileTurns(profileTurns);
+
+  return new AgentOrchestrator({
     slots,
     mcp,
     deferredActivation,
-    promptPlan,
+    credentials,
     toolExecutors,
     turnPrep,
-    profilePrep: new ProfileTurnPreparation(turnPrep),
-    turnRunner,
+    profileTurns,
     backgroundSubagents,
   });
-  subagents.bindProfileTurns(orchestrator);
-  return orchestrator;
 }
 
 export const agentOrchestrator = createAgentOrchestrator();

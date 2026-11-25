@@ -24,14 +24,15 @@ const messageOf = (event: ConversationStreamEvent | undefined): ConversationMess
 function runTurn(withApprovedExecution = false): { events: ConversationStreamEvent[]; done: Promise<void> } {
   const events: ConversationStreamEvent[] = [];
   const host: ConversationTurnRunnerHost = {
-    persistConversationSnapshot: () => null,
-    emitConversationEvent: (event) => { events.push(event); },
-    publishRunStatus: vi.fn(),
-    publishConversationTrace: vi.fn(),
-    registerActiveTurn: vi.fn(),
-    clearActiveTurn: vi.fn(),
-    assertTerminalContextOwnership: vi.fn(),
-    ephemeralTraceSessionId: (turnId) => `conversation-${turnId}`,
+    output: {
+      persistConversationSnapshot: () => null,
+      emitConversationEvent: (event) => { events.push(event); },
+      publishRunStatus: vi.fn(),
+      publishConversationTrace: vi.fn(),
+      assertTerminalContextOwnership: vi.fn(),
+      ephemeralTraceSessionId: (turnId) => `conversation-${turnId}`,
+    },
+    turns: { registerActiveTurn: vi.fn(), clearActiveTurn: vi.fn() },
   };
   const input = {
     context: { session: withApprovedExecution ? { sessionId: 'session' } : null, projectId: null, currentRun: null },
@@ -57,8 +58,8 @@ function runTurn(withApprovedExecution = false): { events: ConversationStreamEve
 
 describe('completeProfileTurn kernel cancellation', () => {
   it('commits a stopped terminal when the turn handle aborts without a session Stop', async () => {
-    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
-      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'stopped' });
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
+      turn.onTerminalContext({ messages: [], executionIdentity: {}, status: 'stopped' });
       throw new DOMException('Aborted', 'AbortError');
     });
     const { events, done } = runTurn();
@@ -71,8 +72,8 @@ describe('completeProfileTurn kernel cancellation', () => {
   });
 
   it('still reports a genuine provider failure as an error', async () => {
-    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
-      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'error' });
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
+      turn.onTerminalContext({ messages: [], executionIdentity: {}, status: 'error' });
       throw new Error('upstream 500');
     });
     const { events, done } = runTurn();
@@ -81,8 +82,8 @@ describe('completeProfileTurn kernel cancellation', () => {
   });
 
   it('consumes the owning Agent receipt without calling a domain validator', async () => {
-    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
-      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete',
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
+      turn.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete',
         completionReceipt: { turnId: 'turn-1', runtimePlanFingerprint: 'frozen-plan', finalAnswerText: 'Canonical final' } });
       return 'Noncanonical response text';
     });
@@ -93,8 +94,8 @@ describe('completeProfileTurn kernel cancellation', () => {
 
   it.each(['completed', 'partial'] as const)('commits the approved execution receipt only for %s', async disposition => {
     storage.commitConversationTerminal.mockClear();
-    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
-      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete', completionDeclaration: { disposition, evidenceRefs: [] },
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
+      turn.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete', completionDeclaration: { disposition, evidenceRefs: [] },
         completionReceipt: { turnId: 'turn-1', runtimePlanFingerprint: 'frozen-plan', finalAnswerText: 'Final' } });
     });
     const { done } = runTurn(true);
@@ -109,8 +110,8 @@ describe('completeProfileTurn kernel cancellation', () => {
 
   it('preserves a Mission contract failure as failure', async () => {
     const { MissionCompletionError } = await import('../investigation/missionCompletionContract');
-    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
-      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'error' });
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
+      turn.onTerminalContext({ messages: [], executionIdentity: {}, status: 'error' });
       throw new MissionCompletionError('missing_report', 'report missing');
     });
     const { events, done } = runTurn();
@@ -119,8 +120,8 @@ describe('completeProfileTurn kernel cancellation', () => {
   });
 
   it('preserves an approved plan exit without inventing a final answer', async () => {
-    orchestrator.sendProfileMessage.mockImplementationOnce(async (_agent, _content, options) => {
-      options.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete', approvedPlan: {},
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
+      turn.onTerminalContext({ messages: [], executionIdentity: {}, status: 'complete', approvedPlan: {},
         completionReceipt: { turnId: 'turn-1', runtimePlanFingerprint: 'frozen-plan', finalAnswerText: '' } });
       return '';
     });

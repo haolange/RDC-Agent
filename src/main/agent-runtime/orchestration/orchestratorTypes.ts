@@ -98,7 +98,6 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** Shared parent-child policy lineage; child turns must not reset counters. */
   policyBudget?: PolicyBudgetState;
   subagentBudget?: SubagentBudgetState;
-  preparedTurn?: PreparedAgentTurnContext;
   onTerminalContext?: (result: {
     messages: Message[];
     executionIdentity: ExecutionIdentity;

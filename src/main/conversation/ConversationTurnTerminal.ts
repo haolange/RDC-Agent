@@ -4,6 +4,8 @@ import { workflowProjectionPublisher } from '../agent-runtime/orchestration/Work
 import { traceService } from '../agent-trace/TraceService';
 import { normalizeBranchId } from '../sessions/store/ConversationBranchResolver';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
+import type { RunSummary } from '@shared/types/session';
+import type { ConversationTurnOutput } from './ConversationTurnRunner';
 
 export function persistConversationSnapshot(
     sessionId: string | null | undefined,
@@ -112,3 +114,17 @@ export function publishConversationTrace(
 export function ephemeralTraceSessionId(turnId: string): string {
     return `conversation-${turnId}`;
   }
+
+export function publishRunStatus(sessionId: string, runId: string, status: RunSummary['status']): void {
+  workflowProjectionPublisher.publishRunStatus({ sessionId, runId, status });
+}
+
+/** How a running turn reaches the session files, the conversation event stream and the trace projection. */
+export const conversationTurnOutput: ConversationTurnOutput = {
+  persistConversationSnapshot,
+  emitConversationEvent,
+  publishRunStatus,
+  publishConversationTrace,
+  assertTerminalContextOwnership,
+  ephemeralTraceSessionId,
+};

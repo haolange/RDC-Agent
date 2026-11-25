@@ -2,7 +2,6 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { generateEventId } from '@shared/utils/id';
 import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
@@ -27,19 +26,10 @@ import {
 } from './ConversationInteractionAnswers';
 import { conversationRdcHost } from './conversationRdcHost';
 import { canonicalJson } from './ConversationRoutePreflight';
-import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
-import { startProfileTurn as runStartProfileTurn } from './ConversationTurnStarter';
-import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
-import {
-  persistConversationSnapshot,
-  assertTerminalContextOwnership,
-  emitConversationEvent,
-  publishConversationTrace,
-  publishTraceProjection,
-  ephemeralTraceSessionId,
-} from './ConversationTurnTerminal';
+import { startProfileTurn as runStartProfileTurn, type PreparingConversationRequests, type ProfileTurnStart } from './ConversationTurnStarter';
+import { conversationTurnOutput, publishConversationTrace, publishTraceProjection } from './ConversationTurnTerminal';
+import type { ActiveConversationTurns } from './ConversationTurnRunner';
 import type { SessionRecord } from '@shared/types/session';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type {
   ConversationBranchState,
   ConversationSwitchBranchRequest,
@@ -55,7 +45,6 @@ import type {
   ConversationTurnResult,
 } from '@shared/types/conversation';
 import type {
-  ConversationBranchTurnContext,
   ActiveConversationTurn,
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
@@ -70,7 +59,7 @@ interface ConversationRewriteContextInput extends ConversationRewriteFromMessage
   fallbackSessionId?: string | null;
   fallbackRunId?: string | null;
 }
-export class ConversationService {
+export class ConversationService implements ActiveConversationTurns, PreparingConversationRequests {
   private acceptingTurns = true; private activeTurns = new Map<string, ActiveConversationTurn>();
   private readonly preparingRequests = new Map<string, {
     requestId: string;
@@ -215,11 +204,11 @@ export class ConversationService {
   answerUserInput = answerConversationUserInput;
   answerPlanReview = answerConversationPlanReview;
   answerToolApproval = answerConversationToolApproval;
-  private registerActiveTurn(turn: ActiveConversationTurn): void {
+  registerActiveTurn(turn: ActiveConversationTurn): void {
     this.activeTurns.set(turn.turnId, turn);
     if (turn.sessionId) conversationRdcHost().setInteractionLock(turn.sessionId, turn.turnId, true);
   }
-  private clearActiveTurn(turnId: string, controller: AbortController): void {
+  clearActiveTurn(turnId: string, controller: AbortController): void {
     const active = this.activeTurns.get(turnId);
     if (active?.abortController === controller) {
       const sessionId = active.sessionId;
@@ -228,7 +217,7 @@ export class ConversationService {
       // Background Task settlement updates its own projection, not the parent turn.
     }
   }
-  private getPreparingRequestByRequestId(requestId: string) {
+  getPreparingRequestByRequestId(requestId: string) {
     for (const entry of this.preparingRequests.values()) {
       if (entry.requestId === requestId) return entry;
     }
@@ -514,20 +503,19 @@ export class ConversationService {
           throw new AppError('CONVERSATION_BUSY', 'this conversation already has a running turn.');
         }
         if (context.session) agentPlanReviewRequestService.retireRecovered(context.session.sessionId);
-        return await this.startProfileTurn(
+        return await this.startProfileTurn({
           context,
-          input.profileId ?? input.agentId ?? null,
-          input.agentId ?? input.profileId ?? null,
-          trimmed,
-          attachments,
-          input.preloadSkillIds ?? [],
-          undefined,
-          input.turnControls,
+          requestedProfileId: input.profileId ?? input.agentId ?? null,
+          requestedAgentId: input.agentId ?? input.profileId ?? null,
+          rawMessage: trimmed,
+          pendingAttachments: attachments,
+          preloadSkillIds: input.preloadSkillIds ?? [],
+          requestTurnControls: input.turnControls,
           requestId,
-          controller,
-          input.configurationCommit,
+          preparationController: controller,
+          configurationCommit: input.configurationCommit,
           requestFingerprint,
-        );
+        });
     });
   }
 
@@ -548,20 +536,19 @@ export class ConversationService {
     const context = await this.resolveContext(input);
     const sessionId = input.sessionId ?? context.session?.sessionId ?? null;
     if (!sessionId) {
-      return this.startProfileTurn(
+      return this.startProfileTurn({
         context,
-        input.profileId ?? input.agentId ?? null,
-        input.agentId ?? input.profileId ?? null,
-        trimmed,
-        input.attachments ?? [],
-        input.preloadSkillIds ?? [],
-        undefined,
-        input.turnControls,
-        input.requestId,
+        requestedProfileId: input.profileId ?? input.agentId ?? null,
+        requestedAgentId: input.agentId ?? input.profileId ?? null,
+        rawMessage: trimmed,
+        pendingAttachments: input.attachments ?? [],
+        preloadSkillIds: input.preloadSkillIds ?? [],
+        requestTurnControls: input.turnControls,
+        requestId: input.requestId,
         preparationController,
-        input.configurationCommit,
+        configurationCommit: input.configurationCommit,
         requestFingerprint,
-      );
+      });
     }
 
     const initialHistory = conversationHistoryStore.readConversationHistory(sessionId);
@@ -640,27 +627,27 @@ export class ConversationService {
       ...context,
       session: sessionRecordStore.readSession(sessionId) ?? context.session,
     };
-    return this.startProfileTurn(
-      updatedContext,
-      input.profileId ?? input.agentId ?? null,
-      input.agentId ?? input.profileId ?? null,
-      trimmed,
-      input.attachments ?? [],
-      input.preloadSkillIds ?? [],
-      {
+    return this.startProfileTurn({
+      context: updatedContext,
+      requestedProfileId: input.profileId ?? input.agentId ?? null,
+      requestedAgentId: input.agentId ?? input.profileId ?? null,
+      rawMessage: trimmed,
+      pendingAttachments: input.attachments ?? [],
+      preloadSkillIds: input.preloadSkillIds ?? [],
+      branchContext: {
         branchId: newBranchId,
         forkId,
         variantIndex,
         parentBranchId: targetBranchId,
         branchState,
       },
-      input.turnControls,
-      input.requestId,
+      requestTurnControls: input.turnControls,
+      requestId: input.requestId,
       preparationController,
-      input.configurationCommit,
+      configurationCommit: input.configurationCommit,
       requestFingerprint,
-      targetMessage.turnId,
-    );
+      excludeTurnId: targetMessage.turnId,
+    });
   }
 
   async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
@@ -752,75 +739,11 @@ export class ConversationService {
    * 顶层身份只有四 builtin：general / debugger / analyzer / optimizer；
    * 自定义 profile 走同一路由，不再把 ask/plan/edit 当 mode。
    */
-  private prepareConversationPrompt(input: PrepareConversationPromptInput) {
-    return buildConversationPrompt(input);
-  }
-
-  private createTurnStarterHost() {
-    return {
-      getPreparingRequestByRequestId: (requestId: string) => this.getPreparingRequestByRequestId(requestId),
-      prepareConversationPrompt: (input: PrepareConversationPromptInput) => this.prepareConversationPrompt(input),
-      persistConversationSnapshot,
-      publishConversationTrace: (
-        traceSessionId: string,
-        messages: ConversationMessage[],
-        persistedSessionId?: string | null,
-      ) => publishConversationTrace(traceSessionId, messages, persistedSessionId, publishTraceProjection),
-      ephemeralTraceSessionId,
-    };
-  }
-
-  private createTurnRunnerHost(): ConversationTurnRunnerHost {
-    return {
-      persistConversationSnapshot,
-      emitConversationEvent,
-      publishRunStatus: (sessionId, runId, status) => workflowProjectionPublisher.publishRunStatus({ sessionId, runId, status }),
-      publishConversationTrace: (
-        traceSessionId: string,
-        messages: ConversationMessage[],
-        persistedSessionId?: string | null,
-      ) => publishConversationTrace(traceSessionId, messages, persistedSessionId, publishTraceProjection),
-      registerActiveTurn: (turn: ActiveConversationTurn) => this.registerActiveTurn(turn),
-      clearActiveTurn: (turnId: string, controller: AbortController) => this.clearActiveTurn(turnId, controller),
-      assertTerminalContextOwnership,
-      ephemeralTraceSessionId,
-    };
-  }
-
+  /** Starts one conversation turn with this service as its request and turn registry. */
   private async startProfileTurn(
-    context: ResolvedConversationContext,
-    requestedProfileId: string | null,
-    requestedAgentId: string | null,
-    rawMessage: string,
-    pendingAttachments: ConversationAttachmentInput[],
-    preloadSkillIds: string[] = [],
-    branchContext?: ConversationBranchTurnContext,
-    requestTurnControls?: ConversationTurnControls,
-    requestId: string = generateEventId('request'),
-    preparationController: AbortController = new AbortController(),
-    configurationCommit?: ConversationSendRequest['configurationCommit'],
-    requestFingerprint?: string,
-    excludeTurnId?: string,
-    policyBudget?: import('../agent-runtime/orchestration/TurnCoordinator').PolicyBudgetState,
+    start: Omit<ProfileTurnStart, 'requests' | 'turns' | 'output'>,
   ): Promise<ConversationTurnResult> {
-    return runStartProfileTurn(
-      this.createTurnStarterHost(),
-      (input: CompleteProfileTurnInput) => runCompleteProfileTurn(this.createTurnRunnerHost(), input),
-      context,
-      requestedProfileId,
-      requestedAgentId,
-      rawMessage,
-      pendingAttachments,
-      preloadSkillIds,
-      branchContext,
-      requestTurnControls,
-      requestId,
-      preparationController,
-      configurationCommit,
-      requestFingerprint,
-      excludeTurnId,
-      policyBudget,
-    );
+    return runStartProfileTurn({ ...start, requests: this, turns: this, output: conversationTurnOutput });
   }
 
 }

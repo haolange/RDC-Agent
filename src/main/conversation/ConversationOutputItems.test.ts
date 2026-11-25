@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
-import { createAgentEventHandler, type AgentEventHandlerDeps, type TurnStreamState } from './ConversationTurnAgentEventHandler';
+import { createAgentEventHandler, type AgentEventTurn, type TurnStreamState } from './ConversationTurnAgentEventHandler';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ProviderOutputRef } from '@shared/types/reasoning';
@@ -11,7 +11,7 @@ function fixture() {
     assistantMessage: { id: 'a', turnId: 'turn', role: 'assistant', content: '', createdAt: 1, updatedAt: 1 },
     currentLoopText: '', currentLoopProviderOutputRefs: [], loopHasTools: false,
     loopSeq: 1, pendingNewLoop: false,
-  } as unknown as TurnStreamState;
+  } as unknown as TurnStreamState & { loopSeq: number };
   const commit = (_type: string, patch: Partial<ConversationMessage>) => { state.assistantMessage = { ...state.assistantMessage, ...patch }; };
   const deps = {
     host: { emitConversationEvent: vi.fn() }, sessionId: 'session',
@@ -33,7 +33,7 @@ function fixture() {
     recordProviderOutputRefs: (refs: ProviderOutputRef[] = []) => { state.currentLoopProviderOutputRefs.push(...refs); },
     currentLoopOptions: () => ({ loopId: deps.currentLoopId(), loopProviderOutputRefs: state.currentLoopProviderOutputRefs }),
     pendingContinuation: { approval: false, userInput: false, planReview: false, handoff: false },
-  } as unknown as AgentEventHandlerDeps;
+  } as unknown as AgentEventTurn;
   const handler = createAgentEventHandler(deps);
   const send = (type: AgentEvent['type'], payload: Record<string, unknown>) => handler({
     id: `event-${type}`, type, sessionId: 'session', timestamp: 1, payload,

@@ -25,7 +25,7 @@ Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / faile
 | 模块 | 职责 |
 | --- | --- |
 | `EffectiveRuntimePlan` | `schemaVersion: 3`；project-aware effective profile snapshot（definition + scope/provenance/sourceHash + compiled route）+ 冻结 `profileDelegates`（effective `agents`）；tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints, attachment manifest fingerprint；Prompt and Executor share it。`settings.llm.agentRoutes` 只是 `compiledRoute` 的 Settings 派生镜像；`getEffectiveModel` / `applyLlmConfig` / preflight 只读 snapshot 的 `compiledRoute`。 |
-| `AgentOrchestrator` | façade（少于 800 行）；产品回合经 conversation `prepareTurnContext` 冻结，子执行经 `ProfileTurnPreparation`；`sendProfileMessage` 是唯一执行入口；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
+| `AgentOrchestrator` | façade（少于 800 行，协作者由 `agentRuntimeRoot.ts` 构造）；产品回合经 conversation `prepareTurnContext` 冻结后由 `sendProfileMessage` 执行（只接收已准备的回合）；子执行经 `ProfileTurnRunner.runChildTurn` 在自有凭据租约下准备并执行；二者共用 `ProfileTurnRunner` 的同一组阶段；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
 | `TurnCoordinator` / `TurnHandle` | Session ownership Active→Aborting→Orphaned→Settled；Orphaned 时 `beginTurn` → `TURN_ORPHANED`；同一 session 的 `beginTurn` 串行执行，并发发送只留最后一个为 active、之前的全部 abort；`abortSession` 只移除它停下的那个 handle，不会删掉期间新开的 turn；`abortAndJoin` 等 stream + producerCompletion；late producer join |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T` 自身有有限 timeout；close-observed registry；timeout yields `unconfirmed_orphan`，不以终止命令返回冒充目标退出 |
 | `ShutdownCoordinator` | `running → … → release_owned_runtimes → terminate_processes → … → exited`；before-quit 限时 `shutdownAll`；RDC clear+stop 不得与 `joinAll` 并行 |

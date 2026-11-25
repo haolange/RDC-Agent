@@ -1311,7 +1311,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
         effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
       const call = { id: 'plan-call', type: 'toolCall' as const, name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work' } };
-      const denied = await factory.executePlanArtifactTool(call, 'debugger', context);
+      const denied = await factory.executePlanArtifactTool({ toolCall: call, agentId: 'debugger', runtimeContext: context });
       expect(denied.isError).toBe(true);
       expect(JSON.stringify(denied.content)).toContain('PLAN_DIRECT_TASKS_UNSETTLED');
       expect(JSON.stringify(denied.content)).toContain('planning-task');
@@ -1319,7 +1319,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       expect(write).not.toHaveBeenCalled();
       expect(review).not.toHaveBeenCalled();
 
-      const submitted = await factory.executePlanArtifactTool(call, 'debugger', context);
+      const submitted = await factory.executePlanArtifactTool({ toolCall: call, agentId: 'debugger', runtimeContext: context });
       expect(submitted.isError).toBe(false);
       expect(write).toHaveBeenCalledTimes(1);
       expect(review).toHaveBeenCalledTimes(1);
@@ -1346,22 +1346,22 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       const factory = createFactory(turn);
       const call = { id: 'plan-call', type: 'toolCall' as const, name: 'plan_artifact',
         arguments: { title: 'Plan', summary: ['Work'], content: 'The task is described in prose.' } };
-      const omitted = await factory.executePlanArtifactTool(call, 'analyzer', context);
+      const omitted = await factory.executePlanArtifactTool({ toolCall: call, agentId: 'analyzer', runtimeContext: context });
       expect(omitted.isError).toBe(true);
       expect(JSON.stringify(omitted.content)).toContain('PLAN_TASK_BINDINGS_UNDECLARED');
       expect(JSON.stringify(omitted.content)).toContain('required-task');
       expect(JSON.stringify(omitted.content)).not.toContain('other-turn-task');
       expect(write).not.toHaveBeenCalled(); expect(review).not.toHaveBeenCalled();
 
-      const bound = await factory.executePlanArtifactTool({ ...call, arguments: { ...call.arguments, requiredTaskIds: ['required-task'] } }, 'analyzer', context);
+      const bound = await factory.executePlanArtifactTool({ toolCall: { ...call, arguments: { ...call.arguments, requiredTaskIds: ['required-task'] } }, agentId: 'analyzer', runtimeContext: context });
       expect(bound.isError, JSON.stringify(bound.content)).toBe(false);
       expect(parsePlanTaskRequirements(write.mock.calls.at(-1)![1])).toEqual([expect.objectContaining({ taskId: 'required-task', revision: 1 })]);
-      const explicitNone = await factory.executePlanArtifactTool({ ...call, arguments: { ...call.arguments, requiredTaskIds: [] } }, 'analyzer', context);
+      const explicitNone = await factory.executePlanArtifactTool({ toolCall: { ...call, arguments: { ...call.arguments, requiredTaskIds: [] } }, agentId: 'analyzer', runtimeContext: context });
       expect(explicitNone.isError, JSON.stringify(explicitNone.content)).toBe(false);
       expect(parsePlanTaskRequirements(write.mock.calls.at(-1)![1])).toEqual([]);
 
       listTasks.mockResolvedValue([{ ...task, id: 'other-turn-task', creationTurnRef: 'turn:other:generation:7' }] as never);
-      expect((await factory.executePlanArtifactTool(call, 'analyzer', context)).isError).toBe(false);
+      expect((await factory.executePlanArtifactTool({ toolCall: call, agentId: 'analyzer', runtimeContext: context })).isError).toBe(false);
     } finally {
       listExecutions.mockRestore(); listTasks.mockRestore(); getTask.mockRestore();
       write.mockRestore(); begin.mockRestore(); review.mockClear();
@@ -1375,8 +1375,8 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
         effectivePlan: { completionContract: 'investigation-report', investigationMission: 'analyzer', projectId: null,
           profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
-      const result = await createFactory().executePlanArtifactTool({ id: 'plan-call', type: 'toolCall', name: 'plan_artifact',
-        arguments: { title: 'Plan', summary: ['Analyze'], content: 'Work' } }, 'analyzer', context);
+      const result = await createFactory().executePlanArtifactTool({ toolCall: { id: 'plan-call', type: 'toolCall', name: 'plan_artifact',
+        arguments: { title: 'Plan', summary: ['Analyze'], content: 'Work' } }, agentId: 'analyzer', runtimeContext: context });
       expect(result.isError, JSON.stringify(result.content)).toBe(false);
       expect(parseInvestigationPlanContract(write.mock.calls[0][1])).toEqual({ schemaVersion: 1, mission: 'analyzer' });
       expect(vi.mocked(agentPlanReviewRequestService.request).mock.calls.at(-1)?.[0].planReview.sections)
@@ -1393,8 +1393,8 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       for (const name of ['AbortError', 'Error']) {
         const error = new Error('review did not complete'); error.name = name;
         vi.mocked(agentPlanReviewRequestService.request).mockRejectedValueOnce(error);
-        const result = await createFactory().executePlanArtifactTool({ id: 'call', type: 'toolCall', name: 'plan_artifact',
-          arguments: { title: 'Plan', summary: ['Work'], content: 'Work' } }, 'debugger', context);
+        const result = await createFactory().executePlanArtifactTool({ toolCall: { id: 'call', type: 'toolCall', name: 'plan_artifact',
+          arguments: { title: 'Plan', summary: ['Work'], content: 'Work' } }, agentId: 'debugger', runtimeContext: context });
         expect(result.isError).toBe(true);
         expect(result.details).toEqual(name === 'AbortError' ? { reason: 'abort' } : undefined);
       }
@@ -1408,7 +1408,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     try {
       const factory = createFactory();
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' }, surface: 'plan-gate' }] } } as never;
-      const value = await factory.executePlanArtifactTool({ id: 'plan-call', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: '## Work\nAnalyze.', requiredTaskIds: ['task-real'], metadata: { executionRequirements: { mode: 'direct' } } } }, 'debugger', context);
+      const value = await factory.executePlanArtifactTool({ toolCall: { id: 'plan-call', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: '## Work\nAnalyze.', requiredTaskIds: ['task-real'], metadata: { executionRequirements: { mode: 'direct' } } } }, agentId: 'debugger', runtimeContext: context });
       expect(value.isError, JSON.stringify(value.content)).toBe(false);
       expect(getTask).toHaveBeenCalledWith('task-real');
       expect(vi.mocked(agentPlanReviewRequestService.request).mock.calls.at(-1)?.[0].planReview.handoffOptions)
@@ -1416,14 +1416,14 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       const snapshots = parsePlanTaskRequirements(write.mock.calls[0][1]);
       expect(snapshots[0]).toMatchObject({ taskId: 'task-real', revision: 2, subject: 'Actual analysis', executionRequirements: { mode: 'subagent' } });
       write.mockClear();
-      const duplicate = await factory.executePlanArtifactTool({ id: 'duplicate', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['task-real', 'task-real'] } }, 'debugger', context);
+      const duplicate = await factory.executePlanArtifactTool({ toolCall: { id: 'duplicate', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['task-real', 'task-real'] } }, agentId: 'debugger', runtimeContext: context });
       expect(duplicate.isError).toBe(true); expect(write).not.toHaveBeenCalled();
       getTask.mockResolvedValue(null); write.mockClear();
-      const missing = await factory.executePlanArtifactTool({ id: 'missing', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['missing'] } }, 'debugger', context);
+      const missing = await factory.executePlanArtifactTool({ toolCall: { id: 'missing', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['missing'] } }, agentId: 'debugger', runtimeContext: context });
       expect(missing.isError).toBe(true); expect(write).not.toHaveBeenCalled();
       const release = registerDelegatedTaskScope('sess', { ownerSessionId: 'owner', rootTaskId: 'root' });
       try {
-        const denied = await factory.executePlanArtifactTool({ id: 'scope', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['task-real'] } }, 'general', context);
+        const denied = await factory.executePlanArtifactTool({ toolCall: { id: 'scope', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work', requiredTaskIds: ['task-real'] } }, agentId: 'general', runtimeContext: context });
         expect(denied.isError).toBe(true); expect(JSON.stringify(denied.content)).toContain('TASK_SCOPE_DENIED');
         expect(write).not.toHaveBeenCalled();
       } finally { release(); }
