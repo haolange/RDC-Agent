@@ -10,15 +10,15 @@ import * as fs from 'fs';
 import { createHash } from 'node:crypto';
 import * as readline from 'readline';
 import { AppError } from '@shared/errors/appError';
-import { recordSuccessfulFileRead } from './fileReadAccess';
-import { auditFiles, type FileAuditDetails, type FileAuditParams } from './fileAudit';
-import { assertTextReadable, safeResolvePath, truncateOutput } from './_shared';
+import { assertTextReadable, safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
 import {
   READ_FILE_DEFAULT_LIMIT,
   READ_FILE_MAX_LIMIT,
   READ_FILE_MAX_OUTPUT_BYTES,
   TEXT_FILE_MAX_BYTES,
-} from './toolLimits';
+} from '../../../runtime/toolLimits';
+import { recordSuccessfulFileRead } from './fileReadAccess';
+import { auditFiles, type FileAuditDetails, type FileAuditParams } from './fileAudit';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface ReadFileParams extends FileAuditParams {

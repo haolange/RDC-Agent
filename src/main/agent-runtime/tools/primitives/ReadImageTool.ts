@@ -3,9 +3,9 @@ import * as path from 'path';
 import { createHash } from 'node:crypto';
 import { nativeImage } from 'electron';
 import { AppError } from '@shared/errors/appError';
-import { assertSafeImageAttachment } from '../../../conversation/ConversationAttachmentMaterializer';
-import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
-import { safeResolvePath } from './_shared';
+import { assertSafeImageAttachment } from '../../attachments/ConversationAttachmentMaterializer';
+import { recordToolImagePreview } from '../../attachments/ToolImagePreviewStore';
+import { safeResolvePath } from '../../../runtime/toolFiles';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface ReadImageParams {

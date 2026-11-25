@@ -7,15 +7,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { convertAgentMessagesToLlm } from '../../agent/ContextManager';
 import * as responses from '../../providers/OpenAIResponsesProvider';
 import { createTestRequestPlan } from '../../../testing/createTestRequestPlan';
-import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
+import { recordToolImagePreview } from '../../attachments/ToolImagePreviewStore';
+import { withTemporaryPathAccess } from '../../../runtime/toolFiles';
 import { readImageTool } from './ReadImageTool';
-import { withTemporaryPathAccess } from './_shared';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const imageMock = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('electron', () => ({ nativeImage: { createFromBuffer: imageMock.create },
   app: { getAppPath: () => process.cwd(), getPath: () => process.env.TEMP ?? process.cwd() } }));
-vi.mock('../../../conversation/ToolImagePreviewStore', () => ({
+vi.mock('../../attachments/ToolImagePreviewStore', () => ({
   recordToolImagePreview: vi.fn(async () => ({
     previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
     toolCallId: 'img-1',

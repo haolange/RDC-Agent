@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { fetchPublic, PublicRequestFailedError } from '../../../runtime/net/publicEgress';
-import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from './toolLimits';
+import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from '../../../runtime/toolLimits';
 import { readWebTextPage, validateWebTextCursor, type WebTextCursor } from './WebTextPage';
 import type { AgentTool } from '../../agent/AgentTool';
 

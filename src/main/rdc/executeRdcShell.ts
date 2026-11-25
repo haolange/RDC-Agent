@@ -195,7 +195,7 @@ export async function executeRdcShell(
     }, signal) : undefined;
     // Perf dispatch awaits all sampling before returning; observe only after its completed result and receipt.
     if (definition.effects.some(effect => ['replay_position', 'shader_replacement'].includes(effect))) {
-      const { rdcSessionService } = await import('../sessions');
+      const { rdcSessionService } = await import('./RdcSessionService');
       await rdcSessionService.observeAgentOperation({ sessionId: sessionId, projectId: projectId }, input.operation, toolCallId, cli, true);
     }
     const rdcExecutionIdentity = {
@@ -257,7 +257,7 @@ export async function executeRdcShell(
           && lastReplayState !== null && rdcDigest(lastReplayState) === rdcDigest(originalReplayState)
           && (event === originalEvent || event === args.event_id);
         if (nativeStateVerifiedSafe) {
-          const { rdcSessionService } = await import('../sessions');
+          const { rdcSessionService } = await import('./RdcSessionService');
           await rdcSessionService.observeAgentOperation({ sessionId, projectId }, input.operation, toolCallId, cli, true);
           const observed = assertRdcContextLeaseOwnership({ sessionId, projectId });
           nativeStateVerifiedSafe = !signal?.aborted && observed?.version === lease.version && observed.contextId === lease.contextId;

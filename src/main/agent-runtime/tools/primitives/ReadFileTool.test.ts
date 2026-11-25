@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
+import { READ_FILE_MAX_OUTPUT_BYTES } from '../../../runtime/toolLimits';
 import { readFileTool } from './ReadFileTool';
-import { READ_FILE_MAX_OUTPUT_BYTES } from './toolLimits';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const roots: string[] = [];

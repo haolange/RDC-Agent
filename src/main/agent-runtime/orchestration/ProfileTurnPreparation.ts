@@ -6,7 +6,7 @@ import { AppError } from '@shared/errors/appError';
 
 import { generateEventId } from '@shared/utils/id';
 import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
-import { imageTokenAdjustmentForContent } from '../../conversation/ConversationAttachmentMaterializer';
+import { imageTokenAdjustmentForContent } from '../attachments/ConversationAttachmentMaterializer';
 import {
   resolveAgentRouteCapability,
 } from '../capabilities/RouteCapabilityResolver';

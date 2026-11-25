@@ -7,10 +7,10 @@
  */
 
 import * as fs from 'fs/promises';
-import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
+import { assertFileWriteBoundary } from '../../../runtime/FileOperationBoundary';
+import { assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../../../runtime/toolFiles';
+import { TEXT_FILE_MAX_BYTES } from '../../../runtime/toolLimits';
 import { requireSuccessfulFileRead } from './fileReadAccess';
-import { assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
-import { TEXT_FILE_MAX_BYTES } from './toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface EditFileParams {

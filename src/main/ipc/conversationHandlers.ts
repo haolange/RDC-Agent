@@ -3,14 +3,14 @@ import { AppError } from '@shared/errors/appError';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { conversationService } from '../conversation/ConversationService';
 import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
-import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
+import { readToolImagePreviewDataUrl } from '../agent-runtime/attachments/ToolImagePreviewStore';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import {
   assertAttachmentPreviewPath,
   readAttachmentFilePreviewDataUrl,
-} from '../conversation/attachmentPreview';
-import { NATIVE_IMAGE_MIME_TYPES } from '../conversation/attachmentClassify';
-import { delegationTraceStore } from '../conversation/DelegationTraceStore';
+} from '../runtime/attachmentPreview';
+import { NATIVE_IMAGE_MIME_TYPES } from '../runtime/attachmentClassify';
+import { delegationTraceStore } from '../agent-runtime/workTrace/DelegationTraceStore';
 import { toRejectedSendResult } from '../conversation/conversationSendRejection';
 import { requireActiveSessionOwner } from './sessionOwnerGate';
 import {

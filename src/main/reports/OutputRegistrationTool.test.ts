@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./ArtifactStore', () => ({ artifactStore: { register: mocks.register } }));
-vi.mock('../agent-runtime/orchestration/RunScopedStore', () => ({
+vi.mock('../sessions/store/RunScopedStore', () => ({
   runScopedStore: { getRunRoot: () => mocks.runRoot },
 }));
 

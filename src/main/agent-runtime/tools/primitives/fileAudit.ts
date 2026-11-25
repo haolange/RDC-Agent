@@ -3,8 +3,8 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { AppError } from '@shared/errors/appError';
-import { safeResolvePath, truncateOutput } from './_shared';
-import { TEXT_FILE_MAX_BYTES } from './toolLimits';
+import { safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
+import { TEXT_FILE_MAX_BYTES } from '../../../runtime/toolLimits';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 export interface FileAuditParams {

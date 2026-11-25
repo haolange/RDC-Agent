@@ -31,7 +31,7 @@ vi.mock('../rdc/captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore
 vi.mock('../sessions/store/sessionStores', () => ({
   projectWorkspaceStore: { setInputReconciler: vi.fn(), setInputCommitListener: vi.fn(), listProjects: () => [{ projectId: 'project', rootPath: 'D:/fixture' }], refreshProjectInputs: (...args: []) => mocks.refresh(...args) },
 }));
-vi.mock('../sessions', () => ({ rdcSessionService: {} }));
+vi.mock('../rdc/RdcSessionService', () => ({ rdcSessionService: {} }));
 vi.mock('../conversation/ConversationService', () => ({ conversationService: {} }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {

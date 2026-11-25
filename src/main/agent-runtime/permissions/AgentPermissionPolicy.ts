@@ -4,10 +4,11 @@ import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agent
 import { expandHomePath } from '../../platform/paths';
 import { defaultShellKind } from '../../platform/shell';
 import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
-import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
+import { resolveConfiguredShell } from '../../tools/resolveConfiguredShell';
 import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
-import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
-import { safeResolvePath } from '../tools/primitives/_shared';
+import { isWithinRootAllowingAliases } from '../../runtime/toolFiles';
+import { safeResolvePath } from '../../runtime/toolFiles';
+import { fileOperationBoundary } from '../../runtime/FileOperationBoundary';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
 import {
   matchesDeniedCommandPrefix,
@@ -17,7 +18,6 @@ import {
   isToolDeniedByPolicy,
   resolvePolicyApprovalFloor,
 } from './PolicyCompiler';
-import { fileOperationBoundary } from './FileOperationBoundary';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { AgentTool, ToolExecutionContext } from '../agent/AgentTool';

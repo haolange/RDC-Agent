@@ -13,9 +13,9 @@ import type { ReplayDeviceSnapshot } from '@shared/types/device';
 import type { ReplayHistoryStore } from './captures/replay/ReplayHistoryStore';
 
 const mocks = vi.hoisted(() => ({ deviceSubscribers: new Set<(snapshot: ReplayDeviceSnapshot) => void>(), opened: vi.fn(), inspect: vi.fn(), prepare: vi.fn(), close: vi.fn(), observe: vi.fn(), events: vi.fn(), append: vi.fn(), hash: vi.fn(), saveSelection: vi.fn(), liveRead: vi.fn(), liveClear: vi.fn(), project: vi.fn(), reference: vi.fn() }));
-vi.mock('./captures/replay/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
+vi.mock('../runtime/captureContentHash', () => ({ hashCaptureFile: mocks.hash }));
 vi.mock('../sessions/store/sessionStores', () => ({ projectWorkspaceStore: { getProjectById: mocks.project } }));
-vi.mock('./captures/ExternalCaptureReference', () => ({ verifyExternalCaptureReference: mocks.reference }));
+vi.mock('../runtime/ExternalCaptureReference', () => ({ verifyExternalCaptureReference: mocks.reference }));
 vi.mock('./captures/replay/ReplayHistoryStore', () => ({ replayHistoryStore: { saveSelection: mocks.saveSelection, append: mocks.append } }));
 vi.mock('./captures/replay/ReplayLivePreviewStore', () => ({
   replayLivePreviewStore: { read: mocks.liveRead, clear: mocks.liveClear, write: vi.fn() },

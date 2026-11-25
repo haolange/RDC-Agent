@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { z } from 'zod';
-import { assertFileSizeCap, assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../primitives/_shared';
-import { NOTEBOOK_MAX_BYTES } from '../primitives/toolLimits';
+import { assertFileSizeCap, assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../../../runtime/toolFiles';
+import { NOTEBOOK_MAX_BYTES } from '../../../runtime/toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 
 /** The nbformat fields this tool edits; every other notebook field is written back unchanged. */

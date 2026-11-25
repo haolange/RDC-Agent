@@ -4,14 +4,14 @@ import { generateShortId, nowMs, sanitizeToken } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { writeYaml } from '../../runtime/yaml';
 import { appPathService } from '../../runtime/AppPathService';
-import { hashCaptureFile } from '../../rdc/captures/replay/captureContentHash';
-import { safePath } from '../../rdc/captures/replay/replayFileSafety';
-import { createExternalCaptureReference, verifyExternalCaptureReference } from '../../rdc/captures/ExternalCaptureReference';
+import { hashCaptureFile } from '../../runtime/captureContentHash';
+import { safePath } from '../../runtime/replayFileSafety';
+import { createExternalCaptureReference, verifyExternalCaptureReference } from '../../runtime/ExternalCaptureReference';
+import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from '../../runtime/projectRegistrySchema';
 import { withDirectoryFileLockSync } from './directoryFileLock';
-import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSchema';
 import type { ProjectRegistry, SelectionState } from './storageTypes';
 import type { ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { StorageIo } from './StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 /** Session records the project registry reads: the selected session, startup reconciliation, cached locations. */
 export interface ProjectSessionRecords {

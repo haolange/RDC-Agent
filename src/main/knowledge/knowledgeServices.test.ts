@@ -4,7 +4,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { investigationMethodCases } from '../testing/fixtures/investigationMethodCases';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { createDisposableCandidateService } from './KnowledgeCandidateService';
 import { KnowledgeCompileService } from './KnowledgeCompileService';
 import { KnowledgeIndexService, contentHashOf } from './KnowledgeIndexService';

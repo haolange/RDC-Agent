@@ -10,7 +10,7 @@ vi.mock('../sessions/store/sessionStores', () => ({
   sessionRecordStore: { readSession },
 }));
 
-vi.mock('../sessions/run/DebuggerLlmService', () => ({
+vi.mock('../agent-runtime/context/DebuggerLlmService', () => ({
   debuggerLlmService: { getSessionContextUsage },
 }));
 

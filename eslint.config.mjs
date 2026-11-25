@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import importPlugin from 'eslint-plugin-import';
@@ -90,6 +92,71 @@ const leafImport = (self) => mainDomainImport(
   MAIN_DOMAINS.filter((domain) => domain !== self),
   `src/main/${self} is a leaf: it imports no other main-process domain.`,
 );
+// Main-process domain direction (ARCHITECTURE.md "进程间与主进程依赖方向"): a domain imports only domains in lower
+// layers, so the domain graph has no cycle. Peers in one layer do not import each other. Type-only imports carry no
+// runtime dependency and are allowed. Files directly under src/main (index.ts) are the composition root, above all.
+export const MAIN_DOMAIN_LAYERS = [
+  ['platform', 'provider-catalog', 'lifecycle'],
+  ['runtime'],
+  ['hooks'],
+  ['settings'],
+  ['window', 'tools', 'media'],
+  ['sessions'],
+  ['rdc'],
+  ['investigation'],
+  ['reports'],
+  ['knowledge'],
+  ['agent-runtime'],
+  ['agent-trace', 'workers'],
+  ['conversation'],
+  ['commands'],
+  ['ipc'],
+  ['browserAppBridge'],
+];
+const MAIN_ROOT = path.join(import.meta.dirname, 'src/main');
+const mainDomainLayer = new Map(MAIN_DOMAIN_LAYERS.flatMap((domains, layer) => domains.map((domain) => [domain, layer])));
+for (const entry of fs.readdirSync(MAIN_ROOT, { withFileTypes: true })) {
+  if (entry.isDirectory() && entry.name !== 'testing' && !mainDomainLayer.has(entry.name)) {
+    throw new Error(`eslint.config.mjs: src/main/${entry.name} has no layer in MAIN_DOMAIN_LAYERS.`);
+  }
+}
+const mainDomainOf = (absolutePath) => {
+  const [first, ...rest] = path.relative(MAIN_ROOT, absolutePath).split(path.sep);
+  return first && first !== '..' && (rest.length > 0 || mainDomainLayer.has(first)) ? first : null;
+};
+const mainDomainDirection = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      upward: 'src/main/{{from}} (layer {{fromLayer}}) must not import src/main/{{to}} (layer {{toLayer}}): a domain imports only '
+        + 'lower layers. Move the shared primitive down (src/main/runtime for primitives) or bind the implementation at '
+        + 'the composition root.',
+    },
+  },
+  create(context) {
+    const from = mainDomainOf(context.filename);
+    if (!from || !mainDomainLayer.has(from)) return {};
+    const check = (node, source, typeOnly) => {
+      if (typeOnly || typeof source !== 'string') return;
+      const target = source.startsWith('@main/') ? path.join(MAIN_ROOT, source.slice(6))
+        : source.startsWith('.') ? path.resolve(path.dirname(context.filename), source) : null;
+      const to = target ? mainDomainOf(target) : null;
+      if (!to || to === from || !mainDomainLayer.has(to)) return;
+      const fromLayer = mainDomainLayer.get(from);
+      const toLayer = mainDomainLayer.get(to);
+      if (toLayer >= fromLayer) context.report({ node, messageId: 'upward', data: { from, to, fromLayer, toLayer } });
+    };
+    const typeOnlyImport = (node) => node.importKind === 'type'
+      || (node.specifiers.length > 0 && node.specifiers.every((spec) => spec.type === 'ImportSpecifier' && spec.importKind === 'type'));
+    return {
+      ImportDeclaration: (node) => check(node, node.source.value, typeOnlyImport(node)),
+      ExportNamedDeclaration: (node) => node.source && check(node, node.source.value, node.exportKind === 'type'),
+      ExportAllDeclaration: (node) => check(node, node.source.value, node.exportKind === 'type'),
+      ImportExpression: (node) => node.source.type === 'Literal' && check(node, node.source.value, false),
+    };
+  },
+};
 const NODE_BUILTINS = [
   'assert', 'buffer', 'child_process', 'crypto', 'events', 'fs', 'fs/promises', 'http', 'https', 'net', 'os',
   'path', 'stream', 'url', 'util', 'worker_threads', 'zlib',
@@ -173,6 +240,12 @@ export default [
     files: ['src/main/**/*.ts'],
     ignores: [...mainTestFiles, 'src/main/index.ts', 'src/main/ipc/**', 'src/main/browserAppBridge/**'],
     rules: { 'no-restricted-imports': ['error', { patterns: [noTestingImport, noIpcImport] }] },
+  },
+  {
+    files: ['src/main/**/*.ts'],
+    ignores: [...mainTestFiles, 'src/main/**/*.d.ts'],
+    plugins: { 'main-domains': { rules: { direction: mainDomainDirection } } },
+    rules: { 'main-domains/direction': 'error' },
   },
   {
     files: ['src/main/ipc/**/*.ts', 'src/main/browserAppBridge/**/*.ts'],

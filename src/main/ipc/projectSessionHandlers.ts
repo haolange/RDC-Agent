@@ -1,18 +1,18 @@
 import { dialog, ipcMain } from 'electron';
-import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
+import { createSessionWithHooks, removeSessionWithHooks } from '../rdc/sessionLifecycle';
 import { conversationService } from '../conversation/ConversationService';
 import { traceService } from '../agent-trace/TraceService';
-import { applyDeclaredHandoff } from '../conversation/applyDeclaredHandoff';
+import { applyDeclaredHandoff } from '../agent-runtime/interactions/applyDeclaredHandoff';
 import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
-import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
+import { resolveEnabledAgentDefinition } from '../settings/agent-manifests/effectiveAgentSnapshot';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { nativeMessage } from '../window/nativeI18n';
-import { assertSessionModelExecutable } from '../conversation/sessionModelGate';
-import { rdcSessionService } from '../sessions';
+import { assertSessionModelExecutable } from '../agent-runtime/interactions/sessionModelGate';
+import { rdcSessionService } from '../rdc/RdcSessionService';
 import {
   ProjectAddArgsSchema,
   ProjectInputsImportArgsSchema,

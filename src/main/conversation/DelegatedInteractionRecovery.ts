@@ -2,10 +2,10 @@ import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { finalizeTrace } from './ConversationWorkTrace';
+import { finalizeTrace } from '../agent-runtime/workTrace/ConversationWorkTrace';
+import { INTERRUPTED_CONVERSATION_SUMMARY } from '../agent-runtime/context/SessionContextJournal';
 import type { ConversationMessage } from '@shared/types/conversation';
 
-export const INTERRUPTED_CONVERSATION_SUMMARY = '请求在应用退出后中断，需重新发起。';
 
 /** Persisted requests do not resurrect approval authority after restart. */
 export function reconcileDelegatedInteractionRequests(sessionId: string, message: ConversationMessage): ConversationMessage {

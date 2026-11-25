@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
 import { samePath } from '../platform/paths';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
 import type { ParsedKnowledgeSource } from './knowledgeCardSchema';
 

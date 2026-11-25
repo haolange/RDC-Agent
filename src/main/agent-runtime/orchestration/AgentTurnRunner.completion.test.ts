@@ -6,7 +6,7 @@ vi.mock('electron', () => ({ app: {
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: vi.fn(async () => true) }));
 vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { providerConnections: { get: () => undefined, list: () => [] } } }));
 vi.mock('../../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
-vi.mock('../../sessions/run/DebuggerLlmService', () => ({ debuggerLlmService: { recordAgentTurnUsage: vi.fn() } }));
+vi.mock('../context/DebuggerLlmService', () => ({ debuggerLlmService: { recordAgentTurnUsage: vi.fn() } }));
 vi.mock('../../sessions/run/handoffSkills', () => ({ assertApprovedExecutionCurrent: vi.fn() }));
 vi.mock('./DirectTaskTurnLifecycle', () => ({
   listUnfinishedDirectTasks: vi.fn(async () => []),

@@ -10,15 +10,15 @@ import type { ExecutionOffer } from '@shared/types/executionOffer';
 const mock = vi.hoisted(() => ({ state: vi.fn(), opened: vi.fn(), open: vi.fn(), close: vi.fn(), restore: vi.fn(), prepareDevice: vi.fn(),
   project: vi.fn(), session: vi.fn(), verifyInput: vi.fn(), device: vi.fn(), snapshot: vi.fn(), recoverySnapshot: vi.fn(), permission: vi.fn(), active: vi.fn(),
   entries: vi.fn(), readRecord: vi.fn(), assertOffer: vi.fn(), readPlan: vi.fn(), parsePlan: vi.fn() }));
-vi.mock('../../sessions', () => ({ rdcSessionService: { snapshotReplayForSession: mock.state, snapshotOpenedCaptureForSession: mock.opened,
+vi.mock('../../rdc/RdcSessionService', () => ({ rdcSessionService: { snapshotReplayForSession: mock.state, snapshotOpenedCaptureForSession: mock.opened,
   openProjectInput: mock.open, clearOpenedCaptureForSession: mock.close, restoreAgentPosition: mock.restore, prepareAgentDevice: mock.prepareDevice } }));
 vi.mock('../../sessions/store/sessionStores', () => ({ sessionRecordStore: { readSession: mock.session }, projectWorkspaceStore: { getProjectById: mock.project } }));
-vi.mock('../../sessions/run/prepareInvestigationPlan', () => ({ verifyPlanInput: mock.verifyInput }));
+vi.mock('../../rdc/prepareInvestigationPlan', () => ({ verifyPlanInput: mock.verifyInput }));
 vi.mock('../../sessions/run/handoffSkills', () => ({ assertApprovedExecutionCurrent: mock.assertOffer }));
 vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.readPlan } }));
 vi.mock('../../sessions/run/approvedInvestigationContract', () => ({ approvedInvestigationContract: mock.parsePlan }));
 vi.mock('../../rdc/RdcSwitchSnapshot', () => ({ readRdcSwitchSnapshot: mock.snapshot, readRdcRecoverySnapshot: mock.recoverySnapshot }));
-vi.mock('../permissions/RuntimePermissionStateService', () => ({ runtimePermissionStateService: { getSnapshot: mock.permission } }));
+vi.mock('../../runtime/RuntimePermissionStateService', () => ({ runtimePermissionStateService: { getSnapshot: mock.permission } }));
 vi.mock('../../rdc/captures/ReplayDeviceService', () => ({ replayDeviceService: { getDeviceById: mock.device } }));
 vi.mock('../../rdc/RdcLifecycleReceipts', () => ({ rdcLifecycleReceipts: { prepare: vi.fn(), write: vi.fn(), pending: vi.fn() } }));
 vi.mock('../../investigation/InvestigationArtifactService', () => ({ investigationArtifactService: { list: mock.entries, readRecord: mock.readRecord } }));

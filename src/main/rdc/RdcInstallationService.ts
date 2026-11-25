@@ -3,7 +3,7 @@ import path from 'path';
 import { AppError } from '@shared/errors/appError';
 import { resolvedPathKey, samePath } from '../platform/paths';
 import { rdcDefaultInstallationRoots, rdcHostLayout, rdcInstallationFiles, rdcRootFromPython } from '../platform/rdcLayout';
-import { assertRdcCliBinding } from './rdcCliBinding';
+import { assertRdcCliBinding } from '../runtime/rdcCliBinding';
 import type { RdcInstallationCandidate, RdcInstallationRequest } from '@shared/types/rdcInstallation';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 

@@ -7,7 +7,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TurnCoordinator } from '../../agent-runtime/orchestration/TurnCoordinator';
-import { safeResolvePath } from '../../agent-runtime/tools/primitives/_shared';
+import { safeResolvePath } from '../../runtime/toolFiles';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 function makeEvent(id: string, sessionId: string): AgentEvent {

@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../../runtime/resolveConfiguredShell', () => ({
+vi.mock('../../tools/resolveConfiguredShell', () => ({
   resolveConfiguredShell: () => ({
     executable: 'pwsh',
     kind: 'pwsh',

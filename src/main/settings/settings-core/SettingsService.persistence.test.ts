@@ -96,7 +96,7 @@ describe('SettingsService provider persistence', () => {
 
   it('publishes permission mode only after durable settings commit and survives notification failures', async () => {
     const { SettingsService } = await import('./SettingsService');
-    const { runtimePermissionStateService } = await import('../../agent-runtime/permissions/RuntimePermissionStateService');
+    const { runtimePermissionStateService } = await import('../../runtime/RuntimePermissionStateService');
     const service = new SettingsService(); service.initialize();
     const before = runtimePermissionStateService.getSnapshot();
     const notifications = vi.fn(); const stop = runtimePermissionStateService.subscribe(notifications);

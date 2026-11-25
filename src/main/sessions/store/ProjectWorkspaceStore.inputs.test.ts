@@ -4,7 +4,7 @@ import os from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import type { ProjectRecord } from '@shared/types/session';
-import type { StorageIo } from './StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 vi.mock('electron', () => ({ app: {} }));
 const roots: string[] = [];

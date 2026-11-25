@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
-import { StorageIo } from '../store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import {
   EXECUTION_OFFER_FILE,
   ExecutionOfferStore,

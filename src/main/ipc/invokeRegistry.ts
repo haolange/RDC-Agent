@@ -3,7 +3,7 @@ import { AppError, IPC_ERROR_KEY, toIpcErrorPayload, type IpcErrorResult } from 
 import { isHighImpactChannel, RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
 import { auditArgumentsHash, auditLog, runWithAuditOrigin, type AuditEvent, type AuditOrigin } from '../runtime/AuditLog';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
-import { isTrustedRendererUrl } from '../window/rendererTrust';
+import { isTrustedRendererUrl } from '../runtime/rendererTrust';
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown | Promise<unknown>;
 

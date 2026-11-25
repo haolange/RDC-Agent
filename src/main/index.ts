@@ -16,20 +16,26 @@ import { appPathService } from './runtime/AppPathService';
 
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
-import { projectWorkspaceStore } from './sessions/store/sessionStores';
-import { rdcSessionService } from './sessions';
+import { projectWorkspaceStore, sessionRecordStore } from './sessions/store/sessionStores';
+import { rdcSessionService } from './rdc/RdcSessionService';
 import { harvestOwnedRdcDaemons } from './rdc/OwnedRdcDaemonRegistry';
 import { settingsService } from './settings/settings-core/SettingsService';
 import { SettingsFileError } from './settings/settings-core/settingsFileSchema';
-import './rdc/rdcShellPermission';
-import './rdc/registerConversationRdcHost';
+import { evaluateRdcShellBaseline } from './rdc/rdcShellPermission';
+import { acquireRdcPreparationLock, setRdcInteractionLock } from './rdc/RdcOperationCoordinator';
+import { registerConversationRdcHost } from './conversation/conversationRdcHost';
+import { registerRdcShellBaseline } from './agent-runtime/permissions/AgentPermissionPolicy';
+import { bindTraceProjectionSource } from './agent-runtime/orchestration/TraceProjectionRefreshService';
+import { requestSnapshotStore } from './agent-runtime/prompt/RequestSnapshotStore';
+import { removeSessionTasks } from './agent-runtime/tasks/sessionTaskStore';
+import { traceService } from './agent-trace/TraceService';
 import { rdcCliInvokerService } from './rdc/RdcCliInvokerService';
 import { replayDeviceService } from './rdc/captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
 import { installProcessFaultHandlers, reportProcessFault } from './runtime/processFaultHandlers';
 import { isDevelopmentRun } from './runtime/developmentRun';
 import { onJsonlTailRepair } from './runtime/jsonl';
-import { rendererEventHub } from './browserAppBridge/rendererEventHub';
+import { rendererEventHub } from './runtime/rendererEventHub';
 import {
   shouldStartBrowserAppBridge,
   startBrowserAppBridge,
@@ -47,14 +53,29 @@ import {
 import { bindProductIcon } from './window/productIcon';
 import { reportSettingsStartupFailure } from './window/settingsStartupFailure';
 import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
-import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './window/rendererTrust';
+import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './runtime/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 import { currentHost } from './platform/host';
 import { currentProcessIdentity } from './platform/process';
 
-// Re-export for callers that historically imported from main entry.
-export { rdcSessionService } from './sessions';
+/**
+ * Lower domains declare the port they need and this composition root binds the implementation from the domain
+ * above, once, before anything else runs.
+ */
+function bindCrossDomainHosts(): void {
+  registerRdcShellBaseline(evaluateRdcShellBaseline);
+  registerConversationRdcHost({
+    acquirePreparationLock: acquireRdcPreparationLock,
+    setInteractionLock: setRdcInteractionLock,
+    snapshotOpenedCapture: (scope) => rdcSessionService.snapshotOpenedCaptureForSession(scope),
+    replayDevice: (deviceId) => replayDeviceService.getDeviceById(deviceId),
+  });
+  bindTraceProjectionSource(traceService);
+  sessionRecordStore.addSideChannels(requestSnapshotStore);
+  sessionRecordStore.addSideChannels({ removeSession: removeSessionTasks });
+}
+bindCrossDomainHosts();
 
 const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;

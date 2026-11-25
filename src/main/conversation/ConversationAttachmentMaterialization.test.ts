@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { materializeAgentUserInput } from './ConversationAttachmentMaterializer';
+import { materializeAgentUserInput } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-mat-'));
 

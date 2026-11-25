@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../primitives/_shared';
-import { COPY_MOVE_MAX_BYTES } from '../primitives/toolLimits';
+import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../../../runtime/toolFiles';
+import { COPY_MOVE_MAX_BYTES } from '../../../runtime/toolLimits';
 import { renameWithRetry } from '../../../platform/fileRename';
 import type { AgentTool } from '../../agent/AgentTool';
 

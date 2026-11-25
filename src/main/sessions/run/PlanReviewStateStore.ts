@@ -7,7 +7,7 @@ import {
 import { generateShortId, nowMs } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { executionOfferStore, sessionRecordStore, storageIo } from '../store/sessionStores';
-import type { StorageIo } from '../store/StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 const planReviewStateSchema = z.object({
   schemaVersion: z.literal(PLAN_REVIEW_STATE_SCHEMA),

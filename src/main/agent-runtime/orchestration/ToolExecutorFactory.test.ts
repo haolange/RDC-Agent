@@ -5,13 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseInvestigationPlanContract } from '@shared/types/planInvestigation';
 
 import { parsePlanTaskRequirements } from '@shared/types/taskExecution';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
 import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { TaskRegistry, registerDelegatedTaskScope } from '../tasks';
 import { grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
-import { StorageIo } from '../../sessions/store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import * as toolResultArtifacts from '../tools/ToolResultArtifactizer';
 import { shellTool } from '../tools/primitives/ShellTool';
@@ -39,7 +39,7 @@ const EXCLUSIVE_SPEC = { concurrency: 'exclusive', isReadOnly: false, isDestruct
 
 beforeEach(() => { runtimePermissionStateService.initialize('default'); runtimePermissionStateService.commitMode('default'); });
 const handoffPreflight = vi.hoisted(() => vi.fn());
-vi.mock('../../conversation/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: handoffPreflight }));
+vi.mock('../interactions/applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: handoffPreflight }));
 vi.mock('electron', () => ({
   app: {
     getPath: () => process.env.TEMP ?? process.env.TMP ?? process.cwd(),

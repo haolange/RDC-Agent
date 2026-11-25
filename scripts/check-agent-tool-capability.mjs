@@ -21,7 +21,7 @@ if (!preflight.includes('CONVERSATION_LLM_TOOLS_UNAVAILABLE') || !preflight.incl
   fail('Route preflight must fail closed through the shared Agent tool-eligibility gate');
 }
 
-const sessionModelGate = fs.readFileSync(path.join(repoRoot, 'src/main/conversation/sessionModelGate.ts'), 'utf8');
+const sessionModelGate = fs.readFileSync(path.join(repoRoot, 'src/main/agent-runtime/interactions/sessionModelGate.ts'), 'utf8');
 if (!sessionModelGate.includes('isAgentToolExecutableModel')) {
   fail('The session model gate must use the shared Agent tool-eligibility gate');
 }

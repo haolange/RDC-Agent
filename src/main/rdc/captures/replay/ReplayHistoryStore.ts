@@ -4,7 +4,7 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
-import { assertHash, assertSession, atomicWrite, missing, projectLock, safePath, treeBytes } from './replayFileSafety';
+import { assertHash, assertSession, atomicWrite, missing, projectLock, safePath, treeBytes } from '../../../runtime/replayFileSafety';
 import { replayPngCodec } from './replayPngCodec';
 import type { ReplayHistoryEntry, ReplayHistoryOptions, ReplayHistoryScope, ReplayManifest, ReplayObservation, ReplaySelection } from './replayStorageTypes';
 

@@ -8,7 +8,7 @@ import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { rdcExecutionReceipts } from '../../rdc/RdcExecutionReceipts';
 import { rdcLifecycleReceipts } from '../../rdc/RdcLifecycleReceipts';
-import { fileOperationBoundary } from './FileOperationBoundary';
+import { fileOperationBoundary } from '../../runtime/FileOperationBoundary';
 import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';

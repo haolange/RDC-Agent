@@ -1,20 +1,28 @@
 import { createHash } from 'node:crypto';
 import { SessionArtifactError, SESSION_ARTIFACT_MAX_FILE_BYTES, isSessionArtifactizedEnvelope } from '@shared/types/sessionArtifact';
 import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
-import { sessionContextJournal, type SessionContextJournal } from '../conversation/SessionContextJournal';
 import { delegatedArtifactOwner } from '../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import { conversationHistoryStore } from '../sessions/store/sessionStores';
+import { conversationHistoryStore, sessionContextStore } from '../sessions/store/sessionStores';
 import { canonicalJson } from './RdcOperationCatalog';
 import { containsSensitiveRequestKey } from './RdcInvocationRecord';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
+import type { SessionContextTurnEntry } from '../agent-runtime/context/SessionContextJournal';
 
 export type RecordedRequestQualification = 'recorded-model-request-only' | 'recorded-operation-index-only';
+/** Every durable turn entry of a session. */
+interface RecordedTurnJournal {
+  readEntries(sessionId: string): SessionContextTurnEntry[];
+}
 interface RecordedRdcDeps {
   resolver: Pick<SessionArtifactResolver, 'read' | 'write'>;
-  journal: Pick<SessionContextJournal, 'readEntries'>;
+  journal: RecordedTurnJournal;
   history?: Pick<typeof conversationHistoryStore, 'readConversationHistory'>;
 }
+
+const sessionTurnJournal: RecordedTurnJournal = {
+  readEntries: (sessionId) => sessionContextStore.readSessionContextJournal(sessionId, () => true),
+};
 
 const digest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 const object = (value: unknown): Record<string, unknown> | null => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -28,7 +36,7 @@ function experimentField(request: Record<string, unknown>): { experimentId?: str
 /** Own-session recorded requests are provenance, not proof of native execution/defaults. */
 export function materializeRecordedRdcRequest(
   context: ToolExecutionContext, uri: string, expectedHash: string | undefined,
-  deps: RecordedRdcDeps = { resolver: sessionArtifactResolver, journal: sessionContextJournal, history: conversationHistoryStore },
+  deps: RecordedRdcDeps = { resolver: sessionArtifactResolver, journal: sessionTurnJournal, history: conversationHistoryStore },
   operationIndex = false,
 ): { uri: string; hash: string; qualification: RecordedRequestQualification } {
   const sessionId = context.sessionId;

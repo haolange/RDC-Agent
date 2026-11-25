@@ -1,5 +1,5 @@
 import { AppError } from '@shared/errors/appError';
-import { openExternalHttps } from '../../window/rendererTrust';
+import { openExternalHttps } from '../../runtime/rendererTrust';
 import { settingsService } from '../settings-core/SettingsService';
 import { getProviderAccountAuth, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { oauthRefreshManager } from './OAuthRefreshManager';

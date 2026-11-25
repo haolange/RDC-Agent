@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { hashAttachmentContents } from './ConversationAttachmentHashing';
+import { hashAttachmentContents } from '../agent-runtime/attachments/ConversationAttachmentHashing';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-tx-'));
 

@@ -4,7 +4,7 @@ import { z, type ZodType } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
-import { runScopedStore } from './RunScopedStore';
+import { runScopedStore } from '../../sessions/store/RunScopedStore';
 import type {
   RequestBranch,
   RequestBranchGroup,

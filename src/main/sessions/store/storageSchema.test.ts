@@ -9,24 +9,10 @@ import { createDefaultSettingsFile } from '../../settings/settings-core/settings
 import { parseSettingsFile, SETTINGS_SCHEMA_VERSION } from '../../settings/settings-core/settingsFileSchema';
 import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { stringifyYaml } from '../../runtime/yaml';
-import {
-  parseStoredDocument,
-  PROJECT_REGISTRY_MIGRATIONS,
-  SessionRecordSchema,
-  SessionAttachmentManifestSchema,
-  toSessionAttachmentManifest,
-  CURRENT_USAGE_SCHEMA_VERSION,
-  SessionUsageV2Schema,
-  readCurrentStoredJson,
-  SESSION_SHELL_STATE_MIGRATIONS,
-  toSessionUsageManifest,
-  toSessionShellStateManifest,
-  CONVERSATION_TURN_COMMIT_MIGRATIONS,
-  CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
-  StorageSchemaError,
-  type StorageMigration,
-} from './storageSchema';
-import { StorageIo } from './StorageIo';
+import { PROJECT_REGISTRY_MIGRATIONS } from '../../runtime/projectRegistrySchema';
+import { parseStoredDocument, readCurrentStoredJson, StorageSchemaError, type StorageMigration } from '../../runtime/storedDocument';
+import { StorageIo } from '../../runtime/StorageIo';
+import { SessionRecordSchema, SessionAttachmentManifestSchema, toSessionAttachmentManifest, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema, SESSION_SHELL_STATE_MIGRATIONS, toSessionUsageManifest, toSessionShellStateManifest, CONVERSATION_TURN_COMMIT_MIGRATIONS, CONVERSATION_TERMINAL_COMMIT_MIGRATIONS } from './storageSchema';
 
 describe('storageSchema parseStoredDocument', () => {
   const current = z.object({

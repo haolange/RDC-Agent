@@ -12,7 +12,7 @@ import {
   mentionsTextualToolCall,
   translateCoreToSharedAgentEvent,
 } from '../AgentEventBridge';
-import { debuggerLlmService } from '../../sessions/run/DebuggerLlmService';
+import { debuggerLlmService } from '../context/DebuggerLlmService';
 import { isMcpPrefixedToolName, partitionDeferredTools } from './deferredTools';
 import { isSuccessfulProviderResponse, reportedUsageFields } from './AgentSlotFactory';
 import { persistToolCallingSupport } from './AgentTurnCapabilityObservations';

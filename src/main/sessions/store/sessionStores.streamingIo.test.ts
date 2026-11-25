@@ -216,7 +216,7 @@ describe('conversationHistoryStore streaming I/O', () => {
 
   it('appends only the work blocks an update changed and replays them into the full trace', async () => {
     const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore } = await import('./sessionStores');
-    const { upsertLoopTextItem } = await import('../../conversation/ConversationWorkTrace');
+    const { upsertLoopTextItem } = await import('../../agent-runtime/workTrace/ConversationWorkTrace');
     await projectWorkspaceStore.initializeWorkspace();
     const projectRoot = path.join(tempRoot, 'project-root-trace-blocks');
     fs.mkdirSync(projectRoot, { recursive: true });

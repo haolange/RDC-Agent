@@ -2,18 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
-import {
-  SESSION_SHELL_STATE_MIGRATIONS,
-  CURRENT_USAGE_SCHEMA_VERSION,
-  SessionContextTurnEntrySchema,
-  SessionUsageV2Schema,
-  readCurrentStoredJson,
-  toSessionShellStateManifest,
-  toSessionUsageManifest,
-} from './storageSchema';
+import { readCurrentStoredJson } from '../../runtime/storedDocument';
+import { SESSION_SHELL_STATE_MIGRATIONS, CURRENT_USAGE_SCHEMA_VERSION, SessionContextTurnEntrySchema, SessionUsageV2Schema, toSessionShellStateManifest, toSessionUsageManifest } from './storageSchema';
 import type { RunContextUsageSummary } from '@shared/types/session';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
-import type { StorageIo } from './StorageIo';
+import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 /** What the per-session context files need: file I/O and where each session lives. */
 export interface SessionContextHost {

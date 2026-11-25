@@ -6,9 +6,9 @@ import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/run/
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
-import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
-import { resolveRecoverablePlan } from '../../sessions/run/planReviewRecovery';
-import { resolveApprovedHandoff } from '../../sessions/run/approvedHandoffRecovery';
+import { traceProjectionRefreshService } from '../orchestration/TraceProjectionRefreshService';
+import { resolveRecoverablePlan } from './planReviewRecovery';
+import { resolveApprovedHandoff } from './approvedHandoffRecovery';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import { runPlanApprovalTransaction } from './PlanApprovalTransaction';
 import type { PlanReadRequest, PlanReviewContext, PlanReviewProjection, ConversationAnswerPlanReviewRequest, ConversationAnswerPlanReviewResult } from '@shared/types/planReview';

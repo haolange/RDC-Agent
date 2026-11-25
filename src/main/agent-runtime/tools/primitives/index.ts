@@ -12,9 +12,9 @@ export { globTool } from './GlobTool';
 export { grepTool } from './GrepTool';
 export { gitAddTool, gitCommitTool, gitDiffTool, gitLogTool, gitStatusTool, gitUnstageTool } from './GitTool';
 export { webFetchTool, webSearchTool } from './WebTools';
-export { assertTextReadable, truncateOutput } from './_shared';
+export { assertTextReadable, truncateOutput } from '../../../runtime/toolFiles';
 export { matchShellHardDeny } from './shellHardDeny';
-export * from './toolLimits';
+export * from '../../../runtime/toolLimits';
 
 import { deleteFileTool, moveFileTool, copyFileTool } from '../file';
 import { notebookEditTool } from '../system';

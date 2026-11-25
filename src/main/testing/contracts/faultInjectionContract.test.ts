@@ -17,11 +17,11 @@ import {
   ProviderStreamProtocolError,
 } from '../../agent-runtime/providers/internal/AssistantStreamBuilder';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { StorageIo } from '../../sessions/store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { StdioRpcClient } from '../../agent-runtime/agent/mcpRpcTransport';
 import { ShutdownCoordinator } from '../../lifecycle/ShutdownCoordinator';
-import { writeTextFileNoFollow } from '../../agent-runtime/tools/primitives/_shared';
-import { hashAttachmentContents } from '../../conversation/ConversationAttachmentHashing';
+import { writeTextFileNoFollow } from '../../runtime/toolFiles';
+import { hashAttachmentContents } from '../../agent-runtime/attachments/ConversationAttachmentHashing';
 import { ConversationHistoryStore } from '../../sessions/store/ConversationHistoryStore';
 
 const childState = vi.hoisted(() => {

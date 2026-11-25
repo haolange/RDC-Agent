@@ -2,11 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AppError } from '@shared/errors/appError';
 import { stringifyYaml } from '../../runtime/yaml';
-import { readCurrentStoredJson, StorageSchemaError } from '../store/storageSchema';
+import { readCurrentStoredJson, StorageSchemaError } from '../../runtime/storedDocument';
 import { PersistedRunRecordV3Schema } from './runV3/runRecordSchema';
 import type { RunSummary } from '@shared/types/session';
 import type { PersistedRunRecord } from '../store/storageTypes';
-import type { StorageIo } from '../store/StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 export function toRunSummary(run: PersistedRunRecord): RunSummary {
   const { createdAt: _createdAt, updatedAt: _updatedAt, runtime: _runtime, ...summary } = run;

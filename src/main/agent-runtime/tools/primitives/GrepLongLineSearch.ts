@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { GREP_REGEX_TIMEOUT_MS } from './toolLimits';
+import { GREP_REGEX_TIMEOUT_MS } from '../../../runtime/toolLimits';
 import type { GrepWorkerMatch, GrepWorkerRequest, GrepWorkerResponse } from '../../../workers/grepRegexWorker';
 
 const WORKER_STARTUP_TIMEOUT_MS = 5_000;

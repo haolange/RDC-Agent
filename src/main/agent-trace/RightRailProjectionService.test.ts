@@ -18,12 +18,12 @@ vi.mock('../agent-runtime/tasks/TaskRegistry', () => ({ TaskRegistry: class {
   async reconcileInterruptedExecutions() { return this; }
   async readConsistentSnapshot() { return { tasks: [], executions: [] }; }
 } }));
-vi.mock('../sessions', () => ({ rdcSessionService: {
+vi.mock('../rdc/RdcSessionService', () => ({ rdcSessionService: {
   snapshotOpenedCaptureForSession: () => null,
   snapshotContextForSession: () => null,
 } }));
-vi.mock('../sessions/artifacts/SessionArtifactSource', () => ({ listSessionArtifactSources: async () => [] }));
-vi.mock('../agent-runtime/permissions/RuntimePermissionStateService', () => ({ runtimePermissionStateService: {
+vi.mock('../reports/SessionArtifactSource', () => ({ listSessionArtifactSources: async () => [] }));
+vi.mock('../runtime/RuntimePermissionStateService', () => ({ runtimePermissionStateService: {
   getSnapshot: () => ({ mode: 'default' }),
 } }));
 vi.mock('../agent-runtime/prompt', () => ({ requestSnapshotStore: { listPromptSegments: () => [] } }));

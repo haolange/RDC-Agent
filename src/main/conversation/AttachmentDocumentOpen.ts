@@ -1,6 +1,6 @@
 import { lstat, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assertAttachmentPreviewPath } from './attachmentPreview';
+import { assertAttachmentPreviewPath } from '../runtime/attachmentPreview';
 import type { ConversationAccessAttachmentResult } from '@shared/types/conversation';
 
 const COPY_PREFIX = 'document-';

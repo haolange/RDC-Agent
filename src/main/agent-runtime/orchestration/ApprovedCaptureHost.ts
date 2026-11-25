@@ -7,14 +7,14 @@ import { readRdcRecoverySnapshot, readRdcSwitchSnapshot } from '../../rdc/RdcSwi
 import { ownsRdcInteractionLock } from '../../rdc/RdcOperationCoordinator';
 import { selectedProbeDeviceId } from '../../rdc/RdcProbeLifecycle';
 import { replayDeviceService } from '../../rdc/captures/ReplayDeviceService';
-import { rdcSessionService } from '../../sessions';
+import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { approvedInvestigationContract } from '../../sessions/run/approvedInvestigationContract';
 import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
-import { verifyPlanInput } from '../../sessions/run/prepareInvestigationPlan';
+import { verifyPlanInput } from '../../rdc/prepareInvestigationPlan';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageIo } from '../store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { PlanReviewStateStore } from './PlanReviewStateStore';
 
 describe('PlanReviewStateStore', () => {

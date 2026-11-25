@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppError } from '@shared/errors/appError';
 import { expectMonotonicProgress } from '../testing/knowledgeProgress';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
 import type { KnowledgeOperationPhase } from '@shared/types/knowledgeOperation';
 

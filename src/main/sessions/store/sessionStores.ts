@@ -7,7 +7,7 @@
  */
 
 import { ExecutionOfferStore } from '../run/ExecutionOfferStore';
-import { StorageIo } from './StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import { SessionRecordStore } from './SessionRecordStore';
 import { ConversationHistoryStore } from './ConversationHistoryStore';

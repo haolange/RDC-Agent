@@ -9,8 +9,6 @@ import {
 } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
-import { requestSnapshotStore } from '../../agent-runtime/prompt/RequestSnapshotStore';
-import { removeSessionTasks } from '../../agent-runtime/tasks/sessionTaskStore';
 import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
 import { appPathService } from '../../runtime/AppPathService';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
@@ -34,7 +32,7 @@ import type { ReservedStagedConversationSession, StagedConversationSessionCommit
 import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import type { ConversationHistoryStore } from './ConversationHistoryStore';
 import type { ExecutionOfferStore } from '../run/ExecutionOfferStore';
-import type { StorageIo } from './StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 /** What session records need from storage: file I/O and the project registry that places them. */
 export interface SessionRecordHost {
@@ -44,6 +42,11 @@ export interface SessionRecordHost {
     | 'getProjectById' | 'listProjects' | 'ensureProjectSessionsRoot' | 'touchProject' | 'readSelection'
     | 'writeSelection' | 'getCurrentProjectId' | 'setCurrentProjectId' | 'setCurrentSessionId'
   >;
+}
+
+/** Per-session state another domain keeps outside the session directory; it is removed with the session. */
+export interface SessionSideChannel {
+  removeSession(sessionId: string): void;
 }
 
 export interface SessionRecordLinks {
@@ -69,12 +72,18 @@ export class SessionRecordStore {
   private readonly sessionProjects = new Map<string, ProjectRecord>();
 
   private links!: SessionRecordLinks;
+  private readonly sideChannels: SessionSideChannel[] = [];
 
   constructor(private readonly host: SessionRecordHost) {}
 
   /** Wired once by the storage composition root (`sessionStores.ts`): the stores reference each other. */
   connect(links: SessionRecordLinks): void {
     this.links = links;
+  }
+
+  /** Bound by the process composition root (`src/main/index.ts`) for the agent runtime's per-session files. */
+  addSideChannels(channel: SessionSideChannel): void {
+    this.sideChannels.push(channel);
   }
 
   removeSession(sessionId: string): void {
@@ -110,8 +119,7 @@ export class SessionRecordStore {
 
   private removeSessionSideChannels(sessionId: string, runIds: string[]): void {
     const paths = appPathService.getAppStatePaths();
-    requestSnapshotStore.removeSession(sessionId);
-    removeSessionTasks(sessionId);
+    for (const channel of this.sideChannels) channel.removeSession(sessionId);
 
     const tracesRunsDir = path.join(paths.tracesPath, 'runs');
     const tracesEventsDir = path.join(paths.tracesPath, 'events');

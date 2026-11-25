@@ -12,7 +12,7 @@ import { getRdcTurnBinding } from '../../rdc/RdcTurnBindings';
  * result presentation) is read from the declared `AgentTool.spec`, never from the tool name.
  */
 
-import { getWorkspaceRoot, withTemporaryPathAccess } from '../tools/primitives/_shared';
+import { getWorkspaceRoot, withTemporaryPathAccess } from '../../runtime/toolFiles';
 import { buildDiagnosticAgentEvent } from '../AgentEventBridge';
 import { agentUserInputRequestService } from '../interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
@@ -24,9 +24,9 @@ import {
 import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
 import { preparePlanTaskRequirements } from '../tasks/TaskExecutionRequirements';
-import { prepareInvestigationPlan } from '../../sessions/run/prepareInvestigationPlan';
-import { rdcSessionService } from '../../sessions';
-import { assertDeclaredHandoffForPlan } from '../../conversation/applyDeclaredHandoff';
+import { prepareInvestigationPlan } from '../../rdc/prepareInvestigationPlan';
+import { rdcSessionService } from '../../rdc/RdcSessionService';
+import { assertDeclaredHandoffForPlan } from '../interactions/applyDeclaredHandoff';
 import { authorizeToolPermission, ToolPermissionDenied } from '../permissions/ToolPermissionAuthorization';
 import { hookEngine } from '../../hooks/HookEngine';
 import { appPathService } from '../../runtime/AppPathService';

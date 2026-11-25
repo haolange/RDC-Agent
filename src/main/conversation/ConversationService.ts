@@ -10,6 +10,14 @@ import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRo
 import { traceService } from '../agent-trace/TraceService';
 import { conversationHistoryStore, projectWorkspaceStore, sessionContextStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { sessionContextJournal } from '../agent-runtime/context/SessionContextJournal';
+import {
+  createDefaultBranchState,
+  normalizeBranchId,
+  repairConversationBranchState,
+  resolveVisibleConversationMessages,
+} from '../sessions/store/ConversationBranchResolver';
+import { hashAttachmentContents } from '../agent-runtime/attachments/ConversationAttachmentHashing';
 import { resolvePlanReference } from './planReferenceResolution';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import {
@@ -18,16 +26,8 @@ import {
   answerConversationUserInput,
 } from './ConversationInteractionAnswers';
 import { conversationRdcHost } from './conversationRdcHost';
-import { sessionContextJournal } from './SessionContextJournal';
-import {
-  createDefaultBranchState,
-  normalizeBranchId,
-  repairConversationBranchState,
-  resolveVisibleConversationMessages,
-} from './ConversationBranchResolver';
 import { canonicalJson } from './ConversationRoutePreflight';
 import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
-import { hashAttachmentContents } from './ConversationAttachmentHashing';
 import { startProfileTurn as runStartProfileTurn } from './ConversationTurnStarter';
 import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
 import {

@@ -1,11 +1,11 @@
 import * as fs from 'node:fs';
 import { basename } from 'node:path';
 import { associatedDocumentMime, attachmentExtension, isMarkdownAttachment } from '@shared/attachmentPresentation';
-import { openAttachmentDocumentCopy } from './AttachmentDocumentOpen';
 import {
   assertSafeImageBytes, MAX_ATTACHMENT_BYTES_PER_FILE, MAX_DECODED_IMAGE_BYTES, NATIVE_IMAGE_MIME_TYPES,
-} from './attachmentClassify';
-import { assertAttachmentPreviewPath, toDataUrl } from './attachmentPreview';
+} from '../runtime/attachmentClassify';
+import { assertAttachmentPreviewPath, toDataUrl } from '../runtime/attachmentPreview';
+import { openAttachmentDocumentCopy } from './AttachmentDocumentOpen';
 import { isOfficeDocument } from './attachmentOfficeDocument';
 import type { AttachmentLayer, ConversationAccessAttachmentRequest, ConversationAccessAttachmentResult } from '@shared/types/conversation';
 

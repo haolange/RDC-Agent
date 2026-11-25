@@ -1,6 +1,6 @@
 import { toolResultToSharedResult } from '../agent-runtime/AgentEventBridge';
+import { upsertRuntimeToolCall } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import { buildConversationToolCompletion } from './ConversationToolCompletion';
-import { upsertRuntimeToolCall } from './ConversationWorkTrace';
 import type { Message } from '../agent-runtime/core/types';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 

@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { z } from 'zod';
-import { providerProbeBatchService } from '../settings/provider-catalog/ProviderProbeBatchService';
+import { providerProbeBatchService } from '../agent-runtime/capabilities/ProviderProbeBatchService';
 import { shutdownCoordinator } from '../lifecycle/ShutdownCoordinator';
 import { parseIpcArgs, ipcNonEmptyString } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';

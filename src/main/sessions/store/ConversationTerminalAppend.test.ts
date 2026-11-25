@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 
 describe('bounded terminal append transaction', () => {
   let root = '';

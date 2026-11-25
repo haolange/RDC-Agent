@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { generateEventId, nowIso } from '@shared/utils/id';
-import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
-import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
+import { runScopedStore } from '../sessions/store/RunScopedStore';
+import { safeResolvePath } from '../runtime/toolFiles';
 import { artifactStore } from './ArtifactStore';
 import type { ArtifactKind, ArtifactRecord } from '@shared/types/harness';
 import type { AgentTool } from '../agent-runtime/agent/AgentTool';

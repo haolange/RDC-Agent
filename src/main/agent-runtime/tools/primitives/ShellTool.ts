@@ -9,14 +9,14 @@ import { parseShellRdcInput, type RdcShellInput } from '../../../rdc/RdcShellInp
 import { executeRdcShell } from '../../../rdc/executeRdcShell';
 import { processSupervisor } from '../../../runtime/ProcessSupervisor';
 import { shellResolver, type ShellKind } from '../../../runtime/ShellResolver';
-import { describeResolvedShell, resolveConfiguredShell } from '../../../runtime/resolveConfiguredShell';
+import { describeResolvedShell, resolveConfiguredShell } from '../../../tools/resolveConfiguredShell';
 import { sessionContextStore } from '../../../sessions/store/sessionStores';
 import {
   SHELL_DEFAULT_TIMEOUT_MS,
   SHELL_MAX_OUTPUT_BYTES,
   SHELL_MAX_TIMEOUT_MS,
-} from './toolLimits';
-import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
+} from '../../../runtime/toolLimits';
+import { requireMutationWorkspaceRoot, truncateOutput } from '../../../runtime/toolFiles';
 import {
   buildAgentShellEnv,
   createShellTrailerMarker,

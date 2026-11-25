@@ -1,4 +1,4 @@
-import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import type { CommandDefinition } from '@shared/types/command';
 
 const PERMISSION_MODES = new Set(['default', 'auto-review', 'full-access', 'custom']);

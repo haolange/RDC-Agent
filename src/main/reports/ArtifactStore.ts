@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { z, type ZodType } from 'zod';
 import { nowIso } from '@shared/utils/id';
-import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
+import { runScopedStore } from '../sessions/store/RunScopedStore';
 import type { ArtifactRecord } from '@shared/types/harness';
 
 export interface ArtifactStoreSnapshot {

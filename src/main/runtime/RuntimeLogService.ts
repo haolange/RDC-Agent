@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { generateEventId, nowMs } from '@shared/utils/id';
-import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { rendererEventHub } from './rendererEventHub';
 import { redactCredentialLikeText, redactSecretsDeep } from './secretRedaction';
 import type {
   RuntimeLogEntry,

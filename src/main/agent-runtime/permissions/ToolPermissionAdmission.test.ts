@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ToolResourceArbiter } from '../orchestration/ToolResourceArbiter';
-import { RuntimePermissionStateService } from './RuntimePermissionStateService';
+import { RuntimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { executeWithPermissionAdmission } from './ToolPermissionAdmission';
 import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestService';
 import type { AgentPermissionMode } from '@shared/types/settings';

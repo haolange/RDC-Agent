@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
-import { assertSession, missing } from './replayFileSafety';
+import { assertSession, missing } from '../../../runtime/replayFileSafety';
 import type { OpenedCapturePreview } from '@shared/types/session';
 import type { EncodedReplayPng } from './replayStorageTypes';
 

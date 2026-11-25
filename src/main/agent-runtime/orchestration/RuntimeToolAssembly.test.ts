@@ -24,14 +24,14 @@ vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({
   setRdcRuntimeContextForSession: vi.fn(() => null),
 }));
 
-vi.mock('../../sessions', () => ({ rdcSessionService: {
+vi.mock('../../rdc/RdcSessionService', () => ({ rdcSessionService: {
   listBindingsForProject: vi.fn(() => []),
   snapshotOpenedCaptureForSession: vi.fn(() => null),
   snapshotReplayForSession: vi.fn(() => ({ replayDeviceId: null, preparation: { targetDeviceId: null, phase: 'idle' } })),
 } }));
 
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
-import { rdcSessionService } from '../../sessions';
+import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';

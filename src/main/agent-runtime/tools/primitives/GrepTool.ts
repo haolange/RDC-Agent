@@ -1,13 +1,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getWorkspaceRoot, safeResolvePath, truncateOutput } from './_shared';
-import { searchLongLines } from './GrepLongLineSearch';
+import { getWorkspaceRoot, safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
 import {
   GREP_MAX_FILE_BYTES,
   GREP_MAX_LINE_CHARS,
   GREP_MAX_OUTPUT_BYTES,
   GREP_REGEX_TIMEOUT_MS,
-} from './toolLimits';
+} from '../../../runtime/toolLimits';
+import { searchLongLines } from './GrepLongLineSearch';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface GrepParams {

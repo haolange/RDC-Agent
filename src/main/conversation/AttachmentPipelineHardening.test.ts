@@ -4,10 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { directoryLinkType } from '../platform/paths';
-import { classifyAttachmentBytes } from './attachmentClassify';
-import { hydrateFrozenUserContent, materializeAgentUserInput } from './ConversationAttachmentMaterializer';
+import { classifyAttachmentBytes } from '../runtime/attachmentClassify';
+import { hydrateFrozenUserContent, materializeAgentUserInput } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
+import { assertAttachmentPreviewPath } from '../runtime/attachmentPreview';
 import { AttachmentStagingService } from './AttachmentStagingService';
-import { assertAttachmentPreviewPath } from './attachmentPreview';
 import { toRejectedSendResult } from './conversationSendRejection';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-hard-'));

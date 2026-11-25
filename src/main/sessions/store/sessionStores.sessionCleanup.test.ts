@@ -4,7 +4,7 @@ import path from 'path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { prepareTerminalAppend } from './ConversationTerminalAppend';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-cleanup-'));
 afterAll(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
@@ -163,6 +163,11 @@ describe('sessionRecordStore.removeSession side-channel cleanup', () => {
   });
   it('removes tasks, llm-calls, and matching trace run files for the session', async () => {
     const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
+    // The process composition root binds the agent runtime's per-session files as removal side channels.
+    const { requestSnapshotStore } = await import('../../agent-runtime/prompt/RequestSnapshotStore');
+    const { removeSessionTasks } = await import('../../agent-runtime/tasks/sessionTaskStore');
+    sessionRecordStore.addSideChannels(requestSnapshotStore);
+    sessionRecordStore.addSideChannels({ removeSession: removeSessionTasks });
     const { appPathService } = await import('../../runtime/AppPathService');
     const paths = appPathService.getAppStatePaths();
 

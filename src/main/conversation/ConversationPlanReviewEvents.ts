@@ -1,6 +1,6 @@
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
-import { supersedePreviousPlanReviews, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { supersedePreviousPlanReviews, upsertRuntimeToolCall } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import type { PlanReviewDecision } from '@shared/types/planReview';
 import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 

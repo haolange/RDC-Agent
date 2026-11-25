@@ -11,7 +11,7 @@ import { settingsService } from '../settings/settings-core/SettingsService';
 import { buildEffectiveCatalogRequest, resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/provider-catalog/EffectiveCatalogService';
 import { CatalogChangePublisher } from '../settings/provider-catalog/catalogChangePublisher';
-import { providerCapabilityProbeService } from '../settings/provider-catalog/ProviderCapabilityProbeService';
+import { providerCapabilityProbeService } from '../agent-runtime/capabilities/ProviderCapabilityProbeService';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { applyProductIcon } from '../window/productIcon';

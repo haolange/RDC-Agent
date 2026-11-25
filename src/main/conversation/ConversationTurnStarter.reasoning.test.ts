@@ -8,7 +8,7 @@ vi.mock('electron', () => ({ app: { getPath: () => '.', getAppPath: () => '.' },
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { revalidateExternalInputs: () => undefined, providerConnections: { get: () => undefined, list: () => [] } } }));
 vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({ agentOrchestrator: { refreshProviderRuntimeCredentials: async () => 'lease' } }));
 vi.mock('../provider-catalog/ProviderCatalogRegistry', () => ({ loadProviderSurface: async () => ({}) }));
-vi.mock('../settings/settings-core/compactionPercent', () => ({ resolveCompactionPercentForProject: () => 80 }));
+vi.mock('../agent-runtime/context/compactionPercent', () => ({ resolveCompactionPercentForProject: () => 80 }));
 vi.mock('../settings/provider-catalog/EffectiveModelResolver', () => ({
   awaitFirstCatalogLoad: async () => undefined,
   resolveEffectiveModel: () => fixture.model,
@@ -18,10 +18,12 @@ vi.mock('../settings/provider-catalog/EffectiveModelResolver', () => ({
   },
 }));
 vi.mock('../agent-runtime/capabilities/RouteCapabilityResolver', () => ({ resolveAgentRouteCapability: () => { throw new Error('AFTER_REQUEST_PLAN'); } }));
-vi.mock('./ConversationRoutePreflight', () => ({
-  resolveConversationAgentId: () => 'general',
+vi.mock('../settings/agent-manifests/effectiveAgentSnapshot', () => ({
   resolveEnabledAgentDefinition: () => ({ id: 'general', reasoningLevel: fixture.level,
     compiledRoute: { providerId: 'provider', modelId: 'model' } }),
+}));
+vi.mock('./ConversationRoutePreflight', () => ({
+  resolveConversationAgentId: () => 'general',
   resolveAgentRoutePreflight: () => ({ ok: true, providerId: 'provider', modelId: 'model' }),
 }));
 

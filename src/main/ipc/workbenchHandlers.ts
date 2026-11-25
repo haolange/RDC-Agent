@@ -13,7 +13,7 @@ import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { applyProductIcon } from '../window/productIcon';
 import { applyWindowBackgrounds } from '../window/appearanceChrome';
 import { sessionResumeService } from '../sessions/store/SessionResumeService';
-import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { rendererEventHub } from '../runtime/rendererEventHub';
 import { registerMemoryHandlers } from './memoryHandlers';
 import { registerInvestigationHandlers } from './investigationHandlers';
 import { registerKnowledgeHandlers } from './knowledgeHandlers';

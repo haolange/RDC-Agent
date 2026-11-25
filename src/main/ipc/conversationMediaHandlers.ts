@@ -3,7 +3,7 @@ import { ipcMain, shell } from 'electron';
 import { pruneAttachmentDocumentCopies } from '../conversation/AttachmentDocumentOpen';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import { accessOwnedAttachment, type OwnedAttachment } from '../conversation/ConversationAttachmentAccess';
-import { layerFromPersistedKind } from '../conversation/attachmentClassify';
+import { layerFromPersistedKind } from '../runtime/attachmentClassify';
 import { resolveConversationMedia } from '../conversation/ConversationMediaResolver';
 import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';

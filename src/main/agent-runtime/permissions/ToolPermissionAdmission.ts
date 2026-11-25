@@ -1,4 +1,4 @@
-import { PermissionModeChangedError, runtimePermissionStateService, type RuntimePermissionStateService } from './RuntimePermissionStateService';
+import { PermissionModeChangedError, runtimePermissionStateService, type RuntimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { AgentPermissionDecision } from './AgentPermissionPolicy';
 

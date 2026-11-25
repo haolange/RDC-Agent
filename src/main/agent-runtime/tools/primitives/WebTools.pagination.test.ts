@@ -5,8 +5,8 @@ const { fetchMock, lookupMock } = vi.hoisted(() => ({ fetchMock: vi.fn(), lookup
 vi.mock('dns/promises', () => ({ lookup: lookupMock }));
 vi.mock('../../../runtime/net/pinnedTransport', () => ({ requestPinned: fetchMock }));
 
+import { WEB_MAX_RESPONSE_BYTES } from '../../../runtime/toolLimits';
 import { webFetchTool } from './WebTools';
-import { WEB_MAX_RESPONSE_BYTES } from './toolLimits';
 
 const url = 'https://example.com/large-source';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');

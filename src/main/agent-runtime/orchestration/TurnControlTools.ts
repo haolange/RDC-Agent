@@ -7,9 +7,9 @@
 import { AppError } from '@shared/errors/appError';
 import { UNRESOLVED_BLOCKERS, parseUnresolvedItems } from '@shared/types/unresolvedWork';
 import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
-import { rdcSessionService } from '../../sessions';
+import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { readRdcHostControls } from '../../rdc/RdcHostControls';
 import type { TurnCompletionDeclaration, TurnHandle } from './TurnCoordinator';

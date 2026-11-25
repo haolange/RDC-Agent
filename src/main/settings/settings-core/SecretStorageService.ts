@@ -5,7 +5,7 @@ import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../../runtime/atomicFile';
 import { hardenSecretFile, secretStorageUnavailableReason } from '../../platform/secrets';
-import { StampedValue, fileStamp } from './externalInput';
+import { StampedValue, fileStamp } from '../../runtime/externalInput';
 
 interface SecretRecord {
   encoding: 'safeStorage';

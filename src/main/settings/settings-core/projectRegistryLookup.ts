@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { appPathService } from '../../runtime/AppPathService';
-import { StorageIo } from '../../sessions/store/StorageIo';
-import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from '../../sessions/store/storageSchema';
-import { StampedValue, fileStamp } from './externalInput';
+import { StorageIo } from '../../runtime/StorageIo';
+import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from '../../runtime/projectRegistrySchema';
+import { StampedValue, fileStamp } from '../../runtime/externalInput';
 
 const io = new StorageIo();
 

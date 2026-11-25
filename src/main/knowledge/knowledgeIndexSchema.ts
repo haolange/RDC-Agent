@@ -8,7 +8,7 @@ import {
   KNOWLEDGE_INDEX_SCHEMA_VERSION,
   type KnowledgeIndexSnapshot,
 } from './knowledgeLanes';
-import type { StorageMigration } from '../sessions/store/storageSchema';
+import type { StorageMigration } from '../runtime/storedDocument';
 
 export const KnowledgeIndexEntrySchema = z.object({
   cardId: z.string().trim().min(1),

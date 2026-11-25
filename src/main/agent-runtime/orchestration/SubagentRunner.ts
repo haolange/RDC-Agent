@@ -29,7 +29,7 @@ import {
   revokeDelegatedLease,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { TaskRegistry, createSessionTaskStore, releaseScopeTaskStore, type TaskExecutionRecord, registerDelegatedTaskScope, getDelegatedTaskScope } from '../tasks';
-import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { delegationTraceStore } from '../workTrace/DelegationTraceStore';
 import { createEphemeralScopeId } from './executionScope';
 import {
   APPROVED_CAPTURE_SCOPE_REQUIRED,

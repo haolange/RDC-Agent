@@ -3,7 +3,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { z } from 'zod';
 import { EXECUTION_OFFER_SCHEMA, type ExecutionOffer } from '@shared/types/executionOffer';
 import { AppError } from '@shared/errors/appError';
-import type { StorageIo } from '../store/StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 export const EXECUTION_OFFER_FILE = 'execution-offer.json';
 export const REMOVED_HANDOFF_STATE_FILE = 'handoff-state.json';

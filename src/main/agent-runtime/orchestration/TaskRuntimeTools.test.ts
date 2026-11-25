@@ -10,7 +10,7 @@ vi.mock('../tasks', async importOriginal => ({
   createSessionTaskStore: () => state.store,
   getDelegatedTaskScope: () => null,
 }));
-vi.mock('../../agent-trace/TraceProjectionRefreshService', () => ({ traceProjectionRefreshService: { schedule: vi.fn() } }));
+vi.mock('./TraceProjectionRefreshService', () => ({ traceProjectionRefreshService: { schedule: vi.fn() } }));
 vi.mock('../../sessions/artifacts/SessionArtifactResolver', () => ({ sessionArtifactResolver: { read: vi.fn() } }));
 
 const policy = (toolCalls = 1, maxToolCalls = 100) => {

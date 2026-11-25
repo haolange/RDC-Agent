@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { withDirectoryFileLockSync } from '../sessions/store/directoryFileLock';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { hashesEqual, sha256Prefixed } from './investigationHash';

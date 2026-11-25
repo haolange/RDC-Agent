@@ -19,7 +19,7 @@ import {
   DEFAULT_SHELL_TOOLING,
 } from '@shared/constants/appSettingsDefaults';
 import { expandHomePath } from '../../platform/paths';
-import { assertRdcCliBinding } from '../../rdc/rdcCliBinding';
+import { assertRdcCliBinding } from '../../runtime/rdcCliBinding';
 import {
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,

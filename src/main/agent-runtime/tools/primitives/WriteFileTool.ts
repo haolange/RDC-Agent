@@ -8,10 +8,10 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
+import { assertFileWriteBoundary } from '../../../runtime/FileOperationBoundary';
+import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../../../runtime/toolFiles';
+import { WRITE_FILE_MAX_CONTENT_BYTES } from '../../../runtime/toolLimits';
 import { requireSuccessfulFileRead } from './fileReadAccess';
-import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
-import { WRITE_FILE_MAX_CONTENT_BYTES } from './toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface WriteFileParams {

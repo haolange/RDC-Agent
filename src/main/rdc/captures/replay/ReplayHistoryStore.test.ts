@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { directoryLinkType } from '../../../platform/paths';
 
 vi.mock('electron', () => ({ app: {} }));
+import { hashCaptureFile } from '../../../runtime/captureContentHash';
 import { ReplayHistoryStore } from './ReplayHistoryStore';
-import { hashCaptureFile } from './captureContentHash';
 import type { ReplayHistoryScope } from './replayStorageTypes';
 
 const roots: string[] = [];

@@ -15,6 +15,7 @@ import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/Route
 import { appPathService } from '../runtime/AppPathService';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
+import { resolveEffectiveAgentSnapshot, resolveEnabledAgentDefinition } from '../settings/agent-manifests/effectiveAgentSnapshot';
 import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { diagnosticText } from './diagnosticText';
@@ -219,23 +220,6 @@ export function findEffectiveAgentProfile(agentId: string, projectRootPath?: str
     enabled: Boolean(profile?.enabled),
     profile,
   };
-}
-
-export function resolveEffectiveAgentSnapshot(agentId: string, projectRootPath?: string | null) {
-  const snapshot = agentManifestService.resolveEffectiveSnapshot(
-    appPathService.getRuntimePaths(),
-    projectRootPath ?? undefined,
-  );
-  const profile = snapshot.profiles.find((entry) => entry.id === agentId && entry.enabled) ?? null;
-  return {
-    profile,
-    overlayDiagnostics: snapshot.diagnostics.filter((entry) => entry.agentId === agentId && entry.scope !== 'builtin'),
-    diagnostics: snapshot.diagnostics,
-  };
-}
-
-export function resolveEnabledAgentDefinition(agentId: string, projectRootPath?: string | null) {
-  return resolveEffectiveAgentSnapshot(agentId, projectRootPath).profile;
 }
 
 export function getAgentLabel(agentId: AgentRole): string {

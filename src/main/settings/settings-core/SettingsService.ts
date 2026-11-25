@@ -24,7 +24,7 @@ import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import { providerCatalogService } from '../provider-catalog/ProviderCatalogService';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
 import { auditLog } from '../../runtime/AuditLog';
-import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { secretStorageService } from './SecretStorageService';
 import { executionProfileService } from './ExecutionProfileService';
 import {

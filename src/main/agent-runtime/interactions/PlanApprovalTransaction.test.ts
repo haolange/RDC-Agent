@@ -34,9 +34,9 @@ vi.mock('../../sessions/store/sessionStores', async () => {
   };
 });
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: disk.hooks }));
-vi.mock('../../conversation/sessionModelGate', () => ({ assertSessionModelAndControls: disk.model }));
-vi.mock('../../conversation/ConversationRoutePreflight', () => ({ resolveEnabledAgentDefinition: disk.profiles }));
-vi.mock('../../sessions/run/handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: vi.fn() }));
+vi.mock('./sessionModelGate', () => ({ assertSessionModelAndControls: disk.model }));
+vi.mock('../../settings/agent-manifests/effectiveAgentSnapshot', () => ({ resolveEnabledAgentDefinition: disk.profiles }));
+vi.mock('./handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: vi.fn() }));
 
 import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
 import { runPlanApprovalTransaction, type PlanApprovalDeps, type PlanApprovalInput } from './PlanApprovalTransaction';

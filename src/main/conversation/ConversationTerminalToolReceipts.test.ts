@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { finalizeTrace, upsertRuntimeToolCall } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
-import { finalizeTrace, upsertRuntimeToolCall } from './ConversationWorkTrace';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 import type { ToolResultMessage } from '../agent-runtime/core/types';
 

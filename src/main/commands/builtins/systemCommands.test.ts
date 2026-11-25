@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const status = vi.hoisted(() => ({ mode: 'auto-review' as const, servers: [] as unknown[] }));
-vi.mock('../../agent-runtime/permissions/RuntimePermissionStateService', () => ({
+vi.mock('../../runtime/RuntimePermissionStateService', () => ({
   runtimePermissionStateService: { getSnapshot: () => ({ mode: status.mode, revision: 3 }) },
 }));
 vi.mock('../../agent-runtime/orchestration/agentRuntimeRoot', () => ({

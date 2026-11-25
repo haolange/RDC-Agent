@@ -14,7 +14,7 @@ import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { createExecutionContextManager } from '../context/ExecutionContextWindow';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { RUNTIME_PERMISSION_TOKEN_RESERVE } from '../permissions/RuntimePermissionContext';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { requestEnvelopeBuilder, requestSnapshotStore } from '../prompt';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
 import { configuredRuntimeProvider, encodeAgentModel } from '../providers/ConfiguredRuntimeProvider';

@@ -1,9 +1,9 @@
 import { AppError } from '@shared/errors/appError';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
-import { resolveApprovedHandoff } from '../sessions/run/approvedHandoffRecovery';
+import { resolveApprovedHandoff } from '../agent-runtime/interactions/approvedHandoffRecovery';
 import { conversationHistoryStore } from '../sessions/store/sessionStores';
-import { resolveVisibleConversationMessages } from './ConversationBranchResolver';
+import { resolveVisibleConversationMessages } from '../sessions/store/ConversationBranchResolver';
 import type { ConversationPlanReference, PlanReadRequest, PlanReferenceRequest } from '@shared/types/planReview';
 
 export interface ResolvedPlanReference {

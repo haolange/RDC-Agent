@@ -4,7 +4,7 @@ import { errorCodeOf } from '@shared/errors/appError';
 import { SessionRecordSchema } from './storageSchema';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
-import type { StorageIo } from './StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 /** The session files of a project: where its sessions live and how they are read and rewritten. */
 export interface ProjectSessionFiles {

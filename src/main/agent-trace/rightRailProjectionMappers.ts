@@ -14,7 +14,7 @@ import type {
 } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import type { TaskExecutionRecord } from '../agent-runtime/tasks/TaskContracts';
-import type { SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
+import type { SessionArtifactSource } from '../reports/SessionArtifactSource';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 
 const toIso = (value: number | undefined): string => value ? new Date(value).toISOString() : nowIso();

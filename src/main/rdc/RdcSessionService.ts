@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { projectWorkspaceStore } from '../sessions/store/sessionStores';
-import { verifyExternalCaptureReference } from './captures/ExternalCaptureReference';
-import { hashCaptureFile } from './captures/replay/captureContentHash';
+import { verifyExternalCaptureReference } from '../runtime/ExternalCaptureReference';
+import { hashCaptureFile } from '../runtime/captureContentHash';
 import { replayHistoryStore } from './captures/replay/ReplayHistoryStore';
 import { RdcNativeFailure } from './RdcNativeProtocol';
 import { replayDeviceIssue } from './captures/ReplayDeviceIssue';
@@ -320,3 +320,5 @@ export class RdcSessionService extends RdcDevicePreparation {
     return this.snapshotReplayForSession(scope);
   }
 }
+
+export const rdcSessionService = new RdcSessionService();

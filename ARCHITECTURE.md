@@ -138,6 +138,9 @@ ESLint `no-restricted-imports` 强制以下方向（`eslint.config.mjs`）：
 - `src/main/platform` 与 `src/main/provider-catalog` 是叶子：不 import 其它主进程域。
 - `src/main/ipc` 是最外层适配器：只有 `src/main/index.ts` 与 `src/main/browserAppBridge` 调用它；被多个域共用的原语（如单次审批 token）放在 `src/main/runtime`。
 - 生产代码不 import `src/main/testing`。
+- 主进程域分层，域只 import 更低层的域，同层互不 import，所以域之间没有环（`eslint.config.mjs` 的 `MAIN_DOMAIN_LAYERS` 与 `main-domains/direction` 规则，含动态 `import()`；只导入类型不构成运行时依赖，允许）。自下而上：`platform` / `provider-catalog` / `lifecycle` → `runtime` → `hooks` → `settings` → `window` / `tools` / `media` → `sessions` → `rdc` → `investigation` → `reports` → `knowledge` → `agent-runtime` → `agent-trace` / `workers` → `conversation` → `commands` → `ipc` → `browserAppBridge`；`src/main/index.ts` 在所有域之上。新增域必须先在 `MAIN_DOMAIN_LAYERS` 里定层，否则 lint 直接失败。
+- 多个域共用的基础原语放在 `src/main/runtime`：文件与路径（`toolFiles.ts`、`FileOperationBoundary.ts`、`StorageIo.ts`、`storedDocument.ts`、`externalInput.ts`）、capture 文件身份（`captureContentHash.ts`、`replayFileSafety.ts`、`ExternalCaptureReference.ts`）、附件分类与预览、`rendererEventHub.ts`、`rendererTrust.ts`、`RuntimePermissionStateService.ts`、项目 registry schema（`projectRegistrySchema.ts`）。
+- 低层域需要高层实现时，由低层声明端口、`src/main/index.ts` 在启动时绑定一次：shell.rdc 权限（`registerRdcShellBaseline`）、Conversation 的 RDC 宿主（`registerConversationRdcHost`）、trace 投影来源（`bindTraceProjectionSource`）、随 session 删除的 Agent runtime 文件（`SessionRecordStore.addSideChannels`）。
 
 **组合根**：`src/main/index.ts` 是进程的组合根（启动、宿主注册、关停顺序）。子系统的单例在各自的组合根里构造一次：`src/main/sessions/store/sessionStores.ts`（共享 `StorageIo` 与拥有各类文件的 store）、`src/main/agent-runtime/orchestration/agentRuntimeRoot.ts`（`AgentOrchestrator` 的全部协作者）。协作者之间只经消费方模块声明的窄接口相连，不传回调袋，不经转发层或 deps barrel；调用方直接 import 拥有数据或行为的模块。`AgentOrchestrator` 只依赖协作者的类型，`check:orchestrator-facade` 度量它的 fan-out 与最长函数，预算取实测最大值，只降不升。
 

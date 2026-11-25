@@ -12,8 +12,7 @@ import { lastLoopThinking, sameProviderBlock } from '@shared/conversation/loopIt
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { redactCredentialLikeText, redactedArgumentsPreview } from '../runtime/secretRedaction';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
-import { buildConversationToolCompletion } from './ConversationToolCompletion';
-import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
+import { shouldProjectDiagnosticToWorkProcess } from '../agent-runtime/workTrace/workProcessDiagnosticPolicy';
 import {
   attachRuntimeHookDiagnostic,
   upsertRuntimeToolApproval,
@@ -24,20 +23,21 @@ import {
   upsertLoopTextItem,
   upsertLoopThinkingItem,
   upsertWorkBlock,
-} from './ConversationWorkTrace';
-import {
-  applyPlanReviewAnswered,
-  applyPlanReviewRequested,
-  isPlanReviewApprovalPayload,
-} from './ConversationPlanReviewEvents';
-import { delegationTraceStore } from './DelegationTraceStore';
+} from '../agent-runtime/workTrace/ConversationWorkTrace';
+import { delegationTraceStore } from '../agent-runtime/workTrace/DelegationTraceStore';
+import { normalizeTaskSnapshotItems } from '../agent-runtime/workTrace/ConversationTaskSnapshot';
+import { mergeThinkingPayload } from '../agent-runtime/workTrace/ConversationThinkingArtifacts';
 import {
   isActiveRun,
   isLoopTool,
   summarizeRuntimePayload,
 } from './ConversationRoutePreflight';
-import { normalizeTaskSnapshotItems } from './ConversationTaskSnapshot';
-import { mergeThinkingPayload } from './ConversationThinkingArtifacts';
+import {
+  applyPlanReviewAnswered,
+  applyPlanReviewRequested,
+  isPlanReviewApprovalPayload,
+} from './ConversationPlanReviewEvents';
+import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import type { ToolCallResult } from '@shared/types/tool';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import type {

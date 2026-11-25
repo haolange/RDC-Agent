@@ -7,7 +7,7 @@ import { PromptPlanBuilder } from '../agent-runtime/prompt/PromptPlanBuilder';
 import { parseAgentMarkdownStrict } from '../settings/agent-manifests/agentManifestParse';
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
-vi.mock('../runtime/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Text-only comparison'); } }));
+vi.mock('../tools/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Text-only comparison'); } }));
 vi.mock('../sessions/store/sessionStores', () => ({ sessionContextStore: { readSessionShellCwd: () => null } }));
 
 const output = process.env.RDC_AGENT_LIVE_COST_OUTPUT;

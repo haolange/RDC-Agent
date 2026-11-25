@@ -1,0 +1,185 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  readSession: vi.fn(),
+  getProjectById: vi.fn(),
+  updateSession: vi.fn(),
+  offerWrite: vi.fn(),
+  offerRead: vi.fn(),
+  planRead: vi.fn(),
+  resolveEnabled: vi.fn(),
+  dispatchHooks: vi.fn(async () => true),
+  compatibility: vi.fn(),
+  history: vi.fn(),
+}));
+
+vi.mock('../../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: mocks.readSession, updateSession: mocks.updateSession },
+  projectWorkspaceStore: { getProjectById: mocks.getProjectById },
+  conversationHistoryStore: { readConversationHistory: mocks.history },
+  executionOfferStore: {
+      write: mocks.offerWrite,
+      read: mocks.offerRead,
+    },
+}));
+vi.mock('../../sessions/run/PlanReviewStateStore', () => ({
+  planReviewStateStore: { read: mocks.planRead },
+}));
+vi.mock('../../settings/agent-manifests/effectiveAgentSnapshot', () => ({
+  resolveEnabledAgentDefinition: mocks.resolveEnabled,
+}));
+vi.mock('../../hooks/runtimeHookDispatch', () => ({
+  dispatchRuntimeHooks: mocks.dispatchHooks,
+}));
+vi.mock('./handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: mocks.compatibility }));
+vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: () => ({ markdown: '# Approved plan' }) } }));
+
+import { applyDeclaredHandoff } from './applyDeclaredHandoff';
+
+const declared = {
+  agent: 'general',
+  label: 'Execute with General',
+  prompt: 'Execute the frozen plan.',
+  send: true,
+  requiredSkillIds: ['renderdoc-execution'],
+};
+
+describe('applyDeclaredHandoff', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.readSession.mockReturnValue({ sessionId: 'sess', projectId: 'proj', agentId: 'debugger' });
+    mocks.getProjectById.mockReturnValue({ rootPath: 'D:/proj' });
+    mocks.updateSession.mockImplementation((_id: string, patch: { agentId: string }) => ({
+      sessionId: 'sess',
+      projectId: 'proj',
+      agentId: patch.agentId,
+    }));
+    mocks.offerRead.mockReturnValue({
+      schemaVersion: '1', sourceAgentId: 'debugger', targetAgentId: 'general',
+      plan: { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) },
+      requiredSkillIds: ['renderdoc-execution'], label: declared.label, prompt: declared.prompt,
+      approvedAt: 1234,
+    });
+    mocks.planRead.mockReturnValue({
+      status: 'approved',
+      approvedHash: 'a'.repeat(64),
+      frozenUri: 'session://plans/plan-frozen.md',
+      approvedHandoff: { agent: 'general', label: declared.label },
+      updatedAt: 1234,
+    });
+    mocks.resolveEnabled.mockImplementation((agentId: string) => (
+      agentId === 'general'
+        ? { id: 'general', handoffs: [] }
+        : { id: 'debugger', handoffs: [declared] }
+    ));
+    mocks.dispatchHooks.mockResolvedValue(true);
+    mocks.history.mockReturnValue([]);
+  });
+
+  it('refuses a recovered action after its approval changed or a later request was accepted', async () => {
+    const input = { sessionId: 'sess', agent: 'general', label: declared.label, expectedPlanHash: 'a'.repeat(64) };
+    mocks.planRead.mockReturnValueOnce({ status: 'approved', approvedHash: 'b'.repeat(64), updatedAt: 1234 });
+    expect(await applyDeclaredHandoff(input)).toMatchObject({ success: false, error: expect.stringContaining('APPROVAL_CHANGED') });
+    mocks.history.mockReturnValue([{ role: 'user', createdAt: 1234 }]);
+    expect(await applyDeclaredHandoff(input)).toMatchObject({ success: false, error: expect.stringContaining('APPROVAL_CHANGED') });
+    expect(mocks.updateSession).not.toHaveBeenCalled(); expect(mocks.offerWrite).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the approved handoff after the asynchronous before-handoff hook', async () => {
+    mocks.dispatchHooks.mockImplementationOnce(async () => {
+      mocks.planRead.mockReturnValue({ status: 'approved', approvedHash: 'b'.repeat(64), updatedAt: 1235 });
+      return true;
+    });
+    expect(await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label, expectedPlanHash: 'a'.repeat(64) }))
+      .toMatchObject({ success: false, error: expect.stringContaining('APPROVAL_CHANGED') });
+    expect(mocks.updateSession).not.toHaveBeenCalled(); expect(mocks.offerWrite).not.toHaveBeenCalled();
+  });
+
+  it('persists the target agent while preserving the original approval time', async () => {
+    const result = await applyDeclaredHandoff({
+      sessionId: 'sess',
+      agent: 'general',
+      label: 'Execute with General',
+    });
+    expect(result.success).toBe(true);
+    expect(result.session?.record.agentId).toBe('general');
+    expect(mocks.offerWrite).toHaveBeenCalledWith('sess', expect.objectContaining({
+      sourceAgentId: 'debugger',
+      targetAgentId: 'general',
+      requiredSkillIds: ['renderdoc-execution'],
+      approvedAt: 1234,
+    }));
+    expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.before-handoff', expect.any(Object));
+    expect(mocks.dispatchHooks).toHaveBeenCalledWith('agent.after-handoff', expect.any(Object));
+  });
+  it('does not alias an old approved name to a renamed declaration', async () => {
+    mocks.resolveEnabled.mockImplementation((agentId: string) => agentId === 'general' ? { id: 'general', handoffs: [] }
+      : { id: 'debugger', handoffs: [{ ...declared, label: 'Implement Plan', labelTranslations: { 'zh-CN': '执行计划' } }] });
+    expect(await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label }))
+      .toMatchObject({ success: false, error: expect.stringContaining('DECLARED_HANDOFF_NOT_FOUND') });
+    expect(mocks.offerWrite).not.toHaveBeenCalled(); expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps translations out of execution offers and does not use them for matching', async () => {
+    mocks.resolveEnabled.mockImplementation((agentId: string) => agentId === 'general' ? { id: 'general', handoffs: [] }
+      : { id: 'debugger', handoffs: [{ ...declared, labelTranslations: { 'zh-CN': '执行计划' } }] });
+    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: '执行计划' })).success).toBe(false);
+    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).success).toBe(true);
+    expect(mocks.offerWrite.mock.calls[0][1]).not.toHaveProperty('labelTranslations');
+  });
+  it('rejects changed preparation requirements after approval without rewriting the offer or session', async () => {
+    mocks.resolveEnabled.mockImplementation((agentId: string) => agentId === 'general' ? { id: 'general', handoffs: [] }
+      : { id: 'debugger', handoffs: [{ ...declared, requiredSkillIds: ['another-method'] }] });
+    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('EXECUTION_OFFER_CHANGED') });
+    expect(mocks.offerWrite).not.toHaveBeenCalled(); expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps the same approval time when declaring the handoff again from General', async () => {
+    mocks.readSession.mockReturnValue({ sessionId: 'sess', projectId: 'proj', agentId: 'general' });
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(mocks.offerWrite).toHaveBeenCalledTimes(2);
+    for (const [, offer] of mocks.offerWrite.mock.calls) expect(offer.approvedAt).toBe(1234);
+    expect(mocks.offerWrite.mock.calls[0][1].offerId).not.toBe(mocks.offerWrite.mock.calls[1][1].offerId);
+  });
+
+  it.each([null, 9876])('uses the approved decision time even when the offer time is %s', async (offerTime) => {
+    mocks.offerRead.mockReturnValue(offerTime === null ? null : { ...mocks.offerRead(), approvedAt: offerTime });
+    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(result.success).toBe(true);
+    expect(mocks.offerWrite).toHaveBeenCalledWith('sess', expect.objectContaining({ approvedAt: 1234 }));
+  });
+
+  it('does not create an approval from an unapproved plan', async () => {
+    mocks.planRead.mockReturnValue({ status: 'rejected', updatedAt: 9876 });
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(mocks.offerWrite).not.toHaveBeenCalled();
+  });
+
+  it('rejects an undeclared continue action', async () => {
+    const result = await applyDeclaredHandoff({
+      sessionId: 'sess',
+      agent: 'optimizer',
+      label: 'Nope',
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/DECLARED_HANDOFF_NOT_FOUND/);
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('does not switch agents or write an offer when explicit preparation is incompatible', async () => {
+    mocks.compatibility.mockImplementationOnce(() => { throw new Error('TASK_EXECUTION_REQUIREMENTS: comparison-method missing'); });
+    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('comparison-method') });
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+    expect(mocks.offerWrite).not.toHaveBeenCalled();
+    expect(mocks.dispatchHooks).not.toHaveBeenCalled();
+  });
+  it('rejects a different target than the approved action without changing approval time', async () => {
+    mocks.planRead.mockReturnValue({ status: 'approved', approvedHash: 'a'.repeat(64), frozenUri: 'session://plans/plan.md', approvedHandoff: { agent: 'optimizer', label: 'Different' }, updatedAt: 1234 });
+    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).error).toContain('TARGET_MISMATCH');
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+    expect(mocks.offerWrite).not.toHaveBeenCalled();
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TASK_SCHEMA_VERSION } from '../agent-runtime/tasks/TaskContracts';
-import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
+import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../reports/SessionArtifactSource';
 import { buildRdcContext, buildTaskContext, mapRightRailOutputs, mapRightRailTasks } from './rightRailProjectionMappers';
 import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/types/session';
 import type { TraceArtifactRecord } from '@shared/types/trace';

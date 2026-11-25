@@ -8,7 +8,7 @@ import { AgentToolApprovalRequestService } from '../permissions/AgentToolApprova
 import { TaskRegistry, type TaskRecord } from '../tasks';
 import { createSessionTaskStore } from '../tasks/sessionTaskStore';
 import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
-import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { delegationTraceStore } from '../workTrace/DelegationTraceStore';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import {
   assertRdcContextLeaseOwnership,

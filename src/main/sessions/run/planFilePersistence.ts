@@ -4,7 +4,7 @@ import { stringify } from 'yaml';
 import { AppError } from '@shared/errors/appError';
 import { storageIo } from '../store/sessionStores';
 import type { ProjectPlanFrontmatter } from '@shared/types/planReview';
-import type { StorageIo } from '../store/StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 export function assertPlanWritePath(targetPath: string): string {
   if (!path.isAbsolute(targetPath)) throw new AppError('PLAN_TARGET_INVALID', 'absolute path required.');

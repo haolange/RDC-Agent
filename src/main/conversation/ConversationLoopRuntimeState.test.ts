@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { upsertLoopResult, upsertLoopTextItem, upsertLoopThinkingItem, upsertRuntimeToolCall } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import { beginAssistantContentLoopIfPending, type ConversationLoopRuntimeState } from './ConversationLoopRuntimeState';
-import { upsertLoopResult, upsertLoopTextItem, upsertLoopThinkingItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 
 const toolLoopThinking: ThinkingArtifact = {

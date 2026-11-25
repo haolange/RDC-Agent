@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
-import { beginRdcLifecycle, getRdcInteractionLock } from '../rdc/RdcOperationCoordinator';
+import { acquireRdcPreparationLock, beginRdcLifecycle, getRdcInteractionLock, setRdcInteractionLock } from '../rdc/RdcOperationCoordinator';
+import { rdcSessionService } from '../rdc/RdcSessionService';
+import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { conversationService } from './ConversationService';
-import '../rdc/registerConversationRdcHost';
+import { registerConversationRdcHost } from './conversationRdcHost';
 
-vi.mock('../sessions', () => ({
+vi.mock('../rdc/RdcSessionService', () => ({
   rdcSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
 vi.mock('../sessions/store/sessionStores', () => ({
@@ -28,6 +30,13 @@ vi.mock('../agent-trace/TraceService', () => ({
     buildConversationPresentation: vi.fn(async () => null),
   },
 }));
+
+registerConversationRdcHost({
+  acquirePreparationLock: acquireRdcPreparationLock,
+  setInteractionLock: setRdcInteractionLock,
+  snapshotOpenedCapture: (scope) => rdcSessionService.snapshotOpenedCaptureForSession(scope),
+  replayDevice: (deviceId) => replayDeviceService.getDeviceById(deviceId),
+});
 
 type IdempotentService = {
   runIdempotentTurn: (

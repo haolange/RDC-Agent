@@ -7,7 +7,7 @@ import { hookEngine } from '../hooks/HookEngine';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { samePath } from '../platform/paths';
 import { appPathService } from '../runtime/AppPathService';
-import { SCOPED_IMPORT_EXTENSIONS, scopedRuntimeService } from '../runtime/ScopedRuntimeService';
+import { SCOPED_IMPORT_EXTENSIONS, scopedRuntimeService } from '../settings/agent-manifests/ScopedRuntimeService';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
 import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES } from '@shared/types/sessionArtifact';
 import { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { resetSessionArtifactQuotaLedger } from '../../sessions/artifacts/SessionArtifactQuota';
-import { StorageIo } from '../../sessions/store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { grantDelegatedArtifactAccess, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { artifactizeToolResult } from './ToolResultArtifactizer';
 

@@ -3,7 +3,7 @@ import { appPathService } from '../../runtime/AppPathService';
 import { canonicalRealpath, fileIdentity } from '../../runtime/fileIdentity';
 import { TrustStore } from '../../runtime/TrustStore';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { fileStamp } from '../settings-core/externalInput';
+import { fileStamp } from '../../runtime/externalInput';
 
 /**
  * A project Agent profile changes instructions, tools and delegation for every turn in that project,

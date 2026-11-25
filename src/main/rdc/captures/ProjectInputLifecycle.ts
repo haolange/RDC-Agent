@@ -1,8 +1,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
-import { hashCaptureFile } from './replay/captureContentHash';
-import { safePath } from './replay/replayFileSafety';
+import { hashCaptureFile } from '../../runtime/captureContentHash';
+import { safePath } from '../../runtime/replayFileSafety';
 import type { ProjectInputRecord, ProjectInputRemoveResult, ProjectRecord } from '@shared/types/session';
 import type { ReplayHistoryStore } from './replay/ReplayHistoryStore';
 

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { conversationService } from '../conversation/ConversationService';
 import { registerPlanHandlers } from './planHandlers';

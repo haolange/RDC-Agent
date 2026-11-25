@@ -8,24 +8,17 @@ import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
-import { resolveCompactionPercentForProject } from '../settings/settings-core/compactionPercent';
+import { resolveCompactionPercentForProject } from '../agent-runtime/context/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { traceService } from '../agent-trace/TraceService';
+import { createDefaultBranchState, resolveVisibleConversationMessages } from '../sessions/store/ConversationBranchResolver';
+import { createDraftWorkTrace, finalizeTrace } from '../agent-runtime/workTrace/ConversationWorkTrace';
+import { materializeAgentUserInput, resolvePendingAttachmentDescriptors } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
+import { resolveEnabledAgentDefinition } from '../settings/agent-manifests/effectiveAgentSnapshot';
+import { createConversationMessage, isActiveRun, recordOverlayProfileDiagnostics, redactTechnicalMessage, resolveAgentRoutePreflight, resolveConversationAgentId } from './ConversationRoutePreflight';
 import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
-import { createDefaultBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
-import { createDraftWorkTrace, finalizeTrace } from './ConversationWorkTrace';
-import { materializeAgentUserInput, resolvePendingAttachmentDescriptors } from './ConversationAttachmentMaterializer';
-import {
-  createConversationMessage,
-  isActiveRun,
-  recordOverlayProfileDiagnostics,
-  redactTechnicalMessage,
-  resolveAgentRoutePreflight,
-  resolveConversationAgentId,
-  resolveEnabledAgentDefinition,
-} from './ConversationRoutePreflight';
 import {
   createContinuationDropNotice,
   shouldAnnounceContinuationDrop,

@@ -4,7 +4,7 @@ import { AppError } from '@shared/errors/appError';
 import { ProjectInputLifecycle } from '../rdc/captures/ProjectInputLifecycle';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
 import { projectWorkspaceStore } from '../sessions/store/sessionStores';
-import { rdcSessionService } from '../sessions';
+import { rdcSessionService } from '../rdc/RdcSessionService';
 import { conversationService } from '../conversation/ConversationService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { settingsService } from '../settings/settings-core/SettingsService';

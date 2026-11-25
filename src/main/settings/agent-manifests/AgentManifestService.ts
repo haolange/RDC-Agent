@@ -17,7 +17,7 @@ import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import { resolvedPathKey, samePath } from '../../platform/paths';
 import { isReservedAgentId } from '../settings-core/reservedAgentIds';
-import { StampedValue, directoryStamp, fileStamp } from '../settings-core/externalInput';
+import { StampedValue, directoryStamp, fileStamp } from '../../runtime/externalInput';
 import { writeFileAtomic } from '../../runtime/atomicFile';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
 import { projectAgentTrust } from './ProjectAgentTrust';

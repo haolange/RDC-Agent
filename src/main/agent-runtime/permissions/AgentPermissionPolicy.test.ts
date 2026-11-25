@@ -2,11 +2,11 @@ import * as os from 'os';
 import * as path from 'path';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import '../../rdc/rdcShellPermission';
 import { DEFAULT_RDC_CLI_INVOKER } from '@shared/constants/appSettingsDefaults';
+import { evaluateRdcShellBaseline } from '../../rdc/rdcShellPermission';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { compileFixturePolicy } from '../../testing/policyFixture';
-import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
+import { isWithinRootAllowingAliases } from '../../runtime/toolFiles';
 import { currentHost } from '../../platform/host';
 import { directoryLinkType } from '../../platform/paths';
 
@@ -20,7 +20,9 @@ import { webSearchTool as productionWebSearch } from '../tools/primitives/WebToo
 import { deleteFileTool as productionDeleteFile } from '../tools/file/DeleteFileTool';
 import { moveFileTool as productionMoveFile } from '../tools/file/MoveFileTool';
 import { appPathService } from '../../runtime/AppPathService';
-import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
+import { AgentPermissionPolicyService, registerRdcShellBaseline } from './AgentPermissionPolicy';
+
+registerRdcShellBaseline(evaluateRdcShellBaseline);
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolCall } from '../core/types';
 import type { AgentTool, AgentToolSpec } from '../agent/AgentTool';
@@ -51,7 +53,7 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
     snapshot: () => ({ revision: 1, user: mockSettings }),
   },
 }));
-vi.mock('../../runtime/resolveConfiguredShell', () => ({
+vi.mock('../../tools/resolveConfiguredShell', () => ({
   resolveConfiguredShell: () => ({
     executable: currentHost().isWindows ? 'pwsh' : '/bin/bash',
     kind: currentHost().isWindows ? 'pwsh' : 'bash',

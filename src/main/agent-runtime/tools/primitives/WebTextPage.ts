@@ -1,4 +1,4 @@
-import { WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from './toolLimits';
+import { WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from '../../../runtime/toolLimits';
 
 export interface WebTextCursor { offset?: number; expectedSourceHash?: string }
 

@@ -19,6 +19,8 @@ import {
   listProviderSummaries,
 } from '../provider-catalog/ProviderCatalogRegistry';
 import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsFileSchema';
+import { rendererEventHub } from '../runtime/rendererEventHub';
+import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import {
   attachDevRendererWebSocketProxy,
   proxyHttpToDevRenderer,
@@ -35,7 +37,6 @@ import {
   tokensMatch,
   cookieOriginRequiredForPath,
 } from './bridgeSecurity';
-import { rendererEventHub } from './rendererEventHub';
 
 type BridgeOptions = {
   devRendererUrl: string | null;
@@ -397,6 +398,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   }
 
   if (url.pathname === '/events' && request.method === 'POST') {
+    if (!rendererEventHub.hasClients()) attachmentStagingService.clearAll();
     rendererEventHub.connect(response, requestOrigin && allowedOrigins.has(requestOrigin) ? requestOrigin : undefined);
     return;
   }

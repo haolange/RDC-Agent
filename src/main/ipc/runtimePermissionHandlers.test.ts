@@ -10,7 +10,7 @@ const fixture = vi.hoisted(() => ({
   state: { mode: 'default', revision: 1 } as RuntimePermissionState,
 }));
 vi.mock('electron', () => ({ ipcMain: { handle: fixture.handle } }));
-vi.mock('../agent-runtime/permissions/RuntimePermissionStateService', () => ({ runtimePermissionStateService: {
+vi.mock('../runtime/RuntimePermissionStateService', () => ({ runtimePermissionStateService: {
   getSnapshot: () => fixture.state,
   subscribe: (listener: (state: RuntimePermissionState) => void) => { fixture.listener = listener; return fixture.unsubscribe; },
 } }));

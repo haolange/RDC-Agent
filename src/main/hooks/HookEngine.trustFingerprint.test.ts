@@ -42,9 +42,9 @@ describe('HookEngine trust fingerprint', () => {
     expect(CANONICAL_HOOK_EVENTS).toHaveLength(12);
     const repoRoot = path.resolve(__dirname, '../../..');
     const dispatchSources = [
-      'src/main/hooks/sessionLifecycle.ts',
+      'src/main/rdc/sessionLifecycle.ts',
       'src/main/hooks/runtimeHookDispatch.ts',
-      'src/main/conversation/applyDeclaredHandoff.ts',
+      'src/main/agent-runtime/interactions/applyDeclaredHandoff.ts',
       'src/main/agent-runtime/orchestration/AgentTurnRunner.ts',
       'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts',
       'src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts',

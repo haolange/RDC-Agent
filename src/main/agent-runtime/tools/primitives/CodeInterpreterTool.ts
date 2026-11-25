@@ -6,10 +6,10 @@ import { AppError } from '@shared/errors/appError';
 import { defaultPythonCommand } from '../../../platform/shell';
 import { processSupervisor, type ProcessExitReason } from '../../../runtime/ProcessSupervisor';
 import { settingsService } from '../../../settings/settings-core/SettingsService';
-import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
-import { detectImageMagicMime } from '../../../conversation/ConversationAttachmentMaterializer';
-import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
-import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
+import { recordToolImagePreview } from '../../attachments/ToolImagePreviewStore';
+import { detectImageMagicMime } from '../../attachments/ConversationAttachmentMaterializer';
+import { SHELL_MAX_OUTPUT_BYTES } from '../../../runtime/toolLimits';
+import { requireMutationWorkspaceRoot, truncateOutput } from '../../../runtime/toolFiles';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface InterpreterParams {

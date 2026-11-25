@@ -18,7 +18,7 @@ vi.mock('../../../runtime/ProcessSupervisor', () => ({
   processSupervisor: { spawn },
 }));
 
-vi.mock('../../../conversation/ToolImagePreviewStore', () => ({
+vi.mock('../../attachments/ToolImagePreviewStore', () => ({
   recordToolImagePreview: vi.fn(),
 }));
 

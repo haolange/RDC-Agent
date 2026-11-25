@@ -6,9 +6,9 @@ import {
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
   upsertLoopThinkingItem,
-} from './ConversationWorkTrace';
+} from '../agent-runtime/workTrace/ConversationWorkTrace';
+import { readStoredWorkTrace, sanitizeStoredWorkTrace } from '../sessions/store/StoredWorkTrace';
 import { applyPlanReviewRequested } from './ConversationPlanReviewEvents';
-import { readStoredWorkTrace, sanitizeStoredWorkTrace } from './StoredWorkTrace';
 
 describe('ConversationService work trace tool approvals', () => {
   it('keeps a question owned by the model loop across later updates', () => {

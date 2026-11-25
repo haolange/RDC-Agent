@@ -21,7 +21,7 @@ import { compiledRoutesFromDefinitions } from '../../settings/provider-catalog/c
 import { providerRuntimeCredentialService } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 import { freezeProviderRuntimeCredentials } from '../../settings/provider-auth/ProviderRuntimeCredentialLease';
 import { planEffectiveModelRequest, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
-import { resolveCompactionPercentForProject } from '../../settings/settings-core/compactionPercent';
+import { resolveCompactionPercentForProject } from '../context/compactionPercent';
 import { delegableProfileIds } from './delegableProfiles';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
 import { resolveProfileToolAllowlist } from './ProfileTurnPreparation';

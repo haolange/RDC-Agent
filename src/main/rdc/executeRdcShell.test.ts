@@ -12,7 +12,7 @@ import { verifyRollbackIdentity } from './RdcValidatedEvidence';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 const mock = vi.hoisted(() => ({ execute: vi.fn(), lease: vi.fn(), retainedLease: vi.fn(), prepare: vi.fn(), write: vi.fn(), quarantine: vi.fn(), observe: vi.fn() }));
-vi.mock('../sessions', () => ({ rdcSessionService: { observeAgentOperation: mock.observe } }));
+vi.mock('./RdcSessionService', () => ({ rdcSessionService: { observeAgentOperation: mock.observe } }));
 vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: mock.execute } }));
 vi.mock('./RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: mock.lease, getRdcContextLease: mock.retainedLease, quarantineRdcContext: mock.quarantine }));
 vi.mock('./RdcExecutionReceipts', async (importOriginal) => {

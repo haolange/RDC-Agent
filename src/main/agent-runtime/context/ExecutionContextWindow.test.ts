@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ hook: vi.fn(), save: vi.fn(), verify: vi.fn(),
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: mocks.hook }));
 vi.mock('../../sessions/store/sessionStores', () => ({ sessionRecordStore: { readSession: () => ({ projectId: 'project' }) }, sessionContextStore: { readSessionContextJournal: mocks.journal } }));
 vi.mock('../../settings/settings-core/projectRegistryLookup', () => ({ lookupProjectById: () => ({ rootPath: 'project-root' }) }));
-vi.mock('../../sessions/store/CompactionAuthoritySource', () => ({ saveCompactionAuthoritySource: mocks.save, verifyCompactionAuthoritySource: mocks.verify, readCompactionAuthorityState: mocks.state, readCompactionAuthorityJournal: mocks.archive, projectCompactionJournalMessages: mocks.project }));
+vi.mock('./CompactionAuthoritySource', () => ({ saveCompactionAuthoritySource: mocks.save, verifyCompactionAuthoritySource: mocks.verify, readCompactionAuthorityState: mocks.state, readCompactionAuthorityJournal: mocks.archive, projectCompactionJournalMessages: mocks.project }));
 vi.mock('./CompactionHandoffService', () => ({ generateCompactionSections: mocks.generate }));
 vi.mock('./StructuredHandoffBuilder', () => ({ serializeHandoffSourceTranscript: () => 'originals', assembleDerivedContextView: mocks.assemble, createStructuredHandoffMessage: mocks.message }));
 vi.mock('../../sessions/artifacts/DelegatedArtifactAccess', () => ({ delegatedArtifactOwner: () => 'owner', grantDelegatedOutput: vi.fn() }));
@@ -63,7 +63,7 @@ it('starts an isolated delegated execution without reading a nonexistent child j
   expect(mocks.list).not.toHaveBeenCalled();
 });
 it('keeps large retained vision bytes in verified sidecars and restores the exact image across executions', async () => {
-  const actual = await vi.importActual<typeof import('../../sessions/store/CompactionAuthoritySource')>('../../sessions/store/CompactionAuthoritySource');
+  const actual = await vi.importActual<typeof import('./CompactionAuthoritySource')>('./CompactionAuthoritySource');
   mocks.project.mockImplementation(actual.projectCompactionJournalMessages);
   const data = Buffer.alloc(2_639_085, 7).toString('base64');
   const input = structuredClone(messages);

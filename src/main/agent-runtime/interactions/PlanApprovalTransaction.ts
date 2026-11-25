@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { nowMs } from '@shared/utils/id';
-import { assertDeclaredHandoffForPlan, declaredExecutionOffer, declaredHandoffSuggestion } from '../../conversation/applyDeclaredHandoff';
-import { assertSessionModelAndControls } from '../../conversation/sessionModelGate';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { executionOfferStore, projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
+import { assertSessionModelAndControls } from './sessionModelGate';
+import { assertDeclaredHandoffForPlan, declaredExecutionOffer, declaredHandoffSuggestion } from './applyDeclaredHandoff';
 import type { PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import type { PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import type { PlanTaskRequirement } from '@shared/types/taskExecution';

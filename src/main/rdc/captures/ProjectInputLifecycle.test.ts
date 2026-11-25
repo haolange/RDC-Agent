@@ -2,8 +2,8 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { hashCaptureFile } from '../../runtime/captureContentHash';
 import { ProjectInputLifecycle, type ProjectInputLifecycleHost } from './ProjectInputLifecycle';
-import { hashCaptureFile } from './replay/captureContentHash';
 import type { ProjectRecord } from '@shared/types/session';
 import type { ReplayHistoryStore } from './replay/ReplayHistoryStore';
 

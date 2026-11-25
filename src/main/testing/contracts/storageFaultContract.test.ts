@@ -12,7 +12,7 @@ import {
   readJsonl,
   writeJsonl,
 } from '../../runtime/jsonl';
-import { StorageIo } from '../../sessions/store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 
 const IdRecord = z.object({ id: z.string() });
 const NumberRecord = z.object({ n: z.number() });

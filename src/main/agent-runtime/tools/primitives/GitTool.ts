@@ -3,8 +3,8 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { AppError } from '@shared/errors/appError';
-import { getWorkspaceRoot, isWithinRoot, requireMutationWorkspaceRoot, truncateOutput } from './_shared';
-import { GIT_MAX_OUTPUT_BYTES, GIT_TIMEOUT_MS } from './toolLimits';
+import { getWorkspaceRoot, isWithinRoot, requireMutationWorkspaceRoot, truncateOutput } from '../../../runtime/toolFiles';
+import { GIT_MAX_OUTPUT_BYTES, GIT_TIMEOUT_MS } from '../../../runtime/toolLimits';
 import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
 
 const execFileAsync = promisify(execFile);

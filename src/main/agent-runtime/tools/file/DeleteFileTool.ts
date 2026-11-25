@@ -3,7 +3,7 @@ import {
   assertNotSensitiveDeletePath,
   requireMutationWorkspaceRoot,
   safeResolvePath,
-} from '../primitives/_shared';
+} from '../../../runtime/toolFiles';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface DeleteFileParams {

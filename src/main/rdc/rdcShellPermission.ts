@@ -1,12 +1,8 @@
-import { fileOperationBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
-import {
-  registerRdcShellBaseline,
-  type AgentPermissionDecision,
-  type AgentPermissionDecisionInput,
-} from '../agent-runtime/permissions/AgentPermissionPolicy';
+import { fileOperationBoundary } from '../runtime/FileOperationBoundary';
 import { assertRdcDiscovery, parseShellRdcInput } from './RdcShellInput';
 import { assertRdcBindingOwnership, authorizeRdcOperation, rdcCatalogCapabilitySummary, rdcOperationCapability } from './RdcOperationPolicy';
 import { readRdcHostControls } from './RdcHostControls';
+import type { AgentPermissionDecision, AgentPermissionDecisionInput } from '../agent-runtime/permissions/AgentPermissionPolicy';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 import type { AgentPermissionMode } from '@shared/types/settings';
@@ -112,5 +108,3 @@ export function evaluateRdcShellBaseline(
     return denied(error instanceof Error ? error.message : String(error));
   }
 }
-
-registerRdcShellBaseline(evaluateRdcShellBaseline);

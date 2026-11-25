@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [] },
 }));
 
-vi.mock('../conversation/ToolImagePreviewStore', () => ({
+vi.mock('../agent-runtime/attachments/ToolImagePreviewStore', () => ({
   readToolImagePreviewDataUrl,
 }));
 
@@ -30,7 +30,7 @@ vi.mock('../conversation/ConversationService', () => ({
   conversationService: {},
 }));
 
-vi.mock('../conversation/attachmentPreview', () => ({
+vi.mock('../runtime/attachmentPreview', () => ({
   readAttachmentFilePreviewDataUrl,
   assertAttachmentPreviewPath,
 }));

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { localizedTranslator } from '../../renderer/i18n/messages';
 import { createToolRowForPresentation } from '../../renderer/features/transcript/workProcessToolRows';
 import { stopWorkTrace } from '../../renderer/lib/stopWorkTrace';
-import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { finalizeTrace, upsertLoopResult, upsertRuntimeToolApproval, upsertRuntimeToolCall } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import { buildConversationToolCompletion } from './ConversationToolCompletion';
 import { applyPlanReviewAnswered } from './ConversationPlanReviewEvents';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';

@@ -2,7 +2,7 @@ import type { AssistantMessage, ToolDefinition } from '../../agent-runtime/core/
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { LlmModelCapabilityProbeRequest, LlmModelCapabilityProbeResult } from '@shared/types/settings';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import type { ResolvedProbeTarget } from './ProviderCapabilityProbeService';
+import type { ResolvedProbeTarget } from '../../agent-runtime/capabilities/ProviderCapabilityProbeService';
 
 /**
  * The probe's one no-op tool. Real turns always carry tools, so the probe offers one too; a structured call

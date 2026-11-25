@@ -6,7 +6,7 @@ import { AppError } from '@shared/errors/appError';
 import { ensureJsonlRecordBoundary } from '../../runtime/jsonl';
 import { ConversationHistoryRecordSchema, SessionContextTurnEntrySchema } from './storageSchema';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 import type { ConversationTerminalAppendJournal, TerminalAppendFile } from './storageCommitTypes';
 
 const CHUNK_BYTES = 64 * 1024;

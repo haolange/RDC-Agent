@@ -1,7 +1,7 @@
 import type { ConversationMessage, ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 
 export interface ConversationTurnCommitJournal {
   schemaVersion: '1';

@@ -16,7 +16,7 @@ vi.mock('../../sessions/store/sessionStores', () => ({
   projectWorkspaceStore: { getWorkspacePath: () => '/tmp/rdc-agent-test-workspace' },
 }));
 
-vi.mock('../../browserAppBridge/rendererEventHub', () => ({
+vi.mock('../../runtime/rendererEventHub', () => ({
   rendererEventHub: {
     emit: vi.fn(),
   },

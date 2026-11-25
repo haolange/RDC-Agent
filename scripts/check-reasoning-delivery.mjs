@@ -134,7 +134,7 @@ const fs = require('node:fs');
 // 1) journal 落盘不得升格为可读 thinking（text 永远剥离）；
 // 2) 跨身份必经 ReplayPolicy 决策（drop / replay）；
 // 3) retention 上限必须生效。
-const journalSource = fs.readFileSync('src/main/conversation/SessionContextJournal.ts', 'utf8');
+const journalSource = fs.readFileSync('src/main/agent-runtime/context/SessionContextJournal.ts', 'utf8');
 assert(!journalSource.includes('sanitizeReadableContinuation'), 'Legacy readable-only continuation persistence must remain removed.');
 assert(/CONTINUATION_RETENTION_TURNS\s*=\s*\d+/.test(journalSource), 'Journal must define a bounded CONTINUATION_RETENTION_TURNS constant.');
 

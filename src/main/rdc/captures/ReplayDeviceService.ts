@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron';
 import { rdcCliInvokerService } from '../RdcCliInvokerService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { withRdcHostRuntimeEnv } from '../withRdcHostRuntimeEnv';
-import { rendererEventHub } from '../../browserAppBridge/rendererEventHub';
+import { rendererEventHub } from '../../runtime/rendererEventHub';
 import { processSupervisor } from '../../runtime/ProcessSupervisor';
 import { AdbExecutableCache } from './adbExecutable';
 import {

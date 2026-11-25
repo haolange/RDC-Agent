@@ -7,12 +7,12 @@
 | RDC runtime boundary | `src/main/rdc/RdcCliInvokerService.ts`, `src/main/tools/ShellInvocationService.ts`, `src/main/rdc/RdcSessionRuntime.ts` | `RdcRuntimeContext`, `OpenedCaptureState`, `RdcTurnBinding` | `capture:openProjectInput`, `context:get`, `capture:refreshFrame`, `tool:verifyInstallation` | Settings > Tools, capture library, session context, Activity | typecheck, shell/browser smoke |
 | Settings/provider system | `src/main/settings/settings-core`, `provider-catalog`, `provider-auth`, `agent-manifests` | `AppSettings`, provider catalog, routes, `ToolingSettings` | settings IPC | Settings modal | typecheck, provider-system tests |
 | Sessions/captures | `src/main/sessions/store`（组合根 `sessions/store/sessionStores.ts` 创建共享 `StorageIo` 与各 store：`ProjectWorkspaceStore` 项目 registry 与选择、`SessionRecordStore` session/run 记录、`ConversationHistoryStore` 对话历史/分支/附件、`SessionContextStore` usage/shell/journal、`ExecutionOfferStore`；调用方直接依赖拥有数据的 store，无转发层）, `sessions/run`, `sessions/artifacts`, `src/main/rdc/captures` | `SessionRecord` (`schemaVersion: '1'`, 旧文件 fail-closed), `RunSummary`, `OpenedCaptureState` | project/session/capture IPC | project tree, capture library, opened capture panels | typecheck, shell smoke |
-| Scoped resources | `src/main/runtime/ScopedRuntimeService.ts` | Agent/Skill/MCP/Hook/policy documents | `rdc-runtime:*` | Settings resource editors | typecheck, scoped-resources |
+| Scoped resources | `src/main/settings/agent-manifests/ScopedRuntimeService.ts` | Agent/Skill/MCP/Hook/policy documents | `rdc-runtime:*` | Settings resource editors | typecheck, scoped-resources |
 | RDC 操作协调与恢复 | `src/main/rdc/RdcOperationCoordinator.ts`, `RdcOperationPolicy.ts`, `RdcOperationCatalog.ts`, `RdcCaptureRecovery.ts`, `RdcTurnBindings.ts`, `OwnedRdcDaemonRegistry.ts`, `RdcRemoteConnection.ts` | `RdcTurnBinding`, 操作回执 | 经 `shell.rdc` / `rdc_probe` 与 capture IPC | Capture 卡、session context | typecheck, shell smoke（契约见 `rdc-runtime.md`） |
 | Investigation | `src/main/investigation/*`（`InvestigationArtifactService`, `investigationRecordChecks`, `InvestigationTools`） | Investigation Artifact / manifest 记录 | `investigation:list` 等 | Right Rail Artifacts | typecheck, investigation tests |
 | Knowledge | `src/main/knowledge/*` | Knowledge candidate / index / export | knowledge IPC | `features/knowledge` | typecheck, knowledge tests |
 | Hooks | `src/main/hooks/*`（`HookEngine`；信任记录经 `src/main/runtime/TrustStore.ts`） | Hook 文档与 trust fingerprint | `rdc-runtime:*` | Settings > Hooks | typecheck, scoped-resources |
-| Conversation | `src/main/conversation/*`（`ConversationService`, `ConversationTurnRunner`, `ConversationWorkTrace`） | `ConversationWorkTrace`, 附件与分支 | `conversation:*` | `features/composer`, `features/transcript` | typecheck, agent-runtime, work-process |
+| Conversation | `src/main/conversation/*`（`ConversationService`, `ConversationTurnStarter`, `ConversationTurnRunner`）；work trace 与委派投影在 `src/main/agent-runtime/workTrace/*`，附件物化与工具图片预览在 `src/main/agent-runtime/attachments/*`，session context journal 在 `src/main/agent-runtime/context/SessionContextJournal.ts` | `ConversationWorkTrace`, 附件与分支 | `conversation:*` | `features/composer`, `features/transcript` | typecheck, agent-runtime, work-process |
 | Permissions | `src/main/agent-runtime/permissions/*`（`AgentPermissionPolicy`, `PolicyCompiler`） | 权限模式与 policy | `conversation:answerToolApproval` 等 | 审批卡、Settings > Policy | typecheck, 见 `contracts/permissions.md` |
 | Tasks | `src/main/agent-runtime/tasks/*`（`TaskRegistry` 生命周期变更，基于 `TaskExecutionLedger` 执行记账与 `TaskRegistryCore` 记录读取、依赖图与完成校验；`TaskTools`, `taskProjection`） | `TaskRailItem` | `task_*` 工具、trace 投影 | Right Rail Tasks、Tasks 历史卡 | typecheck, agent-runtime |
 | Provider adapters | `src/main/agent-runtime/providers/*` | `RequestPlan`, `EffectiveModel` | 无直接 IPC | 无 | typecheck, provider-system tests（见 `provider-architecture.md`） |
@@ -23,7 +23,7 @@
 Rules:
 
 - Cross-layer contracts belong in `src/shared`.
-- Main-process domains may depend on shared types and adjacent main services.
+- Main-process domains import only lower layers (`MAIN_DOMAIN_LAYERS` in `eslint.config.mjs`, described in `ARCHITECTURE.md`); primitives several domains share live in `src/main/runtime`, and a lower domain that needs a higher implementation declares a port that `src/main/index.ts` binds.
 - Renderer code reaches main capabilities only through preload APIs.
 - RDC-Tool CLI installation details are Settings data. Lifecycle operations and their argument construction are fixed in the main session boundary.
 

@@ -1,9 +1,9 @@
 import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore';
 import { TaskRegistry } from '../agent-runtime/tasks/TaskRegistry';
-import { rdcSessionService } from '../sessions';
-import { listSessionArtifactSources } from '../sessions/artifacts/SessionArtifactSource';
+import { rdcSessionService } from '../rdc/RdcSessionService';
+import { listSessionArtifactSources } from '../reports/SessionArtifactSource';
 import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
-import { runtimePermissionStateService } from '../agent-runtime/permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../runtime/RuntimePermissionStateService';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { mapRightRailInvestigationArtifacts } from './rightRailInvestigationArtifacts';
 import { collectSessionTaskContextResources } from './rightRailTaskContextResources';

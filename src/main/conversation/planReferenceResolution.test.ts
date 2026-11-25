@@ -10,7 +10,7 @@ const f = vi.hoisted(() => ({
   history: [] as ConversationMessage[],
   source: { ownerSessionId: 's', turnId: 'turn', agentId: 'debugger', markdown: '# Plan' },
 }));
-vi.mock('../sessions/run/approvedHandoffRecovery', () => ({ resolveApprovedHandoff: () => f.handoff }));
+vi.mock('../agent-runtime/interactions/approvedHandoffRecovery', () => ({ resolveApprovedHandoff: () => f.handoff }));
 vi.mock('../sessions/run/PlanReviewStateStore', () => ({ planReviewStateStore: { read: () => f.state } }));
 vi.mock('../sessions/run/sessionPlanReference', () => ({ readReferencedPlan: () => f.source }));
 vi.mock('../sessions/store/sessionStores', () => ({

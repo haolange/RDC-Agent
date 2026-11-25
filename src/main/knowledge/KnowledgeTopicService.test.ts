@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, type KnowledgeSpace, type KnowledgeTopicChanges } from '@shared/types/knowledge';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeQueryService } from './KnowledgeQueryService';
 import { KnowledgeTopicService } from './KnowledgeTopicService';

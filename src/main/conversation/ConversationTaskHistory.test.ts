@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
+import { upsertWorkBlock } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
-import { upsertWorkBlock } from './ConversationWorkTrace';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 
 it('keeps one immutable Task card per event and deduplicates replay by event ID', () => {

@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { GREP_MAX_LINE_CHARS } from '../../../runtime/toolLimits';
 import { grepTool } from './GrepTool';
-import { GREP_MAX_LINE_CHARS } from './toolLimits';
 
 const tempDirs: string[] = [];
 

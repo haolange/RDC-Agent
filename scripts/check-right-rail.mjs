@@ -34,7 +34,7 @@ const requiredFiles = [
   'src/main/agent-trace/rightRailInvestigationArtifacts.ts',
   'src/main/agent-trace/rightRailTaskContextResources.ts',
   'src/main/reports/OutputRegistrationTool.ts',
-  'src/main/sessions/artifacts/SessionArtifactSource.ts',
+  'src/main/reports/SessionArtifactSource.ts',
   'src/renderer/features/right-rail/SessionRightRail.tsx',
   'src/renderer/features/right-rail/ProjectCaptureImportPanel.tsx',
   'src/renderer/features/right-rail/RightRailArtifactList.tsx',
@@ -268,7 +268,7 @@ requireText(projectionService, "agentProfile: ''", 'empty right-rail panel must 
 for (const forbidden of ['usedToolNames', "kind: 'tool'", 'settings.agents.definitions']) {
   forbidText(projection, forbidden, 'right rail projection must not retain generic resource path ' + forbidden);
 }
-const artifactSource = read('src/main/sessions/artifacts/SessionArtifactSource.ts');
+const artifactSource = read('src/main/reports/SessionArtifactSource.ts');
 for (const required of ['export type SessionArtifactSourceKind = \'attachment\' | \'output\'', 'categorizeOutput', 'artifactStore.list']) {
   requireText(artifactSource, required, `SessionArtifactSource must retain ${required}`);
 }

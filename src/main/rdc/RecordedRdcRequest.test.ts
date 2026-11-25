@@ -6,10 +6,10 @@ import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactRe
 import { resolveDelegatedArtifactRead } from '../sessions/artifacts/DelegatedArtifactAccess';
 import { grantDelegatedArtifactAccess } from '../sessions/artifacts/DelegatedArtifactAccess';
 vi.mock('../sessions/store/sessionStores', () => ({}));
-vi.mock('../conversation/SessionContextJournal', () => ({ sessionContextJournal: {} }));
+vi.mock('../agent-runtime/context/SessionContextJournal', () => ({ sessionContextJournal: {} }));
 import { materializeRecordedRdcRequest } from './RecordedRdcRequest';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
+import type { SessionContextTurnEntry } from '../agent-runtime/context/SessionContextJournal';
 
 const hash = 'a'.repeat(64);
 const uri = 'session://tool-outputs/call.json';

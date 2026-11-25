@@ -4,7 +4,7 @@ import YAML from 'yaml';
 import { errorCodeOf } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
-import { directoryStamp } from '../settings/settings-core/externalInput';
+import { directoryStamp } from '../runtime/externalInput';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
 import { canonicalRealpath } from '../runtime/fileIdentity';
 import { TrustStore, type TrustRecord, type TrustScope } from '../runtime/TrustStore';

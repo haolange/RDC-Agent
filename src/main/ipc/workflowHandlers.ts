@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron';
 import { nowIso } from '@shared/utils/id';
-import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
+import { traceProjectionRefreshService } from '../agent-runtime/orchestration/TraceProjectionRefreshService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
-import { rdcSessionService } from '../sessions';
+import { rdcSessionService } from '../rdc/RdcSessionService';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';

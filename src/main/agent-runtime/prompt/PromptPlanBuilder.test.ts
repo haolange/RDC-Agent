@@ -6,7 +6,7 @@ import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
-vi.mock('../../runtime/resolveConfiguredShell', () => ({
+vi.mock('../../tools/resolveConfiguredShell', () => ({
   resolveConfiguredShell: () => {
     throw new Error('SHELL_UNAVAILABLE: test stub');
   },

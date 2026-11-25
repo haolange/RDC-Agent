@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron';
 import { AppError } from '@shared/errors/appError';
-import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
+import { traceProjectionRefreshService } from '../agent-runtime/orchestration/TraceProjectionRefreshService';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
-import { rdcSessionService } from '../sessions';
+import { rdcSessionService } from '../rdc/RdcSessionService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { replayDeviceIssue } from '../rdc/captures/ReplayDeviceIssue';

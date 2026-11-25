@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { auditLog, AuditWriteFailedError } from '../../runtime/AuditLog';
-import { PermissionModeChangedError } from './RuntimePermissionStateService';
+import { PermissionModeChangedError } from '../../runtime/RuntimePermissionStateService';
 import { PermissionReviewError } from './PermissionReviewRuntime';
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
 import type { AgentRole } from '@shared/types/agent';

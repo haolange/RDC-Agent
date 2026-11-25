@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageIo } from '../../store/StorageIo';
+import { StorageIo } from '../../../runtime/StorageIo';
 import { readPersistedRun, writeRunFiles } from '../sessionRunPersistence';
 import { SessionRecordStore } from '../../store/SessionRecordStore';
 import { PersistedRunRecordV3Schema, toPersistedRunV3 } from './runRecordSchema';

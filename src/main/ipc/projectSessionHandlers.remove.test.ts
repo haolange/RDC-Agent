@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { rdcSessionService } from '../sessions';
+import { rdcSessionService } from '../rdc/RdcSessionService';
 import { registerProjectSessionHandlers } from './projectSessionHandlers';
 import type { RunSummary } from '@shared/types/session';
 
@@ -44,7 +44,7 @@ vi.mock('../sessions/store/sessionStores', () => ({
   executionOfferStore: storage.executionOffers,
 }));
 vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
-vi.mock('../sessions', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
+vi.mock('../rdc/RdcSessionService', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
 vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({
   agentOrchestrator: { syncSessionSlots, releaseSessionToolState: vi.fn(), backgroundSubagents: { abortSession: abortBackgroundSession } },
 }));
@@ -54,10 +54,10 @@ vi.mock('../conversation/ConversationService', () => ({
 vi.mock('../agent-trace/TraceService', () => ({
   traceService: { getSession: vi.fn(async (sessionId: string) => ({ success: true, sessionId, presentation: null })) },
 }));
-vi.mock('../conversation/ConversationRoutePreflight', () => ({
+vi.mock('../settings/agent-manifests/effectiveAgentSnapshot', () => ({
   resolveEnabledAgentDefinition: vi.fn(() => ({ id: 'general' })),
 }));
-vi.mock('../hooks/sessionLifecycle', () => ({
+vi.mock('../rdc/sessionLifecycle', () => ({
   createSessionWithHooks: vi.fn(),
   removeSessionWithHooks: vi.fn(async (sessionId: string) => {
     storage.removeSession(sessionId);

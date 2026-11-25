@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { AppError } from '@shared/errors/appError';
-import { detectImageMagicMime } from '../conversation/attachmentClassify';
+import { detectImageMagicMime } from '../runtime/attachmentClassify';
 import { knowledgeImageMime } from './knowledgeImages';
 import { normalizeZipEntryName } from './knowledgeZip';
 

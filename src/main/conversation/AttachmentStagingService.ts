@@ -9,8 +9,8 @@ import {
   MAX_ATTACHMENT_TOTAL_BYTES,
   assertSafeImageBytes,
   classifyAttachmentBytes,
-} from './attachmentClassify';
-import { assertAttachmentPreviewPath, createCardThumbnail, toDataUrl } from './attachmentPreview';
+} from '../runtime/attachmentClassify';
+import { assertAttachmentPreviewPath, createCardThumbnail, toDataUrl } from '../runtime/attachmentPreview';
 import type { OwnedAttachment } from './ConversationAttachmentAccess';
 import type {
   AttachmentRejectCode,

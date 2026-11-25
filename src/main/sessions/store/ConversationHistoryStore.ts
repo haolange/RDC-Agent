@@ -2,9 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId, nowMs } from '@shared/utils/id';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../../runtime/jsonl';
-import { readStoredWorkTrace, sanitizeStoredWorkTrace } from '../../conversation/StoredWorkTrace';
-import { classifyAttachmentBytes } from '../../conversation/attachmentClassify';
+import { classifyAttachmentBytes } from '../../runtime/attachmentClassify';
 import { copyFileAtomicSync } from '../../runtime/atomicFile';
+import { readCurrentStoredJson, CURRENT_STORE_SCHEMA_VERSION } from '../../runtime/storedDocument';
+import { readStoredWorkTrace, sanitizeStoredWorkTrace } from './StoredWorkTrace';
 import {
   CONVERSATION_COMPACTION_DELTA_THRESHOLD,
   type ConversationHistoryCacheEntry,
@@ -15,26 +16,17 @@ import {
   type ConversationTurnCommitJournal,
   type ExistingConversationTurnCommit,
 } from './storageCommitTypes';
-import {
-  CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
-  CONVERSATION_TURN_COMMIT_MIGRATIONS,
-  ConversationHistoryRecordSchema,
-  SessionAttachmentManifestSchema,
-  readCurrentStoredJson,
-  CURRENT_STORE_SCHEMA_VERSION,
-  SessionRecordSchema,
-  toSessionAttachmentManifest,
-} from './storageSchema';
+import { CONVERSATION_TERMINAL_COMMIT_MIGRATIONS, CONVERSATION_TURN_COMMIT_MIGRATIONS, ConversationHistoryRecordSchema, SessionAttachmentManifestSchema, SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 import { readProjectSessions } from './sessionRecordReconcile';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 import type { SessionAttachmentKind, SessionAttachmentLayer, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import type { SessionRecordStore } from './SessionRecordStore';
 import type { SessionContextStore } from './SessionContextStore';
-import type { StorageIo } from './StorageIo';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 /** What conversation history needs from storage: file I/O, session records, the project registry and the turn journal. */
 export interface ConversationHistoryHost {

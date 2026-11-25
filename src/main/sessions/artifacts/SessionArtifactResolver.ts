@@ -25,7 +25,7 @@ import {
 } from '@shared/types/sessionArtifact';
 import { generateShortId } from '@shared/utils/id';
 import { normalizeSha256, sha256Hex } from '../../runtime/contentHash';
-import { StorageIo } from '../store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { sessionRecordStore } from '../store/sessionStores';
 import { renameWithRetrySync } from '../../platform/fileRename';
 import { inspectArtifactJson, readArtifactJsonText, readDefaultToolResultText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';

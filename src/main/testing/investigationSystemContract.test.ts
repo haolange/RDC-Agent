@@ -956,7 +956,7 @@ describe('investigation system contract', () => {
     expect(runner).toMatch(/validateCompletion/);
     expect(conversation).not.toMatch(/validateCompletion/);
     expect(conversation).toMatch(/completionReceipt/);
-    expect(readRepo('src/main/conversation/applyDeclaredHandoff.ts')).toMatch(/applyDeclaredHandoff/);
+    expect(readRepo('src/main/agent-runtime/interactions/applyDeclaredHandoff.ts')).toMatch(/applyDeclaredHandoff/);
     expect(readRepo('src/main/sessions/run/ExecutionOfferStore.ts')).toMatch(/execution-offer\.json/);
     expect(enforceMissionTurnCompletion({
       profileId: 'general',

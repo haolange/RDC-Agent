@@ -4,7 +4,7 @@ import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { RuntimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { RuntimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { EventStream } from '../core/EventStream';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { assertMissionTurnCompletion } from '../../investigation/missionCompletionContract';

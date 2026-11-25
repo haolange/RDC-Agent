@@ -17,7 +17,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { directoryLinkType } from '../platform/paths';
 import { acquireDirectoryFileLock, releaseDirectoryFileLock } from '../sessions/store/directoryFileLock';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
 import { KNOWLEDGE_IMPORT_MAX_BYTES, ingestKnowledgeFromPath, sanitizeProvenanceToken } from './knowledgeIngest';
 import {

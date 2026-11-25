@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { runtimePermissionStateService } from '../agent-runtime/permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../runtime/RuntimePermissionStateService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';

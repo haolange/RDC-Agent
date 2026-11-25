@@ -25,7 +25,7 @@ import type { ProviderStrategy } from '../agent-runtime/core/ProviderRegistry';
 
 vi.mock('electron', () => ({ app: { getPath: () => process.env.TEMP, getAppPath: () => process.cwd() }, safeStorage: { isEncryptionAvailable: () => false } }));
 vi.mock('../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: async () => true }));
-vi.mock('../runtime/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('No shell in provider fixture'); } }));
+vi.mock('../tools/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('No shell in provider fixture'); } }));
 const TEST_MODEL: Model = {
   id: 'test-model',
   name: 'Test model',

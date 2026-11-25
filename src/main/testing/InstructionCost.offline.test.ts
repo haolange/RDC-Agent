@@ -8,7 +8,7 @@ import { PromptPlanBuilder } from '../agent-runtime/prompt/PromptPlanBuilder';
 import { parseAgentMarkdownStrict } from '../settings/agent-manifests/agentManifestParse';
 import { appPathService } from '../runtime/AppPathService';
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
-vi.mock('../runtime/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Offline fixed environment'); } }));
+vi.mock('../tools/resolveConfiguredShell', () => ({ resolveConfiguredShell: () => { throw new Error('Offline fixed environment'); } }));
 vi.mock('../sessions/store/sessionStores', () => ({ sessionContextStore: { readSessionShellCwd: () => null } }));
 const model = 'offline-fixture';
 const headSources = new Map<string, string>();

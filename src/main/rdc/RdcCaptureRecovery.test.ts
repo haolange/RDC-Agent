@@ -4,11 +4,11 @@ import { setRdcInteractionLock } from './RdcOperationCoordinator';
 const mock = vi.hoisted(() => ({ pending: vi.fn(), write: vi.fn(), session: vi.fn(), project: vi.fn(), verify: vi.fn(),
   snapshot: vi.fn(), opened: vi.fn(), binding: vi.fn(), deviceOwner: vi.fn(), clear: vi.fn(), prepare: vi.fn(), open: vi.fn(), restore: vi.fn(),
   device: vi.fn(), catalog: vi.fn(), lease: vi.fn(), owner: vi.fn(), native: vi.fn(), daemons: vi.fn() }));
-vi.mock('../sessions', () => ({ rdcSessionService: { snapshotReplayForSession: mock.snapshot, snapshotOpenedCaptureForSession: mock.opened,
+vi.mock('./RdcSessionService', () => ({ rdcSessionService: { snapshotReplayForSession: mock.snapshot, snapshotOpenedCaptureForSession: mock.opened,
   recoveryBinding: mock.binding, getDeviceOwner: mock.deviceOwner, clearOpenedCaptureForSession: mock.clear,
   prepareAgentDevice: mock.prepare, openProjectInput: mock.open, restoreAgentPosition: mock.restore } }));
 vi.mock('../sessions/store/sessionStores', () => ({ sessionRecordStore: { readSession: mock.session }, projectWorkspaceStore: { getProjectById: mock.project } }));
-vi.mock('../sessions/run/prepareInvestigationPlan', () => ({ verifyPlanInput: mock.verify }));
+vi.mock('./prepareInvestigationPlan', () => ({ verifyPlanInput: mock.verify }));
 vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: cli } } }) } }));
 vi.mock('./withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
 vi.mock('./captures/ReplayDeviceService', () => ({ replayDeviceService: { getDeviceById: mock.device } }));

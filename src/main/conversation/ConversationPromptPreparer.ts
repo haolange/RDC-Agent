@@ -8,8 +8,8 @@ import { agentManifestService } from '../settings/agent-manifests/AgentManifestS
 import { conversationHistoryStore, projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { resolveAgentToolAllowlistFromDefinition } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { buildTurnPromptPlan } from '../agent-runtime/orchestration/TurnPromptPlan';
-import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
-import { resolveEffectiveAgentSnapshot } from './ConversationRoutePreflight';
+import { repairConversationBranchState, resolveVisibleConversationMessages } from '../sessions/store/ConversationBranchResolver';
+import { resolveEffectiveAgentSnapshot } from '../settings/agent-manifests/effectiveAgentSnapshot';
 import type {
   AgentRoutePreflightOk,
   PreparedConversationPrompt,

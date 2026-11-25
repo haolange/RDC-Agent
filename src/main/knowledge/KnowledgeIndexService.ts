@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { appPathService } from '../runtime/AppPathService';
 import { projectWorkspaceStore } from '../sessions/store/sessionStores';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KNOWLEDGE_INDEX_MIGRATIONS } from './knowledgeIndexSchema';
 import {

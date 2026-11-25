@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskRegistry } from '../tasks';
-import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { delegationTraceStore } from '../workTrace/DelegationTraceStore';
 import { BackgroundSubagentService } from './BackgroundSubagentService';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { createSubagentBudgetState } from './TurnCoordinator';

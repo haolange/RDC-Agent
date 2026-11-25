@@ -2,7 +2,7 @@ import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { conversationHistoryStore } from '../sessions/store/sessionStores';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { traceService } from '../agent-trace/TraceService';
-import { normalizeBranchId } from './ConversationBranchResolver';
+import { normalizeBranchId } from '../sessions/store/ConversationBranchResolver';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 
 export function persistConversationSnapshot(

@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { writeFileAtomic } from '../runtime/atomicFile';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
 import { assertSafeKnowledgeWriteTarget } from './knowledgeFs';
 import { isKnowledgeImagePathAllowed } from './knowledgeImages';
