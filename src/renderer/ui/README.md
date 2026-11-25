@@ -14,7 +14,7 @@
 
 `EmptyState` 提供 `variant="inline" | "panel" | "page"`：`inline` 是列表里没有行时的一行安静说明；`panel` 是带创建动作的空资源，有界表面；`page` 填满所在栏位并居中，保留 visual 槽。不要在消费方再包一层边框盒子。
 
-`OverflowFade` 保留完整单行 DOM 文本和 `title`，仅在实测溢出时添加线性渐隐；监听宽度、文本与字体加载变化，空字符串仍保留一行高度。`Tabs` 默认按内容宽度布局；仅在调用方明确传入 `fullWidth` 时占满容器并均分选项。
+`OverflowFade` 保留完整单行 DOM 文本，仅在实测溢出时添加线性渐隐，并以 `data-tooltip` 提供完整文字（不用原生 `title`）；监听宽度、文本与字体加载变化，空字符串仍保留一行高度。`Tabs` 默认按内容宽度布局；仅在调用方明确传入 `fullWidth` 时占满容器并均分选项。
 
 `ListRow` 继续统一 hover / focus / selected / disabled；领域组合可通过 `--ui-list-row-padding`、`--ui-list-row-gap` 与 `--ui-list-row-selected-border` 配置布局及选中边界，默认值保持自然单行列表表现，不受 CSS 加载顺序影响。Settings feature 的 `AgentListItem` 是其局部组合（两行单行文本、无底座小图标），不属于第二套公共列表体系；标题与描述、图标比例样式共置在该组件，不在共享 kit 留业务选择器。
 

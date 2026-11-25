@@ -2,7 +2,11 @@
 
 `KnowledgeCenterModal` 组装 spaces/list/detail 三列与覆盖式导入、导出、写入确认面；`columns`、`panels`、`parts` 分别承担布局内容、任务对话框和局部展示。现有样式已按 shell、sidebar、list、reader、metadata 和 dialogs 拆分，继续保持。
 
-`useKnowledgeCenter` 协调查询与选择：`useKnowledgeOverview` 读空间与索引概况，`useKnowledgeQuery` 管搜索、分页与知识包，`useKnowledgeRebuild` 运行重建；`useKnowledgeSelection`、`useKnowledgeRequestScope` 保证请求结果属于当前 open/scope 生命周期；`useKnowledgeImport`（选来源 → 预览 → 结果，来源输入在 `useKnowledgeImportSource`）、`useKnowledgeCandidateInbox`（会话候选队列与创建候选）、`useKnowledgeExport`（含选卡清单）与 `useKnowledgeWriteConfirm` 各自管理操作状态，不把关闭或切换作用域当作取消后端写入。导入、导出与重建索引经 `useKnowledgeOperation` 运行：每次生成 `operationId`，只跟随自己的 `knowledge:progress`，「取消」调用 `knowledge:cancel`；`KNOWLEDGE_OPERATION_CANCELLED` 是中性结果（主进程已恢复原状），其余失败照常显示。详情栏的正文在 `parts/KnowledgeCardDocument.tsx`，底部动作在 `parts/KnowledgeCardActionBar.tsx`；案例卡的章节形态在 `parts/CaseChapterContent.tsx`，通用的值与事实行在 `parts/CaseValue.tsx`，值的人话规则在 `knowledgeCaseValues.ts`。窄屏切换不改变所选知识内容。
+`useKnowledgeCenter` 协调查询与选择：`useKnowledgeOverview` 读空间与索引概况，`useKnowledgeQuery` 管搜索、分页与知识包，`useKnowledgeRebuild` 运行重建；`useKnowledgeSelection`、`useKnowledgeRequestScope` 保证请求结果属于当前 open/scope 生命周期；`useKnowledgeImport`（选来源 → 预览 → 结果，来源输入在 `useKnowledgeImportSource`）、`useKnowledgeCandidateInbox`（会话候选队列与创建候选）、`useKnowledgeExport`（含选卡清单）与 `useKnowledgeWriteConfirm` 各自管理操作状态，不把关闭或切换作用域当作取消后端写入。
+
+- 导入、导出与重建索引经 `useKnowledgeOperation` 运行：每次生成 `operationId`，只跟随自己的 `knowledge:progress`，「取消」调用 `knowledge:cancel`；`KNOWLEDGE_OPERATION_CANCELLED` 是中性结果（主进程已恢复原状），其余失败照常显示。
+- 详情栏的正文在 `parts/KnowledgeCardDocument.tsx`，底部动作在 `parts/KnowledgeCardActionBar.tsx`；案例卡的章节形态在 `parts/CaseChapterContent.tsx`，通用的值与事实行在 `parts/CaseValue.tsx`，值的人话规则在 `knowledgeCaseValues.ts`。
+- 窄屏切换不改变所选知识内容。
 
 既有 selection、write-confirm、query/model 测试覆盖迟到响应和写入边界；`useKnowledgeRequestScope.test.ts` 补充 StrictMode、切 scope、关闭、重开与卸载的 React 生命周期验证。知识 lifecycle 的 `retired` 保留人工退役与历史追溯语义；默认召回排除该状态。
 

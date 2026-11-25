@@ -13,7 +13,7 @@ Provider Catalog 不是 `settings:get` 的派生 UI 状态。它有独立 contra
 
 - 事实输入：`src/shared/provider-catalog/manifests/{identities,profiles,surfaces}/*.json`
 - 构建入口：共享 strict Schema 与 Catalog compiler
-- 运行时入口：`ProviderCatalogRegistry.listProviderSummaries()` 与 `loadProviderSurface(id)`
+- 运行时入口：`ProviderCatalogRegistry` 的 `listProviderSummaries()` 与按 id 读取的 `getProviderSurfaceSummary(id)` 等函数
 
 - IPC: `settings:getProviderCatalog`
 - Preload: `window.electronAPI.settings.getProviderCatalog()`
@@ -28,12 +28,12 @@ Provider Catalog 不是 `settings:get` 的派生 UI 状态。它有独立 contra
 
 Catalog DTO 不得包含 `apiKey`、`secretRef`、`hasStoredSecret`、OAuth token、account label、plan label、last test/error 状态、credential、password 或任何 secret-like 字段。
 
-Settings 初始列表只读取 summary index；surface 详情按需异步加载。renderer、preload 和 Browser bridge 不读取 raw manifest。任何 provider/model/route 更新只刷新对应 projection，不能重载完整 Catalog。
+renderer 在启动时经 `settings:getProviderCatalog` 读一次目录，再与 `settings:get` 的连接状态拼回 `LlmProviderEntry`；目录变化不引发设置重读。renderer、preload 和 Browser bridge 不读取 raw manifest。任何 provider/model/route 更新只刷新对应 projection，不能重载完整 Catalog。
 
 Provider definition 的公开维度是：
 
 - `protocol`: wire protocol，供主进程 adapter 使用，例如 `AnthropicMessages` 或 `OpenAICompatibleChatCompletions`；
-- `category`: Settings UI category，固定七类（OAuth/Login、第一方直连、Cloud、兼容接入、Coding/Token Plan、Local、Image）；
+- `category`: Settings UI category，固定六类，对应 manifest 的 `category` 枚举：登录授权、第一方直连、Cloud、Coding/Token Plan、兼容接入、Local；
 - `authMode`: 用户如何认证；
 - `capabilities`: 下游可验证的能力声明。
 
@@ -53,9 +53,7 @@ Provider definition 的公开维度是：
 
 Provider catalog 中的 coding / token plan entries 必须作为独立 provider entry 保留，并归入 `coding-token-plan`。ClinePass、OpenCode Go、Wafer Pass 等订阅 plan 不得折叠进 Compatible Access 的 entitlement overlay。NanoGPT 指 `nano-gpt.com` 兼容网关，不是 Karpathy 教学仓库。
 
-Plan agent 是独立 profile，用于研究、提问、计划 artifact 与 handoff。Settings 生成或保存 Plan route 时必须 fail-closed：provider/model 不存在、未启用、未配置或不可用时，route 写为空值，不得静默回退到默认模型。
-
-Plan 的 seed manifest 不包含 `bash`、`write`、`edit` 或 `rdcContext`；获批后的实现由 Plan handoff 到 Edit。
+Agent 的模型路由来自 Settings → Agents（`agentModels`）。provider/model 不存在、未启用、未配置或不可执行时 fail-closed，并给出同 provider 的已验证候选，不静默回退到默认模型（见 `ARCHITECTURE.md` Architecture Principles §9）。
 
 ## Validation
 
