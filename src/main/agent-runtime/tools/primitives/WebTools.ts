@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { assertPublicHttpUrl, fetchPinnedPublic } from '../../net/assertPublicHttpUrl';
+import { fetchPublic, PublicRequestFailedError } from '../../../runtime/net/publicEgress';
 import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES, WEB_MAX_SOURCE_BYTES } from './toolLimits';
 import { readWebTextPage, validateWebTextCursor, type WebTextCursor } from './WebTextPage';
 import type { AgentTool } from '../../agent/AgentTool';
@@ -238,51 +238,19 @@ async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
 }
 
 async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = '*/*', responseLimit = MAX_RESPONSE_BYTES): Promise<PublicTextResponse> {
-  if (signal?.aborted) throw signal.reason ?? new Error('Request aborted');
-  let current = await assertPublicHttpUrl(rawUrl);
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new Error(`Timed out after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS);
-  const abort = (): void => controller.abort(signal?.reason ?? new Error('Request aborted'));
-  if (signal?.aborted) abort();
-  else signal?.addEventListener('abort', abort, { once: true });
+  let fetched;
   try {
-    for (let hop = 0; hop <= WEB_MAX_REDIRECTS; hop += 1) {
-      const response = await fetchPinnedPublic(current, {
-        redirect: 'manual',
-        signal: controller.signal,
-        maxResponseBytes: WEB_MAX_SOURCE_BYTES,
-        headers: {
-          Accept: accept,
-          'User-Agent': 'RDC-Agent/AskReadonlyWebTool',
-        },
-      });
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (!location) {
-          throw new Error(`Redirect missing Location header from ${current.href}`);
-        }
-        const next = new URL(location, current.href).toString();
-        current = await assertPublicHttpUrl(next);
-        continue;
-      }
-      const { bytes, text, truncated, bodyHash } = await readResponseBodyLimited(response, responseLimit);
-      return {
-        finalUrl: current.href,
-        status: response.status,
-        statusText: response.statusText,
-        bytes,
-        truncated,
-        text,
-        bodyHash,
-      };
-    }
-    throw new Error(`Too many redirects (>${WEB_MAX_REDIRECTS}) starting from ${rawUrl}`);
+    fetched = await fetchPublic(rawUrl, {
+      accept, userAgent: 'RDC-Agent/AskReadonlyWebTool', maxResponseBytes: WEB_MAX_SOURCE_BYTES,
+      maxRedirects: WEB_MAX_REDIRECTS, timeoutMs: REQUEST_TIMEOUT_MS, signal,
+    });
   } catch (error) {
-    throw createNetworkError(current.href, error);
-  } finally {
-    clearTimeout(timeoutId);
-    signal?.removeEventListener('abort', abort);
+    if (error instanceof PublicRequestFailedError) throw createNetworkError(error.url, error.cause);
+    throw error;
   }
+  const { response, finalUrl } = fetched;
+  const { bytes, text, truncated, bodyHash } = await readResponseBodyLimited(response, responseLimit);
+  return { finalUrl, status: response.status, statusText: response.statusText, bytes, truncated, text, bodyHash };
 }
 
 async function readResponseBodyLimited(

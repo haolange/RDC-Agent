@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { assertPublicHttpUrl, fetchPinnedPublic } from '../agent-runtime/net/assertPublicHttpUrl';
+import { fetchPublic } from '../runtime/net/publicEgress';
 import { appPathService } from '../runtime/AppPathService';
 import { readLimitedBytes, sniffRasterImageMime } from './mediaBytes';
 
@@ -78,39 +78,19 @@ function sniffMime(bytes: Uint8Array, contentType: string | null): string | null
 }
 
 async function fetchPublicBytes(rawUrl: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
-  if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) return null;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    let current = await assertPublicHttpUrl(rawUrl);
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-      const response = await fetchPinnedPublic(current, {
-        maxResponseBytes: MAX_FAVICON_BYTES,
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: {
-          Accept: 'image/*,*/*;q=0.8',
-          'User-Agent': 'RDC-Agent/FaviconResolve',
-        },
-      });
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (!location) return null;
-        current = await assertPublicHttpUrl(new URL(location, current.href).toString());
-        continue;
-      }
-      if (!response.ok) return null;
-      const bytes = await readLimitedBytes(response, MAX_FAVICON_BYTES);
-      if (!bytes || bytes.byteLength === 0) return null;
-      const mime = sniffMime(bytes, response.headers.get('content-type'));
-      if (!mime || !ALLOWED_MIME.has(mime)) return null;
-      return { bytes, mime };
-    }
-    return null;
+    const { response } = await fetchPublic(rawUrl, {
+      accept: 'image/*,*/*;q=0.8', userAgent: 'RDC-Agent/FaviconResolve', maxResponseBytes: MAX_FAVICON_BYTES,
+      maxRedirects: MAX_REDIRECTS, timeoutMs: REQUEST_TIMEOUT_MS,
+    });
+    if (!response.ok) return null;
+    const bytes = await readLimitedBytes(response, MAX_FAVICON_BYTES);
+    if (!bytes || bytes.byteLength === 0) return null;
+    const mime = sniffMime(bytes, response.headers.get('content-type'));
+    return mime && ALLOWED_MIME.has(mime) ? { bytes, mime } : null;
   } catch {
+    // A favicon is decoration: an unreachable or refused icon falls back to the generic glyph.
     return null;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
@@ -162,43 +142,13 @@ async function discoverIconUrls(domain: string): Promise<string[]> {
   ];
 
   try {
-    let page = await assertPublicHttpUrl(`${httpsOrigin}/`);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      let response = await fetchPinnedPublic(page, {
-        maxResponseBytes: MAX_ICON_PAGE_BYTES,
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: {
-          Accept: 'text/html,application/xhtml+xml',
-          'User-Agent': 'RDC-Agent/FaviconResolve',
-        },
-      });
-      for (let hop = 0; hop < MAX_REDIRECTS && response.status >= 300 && response.status < 400; hop += 1) {
-        const location = response.headers.get('location');
-        if (!location) break;
-        page = await assertPublicHttpUrl(new URL(location, page.href).toString());
-        response = await fetchPinnedPublic(page, {
-          maxResponseBytes: MAX_ICON_PAGE_BYTES,
-          redirect: 'manual',
-          signal: controller.signal,
-          headers: {
-            Accept: 'text/html,application/xhtml+xml',
-            'User-Agent': 'RDC-Agent/FaviconResolve',
-          },
-        });
-      }
-      if (response.ok) {
-        const text = (await response.text()).slice(0, 80_000);
-        const fromHtml = parseIconHrefFromHtml(text, page.href);
-        candidates.unshift(...fromHtml);
-      }
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const { response, finalUrl } = await fetchPublic(`${httpsOrigin}/`, {
+      accept: 'text/html,application/xhtml+xml', userAgent: 'RDC-Agent/FaviconResolve', maxResponseBytes: MAX_ICON_PAGE_BYTES,
+      maxRedirects: MAX_REDIRECTS, timeoutMs: REQUEST_TIMEOUT_MS,
+    });
+    if (response.ok) candidates.unshift(...parseIconHrefFromHtml((await response.text()).slice(0, 80_000), finalUrl));
   } catch {
-    /* fall through to direct icon candidates */
+    // The page is only a hint for icon links; the direct candidates remain.
   }
 
   return [...new Set(candidates)];

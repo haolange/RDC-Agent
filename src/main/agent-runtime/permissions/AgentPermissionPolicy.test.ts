@@ -943,10 +943,17 @@ describe('AgentPermissionPolicyService declared effects', () => {
     expect(shell.action).toBe('ask_user');
   });
 
-  it('treats a parent-directory reference in a routine command as an external path', () => {
-    const decision = service.evaluate({ ...permissionInput(settings('default')), tool: shellTool,
-      toolCall: call('shell', { command: 'ls ../..' }), projectRootPath: workspaceRoot });
-    expect(decision.action).toBe('ask_user');
+  it('asks before a routine command names anything outside the workspace', () => {
+    const evaluate = (command: string) => service.evaluate({ ...permissionInput(settings('default')), tool: shellTool,
+      toolCall: call('shell', { command }), projectRootPath: workspaceRoot }).action;
+    const workspace = workspaceRoot.replace(/\\/g, '/');
+    for (const command of ['ls ../..', 'ls /etc', 'ls /', 'dir D:/', 'dir D:', 'Get-ChildItem Env:', 'ls //host/share', 'ls ~',
+      `ls ${workspace}/src /etc`, 'ls --hide=/etc src']) {
+      expect([command, evaluate(command)]).toEqual([command, 'ask_user']);
+    }
+    for (const command of ['ls', 'ls src', `ls ${workspace}`, `ls ${workspace}/src`]) {
+      expect([command, evaluate(command)]).toEqual([command, 'allow']);
+    }
   });
 
   it('reviews a tool that declares no effects by its access level', () => {

@@ -3,10 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { fetchMock, lookupMock } = vi.hoisted(() => ({ fetchMock: vi.fn(), lookupMock: vi.fn() }));
 vi.mock('dns/promises', () => ({ lookup: lookupMock }));
-vi.mock('../../net/assertPublicHttpUrl', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../net/assertPublicHttpUrl')>(),
-  fetchPinnedPublic: fetchMock,
-}));
+vi.mock('../../../runtime/net/pinnedTransport', () => ({ requestPinned: fetchMock }));
 
 import { webFetchTool } from './WebTools';
 import { WEB_MAX_RESPONSE_BYTES } from './toolLimits';

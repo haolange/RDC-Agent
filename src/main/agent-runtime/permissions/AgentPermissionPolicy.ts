@@ -1,4 +1,3 @@
-import * as os from 'os';
 import * as path from 'path';
 import { isToolWithinCeiling, toolAccessOf } from '@shared/constants/toolAccess';
 import { agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
@@ -220,21 +219,25 @@ function classifyWriteTargets(
   return { protectedTarget };
 }
 
-function commandUsesExternalPath(command: string, workspaceRoot: string, roots: string[]): boolean {
-  const normalized = command.replace(/\\/g, '/');
-  if (/(^|[\s"'=:])\.\.(?:\/|$|[\s"';|&])/.test(normalized)) return true;
-  const home = os.homedir().replace(/\\/g, '/');
-  const workspace = workspaceRoot.replace(/\\/g, '/');
-  const mentionsHome = normalized.includes('~/') || normalized.toLowerCase().includes(home.toLowerCase());
-  const mentionsOtherRoot = roots.some((root) => normalized.toLowerCase().includes(root.replace(/\\/g, '/').toLowerCase()));
-  const absoluteMentions = [
-    ...normalized.matchAll(/[A-Za-z]:\/[^\s"'|&;]+/g),
-    ...normalized.matchAll(/\/(?:Users|home|Desktop|tmp|var|etc|opt)\/[^\s"'|&;]*/g),
-    ...normalized.matchAll(/(^|\s)\/(?=\s|$)/g),
-  ].map((match) => match[0].trim()).filter(Boolean);
-  const mentionsExternalAbsolutePath = absoluteMentions.some((candidate) => !candidate.toLowerCase().startsWith(workspace.toLowerCase()));
-  if (!mentionsHome && !mentionsOtherRoot && !mentionsExternalAbsolutePath) return false;
-  return !normalized.toLowerCase().includes(workspace.toLowerCase());
+const POWERSHELL_PROVIDER_DRIVE = /^(?:alias|cert|env|function|hkcu|hklm|variable|wsman):/iu;
+const DRIVE_PATH = /^[a-z]:/iu;
+
+/**
+ * A routine command may name only workspace paths. Each token (and each `name=value` part) is classified on its own:
+ * home references, `..`, PowerShell provider drives (`Env:`, `HKLM:`), and absolute, drive-root, drive-relative or UNC
+ * paths outside the workspace make the command external. Mentioning the workspace elsewhere in the command does not
+ * excuse another token.
+ */
+function commandUsesExternalPath(command: string, workspaceRoot: string): boolean {
+  const workspace = workspaceRoot.replace(/\\/g, '/').replace(/\/+$/u, '').toLowerCase();
+  return command.split(/[\s;|&]+/u).flatMap((token) => token.split('=')).some((raw) => {
+    const token = raw.replace(/\\/g, '/');
+    if (!token) return false;
+    if (token.startsWith('~') || token.split('/').includes('..') || POWERSHELL_PROVIDER_DRIVE.test(token)) return true;
+    if (!token.startsWith('/') && !DRIVE_PATH.test(token)) return false;
+    const target = token.replace(/\/+$/u, '').toLowerCase();
+    return target !== workspace && !target.startsWith(`${workspace}/`);
+  });
 }
 
 function isCommandDeniedByRule(command: string, permissions: AgentPermissionSettings): boolean {
@@ -492,7 +495,7 @@ export class AgentPermissionPolicyService {
       if (!workspaceRoot) {
         return request(mode, `No project is open, so the shell has no workspace to run within: ${command}`, 'medium');
       }
-      if (commandUsesExternalPath(command, workspaceRoot, configuredReadableRoots)) {
+      if (commandUsesExternalPath(command, workspaceRoot)) {
         return request(mode, `Shell command references paths outside the workspace: ${command}`, 'medium');
       }
       if (isRoutineCommand(command, customRules)) {

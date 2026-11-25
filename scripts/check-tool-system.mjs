@@ -311,13 +311,6 @@ function main() {
   assert(readFileTool.includes('assertTextReadable'), 'read_file must gate binary/.rdc via assertTextReadable');
   assert(!readFileTool.includes('session-artifacts'), 'read_file must not gain a session-artifacts allow path');
 
-  const webTools = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/WebTools.ts'),
-    'utf8',
-  );
-  assert(!/redirect:\s*['"]follow['"]/.test(webTools), 'WebTools must not use redirect: follow');
-  assert(webTools.includes("redirect: 'manual'") || webTools.includes('redirect: "manual"'), 'WebTools must use manual redirects');
-
   const contextManager = fs.readFileSync(
     path.join(repoRoot, 'src/main/agent-runtime/agent/ContextManager.ts'),
     'utf8',

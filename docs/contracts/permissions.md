@@ -61,6 +61,11 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - 导航：窗口只加载应用入口（开发服务器按 origin，打包按精确入口文件）；其它链接、重定向与拖入窗口的本地页面一律拒绝，不附加 webview。
 - IPC：每次 invoke 先核对发送方文档是应用入口，否则 `IPC_SENDER_REJECTED`；Browser QA 桥独立认证后直接调用已登记的处理器。
 - 外部链接：账号与登录页只经 https 打开（`EXTERNAL_URL_REJECTED`）。
+- **出网**：主进程取公网内容只有一个入口 `src/main/runtime/net/publicEgress.ts` 的 `fetchPublic`，`web_fetch`、`web_search`、`web:fetchImage` 与 favicon 都经它。每一跳（含重定向）先校验协议与主机，再解析 DNS 并把连接 pin 到已校验的地址；任一解析地址落在非公网段就拒绝，请求不发出；不带 cookie，接收阶段即限制字节数。非公网判定是一张表（`publicAddress.ts`）：
+  - IPv4：`0/8`、`10/8`、`100.64/10`、`127/8`、`169.254/16`、`172.16/12`、`192.0.0/24`、`192.0.2/24`、`192.88.99/24`、`192.168/16`、`198.18/15`、`198.51.100/24`、`203.0.113/24`、`224/4`、`240/4`。
+  - IPv6：只有 `2000::/3` 是公网，其中再排除 `2001:db8::/32` 与 `3fff::/20`；`::ffff:0:0/96`、`::/96`、`64:ff9b::/96`、`2002::/16` 按内嵌的 IPv4 地址判定。
+  - Provider、OAuth 与 MCP 的 HTTP 端点由用户配置，可以是本机服务，不经这条公网通道。
+- **Shell routine**：只有静态简单命令（无引号、变量、子 shell、重定向）且每个参数都留在工作区内时，才按 routine 自动放行。工作区外的绝对路径、盘符根或盘符相对路径（`D:`、`D:/`）、UNC（`//host/share`）、`~`、`..`、PowerShell provider 驱动器（`Env:`、`HKLM:` 等）逐个 token 判定，任何一个出界就改为审批；命令里另外出现工作区路径不能抵消。
 - CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`；`img-src 'self' data: blob:` 不放行远程主机，回答里的远程图片由主进程 `web:fetchImage` 代取（仅 https 公网地址、≤5MB、按内容嗅探、不带 cookie）；`media-src 'self' blob:` 只播放 `conversation:resolveMedia` 解析出的会话产物、附件与项目内视频。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。
 
 ## IPC Schema（Zod）

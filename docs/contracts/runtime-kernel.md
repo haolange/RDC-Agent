@@ -203,7 +203,7 @@ Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoo
 
 Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。`/model` 参数为 `[provider:model|modelId|default]`；`default` 跟随当前 Agent 配置，与 Composer 底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集。裸 `default` 先于模型 id 解析，真名叫 `default` 的模型用 canonical `provider:model`。
 
-权限模式：`Default` / `Auto-review` / `Full access` / `Custom`；主进程权威。可读根、可写根和命令前缀只在 Custom 生效，并在 Settings 的 Custom 规则里保存，保存以主进程确认为准。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝（按平台分集）、`web_*` SSRF fail-closed。agent `shell` 每次新进程，不提供 `run_in_background`。
+权限模式：`Default` / `Auto-review` / `Full access` / `Custom`；主进程权威。可读根、可写根和命令前缀只在 Custom 生效，并在 Settings 的 Custom 规则里保存，保存以主进程确认为准。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝（按平台分集）、公网出网（`web_*`、远程图片、favicon）只经 `fetchPublic`，SSRF fail-closed。agent `shell` 每次新进程，不提供 `run_in_background`。
 
 `web_fetch` 的来源覆盖和输出窗口分别计量：每次通过同一逐跳 DNS pin 路径读取最多 2 MiB 的完整 UTF-8 来源，接收阶段即执行大小限制；每页正文最多 160 KiB。返回完整来源的 `sourceHash`、字节量和 UTF-16 `page.nextOffset`。续页必须给出 `offset` 与 `expectedSourceHash`，重新读取来源并验完整 hash，来源改变、越界或拆开 surrogate pair 均拒绝；不得拼接不同响应或将截断前缀标为全文。无另一路缓存/下载器，不接受调用者自定义 headers、secret 或大小上限。超过完整来源硬界、非法 UTF-8 和取消须明确失败。HTTP 非 2xx 保留实际 status，不能把其诊断正文当权威资料；来源 hash 与外层工具制品 hash 分别标明。分页的重复请求和成本计入实际工具预算。
 
