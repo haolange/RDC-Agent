@@ -93,13 +93,14 @@ export class AppPathService {
    * then Electron `process.resourcesPath`. First existing candidate wins.
    */
   getBuiltinAgentRuntimeRoot(): string {
+    const appResources = path.join(app?.getAppPath?.() || process.cwd(), 'resources', 'agent-runtime');
     const candidates = [
-      path.join(app?.getAppPath?.() || process.cwd(), 'resources', 'agent-runtime'),
+      appResources,
       path.join(process.cwd(), 'resources', 'agent-runtime'),
       path.join(process.resourcesPath ?? '', 'agent-runtime'),
     ];
     return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate))
-      ?? path.resolve(candidates[0]);
+      ?? path.resolve(appResources);
   }
 
   getBuiltinAgentsPath(): string {

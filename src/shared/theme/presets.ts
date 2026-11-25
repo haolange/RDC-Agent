@@ -22,14 +22,16 @@ const chrome = (
   fonts: { ui: null, code: null },
 });
 
+const RDC_PRESET: ThemePresetDefinition = {
+  id: 'rdc',
+  label: 'RDC',
+  light: chrome('rdc', '#1b9dcc', '#fafbfd', '#151d27', 45),
+  dark: chrome('rdc', '#33d1ff', '#0f1115', '#f4f6f8', 45),
+};
+
 /** Built-in Appearance presets (Codex-aligned names + RDC product default). */
 export const THEME_PRESET_CATALOG: readonly ThemePresetDefinition[] = [
-  {
-    id: 'rdc',
-    label: 'RDC',
-    light: chrome('rdc', '#1b9dcc', '#fafbfd', '#151d27', 45),
-    dark: chrome('rdc', '#33d1ff', '#0f1115', '#f4f6f8', 45),
-  },
+  RDC_PRESET,
   {
     id: 'absolutely',
     label: 'Absolutely',
@@ -92,7 +94,7 @@ export function isThemePresetId(value: unknown): value is ThemePresetId {
 
 export function getThemePreset(id: ThemePresetId): ThemePresetDefinition {
   const found = THEME_PRESET_CATALOG.find((preset) => preset.id === id);
-  return found ?? THEME_PRESET_CATALOG[0];
+  return found ?? RDC_PRESET;
 }
 
 export function getPresetChrome(id: ThemePresetId, variant: ThemeVariant): ThemeChromeConfig {

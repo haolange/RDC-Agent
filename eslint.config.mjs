@@ -44,6 +44,12 @@ export const storageRestrictions = [{
   selector: "CallExpression[callee.property.name=/^rename(Sync)?$/]",
   message: 'Write files with writeFileAtomic (src/main/runtime/atomicFile.ts); move paths with renameWithRetry (src/main/platform/fileRename.ts).',
 }];
+// Renderer colors come from design tokens; a hex literal inside a style prop bypasses theming and contrast checks.
+const inlineHexStyleMessage = 'Inline hex color in a style prop; use a design token such as rgb(var(--color-…)).';
+export const inlineHexStyleRestrictions = [
+  "JSXAttribute[name.name='style'] Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+  "JSXAttribute[name.name='style'] TemplateElement[value.raw=/#[0-9a-fA-F]{3,8}\\b/]",
+].map((selector) => ({ selector, message: inlineHexStyleMessage }));
 const productionSources = { files: ['src/**/*.{ts,tsx}'], ignores: ['src/**/*.test.{ts,tsx}', 'src/main/testing/**', 'src/**/*.d.ts'] };
 
 // Dependency direction (ARCHITECTURE.md): shared runs in every process, so it imports no Node
@@ -111,7 +117,7 @@ export default [
   {
     ...productionSources,
     rules: {
-      'no-restricted-syntax': ['error', ...errorContractRestrictions],
+      'no-restricted-syntax': ['error', ...errorContractRestrictions, ...inlineHexStyleRestrictions],
       'preserve-caught-error': ['error', { requireCatchParameter: false }],
     },
   },
@@ -203,7 +209,7 @@ export default [
       'no-restricted-imports': ['error', {
         patterns: ['**/features/**', '**/platform/**', '**/app/**', '**/shell/**'],
       }],
-      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions],
+      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions, ...inlineHexStyleRestrictions],
     },
   },
   {

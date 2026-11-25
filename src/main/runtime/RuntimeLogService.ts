@@ -33,7 +33,7 @@ function truncateUtf8(text: string, maxBytes: number): string {
   const buf = Buffer.from(text, 'utf8');
   if (buf.byteLength <= maxBytes) return text;
   let end = Math.max(0, maxBytes - Buffer.byteLength('…[truncated]', 'utf8'));
-  while (end > 0 && (buf[end] & 0xc0) === 0x80) end -= 1;
+  while (end > 0 && (buf.readUInt8(end) & 0xc0) === 0x80) end -= 1;
   return `${buf.subarray(0, end).toString('utf8')}…[truncated]`;
 }
 

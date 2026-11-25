@@ -207,9 +207,9 @@ export class ScopedRuntimeService {
       if (!request.content.trim()) throw new Error('Resource content is empty.');
       if (request.kind === 'mcp') JSON.parse(request.content);
       if (request.kind === 'agent' || request.kind === 'skill') {
-        const frontmatter = request.content.match(/^---\r?\n([\s\S]*?)\r?\n---/u);
-        if (request.kind === 'agent' && !frontmatter) throw new Error('Agent requires YAML frontmatter.');
-        if (frontmatter) YAML.parse(frontmatter[1]);
+        const frontmatter = request.content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1];
+        if (request.kind === 'agent' && frontmatter === undefined) throw new Error('Agent requires YAML frontmatter.');
+        if (frontmatter !== undefined) YAML.parse(frontmatter);
       }
       if (request.kind === 'hook' || request.kind === 'policy') YAML.parse(request.content);
       if (request.kind === 'policy' && request.scope === 'project' && request.projectRoot) {

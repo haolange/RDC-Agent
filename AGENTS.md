@@ -113,7 +113,7 @@
 | 渲染结果（renderer 样式、组件、布局） | 另加差分渲染：`node scripts/visual-diff/run.mjs capture <head>`、对本轮起点构建 `capture <base> --build <base 检出>`、`compare <base> <head>`；有意的可见变化在提交 trailer 写 `Visual-Diff-Allow: <场景 id,…>`。IPC 契约变化时用 `run.mjs record` 重录场景（启动一次性 Browser QA 实例，从真实后端取响应） |
 | 内置方法文本（`resources/agent-runtime`） | 另加 `src/main/testing/investigationSystemContract.test.ts`、`src/main/testing/InstructionCost.offline.test.ts`、`pnpm run check:investigation-system` |
 
-行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
+行为门禁在 `src/main/testing/gates/behaviorChecks.test.ts`。生产代码按目录收紧 `noUncheckedIndexedAccess`：`check:indexed-access`（在 `check:gates` 内）要求清单外的目录零错误，清单只减不增，清零的目录在同一次改动里移出。行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）；宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
 
 secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不指定时只检查最近一次提交。Windows 上测试遇到系统 TEMP 的 rename 权限错误时，把 `TEMP`／`TMP`／`TMPDIR` 指到本轮自有的工作区临时目录，不放宽产品的路径检查。
 

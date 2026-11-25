@@ -31,14 +31,21 @@ interface EmbeddedIpv4Range extends AddressRange {
   ipv4Offset: number;
 }
 
+/** The tables below are literals; a malformed entry is a programming error and fails at module load. */
+function splitCidr(cidr: string): { address: string; bits: number } {
+  const [, address, bits] = /^([^/]+)\/(\d{1,3})$/u.exec(cidr) ?? [];
+  if (!address || !bits) throw new TypeError(`Malformed CIDR literal: ${cidr}`);
+  return { address, bits: Number(bits) };
+}
+
 const ipv4 = (cidr: string): AddressRange => {
-  const [address, bits] = cidr.split('/');
-  return { network: ipv4ToBigInt(address), bits: Number(bits) };
+  const { address, bits } = splitCidr(cidr);
+  return { network: ipv4ToBigInt(address), bits };
 };
 
 const ipv6 = (cidr: string): AddressRange => {
-  const [address, bits] = cidr.split('/');
-  return { network: ipv6ToBigInt(address), bits: Number(bits) };
+  const { address, bits } = splitCidr(cidr);
+  return { network: ipv6ToBigInt(address), bits };
 };
 
 /** IPv4 space that is not globally routable unicast (RFC 6890 special-purpose registry, plus multicast and reserved). */
@@ -66,11 +73,13 @@ function ipv4ToBigInt(address: string): bigint {
 }
 
 function ipv6ToBigInt(address: string): bigint {
-  let text = address.toLowerCase().split('%')[0];
-  const dotted = /(\d+\.\d+\.\d+\.\d+)$/u.exec(text);
-  if (dotted) {
-    const value = ipv4ToBigInt(dotted[1]);
-    text = `${text.slice(0, -dotted[1].length)}${(value >> 16n).toString(16)}:${(value & 0xffffn).toString(16)}`;
+  const lowered = address.toLowerCase();
+  const zoneStart = lowered.indexOf('%');
+  let text = zoneStart === -1 ? lowered : lowered.slice(0, zoneStart);
+  const dottedTail = /(\d+\.\d+\.\d+\.\d+)$/u.exec(text)?.[1];
+  if (dottedTail) {
+    const value = ipv4ToBigInt(dottedTail);
+    text = `${text.slice(0, -dottedTail.length)}${(value >> 16n).toString(16)}:${(value & 0xffffn).toString(16)}`;
   }
   const [head, tail] = text.split('::');
   const headGroups = head ? head.split(':') : [];
@@ -134,10 +143,10 @@ export async function pinPublicUrl(rawUrl: string, options: { httpsOnly?: boolea
   } catch (error) {
     throw new PublicUrlDeniedError(`DNS lookup failed for ${hostname}: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (addresses.length === 0) throw new PublicUrlDeniedError(`DNS lookup returned no addresses for ${hostname}`);
+  const [primary] = addresses;
+  if (!primary) throw new PublicUrlDeniedError(`DNS lookup returned no addresses for ${hostname}`);
   const blocked = addresses.find((entry) => !isPublicAddress(entry.address));
   if (blocked) throw new PublicUrlDeniedError(`Blocked private network address: ${blocked.address}`);
-  const [primary] = addresses;
   return {
     href: parsed.toString(),
     hostname: parsed.hostname,

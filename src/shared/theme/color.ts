@@ -62,8 +62,9 @@ export function relativeLuminance({ r, g, b }: Rgb): number {
 }
 
 export function contrastRatio(a: Rgb, b: Rgb): number {
-  const [lighter, darker] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
-  return (lighter + 0.05) / (darker + 0.05);
+  const luminanceA = relativeLuminance(a);
+  const luminanceB = relativeLuminance(b);
+  return (Math.max(luminanceA, luminanceB) + 0.05) / (Math.min(luminanceA, luminanceB) + 0.05);
 }
 
 const NEAR_BLACK: Rgb = { r: 12, g: 16, b: 22 };
@@ -220,7 +221,11 @@ export function applyContrastPair(
   };
 }
 
-export function scaleAccentPalette(accent: Rgb): Record<string, Rgb> {
+export type AccentStep = '50' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+export type SurfaceStep = '0' | '1' | '2' | '3' | '4' | '5';
+export type InkStep = 'primary' | 'secondary' | 'tertiary' | 'muted' | 'disabled';
+
+export function scaleAccentPalette(accent: Rgb): Record<AccentStep, Rgb> {
   const hsl = rgbToHsl(accent);
   const shade = (l: number, sMul = 1) =>
     hslToRgb({ h: hsl.h, s: Math.min(100, hsl.s * sMul), l });
@@ -238,7 +243,7 @@ export function scaleAccentPalette(accent: Rgb): Record<string, Rgb> {
   };
 }
 
-export function scaleSurfacePalette(surface: Rgb, variant: 'dark' | 'light'): Record<string, Rgb> {
+export function scaleSurfacePalette(surface: Rgb, variant: 'dark' | 'light'): Record<SurfaceStep, Rgb> {
   if (variant === 'dark') {
     return {
       '0': mixRgb(surface, { r: 0, g: 0, b: 0 }, 0.35),
@@ -259,7 +264,7 @@ export function scaleSurfacePalette(surface: Rgb, variant: 'dark' | 'light'): Re
   };
 }
 
-export function scaleInkPalette(ink: Rgb, variant: 'dark' | 'light'): Record<string, Rgb> {
+export function scaleInkPalette(ink: Rgb, variant: 'dark' | 'light'): Record<InkStep, Rgb> {
   if (variant === 'dark') {
     return {
       primary: ink,

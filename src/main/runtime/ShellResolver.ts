@@ -61,9 +61,9 @@ export function formatShellDialect(kind: ShellKind): string {
 }
 
 export function parseShellVersionMajor(version: string): number | null {
-  const match = version.trim().match(/^(\d+)/);
-  if (!match) return null;
-  const major = Number.parseInt(match[1], 10);
+  const digits = version.trim().match(/^(\d+)/)?.[1];
+  if (!digits) return null;
+  const major = Number.parseInt(digits, 10);
   return Number.isFinite(major) ? major : null;
 }
 

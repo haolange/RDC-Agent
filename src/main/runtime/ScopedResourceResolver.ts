@@ -60,10 +60,13 @@ export const hashScopedResource = (value: unknown): string => {
   return hash.digest('hex');
 };
 
+/** Candidates for one kind:id; a group exists only once its first candidate arrives. */
+type CandidateGroup<T> = [ScopedResourceCandidate<T>, ...Array<ScopedResourceCandidate<T>>];
+
 export class ScopedResourceResolver {
   resolve<T>(candidates: Array<ScopedResourceCandidate<T>>): ScopedResourceCatalog<T> {
     const diagnostics: ScopedResourceCatalog<T>['diagnostics'] = [];
-    const grouped = new Map<string, Array<ScopedResourceCandidate<T>>>();
+    const grouped = new Map<string, CandidateGroup<T>>();
 
     for (const candidate of candidates) {
       const id = candidate.id.trim();
@@ -87,18 +90,19 @@ export class ScopedResourceResolver {
         continue;
       }
       const groupKey = `${candidate.kind}:${id}`;
-      const group = grouped.get(groupKey) ?? [];
-      group.push({ ...candidate, id });
-      grouped.set(groupKey, group);
+      const group = grouped.get(groupKey);
+      if (group) group.push({ ...candidate, id });
+      else grouped.set(groupKey, [{ ...candidate, id }]);
     }
 
     const resources = Array.from(grouped.values()).map((group): ResolvedResource<T> => {
-      const ordered = group.slice().sort((left, right) => {
-        const scopeDelta = SCOPE_PRECEDENCE[left.scope] - SCOPE_PRECEDENCE[right.scope];
-        return scopeDelta || left.sourcePath.localeCompare(right.sourcePath);
+      // Highest precedence first: the winner, then the source it overrides.
+      const ordered: CandidateGroup<T> = [...group];
+      ordered.sort((left, right) => {
+        const scopeDelta = SCOPE_PRECEDENCE[right.scope] - SCOPE_PRECEDENCE[left.scope];
+        return scopeDelta || right.sourcePath.localeCompare(left.sourcePath);
       });
-      const winner = ordered[ordered.length - 1];
-      const previous = ordered[ordered.length - 2];
+      const [winner, previous] = ordered;
       const provenance: ResourceProvenance = {
         scope: winner.scope,
         sourcePath: winner.sourcePath,

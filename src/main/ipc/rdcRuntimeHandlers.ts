@@ -6,6 +6,7 @@ import { nativeMessage } from '../window/nativeI18n';
 import { hookEngine } from '../hooks/HookEngine';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { samePath } from '../platform/paths';
+import { appPathService } from '../runtime/AppPathService';
 import { SCOPED_IMPORT_EXTENSIONS, scopedRuntimeService } from '../runtime/ScopedRuntimeService';
 import { agentRuntimeConfigService } from '../settings/agent-manifests/AgentRuntimeConfigService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -60,7 +61,7 @@ async function mutateHookTrust(
   confirm?: (hook: ReturnType<typeof hookEngine.list>[number]) => Promise<boolean>,
 ) {
   const overviewRoot = ownedProjectRoot(projectRoot);
-  hookEngine.load(scopedRuntimeService.overview(overviewRoot).userPaths.hooksPath, overviewRoot);
+  hookEngine.load(appPathService.getUserRdcPaths().hooksPath, overviewRoot);
   const hook = hookEngine.list().find((entry) => entry.definition.id === hookId);
   if (confirm && hook && !await confirm(hook)) return scopedRuntimeService.overview(overviewRoot);
   // Same rule as renderer resolveHookTrustProjectRoot: only project-scope mutations receive a root.

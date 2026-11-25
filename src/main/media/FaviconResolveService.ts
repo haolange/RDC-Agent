@@ -105,11 +105,12 @@ async function fetchPublicBytes(rawUrl: string): Promise<{ bytes: Uint8Array; mi
 
 function parseDataImageUrl(raw: string): { mime: string; bytes: Uint8Array } | null {
   const match = raw.trim().match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
-  if (!match) return null;
-  const mime = match[1].toLowerCase();
+  const [, declaredMime, payload] = match ?? [];
+  if (!declaredMime || !payload) return null;
+  const mime = declaredMime.toLowerCase();
   if (!ALLOWED_MIME.has(mime)) return null;
   try {
-    const bytes = Uint8Array.from(Buffer.from(match[2].replace(/\s+/g, ''), 'base64'));
+    const bytes = Uint8Array.from(Buffer.from(payload.replace(/\s+/g, ''), 'base64'));
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_FAVICON_BYTES) return null;
     return { mime, bytes };
   } catch {

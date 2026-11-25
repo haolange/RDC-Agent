@@ -147,12 +147,13 @@ export function registerShellHandlers(): void {
       filters: [{ name: nativeMessage('imageFilter'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
       properties: ['openFile'],
     });
-    if (result.canceled || result.filePaths.length === 0) {
+    const [selectedPath] = result.filePaths;
+    if (result.canceled || !selectedPath) {
       return null;
     }
 
     try {
-      return copyAvatarToWorkspace(result.filePaths[0]);
+      return copyAvatarToWorkspace(selectedPath);
     } catch (error) {
       console.warn('[IPC] Failed to import avatar:', error);
       return null;
