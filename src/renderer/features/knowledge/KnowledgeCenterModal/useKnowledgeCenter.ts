@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { errorDetail } from '../../../lib/errorDetail';
 import { useProjectStore } from '../../../stores/projectStore';
 import {
-  createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, toggleSetValue,
+  createRequestSeq, knowledgeQueryKey, toggleSetValue,
   type KnowledgeViewMode,
 } from './knowledgeCenterModel';
 import { buildKnowledgeCenterQueryRequest, includeSelectedSpaceId, nextSelectedSpaceIds, SEARCH_DEBOUNCE_MS } from './knowledgeCenterQuery';
@@ -53,7 +54,7 @@ export function useKnowledgeCenter(open: boolean) {
       setIndex(result.index);
       setSelectedSpaceIds((current) => nextSelectedSpaceIds(current, result.spaces));
     } catch (err) {
-      if (overviewSeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (overviewSeq.current.isCurrent(seq)) setError(errorDetail(err));
     } finally {
       if (overviewSeq.current.isCurrent(seq)) setLoadingOverview(false);
     }
@@ -94,7 +95,7 @@ export function useKnowledgeCenter(open: boolean) {
       if (!rebuildSeq.current.isCurrent(seq)) return;
       await refreshQuery();
     } catch (err) {
-      if (rebuildSeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (rebuildSeq.current.isCurrent(seq)) setError(errorDetail(err));
     } finally {
       if (rebuildSeq.current.isCurrent(seq)) setRebuilding(false);
     }

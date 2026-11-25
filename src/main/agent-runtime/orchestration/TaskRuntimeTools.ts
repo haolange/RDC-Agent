@@ -1,5 +1,6 @@
 import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { createTaskTools, TaskRegistry, createSessionTaskStore, taskStoreForExecutionScope, getDelegatedTaskScope } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
@@ -94,7 +95,7 @@ export function createTaskRuntimeTools(input: {
       execute: async (_id, args) => {
         const kind = String(args.kind ?? '');
         const body = String(args.body ?? '').trim();
-        if (!['progress', 'blocked', 'decision_required'].includes(kind) || !body || body.length > 8_000) throw new Error('SUBAGENT_REPORT_INVALID');
+        if (!['progress', 'blocked', 'decision_required'].includes(kind) || !body || body.length > 8_000) throw new AppError('SUBAGENT_REPORT_INVALID');
         const message = await registry.appendExecutionMessage(delegatedScope.executionId!, { expectedGeneration: delegatedScope.generation!, kind: kind as 'progress' | 'blocked' | 'decision_required', direction: 'to_parent', body });
         return { content: [{ type: 'text', text: `Report queued: ${message.id}` }], details: { messageId: message.id, sequence: message.sequence } };
       },

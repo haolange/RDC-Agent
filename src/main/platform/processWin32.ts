@@ -5,6 +5,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import type { ProcessBackend } from './processBackend';
 
 export interface Win32ProcessDeps {
@@ -25,7 +26,7 @@ const defaultDeps: Win32ProcessDeps = {
 /** System Windows PowerShell 5.1, resolved from %SystemRoot% instead of PATH. */
 export function windowsPowerShellPath(systemRoot: string | undefined = process.env.SystemRoot): string {
   if (!systemRoot || !path.win32.isAbsolute(systemRoot)) {
-    throw new Error('PROCESS_QUERY_UNAVAILABLE: %SystemRoot% is not an absolute path.');
+    throw new AppError('PROCESS_QUERY_UNAVAILABLE', '%SystemRoot% is not an absolute path.');
   }
   return path.win32.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 }
@@ -60,9 +61,9 @@ export function createWin32ProcessBackend(deps: Win32ProcessDeps = defaultDeps):
       if (!isRunning(pid)) return null;
       const result = query(`$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; `
         + "if ($null -eq $p -or $p.HasExited) { 'absent' } else { $p.StartTime.ToFileTimeUtc() }");
-      if (result.status !== 0) throw new Error(`PROCESS_QUERY_FAILED: birth of pid ${pid} is unreadable.`);
+      if (result.status !== 0) throw new AppError('PROCESS_QUERY_FAILED', `birth of pid ${pid} is unreadable.`);
       if (result.stdout === 'absent') return null;
-      if (!/^[1-9]\d*$/.test(result.stdout)) throw new Error(`PROCESS_QUERY_FAILED: invalid birth for pid ${pid}.`);
+      if (!/^[1-9]\d*$/.test(result.stdout)) throw new AppError('PROCESS_QUERY_FAILED', `invalid birth for pid ${pid}.`);
       return `windows-filetime:${result.stdout}`;
     },
     readCommandLine(pid) {

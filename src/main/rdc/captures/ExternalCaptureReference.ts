@@ -1,6 +1,7 @@
 import { promises as fs, type BigIntStats } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { openedFileIdentity } from '../../platform/fileIdentity';
 import { hashCaptureFile } from './replay/captureContentHash';
 import { safePath } from './replay/replayFileSafety';
@@ -9,13 +10,13 @@ import type { ProjectInputRecord } from '@shared/types/session';
 /** Explicit file registration only: no directory discovery and no write authority. */
 export async function createExternalCaptureReference(filePath: string): Promise<ProjectInputRecord> {
   if (!path.isAbsolute(filePath) || path.extname(filePath).toLowerCase() !== '.rdc') {
-    throw new Error('CAPTURE_REFERENCE_INVALID_PATH');
+    throw new AppError('CAPTURE_REFERENCE_INVALID_PATH');
   }
   const absolute = path.resolve(filePath);
   await safePath(path.parse(absolute).root, absolute);
   const canonical = await fs.realpath(absolute);
   const link = await fs.lstat(canonical, { bigint: true });
-  if (!link.isFile() || link.isSymbolicLink() || link.nlink > 1n) throw new Error('CAPTURE_UNSAFE_FILE');
+  if (!link.isFile() || link.isSymbolicLink() || link.nlink > 1n) throw new AppError('CAPTURE_UNSAFE_FILE');
   // Identity is compared between handle stats only; see openedFileIdentity.
   const handle = await fs.open(canonical, 'r');
   let before: BigIntStats;
@@ -23,12 +24,12 @@ export async function createExternalCaptureReference(filePath: string): Promise<
     before = await handle.stat({ bigint: true });
     const header = Buffer.alloc(4);
     const { bytesRead } = await handle.read(header, 0, 4, 0);
-    if (bytesRead !== 4 || header.toString('ascii') !== 'RDOC') throw new Error('CAPTURE_REFERENCE_INVALID_RDC');
+    if (bytesRead !== 4 || header.toString('ascii') !== 'RDOC') throw new AppError('CAPTURE_REFERENCE_INVALID_RDC');
   } finally { await handle.close(); }
   const hashed = await hashCaptureFile(canonical);
   const after = await openedFileIdentity(canonical);
   if (before.dev !== after.dev || before.ino !== after.ino || before.ctimeNs !== after.ctimeNs) {
-    throw new Error('CAPTURE_CHANGED_DURING_HASH');
+    throw new AppError('CAPTURE_CHANGED_DURING_HASH');
   }
   return {
     inputId: `reference_${createHash('sha256').update(canonical).digest('hex').slice(0, 24)}`,
@@ -41,14 +42,14 @@ export async function createExternalCaptureReference(filePath: string): Promise<
 
 export async function verifyExternalCaptureReference(input: ProjectInputRecord): Promise<ProjectInputRecord> {
   if (input.source !== 'external_reference' || !input.referenceIdentity || !input.contentSha256) {
-    throw new Error('CAPTURE_REFERENCE_INVALID_RECORD');
+    throw new AppError('CAPTURE_REFERENCE_INVALID_RECORD');
   }
   const current = await createExternalCaptureReference(input.filePath);
   if (current.filePath !== input.filePath || current.contentSha256 !== input.contentSha256
     || current.referenceIdentity?.device !== input.referenceIdentity.device
     || current.referenceIdentity?.inode !== input.referenceIdentity.inode
     || current.referenceIdentity?.birthtimeNs !== input.referenceIdentity.birthtimeNs) {
-    throw new Error('CAPTURE_REFERENCE_CHANGED: explicitly register the current file again.');
+    throw new AppError('CAPTURE_REFERENCE_CHANGED', 'explicitly register the current file again.');
   }
   return { ...current, inputId: input.inputId, discoveredAt: input.discoveredAt };
 }

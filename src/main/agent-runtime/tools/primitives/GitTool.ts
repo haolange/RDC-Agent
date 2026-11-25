@@ -2,6 +2,7 @@ import os from 'os';
 import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { AppError } from '@shared/errors/appError';
 import { getWorkspaceRoot, isWithinRoot, requireMutationWorkspaceRoot, truncateOutput } from './_shared';
 import { GIT_MAX_OUTPUT_BYTES, GIT_TIMEOUT_MS } from './toolLimits';
 import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
@@ -79,12 +80,12 @@ async function runGit(
   } catch (error) {
     const err = error as Error & { stdout?: string | Buffer; stderr?: string | Buffer; killed?: boolean };
     if (err.killed || /timed out/i.test(err.message)) {
-      throw new Error(`git command timed out after ${GIT_TIMEOUT_MS}ms`);
+      throw new Error(`git command timed out after ${GIT_TIMEOUT_MS}ms`, { cause: error });
     }
     const output = [String(err.stdout ?? '').trim(), String(err.stderr ?? '').trim(), err.message]
       .filter(Boolean)
       .join('\n');
-    throw new Error(output);
+    throw new Error(output, { cause: error });
   }
 }
 
@@ -124,7 +125,7 @@ async function assertInertRepositoryConfig(gitRoot: string, signal?: AbortSignal
   const output = await runGit(gitRoot, ['config', '--local', '--name-only', '--list'], signal);
   const executable = output.stdout.split(/\r?\n/).map((key) => key.trim()).filter((key) => EXECUTABLE_CONFIG_KEY.test(key));
   if (executable.length > 0) {
-    throw new Error(`GIT_REPOSITORY_CONFIG_EXECUTABLE: repository config names programs git would run (${[...new Set(executable)].join(', ')}). Review the repository configuration before using git tools.`);
+    throw new AppError('GIT_REPOSITORY_CONFIG_EXECUTABLE', `repository config names programs git would run (${[...new Set(executable)].join(', ')}). Review the repository configuration before using git tools.`);
   }
 }
 

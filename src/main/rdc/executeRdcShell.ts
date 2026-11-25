@@ -1,4 +1,5 @@
 import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
+import { AppError } from '@shared/errors/appError';
 import { assertRdcBindingOwnership, authorizeRdcOperation, isMainOwnedRdcIdentityKey, rdcCapabilityPolicy, rdcCatalogCapabilitySummary, rdcOperationCapability } from './RdcOperationPolicy';
 import { operationFingerprint } from './RdcOperationCatalog';
 import { isUnchangedShaderResult, validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
@@ -66,14 +67,14 @@ export async function executeRdcShell(
   const input = RdcShellInputSchema.parse(raw);
   signal?.throwIfAborted();
   if (!context || !allowsNativeRdcExecution(context) || context.excludeRdcLeaseTools || !context.sessionId || !context.projectId || !context.turnId) {
-    throw new Error('RDC_EXECUTION_DENIED: native RDC execution requires a full access ceiling and the owning turn.');
+    throw new AppError('RDC_EXECUTION_DENIED', 'native RDC execution requires a full access ceiling and the owning turn.');
   }
   const lease = assertRdcBindingOwnership(context);
   const cli = context.rdcBinding!.cli;
   const identity = context.rdcBinding!.identity!;
   if ('discovery' in input) {
     const binding = context.rdcBinding!;
-    if (operationFingerprint(binding.definitions) !== binding.definitionsFingerprint) throw new Error('RDC_EXECUTION_DENIED: invalid frozen catalog.');
+    if (operationFingerprint(binding.definitions) !== binding.definitionsFingerprint) throw new AppError('RDC_EXECUTION_DENIED', 'invalid frozen catalog.');
     const request = input.discovery;
     assertRdcDiscovery(request, binding);
     let data: unknown;
@@ -101,11 +102,11 @@ export async function executeRdcShell(
   const replaySessionId = lease.runtimeContext.replaySessionId!;
   const frozenCaptureId = identity.runtimeContext?.captureFileId;
   if (frozenCaptureId !== lease.runtimeContext.captureFileId || identity.runtimeContext?.replaySessionId !== replaySessionId) {
-    throw new Error('RDC_EXECUTION_DENIED: capture/replay identity changed since prepareTurn.');
+    throw new AppError('RDC_EXECUTION_DENIED', 'capture/replay identity changed since prepareTurn.');
   }
   const { definition, args } = authorizeRdcOperation(input.operation, input.args, context, replaySessionId, frozenCaptureId);
-  if (input.experimentId && !definition.evidence_kind) throw new Error(
-    `RDC_EVIDENCE_INVALID: ${input.operation} has no supported evidence capability; no native operation was executed. `
+  if (input.experimentId && !definition.evidence_kind) throw new AppError(
+    'RDC_EVIDENCE_INVALID', `${input.operation} has no supported evidence capability; no native operation was executed. `
     + 'Discover and describe a compatible measurement/intervention/rollback operation in the frozen catalog before requesting an experiment receipt. '
     + 'Ordinary tool output cannot replace the returned receipt.uri/expectedHash.',
   );
@@ -116,7 +117,7 @@ export async function executeRdcShell(
   signal?.throwIfAborted();
   const queuedLease = assertRdcContextLeaseOwnership({ sessionId, projectId });
   if (!queuedLease || queuedLease.version !== lease.version || queuedLease.contextId !== lease.contextId) {
-    throw new Error('RDC_EXECUTION_DENIED: binding changed while queued.');
+    throw new AppError('RDC_EXECUTION_DENIED', 'binding changed while queued.');
   }
   const startedAt = Date.now();
   let lastInvocation: ReturnType<typeof rdcInvocationRecord> | undefined;
@@ -133,7 +134,7 @@ export async function executeRdcShell(
       const runtime = snapshot.data.runtime as Record<string, unknown> | undefined;
       if (snapshot.data.context_id !== lease.contextId || snapshot.data.current_session_id !== replaySessionId
         || !Number.isSafeInteger(runtime?.active_event_id) || Number(runtime?.active_event_id) < 0) {
-        throw new Error('RDC_CLI_PROTOCOL: cannot verify temporary replay identity and position.');
+        throw new AppError('RDC_CLI_PROTOCOL', 'cannot verify temporary replay identity and position.');
       }
       lastReplayState = null;
       const sessions = snapshot.data.sessions;
@@ -170,15 +171,15 @@ export async function executeRdcShell(
       || (payload.data.context_id !== undefined && payload.data.context_id !== lease.contextId)
       || (payload.data.session_id !== undefined && payload.data.session_id !== replaySessionId)
       || (definition.scope === 'capture' && payload.data.capture_file_id !== frozenCaptureId)) {
-      throw new Error('RDC_CLI_PROTOCOL: operation or replay identity mismatch; no receipt issued.');
+      throw new AppError('RDC_CLI_PROTOCOL', 'operation or replay identity mismatch; no receipt issued.');
     }
     const after = assertRdcContextLeaseOwnership({ sessionId: sessionId, projectId: projectId });
     if (!after || after.version !== lease.version || after.contextId !== lease.contextId) {
-      throw new Error('RDC_EXECUTION_DENIED: replay ownership changed during execution; inspect state before retrying.');
+      throw new AppError('RDC_EXECUTION_DENIED', 'replay ownership changed during execution; inspect state before retrying.');
     }
     if (temporaryReplayRead && originalEvent !== undefined && (payload.data.replay_state_restored !== true
       || payload.data.restored_event_id !== originalEvent || await readReplayEvent() !== originalEvent)) {
-      throw new Error('RDC_CLI_PROTOCOL: temporary replay operation did not prove restoration.');
+      throw new AppError('RDC_CLI_PROTOCOL', 'temporary replay operation did not prove restoration.');
     }
     const unchangedShader = isUnchangedShaderResult(definition, payload.data);
     const evidence = input.experimentId && !unchangedShader ? await validateExecutionEvidence(definition, args, payload.data, context, lease.contextId, input.experimentId) : null;

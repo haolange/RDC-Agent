@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { appendRuntimePermissionContext } from '../permissions/RuntimePermissionContext';
 /**
  * AgentLoop — transition 状态机式 Agent 主循环。
@@ -541,7 +542,7 @@ async function streamAssistantResponseWithRecovery(
           consecutiveCompactionFailures++;
           if (consecutiveCompactionFailures >= CIRCUIT_BREAKER_LIMIT) {
             throw new Error(
-              `[Circuit breaker] ${CIRCUIT_BREAKER_LIMIT} consecutive compaction attempts failed; aborting`,
+              `[Circuit breaker] ${CIRCUIT_BREAKER_LIMIT} consecutive compaction attempts failed; aborting`, { cause: err },
             );
           }
           recovery.markReactiveCompactAttempted();
@@ -648,8 +649,8 @@ async function streamAssistantResponse(
   if (config.resolveMaxTokens) {
     const dynamicMaxTokens = config.resolveMaxTokens(llmMessages);
     if (dynamicMaxTokens == null || dynamicMaxTokens <= 0) {
-      throw new Error(
-        'CONTEXT_CANNOT_FIT: remaining context window cannot admit any output tokens.',
+      throw new AppError(
+        'CONTEXT_CANNOT_FIT', 'remaining context window cannot admit any output tokens.',
       );
     }
     resolvedMaxTokens = dynamicMaxTokens;

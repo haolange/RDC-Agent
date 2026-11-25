@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { AppError } from '@shared/errors/appError';
 import { pathComparisonKey } from '../../platform/paths';
 import { storageAdapter } from '../../sessions/store/StorageAdapter';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
@@ -38,7 +39,7 @@ export function permissionReviewCaptureBaseline(input: {
   const receipt = rdcLifecycleReceipts.read(input.sessionId, baseline.receipt);
   if (receipt.event !== 'baseline' || receipt.projectId !== input.projectId || receipt.turnId !== input.turnId
     || !isDeepStrictEqual(receipt.original, baseline.original)) {
-    throw new Error('PERMISSION_REVIEW_EVIDENCE_INVALID: capture baseline does not match the owning execution.');
+    throw new AppError('PERMISSION_REVIEW_EVIDENCE_INVALID', 'capture baseline does not match the owning execution.');
   }
   return { ref: baseline.receipt, original: receipt.original, verifiedBy: 'main-lifecycle-signature-and-owner-check' };
 }
@@ -54,7 +55,7 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
     const receipt = rdcExecutionReceipts.read(sessionId, ref);
     if (message.isError || receipt.toolCallId !== message.toolCallId
       || receipt.operation !== (message.details as Record<string, unknown>).operation) {
-      throw new Error('PERMISSION_REVIEW_EVIDENCE_INVALID: receipt does not match the observed successful invocation.');
+      throw new AppError('PERMISSION_REVIEW_EVIDENCE_INVALID', 'receipt does not match the observed successful invocation.');
     }
     return { ref, verifiedBy: 'main-receipt-signature-and-owner-check', operation: receipt.operation,
       experimentId: receipt.experimentId, contextId: receipt.contextId, leaseVersion: receipt.leaseVersion,
@@ -160,7 +161,7 @@ export function permissionReviewAuthority(input: {
   const approvedOffer = input.promptPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer')?.content ?? null;
   const offer = approvedOffer ? storageAdapter.executionOffers.read(input.sessionId) : null;
   if (approvedOffer && (!offer || !approvedOffer.includes(JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))))) {
-    throw new Error('PERMISSION_REVIEW_AUTHORITY_CHANGED: approved offer no longer matches preparation.');
+    throw new AppError('PERMISSION_REVIEW_AUTHORITY_CHANGED', 'approved offer no longer matches preparation.');
   }
   return JSON.stringify({
     userMessages: (input.delegated ? [] : input.messages).filter(message => message.role === 'user' && !message.derivedContext)

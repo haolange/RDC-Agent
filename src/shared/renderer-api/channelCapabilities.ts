@@ -1,3 +1,4 @@
+import { AppError } from '../errors/appError';
 /**
  * Browser QA channel capability matrix — closed map with channels.ts.
  * Every RENDERER_INVOKE_CHANNEL must be listed here; missing keys fail TypeScript
@@ -185,7 +186,7 @@ export function hasBridgeChannelCapability(channel: string): channel is Renderer
 
 export function resolveBridgeChannelCapability(channel: string): BridgeChannelCapability {
   if (!hasBridgeChannelCapability(channel)) {
-    throw new Error(`BRIDGE_CAPABILITY_MISSING: ${channel}`);
+    throw new AppError('BRIDGE_CAPABILITY_MISSING', channel);
   }
   return CHANNEL_CAPABILITY[channel];
 }
@@ -203,11 +204,11 @@ export function assertChannelCapabilityCoverage(): void {
   const mapped = new Set(Object.keys(CHANNEL_CAPABILITY));
   const missing = listUnclassifiedInvokeChannels();
   if (missing.length > 0) {
-    throw new Error(`BRIDGE_CAPABILITY_MISSING: ${missing.join(', ')}`);
+    throw new AppError('BRIDGE_CAPABILITY_MISSING', missing.join(', '));
   }
   const extra = [...mapped].filter((channel) => !RENDERER_INVOKE_CHANNELS.includes(channel as RendererInvokeChannel));
   if (extra.length > 0) {
-    throw new Error(`BRIDGE_CAPABILITY_EXTRA: ${extra.join(', ')}`);
+    throw new AppError('BRIDGE_CAPABILITY_EXTRA', extra.join(', '));
   }
   for (const channel of RENDERER_INVOKE_CHANNELS) {
     resolveBridgeChannelCapability(channel);

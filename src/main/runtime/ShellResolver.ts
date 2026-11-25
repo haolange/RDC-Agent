@@ -10,6 +10,7 @@ import { spawnSync, type SpawnSyncOptions } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { currentHost, type HostDescriptor } from '../platform/host';
 import { shellCandidates } from '../platform/shell';
 
@@ -31,11 +32,9 @@ export interface ShellResolverDeps {
   spawnSync: typeof spawnSync;
 }
 
-export class ShellUnavailableError extends Error {
-  readonly code = 'SHELL_UNAVAILABLE';
-
+export class ShellUnavailableError extends AppError {
   constructor(detail = 'No usable shell executable was found.') {
-    super(`SHELL_UNAVAILABLE: ${detail}`);
+    super('SHELL_UNAVAILABLE', detail);
     this.name = 'ShellUnavailableError';
   }
 }

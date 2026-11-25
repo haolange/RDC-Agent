@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../../i18n';
+import { humanizeError } from '../../../i18n/humanizeError';
+import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
-import { knowledgeErrorMessage } from './knowledgeCenterModel';
 import { beginSynchronousFlight } from './knowledgeImportExportModel';
 import type { KnowledgeImportResult, KnowledgeSpace } from '@shared/types/knowledge';
 
 export type KnowledgeImportMode = 'file' | 'paste';
 /** One dialog, three moments: choose a source, see what it would do, see what it did. */
 export type KnowledgeImportStep = 'input' | 'preview' | 'result';
+/** Why importing stopped: one sentence to show, and the technical reason that only "Copy details" carries. */
+export interface KnowledgeImportError { message: string; detail?: string }
 
 export function useKnowledgeImport(options: {
   open: boolean;
@@ -26,7 +29,8 @@ export function useKnowledgeImport(options: {
   const [preview, setPreview] = useState<KnowledgeImportResult | null>(null);
   const [result, setResult] = useState<KnowledgeImportResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<KnowledgeImportError | null>(null);
+  const fail = useCallback((err: unknown) => setError({ message: humanizeError(err, t, 'app.error.actionFailed'), detail: errorDetail(err) }), [t]);
 
   const close = useCallback(() => {
     request.next();
@@ -79,11 +83,11 @@ export function useKnowledgeImport(options: {
       const planned = await window.electronAPI.knowledge.previewImport({ spaceId, ...input });
       if (request.isCurrent(seq)) setPreview(planned);
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) fail(err);
     } finally {
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [request, spaceId]);
+  }, [fail, request, spaceId]);
 
   const takeFile = useCallback(async (next: string) => {
     setFilePath(next);
@@ -103,17 +107,17 @@ export function useKnowledgeImport(options: {
       if (next) await takeFile(next);
     } catch (err) {
       if (request.isCurrent(seq)) {
-        setError(knowledgeErrorMessage(err));
+        fail(err);
         setBusy(false);
       }
     }
-  }, [request, takeFile]);
+  }, [fail, request, takeFile]);
 
   /** A dropped file is read from its path on disk, as a chosen one is; a drop without a path cannot be imported. */
   const dropFile = useCallback(async (file: File) => {
     const dropped = window.rdcDesktop?.getPathForFile(file) ?? null;
     if (!dropped) {
-      setError(t('knowledgeCenter.importDropUnavailable'));
+      setError({ message: t('knowledgeCenter.importDropUnavailable') });
       return;
     }
     await takeFile(dropped);
@@ -124,7 +128,7 @@ export function useKnowledgeImport(options: {
 
   const importSource = useCallback(async () => {
     if (!spaceId) {
-      setError(t('knowledgeCenter.emptyNoSpaces'));
+      setError({ message: t('knowledgeCenter.emptyNoSpaces') });
       return;
     }
     if (!beginSynchronousFlight(inFlight)) return;
@@ -142,12 +146,12 @@ export function useKnowledgeImport(options: {
       setResult(imported);
       await options.onImported(imported);
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) fail(err);
     } finally {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [filePath, options, request, source, spaceId, t]);
+  }, [fail, filePath, options, request, source, spaceId, t]);
 
   return {
     open,

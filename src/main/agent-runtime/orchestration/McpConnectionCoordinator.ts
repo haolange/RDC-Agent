@@ -7,6 +7,7 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { currentHost, type HostDescriptor } from '../../platform/host';
 import { pathComparisonKey } from '../../platform/paths';
 import {
@@ -247,12 +248,12 @@ export class McpConnectionCoordinator {
     const poolKey = this.poolKey(root, normalizedProjectId, descriptorHash);
 
     if (this.orphanedPools.has(poolKey)) {
-      throw new Error(`MCP_POOL_QUARANTINED: pool ${poolKey} is quarantined until orphaned processes exit.`);
+      throw new AppError('MCP_POOL_QUARANTINED', `pool ${poolKey} is quarantined until orphaned processes exit.`);
     }
 
     let pool = this.pools.get(poolKey);
     if (pool?.quarantined) {
-      throw new Error(`MCP_POOL_QUARANTINED: pool ${poolKey} is quarantined until orphaned processes exit.`);
+      throw new AppError('MCP_POOL_QUARANTINED', `pool ${poolKey} is quarantined until orphaned processes exit.`);
     }
     if (!pool) {
       pool = {

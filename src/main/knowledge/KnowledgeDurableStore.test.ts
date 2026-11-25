@@ -21,12 +21,6 @@ import { StorageIo } from '../sessions/store/StorageIo';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
 import { KNOWLEDGE_IMPORT_MAX_BYTES, ingestKnowledgeFromPath, sanitizeProvenanceToken } from './knowledgeIngest';
 import {
-  KnowledgeHumanConfirmationRequiredError,
-  KnowledgeLifecycleError,
-  KnowledgeRevisionConflictError,
-  KnowledgeWritePathError,
-} from './knowledgeErrors';
-import {
   createSessionScopedKnowledgeStore,
   KnowledgeDurableStore,
 } from './KnowledgeDurableStore';
@@ -129,11 +123,11 @@ describe('Knowledge durable store', () => {
     expect(created.revision).toBe(1);
     await expect(store.putCandidate('sess-b', {
       candidate: candidateOf({ ...factCard(), body: 'changed' }),
-    })).rejects.toBeInstanceOf(KnowledgeRevisionConflictError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_REVISION_CONFLICT' });
     await expect(store.putCandidate('sess-b', {
       candidate: candidateOf({ ...factCard(), body: 'changed' }),
       expectedRevision: 0,
-    })).rejects.toBeInstanceOf(KnowledgeRevisionConflictError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_REVISION_CONFLICT' });
     const updated = await store.putCandidate('sess-b', {
       candidate: candidateOf({ ...factCard(), body: 'changed' }),
       expectedRevision: 1,
@@ -419,7 +413,7 @@ describe('Knowledge write gates', () => {
       card: { ...factCard(), relativePath: '../escape.md' },
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
 
     const outside = path.join(root, 'outside');
     mkdirSync(outside, { recursive: true });
@@ -430,7 +424,7 @@ describe('Knowledge write gates', () => {
       card: factCard('user:facts/via-junction.md'),
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
 
     const realFile = path.join(root, 'real.md');
     writeFileSync(realFile, 'seed', 'utf8');
@@ -442,7 +436,7 @@ describe('Knowledge write gates', () => {
       card: { ...factCard(), relativePath: 'hard.md' },
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
   });
 
   it('rejects a parent junction space root before mkdir', async () => {
@@ -458,7 +452,7 @@ describe('Knowledge write gates', () => {
       card: factCard(),
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
     expect(readdirSync(outside)).toEqual(before);
     expect(existsSync(path.join(outside, 'knowledge'))).toBe(false);
     expect(existsSync(path.join(outside, 'facts'))).toBe(false);
@@ -472,7 +466,7 @@ describe('Knowledge write gates', () => {
       card: factCard(),
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: false } as never,
-    })).rejects.toBeInstanceOf(KnowledgeHumanConfirmationRequiredError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED' });
   });
 
   it('never treats sourceStatus=fixed as verified', async () => {
@@ -498,14 +492,14 @@ describe('Knowledge write gates', () => {
       card: { ...factCard(), lifecycle: 'verified', sourceStatus: 'fixed' },
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
     await expect(write.promote({
       spaceId: 'user',
       card: { ...factCard(), lifecycle: 'candidate', sourceStatus: 'fixed' },
       to: 'verified',
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
   });
 
   it('marks the index revision stale after an external card edit', async () => {

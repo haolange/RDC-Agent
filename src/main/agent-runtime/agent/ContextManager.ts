@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /** Request budgeting and model-window conversion; canonical history is never truncated. */
 import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
@@ -25,7 +26,7 @@ export class ContextManager {
   }
   get tokenLimit(): number { return this.config.contextTokenLimit; }
   setRequestTokenLimit(limit: number): void {
-    if (!Number.isFinite(limit) || limit <= 0) throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: no conversation budget remains.');
+    if (!Number.isFinite(limit) || limit <= 0) throw new AppError('PROMPT_OVERHEAD_EXCEEDS_BUDGET', 'no conversation budget remains.');
     this.config.contextTokenLimit = limit;
   }
   convertToLlm(messages: AgentMessage[]): Message[] {
@@ -38,12 +39,12 @@ export class ContextManager {
       const result = await this.config.compact([...messages], signal, onProgress);
       signal?.throwIfAborted();
       if (this.estimateTokens(result.messages) > this.config.contextTokenLimit) {
-        throw new Error('CONTEXT_CANNOT_FIT: recoverable context exceeds request budget; original history retained.');
+        throw new AppError('CONTEXT_CANNOT_FIT', 'recoverable context exceeds request budget; original history retained.');
       }
       return result;
     }
     if (this.estimateTokens(messages) > this.config.contextTokenLimit) {
-      throw new Error('CONTEXT_CANNOT_FIT: a recoverable compaction service is required; original history retained.');
+      throw new AppError('CONTEXT_CANNOT_FIT', 'a recoverable compaction service is required; original history retained.');
     }
     return { messages: [...messages] };
   }

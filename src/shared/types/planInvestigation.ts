@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from '../errors/appError';
 import { PLAN_TASK_REQUIREMENTS_HEADING } from './taskExecution';
 
 const id = z.string().trim().min(1).max(256);
@@ -36,13 +37,13 @@ export function parseInvestigationPlanContract(markdown: string): InvestigationP
   if (!headings.length) return null;
   const index = headings[0]?.index;
   if (index === undefined || headings.length !== 1 || !markdown.startsWith(marker, index)) {
-    throw new Error('PLAN_INVESTIGATION_INVALID: malformed or duplicate contract section.');
+    throw new AppError('PLAN_INVESTIGATION_INVALID', 'malformed or duplicate contract section.');
   }
   const tail = markdown.slice(index + marker.length);
   const end = tail.indexOf('\n```');
   const remaining = end < 0 ? '' : tail.slice(end + 4).trim();
   if (end < 0 || (remaining && !remaining.startsWith(`${PLAN_TASK_REQUIREMENTS_HEADING}\n`))) {
-    throw new Error('PLAN_INVESTIGATION_INVALID: contract must precede the Task section or terminate the plan.');
+    throw new AppError('PLAN_INVESTIGATION_INVALID', 'contract must precede the Task section or terminate the plan.');
   }
   return InvestigationPlanContractSchema.parse(JSON.parse(tail.slice(0, end)));
 }

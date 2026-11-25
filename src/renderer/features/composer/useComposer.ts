@@ -25,13 +25,12 @@ import type { ModeConfig } from '@shared/types/layout';
 
 
 export function useComposer(options: {
-  showNotice: (message: string) => void;
   effectiveLeftCollapsed: boolean;
   leftToggleDisabled: boolean;
   toggleLeftSidebar: () => void | Promise<void>;
   openSettings: (section?: string) => void;
 }) {
-  const { showNotice, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar, openSettings } = options;
+  const { effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar, openSettings } = options;
   const { t, language } = useI18n();
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
@@ -72,7 +71,6 @@ export function useComposer(options: {
     message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'));
 
   const attachments = useComposerAttachments({
-    showNotice,
     t,
     currentProject,
     currentSession,
@@ -106,7 +104,6 @@ export function useComposer(options: {
   const currentModeLabel = selectedAgent?.name ?? currentModeConfig.label;
 
   const send = useComposerSend({
-    showNotice,
     t,
     currentMode,
     selectedAgentId,

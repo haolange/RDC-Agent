@@ -23,8 +23,9 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
   const options = provider.authModeOptions ?? [provider.authMode];
   if (options.length < 2) return null;
   const selectedAvailability = provider.authModeAvailability?.[value] ?? provider.providerAvailability;
-  const selectedReason = selectedAvailability.reason
-    ?? (selectedAvailability.state === 'unknown' ? t('settings.providerAuthUnverified') : '');
+  // The manifest's reason is English provider data: it may explain in a tooltip, the visible line is product copy.
+  const selectedState = selectedAvailability.state === 'unknown' ? t('settings.providerAuthUnverified')
+    : selectedAvailability.state === 'unavailable' ? t('settings.providerAuthUnavailable') : '';
 
   return (
     <div className="settings-field settings-provider-auth-field">
@@ -53,12 +54,13 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
           );
         })}
       </div>
-      {selectedAvailability.state !== 'available' && selectedReason ? (
+      {selectedState ? (
         <span
           className={`settings-provider-auth-state settings-provider-auth-state--${selectedAvailability.state}`}
           data-testid="settings-provider-auth-state"
+          data-tooltip={selectedAvailability.reason}
         >
-          {selectedReason}
+          {selectedState}
         </span>
       ) : null}
     </div>

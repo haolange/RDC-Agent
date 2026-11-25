@@ -1,4 +1,5 @@
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
+import { AppError } from '@shared/errors/appError';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedInstructionResolver } from '../../runtime/ScopedInstructionResolver';
@@ -68,7 +69,7 @@ export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan 
   });
   const preloadedSkills = preloadSkillIds.map((skillId) => {
     const skill = agentRuntimeConfigService.loadSkill(skillId, projectRoot, input.agentId);
-    if (!skill) throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
+    if (!skill) throw new AppError('SKILL_UNAVAILABLE', `skill is not configured: ${skillId}`);
     return skill;
   });
   const baseTools = input.baseTools.map((toolName) => normalizeToolName(toolName));

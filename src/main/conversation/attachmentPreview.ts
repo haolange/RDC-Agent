@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 
 const MAX_EDGE = 512;
 const CARD_EDGE = 144;
@@ -25,7 +26,7 @@ function assertNoSymlinkPath(target: string): void {
   while (fs.existsSync(current)) {
     const stat = fs.lstatSync(current);
     if (stat.isSymbolicLink()) {
-      throw new Error(`IMAGE_PREVIEW_PATH_ESCAPE: refusing to follow symlink/reparse path ${current}.`);
+      throw new AppError('IMAGE_PREVIEW_PATH_ESCAPE', `refusing to follow symlink/reparse path ${current}.`);
     }
     const parent = path.dirname(current);
     if (parent === current) break;
@@ -54,7 +55,7 @@ export function resizeAttachmentThumbnail(
     return { data: resized.toPNG(), mimeType: 'image/png', width: nextSize.width, height: nextSize.height };
   } catch {
     if (bytes.length > FALLBACK_MAX_BYTES) {
-      throw new Error('IMAGE_PREVIEW_TOO_LARGE');
+      throw new AppError('IMAGE_PREVIEW_TOO_LARGE');
     }
     return { data: bytes, mimeType };
   }
@@ -73,7 +74,7 @@ export function assertAttachmentPreviewPath(rootPath: string, filePath: string):
   const resolvedFile = path.resolve(filePath);
   const lexicalRelative = path.relative(resolvedRoot, resolvedFile);
   if (lexicalRelative.startsWith('..') || path.isAbsolute(lexicalRelative)) {
-    throw new Error('IMAGE_PREVIEW_PATH_ESCAPE');
+    throw new AppError('IMAGE_PREVIEW_PATH_ESCAPE');
   }
   if (fs.existsSync(resolvedRoot)) {
     assertNoSymlinkPath(resolvedRoot);
@@ -86,7 +87,7 @@ export function assertAttachmentPreviewPath(rootPath: string, filePath: string):
   const realFile = fs.realpathSync(resolvedFile);
   const relative = path.relative(realRoot, realFile);
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error('IMAGE_PREVIEW_PATH_ESCAPE');
+    throw new AppError('IMAGE_PREVIEW_PATH_ESCAPE');
   }
   return realFile;
 }

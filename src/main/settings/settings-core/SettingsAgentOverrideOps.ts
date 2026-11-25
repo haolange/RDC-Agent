@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { AGENT_PROJECT_UNTRUSTED } from '@shared/types/agentManifest';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict } from '../agent-manifests/agentManifestParse';
@@ -33,7 +34,7 @@ export class SettingsAgentOverrideOps {
       tryCurrentProjectRoot(),
     );
     if (request.sourceHash !== undefined && request.sourceHash !== target.sourceHash) {
-      throw new Error('AGENT_OVERRIDE_CHANGED: the file changed after it was reviewed; open the preview again.');
+      throw new AppError('AGENT_OVERRIDE_CHANGED', 'the file changed after it was reviewed; open the preview again.');
     }
     return target;
   }
@@ -62,7 +63,7 @@ export class SettingsAgentOverrideOps {
     const plan = planAgentModelFieldMigration(raw);
     const migrated = parseAgentMarkdownStrict(plan.content, target.sourcePath, target.agentId, new Date().toISOString(), false);
     if (!migrated.ok) {
-      throw new Error(`AGENT_MODEL_MIGRATION_STILL_INVALID: ${migrated.reason}`);
+      throw new AppError('AGENT_MODEL_MIGRATION_STILL_INVALID', migrated.reason);
     }
     await fs.promises.writeFile(`${target.sourcePath}.bak`, raw, 'utf8');
     const agentModels = this.settings.getAll().agentModels;
@@ -107,7 +108,7 @@ export class SettingsAgentOverrideOps {
 
   private resolveUntrustedProjectAgent(request: Pick<AgentOverrideFileRequest, 'sourcePath'> & { sourceHash?: string }) {
     const projectRoot = tryCurrentProjectRoot();
-    if (!projectRoot) throw new Error('AGENT_PROJECT_ROOT_REQUIRED: open the project that owns this Agent profile.');
+    if (!projectRoot) throw new AppError('AGENT_PROJECT_ROOT_REQUIRED', 'open the project that owns this Agent profile.');
     const target = agentManifestService.resolveDiagnosedOverride(
       appPathService.getRuntimePaths(),
       request.sourcePath,
@@ -115,7 +116,7 @@ export class SettingsAgentOverrideOps {
       projectRoot,
     );
     if (request.sourceHash !== undefined && request.sourceHash !== target.sourceHash) {
-      throw new Error('AGENT_OVERRIDE_CHANGED: the file changed after it was reviewed; open the preview again.');
+      throw new AppError('AGENT_OVERRIDE_CHANGED', 'the file changed after it was reviewed; open the preview again.');
     }
     return { target, projectRoot };
   }

@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, TaskIndependentSourceSchema, TaskRuntimeEpochSchema, type PlanTaskRequirement, type TaskExecutionPreparation, type TaskRuntimeEpoch } from '@shared/types/taskExecution';
+import { AppError } from '@shared/errors/appError';
 import { orderTasks } from './taskProjection';
 import {
   TASK_SCHEMA_VERSION,
@@ -160,7 +161,7 @@ export class FileTaskStore implements TaskStore {
       return this.readStateFile();
     }
     if (entries.length) {
-      throw new Error('TASK_STORAGE_REQUIRES_CONVERSION: nonempty task storage has no current task-state.json; original files were preserved.');
+      throw new AppError('TASK_STORAGE_REQUIRES_CONVERSION', 'nonempty task storage has no current task-state.json; original files were preserved.');
     }
     return emptyState();
   }
@@ -186,7 +187,7 @@ export class FileTaskStore implements TaskStore {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
     if ((await fs.readdir(this.root)).length) {
-      throw new Error('TASK_STORAGE_REQUIRES_CONVERSION: nonempty task storage has no current task-state.json; original files were preserved.');
+      throw new AppError('TASK_STORAGE_REQUIRES_CONVERSION', 'nonempty task storage has no current task-state.json; original files were preserved.');
     }
     await this.writeState(emptyState());
   }

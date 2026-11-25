@@ -1,11 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n';
+import { useCopyDiagnostics } from '../patterns/CopyDiagnostics';
+import { CopyButton } from '../ui/CopyButton';
 import { Toast, ToastStack } from '../ui/Toast';
-import { useNotificationStore, type NotificationTone } from '../stores/notificationStore';
+import { useNotificationStore, type Notification, type NotificationTone } from '../stores/notificationStore';
 
 /** Errors wait for the user; everything else leaves on its own. */
 const AUTO_DISMISS_MS: Record<NotificationTone, number | null> = { info: 4000, success: 4000, warning: 6000, error: null };
 const VISIBLE_LIMIT = 3;
+
+function CopyErrorDetails({ details }: { details: NonNullable<Notification['details']> }) {
+  const { t } = useI18n();
+  const copy = useCopyDiagnostics(details);
+  return <CopyButton onCopy={copy} label={t('app.copyDetails')} copiedLabel={t('app.copied')} />;
+}
 
 export const NotificationToast: React.FC = () => {
   const { t } = useI18n();
@@ -48,6 +56,7 @@ export const NotificationToast: React.FC = () => {
           dismissLabel={t('app.dismissNotice')}
           onDismiss={() => dismiss(notification.id)}
           onHoldChange={(isHeld) => setHeld(isHeld ? notification.id : null)}
+          action={notification.details?.length ? <CopyErrorDetails details={notification.details} /> : undefined}
           onExited={() => {
             remove(notification.id);
             setClosing((current) => {

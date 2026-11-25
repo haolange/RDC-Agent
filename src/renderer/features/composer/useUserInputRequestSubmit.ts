@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { AppError } from '@shared/errors/appError';
 import type { ConversationAskUserAnswer } from '@shared/types/conversation';
 import type { PendingUserInputRequest } from './userInputRequestModel';
 
@@ -20,6 +21,6 @@ export const useUserInputRequestSubmit = () => useCallback(async (
     answers,
   });
   if (!result.success) {
-    throw new Error(result.error || 'Unable to submit the answer.');
+    throw new AppError('USER_INPUT_ANSWER_INVALID', result.error, { params: result.questionId ? { questionId: result.questionId } : {} });
   }
 }, []);

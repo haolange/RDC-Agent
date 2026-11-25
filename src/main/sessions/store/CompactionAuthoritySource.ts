@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { generateShortId } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver } from '../artifacts/SessionArtifactResolver';
 import { TaskRegistry } from '../../agent-runtime/tasks/TaskRegistry';
 import { collectOpenInvestigationWork } from '../../investigation/openInvestigationWork';
@@ -36,7 +37,7 @@ export function projectCompactionJournalMessages(messages: AgentMessage[], onMed
       const bytes = Buffer.from(block.data, 'base64');
       const hash = createHash('sha256').update(bytes).digest('hex');
       const ext = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' } as Record<string, string>)[block.mimeType];
-      if (!ext) throw new Error('COMPACTION_MEDIA_UNSUPPORTED: original image format cannot be archived safely.');
+      if (!ext) throw new AppError('COMPACTION_MEDIA_UNSUPPORTED', 'original image format cannot be archived safely.');
       const uri = `session://tool-outputs/compaction-authority/media-${hash}.${ext}`;
       onMedia?.({ messageIndex, blockIndex, uri, hash, mimeType: block.mimeType }, bytes);
       return { type: 'text' as const, text: `Original image: ${uri} sha256:${hash}. Not visually inspected by this text checkpoint; use artifact_read to inspect it.` };
@@ -55,33 +56,33 @@ export function readCompactionAuthorityJournal(sessionId: string, uri: string, e
   };
   const visited = new Set<string>();
   const readJournal = (sourceUri: string, sourceHash: string): AgentMessage[] => {
-    if (visited.size >= 512 || visited.has(sourceUri)) throw new Error('CONTEXT_WINDOW_INVALID: source chain is cyclic or too deep.');
+    if (visited.size >= 512 || visited.has(sourceUri)) throw new AppError('CONTEXT_WINDOW_INVALID', 'source chain is cyclic or too deep.');
     visited.add(sourceUri);
     const envelope = readJson(sourceUri, sourceHash) as { encoding?: string; chunks?: string[]; parts?: Array<{ uri: string; hash: string }> };
     let chunks: string[];
     if (envelope.encoding === 'json-chunks' && Array.isArray(envelope.chunks)) chunks = envelope.chunks;
     else if (envelope.encoding === 'json-chunk-parts' && Array.isArray(envelope.parts) && envelope.parts.length) {
       chunks = envelope.parts.flatMap(part => {
-        if (typeof part.uri !== 'string' || typeof part.hash !== 'string') throw new Error('CONTEXT_WINDOW_INVALID: malformed source part.');
+        if (typeof part.uri !== 'string' || typeof part.hash !== 'string') throw new AppError('CONTEXT_WINDOW_INVALID', 'malformed source part.');
         const body = readJson(part.uri, part.hash) as { chunks?: string[] };
-        if (!Array.isArray(body.chunks) || !body.chunks.every(chunk => typeof chunk === 'string')) throw new Error('CONTEXT_WINDOW_INVALID: malformed source part.');
+        if (!Array.isArray(body.chunks) || !body.chunks.every(chunk => typeof chunk === 'string')) throw new AppError('CONTEXT_WINDOW_INVALID', 'malformed source part.');
         return body.chunks;
       });
-    } else throw new Error('CONTEXT_WINDOW_INVALID: malformed source envelope.');
-    if (!chunks.every(chunk => typeof chunk === 'string')) throw new Error('CONTEXT_WINDOW_INVALID: malformed source chunks.');
+    } else throw new AppError('CONTEXT_WINDOW_INVALID', 'malformed source envelope.');
+    if (!chunks.every(chunk => typeof chunk === 'string')) throw new AppError('CONTEXT_WINDOW_INVALID', 'malformed source chunks.');
     const source = JSON.parse(chunks.join('')) as {
       journalMessages?: AgentMessage[]; media?: ArchivedMedia[];
       journalPrefix?: { uri: string; hash: string; count: number };
     };
-    if (!Array.isArray(source.journalMessages) || !Array.isArray(source.media)) throw new Error('CONTEXT_WINDOW_INVALID: archived journal missing.');
+    if (!Array.isArray(source.journalMessages) || !Array.isArray(source.media)) throw new AppError('CONTEXT_WINDOW_INVALID', 'archived journal missing.');
     for (const entry of source.media) sessionArtifactResolver.read(owner, entry.uri, { expectedHash: entry.hash, limit: 1 });
     if (!source.journalPrefix) return source.journalMessages;
     const prefix = source.journalPrefix;
     if (typeof prefix.uri !== 'string' || typeof prefix.hash !== 'string' || !Number.isSafeInteger(prefix.count) || prefix.count < 0) {
-      throw new Error('CONTEXT_WINDOW_INVALID: malformed source prefix.');
+      throw new AppError('CONTEXT_WINDOW_INVALID', 'malformed source prefix.');
     }
     const prior = readJournal(prefix.uri, prefix.hash);
-    if (prior.length !== prefix.count) throw new Error('CONTEXT_WINDOW_INVALID: source prefix count changed.');
+    if (prior.length !== prefix.count) throw new AppError('CONTEXT_WINDOW_INVALID', 'source prefix count changed.');
     return [...prior, ...source.journalMessages];
   };
   return readJournal(uri, expectedHash);
@@ -186,7 +187,7 @@ function boundAuthorityContext(state: AuthorityState, archiveUri: string, stateH
     if (context.length <= AUTHORITY_CONTEXT_CHAR_LIMIT) return context;
     const largest = kinds.filter(kind => limits[kind] > 0)
       .sort((left, right) => JSON.stringify(selected[right]).length - JSON.stringify(selected[left]).length)[0];
-    if (!largest) throw new Error('COMPACTION_AUTHORITY_TOO_LARGE: even the partial authority index exceeds the bounded input.');
+    if (!largest) throw new AppError('COMPACTION_AUTHORITY_TOO_LARGE', 'even the partial authority index exceeds the bounded input.');
     limits[largest] = Math.floor(limits[largest] / 2);
   }
 }
@@ -194,7 +195,7 @@ function boundAuthorityContext(state: AuthorityState, archiveUri: string, stateH
 export async function readCompactionAuthorityState(sessionId: string): Promise<string> {
   const owner = delegatedArtifactOwner(sessionId) ?? sessionId;
   const scope = getDelegatedTaskScope(sessionId);
-  if (owner !== sessionId && !scope) throw new Error('COMPACTION_SCOPE_UNAVAILABLE: delegated task scope is required.');
+  if (owner !== sessionId && !scope) throw new AppError('COMPACTION_SCOPE_UNAVAILABLE', 'delegated task scope is required.');
   const tasks = new TaskRegistry(createSessionTaskStore(scope?.ownerSessionId ?? owner));
   const snapshot = await tasks.readConsistentSnapshot();
   const included = new Set(scope ? [scope.rootTaskId] : snapshot.tasks.map(task => task.id));
@@ -247,7 +248,7 @@ export async function saveCompactionAuthoritySource(sessionId: string, journalMe
   const fullContext = JSON.stringify({ ...fullState, media });
   const compacted = fullContext.length > AUTHORITY_CONTEXT_CHAR_LIMIT;
   const context = compacted ? boundAuthorityContext(fullState, uri, stateHash, media) : fullContext;
-  if (context.length > AUTHORITY_CONTEXT_CHAR_LIMIT) throw new Error('COMPACTION_AUTHORITY_TOO_LARGE: authoritative task/artifact index exceeds the bounded compaction input; retain current context.');
+  if (context.length > AUTHORITY_CONTEXT_CHAR_LIMIT) throw new AppError('COMPACTION_AUTHORITY_TOO_LARGE', 'authoritative task/artifact index exceeds the bounded compaction input; retain current context.');
   const original = JSON.stringify({ ...JSON.parse(context), ...(compacted ? { fullAuthorityState: fullState } : {}), ...(journalPrefix ? { journalPrefix } : {}), journalMessages: recoverableMessages });
   const chunks = Array.from({ length: Math.ceil(original.length / 4000) }, (_, index) => original.slice(index * 4000, (index + 1) * 4000));
   const parts: Array<{ uri: string; hash: string }> = [];

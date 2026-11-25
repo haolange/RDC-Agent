@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
+import { useNotificationStore } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useComposerStop } from './useComposerStop';
@@ -29,19 +30,18 @@ const completed = () => assistant({
 });
 const cancel = vi.fn<() => Promise<ConversationCancelActiveTurnResult>>();
 const getHistory = vi.fn();
-const notice = vi.fn();
 let root: Root;
 let host: HTMLDivElement;
 let stop: () => Promise<void>;
 function Harness() {
-  stop = useComposerStop({ currentSession: session, currentRun: null, showNotice: notice, t: (key) => key }).handlePrimaryStop;
+  stop = useComposerStop({ currentSession: session, currentRun: null, t: (key) => key }).handlePrimaryStop;
   return null;
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   cancel.mockReset().mockResolvedValue({ success: true, phase: 'running' });
   getHistory.mockReset().mockResolvedValue({ messages: [completed()], branchState: null });
-  notice.mockReset();
+  useNotificationStore.setState({ notifications: [] });
   Object.defineProperty(window, 'electronAPI', { configurable: true, value: { conversation: { cancelActiveTurn: cancel, getHistory } } });
   useConversationStore.getState().reset();
   useConversationStore.getState().upsertConversationMessage(assistant());
@@ -131,7 +131,9 @@ it('keeps clean preparing cancellation without reading committed history', async
 it('reports a failed authoritative read without fabricating completion', async () => {
   getHistory.mockRejectedValue(new Error('History unavailable'));
   await act(async () => stop());
-  expect(notice).toHaveBeenCalledWith('History unavailable');
+  expect(useNotificationStore.getState().notifications[0]).toMatchObject({
+    tone: 'error', title: 'app.stopRunFailed', details: [{ label: 'Detail', value: 'History unavailable' }],
+  });
   expect(useConversationStore.getState().conversationMessages[0].status).toBe('stopped');
 });
 

@@ -165,8 +165,9 @@ jobs:
       - name: Build head and base
         if: steps.base.outputs.changed == 'true'
         shell: bash
+        # Both builds render in head's Electron, which the prepare wrapper installs; base only contributes its out/.
         run: |
-          pnpm install --frozen-lockfile
+          sh scripts/start-rdc-agent.sh --prepare-only
           pnpm run build
           git worktree add "$RUNNER_TEMP/base" "${{ steps.base.outputs.sha }}"
           (cd "$RUNNER_TEMP/base" && pnpm install --frozen-lockfile && pnpm run build)

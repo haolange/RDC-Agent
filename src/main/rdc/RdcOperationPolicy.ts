@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
+import { AppError } from '@shared/errors/appError';
 import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
 import { assertFileWriteBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
 import { operationFingerprint } from './RdcOperationCatalog';
@@ -12,7 +13,7 @@ const allowedEffects = new Set(['replay_position', 'replay_position_temporary', 
 const scopes = new Set(['global', 'context', 'replay', 'capture']);
 const identityKey = /^(session_?id|context_?id|daemon_?context|target_?context_?id|owner_?session_?id|owner_?lease_?id|runtime_?owner|remote_?id|capture_?file_?id)$/i;
 export const isMainOwnedRdcIdentityKey = (key: string): boolean => identityKey.test(key);
-function denied(message: string): never { throw new Error('RDC_EXECUTION_DENIED: ' + message); }
+function denied(message: string): never { throw new AppError('RDC_EXECUTION_DENIED', message); }
 
 /** Same ownership check before approval and immediately before native execution. */
 export function assertRdcBindingOwnership(context?: ToolExecutionContext) {
@@ -22,7 +23,7 @@ export function assertRdcBindingOwnership(context?: ToolExecutionContext) {
   const lease = assertRdcContextLeaseOwnership({ sessionId: context.sessionId, projectId: context.projectId });
   const retained = !lease ? getRdcContextLease(context.sessionId) : null;
   if (retained?.ownerProjectId === context.projectId && retained.quarantineReason) {
-    throw new Error('RDC_CONTEXT_QUARANTINED: replay outcome is uncertain; close and reopen the capture before execution.');
+    throw new AppError('RDC_CONTEXT_QUARANTINED', 'replay outcome is uncertain; close and reopen the capture before execution.');
   }
   const binding = context.rdcBinding;
   const identity = binding?.identity;

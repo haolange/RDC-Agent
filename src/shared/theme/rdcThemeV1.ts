@@ -16,9 +16,12 @@ export interface RdcThemeV1Payload {
   };
 }
 
+/** Why a theme string was rejected; the renderer words each reason, `error` is the technical text. */
+export type RdcThemeV1Rejection = 'prefix' | 'json' | 'payload' | 'variant' | 'target';
+
 export type RdcThemeV1ParseResult =
   | { ok: true; payload: RdcThemeV1Payload; chrome: ThemeChromeConfig }
-  | { ok: false; error: string };
+  | { ok: false; reason: RdcThemeV1Rejection; error: string };
 
 export function serializeRdcThemeV1(chrome: ThemeChromeConfig, variant: ThemeVariant): string {
   const payload: RdcThemeV1Payload = {
@@ -42,30 +45,31 @@ export function parseRdcThemeV1(raw: string, expectedVariant?: ThemeVariant): Rd
   const trimmed = raw.trim();
   if (!trimmed.startsWith(RDC_THEME_V1_PREFIX)) {
     if (trimmed.startsWith('codex-theme-v1:')) {
-      return { ok: false, error: 'codex-theme-v1 is not supported; use rdc-theme-v1:' };
+      return { ok: false, reason: 'prefix', error: 'codex-theme-v1 is not supported; use rdc-theme-v1:' };
     }
-    return { ok: false, error: 'Theme string must start with rdc-theme-v1:' };
+    return { ok: false, reason: 'prefix', error: 'Theme string must start with rdc-theme-v1:' };
   }
   const jsonPart = trimmed.slice(RDC_THEME_V1_PREFIX.length).trim();
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonPart);
   } catch {
-    return { ok: false, error: 'Invalid JSON after rdc-theme-v1: prefix' };
+    return { ok: false, reason: 'json', error: 'Invalid JSON after rdc-theme-v1: prefix' };
   }
   if (!parsed || typeof parsed !== 'object') {
-    return { ok: false, error: 'Theme payload must be an object' };
+    return { ok: false, reason: 'payload', error: 'Theme payload must be an object' };
   }
   const record = parsed as Record<string, unknown>;
   const variant = record.variant === 'light' || record.variant === 'dark'
     ? record.variant
     : null;
   if (!variant) {
-    return { ok: false, error: 'variant must be "light" or "dark"' };
+    return { ok: false, reason: 'variant', error: 'variant must be "light" or "dark"' };
   }
   if (expectedVariant && variant !== expectedVariant) {
     return {
       ok: false,
+      reason: 'target',
       error: `Theme variant is ${variant}, but this Import targets ${expectedVariant}`,
     };
   }
@@ -73,7 +77,7 @@ export function parseRdcThemeV1(raw: string, expectedVariant?: ThemeVariant): Rd
     ? record.theme as Record<string, unknown>
     : null;
   if (!theme) {
-    return { ok: false, error: 'theme object is required' };
+    return { ok: false, reason: 'payload', error: 'theme object is required' };
   }
   const presetId = isThemePresetId(record.presetId) ? record.presetId : 'rdc';
   const chrome = sanitizeThemeChrome(

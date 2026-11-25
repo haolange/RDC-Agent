@@ -1,14 +1,10 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { missingCaseChapters, serializeKnowledgeCard } from './knowledgeCardSchema';
 import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
-import {
-  KnowledgeAssetsMissingError,
-  KnowledgeHumanConfirmationRequiredError,
-  KnowledgeLifecycleError,
-  KnowledgeWriteIntegrityError,
-} from './knowledgeErrors';
+import { knowledgeHumanConfirmationRequired, knowledgeAssetsMissing } from './knowledgeErrors';
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
 import { clearStagedKnowledgeImages, putStagedKnowledgeImages, takeStagedKnowledgeImages } from './knowledgeImageStaging';
 import { isKnowledgeImagePathAllowed } from './knowledgeImages';
@@ -47,7 +43,7 @@ function assertHumanConfirmation(
   permissionMode: AgentPermissionMode,
 ): void {
   if (confirmation?.explicitHumanConfirmation !== true) {
-    throw new KnowledgeHumanConfirmationRequiredError(permissionMode);
+    throw knowledgeHumanConfirmationRequired(permissionMode);
   }
 }
 
@@ -60,7 +56,7 @@ function resolveSpace(spaces: KnowledgeSpace[], spaceId: string): KnowledgeSpace
 function assertFixedIsNotVerified(card: KnowledgeCardRecord, to?: KnowledgeLifecycle): void {
   const becomingVerified = card.lifecycle === 'verified' || to === 'verified';
   if (becomingVerified && card.sourceStatus === 'fixed') {
-    throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: sourceStatus=fixed is not verified.');
+    throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', 'sourceStatus=fixed is not verified.');
   }
 }
 
@@ -70,16 +66,16 @@ export class KnowledgeWriteService {
   async write(input: KnowledgeWriteInput): Promise<KnowledgeCardRecord> {
     assertHumanConfirmation(input.confirmation, input.permissionMode);
     if (input.card.lifecycle === 'candidate') {
-      throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: persist Candidate via KnowledgeCandidateService, not Write.');
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', 'persist Candidate via KnowledgeCandidateService, not Write.');
     }
     assertFixedIsNotVerified(input.card);
     if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.missingAssets?.length) {
-      throw new KnowledgeAssetsMissingError();
+      throw knowledgeAssetsMissing();
     }
     if (input.card.lifecycle === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
-        throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: case cannot be verified; missing chapters: ${missing.join(',')}`);
+        throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `case cannot be verified; missing chapters: ${missing.join(',')}`);
       }
     }
     if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.images?.length) {
@@ -106,7 +102,7 @@ export class KnowledgeWriteService {
       const expected = createHash('sha256').update(serialized, 'utf8').digest('hex');
       const actual = createHash('sha256').update(written, 'utf8').digest('hex');
       if (expected !== actual) {
-        throw new KnowledgeWriteIntegrityError(`post-write hash mismatch for ${absolute}.`);
+        throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', `post-write hash mismatch for ${absolute}.`);
       }
     } else {
       await writeKnowledgeCardAtomic(absolute, serialized);
@@ -139,18 +135,18 @@ export class KnowledgeWriteService {
     assertFixedIsNotVerified(input.card, input.to);
     const current = input.card.lifecycle;
     if (current === 'draft') {
-      throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: Draft cannot promote; create a Candidate first.');
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', 'Draft cannot promote; create a Candidate first.');
     }
     if (input.to === 'verified' && current !== 'candidate' && current !== 'verified') {
-      throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: cannot promote ${current} to verified.`);
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `cannot promote ${current} to verified.`);
     }
     if (input.to === 'promoted' && current !== 'verified' && current !== 'promoted') {
-      throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: cannot promote ${current} to promoted.`);
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `cannot promote ${current} to promoted.`);
     }
     if (input.to === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
-        throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: case cannot be verified; missing chapters: ${missing.join(',')}`);
+        throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `case cannot be verified; missing chapters: ${missing.join(',')}`);
       }
     }
     return this.write({

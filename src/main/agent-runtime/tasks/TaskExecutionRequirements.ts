@@ -3,10 +3,11 @@ import {
   TaskExecutionPreparationSchema, TaskExecutionRequirementsSchema, PlanTaskRevisionSchema,
   type PlanTaskRequirement, type TaskExecutionPreparation, type TaskIndependentSource,
 } from '@shared/types/taskExecution';
+import { AppError } from '@shared/errors/appError';
 import type { StartTaskExecutionOptions, TaskCompletionResult, TaskExecutionRecord, TaskRecord } from './TaskContracts';
 import type { TaskStore } from './TaskStore';
 
-const denied = (message: string): never => { throw new Error(`TASK_EXECUTION_REQUIREMENTS: ${message}`); };
+const denied = (message: string): never => { throw new AppError('TASK_EXECUTION_REQUIREMENTS', message); };
 
 export function assertApprovedTaskRequirement(task: TaskRecord, approved: readonly PlanTaskRequirement[]): void {
   const snapshot = approved.find(item => item.taskId === task.id);

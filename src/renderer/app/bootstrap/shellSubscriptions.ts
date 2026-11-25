@@ -1,5 +1,6 @@
 import { useTerminalStore } from '../../stores/terminalStore';
 import { resetWorkbenchStores } from '../storesReset';
+import { notify } from '../../stores/notificationStore';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
 import type { ElectronAPI } from '@shared/types/electron';
@@ -17,14 +18,14 @@ export function subscribeAppThemeChanged(electronAPI: ElectronAPI, setSystemThem
   });
 }
 
-export function subscribeShellCommands(electronAPI: ElectronAPI, { showNotice, t, setSettingsModalOpen, setWindowMaximized }: Pick<EventBridgeOptions, 'showNotice' | 't' | 'setSettingsModalOpen' | 'setWindowMaximized'>) {
+export function subscribeShellCommands(electronAPI: ElectronAPI, { t, setSettingsModalOpen, setWindowMaximized }: Pick<EventBridgeOptions, 't' | 'setSettingsModalOpen' | 'setWindowMaximized'>) {
   const handleFileOpen = (paths: unknown) => {
     if (!Array.isArray(paths) || paths.length === 0) return;
-    showNotice(t('app.notice.filesReceived', { count: paths.length }));
+    notify.info(t('app.notice.filesReceived', { count: paths.length }));
   };
   const handleCaseNew = () => {
     resetWorkbenchStores();
-    showNotice(t('app.notice.newWorkspace'));
+    notify.info(t('app.notice.newWorkspace'));
   };
   const handleSettingsOpen = () => {
     setSettingsModalOpen(true);

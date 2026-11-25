@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import type { WorkbenchIpcState } from './workbenchContext';
 
 /** Mutation channels may touch only the session the workbench currently owns. */
@@ -6,7 +7,7 @@ export function requireActiveSessionOwner(
   sessionId: string | null | undefined,
 ): string {
   if (!state.currentSessionId || !sessionId || sessionId !== state.currentSessionId) {
-    throw new Error('SESSION_OWNER_DENIED');
+    throw new AppError('SESSION_OWNER_DENIED');
   }
   return state.currentSessionId;
 }

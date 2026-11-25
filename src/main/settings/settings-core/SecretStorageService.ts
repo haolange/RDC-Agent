@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { safeStorage } from 'electron';
 import { sanitizeToken } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { hardenSecretFile, secretStorageUnavailableReason } from '../../platform/secrets';
 
@@ -15,23 +16,17 @@ type SecretMap = Record<string, SecretRecord>;
 
 const SECRET_FILE_NAME = 'provider-secrets.json';
 
-export class SecretStorageUnavailableError extends Error {
+export class SecretStorageUnavailableError extends AppError {
   constructor(message = 'OS safeStorage is unavailable; refusing to store credentials.') {
-    super(message);
+    super('SECRET_STORAGE_UNAVAILABLE', message);
     this.name = 'SecretStorageUnavailableError';
   }
 }
 
-export class SecretStoreCorruptError extends Error {
-  readonly quarantinePath: string;
-
-  constructor(quarantinePath: string, cause?: unknown) {
-    super(`Secret store is corrupt; quarantined to ${quarantinePath}`);
+export class SecretStoreCorruptError extends AppError {
+  constructor(readonly quarantinePath: string, cause?: unknown) {
+    super('STORAGE_CORRUPT', `Secret store is corrupt; quarantined to ${quarantinePath}`, { cause });
     this.name = 'SecretStoreCorruptError';
-    this.quarantinePath = quarantinePath;
-    if (cause !== undefined) {
-      (this as Error & { cause?: unknown }).cause = cause;
-    }
   }
 }
 

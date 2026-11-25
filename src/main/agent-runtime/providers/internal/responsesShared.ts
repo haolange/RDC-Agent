@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { createContinuationArtifact } from '../../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../../reasoning/ContinuationReplayPolicy';
 import { createProviderStateRef, findLatestProviderState } from '../../reasoning/ProviderStateRefs';
@@ -330,8 +331,8 @@ export function buildResponsesRequestBody(
   const input = toResponsesInput(inputContext, options.requestPlan);
   if (explicitBreakpoint) {
     if (!prompt.stableText) {
-      throw new Error(
-        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE: explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
+      throw new AppError(
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE', 'explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
       );
     }
     const content: ResponsesInputContentPart[] = [{

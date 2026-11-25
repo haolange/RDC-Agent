@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
 import { errorDetail } from '../../../../lib/errorDetail';
+import { InlineError } from '../../../../ui/InlineError';
 import { Skeleton } from '../../../../ui/Skeleton';
 import { testModelCapability } from './providerCatalogActions';
 import { ProviderModelProbe } from './ProviderModelProbe';
@@ -127,7 +128,9 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
               })}
             </div>
           ) : null}
-          {effectiveModel.unavailableReason ? <div className="settings-model-capability-note settings-model-capability-note--error">{effectiveModel.unavailableReason}</div> : null}
+          {effectiveModel.unavailableReason ? (
+            <InlineError detail={effectiveModel.unavailableReason}>{t('settings.providers.modelUnavailableReason')}</InlineError>
+          ) : null}
         </>
       ) : (
         <div className="settings-model-capability-note">

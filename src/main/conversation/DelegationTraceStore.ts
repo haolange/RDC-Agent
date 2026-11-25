@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { delegationTextPreview } from '@shared/utils/delegationTextPreview';
+import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { safeDelegationText as safeText } from './DelegationTraceText';
@@ -124,8 +125,8 @@ function readHead(target: string, sessionId: string, callId: string): Delegation
   const head = headLocation(target);
   if (!fs.existsSync(head)) return null;
   const header = JSON.parse(fs.readFileSync(head, 'utf8')) as DelegationTraceHeader;
-  if (header.recordVersion !== 2) throw new Error('DELEGATION_TRACE_UNAVAILABLE');
-  if (header.parentToolCallId !== callId) throw new Error('DELEGATION_TRACE_ID_MISMATCH');
+  if (header.recordVersion !== 2) throw new AppError('DELEGATION_TRACE_UNAVAILABLE');
+  if (header.parentToolCallId !== callId) throw new AppError('DELEGATION_TRACE_ID_MISMATCH');
   return currentHeader(sessionId, header);
 }
 function updateLatestAction(record: ActiveTrace): void {
@@ -173,7 +174,7 @@ export const delegationTraceStore = {
     const target = location(sessionId, input.parentToolCallId);
     if (!target) return;
     const existing = readHead(target, sessionId, input.parentToolCallId);
-    if (existing && identity(existing) !== identity(input)) throw new Error('DELEGATION_TRACE_ID_CONFLICT');
+    if (existing && identity(existing) !== identity(input)) throw new AppError('DELEGATION_TRACE_ID_CONFLICT');
     if (existing) return;
     const task = safeText(input.task);
     const invocation = safeText(JSON.parse(input.invocation));
@@ -306,24 +307,24 @@ export const delegationTraceStore = {
     childIdentity: Pick<DelegationTraceHeader, 'childSessionId' | 'executionId' | 'generation'>,
     kind: DelegationContentKind, offset: number, stepId?: string): DelegationContentPage {
     const target = location(sessionId, callId);
-    if (!target || !fs.existsSync(target)) throw new Error('DELEGATION_CONTENT_DENIED');
+    if (!target || !fs.existsSync(target)) throw new AppError('DELEGATION_CONTENT_DENIED');
     const header = readHead(target, sessionId, callId);
-    if (!header || identity(header) !== identity(childIdentity)) throw new Error('DELEGATION_CONTENT_DENIED');
+    if (!header || identity(header) !== identity(childIdentity)) throw new AppError('DELEGATION_CONTENT_DENIED');
     if (kind === 'tool_receipt') {
-      if (!stepId) throw new Error('DELEGATION_CONTENT_DENIED');
+      if (!stepId) throw new AppError('DELEGATION_CONTENT_DENIED');
       const trace = readParsed(target, callId);
       if (trace.invalid || ![...trace.blocks.values()].some(({ block }) => block.toolCalls.some((call) => call.id === stepId))) {
-        throw new Error('DELEGATION_CONTENT_DENIED');
+        throw new AppError('DELEGATION_CONTENT_DENIED');
       }
     } else if ((kind === 'task' && !header.taskAvailable)
       || (kind === 'sent_prompt' && !header.sentPromptAvailable)
       || (kind === 'invocation' && !header.invocationAvailable)
       || (kind === 'final' && !header.finalAvailable)
       || (kind === 'parent_receipt' && !header.parentReceiptAvailable)) {
-      throw new Error('DELEGATION_CONTENT_UNAVAILABLE');
+      throw new AppError('DELEGATION_CONTENT_UNAVAILABLE');
     }
     const file = bodyLocation(target, kind, stepId);
-    if (!fs.existsSync(file)) throw new Error('DELEGATION_CONTENT_UNAVAILABLE');
+    if (!fs.existsSync(file)) throw new AppError('DELEGATION_CONTENT_UNAVAILABLE');
     const descriptor = fs.openSync(file, 'r');
     try {
       const size = fs.fstatSync(descriptor).size;
@@ -338,7 +339,7 @@ export const delegationTraceStore = {
         try { text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, length)); decoded = true; break; }
         catch { length -= 1; }
       }
-      if (!decoded) throw new Error('DELEGATION_CONTENT_INVALID_UTF8');
+      if (!decoded) throw new AppError('DELEGATION_CONTENT_INVALID_UTF8');
       const end = start + length;
       return { text, nextOffset: end < size ? end : null, total: size };
     } finally { fs.closeSync(descriptor); }

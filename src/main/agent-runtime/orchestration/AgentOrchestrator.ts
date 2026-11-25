@@ -1,4 +1,5 @@
 import { agentAccessCeiling } from '@shared/types/agentManifest';
+import { AppError } from '@shared/errors/appError';
 import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../../investigation/missionCompletionContract';
 /**
  * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
@@ -241,7 +242,7 @@ export class AgentOrchestrator {
       };
 
       if (!effectiveProfile) {
-        throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${agentId}`);
+        throw new AppError('AGENT_PROFILE_UNAVAILABLE', agentId);
       }
 
       const resolvedAllowlist = preparedTurn?.toolAllowlist
@@ -315,7 +316,7 @@ export class AgentOrchestrator {
         extraSegments: options?.extraPromptSegments,
         effectiveProfiles,
       });
-      if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
+      if (!promptPlan) throw new AppError('PROMPT_PLAN_UNAVAILABLE', agentId);
       if (options?.promptPlan && options.extraPromptSegments?.length) {
         promptPlan = applyDelegationCapsuleToPromptPlan(promptPlan, options.extraPromptSegments);
       }
@@ -339,7 +340,7 @@ export class AgentOrchestrator {
           turnId: options?.turnId,
           credentialHandle: (() => {
             if (!ownedCredentialHandle) {
-              throw new Error('CREDENTIAL_HANDLE_REQUIRED: profile turn preparation requires a credential lease.');
+              throw new AppError('CREDENTIAL_HANDLE_REQUIRED', 'profile turn preparation requires a credential lease.');
             }
             return ownedCredentialHandle;
           })(),

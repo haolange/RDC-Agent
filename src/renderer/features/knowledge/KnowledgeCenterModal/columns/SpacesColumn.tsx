@@ -4,6 +4,7 @@ import { InlineError } from '../../../../ui/InlineError';
 import { ListRow } from '../../../../ui/ListRow';
 import { Panel } from '../../../../ui/Panel';
 import { useI18n } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
 interface SpacesColumnProps { state: ReturnType<typeof useKnowledgeCenter>; candidateCount?: number }
@@ -59,8 +60,8 @@ export function SpacesColumn({ state, candidateCount }: SpacesColumnProps) {
         </>
       ) : null}
       {state.error && (
-        <InlineError className="knowledge-center-error" data-testid="knowledge-center-error">
-          {state.error}
+        <InlineError className="knowledge-center-error" data-testid="knowledge-center-error" detail={state.error}>
+          {humanizeError(state.error, t, 'app.error.loadFailed')}
         </InlineError>
       )}
     </Panel>

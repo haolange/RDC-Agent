@@ -164,6 +164,7 @@ secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不
 - 标准 Electron 布局，不恢复顶层 Config／Saved／Intermediate／Binaries。
 - 关键边界以 `ARCHITECTURE.md` 的核心 Invariant 为准。动手前记住这几条：
   - IPC 入参经 `parseIpcArgs` 校验；组件不直调 `window.electronAPI`。
+  - 跨边界的失败抛 `AppError`（码登记在 `src/shared/errors/errorCodes.ts`）；界面文案经 `humanizeError`，技术文本只进「复制详情」。
   - 审批 token 单次使用；凭据经 safeStorage，不可用时 fail-closed。
   - Provider 与模型事实只在 JSON manifest 里，不写进代码或文档。
   - 实验的五份签名回执（baseline、intervention、variant、rollback、restored）缺一不成立。
@@ -171,7 +172,7 @@ secrets 与 diff 检查需要基线：`RDC_DIFF_BASE=<本轮起点提交>`；不
   - Mission 只规划，不执行；没有自动回 Mission 的路径。
   - CSP 不放行 inline style。
   - 文件行数上限由 ESLint `max-lines` 执行。
--Plan 与 generation：Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具或自动回 Mission。
+- Plan 与 generation：Mission 计划门冻结后，用户点声明按钮进入 General，General 就地终答，用户自行切回 Mission。`handoffs` 只驱动建议行和计划门；不存在 `agent_handoff` 工具或自动回 Mission。
 - Prompt 调用经 PromptPlan。
 
 ## 8. 设计系统约束（写 CSS 必读）

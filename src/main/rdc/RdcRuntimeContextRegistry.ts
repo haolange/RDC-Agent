@@ -1,9 +1,10 @@
+import { createHash } from 'crypto';
+import { AppError } from '@shared/errors/appError';
 /**
  * Per-session RDC context leases. Tools must verify ownership before reading.
  * Parent sessions may grant one scoped, lifecycle-bound delegated lease to a child.
  */
 
-import { createHash } from 'crypto';
 import type { RdcRuntimeContext } from '@shared/types/session';
 
 export const RDC_LEASE_DELEGATE_DENIED = 'RDC_LEASE_DELEGATE_DENIED';
@@ -73,7 +74,7 @@ export function setRdcRuntimeContextForSession(
     const existing = leasesBySession.get(trimmed);
     const delegatedChild = delegatedChildByParent.get(trimmed);
     if (delegatedChild) {
-      throw new Error('RDC_LEASE_DUAL_OWNER: join delegated execution before clearing the parent binding.');
+      throw new AppError('RDC_LEASE_DUAL_OWNER', 'join delegated execution before clearing the parent binding.');
     }
     if (existing?.delegatedFrom && delegatedChildByParent.get(existing.delegatedFrom) === trimmed) {
       delegatedChildByParent.delete(existing.delegatedFrom);
@@ -83,7 +84,7 @@ export function setRdcRuntimeContextForSession(
   }
   const existing = leasesBySession.get(trimmed);
   if (delegatedChildByParent.has(trimmed)) {
-    throw new Error('RDC_LEASE_DUAL_OWNER: join delegated execution before rebinding.');
+    throw new AppError('RDC_LEASE_DUAL_OWNER', 'join delegated execution before rebinding.');
   }
   if (existing?.delegatedFrom) {
     return null;

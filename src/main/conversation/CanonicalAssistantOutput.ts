@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import type { ConversationLoopOutputPhase } from '@shared/types/conversation';
 
 export interface CanonicalAssistantOutputState {
@@ -20,8 +21,8 @@ export function reduceCanonicalAssistantOutput(
 export function requireCanonicalFinalAnswer(state: CanonicalAssistantOutputState): string {
   const finalAnswer = state.finalAnswerText.trim();
   if (!finalAnswer) {
-    throw new Error(
-      'PROVIDER_STREAM_MISSING_FINAL_ANSWER: provider completed without a canonical final_answer block.',
+    throw new AppError(
+      'PROVIDER_STREAM_MISSING_FINAL_ANSWER', 'provider completed without a canonical final_answer block.',
     );
   }
   return finalAnswer;

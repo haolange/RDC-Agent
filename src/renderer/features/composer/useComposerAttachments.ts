@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { AppError, errorCodeOf } from '@shared/errors/appError';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
 import { isBrowserAppSession } from '../../platform/browserSession';
-import { COMPOSER_MAX_ATTACHMENT_COUNT, isAttachmentStageOverflow } from './attachmentRejectCopy';
+import { notify } from '../../stores/notificationStore';
+import { COMPOSER_MAX_ATTACHMENT_COUNT } from './attachmentRejectCopy';
 import { descriptorToDraft, filesToStageItems } from './composerAttachmentIngest';
 import type { ConversationAttachmentStageItem } from '@shared/types/conversation';
 import type { useI18n } from '../../i18n';
@@ -19,7 +21,6 @@ function stagingIdsOf(drafts: readonly PendingAttachmentDraft[]): string[] {
 }
 
 export function useComposerAttachments(options: {
-  showNotice: (message: string) => void;
   t: Translate;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
@@ -28,7 +29,6 @@ export function useComposerAttachments(options: {
   toggleLeftSidebar: () => void | Promise<void>;
 }) {
   const {
-    showNotice,
     t,
     currentProject,
     currentSession,
@@ -84,16 +84,16 @@ export function useComposerAttachments(options: {
     if (effectiveLeftCollapsed && !leftToggleDisabled) {
       void toggleLeftSidebar();
     }
-    showNotice(t('app.attachProjectRequired'));
+    notify.warning(t('app.attachProjectRequired'));
     return false;
-  }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, showNotice, t, toggleLeftSidebar]);
+  }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, t, toggleLeftSidebar]);
 
   const stageItems = useCallback(async (items: ConversationAttachmentStageItem[]) => {
     const electronAPI = window.electronAPI;
     if (!electronAPI || items.length === 0) return;
     try {
       if (items.length > COMPOSER_MAX_ATTACHMENT_COUNT) {
-        throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${COMPOSER_MAX_ATTACHMENT_COUNT} attachments are allowed.`);
+        throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${COMPOSER_MAX_ATTACHMENT_COUNT} attachments are allowed.`);
       }
       const result = await electronAPI.conversation.stageAttachments({
         items,
@@ -116,11 +116,12 @@ export function useComposerAttachments(options: {
       }
       const accepted = result.attachments.filter((item) => !item.error);
       if (accepted.length > 0) {
-        showNotice(t('app.stageFilesSuccess', { count: accepted.length }));
+        notify.success(t('app.stageFilesSuccess', { count: accepted.length }));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const overflow = isAttachmentStageOverflow(message);
+      const code = errorCodeOf(error);
+      const overflow = code === 'ATTACHMENT_LIMIT_EXCEEDED' || code === 'PAYLOAD_TOO_LARGE';
       const drafts: PendingAttachmentDraft[] = items.map((item, index) => ({
         id: `error-${Date.now()}-${index}`,
         stagingId: '',
@@ -136,11 +137,11 @@ export function useComposerAttachments(options: {
         },
       }));
       setPendingAttachments((current) => current.concat(drafts));
-      showNotice(t(overflow
+      notify.error(t(overflow
         ? 'app.attachReject.ATTACHMENT_LIMIT_EXCEEDED'
         : 'app.attachRejected'));
     }
-  }, [attachmentScopeKey, setPendingAttachments, showNotice, t]);
+  }, [attachmentScopeKey, setPendingAttachments, t]);
 
   const handleAttachmentSelect = useCallback(async () => {
     const electronAPI = window.electronAPI;

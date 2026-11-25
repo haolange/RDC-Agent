@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
+import { AppError } from '@shared/errors/appError';
 import { safeResolvePath, truncateOutput } from './_shared';
 import { TEXT_FILE_MAX_BYTES } from './toolLimits';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
@@ -55,7 +56,7 @@ function compareBytes(left: Buffer, right: Buffer) {
 
 function expectedDigest(value: string | undefined): string {
   if (typeof value !== 'string' || !/^(?:sha256:)?[a-fA-F0-9]{64}$/.test(value)) {
-    throw new Error('FILE_AUDIT_EXPECTED_HASH_REQUIRED: supply the exact whole-file SHA-256 for each input.');
+    throw new AppError('FILE_AUDIT_EXPECTED_HASH_REQUIRED', 'supply the exact whole-file SHA-256 for each input.');
   }
   return value.replace(/^sha256:/, '').toLowerCase();
 }
@@ -63,35 +64,36 @@ function expectedDigest(value: string | undefined): string {
 async function readBoundFile(input: string, expected: string, context?: ToolExecutionContext, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const absolute = safeResolvePath(input, undefined, context);
-  if (path.extname(absolute).toLowerCase() === '.rdc') throw new Error('FILE_AUDIT_CAPTURE_DENIED');
+  if (path.extname(absolute).toLowerCase() === '.rdc') throw new AppError('FILE_AUDIT_CAPTURE_DENIED');
   const stat = await fs.promises.stat(absolute);
-  if (!stat.isFile() || stat.size > TEXT_FILE_MAX_BYTES) throw new Error('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
+  if (!stat.isFile() || stat.size > TEXT_FILE_MAX_BYTES) throw new AppError('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
   const chunks: Buffer[] = [];
   let bytes = 0;
   for await (const chunk of fs.createReadStream(absolute, { signal })) {
     bytes += chunk.length;
-    if (bytes > TEXT_FILE_MAX_BYTES) throw new Error('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
+    if (bytes > TEXT_FILE_MAX_BYTES) throw new AppError('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
     chunks.push(chunk);
   }
   signal?.throwIfAborted();
   const buffer = Buffer.concat(chunks);
   if (buffer.length >= 8 && buffer.readUInt32LE(0) === 0x434f4452 && buffer.readUInt32LE(4) === 0) {
-    throw new Error('FILE_AUDIT_CAPTURE_DENIED');
+    throw new AppError('FILE_AUDIT_CAPTURE_DENIED');
   }
   const sha256 = digest(buffer);
-  if (sha256 !== expected) throw new Error(`FILE_AUDIT_HASH_MISMATCH: ${input}`);
+  if (sha256 !== expected) throw new AppError('FILE_AUDIT_HASH_MISMATCH', input);
   return { buffer, identity: { path: absolute, bytes, sha256, headHex: buffer.subarray(0, 64).toString('hex') } };
 }
 
 function normalizedText(bytes: Buffer): string {
+  let text: string;
   try {
     // Preserve BOM, bare CR and all other bytes' text semantics. Only CRLF is normalized.
-    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-    if (text.includes('\0')) throw new Error('NUL');
-    return text.replace(/\r\n/g, '\n');
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
-    throw new Error('FILE_AUDIT_UTF8_REQUIRED: text comparison requires NUL-free, valid UTF-8 inputs.');
+    text = '\0';
   }
+  if (text.includes('\0')) throw new AppError('FILE_AUDIT_UTF8_REQUIRED', 'text comparison requires NUL-free, valid UTF-8 inputs.');
+  return text.replace(/\r\n/g, '\n');
 }
 
 function textIdentity(text: string): TextIdentity {

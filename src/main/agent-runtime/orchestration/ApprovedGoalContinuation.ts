@@ -41,7 +41,7 @@ export function createApprovedGoalContinuation(
       if (!message.startsWith('TASK_EXECUTION_REQUIREMENTS:')) throw error;
       const incomplete = /^TASK_EXECUTION_REQUIREMENTS: approved Task is not completed: (.+)$/u.exec(message);
       const task = incomplete ? await registry.getTask(incomplete[1]) : null;
-      if (incomplete && !task) throw new Error(`Approved Task disappeared during completion check: ${incomplete[1]}`);
+      if (incomplete && !task) throw new Error(`Approved Task disappeared during completion check: ${incomplete[1]}`, { cause: error });
       return { message, task };
     }
   };

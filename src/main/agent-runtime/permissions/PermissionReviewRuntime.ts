@@ -1,16 +1,18 @@
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { AppError } from '@shared/errors/appError';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { ErrorCode } from '@shared/errors/errorCodes';
 
 export interface PermissionReviewVerdict { approved: boolean; reason: string }
-export class PermissionReviewError extends Error {
-  constructor(readonly code: string, detail: string) {
-    super(`${code}: ${detail}`);
+export class PermissionReviewError extends AppError {
+  constructor(code: ErrorCode, detail: string) {
+    super(code, detail);
     this.name = 'PermissionReviewError';
   }
 }

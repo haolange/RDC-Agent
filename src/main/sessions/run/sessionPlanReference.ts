@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../store/StorageAdapter';
 import { planArtifactWriter } from './sessionPlanArtifact';
 import { planReviewStateStore } from './PlanReviewStateStore';
@@ -23,13 +24,13 @@ export function resolvePlanReference(request: PlanReadRequest, history: (session
         && call.planReview.revision === request.revision && matchesPlanUri(request, call)
         && call.planReview.hash === request.expectedHash)
       .map(call => ({ message, call })));
-  if (matches.length !== 1) throw new Error('PLAN_REFERENCE_DENIED: expected one persisted plan revision.');
+  if (matches.length !== 1) throw new AppError('PLAN_REFERENCE_DENIED', 'expected one persisted plan revision.');
   const { message, call } = matches[0];
   const ownerSessionId = call.delegatedRequest?.childSessionId ?? request.sessionId;
   const source = call.delegatedRequest
     ? history(ownerSessionId).find(entry => entry.turnId === call.delegatedRequest!.turnId && entry.role === 'assistant')
     : message;
-  if (!source?.agentId) throw new Error('PLAN_PROVENANCE_MISSING: creating agent is unavailable.');
+  if (!source?.agentId) throw new AppError('PLAN_PROVENANCE_MISSING', 'creating agent is unavailable.');
   return { plan: call.planReview!, ownerSessionId, agentId: source.agentId,
     turnId: call.delegatedRequest?.turnId ?? message.turnId };
 }

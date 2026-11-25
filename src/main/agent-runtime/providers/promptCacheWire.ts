@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import type { Context } from '../core/types';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
 
@@ -28,16 +29,16 @@ export function partitionSystemPrompt(
     .filter((segment) => segment.content.length > 0);
   const composed = normalized.map((segment) => segment.content).join('\n\n');
   if (composed !== combinedText) {
-    throw new Error(
-      'PROMPT_PLAN_CONTEXT_MISMATCH: runtime system prompt differs from its compiled PromptPlan segments.',
+    throw new AppError(
+      'PROMPT_PLAN_CONTEXT_MISMATCH', 'runtime system prompt differs from its compiled PromptPlan segments.',
     );
   }
 
   const firstVolatileIndex = normalized.findIndex((segment) => segment.stability === 'volatile');
   const stableCount = firstVolatileIndex < 0 ? normalized.length : firstVolatileIndex;
   if (normalized.slice(stableCount).some((segment) => segment.stability === 'stable')) {
-    throw new Error(
-      'PROMPT_PLAN_STABILITY_ORDER_INVALID: stable prompt segments must form one contiguous prefix.',
+    throw new AppError(
+      'PROMPT_PLAN_STABILITY_ORDER_INVALID', 'stable prompt segments must form one contiguous prefix.',
     );
   }
 

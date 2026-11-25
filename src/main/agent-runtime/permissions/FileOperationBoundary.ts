@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 
 const normalize = (target: string) => path.resolve(target).replace(/\\/g, '/').toLowerCase();
@@ -49,5 +50,5 @@ export function fileOperationBoundary(target: string): { readOnly: boolean; prot
 
 export function assertFileWriteBoundary(target: string): void {
   const boundary = fileOperationBoundary(target);
-  if (boundary.readOnly) throw new Error(`FILE_WRITE_PROTECTED: ${boundary.reason}`);
+  if (boundary.readOnly) throw new AppError('FILE_WRITE_PROTECTED', boundary.reason);
 }

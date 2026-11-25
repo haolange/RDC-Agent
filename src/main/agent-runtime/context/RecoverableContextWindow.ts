@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import type { AgentMessage } from '../core/types';
 import type { CompressResult } from '../agent/ContextManager';
@@ -44,9 +45,9 @@ export class RecoverableContextWindow {
     const previousMatches = previous && hashScopedResource(messages.slice(0, previous.count)) === previous.hash;
     const window = previousMatches ? [...previous.window, ...messages.slice(previous.count)] : [...messages];
     if (this.options.estimate(window) <= this.tokenLimit) return { messages: window };
-    if (this.pending) throw new Error('CONTEXT_COMPACTION_BUSY: wait for the current checkpoint.');
+    if (this.pending) throw new AppError('CONTEXT_COMPACTION_BUSY', 'wait for the current checkpoint.');
     const sourceHash = hashScopedResource(messages);
-    if (this.failedSource === sourceHash) throw new Error('CONTEXT_CANNOT_FIT: unchanged source previously failed compaction; explicit recovery required.');
+    if (this.failedSource === sourceHash) throw new AppError('CONTEXT_CANNOT_FIT', 'unchanged source previously failed compaction; explicit recovery required.');
 
     // Retain the latest user input and the complete latest tool-call/result group.
     // A single oversized first input cannot be made safe by deleting its middle or images.
@@ -58,7 +59,7 @@ export class RecoverableContextWindow {
       if (message.role === 'user' && !message.derivedContext) { lastUser = i; break; }
     }
     const externalizeInput = messages.length === 1 && messages[0].role === 'user';
-    if (end === 0 && !externalizeInput) throw new Error('CONTEXT_CANNOT_FIT: current tool group exceeds the request budget; nothing was removed.');
+    if (end === 0 && !externalizeInput) throw new AppError('CONTEXT_CANNOT_FIT', 'current tool group exceeds the request budget; nothing was removed.');
     if (externalizeInput) end = 1;
     this.pending = true;
     const compactionId = `compact-${sourceHash.slice(0, 24)}`;
@@ -89,7 +90,7 @@ export class RecoverableContextWindow {
         return portable;
       });
       if (this.options.estimate(candidate) > this.tokenLimit || this.options.estimate(candidate) >= this.options.estimate(window)) {
-        throw new Error('CONTEXT_CANNOT_FIT: candidate does not provide a usable window; original history retained.');
+        throw new AppError('CONTEXT_CANNOT_FIT', 'candidate does not provide a usable window; original history retained.');
       }
       const installedView = { count: messages.length, hash: sourceHash, window: candidate };
       await this.options.installed?.(message, checkpoint, installedView);

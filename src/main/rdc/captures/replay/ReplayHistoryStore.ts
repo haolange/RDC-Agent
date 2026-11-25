@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
 import { assertHash, assertSession, atomicWrite, missing, projectLock, safePath, treeBytes } from './replayFileSafety';
 import { replayPngCodec } from './replayPngCodec';
@@ -31,14 +32,14 @@ export class ReplayHistoryStore {
       throw error;
     }
     let data: ReplayManifest;
-    try { data = JSON.parse(text) as ReplayManifest; } catch { throw new Error('REPLAY_MANIFEST_CORRUPT'); }
+    try { data = JSON.parse(text) as ReplayManifest; } catch { throw new AppError('REPLAY_MANIFEST_CORRUPT'); }
     if (data.sessionId !== scope.sessionId || data.captureSha256 !== scope.captureSha256 || !Array.isArray(data.entries)) {
-      throw new Error('REPLAY_MANIFEST_CORRUPT');
+      throw new AppError('REPLAY_MANIFEST_CORRUPT');
     }
     data.entries.forEach((entry, index) => {
       if (entry.sequence !== index + 1 || !(entry.eventId === null ? Boolean(entry.failure) : Number.isSafeInteger(entry.eventId) && entry.eventId >= 0)
         || !Number.isFinite(entry.timestamp) || typeof entry.summary !== 'string' || typeof entry.operationId !== 'string'
-        || entry.saved !== true || (entry.eventId === null && entry.imageSha256)) throw new Error('REPLAY_MANIFEST_CORRUPT');
+        || entry.saved !== true || (entry.eventId === null && entry.imageSha256)) throw new AppError('REPLAY_MANIFEST_CORRUPT');
       if (entry.imageSha256) assertHash(entry.imageSha256);
     });
     return data;
@@ -48,7 +49,7 @@ export class ReplayHistoryStore {
     if (!(observation.eventId === null ? Boolean(observation.failure) : Number.isSafeInteger(observation.eventId) && observation.eventId >= 0) || !observation.operationId
       || typeof observation.summary !== 'string' || observation.summary.length > 8192
       || (observation.timestamp !== undefined && !Number.isFinite(observation.timestamp))
-      || (observation.eventId === null && pngBytes)) throw new Error('REPLAY_INVALID_OBSERVATION');
+      || (observation.eventId === null && pngBytes)) throw new AppError('REPLAY_INVALID_OBSERVATION');
     return projectLock(scope.projectRoot, async () => {
       const root = this.capture(scope);
       await safePath(scope.projectRoot, root);
@@ -67,7 +68,7 @@ export class ReplayHistoryStore {
         await safePath(scope.projectRoot, imagePath);
         try {
           const existing = await fs.readFile(imagePath);
-          if (createHash('sha256').update(existing).digest('hex') !== imageSha256) throw new Error('REPLAY_IMAGE_CORRUPT');
+          if (createHash('sha256').update(existing).digest('hex') !== imageSha256) throw new AppError('REPLAY_IMAGE_CORRUPT');
           additionalImage = 0;
         } catch (error) { if (!missing(error)) throw error; }
       }
@@ -90,13 +91,13 @@ export class ReplayHistoryStore {
     const sessionBytes = await treeBytes(projectRoot, this.session(projectRoot, sessionId));
     const projectBytes = await treeBytes(projectRoot, this.root(projectRoot));
     if (sessionBytes + delta > (this.options.sessionQuotaBytes ?? 256 * 1024 * 1024)
-      || projectBytes + delta > (this.options.projectQuotaBytes ?? 2 * 1024 * 1024 * 1024)) throw new Error('REPLAY_QUOTA_EXCEEDED');
+      || projectBytes + delta > (this.options.projectQuotaBytes ?? 2 * 1024 * 1024 * 1024)) throw new AppError('REPLAY_QUOTA_EXCEEDED');
   }
 
   async list(scope: ReplayHistoryScope, options: { afterSequence?: number; limit?: number } = {}): Promise<{ entries: ReplayHistoryEntry[]; nextSequence?: number }> {
     const { afterSequence = 0, limit = 100 } = options;
     if (!Number.isSafeInteger(afterSequence) || afterSequence < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
-      throw new Error('REPLAY_INVALID_PAGE');
+      throw new AppError('REPLAY_INVALID_PAGE');
     }
     const manifest = await this.manifest(scope);
     const entries = manifest.entries.filter((entry) => entry.sequence > afterSequence).slice(0, limit);
@@ -107,11 +108,11 @@ export class ReplayHistoryStore {
   async readImage(scope: ReplayHistoryScope, imageSha256: string): Promise<Buffer> {
     assertHash(imageSha256);
     const manifest = await this.manifest(scope);
-    if (!manifest.entries.some((entry) => entry.imageSha256 === imageSha256)) throw new Error('REPLAY_IMAGE_NOT_REFERENCED');
+    if (!manifest.entries.some((entry) => entry.imageSha256 === imageSha256)) throw new AppError('REPLAY_IMAGE_NOT_REFERENCED');
     const target = path.join(this.capture(scope), `${imageSha256}.png`);
     await safePath(scope.projectRoot, target);
     const bytes = await fs.readFile(target);
-    if (createHash('sha256').update(bytes).digest('hex') !== imageSha256) throw new Error('REPLAY_IMAGE_CORRUPT');
+    if (createHash('sha256').update(bytes).digest('hex') !== imageSha256) throw new AppError('REPLAY_IMAGE_CORRUPT');
     return bytes;
   }
 
@@ -121,7 +122,7 @@ export class ReplayHistoryStore {
     try {
       const value = JSON.parse(await fs.readFile(target, 'utf8')) as ReplaySelection;
       if (typeof value.inputId !== 'string' || !value.inputId || (value.deviceId !== undefined && typeof value.deviceId !== 'string')) {
-        throw new Error('REPLAY_SELECTION_CORRUPT');
+        throw new AppError('REPLAY_SELECTION_CORRUPT');
       }
       if (value.captureSha256) assertHash(value.captureSha256);
       return value;
@@ -129,7 +130,7 @@ export class ReplayHistoryStore {
   }
 
   async saveSelection(projectRoot: string, sessionId: string, selection: ReplaySelection): Promise<void> {
-    if (!selection.inputId || typeof selection.inputId !== 'string') throw new Error('REPLAY_INVALID_SELECTION');
+    if (!selection.inputId || typeof selection.inputId !== 'string') throw new AppError('REPLAY_INVALID_SELECTION');
     if (selection.captureSha256) assertHash(selection.captureSha256);
     await projectLock(projectRoot, async () => {
       const root = this.session(projectRoot, sessionId);
@@ -170,7 +171,7 @@ export class ReplayHistoryStore {
       if (!/^\.pending-\d+-[a-f0-9-]+$/u.test(file)) continue;
       const target = path.join(directory, file);
       await safePath(projectRoot, target);
-      if (!(await fs.lstat(target)).isFile()) throw new Error('REPLAY_UNSAFE_ENTRY');
+      if (!(await fs.lstat(target)).isFile()) throw new AppError('REPLAY_UNSAFE_ENTRY');
       await fs.unlink(target);
     }
   }
@@ -183,7 +184,7 @@ export class ReplayHistoryStore {
       if (/^\.pending-\d+-[a-f0-9-]+$/u.test(file) || (/^[a-f0-9]{64}\.png$/u.test(file) && !referenced.has(file))) {
         const target = path.join(root, file);
         await safePath(scope.projectRoot, target);
-        if (!(await fs.lstat(target)).isFile()) throw new Error('REPLAY_UNSAFE_ENTRY');
+        if (!(await fs.lstat(target)).isFile()) throw new AppError('REPLAY_UNSAFE_ENTRY');
         await fs.unlink(target);
       }
     }

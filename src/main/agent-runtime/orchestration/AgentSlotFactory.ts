@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /**
  * AgentSlotFactory — builds or reuses the per-scope Agent execution cache.
  *
@@ -101,7 +102,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
   const executionScopeId = requireExecutionScopeId(request.sessionId);
   const slotKey = agentSlotKey(executionScopeId, agentId);
   if (deps.slots.isQuarantined(slotKey)) {
-    throw new Error(`AGENT_SLOT_QUARANTINED: ${slotKey} is still owned by an orphaned turn.`);
+    throw new AppError('AGENT_SLOT_QUARANTINED', `${slotKey} is still owned by an orphaned turn.`);
   }
   const toolSignature = deps.createToolSignature(signatureTools ?? tools);
   const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
@@ -109,11 +110,11 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
   const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);
   const resolvedContextTokenLimit = requestCompactionThreshold - fixedPromptTokens;
   if (resolvedContextTokenLimit <= 0) {
-    throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
+    throw new AppError('PROMPT_OVERHEAD_EXCEEDS_BUDGET', 'system prompt and tool schemas leave no conversation budget.');
   }
   const existing = deps.slots.getSlot(slotKey);
   if (existing?.agent.isStreaming) {
-    throw new Error(`AGENT_SLOT_BUSY: ${slotKey} has not completed its previous provider loop.`);
+    throw new AppError('AGENT_SLOT_BUSY', `${slotKey} has not completed its previous provider loop.`);
   }
   if (
     existing

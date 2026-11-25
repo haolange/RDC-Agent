@@ -17,7 +17,3 @@
   color: var(--token-text-secondary);
   overflow-wrap: anywhere;
 }
-
-.device-discovery-status.is-error {
-  color: var(--token-status-error);
-}

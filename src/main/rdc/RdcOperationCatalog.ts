@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import type { RdcOperationDefinition } from '@shared/types/tool';
 
 export function canonicalJson(value: unknown): string {
@@ -18,7 +19,7 @@ export function deepFreeze<T>(value: T): T {
 }
 const effects = new Set(['replay_position', 'replay_position_temporary', 'artifact_write', 'remote_control', 'lifecycle', 'global_config', 'desktop_window', 'context_metadata', 'shader_debug', 'shader_replacement', 'artifact_delete']);
 export function validateDefinitions(value: unknown, count: unknown, fingerprint: unknown): RdcOperationDefinition[] {
-  if (!Array.isArray(value) || !value.length || count !== value.length || typeof fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(fingerprint)) throw new Error('RDC_UPGRADE_REQUIRED: incomplete operation catalog. Use a CLI providing the complete current operation contract.');
+  if (!Array.isArray(value) || !value.length || count !== value.length || typeof fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(fingerprint)) throw new AppError('RDC_UPGRADE_REQUIRED', 'incomplete operation catalog. Use a CLI providing the complete current operation contract.');
   const names = new Set<string>();
   for (const raw of value) {
     if (!raw || typeof raw !== 'object' || typeof raw.name !== 'string' || !/^rd\.[a-z_]+\.[a-z_]+$/.test(raw.name) || names.has(raw.name)
@@ -28,11 +29,11 @@ export function validateDefinitions(value: unknown, count: unknown, fingerprint:
       || raw.input_schema?.type !== 'object' || raw.input_schema?.additionalProperties !== false
       || !raw.input_schema.properties || typeof raw.input_schema.properties !== 'object'
       || !Array.isArray(raw.path_inputs) || raw.path_inputs.some((entry: Record<string, unknown>) => !entry || typeof entry.name !== 'string' || !Object.hasOwn(raw.input_schema.properties, entry.name) || !['read', 'write', 'read_directory'].includes(String(entry.access)))) {
-      throw new Error('RDC_UPGRADE_REQUIRED: unrecognized operation contract. Update RDC-Tool and RDC-Agent together.');
+      throw new AppError('RDC_UPGRADE_REQUIRED', 'unrecognized operation contract. Update RDC-Tool and RDC-Agent together.');
     }
     names.add(raw.name);
   }
-  if (operationFingerprint(value) !== fingerprint) throw new Error('RDC_CATALOG_FINGERPRINT: operation definitions do not match their content fingerprint.');
+  if (operationFingerprint(value) !== fingerprint) throw new AppError('RDC_CATALOG_FINGERPRINT', 'operation definitions do not match their content fingerprint.');
   return value as RdcOperationDefinition[];
 }
 
@@ -54,7 +55,7 @@ export function validateApplicationOperations(definitions: RdcOperationDefinitio
       || canonicalJson([...definition.effects].sort()) !== canonicalJson([...expected.effects].sort())
       || Object.entries(expected.parameters).some(([key, type]) => schema?.properties?.[key]?.type !== type)
       || (schema?.required ?? []).some(key => !expected.supplied.includes(key))) {
-      throw new Error(`RDC_UPGRADE_REQUIRED: application operation ${name} is missing or has an incompatible contract. Update RDC-Tool and RDC-Agent together.`);
+      throw new AppError('RDC_UPGRADE_REQUIRED', `application operation ${name} is missing or has an incompatible contract. Update RDC-Tool and RDC-Agent together.`);
     }
   }
 }

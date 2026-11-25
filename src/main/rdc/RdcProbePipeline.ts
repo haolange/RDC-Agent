@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { AppError } from '@shared/errors/appError';
 import { rdcDigest } from './RdcExecutionReceipts';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
 import { runRdcOperation } from './RdcOperationCoordinator';
@@ -22,7 +23,7 @@ export async function executePreservedPipelineProbe(input: {
   const currentLease = () => {
     const current = assertRdcContextLeaseOwnership({ sessionId: lease.ownerSessionId, projectId: lease.ownerProjectId });
     if (!current || current.version !== lease.version || current.contextId !== lease.contextId) {
-      throw new Error('RDC_PROBE_OWNER: replay ownership changed during the pipeline query.');
+      throw new AppError('RDC_PROBE_OWNER', 'replay ownership changed during the pipeline query.');
     }
     return current;
   };
@@ -48,7 +49,7 @@ export async function executePreservedPipelineProbe(input: {
       response = await execute('pipeline', input.args, options);
       const result = parseRdcNativeResult(response, undefined, 'rd.pipeline.get_state');
       if (!isDeepStrictEqual(parseRdcProcessIdentity((result.meta as Record<string, unknown> | undefined)?.process_identity), before.processIdentity)) {
-        throw new Error('RDC_PROBE_OWNER: pipeline result came from a different native process.');
+        throw new AppError('RDC_PROBE_OWNER', 'pipeline result came from a different native process.');
       }
     } catch (error) { queryFailed = true; queryFailure = error; }
 
@@ -71,7 +72,7 @@ export async function executePreservedPipelineProbe(input: {
       quarantineRdcContext(lease.ownerSessionId, lease.version,
         'Pipeline probe could not prove restoration of the owning replay.',
         { operation: 'rd.pipeline.get_state', argsFingerprint: rdcDigest(input.args), code: 'RDC_PROBE_RESTORE_UNCONFIRMED' });
-      throw new Error(`RDC_PROBE_RESTORE_UNCONFIRMED: ${error instanceof Error ? error.message : String(error)}`);
+      throw new AppError('RDC_PROBE_RESTORE_UNCONFIRMED', error instanceof Error ? error.message : String(error), { cause: error });
     }
     if (queryFailed) {
       if (!(queryFailure instanceof RdcNativeFailure && queryFailure.effectsNotAttempted && unchangedAfterQuery)) {

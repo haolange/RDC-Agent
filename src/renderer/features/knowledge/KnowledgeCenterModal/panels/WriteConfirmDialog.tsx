@@ -6,6 +6,7 @@ import { Textarea } from '../../../../ui/Textarea';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { useI18n } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import { ConflictRow } from '../parts/ConflictRow';
 import { KnowledgeStatusTag } from '../parts/KnowledgeStatusTag';
 import { formatKnowledgeTime } from '../knowledgeCenterLabels';
@@ -131,7 +132,7 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
       {write.block === 'draft-to-verified' && <InlineError>{t('knowledgeCenter.confirmBlockedLifecycle')}</InlineError>}
       {write.block?.startsWith('missing-chapters') && <InlineError>{t('knowledgeCenter.confirmMissingChapters')}</InlineError>}
       {write.versionStale && <InlineError>{t('knowledgeCenter.confirmVersionStale')}</InlineError>}
-      {write.error && <InlineError>{write.error}</InlineError>}
+      {write.error && <InlineError detail={write.error}>{humanizeError(write.error, t, 'app.error.actionFailed')}</InlineError>}
 
       <Checkbox
         className="knowledge-center-check"

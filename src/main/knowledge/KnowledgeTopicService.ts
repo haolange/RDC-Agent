@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import { knowledgeIndexService, type KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeTopicChangesSchema, KnowledgeTopicStore } from './KnowledgeTopicStore';
@@ -61,13 +62,13 @@ export class KnowledgeTopicService {
   private async calculate(raw: KnowledgeTopicChanges): Promise<{ preview: KnowledgeTopicPreview; next: KnowledgeTopicDocument }> {
     const changes = KnowledgeTopicChangesSchema.parse(raw);
     const [{ document, revision }, snapshot] = await Promise.all([this.store.read(), this.index.getOrRebuild()]);
-    if (changes.expectedRevision !== revision) throw new Error('KNOWLEDGE_TOPICS_CHANGED: refresh the proposal.');
-    if (changes.expectedCorpusRevision !== snapshot.revision) throw new Error('KNOWLEDGE_INDEX_CHANGED: refresh the proposal.');
+    if (changes.expectedRevision !== revision) throw new AppError('KNOWLEDGE_TOPICS_CHANGED', 'refresh the proposal.');
+    if (changes.expectedCorpusRevision !== snapshot.revision) throw new AppError('KNOWLEDGE_INDEX_CHANGED', 'refresh the proposal.');
     if (new Set(changes.topics.map(topic => topic.id)).size !== changes.topics.length
       || new Set(changes.assignments.map(item => item.cardId)).size !== changes.assignments.length) {
-      throw new Error('KNOWLEDGE_TOPICS_DUPLICATE: each topic and card may appear only once.');
+      throw new AppError('KNOWLEDGE_TOPICS_DUPLICATE', 'each topic and card may appear only once.');
     }
-    if (!changes.topics.length && !changes.assignments.length && !changes.merges.length) throw new Error('KNOWLEDGE_TOPICS_EMPTY: choose at least one change.');
+    if (!changes.topics.length && !changes.assignments.length && !changes.merges.length) throw new AppError('KNOWLEDGE_TOPICS_EMPTY', 'choose at least one change.');
     const topics = new Map(document.topics.map(topic => [topic.id, topic]));
     for (const topic of changes.topics) topics.set(topic.id, { ...topic, synonyms: sorted(topic.synonyms) });
     const assignments = new Map(document.assignments.map(item => [item.cardId, item]));
@@ -79,18 +80,18 @@ export class KnowledgeTopicService {
     const merges: KnowledgeTopicPreview['merges'] = [];
     const mergeSources = new Set(changes.merges.map(item => item.sourceId));
     if (mergeSources.size !== changes.merges.length || changes.merges.some(item => item.sourceId === item.targetId || mergeSources.has(item.targetId))) {
-      throw new Error('KNOWLEDGE_TOPIC_MERGE_INVALID: merge sources must be distinct and targets cannot themselves be merged.');
+      throw new AppError('KNOWLEDGE_TOPIC_MERGE_INVALID', 'merge sources must be distinct and targets cannot themselves be merged.');
     }
     for (const merge of changes.merges) {
       const source = topics.get(merge.sourceId), target = topics.get(merge.targetId);
-      if (!source || !target) throw new Error('KNOWLEDGE_TOPIC_UNKNOWN: merge source or target is missing.');
+      if (!source || !target) throw new AppError('KNOWLEDGE_TOPIC_UNKNOWN', 'merge source or target is missing.');
       const combined = { ...target, synonyms: sorted([...target.synonyms, source.label, ...source.synonyms]) };
       topics.set(target.id, combined);
       topics.delete(source.id);
       merges.push({ source, target: combined });
       for (const old of assignments.values()) {
         if (!old.topicIds.includes(source.id)) continue;
-        if ((cardCounts.get(old.cardId) ?? 0) > 1) throw new Error('KNOWLEDGE_TOPIC_CARD_AMBIGUOUS: duplicate card identity.');
+        if ((cardCounts.get(old.cardId) ?? 0) > 1) throw new AppError('KNOWLEDGE_TOPIC_CARD_AMBIGUOUS', 'duplicate card identity.');
         const card = cardsById.get(old.cardId);
         const before = document.assignments.find(item => item.cardId === old.cardId)?.topicIds ?? [];
         const after = sorted([...old.topicIds.filter(id => id !== source.id), target.id]);
@@ -101,9 +102,9 @@ export class KnowledgeTopicService {
     }
     for (const change of changes.assignments) {
       const card = cardsById.get(change.cardId);
-      if ((cardCounts.get(change.cardId) ?? 0) > 1) throw new Error('KNOWLEDGE_TOPIC_CARD_AMBIGUOUS: duplicate card identity.');
-      if (!card || card.contentHash !== change.contentHash) throw new Error('KNOWLEDGE_TOPIC_SOURCE_CHANGED: refresh the proposal.');
-      if (!change.topicIds.length || change.topicIds.some(id => !topics.has(id))) throw new Error('KNOWLEDGE_TOPIC_UNKNOWN: assignments require existing or proposed topics.');
+      if ((cardCounts.get(change.cardId) ?? 0) > 1) throw new AppError('KNOWLEDGE_TOPIC_CARD_AMBIGUOUS', 'duplicate card identity.');
+      if (!card || card.contentHash !== change.contentHash) throw new AppError('KNOWLEDGE_TOPIC_SOURCE_CHANGED', 'refresh the proposal.');
+      if (!change.topicIds.length || change.topicIds.some(id => !topics.has(id))) throw new AppError('KNOWLEDGE_TOPIC_UNKNOWN', 'assignments require existing or proposed topics.');
       const old = assignments.get(card.cardId);
       const stale = Boolean(old && old.contentHash !== card.contentHash);
       const before = document.assignments.find(item => item.cardId === card.cardId)?.topicIds ?? [];
@@ -131,7 +132,7 @@ export class KnowledgeTopicService {
   async apply(changes: KnowledgeTopicChanges, changeHash: string): Promise<{ revision: string }> {
     return this.store.withWriteLock(async () => {
       const { preview, next } = await this.calculate(changes);
-      if (preview.changeHash !== changeHash) throw new Error('KNOWLEDGE_TOPICS_PREVIEW_CHANGED: review the changes again.');
+      if (preview.changeHash !== changeHash) throw new AppError('KNOWLEDGE_TOPICS_PREVIEW_CHANGED', 'review the changes again.');
       return { revision: await this.store.write(preview.revision, next) };
     });
   }

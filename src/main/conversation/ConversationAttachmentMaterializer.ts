@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { describeMaterialContext } from '@shared/types/materialContext';
+import { AppError } from '@shared/errors/appError';
 import { hashAttachmentContents } from './ConversationAttachmentHashing';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
@@ -67,11 +68,11 @@ export async function assertSafeImageAttachment(
   fileName: string,
 ): Promise<{ mimeType: string; size: number }> {
   if (declaredMimeType === 'image/svg+xml' || path.extname(filePath).toLowerCase() === '.svg') {
-    throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (image/svg+xml)`);
+    throw new AppError('ATTACHMENT_MEDIA_UNSUPPORTED', `${fileName} (image/svg+xml)`);
   }
   if ((declaredMimeType === null && path.extname(filePath) !== '')
     || (declaredMimeType !== null && !NATIVE_IMAGE_MIME_TYPES.has(declaredMimeType))) {
-    throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (${declaredMimeType})`);
+    throw new AppError('ATTACHMENT_MEDIA_UNSUPPORTED', `${fileName} (${declaredMimeType})`);
   }
   const handle = await fs.promises.open(filePath, 'r');
   try {
@@ -91,7 +92,7 @@ export async function resolvePendingAttachmentDescriptors(
   attachments: ConversationAttachmentInput[],
 ): Promise<AgentInputAttachment[]> {
   if (attachments.length > MAX_ATTACHMENT_COUNT) {
-    throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
+    throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
   }
   const resolved: AgentInputAttachment[] = [];
   let totalBytes = 0;
@@ -99,14 +100,14 @@ export async function resolvePendingAttachmentDescriptors(
     const filePath = path.resolve(attachment.sourcePath);
     const stats = await fs.promises.stat(filePath).catch(() => null);
     if (!stats?.isFile()) {
-      throw new Error(`ATTACHMENT_NOT_FOUND: ${attachment.fileName || path.basename(filePath)}`);
+      throw new AppError('ATTACHMENT_NOT_FOUND', attachment.fileName || path.basename(filePath));
     }
     if (stats.size > MAX_ATTACHMENT_BYTES_PER_FILE) {
-      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: ${attachment.fileName || path.basename(filePath)} exceeds ${MAX_ATTACHMENT_BYTES_PER_FILE} bytes.`);
+      throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `${attachment.fileName || path.basename(filePath)} exceeds ${MAX_ATTACHMENT_BYTES_PER_FILE} bytes.`);
     }
     totalBytes += stats.size;
     if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
-      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
+      throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
     }
     const fileName = attachment.fileName || path.basename(filePath);
     const header = Buffer.alloc(Math.min(stats.size, 64 * 1024));
@@ -226,10 +227,10 @@ export async function materializeAgentUserInput(
     return { content: message, imageTokenAdjustment: 0, inlineTokenBudget: 0, attachmentManifest: [] };
   }
   if (attachments.length > MAX_ATTACHMENT_COUNT) {
-    throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
+    throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
   }
   if (attachments.some((attachment) => !attachment.layer)) {
-    throw new Error('ATTACHMENT_INVALID: attachment layer is required.');
+    throw new AppError('ATTACHMENT_INVALID', 'attachment layer is required.');
   }
   let totalBytes = 0;
   for (const attachment of attachments) {
@@ -237,28 +238,28 @@ export async function materializeAgentUserInput(
     const stats = await fs.promises.stat(sourcePath).catch(() => null);
     const actualSize = stats?.isFile() ? stats.size : attachment.size;
     if (!Number.isFinite(actualSize) || actualSize < 0 || actualSize > MAX_ATTACHMENT_BYTES_PER_FILE) {
-      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: ${attachment.fileName} exceeds the per-file byte limit.`);
+      throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `${attachment.fileName} exceeds the per-file byte limit.`);
     }
     totalBytes += actualSize;
     if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
-      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
+      throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
     }
   }
 
   const imageAttachments = attachments.filter((attachment) => attachment.layer === 'image');
   if (imageAttachments.length > 0 && visionInputMode !== 'native') {
-    throw new Error('VISION_INPUT_UNSUPPORTED: the selected model route does not accept image attachments.');
+    throw new AppError('VISION_INPUT_UNSUPPORTED', 'the selected model route does not accept image attachments.');
   }
   for (const attachment of imageAttachments) {
     if (!NATIVE_IMAGE_MIME_TYPES.has(attachment.mimeType)) {
-      throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${attachment.fileName} (${attachment.mimeType})`);
+      throw new AppError('ATTACHMENT_MEDIA_UNSUPPORTED', `${attachment.fileName} (${attachment.mimeType})`);
     }
     const sourcePath = sourcePathOf(attachment);
     const exists = await fs.promises.stat(sourcePath).then((stats) => stats.isFile()).catch(() => false);
     if (exists) {
       await assertSafeImageAttachment(sourcePath, attachment.mimeType, attachment.fileName);
     } else if (resolved.includeImageData) {
-      throw new Error(`ATTACHMENT_NOT_FOUND: ${attachment.fileName}`);
+      throw new AppError('ATTACHMENT_NOT_FOUND', attachment.fileName);
     }
   }
 
@@ -279,7 +280,7 @@ export async function materializeAgentUserInput(
     for (const attachment of imageAttachments) {
       const bytes = await fs.promises.readFile(sourcePathOf(attachment));
       if (bytes.byteLength > MAX_DECODED_IMAGE_BYTES) {
-        throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: decoded image ${attachment.fileName} exceeds ${MAX_DECODED_IMAGE_BYTES} bytes.`);
+        throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `decoded image ${attachment.fileName} exceeds ${MAX_DECODED_IMAGE_BYTES} bytes.`);
       }
       imageData.set(attachment.filePath, bytes.toString('base64'));
     }
@@ -321,17 +322,17 @@ export async function hydrateFrozenUserContent(
   importedAttachments: SessionAttachmentRecord[],
 ): Promise<UserMessage['content']> {
   if (manifest.length !== importedAttachments.length) {
-    throw new Error('ATTACHMENT_INVALID: frozen attachment manifest length does not match committed attachments.');
+    throw new AppError('ATTACHMENT_INVALID', 'frozen attachment manifest length does not match committed attachments.');
   }
   for (let index = 0; index < manifest.length; index += 1) {
     const expected = manifest[index]!;
     const actual = importedAttachments[index]!;
     if (expected.sourceHash) {
       const hash = (await hashAttachmentContents([{ sourcePath: actual.filePath, fileName: actual.fileName }]))[0];
-      if (hash !== expected.sourceHash) throw new Error(`ATTACHMENT_SOURCE_CHANGED: ${expected.fileName}; prepare the request again.`);
+      if (hash !== expected.sourceHash) throw new AppError('ATTACHMENT_SOURCE_CHANGED', `${expected.fileName}; prepare the request again.`);
     }
     if (!sameManifestEntry(expected, actual)) {
-      throw new Error(`ATTACHMENT_INVALID: frozen attachment manifest mismatch for ${expected.fileName}.`);
+      throw new AppError('ATTACHMENT_INVALID', `frozen attachment manifest mismatch for ${expected.fileName}.`);
     }
   }
   if (typeof frozen === 'string') return frozen;
@@ -340,12 +341,12 @@ export async function hydrateFrozenUserContent(
     if (entry.layer !== 'image') continue;
     const exists = await fs.promises.stat(entry.filePath).then((stats) => stats.isFile()).catch(() => false);
     if (!exists) {
-      throw new Error(`ATTACHMENT_NOT_FOUND: ${entry.fileName}`);
+      throw new AppError('ATTACHMENT_NOT_FOUND', entry.fileName);
     }
     await assertSafeImageAttachment(entry.filePath, entry.mimeType, entry.fileName);
     const bytes = await fs.promises.readFile(entry.filePath);
     if (bytes.byteLength > MAX_DECODED_IMAGE_BYTES) {
-      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: decoded image ${entry.fileName} exceeds ${MAX_DECODED_IMAGE_BYTES} bytes.`);
+      throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `decoded image ${entry.fileName} exceeds ${MAX_DECODED_IMAGE_BYTES} bytes.`);
     }
     imageByPath.set(entry.filePath, bytes.toString('base64'));
   }
@@ -356,7 +357,7 @@ export async function hydrateFrozenUserContent(
     const entry = imageEntries[imageIndex];
     imageIndex += 1;
     if (!entry) {
-      throw new Error('ATTACHMENT_INVALID: frozen image block has no matching manifest entry.');
+      throw new AppError('ATTACHMENT_INVALID', 'frozen image block has no matching manifest entry.');
     }
     return {
       ...block,

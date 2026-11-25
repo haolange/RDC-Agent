@@ -1,8 +1,9 @@
+import { createHash } from 'crypto';
+import { AppError } from '@shared/errors/appError';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
 
-import { createHash } from 'crypto';
 import { agentCompletionContract } from '@shared/types/agentManifest';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import { charsToTokens } from '@shared/utils/tokens';
@@ -89,10 +90,10 @@ function resolveSkillIntersection(
   let investigationMission: 'debugger' | 'analyzer' | 'optimizer' | null = null;
   for (const skillId of profileSkills) {
     const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId);
-    if (!skill) throw new Error('SKILL_UNAVAILABLE: ' + skillId);
+    if (!skill) throw new AppError('SKILL_UNAVAILABLE', skillId);
     const frozen = promptPlan.segments.find(segment => segment.id === 'skill:' + skillId && segment.kind === 'preloaded-skill');
-    if (!frozen) throw new Error('SKILL_NOT_PRELOADED: rebuild preparation for ' + skillId);
-    if (frozen.sourceHash !== skill.sourceHash) throw new Error('SKILL_SOURCE_CHANGED: rebuild preparation for ' + skillId);
+    if (!frozen) throw new AppError('SKILL_NOT_PRELOADED', 'rebuild preparation for ' + skillId);
+    if (frozen.sourceHash !== skill.sourceHash) throw new AppError('SKILL_SOURCE_CHANGED', 'rebuild preparation for ' + skillId);
     if (skill.investigationMission && investigationMission && skill.investigationMission !== investigationMission) {
       throw new Error('mission_method: preloaded skills declare conflicting investigation-mission values');
     }
@@ -158,7 +159,7 @@ export class TurnPreparationService {
     excludeSubagent?: boolean;
   }): Promise<PreparedAgentTurnContext> {
     const throwIfCancelled = () => {
-      if (input.signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
+      if (input.signal?.aborted) throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
     };
     throwIfCancelled();
     const contextRoute = {
@@ -203,7 +204,7 @@ export class TurnPreparationService {
     const offerSegment = promptPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer');
     if (Boolean(approvedExecutionOffer) !== Boolean(offerSegment)
       || (approvedExecutionOffer && offerSegment?.sourceHash !== hashScopedResource(approvedExecutionOfferFact(approvedExecutionOffer)))) {
-      throw new Error('APPROVED_PLAN_CHANGED: rebuild the prompt and preparation for the current plan.');
+      throw new AppError('APPROVED_PLAN_CHANGED', 'rebuild the prompt and preparation for the current plan.');
     }
     const approvedExecution = approvedExecutionOffer && input.sessionId ? {
       offer: structuredClone(approvedExecutionOffer),
@@ -242,7 +243,7 @@ export class TurnPreparationService {
         && (refs.some(ref => !ref.startsWith('session://investigation/')) || !canUse('investigation_read'))) {
         missing.push('artifact_read (or investigation_read for Investigation records)');
       }
-      if (missing.length) throw new Error(`DELEGATION_PREPARATION_CONFLICT: ${input.agentId} cannot use ${missing.join(', ')} under the prepared Profile, Skill intersection or policy. Review the declared methods and authorized profile; do not bypass policy or approved Task requirements.`);
+      if (missing.length) throw new AppError('DELEGATION_PREPARATION_CONFLICT', `${input.agentId} cannot use ${missing.join(', ')} under the prepared Profile, Skill intersection or policy. Review the declared methods and authorized profile; do not bypass policy or approved Task requirements.`);
     }
     const acquiredMcp = await this.deps.mcp.acquireConnections(
       input.agentId,
@@ -296,8 +297,8 @@ export class TurnPreparationService {
     const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: userTimestamp };
     const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
     if (messageBudget <= 0) {
-      throw new Error(
-        'PROMPT_OVERHEAD_EXCEEDS_BUDGET: System prompt, skills, and tool schemas exceed the selected model prompt budget.',
+      throw new AppError(
+        'PROMPT_OVERHEAD_EXCEEDS_BUDGET', 'System prompt, skills, and tool schemas exceed the selected model prompt budget.',
       );
     }
 
@@ -376,7 +377,7 @@ export class TurnPreparationService {
       lastPreparedMessage?.role !== 'user'
       || JSON.stringify(lastPreparedMessage.content) !== JSON.stringify(input.content)
     ) {
-      throw new Error('CONTEXT_CANNOT_FIT: preparation did not preserve the current user message.');
+      throw new AppError('CONTEXT_CANNOT_FIT', 'preparation did not preserve the current user message.');
     }
     const initialMessages = compactedMessages.slice(0, -1);
     // prepareTurn 唯一一次解析 settings → 写入 effectivePlan；runAgentTurn/Executor 不得再读。

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { isSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { AppError } from '@shared/errors/appError';
 import { sniffRasterImageMime, sniffVideoMime, toDataUrl } from '../media/mediaBytes';
 
 const IMAGE_MAX_BYTES = 20 * 1024 * 1024;
@@ -20,10 +21,8 @@ export interface ConversationMediaScope {
   attachments: ReadonlyArray<{ fileName: string; filePath: string }>;
 }
 
-class MediaError extends Error {
-  constructor(readonly code: ConversationMediaError) {
-    super(code);
-  }
+class MediaError extends AppError {
+  declare readonly code: ConversationMediaError;
 }
 
 const realpathWithin = (candidate: string, root: string): string => {

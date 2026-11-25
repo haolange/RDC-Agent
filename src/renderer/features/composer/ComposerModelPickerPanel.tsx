@@ -269,13 +269,20 @@ const ProviderNotice: React.FC<{
   onRetry: () => void;
 }> = ({ notice, retrying, onRetry }) => {
   const { t } = useI18n();
-  const text = t(notice.kind === 'failed' ? 'composer.model.refreshFailed'
-    : notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty');
-  // The provider's own error text is technical; it stays on hover rather than in the sentence.
+  // The provider's own error text is technical; only "Copy details" carries it.
+  if (notice.kind === 'failed') {
+    return (
+      <div className="composer-model-notice" data-notice={notice.kind}>
+        <InlineError className="composer-model-notice-text" detail={notice.error}
+          onRetry={onRetry} retryLabel={t('settings.retry')} retryDisabled={retrying}>
+          {t('composer.model.refreshFailed')}
+        </InlineError>
+      </div>
+    );
+  }
   return (
-    <div className="composer-model-notice" role="status" data-notice={notice.kind}
-      data-tooltip={notice.kind === 'failed' ? notice.error : undefined}>
-      <span className="composer-model-notice-text">{text}</span>
+    <div className="composer-model-notice" role="status" data-notice={notice.kind}>
+      <span className="composer-model-notice-text">{t(notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty')}</span>
       {notice.kind === 'loading' ? null : (
         <Button variant="secondary" size="sm" disabled={retrying} onClick={onRetry}>{t('settings.retry')}</Button>
       )}

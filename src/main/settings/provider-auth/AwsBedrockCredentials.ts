@@ -68,7 +68,7 @@ export async function resolveAwsBedrockCredentials(
     resolved = await provider();
   } catch (error) {
     throw new Error(
-      `AWS credential chain is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      `AWS credential chain is unavailable: ${error instanceof Error ? error.message : String(error)}`, { cause: error },
     );
   }
   if (!resolved.accessKeyId || !resolved.secretAccessKey) {

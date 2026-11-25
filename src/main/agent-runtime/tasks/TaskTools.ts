@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /**
  * TaskTools — 把 TaskRegistry 暴露为 5 个 AgentTool。
  *
@@ -230,7 +231,7 @@ export function createTaskUpdateTool(
 
       const status = readEnum(params, 'status', ALLOWED_STATUS);
       const executionRequirements = params.executionRequirements === undefined ? undefined : TaskExecutionRequirementsSchema.parse(params.executionRequirements);
-      if (executionRequirements && status && status !== 'pending') throw new Error('TASK_EXECUTION_REQUIREMENTS: revise requirements separately before starting or settling work.');
+      if (executionRequirements && status && status !== 'pending') throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'revise requirements separately before starting or settling work.');
       if (params.resumeCancelled !== undefined && typeof params.resumeCancelled !== 'boolean') throw new Error('resumeCancelled must be boolean.');
       const resumeCancelled = params.resumeCancelled === true;
       if (resumeCancelled && (status !== 'in_progress' || context.scopeRootTaskId)) {
@@ -471,7 +472,7 @@ export function createTaskStopTool(
 async function assertTaskInScope(registry: TaskRegistry, taskId: string, rootTaskId: string | undefined, allowRoot: boolean): Promise<void> {
   if (!rootTaskId) return;
   const tasks = await registry.listTasks();
-  if (!isTaskInScope(taskId, rootTaskId, tasks, allowRoot)) throw new Error('TASK_SCOPE_DENIED: delegated agents may access only descendants of their owning Task.');
+  if (!isTaskInScope(taskId, rootTaskId, tasks, allowRoot)) throw new AppError('TASK_SCOPE_DENIED', 'delegated agents may access only descendants of their owning Task.');
 }
 
 function isTaskInScope(taskId: string, rootTaskId: string, tasks: readonly TaskRecord[], allowRoot: boolean): boolean {

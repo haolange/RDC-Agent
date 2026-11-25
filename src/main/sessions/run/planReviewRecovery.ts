@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { resolveVisibleConversationMessages } from '../../conversation/ConversationBranchResolver';
 import { storageAdapter } from '../store/StorageAdapter';
 import { planReviewStateStore, type PlanReviewStateStore } from './PlanReviewStateStore';
@@ -18,7 +19,7 @@ export function resolveRecoverablePlan(sessionId: string, store: PlanReviewState
     const plan = call.planReview!;
     const turnId = call.delegatedRequest?.turnId ?? message.turnId;
     if (!state || state.planId !== plan.planId || state.revision !== plan.revision) continue;
-    if (!state.ownerTurnId || state.ownerTurnId !== turnId) throw new Error('PLAN_PROVENANCE_MISSING: plan ownership is unproven.');
+    if (!state.ownerTurnId || state.ownerTurnId !== turnId) throw new AppError('PLAN_PROVENANCE_MISSING', 'plan ownership is unproven.');
     if (state.status !== 'awaiting' && state.status !== 'cancelled') return null;
     const reference: PlanReadRequest = { sessionId, planId: plan.planId, revision: plan.revision, uri: plan.uri, expectedHash: plan.hash };
     const source = readReferencedPlan(reference);
@@ -28,7 +29,7 @@ export function resolveRecoverablePlan(sessionId: string, store: PlanReviewState
   }
   const state = store.read(sessionId);
   if (state?.status === 'awaiting' || state?.status === 'cancelled') {
-    throw new Error('PLAN_REVIEW_SOURCE_UNAVAILABLE: current revision has no matching owner on the selected branch.');
+    throw new AppError('PLAN_REVIEW_SOURCE_UNAVAILABLE', 'current revision has no matching owner on the selected branch.');
   }
   return null;
 }

@@ -1,3 +1,4 @@
+import { AppError } from '../errors/appError';
 import type { AgentModelBinding, AppLanguage, LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 import type { ModelCost } from '../provider-catalog/modelManifestSchema';
@@ -225,7 +226,7 @@ export function resolveAgentWriteTarget(
   if (definition?.provenance?.scope === 'project') {
     const projectId = currentProjectId?.trim();
     if (!projectId) {
-      throw new Error('AGENT_MANIFEST_PROJECT_ID_REQUIRED: project effective profile requires a current projectId.');
+      throw new AppError('AGENT_MANIFEST_PROJECT_ID_REQUIRED', 'project effective profile requires a current projectId.');
     }
     return { scope: 'project', projectId };
   }
@@ -239,7 +240,7 @@ export function resolveAgentWriteTargetFromDraft(
   if (draft.writeScope === 'project') {
     const projectId = draft.writeProjectId?.trim() || currentProjectId?.trim();
     if (!projectId) {
-      throw new Error('AGENT_MANIFEST_PROJECT_ID_REQUIRED: project-scoped editor draft requires a current projectId.');
+      throw new AppError('AGENT_MANIFEST_PROJECT_ID_REQUIRED', 'project-scoped editor draft requires a current projectId.');
     }
     return { scope: 'project', projectId };
   }

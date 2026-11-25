@@ -1,3 +1,4 @@
+import { AppError } from '../errors/appError';
 /**
  * session:// Artifact 契约与配额。
  * Wave 2：grammar / category 闭集 / 配额数字的单一事实源。
@@ -75,13 +76,12 @@ export const SESSION_ARTIFACT_ERROR_CODES = [
 
 export type SessionArtifactErrorCode = (typeof SESSION_ARTIFACT_ERROR_CODES)[number];
 
-export class SessionArtifactError extends Error {
-  readonly code: SessionArtifactErrorCode;
+export class SessionArtifactError extends AppError {
+  declare readonly code: SessionArtifactErrorCode;
 
   constructor(code: SessionArtifactErrorCode, message?: string) {
-    super(message ? `${code}: ${message}` : code);
+    super(code, message);
     this.name = 'SessionArtifactError';
-    this.code = code;
   }
 }
 

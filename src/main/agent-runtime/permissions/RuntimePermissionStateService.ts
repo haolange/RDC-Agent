@@ -1,7 +1,8 @@
+import { AppError } from '@shared/errors/appError';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
-export class PermissionModeChangedError extends Error {
+export class PermissionModeChangedError extends AppError {
   constructor() { super('PERMISSION_MODE_CHANGED'); this.name = 'PermissionModeChangedError'; }
 }
 
@@ -16,7 +17,7 @@ export class RuntimePermissionStateService {
   }
 
   getSnapshot(): RuntimePermissionState {
-    if (!this.snapshot) throw new Error('PERMISSION_STATE_UNINITIALIZED');
+    if (!this.snapshot) throw new AppError('PERMISSION_STATE_UNINITIALIZED');
     return this.snapshot;
   }
 

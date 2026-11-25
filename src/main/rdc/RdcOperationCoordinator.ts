@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /** All UI and Agent operations for a native context share this queue. */
 const queues = new Map<string, Promise<unknown>>();
 const locks = new Map<string, Set<string>>();
@@ -11,7 +12,7 @@ export function beginRdcLifecycle(sessionId: string): () => void {
   };
 }
 export function acquireRdcPreparationLock(sessionId: string, owner: string): void {
-  if (lifecycles.has(sessionId)) throw new Error('RDC_REPLAY_BUSY: wait for capture lifecycle completion.');
+  if (lifecycles.has(sessionId)) throw new AppError('RDC_REPLAY_BUSY', 'wait for capture lifecycle completion.');
   setRdcInteractionLock(sessionId, owner, true);
 }
 export function runRdcOperation<T>(contextId: string, operation: () => Promise<T>): Promise<T> {

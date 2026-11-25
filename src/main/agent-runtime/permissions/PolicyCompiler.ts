@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { hashScopedResource, scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import type {
@@ -44,19 +45,19 @@ function normalizeToolName(name: string): string {
 
 function assertFiniteNonNegative(key: string, value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
-    throw new Error(`POLICY_INVALID: limit "${key}" must be a non-negative integer.`);
+    throw new AppError('POLICY_INVALID', `limit "${key}" must be a non-negative integer.`);
   }
   return value;
 }
 
 function parseApprovalFloor(value: unknown, toolName: string): PolicyApprovalFloor {
   if (value === 'none' || value === 'auto_review' || value === 'user') return value;
-  throw new Error(`POLICY_INVALID: approvalFloorByTool.${toolName} must be none|auto_review|user.`);
+  throw new AppError('POLICY_INVALID', `approvalFloorByTool.${toolName} must be none|auto_review|user.`);
 }
 
 function sanitizeRestrictivePolicy(raw: unknown, sourcePath: string): RestrictivePolicy {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error(`POLICY_INVALID: ${sourcePath} must be a YAML object.`);
+    throw new AppError('POLICY_INVALID', `${sourcePath} must be a YAML object.`);
   }
   const input = raw as Record<string, unknown>;
   const deniedTools = Array.isArray(input.deniedTools)
@@ -66,18 +67,18 @@ function sanitizeRestrictivePolicy(raw: unknown, sourcePath: string): Restrictiv
       .filter(Boolean)
     : [];
   if (Array.isArray(input.deniedTools) && input.deniedTools.some((entry) => typeof entry !== 'string')) {
-    throw new Error(`POLICY_INVALID: ${sourcePath} deniedTools must be string[].`);
+    throw new AppError('POLICY_INVALID', `${sourcePath} deniedTools must be string[].`);
   }
 
   const approval = input.approval ?? 'none';
   if (approval !== 'none' && approval !== 'destructive' && approval !== 'mutation' && approval !== 'all') {
-    throw new Error(`POLICY_INVALID: ${sourcePath} approval must be none|destructive|mutation|all.`);
+    throw new AppError('POLICY_INVALID', `${sourcePath} approval must be none|destructive|mutation|all.`);
   }
 
   const approvalFloorByTool: Record<string, PolicyApprovalFloor> = {};
   if (input.approvalFloorByTool !== undefined) {
     if (!input.approvalFloorByTool || typeof input.approvalFloorByTool !== 'object' || Array.isArray(input.approvalFloorByTool)) {
-      throw new Error(`POLICY_INVALID: ${sourcePath} approvalFloorByTool must be an object.`);
+      throw new AppError('POLICY_INVALID', `${sourcePath} approvalFloorByTool must be an object.`);
     }
     for (const [toolName, floor] of Object.entries(input.approvalFloorByTool as Record<string, unknown>)) {
       approvalFloorByTool[normalizeToolName(toolName)] = parseApprovalFloor(floor, toolName);
@@ -87,11 +88,11 @@ function sanitizeRestrictivePolicy(raw: unknown, sourcePath: string): Restrictiv
   const limits: Record<string, number> = {};
   if (input.limits !== undefined) {
     if (!input.limits || typeof input.limits !== 'object' || Array.isArray(input.limits)) {
-      throw new Error(`POLICY_INVALID: ${sourcePath} limits must be an object.`);
+      throw new AppError('POLICY_INVALID', `${sourcePath} limits must be an object.`);
     }
     for (const [key, value] of Object.entries(input.limits as Record<string, unknown>)) {
       if (!KNOWN_LIMIT_KEYS.has(key)) {
-        throw new Error(`POLICY_INVALID: unknown limit "${key}".`);
+        throw new AppError('POLICY_INVALID', `unknown limit "${key}".`);
       }
       limits[key] = assertFiniteNonNegative(key, value);
     }
@@ -136,8 +137,8 @@ function loadPolicyDirectory(dir: string): PolicySource[] {
     try {
       raw = YAML.parse(fs.readFileSync(sourcePath, 'utf8'));
     } catch (error) {
-      throw new Error(
-        `POLICY_INVALID: failed to parse ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`,
+      throw new AppError(
+        'POLICY_INVALID', `failed to parse ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`, { cause: error },
       );
     }
     if (raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as Record<string, unknown>).enabled === false) {

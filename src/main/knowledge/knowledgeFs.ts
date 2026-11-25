@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { samePath } from '../platform/paths';
 import { StorageIo } from '../sessions/store/StorageIo';
-import { KnowledgeWriteIntegrityError, KnowledgeWritePathError } from './knowledgeErrors';
 import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
 import type { ParsedKnowledgeSource } from './knowledgeCardSchema';
 
@@ -52,7 +52,7 @@ export async function resolveWithinRoot(rootPath: string, relativePath: string):
     if (!isPathInside(realRoot, realTarget)) throw new Error('Knowledge card path escaped its space root.');
     return realTarget;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Knowledge card not found.');
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Knowledge card not found.', { cause: error });
     throw error;
   }
 }
@@ -111,10 +111,10 @@ async function lstatOrNull(target: string): Promise<import('node:fs').Stats | nu
 
 function assertNotLink(stat: import('node:fs').Stats, target: string): void {
   if (stat.isSymbolicLink()) {
-    throw new KnowledgeWritePathError(`refusing symlink/junction write path ${target}.`);
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `refusing symlink/junction write path ${target}.`);
   }
   if (stat.isFile() && stat.nlink > 1) {
-    throw new KnowledgeWritePathError(`refusing hardlinked write path ${target} (nlink=${stat.nlink}).`);
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `refusing hardlinked write path ${target} (nlink=${stat.nlink}).`);
   }
 }
 
@@ -138,7 +138,7 @@ async function assertLexicalAncestorsAreLinkFree(absolute: string): Promise<void
     assertNotLink(stat, hop);
     const real = await fs.realpath(hop);
     if (!samePath(real, hop)) {
-      throw new KnowledgeWritePathError(`path escapes through a link at ${hop}.`);
+      throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `path escapes through a link at ${hop}.`);
     }
   }
 }
@@ -149,18 +149,18 @@ export async function assertSafeKnowledgeWriteTarget(
 ): Promise<string> {
   const normalizedRelative = toPosixRelative(relativePath).replace(/^\/+/, '');
   if (!normalizedRelative || normalizedRelative.includes('\0') || normalizedRelative.split('/').includes('..')) {
-    throw new KnowledgeWritePathError('relative path contains .., NUL, or is empty.');
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', 'relative path contains .., NUL, or is empty.');
   }
   const lexicalRoot = path.resolve(rootPath);
   await assertLexicalAncestorsAreLinkFree(lexicalRoot);
   await fs.mkdir(lexicalRoot, { recursive: true });
   const realRoot = await fs.realpath(lexicalRoot);
   if (!samePath(realRoot, lexicalRoot)) {
-    throw new KnowledgeWritePathError(`space root realpath diverged from lexical path ${lexicalRoot}.`);
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `space root realpath diverged from lexical path ${lexicalRoot}.`);
   }
   const lexical = path.resolve(lexicalRoot, ...normalizedRelative.split('/'));
   if (!isPathInside(lexicalRoot, lexical)) {
-    throw new KnowledgeWritePathError('Knowledge card path escaped its space root.');
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', 'Knowledge card path escaped its space root.');
   }
   let current = lexicalRoot;
   for (const part of path.relative(lexicalRoot, lexical).split(path.sep).filter(Boolean)) {
@@ -182,7 +182,7 @@ export async function writeKnowledgeCardAtomic(
   const expected = createHash('sha256').update(contents, 'utf8').digest('hex');
   const actual = createHash('sha256').update(written, 'utf8').digest('hex');
   if (expected !== actual) {
-    throw new KnowledgeWriteIntegrityError(`post-write hash mismatch for ${absolutePath}.`);
+    throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', `post-write hash mismatch for ${absolutePath}.`);
   }
   const writtenStat = await fs.lstat(absolutePath);
   assertNotLink(writtenStat, absolutePath);

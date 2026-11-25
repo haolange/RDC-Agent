@@ -1,13 +1,14 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
 
 export const assertHash = (value: string): void => {
-  if (!/^[a-f0-9]{64}$/u.test(value)) throw new Error('REPLAY_INVALID_HASH');
+  if (!/^[a-f0-9]{64}$/u.test(value)) throw new AppError('REPLAY_INVALID_HASH');
 };
 export const assertSession = (value: string): void => {
-  if (!/^[a-zA-Z0-9_-]{1,128}$/u.test(value)) throw new Error('REPLAY_INVALID_SESSION');
+  if (!/^[a-zA-Z0-9_-]{1,128}$/u.test(value)) throw new AppError('REPLAY_INVALID_SESSION');
 };
 export const missing = (error: unknown): boolean => (error as NodeJS.ErrnoException).code === 'ENOENT';
 
@@ -15,17 +16,17 @@ export const missing = (error: unknown): boolean => (error as NodeJS.ErrnoExcept
 export async function safePath(projectRoot: string, target: string): Promise<void> {
   const root = path.resolve(projectRoot);
   const relative = path.relative(root, path.resolve(target));
-  if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('REPLAY_PATH_ESCAPE');
+  if (relative.startsWith('..') || path.isAbsolute(relative)) throw new AppError('REPLAY_PATH_ESCAPE');
   const realRoot = await fs.realpath(root);
   let current = root;
   for (const segment of relative.split(path.sep).filter(Boolean)) {
     current = path.join(current, segment);
     try {
       const stat = await fs.lstat(current);
-      if (stat.isSymbolicLink()) throw new Error('REPLAY_UNSAFE_LINK');
+      if (stat.isSymbolicLink()) throw new AppError('REPLAY_UNSAFE_LINK');
       const resolved = await fs.realpath(current);
       const actual = path.relative(realRoot, resolved);
-      if (actual.startsWith('..') || path.isAbsolute(actual)) throw new Error('REPLAY_PATH_ESCAPE');
+      if (actual.startsWith('..') || path.isAbsolute(actual)) throw new AppError('REPLAY_PATH_ESCAPE');
     } catch (error) { if (missing(error)) return; throw error; }
   }
 }
@@ -40,7 +41,7 @@ export async function treeBytes(projectRoot: string, root: string): Promise<numb
     await safePath(projectRoot, target);
     if (entry.isDirectory()) total += await treeBytes(projectRoot, target);
     else if (entry.isFile()) total += (await fs.stat(target)).size;
-    else throw new Error('REPLAY_UNSAFE_ENTRY');
+    else throw new AppError('REPLAY_UNSAFE_ENTRY');
   }
   return total;
 }
@@ -79,26 +80,26 @@ async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
       return async () => {
         await safePath(projectRoot, target);
         const owner = JSON.parse(await fs.readFile(target, 'utf8')) as { token: string };
-        if (owner.token !== token) throw new Error('REPLAY_LOCK_OWNERSHIP_LOST');
+        if (owner.token !== token) throw new AppError('REPLAY_LOCK_OWNERSHIP_LOST');
         await fs.unlink(target);
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const before = await fs.stat(target);
       let owner: { pid: number };
-      try { owner = JSON.parse(await fs.readFile(target, 'utf8')) as { pid: number }; } catch { throw new Error('REPLAY_LOCK_CORRUPT'); }
-      if (!Number.isSafeInteger(owner.pid) || owner.pid < 1) throw new Error('REPLAY_LOCK_CORRUPT');
-      try { process.kill(owner.pid, 0); throw new Error('REPLAY_STORE_BUSY'); } catch (probeError) {
+      try { owner = JSON.parse(await fs.readFile(target, 'utf8')) as { pid: number }; } catch (parseError) { throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: parseError }); }
+      if (!Number.isSafeInteger(owner.pid) || owner.pid < 1) throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: error });
+      try { process.kill(owner.pid, 0); throw new AppError('REPLAY_STORE_BUSY', undefined, { cause: error }); } catch (probeError) {
         if ((probeError as NodeJS.ErrnoException).code !== 'ESRCH') throw probeError;
       }
       const after = await fs.stat(target);
-      if (before.ino !== after.ino || before.mtimeMs !== after.mtimeMs || before.size !== after.size) throw new Error('REPLAY_STORE_BUSY');
+      if (before.ino !== after.ino || before.mtimeMs !== after.mtimeMs || before.size !== after.size) throw new AppError('REPLAY_STORE_BUSY', undefined, { cause: error });
       await fs.unlink(target);
     } finally {
       await fs.rm(pending, { force: true });
     }
   }
-  throw new Error('REPLAY_STORE_BUSY');
+  throw new AppError('REPLAY_STORE_BUSY');
 }
 
 export async function projectLock<T>(projectRoot: string, operation: () => Promise<T>): Promise<T> {

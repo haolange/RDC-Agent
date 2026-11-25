@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../store/StorageAdapter';
 import { planReviewStateStore } from './PlanReviewStateStore';
 import { executionOfferMatches } from './ExecutionOfferStore';
@@ -42,7 +43,7 @@ export function approvedExecutionOfferForAgent(
 export function assertApprovedExecutionCurrent(sessionId: string, agentId: string, prepared: ExecutionOffer): void {
   const current = approvedExecutionOfferForAgent(sessionId, agentId);
   if (!current || JSON.stringify(current) !== JSON.stringify(prepared)) {
-    throw new Error('APPROVED_PLAN_CHANGED: the approved execution offer changed during this turn.');
+    throw new AppError('APPROVED_PLAN_CHANGED', 'the approved execution offer changed during this turn.');
   }
 }
 

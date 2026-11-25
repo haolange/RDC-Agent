@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createHash } from 'node:crypto';
 import { nativeImage } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { assertSafeImageAttachment } from '../../../conversation/ConversationAttachmentMaterializer';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
 import { safeResolvePath } from './_shared';
@@ -65,7 +66,7 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
   async execute(toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
     if (context?.visionInputMode !== 'native') {
-      throw new Error('VISION_INPUT_UNSUPPORTED: the selected model route does not accept image attachments.');
+      throw new AppError('VISION_INPUT_UNSUPPORTED', 'the selected model route does not accept image attachments.');
     }
     const absolute = safeResolvePath(params.path, undefined, context);
     const fileName = path.basename(absolute);
@@ -81,16 +82,16 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
     if (params.region) {
       const { x, y, width, height } = params.region;
       if (![x, y, width, height].every(Number.isSafeInteger) || x < 0 || y < 0 || width < 1 || height < 1) {
-        throw new Error('IMAGE_REGION_INVALID: expected a positive in-bounds pixel rectangle.');
+        throw new AppError('IMAGE_REGION_INVALID', 'expected a positive in-bounds pixel rectangle.');
       }
       const image = nativeImage.createFromBuffer(sourceBytes);
-      if (image.isEmpty()) throw new Error('IMAGE_REGION_INVALID: source image could not be decoded.');
+      if (image.isEmpty()) throw new AppError('IMAGE_REGION_INVALID', 'source image could not be decoded.');
       const size = image.getSize();
-      if (x + width > size.width || y + height > size.height) throw new Error('IMAGE_REGION_INVALID: rectangle exceeds source dimensions.');
+      if (x + width > size.width || y + height > size.height) throw new AppError('IMAGE_REGION_INVALID', 'rectangle exceeds source dimensions.');
       const cropped = image.crop({ x, y, width, height });
       const croppedSize = cropped.getSize();
       if (cropped.isEmpty() || croppedSize.width !== width || croppedSize.height !== height) {
-        throw new Error('IMAGE_REGION_INVALID: region could not be decoded at the requested dimensions.');
+        throw new AppError('IMAGE_REGION_INVALID', 'region could not be decoded at the requested dimensions.');
       }
       bytes = cropped.toPNG();
       outputMimeType = 'image/png';

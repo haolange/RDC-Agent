@@ -25,10 +25,12 @@ export interface ToastProps {
   onExited: () => void;
   /** Hovering or focusing a toast pauses its timer. */
   onHoldChange?: (held: boolean) => void;
+  /** A quiet secondary action beside dismiss, such as copying an error's details. */
+  action?: ReactNode;
 }
 
 /** One toast: a tone icon, one sentence and an optional second, a dismiss button; enters and leaves with motion. */
-export function Toast({ open, title, message, tone = 'info', dismissLabel, onDismiss, onExited, onHoldChange }: ToastProps) {
+export function Toast({ open, title, message, tone = 'info', dismissLabel, onDismiss, onExited, onHoldChange, action }: ToastProps) {
   const ref = useRef<HTMLDivElement>(null);
   const presence = usePresence(open, ref, onExited);
   if (!presence.mounted) return null;
@@ -48,6 +50,7 @@ export function Toast({ open, title, message, tone = 'info', dismissLabel, onDis
         <span className="ui-toast-title">{title}</span>
         {message ? <span className="ui-toast-message">{message}</span> : null}
       </div>
+      {action ? <div className="ui-toast-action">{action}</div> : null}
       <IconButton label={dismissLabel} size="sm" className="ui-toast-dismiss" onClick={onDismiss}>
         <Icon name="close" size={14} />
       </IconButton>

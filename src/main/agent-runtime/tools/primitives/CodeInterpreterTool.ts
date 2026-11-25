@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { defaultPythonCommand } from '../../../platform/shell';
 import { processSupervisor, type ProcessExitReason } from '../../../runtime/ProcessSupervisor';
 import { settingsService } from '../../../settings/settings-core/SettingsService';
@@ -75,11 +76,11 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
   async execute(toolCallId, params, signal, onUpdate, context) {
     const settings = settingsService.getAll().tooling.codeInterpreter;
     if (!settings.enabled) {
-      throw new Error('CODE_INTERPRETER_DISABLED: enable the interpreter in Settings → Tools.');
+      throw new AppError('CODE_INTERPRETER_DISABLED', 'enable the interpreter in Settings → Tools.');
     }
     const language = (params.language ?? 'python').trim().toLowerCase();
     if (language && language !== 'python' && language !== 'py') {
-      throw new Error(`CODE_INTERPRETER_UNSUPPORTED_LANGUAGE: ${language}`);
+      throw new AppError('CODE_INTERPRETER_UNSUPPORTED_LANGUAGE', language);
     }
     const cwd = requireMutationWorkspaceRoot(context);
     const command = resolveInterpreterCommand(settings.command);

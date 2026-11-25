@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
 import type { CLIResult } from '@shared/types/tool';
 import type { AgentToolResult } from '../agent-runtime/agent/AgentTool';
@@ -50,19 +51,19 @@ export class RdcNativeFailure extends Error {
 /** Fail before any lease/experiment state is committed. Never surface binary stdout. */
 export function parseRdcNativeResult(result: CLIResult, expectedContext?: string, expectedKind?: string): RdcNativeEnvelope {
   if (result.stdoutTruncated) {
-    throw new Error(`RDC_CLI_OUTPUT_TRUNCATED: native result exceeded the bounded stdout buffer (${result.stdoutByteLength ?? 'unknown'} bytes).`);
+    throw new AppError('RDC_CLI_OUTPUT_TRUNCATED', `native result exceeded the bounded stdout buffer (${result.stdoutByteLength ?? 'unknown'} bytes).`);
   }
   if (result.exitCode !== 0 && !result.stdout.trim()) {
-    throw new Error(`RDC_CLI_FAILED: native rdc exited with code ${result.exitCode} without a result.`);
+    throw new AppError('RDC_CLI_FAILED', `native rdc exited with code ${result.exitCode} without a result.`);
   }
   let value: unknown;
   try { value = JSON.parse(result.stdout); } catch {
     const bytes = result.stdoutByteLength ?? Buffer.byteLength(result.stdout, 'utf8');
     const prefix = result.stdout.trimStart().startsWith('{') ? 'json_object' : 'other';
-    throw new Error(`RDC_CLI_PROTOCOL: expected a canonical JSON result (stdoutBytes=${bytes}, prefix=${prefix}).`);
+    throw new AppError('RDC_CLI_PROTOCOL', `expected a canonical JSON result (stdoutBytes=${bytes}, prefix=${prefix}).`);
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('RDC_CLI_PROTOCOL: expected a JSON object.');
+    throw new AppError('RDC_CLI_PROTOCOL', 'expected a JSON object.');
   }
   const envelope = value as Record<string, unknown>;
   if (envelope.ok === false && envelope.error && typeof envelope.error === 'object' && !Array.isArray(envelope.error)) {
@@ -123,16 +124,16 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
         screenshotTargetRestoration, inspectionRestoration);
     }
   }
-  if (result.exitCode !== 0) throw new Error('RDC_CLI_FAILED: native rdc exited with code ' + result.exitCode);
-  if (envelope.ok !== true) throw new Error('RDC_CLI_FAILED: native rdc did not report ok:true.');
+  if (result.exitCode !== 0) throw new AppError('RDC_CLI_FAILED', 'native rdc exited with code ' + result.exitCode);
+  if (envelope.ok !== true) throw new AppError('RDC_CLI_FAILED', 'native rdc did not report ok:true.');
   if (typeof envelope.result_kind !== 'string' || !envelope.result_kind
     || !envelope.data || typeof envelope.data !== 'object' || Array.isArray(envelope.data)) {
-    throw new Error('RDC_CLI_PROTOCOL: missing result_kind or data.');
+    throw new AppError('RDC_CLI_PROTOCOL', 'missing result_kind or data.');
   }
-  if (expectedKind && envelope.result_kind !== expectedKind) throw new Error('RDC_CLI_PROTOCOL: unexpected result_kind.');
+  if (expectedKind && envelope.result_kind !== expectedKind) throw new AppError('RDC_CLI_PROTOCOL', 'unexpected result_kind.');
   const responseContext = (envelope.data as Record<string, unknown>).context_id;
   if (expectedContext && responseContext !== expectedContext) {
-    throw new Error('RDC_CONTEXT_MISMATCH: CLI response does not belong to the owning daemon context.');
+    throw new AppError('RDC_CONTEXT_MISMATCH', 'CLI response does not belong to the owning daemon context.');
   }
   return envelope as unknown as RdcNativeEnvelope;
 }

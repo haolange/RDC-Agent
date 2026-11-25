@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { settingsService } from '../settings/settings-core/SettingsService';
@@ -78,7 +79,7 @@ export function listAppDaemonContextsInIntermediateRoot(intermediateRoot: string
 
 export function rememberOwnedRdcDaemon(record: OwnedRdcDaemonRecord, options: OwnedRdcDaemonStoreOptions = {}): void {
   if (!isAppRdcContextId(record.contextId)) {
-    throw new Error(`RDC_OWNERSHIP_DENIED: ${record.contextId} is not an application-owned daemon context.`);
+    throw new AppError('RDC_OWNERSHIP_DENIED', `${record.contextId} is not an application-owned daemon context.`);
   }
   const document = readRegistry(options.registryPath);
   document.records[record.contextId] = { ...record, contextId: record.contextId };
@@ -138,7 +139,7 @@ export async function harvestOwnedRdcDaemons(
       const probe = options.probeProcess ?? probeProcess;
       const owner = probe(ownerIdentity(record));
       if (record.ownerPid !== process.pid && owner !== 'exited') {
-        throw new Error(`RDC_OWNERSHIP_BUSY: owner ${record.ownerPid} is ${owner === 'alive' ? 'still alive' : 'unverifiable'}.`);
+        throw new AppError('RDC_OWNERSHIP_BUSY', `owner ${record.ownerPid} is ${owner === 'alive' ? 'still alive' : 'unverifiable'}.`);
       }
       const stateFile = path.join(record.intermediateRoot, 'runtime', 'rdc_tool_cli', `daemon_state_${record.contextId}.json`);
       const dead = owner === 'exited' && [daemonIdentity(record), workerIdentity(record)].every((identity) => probe(identity) === 'exited');
@@ -195,11 +196,11 @@ async function stopOwnedDaemon(
     throw error;
   });
   if (cleared && cleared.data.context_id && cleared.data.context_id !== record.contextId) {
-    throw new Error('RDC_CONTEXT_MISMATCH: context clear does not belong to the owned daemon.');
+    throw new AppError('RDC_CONTEXT_MISMATCH', 'context clear does not belong to the owned daemon.');
   }
   try {
     const stopped = await invoke('daemon', ['stop', '--daemon-context', record.contextId], 'rdc_tool.daemon.stop');
-    if (stopped.data.stopped !== true) throw new Error('RDC_CLOSE_FAILED: daemon shutdown was not confirmed.');
+    if (stopped.data.stopped !== true) throw new AppError('RDC_CLOSE_FAILED', 'daemon shutdown was not confirmed.');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/no active daemon/i.test(message)) throw error;
@@ -224,11 +225,11 @@ function killVerifiedOwnedPids(
     // An unreadable identity or command line is never proof of exit and never authorizes a kill.
     const commandLine = liveness === 'alive' ? readCommandLine(identity.pid) : null;
     if (!commandLine?.includes(expected) || !commandLine.includes(record.contextId)) {
-      throw new Error(`RDC_CLOSE_FAILED: pid ${identity.pid} is not a confirmed ${expected} for ${record.contextId}.`);
+      throw new AppError('RDC_CLOSE_FAILED', `pid ${identity.pid} is not a confirmed ${expected} for ${record.contextId}.`);
     }
     if (terminate(identity) === 'unconfirmed') remaining.push(identity.pid);
   }
-  if (remaining.length) throw new Error(`RDC_CLOSE_FAILED: owned pids still running: ${remaining.join(', ')}`);
+  if (remaining.length) throw new AppError('RDC_CLOSE_FAILED', `owned pids still running: ${remaining.join(', ')}`);
 }
 
 function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {
@@ -240,10 +241,10 @@ function readRegistry(registryPath?: string): RegistryDocument {
   if (!fs.existsSync(filePath)) return { schemaVersion: REGISTRY_SCHEMA, records: {} };
   const payload = JSON.parse(fs.readFileSync(filePath, 'utf8')) as RegistryDocument;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new Error('RDC_OWNERSHIP_CORRUPT: owned daemon registry is not an object.');
+    throw new AppError('RDC_OWNERSHIP_CORRUPT', 'owned daemon registry is not an object.');
   }
   if (payload.schemaVersion !== REGISTRY_SCHEMA) {
-    throw new Error(`STORAGE_SCHEMA_UNSUPPORTED: owned-rdc-daemons schema ${String(payload.schemaVersion)}`);
+    throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', `owned-rdc-daemons schema ${String(payload.schemaVersion)}`);
   }
   const records: Record<string, OwnedRdcDaemonRecord> = {};
   const birth = (value: unknown): string => (typeof value === 'string' ? value : '');

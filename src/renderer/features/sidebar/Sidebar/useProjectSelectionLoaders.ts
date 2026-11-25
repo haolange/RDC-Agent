@@ -9,6 +9,7 @@ import {
   loadRunsForSession,
   restoreSelectionSnapshot,
   type ProjectSelectionLoaderOpsContext,
+  type SidebarError,
 } from './projectSelectionContext';
 import { loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
 import { selectSessionOp } from './projectSelectionSessionOps';
@@ -25,7 +26,7 @@ export interface UseProjectSelectionLoadersOptions {
   loadProjectSessionList: (projectId: string) => Promise<SessionRecord[]>;
   pruneTreeForProjects: (visibleProjectIds: Set<string>) => void;
   resetTree: () => void;
-  setSidebarError: (error: string | null) => void;
+  setSidebarError: (error: SidebarError | null) => void;
 }
 
 export function useProjectSelectionLoaders({

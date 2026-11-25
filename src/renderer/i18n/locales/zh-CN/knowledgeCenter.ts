@@ -66,7 +66,6 @@ export const zhKnowledgeCenter = {
   'knowledgeCenter.exportRun': '导出',
   'knowledgeCenter.exportDone': '已导出 {count} 条知识。',
   'knowledgeCenter.exportExcluded': '{count} 条因缺失附件、含密钥或绝对路径被跳过。',
-  'knowledgeCenter.exportNoEligibleCards': '所选范围没有可导出的卡片。请补齐缺失附件，或移除敏感内容和非法路径。',
   'knowledgeCenter.importTitle': '导入知识',
   'knowledgeCenter.importDescription': '导入的卡片写成所选空间的草稿，不会自动验证，也不会变成候选。',
   'knowledgeCenter.importInputMode': '输入方式',

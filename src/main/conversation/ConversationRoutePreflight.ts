@@ -9,6 +9,7 @@ import {
   isAgentToolExecutableModel,
 } from '@shared/utils/agentToolCapability';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
+import { AppError } from '@shared/errors/appError';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { settingsService } from '../settings/settings-core/SettingsService';
@@ -115,8 +116,8 @@ export function resolveConversationAgentId(
   if (findEffectiveAgentProfile(DEFAULT_AGENT_ID, projectRootPath).enabled) {
     return DEFAULT_AGENT_ID;
   }
-  throw new Error(
-    `CONVERSATION_AGENT_UNAVAILABLE: default profile \`${DEFAULT_AGENT_ID}\` is not enabled.`,
+  throw new AppError(
+    'CONVERSATION_AGENT_UNAVAILABLE', `default profile \`${DEFAULT_AGENT_ID}\` is not enabled.`,
   );
 }
 

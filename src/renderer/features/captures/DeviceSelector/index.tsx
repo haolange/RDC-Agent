@@ -6,6 +6,7 @@ import { useSessionDevicePreparation } from '../../../hooks/useSessionDevicePrep
 import { DevicePreparationStatus, DEVICE_PHASE_KEYS, isDevicePreparing, isDeviceInstallationUnconfirmed } from '../../../patterns/DevicePreparationStatus';
 import { IconButton } from '../../../ui/IconButton';
 import { Icon } from '../../../ui/Icon';
+import { InlineError } from '../../../ui/InlineError';
 import { Spinner } from '../../../ui/Spinner';
 import { useI18n } from '../../../i18n';
 import { Button } from '../../../ui/Button';
@@ -39,8 +40,7 @@ export function DeviceSelector() {
     if (!scope || !state || locked || (installUnconfirmed && deviceId !== targetId)) return;
     void useSessionDeviceStore.getState().prepare(scope, deviceId);
   };
-  const discoveryMessage = discovery.status === 'failed' ? t('device.discovery.failed')
-    : discovery.status === 'scanning' || discovery.status === 'idle' ? t('device.discovery.scanning')
+  const discoveryMessage = discovery.status === 'scanning' || discovery.status === 'idle' ? t('device.discovery.scanning')
     : devices.some(device => device.type === 'android' && device.adbState !== 'missing') ? null : t('device.discovery.empty');
   return <div className="device-selector-container">
     <Popover open={open} onOpenChange={setOpen} align="end" className="device-selector-dropdown"
@@ -80,8 +80,10 @@ export function DeviceSelector() {
         {/* The target's own preparation state is the one status; an idle, healthy target needs no second line. */}
         {scope && (state?.preparation.phase !== 'idle' || actionFailure || error) && <DevicePreparationStatus preparation={state?.preparation ?? null} issue={actionFailure?.issue} transportError={error} hasCapture={Boolean(state?.inputId && state.contextId)} disabled={locked}
           onRetry={() => select(installUnconfirmed ? targetId : actionFailure?.deviceId ?? targetId)} onCancel={() => useSessionDeviceStore.getState().cancel(scope)} />}
-        {discoveryMessage && <div className="device-discovery-footer">
-          {discoveryMessage && <span role="status" className={`device-discovery-status ${discovery.status === 'failed' ? 'is-error' : ''}`}>{discoveryMessage}</span>}
+        {discovery.status === 'failed' ? <div className="device-discovery-footer">
+          <InlineError detail={discovery.error}>{t('device.discovery.failed')}</InlineError>
+        </div> : discoveryMessage && <div className="device-discovery-footer">
+          <span role="status" className="device-discovery-status">{discoveryMessage}</span>
         </div>}
       </div>
     </Popover>

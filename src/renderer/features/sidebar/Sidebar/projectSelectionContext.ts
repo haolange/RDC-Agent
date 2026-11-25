@@ -7,9 +7,15 @@ import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { RightRailTarget } from './types';
 import type { SelectionSnapshot } from './types';
 
+/** A failed sidebar operation: its own copy, and the technical reason that only "Copy details" carries. */
+export interface SidebarError {
+  contextKey: TranslationKey;
+  detail?: string;
+}
+
 export interface ProjectSelectionLoaderOpsContext {
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
-  setSidebarError: (error: string | null) => void;
+  setSidebarError: (error: SidebarError | null) => void;
   ensureProjectExpanded: (projectId: string) => void;
   loadProjectSessionList: (projectId: string) => Promise<SessionRecord[]>;
   pruneTreeForProjects: (visibleProjectIds: Set<string>) => void;
@@ -31,7 +37,7 @@ export interface ProjectSelectionLoaderOpsContext {
 
 export interface ProjectSelectionHandlerOpsContext extends ProjectSelectionLoaderOpsContext {
   setIsBusy: (busy: boolean) => void;
-  setSidebarError: (error: string | null) => void;
+  setSidebarError: (error: SidebarError | null) => void;
   beginSelectionRequest: () => number;
   loadProjects: (
     preferredProjectId?: string | null,

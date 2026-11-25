@@ -313,7 +313,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 ## 反馈原语
 
 - **提示**：任何元素写 `data-tooltip` 即可获得悬停提示，`ui/TooltipHost`（挂在 `AppProviders`）统一呈现：悬停 450ms 后出现，刚关闭一个后下一个立即出现，键盘聚焦立即出现，Escape、按下指针与离开即消失，触屏不出现；提示文字与元素可访问名称不同时以 `aria-describedby` 关联。组件不写原生 `title`；截断文字用 `OverflowFade`，只在真正溢出时提供完整文字；提示文字与可见文字完全相同且没有截断时，`TooltipHost` 不显示它。
-- **Toast**：`ui/Toast` + `NotificationToast` 是唯一的操作结果反馈：语气图标、一句标题、可选一句正文、关闭按钮；信息与成功 4s、警告 6s 自动消失，错误等待用户关闭，悬停或聚焦时暂停计时，最多同时 3 条。来源只有 `notificationStore`，技术细节不进 Toast。
+- **Toast**：`ui/Toast` + `NotificationToast` 是唯一的操作结果反馈：语气图标、一句标题、可选一句正文、关闭按钮；信息与成功 4s、警告 6s 自动消失，错误等待用户关闭，悬停或聚焦时暂停计时，最多同时 3 条。来源只有 `notificationStore` 的 `notify.info/success/warning/error`；失败用 `notify.failure(error, t, 情境文案键)`，标题由 `humanizeError` 给出，技术细节不上屏，只在关闭按钮旁的「复制详情」里。
 - **错误**：`ui/InlineError` 是唯一的错误呈现：错误图标 + 一句人话（正文字号）+ 可选「重试」+ 有技术原因时一个「复制详情」图标按钮（经 `lib/clipboard` 的 `ClipboardContext`，由 `AppProviders` 注入）。原始报错经 `lib/errorDetail` 只进复制内容，门禁拒绝在组件里渲染 `String(error)` 或裸 `<p role="alert">`。
 - **复制**：`ui/CopyButton` 是唯一的复制入口：复制图标，成功后 1.6s 内变成绿色对勾，提示同步切换为「已复制」。
 - **图片**：`ui/ImageViewer` 是唯一的图片查看器：人话标题、缩放（按钮、滚轮、双击）、放大后拖动平移、上一张 / 下一张（方向键）与「打开原图」；Working 图片组、知识卡片图片与正文图片共用。面板贴合图片：取图片原尺寸，上限为视口的 90%（窄屏铺满），工具条附在面板顶部；遮罩铺满全屏，但不会出现一个巨大的空面板里浮着一张小图。

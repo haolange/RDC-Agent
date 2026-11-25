@@ -9,6 +9,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { childScopePrefix, isTransientScopeId } from '@shared/utils/executionScope';
 import { appPathService } from '../../runtime/AppPathService';
 import { FileTaskStore, MemoryTaskStore, type TaskStore } from './TaskStore';
@@ -32,7 +33,7 @@ export function removeSessionTasks(sessionId: string): void {
   const childPrefix = safeSegment(childScopePrefix(sessionId));
   const entries = fs.readdirSync(base, { withFileTypes: true })
     .filter(entry => entry.name === own || entry.name.startsWith(childPrefix));
-  if (entries.some(entry => !entry.isDirectory())) throw new Error('TASK_SCOPE_NOT_DIRECTORY');
+  if (entries.some(entry => !entry.isDirectory())) throw new AppError('TASK_SCOPE_NOT_DIRECTORY');
   for (const entry of entries) fs.rmSync(path.join(base, entry.name), { recursive: true, force: true });
 }
 

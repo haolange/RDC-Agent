@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { StorageIo } from '../sessions/store/StorageIo';
 import { assertNoUnsupportedSchemaVersion } from '../sessions/store/storageSchema';
 import { withDirectoryFileLock } from '../sessions/store/directoryFileLock';
-import { KnowledgeRevisionConflictError } from './knowledgeErrors';
 import {
   emptyKnowledgeStateDocument,
   KNOWLEDGE_STATE_FILE,
@@ -52,7 +52,7 @@ export function createSessionScopedKnowledgeStore(rootPath: string): KnowledgeDu
 function defaultSessionStatePath(sessionId: string): string {
   const location = storageAdapter.sessions.findSessionLocation(sessionId);
   if (!location) {
-    throw new Error(`KNOWLEDGE_SESSION_UNKNOWN: no durable session path for ${sessionId}.`);
+    throw new AppError('KNOWLEDGE_SESSION_UNKNOWN', `no durable session path for ${sessionId}.`);
   }
   return path.join(location.sessionPath, KNOWLEDGE_STATE_FILE);
 }
@@ -173,7 +173,7 @@ export class KnowledgeDurableStore {
     this.storage.writeUtf8AtomicFsync(statePath, serializeKnowledgeStateDocument(document, leftoverDrafts));
     const written = this.storage.readJson<unknown>(statePath);
     if (!written) {
-      throw new Error('KNOWLEDGE_WRITE_INTEGRITY: durable knowledge-state.json vanished after atomic replace.');
+      throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', 'durable knowledge-state.json vanished after atomic replace.');
     }
     assertNoUnsupportedSchemaVersion(written, KNOWLEDGE_STATE_SCHEMA_VERSION, statePath);
     parseKnowledgeStatePayload(written);
@@ -201,12 +201,12 @@ function upsertRecord<T extends { revision: number; contentHash: string }>(
 ): T {
   if (!existing) {
     if (expectedRevision != null && expectedRevision !== 0) {
-      throw new KnowledgeRevisionConflictError(`${label} does not exist (expected revision ${expectedRevision}).`);
+      throw new AppError('KNOWLEDGE_REVISION_CONFLICT', `${label} does not exist (expected revision ${expectedRevision}).`);
     }
     return build(1);
   }
   if (expectedRevision == null || expectedRevision !== existing.revision) {
-    throw new KnowledgeRevisionConflictError(
+    throw new AppError('KNOWLEDGE_REVISION_CONFLICT', 
       `${label} revision ${existing.revision} does not match expected ${expectedRevision ?? 'none'}; refusing overwrite.`,
     );
   }

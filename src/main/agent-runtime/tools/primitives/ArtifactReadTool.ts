@@ -3,6 +3,7 @@ import {
   ARTIFACT_READ_MAX_OUTPUT_LINES,
   SessionArtifactError,
 } from '@shared/types/sessionArtifact';
+import { AppError } from '@shared/errors/appError';
 import { resolveDelegatedArtifactRead } from '../../../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver } from '../../../sessions/artifacts/SessionArtifactResolver';
 import { ARTIFACT_TEXT_SEARCH_MAX_MATCHES, type ArtifactTextSearch } from '../../../sessions/artifacts/SessionArtifactTextSearch';
@@ -133,7 +134,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
         result.search ? `literal-search total=${result.search.totalMatches} returned=${result.search.returnedMatches}; excerpts are not complete source coverage` : null,
       ].filter(Boolean).join(' · ');
       if (result.mimeType.startsWith('image/') && !result.imageData) {
-        throw new Error('VISION_INPUT_UNSUPPORTED: image evidence requires a native vision route.');
+        throw new AppError('VISION_INPUT_UNSUPPORTED', 'image evidence requires a native vision route.');
       }
       const body = result.text ?? '';
       const recordedRequest = params.includeRecordedOperationIndex === true

@@ -1,4 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { AppError } from '@shared/errors/appError';
 
 export const KNOWLEDGE_PACKAGE_MANIFEST = 'knowledge.yaml';
 export const KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED = 32 * 1024 * 1024;
@@ -12,7 +13,7 @@ export function normalizeZipEntryName(name: string): string {
     || posix.split('/').includes('..')
     || posix.split('/').includes('')
   ) {
-    throw new Error('KNOWLEDGE_ZIP_PATH_INVALID');
+    throw new AppError('KNOWLEDGE_ZIP_PATH_INVALID');
   }
   return posix;
 }
@@ -24,7 +25,7 @@ export function zipKnowledgeFiles(entries: Array<{ name: string; data: Uint8Arra
     const name = normalizeZipEntryName(entry.name);
     total += entry.data.byteLength;
     if (total > KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED) {
-      throw new Error('KNOWLEDGE_ZIP_TOO_LARGE');
+      throw new AppError('KNOWLEDGE_ZIP_TOO_LARGE');
     }
     record[name] = entry.data;
   }
@@ -33,7 +34,7 @@ export function zipKnowledgeFiles(entries: Array<{ name: string; data: Uint8Arra
 
 export function unzipKnowledgeFiles(bytes: Uint8Array): Map<string, Uint8Array> {
   if (bytes.byteLength > KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED) {
-    throw new Error('KNOWLEDGE_ZIP_TOO_LARGE');
+    throw new AppError('KNOWLEDGE_ZIP_TOO_LARGE');
   }
   // Entries are budgeted by their declared size before anything is inflated; fflate sizes each output buffer from
   // that declaration, so a header that understates its size cannot inflate past it either.
@@ -44,13 +45,13 @@ export function unzipKnowledgeFiles(bytes: Uint8Array): Map<string, Uint8Array> 
       filter: (entry) => {
         if (entry.name.endsWith('/')) return false;
         declared += entry.originalSize;
-        if (declared > KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED) throw new Error('KNOWLEDGE_ZIP_TOO_LARGE');
+        if (declared > KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED) throw new AppError('KNOWLEDGE_ZIP_TOO_LARGE');
         return true;
       },
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'KNOWLEDGE_ZIP_TOO_LARGE') throw error;
-    throw new Error('KNOWLEDGE_ZIP_INVALID');
+    throw new AppError('KNOWLEDGE_ZIP_INVALID', undefined, { cause: error });
   }
   return new Map(Object.entries(decoded).map(([raw, data]) => [normalizeZipEntryName(raw), data]));
 }

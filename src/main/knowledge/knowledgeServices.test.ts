@@ -11,7 +11,6 @@ import { KnowledgeIndexService, contentHashOf } from './KnowledgeIndexService';
 import { KnowledgeQueryService } from './KnowledgeQueryService';
 import { KnowledgeWriteService } from './KnowledgeWriteService';
 import { KnowledgeTopicStore } from './KnowledgeTopicStore';
-import { KnowledgeHumanConfirmationRequiredError, KnowledgeLifecycleError } from './knowledgeErrors';
 import { serializeKnowledgeCard } from './knowledgeCardSchema';
 import { projectKnowledgeRead } from './KnowledgeReadService';
 import { createKnowledgeTools } from './KnowledgeTools';
@@ -289,7 +288,7 @@ describe('Knowledge five services', () => {
       card: draftCard(),
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: false } as never,
-    })).rejects.toBeInstanceOf(KnowledgeHumanConfirmationRequiredError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED' });
   });
 
   it('does not auto-promote a confirmed draft write', async () => {
@@ -308,7 +307,7 @@ describe('Knowledge five services', () => {
       to: 'verified',
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
   });
 
   it('creates a candidate only with explicit user intent', async () => {

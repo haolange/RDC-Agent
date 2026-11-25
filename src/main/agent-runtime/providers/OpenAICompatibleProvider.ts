@@ -10,6 +10,7 @@
  * 使用原生 fetch + 自实现 SSE 解析，不引入 `openai` SDK。
  */
 
+import { AppError } from '@shared/errors/appError';
 import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
@@ -415,8 +416,8 @@ function toOpenAIMessages(
     );
   if (explicitBreakpoint) {
     if (!prompt.stableText) {
-      throw new Error(
-        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE: explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
+      throw new AppError(
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE', 'explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
       );
     }
     const content: Array<Record<string, unknown>> = [{

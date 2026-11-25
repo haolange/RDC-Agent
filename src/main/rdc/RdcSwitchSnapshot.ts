@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { assertRdcContextLeaseOwnership, getDelegatedChildSessionId, getRdcContextLease } from './RdcRuntimeContextRegistry';
 import { parseRdcNativeResult, type RdcNativeEnvelope } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity, type RdcProcessIdentity } from './RdcProcessIdentity';
@@ -34,11 +35,11 @@ export function validateRdcSwitchSnapshot(payload: RdcNativeEnvelope, lease: Rdc
     || !Number.isSafeInteger(runtime.active_event_id) || Number(runtime.active_event_id) < 0
     || !Array.isArray(session.shader_replacements) || session.shader_replacements.some((value: unknown) => !value || typeof value !== 'object'
       || typeof (value as Record<string, unknown>).replacement_id !== 'string' || !(value as Record<string, unknown>).replacement_id)) {
-    throw new Error('RDC_SWITCH_IDENTITY_INVALID: the native replay, capture, position or replacement enumeration is unavailable.');
+    throw new AppError('RDC_SWITCH_IDENTITY_INVALID', 'the native replay, capture, position or replacement enumeration is unavailable.');
   }
   const processIdentity = parseRdcProcessIdentity((payload.meta as Record<string, unknown> | undefined)?.process_identity);
   if (payload.data.process_identity && JSON.stringify(parseRdcProcessIdentity(payload.data.process_identity)) !== JSON.stringify(processIdentity)) {
-    throw new Error('RDC_SWITCH_PROCESS_CHANGED: native process identities disagree.');
+    throw new AppError('RDC_SWITCH_PROCESS_CHANGED', 'native process identities disagree.');
   }
   return { contextId: lease.contextId, leaseVersion: lease.version, replaySessionId, captureFileId,
     eventId: Number(runtime.active_event_id), processIdentity, replacementCount: session.shader_replacements.length,
@@ -55,7 +56,7 @@ export async function readRdcSwitchSnapshot(input: {
     || identity.contextId !== lease.contextId || identity.version !== lease.version
     || identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId
     || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
-    throw new Error('RDC_SWITCH_BINDING_CHANGED: the prepared replay binding is no longer owned.');
+    throw new AppError('RDC_SWITCH_BINDING_CHANGED', 'the prepared replay binding is no longer owned.');
   }
   return runRdcOperation(lease.contextId, async () => {
     input.signal?.throwIfAborted();
@@ -66,7 +67,7 @@ export async function readRdcSwitchSnapshot(input: {
     input.signal?.throwIfAborted();
     const current = assertRdcContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId });
     if (!current || current.version !== lease.version || current.contextId !== lease.contextId) {
-      throw new Error('RDC_SWITCH_BINDING_CHANGED: the replay changed during observation.');
+      throw new AppError('RDC_SWITCH_BINDING_CHANGED', 'the replay changed during observation.');
     }
     return validateRdcSwitchSnapshot(payload, current);
   });
@@ -84,7 +85,7 @@ export async function readRdcRecoverySnapshot(input: {
       || identity.ownerSessionId !== input.sessionId || identity.contextId !== lease.contextId || identity.version !== lease.version
       || identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId
       || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
-      throw new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED: the quarantined owning binding and native failure are required.');
+      throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the quarantined owning binding and native failure are required.');
     }
     return lease;
   };
@@ -99,7 +100,7 @@ export async function readRdcRecoverySnapshot(input: {
     const after = check();
     if (after.version !== lease.version || after.contextId !== lease.contextId
       || JSON.stringify(after.quarantineCause) !== JSON.stringify(lease.quarantineCause)) {
-      throw new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED: the quarantined binding changed during observation.');
+      throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the quarantined binding changed during observation.');
     }
     return validateRdcSwitchSnapshot(payload, after);
   });

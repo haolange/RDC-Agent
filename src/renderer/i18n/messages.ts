@@ -9,6 +9,7 @@ import { enControl } from './locales/en/control';
 import { enDevice } from './locales/en/device';
 import { enDialog } from './locales/en/dialog';
 import { enEmptyWorkbench } from './locales/en/emptyWorkbench';
+import { enErrors } from './locales/en/errors';
 import { enFont } from './locales/en/font';
 import { enKnowledgeCenter } from './locales/en/knowledgeCenter';
 import { enLanguage } from './locales/en/language';
@@ -29,6 +30,7 @@ import { zhControl } from './locales/zh-CN/control';
 import { zhDevice } from './locales/zh-CN/device';
 import { zhDialog } from './locales/zh-CN/dialog';
 import { zhEmptyWorkbench } from './locales/zh-CN/emptyWorkbench';
+import { zhErrors } from './locales/zh-CN/errors';
 import { zhFont } from './locales/zh-CN/font';
 import { zhKnowledgeCenter } from './locales/zh-CN/knowledgeCenter';
 import { zhLanguage } from './locales/zh-CN/language';
@@ -54,6 +56,7 @@ export const englishTranslations = {
   ...enDevice,
   ...enDialog,
   ...enEmptyWorkbench,
+  ...enErrors,
   ...enFont,
   ...enKnowledgeCenter,
   ...enLanguage,
@@ -80,6 +83,7 @@ export const chineseTranslations: Record<TranslationKey, string> = {
   ...zhDevice,
   ...zhDialog,
   ...zhEmptyWorkbench,
+  ...zhErrors,
   ...zhFont,
   ...zhKnowledgeCenter,
   ...zhLanguage,

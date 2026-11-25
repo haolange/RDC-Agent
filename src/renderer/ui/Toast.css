@@ -58,6 +58,12 @@
   line-height: var(--type-body-line);
 }
 
+.ui-toast-action {
+  flex-shrink: 0;
+  display: flex;
+  margin-top: calc(-1 * var(--space-1));
+}
+
 .ui-toast-dismiss {
   flex-shrink: 0;
   margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0 0;

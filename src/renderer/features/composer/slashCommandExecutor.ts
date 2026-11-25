@@ -4,6 +4,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { notify } from '../../stores/notificationStore';
 import { resolveComposerModelOverride } from './resolveComposerModelOverride';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import {
@@ -28,7 +29,6 @@ interface SlashCommandContext {
   setConversationMessages: (messages: ConversationMessage[]) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   openSettings: (section?: string) => void;
-  showNotice: (message: string) => void;
   armPendingSkill?: (skillId: string, skillName?: string) => void;
 }
 
@@ -66,7 +66,7 @@ async function loadSession(sessionId: string, context: SlashCommandContext): Pro
   const electronAPI = window.electronAPI;
   const result = await electronAPI.session.select(sessionId);
   if (!result.success || !result.session) {
-    context.showNotice(result.error ?? currentText('composer.commandSessionMissing'));
+    notify.failure(result.error, currentText, 'composer.commandSessionMissing');
     return;
   }
 
@@ -93,7 +93,7 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
   if (isComposerAgentDefaultToken(modelId)) {
     const state = resolveComposerAgentDefaultState(route, options, true);
     if (!state.selectable) {
-      context.showNotice(translate(
+      notify.warning(translate(
         language,
         state.kind === 'unset' ? 'composer.model.agentDefaultUnset' : 'composer.model.agentDefaultUnavailable',
       ));
@@ -103,12 +103,12 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
       context.currentSession?.sessionId,
       context.currentProject?.projectId,
     );
-    if (!cleared.ok) context.showNotice(translate(language, 'composer.model.saveFailed'));
+    if (!cleared.ok) notify.error(translate(language, 'composer.model.saveFailed'));
     return;
   }
   const override = resolveComposerModelOverride(modelId, options);
   if (!override) {
-    context.showNotice(translate(language, 'composer.model.invalidArg'));
+    notify.warning(translate(language, 'composer.model.invalidArg'));
     return;
   }
   const result = await commitComposerModelChoice(
@@ -116,7 +116,7 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
     context.currentSession?.sessionId,
     context.currentProject?.projectId,
   );
-  if (!result.ok) context.showNotice(translate(language, 'composer.model.saveFailed'));
+  if (!result.ok) notify.error(translate(language, 'composer.model.saveFailed'));
 }
 
 async function handleUiAction(action: CommandUiAction, context: SlashCommandContext): Promise<void> {
@@ -144,7 +144,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     case 'switch-theme': {
       const theme = getPayloadString(action, 'theme');
       if (!theme || !(['dark', 'light', 'system'] as string[]).includes(theme)) {
-        context.showNotice(currentText('composer.commandThemeInvalid'));
+        notify.warning(currentText('composer.commandThemeInvalid'));
         return;
       }
       await useAppSettingsStore.getState().setTheme(theme as AppTheme);
@@ -153,7 +153,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     case 'switch-permissions': {
       const mode = getPayloadString(action, 'mode');
       if (!mode || !(['default', 'auto-review', 'full-access', 'custom'] as string[]).includes(mode)) {
-        context.showNotice(currentText('composer.commandPermissionInvalid'));
+        notify.warning(currentText('composer.commandPermissionInvalid'));
         return;
       }
       await useAppSettingsStore.getState().setAgentPermissionMode(mode as AgentPermissionMode);
@@ -167,14 +167,14 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       }
       const result = await electronAPI.workflow.resume();
       if (!result.success) {
-        context.showNotice(result.error ?? currentText('composer.commandNoResumable'));
+        notify.failure(result.error, currentText, 'composer.commandNoResumable');
       }
       return;
     }
     case 'export-session': {
       const sessionId = getPayloadString(action, 'sessionId') || context.currentSession?.sessionId;
       if (!sessionId) {
-        context.showNotice(currentText('composer.commandNoSession'));
+        notify.warning(currentText('composer.commandNoSession'));
         return;
       }
       const format = getPayloadString(action, 'format') === 'json' ? 'json' : 'markdown';
@@ -192,40 +192,40 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     case 'undo-session': {
       const sessionId = getPayloadString(action, 'sessionId') || context.currentSession?.sessionId;
       if (!sessionId) {
-        context.showNotice(currentText('composer.commandNoSession'));
+        notify.warning(currentText('composer.commandNoSession'));
         return;
       }
       const result = await electronAPI.conversation.undoLastTurn(sessionId);
       if (result.success) {
         context.setConversationMessages(result.messages);
       } else {
-        context.showNotice(result.error ?? currentText('composer.commandUndoFailed'));
+        notify.failure(result.error, currentText, 'composer.commandUndoFailed');
       }
       return;
     }
     case 'clear-session': {
       const sessionId = getPayloadString(action, 'sessionId') || context.currentSession?.sessionId;
       if (!sessionId) {
-        context.showNotice(currentText('composer.commandNoSession'));
+        notify.warning(currentText('composer.commandNoSession'));
         return;
       }
       const result = await electronAPI.conversation.clearHistory(sessionId);
       if (result.success) {
         context.setConversationMessages(result.messages);
       } else {
-        context.showNotice(result.error ?? currentText('composer.commandClearFailed'));
+        notify.failure(result.error, currentText, 'composer.commandClearFailed');
       }
       return;
     }
     case 'run-skill': {
       const skillId = getPayloadString(action, 'skillId');
       if (!skillId) {
-        context.showNotice(currentText('composer.commandNoSkill'));
+        notify.warning(currentText('composer.commandNoSkill'));
         return;
       }
       const skillName = getPayloadString(action, 'skillName') || skillId;
       context.armPendingSkill?.(skillId, skillName);
-      context.showNotice(currentText('composer.commandSkillArmed', { skill: skillName }));
+      notify.info(currentText('composer.commandSkillArmed', { skill: skillName }));
       return;
     }
     default:
@@ -275,12 +275,12 @@ export async function executeSlashCommand(input: string, context: SlashCommandCo
     }
 
     if (!response.result.success) {
-      context.showNotice(response.result.message);
+      notify.failure(response.result.message, currentText, 'composer.commandFailed');
     }
 
     return true;
   } catch (error) {
-    context.showNotice(error instanceof Error ? error.message : currentText('composer.commandFailed'));
+    notify.failure(error, currentText, 'composer.commandFailed');
     return true;
   }
 }

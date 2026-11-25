@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { EventStream } from '../core/EventStream';
 import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
@@ -503,14 +504,14 @@ function toAnthropicMessages(
       || promptCache.breakpoint === 'automatic-and-explicit'
     );
   if (explicitBreakpoint && surface !== 'anthropic') {
-    throw new Error(
-      'PROMPT_CACHE_SURFACE_UNSUPPORTED: explicit Anthropic cache blocks are not enabled for this surface manifest.',
+    throw new AppError(
+      'PROMPT_CACHE_SURFACE_UNSUPPORTED', 'explicit Anthropic cache blocks are not enabled for this surface manifest.',
     );
   }
   if (explicitBreakpoint) {
     if (!prompt.stableText) {
-      throw new Error(
-        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE: explicit Anthropic cache mode requires PromptPlan-owned stable segments.',
+      throw new AppError(
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE', 'explicit Anthropic cache mode requires PromptPlan-owned stable segments.',
       );
     }
     const system: AnthropicSystemBlock[] = [{

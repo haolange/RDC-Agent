@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { childScopePrefix } from '@shared/utils/executionScope';
+import { AppError } from '@shared/errors/appError';
 
 export interface RequestUsageSnapshot {
   observedAt: number;
@@ -22,16 +23,16 @@ export function readRequestUsage(rootPath: string, scopeId: string): RequestUsag
   const entries = fs.existsSync(rootPath) ? fs.readdirSync(rootPath, { withFileTypes: true }) : [];
   for (const scope of entries) {
     if (scope.name !== scopeKey && !scope.name.startsWith(childPrefix)) continue;
-    if (!scope.isDirectory()) throw new Error('REQUEST_USAGE_SCOPE_NOT_DIRECTORY');
+    if (!scope.isDirectory()) throw new AppError('REQUEST_USAGE_SCOPE_NOT_DIRECTORY');
     const turns: RequestUsageSnapshot['scopes'][number]['turns'] = [];
     for (const turn of fs.readdirSync(path.join(rootPath, scope.name), { withFileTypes: true })) {
       if (!turn.isDirectory()) {
-        if (turn.isSymbolicLink()) throw new Error('REQUEST_USAGE_TURN_LINK_DENIED');
+        if (turn.isSymbolicLink()) throw new AppError('REQUEST_USAGE_TURN_LINK_DENIED');
         continue;
       }
       const requests = fs.readdirSync(path.join(rootPath, scope.name, turn.name), { withFileTypes: true })
         .filter(entry => /^\d+-.+\.json$/.test(entry.name));
-      if (requests.some(entry => !entry.isFile())) throw new Error('REQUEST_USAGE_COMMIT_NOT_FILE');
+      if (requests.some(entry => !entry.isFile())) throw new AppError('REQUEST_USAGE_COMMIT_NOT_FILE');
       turns.push({ turnId: turn.name, committedRequests: requests.length });
     }
     scopes.push({ scopeKey: scope.name, turns: turns.sort((a, b) => a.turnId.localeCompare(b.turnId)) });

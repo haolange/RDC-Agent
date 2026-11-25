@@ -13,7 +13,7 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 
 - `browser-dev` 只将文档入口 `/app` / `/app/` 映射到 Vite 根；`/app/App.tsx` 等真实模块路径保持原样。Vite 开发期 CSS HMR 经 `src/renderer/platform/devStyles.ts` 写入 constructable stylesheet，保留 `style-src 'self'` 与 `style-src-attr 'none'`，不放宽为 inline 样式。
 
-- `src/shared/renderer-api/` 是唯一 `ElectronAPI` 工厂与 channel manifest；Desktop 和 Browser 各自只实现 transport。
+- `src/shared/renderer-api/` 是唯一 `ElectronAPI` 工厂与 channel manifest；Desktop 和 Browser 各自只实现 transport，工厂都在 renderer 里调用（`src/renderer/platform/rendererApi.ts`）。处理器失败时 `/invoke` 返回 `{ success: false, error, appError }`（`INTERNAL_ERROR` 为 500，其余 422），客户端还原为与桌面相同的错误结果，由工厂抛成 `RendererIpcError`。
 - manifest 中的全部 invoke channel 必须存在 main handler；启动时 `assertRendererIpcParity` fail-closed 校验。
 - Browser bridge 仅接受 canonical manifest 中且已登记 capability 并已注册的 channel。未知、内部、未注册 channel 与不存在的明文 `settings:getProviderSecret` 返回 403。capability 映射是闭合 Record，禁止默认 `mutation` fallback。`conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 是 `high-impact`：代答审批的 Browser QA 必须设置 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`。
 - `conversation:accessAttachment` 包含用户触发的宿主打开与定位，登记为 `mutation`。Browser QA 和 Electron 都按待发所有者或已发送会话解析原件。

@@ -11,6 +11,7 @@
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { expandHomePath, samePath, stripLongPathPrefix } from '../../../platform/paths';
 import { BINARY_SAMPLE_BYTES, TEXT_FILE_MAX_BYTES } from './toolLimits';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
@@ -25,7 +26,7 @@ import type { ToolExecutionContext } from '../../agent/AgentTool';
  */
 export function requireMutationWorkspaceRoot(context?: ToolExecutionContext): string {
   if (!context?.projectRootPath) {
-    throw new Error('MUTATION_REQUIRES_PROJECT: select a trusted project before using a mutation tool.');
+    throw new AppError('MUTATION_REQUIRES_PROJECT', 'select a trusted project before using a mutation tool.');
   }
   return path.resolve(context.projectRootPath);
 }
@@ -129,7 +130,7 @@ function assertNoSymlinkPath(target: string): void {
   while (fs.existsSync(current)) {
     const stat = fs.lstatSync(current);
     if (stat.isSymbolicLink()) {
-      throw new Error(`SYMLINK_PATH_REJECTED: refusing to follow symlink/reparse path ${current}.`);
+      throw new AppError('SYMLINK_PATH_REJECTED', `refusing to follow symlink/reparse path ${current}.`);
     }
     const parent = path.dirname(current);
     if (parent === current) break;
@@ -142,7 +143,7 @@ export async function writeTextFileNoFollow(absolutePath: string, content: strin
   const target = path.resolve(absolutePath);
   const parentDir = path.dirname(target);
   if (!fs.existsSync(parentDir)) {
-    throw new Error(`WRITE_PARENT_MISSING: parent directory does not exist: ${parentDir}`);
+    throw new AppError('WRITE_PARENT_MISSING', `parent directory does not exist: ${parentDir}`);
   }
   assertNoSymlinkPath(parentDir);
   if (fs.existsSync(target)) {
@@ -154,7 +155,7 @@ export async function writeTextFileNoFollow(absolutePath: string, content: strin
     : fs.realpathSync(parentDir);
   const finalTarget = path.join(realParent, path.basename(target));
   if (!isWithinRoot(finalTarget, realParent)) {
-    throw new Error(`WRITE_PARENT_ESCAPE: resolved write target escaped parent ${realParent}`);
+    throw new AppError('WRITE_PARENT_ESCAPE', `resolved write target escaped parent ${realParent}`);
   }
 
   const tmpName = `.${path.basename(finalTarget)}.${process.pid}.${Date.now().toString(36)}.tmp`;

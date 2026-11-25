@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { planArtifactWriter } from '../sessions/run/sessionPlanArtifact';
@@ -14,7 +15,7 @@ export function verifyApprovedPlanExit(sessionId: string | null | undefined, tur
     || state.frozenUri !== approved.frozenUri || state.approvedHandoff?.agent !== approved.target
     || offer?.plan.hash !== approved.hash || offer.plan.uri !== approved.frozenUri
     || offer.targetAgentId !== approved.target) {
-    throw new Error('PLAN_REVIEW_SCOPE_CHANGED: normal plan exit requires its owning frozen approval and execution offer.');
+    throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'normal plan exit requires its owning frozen approval and execution offer.');
   }
   planArtifactWriter.readMarkdown(sessionId, approved.frozenUri, approved.hash);
   return true;

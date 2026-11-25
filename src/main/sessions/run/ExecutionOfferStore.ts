@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { existsSync, unlinkSync } from 'node:fs';
 import { z } from 'zod';
 import { EXECUTION_OFFER_SCHEMA, type ExecutionOffer } from '@shared/types/executionOffer';
+import { AppError } from '@shared/errors/appError';
 import type { StorageIo } from '../store/StorageIo';
 
 export const EXECUTION_OFFER_FILE = 'execution-offer.json';
@@ -61,7 +62,7 @@ export class ExecutionOfferStore {
   write(sessionId: string, offer: ExecutionOffer): ExecutionOffer {
     const filePath = this.offerPath(sessionId);
     if (!filePath) {
-      throw new Error('EXECUTION_OFFER_SESSION_MISSING: session path is required to persist an execution offer.');
+      throw new AppError('EXECUTION_OFFER_SESSION_MISSING', 'session path is required to persist an execution offer.');
     }
     const parsed = ExecutionOfferSchema.parse(offer);
     this.host.io.writeJsonAtomic(filePath, parsed);

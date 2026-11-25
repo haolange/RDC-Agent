@@ -1,4 +1,5 @@
 import { subagentScopeId } from '@shared/utils/executionScope';
+import { AppError } from '@shared/errors/appError';
 import { delegationCapsuleArtifactRefs } from '../prompt/DelegationCapsuleCompiler';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope, registerTaskExecutionCancellationOwner, type TaskExecutionRecord } from '../tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
@@ -82,7 +83,7 @@ export class BackgroundSubagentService {
   }
 
   async start(input: BackgroundSubagentStart): Promise<TaskExecutionRecord> {
-    if (!this.accepting) throw new Error('BACKGROUND_SHUTTING_DOWN: new executions are not accepted.');
+    if (!this.accepting) throw new AppError('BACKGROUND_SHUTTING_DOWN', 'new executions are not accepted.');
     const registry = this.registry(input.sessionId);
     await this.ready.get(input.sessionId);
     const taskRecords = await registry.listTasks();
@@ -311,7 +312,7 @@ export class BackgroundSubagentService {
     return { messages, cursor: messages.at(-1)?.sequence ?? cursor };
   }
   async postMessage(sessionId: string, executionId: string, generation: number, body: string) {
-    if (body.length > 8_000) throw new Error('BACKGROUND_MESSAGE_TOO_LARGE: maximum is 8000 characters.');
+    if (body.length > 8_000) throw new AppError('BACKGROUND_MESSAGE_TOO_LARGE', 'maximum is 8000 characters.');
     const message = await this.registry(sessionId).appendExecutionMessage(executionId, { expectedGeneration: generation, kind: 'decision_required', direction: 'to_child', body });
     return message;
   }
@@ -379,7 +380,7 @@ export class BackgroundSubagentService {
   }
   private async requireOwned(sessionId: string, executionId: string): Promise<TaskExecutionRecord> {
     const execution = await this.registry(sessionId).getExecution(executionId);
-    if (!execution) throw new Error('BACKGROUND_EXECUTION_NOT_FOUND: execution is not owned by this session.');
+    if (!execution) throw new AppError('BACKGROUND_EXECUTION_NOT_FOUND', 'execution is not owned by this session.');
     return execution;
   }
   stopAccepting(): void { this.accepting = false; }
@@ -389,14 +390,14 @@ export class BackgroundSubagentService {
 
   createTools(_parentAgentId: AgentRole, sessionId?: string | null, _turn?: TurnHandle | null): AgentTool[] {
     const delegatedScope = sessionId ? getDelegatedTaskScope(sessionId) : null;
-    const requireSession = () => { if (!sessionId) throw new Error('BACKGROUND_SESSION_REQUIRED: durable execution requires a parent session.'); return delegatedScope?.ownerSessionId ?? sessionId; };
+    const requireSession = () => { if (!sessionId) throw new AppError('BACKGROUND_SESSION_REQUIRED', 'durable execution requires a parent session.'); return delegatedScope?.ownerSessionId ?? sessionId; };
     const requireOwned = async (args: Record<string, unknown>) => {
       const id = executeId(args); const execution = await this.requireOwned(requireSession(), id);
       if (delegatedScope) {
         const tasks = await this.registry(requireSession()).listTasks();
         let taskId: string | undefined = execution.taskId; let inScope = false;
         while (taskId) { if (taskId === delegatedScope.rootTaskId) { inScope = true; break; } taskId = tasks.find((task) => task.id === taskId)?.parentTaskId; }
-        if (!inScope) throw new Error('BACKGROUND_EXECUTION_NOT_FOUND: execution is outside this delegated Task subtree.');
+        if (!inScope) throw new AppError('BACKGROUND_EXECUTION_NOT_FOUND', 'execution is outside this delegated Task subtree.');
       }
       return id;
     };

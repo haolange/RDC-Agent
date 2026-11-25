@@ -7,6 +7,7 @@ import {
   nowMs,
   sanitizeToken,
 } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
 import { requestSnapshotStore } from '../../agent-runtime/prompt/RequestSnapshotStore';
 import { removeSessionTasks } from '../../agent-runtime/tasks/sessionTaskStore';
@@ -514,7 +515,7 @@ export class SessionRecordStore {
     if (existing.kind === 'conversation' && 'captures' in sanitizedPatch) {
       const nextCaptures = sanitizedPatch.captures;
       if (!Array.isArray(nextCaptures) || nextCaptures.length > 0) {
-        throw new Error('CONVERSATION_RUN_CAPTURES_FORBIDDEN: conversation runs cannot persist captures.');
+        throw new AppError('CONVERSATION_RUN_CAPTURES_FORBIDDEN', 'conversation runs cannot persist captures.');
       }
     }
 

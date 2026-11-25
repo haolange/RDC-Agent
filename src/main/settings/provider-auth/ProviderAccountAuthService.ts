@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { openExternalHttps } from '../../window/rendererTrust';
 import { settingsService } from '../settings-core/SettingsService';
 import { getProviderAccountAuth, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
@@ -295,7 +296,7 @@ export class ProviderAccountAuthService {
       force: force || Boolean(flow.requiresRefresh?.(bundle)),
       refresh: () => flow.refresh?.(bundle) ?? Promise.resolve(bundle),
       commit: (refreshed) => {
-        if (!ownsAccount()) throw new Error('PROVIDER_ACCOUNT_CHANGED: credential refresh no longer owns this account.');
+        if (!ownsAccount()) throw new AppError('PROVIDER_ACCOUNT_CHANGED', 'credential refresh no longer owns this account.');
         settingsService.rotateProviderAccountCredential(bundle.providerId, JSON.stringify(refreshed), {
           accountLabel: refreshed.accountLabel,
           planLabel: refreshed.planLabel,

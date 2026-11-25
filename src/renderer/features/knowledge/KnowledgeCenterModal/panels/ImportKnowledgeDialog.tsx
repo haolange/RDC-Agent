@@ -8,6 +8,7 @@ import { Tabs } from '../../../../ui/Tabs';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { Textarea } from '../../../../ui/Textarea';
 import { useI18n, type TranslationKey } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import { TYPE_ICONS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import {
   countKnowledgeImportOutcomes,
@@ -80,7 +81,7 @@ function ImportItems({ items, written, candidates, onProposed }: {
               {meta.length ? <span className="knowledge-import-item-meta">{meta.join(' · ')}</span> : null}
               <ItemNote item={item} />
               {candidates?.candidateError && candidates.candidateError.cardId === item.record?.cardId ? (
-                <InlineError detail={candidates.candidateError.message}>{t('knowledgeCenter.candidateFailed')}</InlineError>
+                <InlineError detail={candidates.candidateError.message}>{humanizeError(candidates.candidateError.message, t, 'knowledgeCenter.candidateFailed')}</InlineError>
               ) : null}
             </div>
             <div className="knowledge-import-item-side">
@@ -236,7 +237,7 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
         </>
       ) : null}
 
-      {importer.error ? <InlineError data-testid="knowledge-center-import-error">{importer.error}</InlineError> : null}
+      {importer.error ? <InlineError data-testid="knowledge-center-import-error" detail={importer.error.detail}>{importer.error.message}</InlineError> : null}
     </TaskDialog>
   );
 }

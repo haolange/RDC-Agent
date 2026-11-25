@@ -1,6 +1,7 @@
 import YAML from 'yaml';
 import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import { AppError } from '@shared/errors/appError';
 import type { AgentModelBinding } from '@shared/types/settings';
 
 export interface AgentModelFieldMigrationPlan {
@@ -25,11 +26,11 @@ const stringValues = (value: unknown): string[] => {
  */
 export function planAgentModelFieldMigration(rawContent: string): AgentModelFieldMigrationPlan {
   const match = FRONTMATTER.exec(rawContent);
-  if (!match) throw new Error('AGENT_MODEL_MIGRATION_NO_FRONTMATTER: the manifest has no YAML frontmatter.');
+  if (!match) throw new AppError('AGENT_MODEL_MIGRATION_NO_FRONTMATTER', 'the manifest has no YAML frontmatter.');
   const [, open, frontmatter, close, body] = match;
   const document = YAML.parseDocument(frontmatter);
   if (document.errors.length > 0) {
-    throw new Error(`AGENT_MODEL_MIGRATION_FRONTMATTER_INVALID: ${document.errors[0].message}`);
+    throw new AppError('AGENT_MODEL_MIGRATION_FRONTMATTER_INVALID', document.errors[0].message);
   }
 
   // Values are read from the plain object; deletions go through the document so formatting survives.

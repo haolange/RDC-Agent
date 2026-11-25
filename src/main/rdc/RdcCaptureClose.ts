@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult, type RdcNativeEnvelope } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity, type RdcProcessIdentity } from './RdcProcessIdentity';
@@ -25,12 +26,12 @@ export async function closeOwnedRemoteCapture(input: {
   const lease = assertRdcContextLeaseOwnership({ ...scope, contextId });
   if (!lease || lease.runtimeContext.replaySessionId !== replaySessionId
     || lease.runtimeContext.captureFileId !== captureFileId) {
-    throw new Error('RDC_SWITCH_IDENTITY_INVALID: the owning replay lease does not match.');
+    throw new AppError('RDC_SWITCH_IDENTITY_INVALID', 'the owning replay lease does not match.');
   }
   const assertLease = () => {
     const current = assertRdcContextLeaseOwnership({ ...scope, contextId });
     if (!current || current.version !== lease.version || current.runtimeContext.replaySessionId !== replaySessionId
-      || current.runtimeContext.captureFileId !== captureFileId) throw new Error('RDC_SWITCH_BINDING_CHANGED: the owning replay lease changed.');
+      || current.runtimeContext.captureFileId !== captureFileId) throw new AppError('RDC_SWITCH_BINDING_CHANGED', 'the owning replay lease changed.');
   };
   const invoke = async (operation: string, args: Record<string, unknown>): Promise<RdcNativeEnvelope> => {
     signal?.throwIfAborted();
@@ -40,13 +41,13 @@ export async function closeOwnedRemoteCapture(input: {
     signal?.throwIfAborted();
     const payload = parseRdcNativeResult(result, undefined, operation);
     if (payload.data.context_id !== undefined && payload.data.context_id !== contextId) {
-      throw new Error('RDC_CONTEXT_MISMATCH: native response belongs to another context.');
+      throw new AppError('RDC_CONTEXT_MISMATCH', 'native response belongs to another context.');
     }
     return payload;
   };
   const readContext = async () => {
     const payload = await invoke('rd.session.get_context', {});
-    if (payload.data.context_id !== contextId) throw new Error('RDC_CONTEXT_MISMATCH: context observation is not owned.');
+    if (payload.data.context_id !== contextId) throw new AppError('RDC_CONTEXT_MISMATCH', 'context observation is not owned.');
     return payload;
   };
   const checkClosedState = (payload: RdcNativeEnvelope, expectedCapture: string, process: RdcProcessIdentity) => {
@@ -58,7 +59,7 @@ export async function closeOwnedRemoteCapture(input: {
       || payload.data.current_session_id !== '' || runtime?.session_id !== '' || runtime.capture_file_id !== expectedCapture
       || !Array.isArray(sessions) || sessions.some(value => value && typeof value === 'object'
         && (value as Record<string, unknown>).session_id === replaySessionId)) {
-      throw new Error('RDC_CAPTURE_CLOSE_UNCONFIRMED: native context, process, or closed state does not match.');
+      throw new AppError('RDC_CAPTURE_CLOSE_UNCONFIRMED', 'native context, process, or closed state does not match.');
     }
   };
 
@@ -69,7 +70,7 @@ export async function closeOwnedRemoteCapture(input: {
     input.onUnconfirmed();
     throw error;
   }
-  if (snapshot.replacementCount) throw new Error('RDC_SWITCH_REPLACEMENTS_ACTIVE: restore active replacements before changing capture.');
+  if (snapshot.replacementCount) throw new AppError('RDC_SWITCH_REPLACEMENTS_ACTIVE', 'restore active replacements before changing capture.');
   try {
     await invoke('rd.capture.close_replay', { session_id: replaySessionId });
     checkClosedState(await readContext(), captureFileId, snapshot.processIdentity);

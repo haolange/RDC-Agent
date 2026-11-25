@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createRequestSeq, knowledgeErrorMessage } from './knowledgeCenterModel';
+import { AppError } from '@shared/errors/appError';
+import { errorDetail } from '../../../lib/errorDetail';
+import { createRequestSeq } from './knowledgeCenterModel';
 import { useKnowledgeConflicts } from './useKnowledgeConflicts';
 import type { KnowledgeCardDetail, KnowledgeCardRecord, KnowledgeLaneHit, KnowledgePack } from '@shared/types/knowledge';
 
@@ -36,14 +38,14 @@ export function useKnowledgeSelection({ open, queryKey, hits, pack, onShowDetail
     try {
       const { card } = await window.electronAPI.knowledge.card(spaceId, relativePath);
       if (!detailSeq.current.isCurrent(seq)) return;
-      if (!card || card.cardId !== cardId) throw new Error('KNOWLEDGE_CARD_IDENTITY_CHANGED: refresh the search.');
+      if (!card || card.cardId !== cardId) throw new AppError('KNOWLEDGE_CARD_IDENTITY_CHANGED', 'refresh the search.');
       // A search hit names the version it matched; a card that changed since must be searched again.
-      if (contentHash && card.contentHash !== contentHash) throw new Error('KNOWLEDGE_VERSION_CHANGED: the card has changed; search again before reading.');
+      if (contentHash && card.contentHash !== contentHash) throw new AppError('KNOWLEDGE_VERSION_CHANGED', 'the card has changed; search again before reading.');
       setSelectedCard(card);
     } catch (err) {
       if (!detailSeq.current.isCurrent(seq)) return;
       setSelectedCard(null);
-      setError(knowledgeErrorMessage(err));
+      setError(errorDetail(err));
     } finally {
       if (detailSeq.current.isCurrent(seq)) setLoadingDetail(false);
     }

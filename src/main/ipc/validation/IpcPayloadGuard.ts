@@ -3,12 +3,11 @@
  * All IPC handlers must validate args through `parseIpcArgs` (fail-closed).
  */
 import { z, type ZodTypeAny } from 'zod';
+import { AppError } from '@shared/errors/appError';
 
-export class IpcValidationError extends Error {
-  readonly code = 'IPC_VALIDATION_ERROR' as const;
-
+export class IpcValidationError extends AppError {
   constructor(message: string) {
-    super(message);
+    super('IPC_VALIDATION_ERROR', message);
     this.name = 'IpcValidationError';
   }
 }

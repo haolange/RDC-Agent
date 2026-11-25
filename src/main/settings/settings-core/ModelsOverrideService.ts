@@ -2,20 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import { EventEmitter } from 'events';
 import { ModelsOverrideSchema, type ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 
 const MODELS_OVERRIDE_FILE = 'models.json';
 
-export class ModelsOverrideCorruptError extends Error {
-  readonly quarantinePath: string;
-
-  constructor(quarantinePath: string, cause?: unknown) {
-    super(`models.json is corrupt; quarantined to ${quarantinePath}`);
+export class ModelsOverrideCorruptError extends AppError {
+  constructor(readonly quarantinePath: string, cause?: unknown) {
+    super('STORAGE_CORRUPT', `models.json is corrupt; quarantined to ${quarantinePath}`, { cause });
     this.name = 'ModelsOverrideCorruptError';
-    this.quarantinePath = quarantinePath;
-    if (cause !== undefined) {
-      (this as Error & { cause?: unknown }).cause = cause;
-    }
   }
 }
 

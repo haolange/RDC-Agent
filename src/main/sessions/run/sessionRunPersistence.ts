@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { stringifyYaml } from '../../runtime/yaml';
 import { readCurrentStoredJson, StorageSchemaError } from '../store/storageSchema';
 import { PersistedRunRecordV3Schema } from './runV3/runRecordSchema';
@@ -15,7 +16,7 @@ export function toRunSummary(run: PersistedRunRecord): RunSummary {
 export function writeRunFiles(host: StorageHost, runPath: string, run: PersistedRunRecord): void {
   const parsed = PersistedRunRecordV3Schema.safeParse(run);
   if (!parsed.success) {
-    throw new Error(`STORAGE_SCHEMA: refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+    throw new AppError('STORAGE_SCHEMA', `refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
   }
   host.io.ensureDir(runPath);
   host.io.writeUtf8AtomicFsync(path.join(runPath, 'run.json'), `${JSON.stringify(parsed.data, null, 2)}\n`);
@@ -31,14 +32,14 @@ export function readPersistedRun(
   const filePath = path.join(runPath, 'run.json');
   if (!fs.existsSync(filePath)) {
     if (fs.existsSync(path.join(runPath, 'run.yaml'))) {
-      throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${runPath} has run.yaml without a Run v3 run.json`);
+      throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${runPath} has run.yaml without a Run v3 run.json`);
     }
     return null;
   }
   const parsed = readCurrentStoredJson(host.io, filePath, '3', PersistedRunRecordV3Schema);
   if (parsed === null) return null;
   if (parsed.runId !== runId || parsed.sessionId !== sessionId || parsed.caseId !== sessionId) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} Run identity does not match its session or directory`);
+    throw new StorageSchemaError('STORAGE_SCHEMA', `${filePath} Run identity does not match its session or directory`);
   }
   return parsed;
 }

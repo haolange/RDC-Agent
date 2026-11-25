@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { useI18n } from '../../i18n';
+import { humanizeError } from '../../i18n/humanizeError';
 import { Textarea } from '../../ui/Textarea';
 import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 
 interface UserMessageEditFormProps {
   value: string;
@@ -61,7 +63,7 @@ export const UserMessageEditForm: React.FC<UserMessageEditFormProps> = ({
           }
         }}
       />
-      {error ? <div className="conversation-edit-error">{error}</div> : null}
+      {error ? <InlineError detail={error}>{humanizeError(error, t, 'chat.rewriteFailed')}</InlineError> : null}
       <div className="conversation-edit-actions">
         <Button type="button" variant="secondary" disabled={submitting} onClick={onCancel}>
           {cancelLabel}

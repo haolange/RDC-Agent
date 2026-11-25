@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { rdcSessionService } from '../sessions';
@@ -29,7 +30,7 @@ const envelope = <T>(scope: SessionScope, payload: T): SessionScopedPayload<T> =
 export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): void {
   registerCaptureReplayReadHandlers();
   const authorizeReplayScope = (scope: SessionScope) => {
-    if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new Error('REPLAY_SCOPE_DENIED');
+    if (storageAdapter.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new AppError('REPLAY_SCOPE_DENIED');
   };
   const lastReplayHint = new Map<string, { phase: string; contextId: string | null; imageEventId: number | null }>();
   rdcSessionService.subscribe(state => {

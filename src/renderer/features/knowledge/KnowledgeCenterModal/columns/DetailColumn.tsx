@@ -11,6 +11,7 @@ import { Panel } from '../../../../ui/Panel';
 import { Tabs } from '../../../../ui/Tabs';
 import { useCopyDiagnostics } from '../../../../patterns/CopyDiagnostics';
 import { useI18n, type TranslationKey } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import { CHAPTER_LABEL_KEYS, TYPE_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { detailToRecord, type KnowledgeWriteAction } from '../knowledgeCenterModel';
 import { hasReadableCaseChapter } from '../knowledgeCaseValues';
@@ -233,7 +234,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
 
       {card && actions ? (
         <div className="knowledge-center-actions" data-testid="knowledge-center-actions">
-          {candidateError ? <InlineError detail={candidateError}>{t('knowledgeCenter.candidateFailed')}</InlineError> : null}
+          {candidateError ? <InlineError detail={candidateError}>{humanizeError(candidateError, t, 'knowledgeCenter.candidateFailed')}</InlineError> : null}
           <Menu
             open={moreOpen}
             onOpenChange={setMoreOpen}

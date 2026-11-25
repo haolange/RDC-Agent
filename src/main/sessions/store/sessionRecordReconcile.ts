@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { errorCodeOf } from '@shared/errors/appError';
 import { SessionRecordSchema } from './storageSchema';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { StorageHost } from './storageHost';
@@ -21,7 +22,7 @@ export function readProjectSessions(
         const session = host.io.readJson(path.join(sessionPath, 'session.json'), SessionRecordSchema);
         return session ? { session, sessionPath } : null;
       } catch (error) {
-        if (!(error instanceof Error) || !error.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) throw error;
+        if (errorCodeOf(error) !== 'STORAGE_SCHEMA_UNSUPPORTED') throw error;
         const session: SessionRecord = {
           schemaVersion: '1',
           storageDiagnostic: 'unsupported-schema',

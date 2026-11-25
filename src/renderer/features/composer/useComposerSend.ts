@@ -20,7 +20,6 @@ import type { AgentMode } from '@shared/types/layout';
 type Translate = ReturnType<typeof useI18n>['t'];
 
 export function useComposerSend(options: {
-  showNotice: (message: string) => void;
   t: Translate;
   currentMode: AgentMode;
   selectedAgentId: string;
@@ -42,7 +41,7 @@ export function useComposerSend(options: {
   armPendingSkill: (skillId: string, skillName?: string) => void;
 }) {
   const {
-    showNotice, t, currentMode, selectedAgentId, setSelectedAgentId, setCurrentMode, openSettings, currentProject,
+    t, currentMode, selectedAgentId, setSelectedAgentId, setCurrentMode, openSettings, currentProject,
     currentSession, currentRun, selectedDeviceEntry,
     hasActiveDebugRun, hasActiveConversationTurn, promptValue,
     setPromptValue, pendingAttachments, setPendingAttachments,
@@ -64,7 +63,6 @@ export function useComposerSend(options: {
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
 
   const { handlePrimaryStop } = useComposerStop({
-    showNotice,
     t,
     currentSession,
     currentRun,
@@ -109,7 +107,6 @@ export function useComposerSend(options: {
           setConversationMessages,
           upsertConversationMessages,
           openSettings,
-          showNotice,
           armPendingSkill,
         });
         if (handled) {
@@ -156,8 +153,7 @@ export function useComposerSend(options: {
         setCurrentRun,
         setRuns,
         setTracePresentation,
-        showNotice,
-        failedSummary: t('app.conversationRequestFailed'),
+        t,
         preserveDraft: Boolean(handoff),
         planReference: handoff?.planReference,
       });
@@ -171,7 +167,7 @@ export function useComposerSend(options: {
     setSelectedAgentId, setCurrentMode, openSettings, setConversationMessages, setBranchState,
     setConversationSnapshot, setCurrentRun, setCurrentSession, setIsPromptSending,
     setPendingAttachments, setPendingSkillIds, setPromptValue, setTracePresentation,
-    setRuns, setSessions, showNotice, t, upsertConversationMessages,
+    setRuns, setSessions, t, upsertConversationMessages,
   ]);
   const handlePromptSend = useCallback(async () => { await performSend(); }, [performSend]);
   const sendHandoffPrompt = useCallback((payload: HandoffSendPayload) => performSend(payload), [performSend]);

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
 import * as path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
   MAX_ATTACHMENT_TOTAL_BYTES,
@@ -17,7 +18,7 @@ interface AttachmentHashCandidate {
 }
 
 function createAbortError(): Error {
-  const error = new Error('ATTACHMENT_HASH_ABORTED: attachment hashing was cancelled.');
+  const error = new AppError('ATTACHMENT_HASH_ABORTED', 'attachment hashing was cancelled.');
   error.name = 'AbortError';
   return error;
 }
@@ -66,7 +67,7 @@ function collectAttachmentHashCandidates(
 
   const totalBytes = candidates.reduce((total, candidate) => total + candidate.size, 0);
   if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
-    throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
+    throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
   }
   return candidates;
 }

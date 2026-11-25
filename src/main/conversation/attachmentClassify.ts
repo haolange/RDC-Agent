@@ -1,4 +1,5 @@
 import { extname } from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import type { AttachmentLayer, AttachmentRejectCode } from '@shared/types/conversation';
 import type { SessionAttachmentKind } from '@shared/types/session';
 
@@ -293,26 +294,26 @@ export function assertSafeImageBytes(
   bytes: Buffer,
 ): void {
   if (mimeType === 'image/svg+xml' || fileExtension(fileName) === '.svg') {
-    throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (image/svg+xml)`);
+    throw new AppError('ATTACHMENT_MEDIA_UNSUPPORTED', `${fileName} (image/svg+xml)`);
   }
   if (!NATIVE_IMAGE_MIME_TYPES.has(mimeType)) {
-    throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (${mimeType})`);
+    throw new AppError('ATTACHMENT_MEDIA_UNSUPPORTED', `${fileName} (${mimeType})`);
   }
   const magicMime = detectImageMagicMime(bytes.subarray(0, Math.min(bytes.length, 64)));
   if (!magicMime || magicMime === 'image/svg+xml') {
-    throw new Error(`ATTACHMENT_INVALID: ${fileName} magic bytes do not match a supported image`);
+    throw new AppError('ATTACHMENT_INVALID', `${fileName} magic bytes do not match a supported image`);
   }
   if (magicMime !== mimeType) {
-    throw new Error(`ATTACHMENT_INVALID: ${fileName} declared ${mimeType} but content is ${magicMime}`);
+    throw new AppError('ATTACHMENT_INVALID', `${fileName} declared ${mimeType} but content is ${magicMime}`);
   }
   const probe = bytes.subarray(0, Math.min(bytes.length, 256 * 1024));
   const dims = readImageDimensions(magicMime, probe);
   if (!dims) return;
   if (dims.width > MAX_IMAGE_EDGE || dims.height > MAX_IMAGE_EDGE) {
-    throw new Error(`ATTACHMENT_INVALID: ${fileName} edge ${dims.width}x${dims.height} exceeds ${MAX_IMAGE_EDGE}`);
+    throw new AppError('ATTACHMENT_INVALID', `${fileName} edge ${dims.width}x${dims.height} exceeds ${MAX_IMAGE_EDGE}`);
   }
   if (dims.width * dims.height > MAX_IMAGE_PIXELS) {
-    throw new Error(`ATTACHMENT_INVALID: ${fileName} pixels ${dims.width * dims.height} exceed ${MAX_IMAGE_PIXELS}`);
+    throw new AppError('ATTACHMENT_INVALID', `${fileName} pixels ${dims.width * dims.height} exceed ${MAX_IMAGE_PIXELS}`);
   }
 }
 

@@ -9,6 +9,7 @@
 import * as fs from 'fs';
 import { createHash } from 'node:crypto';
 import * as readline from 'readline';
+import { AppError } from '@shared/errors/appError';
 import { recordSuccessfulFileRead } from './fileReadAccess';
 import { auditFiles, type FileAuditDetails, type FileAuditParams } from './fileAudit';
 import { assertTextReadable, safeResolvePath, truncateOutput } from './_shared';
@@ -80,13 +81,13 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
     }
 
     if (params.mode === 'audit') {
-      if (params.offset !== undefined || params.limit !== undefined) throw new Error('FILE_AUDIT_PAGING_DENIED');
+      if (params.offset !== undefined || params.limit !== undefined) throw new AppError('FILE_AUDIT_PAGING_DENIED');
       const details = await auditFiles(params, context, signal);
       return { content: [{ type: 'text', text: JSON.stringify(details) }], details };
     }
     if ((params.mode !== undefined && params.mode !== 'text') || params.expectedHash !== undefined
       || params.compareWith !== undefined || params.textComparison !== undefined) {
-      throw new Error('FILE_READ_MODE_INVALID: audit options require explicit mode=audit.');
+      throw new AppError('FILE_READ_MODE_INVALID', 'audit options require explicit mode=audit.');
     }
 
     const absolute = safeResolvePath(params.path, undefined, context);

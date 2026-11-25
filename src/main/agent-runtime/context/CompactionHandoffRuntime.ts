@@ -1,5 +1,6 @@
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { AppError } from '@shared/errors/appError';
 import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
@@ -70,10 +71,10 @@ export async function executeCompactionHandoff(
   });
   input.signal?.throwIfAborted();
   if (message.stopReason !== 'stop') {
-    throw new Error(`COMPACTION_INCOMPLETE: provider ended with ${message.stopReason}; original context retained.`);
+    throw new AppError('COMPACTION_INCOMPLETE', `provider ended with ${message.stopReason}; original context retained.`);
   }
   if (!assistantMessageText(message)) {
-    throw new Error('COMPACTION_HANDOFF_EMPTY: the compaction model returned no text.');
+    throw new AppError('COMPACTION_HANDOFF_EMPTY', 'the compaction model returned no text.');
   }
   return message;
 }

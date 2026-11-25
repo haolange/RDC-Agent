@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import type { TaskBudgetState, TaskExecutionRecord, TaskRecord, TaskRootBudgetRecord } from './TaskContracts';
 import type { TaskRegistry } from './TaskRegistry';
 
@@ -29,10 +30,10 @@ export async function readTaskBudgetSnapshot(
 ): Promise<TaskBudgetSnapshot> {
   const execution = task.currentExecutionId ? await registry.getExecution(task.currentExecutionId) : null;
   if (execution && (execution.taskId !== task.id || execution.id !== task.currentExecutionId)) {
-    throw new Error('TASK_BUDGET_EXECUTION_MISMATCH');
+    throw new AppError('TASK_BUDGET_EXECUTION_MISMATCH');
   }
   const root = execution?.rootBudgetId ? await registry.getRootBudget(execution.rootBudgetId) : null;
-  if (root && root.id !== execution!.rootBudgetId) throw new Error('TASK_BUDGET_ROOT_ID_MISMATCH');
+  if (root && root.id !== execution!.rootBudgetId) throw new AppError('TASK_BUDGET_ROOT_ID_MISMATCH');
   const observedAt = Date.now();
   return {
     observedAt,

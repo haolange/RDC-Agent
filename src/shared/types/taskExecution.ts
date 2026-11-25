@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from '../errors/appError';
 import { REASONING_SELECTIONS } from './modelCapability';
 
 /** Read-only dependency explanation, never a lifecycle state or execution grant. */
@@ -133,14 +134,14 @@ export function parsePlanTaskRequirements(markdown: string): PlanTaskRequirement
   if (!heading || typeof heading.index !== 'number') return [];
   const index = heading.index;
   if (!markdown.startsWith(marker, index) || headings.length !== 1) {
-    throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: malformed or duplicate task contract section.');
+    throw new AppError('PLAN_TASK_REQUIREMENTS_INVALID', 'malformed or duplicate task contract section.');
   }
   const tail = markdown.slice(index + marker.length);
   const end = tail.lastIndexOf('\n```');
-  if (end < 0 || tail.slice(end + 4).trim()) throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: task contract must terminate the plan.');
+  if (end < 0 || tail.slice(end + 4).trim()) throw new AppError('PLAN_TASK_REQUIREMENTS_INVALID', 'task contract must terminate the plan.');
   const parsed = PlanTaskRequirementsSchema.parse(JSON.parse(tail.slice(0, end)));
   if (new Set(parsed.tasks.map(task => task.taskId)).size !== parsed.tasks.length) {
-    throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: duplicate Task ids.');
+    throw new AppError('PLAN_TASK_REQUIREMENTS_INVALID', 'duplicate Task ids.');
   }
   return parsed.tasks;
 }

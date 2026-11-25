@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { emptyForm, formFromContent, type ResourceFormState } from './scopedResourceForm';
 import { deleteScopedResource } from './runtimeScopeActions';
 import { importScopedResourceFromPicker, saveScopedResource } from './runtimeScopeMutations';
 import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 export { normalizeResourceId, templateResourceId } from './runtimeScopeMutations';
+
+/** The editor's last outcome: a confirmation, or a failure in product copy whose technical reason only "Copy details" carries. */
+export type ScopeNotice = { tone: 'success'; message: string } | { tone: 'error'; message: string; detail?: string };
 
 export interface RuntimeScopePanelOptions {
   overview: RdcRuntimeOverview | null;
@@ -31,7 +36,7 @@ export function useRuntimeScopePanel({
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, ''));
   const [baseline, setBaseline] = useState<ResourceFormState>(form);
-  const [message, setMessage] = useState('');
+  const [notice, setNotice] = useState<ScopeNotice | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ScopedResourceDocument | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
@@ -45,7 +50,7 @@ export function useRuntimeScopePanel({
     setDialogEditing(false);
     setForm(next);
     setBaseline(next);
-    setMessage('');
+    setNotice(null);
   };
 
   useEffect(reset, [scope, kind]);
@@ -69,7 +74,7 @@ export function useRuntimeScopePanel({
     setSelectedId(resource.id);
     setForm(next);
     setBaseline(next);
-    setMessage('');
+    setNotice(null);
   });
 
   const startNew = () => guard(() => {
@@ -78,13 +83,13 @@ export function useRuntimeScopePanel({
     setSelectedId(null);
     setForm(next);
     setBaseline(next);
-    setMessage('');
+    setNotice(null);
   });
 
   const closeEditor = () => guard(reset);
 
   const openDialogEditor = () => {
-    setMessage('');
+    setNotice(null);
     setDialogEditing(true);
   };
 
@@ -93,18 +98,21 @@ export function useRuntimeScopePanel({
     setForm(baseline);
     setCreating(false);
     setDialogEditing(false);
-    setMessage('');
+    setNotice(null);
     if (creating) setSelectedId(null);
   });
 
   const patchForm = (patch: Partial<ResourceFormState>) => {
     setForm((current) => ({ ...current, ...patch }));
-    setMessage((current) => current === t('settings.scopeSaved') || current === t('settings.scopeImported') ? '' : current);
+    setNotice((current) => (current?.tone === 'success' ? null : current));
   };
+
+  const fail = (error: unknown, contextKey: 'app.error.saveFailed' | 'app.error.actionFailed') => setNotice(
+    { tone: 'error', message: humanizeError(error, t, contextKey), detail: errorDetail(error) });
 
   const save = async () => {
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       const outcome = await saveScopedResource({
         kind,
@@ -115,9 +123,9 @@ export function useRuntimeScopePanel({
         ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
       });
       if (!outcome.ok) {
-        setMessage(outcome.messageKey
-          ? t(`settings.${outcome.messageKey}` as const)
-          : outcome.message);
+        setNotice(outcome.messageKey
+          ? { tone: 'error', message: t(`settings.${outcome.messageKey}` as const) }
+          : { tone: 'error', message: t('settings.resourceInvalid'), detail: outcome.message });
         return;
       }
       onChanged?.(outcome.overview);
@@ -130,9 +138,9 @@ export function useRuntimeScopePanel({
       setForm(savedForm);
       setBaseline(savedForm);
       setDialogEditing(false);
-      setMessage(t('settings.scopeSaved'));
+      setNotice({ tone: 'success', message: t('settings.scopeSaved') });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      fail(error, 'app.error.saveFailed');
     } finally {
       setBusy(false);
     }
@@ -147,7 +155,7 @@ export function useRuntimeScopePanel({
       if (next) onChanged?.(next);
       reset();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      fail(error, 'app.error.actionFailed');
     } finally {
       setBusy(false);
       setPendingDelete(null);
@@ -156,7 +164,7 @@ export function useRuntimeScopePanel({
 
   const importResource = async () => {
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       const result = await importScopedResourceFromPicker({
         kind,
@@ -172,21 +180,17 @@ export function useRuntimeScopePanel({
         setForm(next);
         setBaseline(next);
       }
-      setMessage(t('settings.scopeImported'));
+      setNotice({ tone: 'success', message: t('settings.scopeImported') });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      fail(error, 'app.error.actionFailed');
     } finally {
       setBusy(false);
     }
   };
   return {
-    resources, selected, selectedId, creating, editing, dirty, form, message, busy,
+    resources, selected, selectedId, creating, editing, dirty, form, notice, busy,
     pendingDelete, pendingDiscard, setPendingDelete,
-    resolveDiscard: (accept: boolean) => {
-      const action = pendingDiscard;
-      setPendingDiscard(null);
-      if (accept) action?.();
-    },
+    resolveDiscard: (accept: boolean) => { const action = pendingDiscard; setPendingDiscard(null); if (accept) action?.(); },
     openResource, startNew, closeEditor, dialogEditing, openDialogEditor, closeDialogEditor,
     patchForm, save, remove, guard, importResource: () => guard(() => void importResource()),
   };

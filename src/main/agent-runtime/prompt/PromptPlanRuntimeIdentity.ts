@@ -1,4 +1,5 @@
 import { charsToTokens } from '@shared/utils/tokens';
+import { AppError } from '@shared/errors/appError';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { runtimeIdentityContent } from './RuntimeIdentity';
 import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
@@ -7,7 +8,7 @@ import type { PromptPlan } from '@shared/types/rdcRuntime';
 /** A new replay identity changes only the volatile identity segment of the frozen PromptPlan. */
 export function refreshPromptPlanRuntimeIdentity(plan: PromptPlan, sessionId: string, permissionRevision: number | null, lease: RdcContextLease | null): PromptPlan {
   const identity = plan.segments.filter(segment => segment.id === 'runtime:identity');
-  if (identity.length !== 1 || identity[0].stability !== 'volatile') throw new Error('RDC_REPREPARE_IDENTITY_MISSING');
+  if (identity.length !== 1 || identity[0].stability !== 'volatile') throw new AppError('RDC_REPREPARE_IDENTITY_MISSING');
   const content = runtimeIdentityContent(sessionId, permissionRevision, lease);
   const segments = plan.segments.map(segment => segment === identity[0]
     ? { ...segment, content, sourceHash: hashScopedResource(content), tokenEstimate: charsToTokens(content.length) } : segment);

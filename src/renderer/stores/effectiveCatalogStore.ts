@@ -3,6 +3,7 @@ import { providerConnectionIdentity } from '@shared/utils/providerConnectionIden
 import { getElectronApi } from '../platform/getElectronApi';
 import { observeEffectiveCatalog, readEffectiveCatalog, refreshEffectiveCatalog } from '../services/effectiveCatalogService';
 import { latestCatalogProjection } from '../lib/catalogProjection';
+import { errorDetail } from '../lib/errorDetail';
 import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import type { LlmProviderEntry, LlmProviderProtocol } from '@shared/types/settings';
 
@@ -14,6 +15,7 @@ export interface CatalogScope {
 export interface CatalogProjection {
   snapshot: EffectiveCatalogSnapshot | null;
   loading: boolean;
+  /** The technical reason a load failed; surfaces word it themselves and keep this for "Copy details". */
   error?: string;
 }
 const EMPTY: CatalogProjection = { snapshot: null, loading: false };
@@ -67,7 +69,7 @@ export const useEffectiveCatalogStore = create<CatalogState>((set, get) => ({
           pendingEvents.delete(key);
           set((state) => ({ entries: { ...state.entries, [key]: {
             snapshot: state.entries[key]?.snapshot ?? null, loading: false,
-            error: error instanceof Error ? error.message : 'The model catalog could not be loaded.',
+            error: errorDetail(error),
           } } }));
         }
         return null;

@@ -37,7 +37,8 @@ describe('AgentSkillPicker', () => {
     const html = renderToStaticMarkup(createElement(AgentSkillPicker, { ...props,
       skills: { ...props.skills, catalog: null, error: 'read denied' },
     }));
-    expect(html).toContain('read denied');
+    expect(html).toContain('settings.skillSelectionReadFailed');
+    expect(html).not.toContain('read denied');
     expect(html).toContain('settings.skillSelectionRetry');
     expect(html).not.toContain('settings.skillSelectionEmpty');
     expect(html).not.toContain('settings.skillSelectionMissing');

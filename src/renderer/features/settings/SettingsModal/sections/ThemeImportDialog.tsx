@@ -65,7 +65,7 @@ export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeI
       {preview.state === 'empty' ? (
         <p className="appearance-import-status" role="status">{t('settings.appearanceImportEmpty')}</p>
       ) : null}
-      {preview.state === 'invalid' ? <InlineError>{themeImportErrorMessage(preview.error, t)}</InlineError> : null}
+      {preview.state === 'invalid' ? <InlineError detail={preview.error}>{themeImportErrorMessage(preview.reason, t)}</InlineError> : null}
       {preview.state === 'valid' ? (
         <>
           <p className="appearance-import-status" role="status">{t('settings.appearanceImportValid')}</p>

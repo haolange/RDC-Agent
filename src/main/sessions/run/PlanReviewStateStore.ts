@@ -7,6 +7,7 @@ import {
   type PlanReviewStatus,
 } from '@shared/types/planReview';
 import { generateShortId, nowMs } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../store/StorageAdapter';
 import type { StorageIo } from '../store/StorageIo';
 
@@ -53,7 +54,7 @@ export class PlanReviewStateStore {
   }
 
   beginRevision(sessionId: string, ownerTurnId: string): BeginPlanRevisionResult {
-    if (!ownerTurnId.trim()) throw new Error('PLAN_REVIEW_OWNER_REQUIRED: a plan requires its owning turn.');
+    if (!ownerTurnId.trim()) throw new AppError('PLAN_REVIEW_OWNER_REQUIRED', 'a plan requires its owning turn.');
     const previous = this.read(sessionId);
     const newCycle = !previous || previous.ownerTurnId !== ownerTurnId
       || previous.status === 'approved' || previous.status === 'cancelled';
@@ -82,7 +83,7 @@ export class PlanReviewStateStore {
   reopenReview(sessionId: string, ownerTurnId: string, planId: string, revision: number): void {
     const current = this.read(sessionId);
     if (!current || current.ownerTurnId !== ownerTurnId || current.planId !== planId
-      || current.revision !== revision || current.status !== 'cancelled') throw new Error('PLAN_REVIEW_SCOPE_CHANGED: plan cannot be reopened.');
+      || current.revision !== revision || current.status !== 'cancelled') throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'plan cannot be reopened.');
     this.write(sessionId, { ...current, status: 'awaiting', updatedAt: nowMs() });
   }
 
@@ -94,11 +95,11 @@ export class PlanReviewStateStore {
   ): PlanReviewStateDocument {
     const current = this.read(sessionId);
     if (!current) {
-      throw new Error('PLAN_REVIEW_STATE_MISSING: no live plan review to decide.');
+      throw new AppError('PLAN_REVIEW_STATE_MISSING', 'no live plan review to decide.');
     }
     if (current.ownerTurnId !== owner.turnId || current.planId !== owner.planId
       || current.revision !== owner.revision || current.status !== 'awaiting') {
-      throw new Error('PLAN_REVIEW_SCOPE_CHANGED: this review no longer owns the current plan.');
+      throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'this review no longer owns the current plan.');
     }
     const next: PlanReviewStateDocument = {
       ...current,
@@ -118,7 +119,7 @@ export class PlanReviewStateStore {
   private write(sessionId: string, document: PlanReviewStateDocument): void {
     const filePath = this.getStatePath(sessionId);
     if (!filePath) {
-      throw new Error(`PLAN_REVIEW_STATE_MISSING: session not found: ${sessionId}`);
+      throw new AppError('PLAN_REVIEW_STATE_MISSING', `session not found: ${sessionId}`);
     }
     this.host.io.writeJsonAtomic(filePath, planReviewStateSchema.parse(document));
   }

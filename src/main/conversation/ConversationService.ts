@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { traceService } from '../agent-trace/TraceService';
@@ -252,7 +253,7 @@ export class ConversationService {
     input: ConversationContextInput | ConversationRewriteContextInput,
   ): { scopeType: 'session' | 'project'; scopeId: string; scopeKey: string; idempotencyKey: string } {
     const requestId = input.requestId?.trim();
-    if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
+    if (!requestId) throw new AppError('PREFLIGHT_FAILED', 'requestId is required.');
     const sessionId = input.sessionId ?? input.fallbackSessionId ?? null;
     if (sessionId) {
       return {
@@ -332,7 +333,7 @@ export class ConversationService {
   private assertFingerprintMatch(idempotencyKey: string, fingerprint: string): void {
     const existingFingerprint = this.sendRequestFingerprints.get(idempotencyKey);
     if (existingFingerprint && existingFingerprint !== fingerprint) {
-      throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different request fingerprint.');
+      throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different request fingerprint.');
     }
   }
 
@@ -356,17 +357,17 @@ export class ConversationService {
       const preparedContext = userMessage?.preparedContext ?? assistantDraftMessage?.preparedContext;
       if (!userMessage || !assistantDraftMessage || !preparedContext) continue;
       if (userMessage.content !== input.message.trim()) {
-        throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different user message.');
+        throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different user message.');
       }
       if (userMessage.requestFingerprint !== requestFingerprint) {
-        throw new Error('REQUEST_ID_CONFLICT: persisted request fingerprint is missing or differs from this request.');
+        throw new AppError('REQUEST_ID_CONFLICT', 'persisted request fingerprint is missing or differs from this request.');
       }
       const requestedCatalogRevision = input.configurationCommit?.providerCatalogRevision;
       if (
         requestedCatalogRevision
         && requestedCatalogRevision !== preparedContext.route.catalogRevision
       ) {
-        throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different frozen route.');
+        throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different frozen route.');
       }
       const branchState = this.readRepairedBranchState(session.sessionId, history);
       const messages = branchState
@@ -412,10 +413,10 @@ export class ConversationService {
     ) => Promise<ConversationTurnResult>,
   ): Promise<ConversationTurnResult> {
     if (!this.acceptingTurns) {
-      throw new Error('SHUTTING_DOWN: conversation service is no longer accepting turns.');
+      throw new AppError('SHUTTING_DOWN', 'conversation service is no longer accepting turns.');
     }
     const requestId = input.requestId?.trim();
-    if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
+    if (!requestId) throw new AppError('PREFLIGHT_FAILED', 'requestId is required.');
     const { scopeKey, idempotencyKey } = this.resolveIdempotencyScope(input);
 
     const controller = new AbortController();
@@ -426,7 +427,7 @@ export class ConversationService {
     if (ownsPreparation) {
       const scopeOwner = this.activeSendScopes.get(scopeKey);
       if (scopeOwner && scopeOwner !== requestId) {
-        throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
+        throw new AppError('CONVERSATION_BUSY', 'another request is preparing for this conversation.');
       }
       if (scopeKey.startsWith('session:')) conversationRdcHost().acquirePreparationLock(scopeKey.slice(8), requestId);
       this.activeSendScopes.set(scopeKey, requestId);
@@ -460,7 +461,7 @@ export class ConversationService {
       const attachments = input.attachments ?? [];
       for (const attachment of attachments) {
         if (!attachment.sourcePath || typeof attachment.sourcePath !== 'string') {
-          throw new Error('PREFLIGHT_FAILED: attachment sourcePath is required.');
+          throw new AppError('PREFLIGHT_FAILED', 'attachment sourcePath is required.');
         }
       }
       let stagedAttachments = attachments;
@@ -470,7 +471,7 @@ export class ConversationService {
         stagedAttachments = staged.stagedAttachments;
       }
       if (activeController.signal.aborted) {
-        throw new Error('TURN_CANCELLED: preparation aborted.');
+        throw new AppError('TURN_CANCELLED', 'preparation aborted.');
       }
       fingerprint = await this.computeRequestFingerprint(input, activeController.signal, stagedAttachments);
       this.assertFingerprintMatch(idempotencyKey, fingerprint);
@@ -509,7 +510,7 @@ export class ConversationService {
     return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint, attachments) => {
         const context = await this.resolveContext(input);
         if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
-          throw new Error('CONVERSATION_BUSY: this conversation already has a running turn.');
+          throw new AppError('CONVERSATION_BUSY', 'this conversation already has a running turn.');
         }
         if (context.session) agentPlanReviewRequestService.retireRecovered(context.session.sessionId);
         return await this.startProfileTurn(

@@ -30,7 +30,7 @@ export async function loadSessionsOp(
     if (options.rollbackState) {
       restoreSelectionSnapshot(ctx, options.rollbackState);
     }
-    ctx.setSidebarError(projectSelection.error || ctx.t('sidebar.selectProjectFailed'));
+    ctx.setSidebarError({ contextKey: 'sidebar.selectProjectFailed', detail: projectSelection.error });
     return;
   }
 

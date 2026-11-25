@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
 import { canonicalJson } from './RdcOperationCatalog';
@@ -36,7 +37,7 @@ export const rdcDigest = (value: unknown): string => createHash('sha256').update
 function signingKey(): string {
   let key = secretStorageService.getSecret(KEY_REF);
   if (!key) {
-    if (secretStorageService.hasSecretRecord(KEY_REF)) throw new Error('RDC_RECEIPT_KEY_UNAVAILABLE: existing signing key cannot be decrypted.');
+    if (secretStorageService.hasSecretRecord(KEY_REF)) throw new AppError('RDC_RECEIPT_KEY_UNAVAILABLE', 'existing signing key cannot be decrypted.');
     key = randomBytes(32).toString('hex');
     secretStorageService.setSecret(KEY_REF, key);
   }
@@ -59,18 +60,18 @@ export class RdcExecutionReceipts {
   }
   read(sessionId: string, ref: InvestigationContentRef): RdcExecutionReceipt {
     const read = this.resolver.read(sessionId, ref.uri, { expectedHash: ref.expectedHash.replace(/^sha256:/, '') });
-    if (read.category !== 'tool-outputs' || read.truncated || !read.text) throw new Error('RDC_RECEIPT_INVALID: incomplete receipt');
+    if (read.category !== 'tool-outputs' || read.truncated || !read.text) throw new AppError('RDC_RECEIPT_INVALID', 'incomplete receipt');
     const signed = JSON.parse(read.text) as { body?: unknown; signature?: unknown };
     if (typeof signed.body !== 'string' || typeof signed.signature !== 'string' || !/^[a-f0-9]{64}$/.test(signed.signature)) {
-      throw new Error('RDC_RECEIPT_INVALID: unsigned content');
+      throw new AppError('RDC_RECEIPT_INVALID', 'unsigned content');
     }
     const expected = createHmac('sha256', this.key()).update(signed.body).digest();
-    if (!timingSafeEqual(expected, Buffer.from(signed.signature, 'hex'))) throw new Error('RDC_RECEIPT_INVALID: signature mismatch');
+    if (!timingSafeEqual(expected, Buffer.from(signed.signature, 'hex'))) throw new AppError('RDC_RECEIPT_INVALID', 'signature mismatch');
     const receipt = JSON.parse(signed.body) as RdcExecutionReceipt;
     if (!receipt.evidence || !['measurement', 'intervention', 'rollback'].includes(receipt.evidence.kind)
       || !/^[a-f0-9]{64}$/.test(receipt.definitionsFingerprint) || receipt.schemaVersion !== 1 || receipt.sessionId !== sessionId || receipt.exitCode !== 0
       || rdcDigest(receipt.result) !== receipt.resultHash || rdcDigest(receipt.args) !== receipt.argsFingerprint) {
-      throw new Error('RDC_RECEIPT_INVALID: ownership or result mismatch');
+      throw new AppError('RDC_RECEIPT_INVALID', 'ownership or result mismatch');
     }
     return receipt;
   }

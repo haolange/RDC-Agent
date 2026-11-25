@@ -1,9 +1,10 @@
+import { randomUUID } from 'crypto';
+import { AppError } from '@shared/errors/appError';
 /**
  * Execution scope ids for turns/slots without a durable session.
  * Never use __anon__ / __no_session__ placeholders.
  */
 
-import { randomUUID } from 'crypto';
 import { ephemeralScopeId } from '@shared/utils/executionScope';
 
 export function createEphemeralScopeId(): string {
@@ -24,7 +25,7 @@ export function resolveExecutionScopeId(
 export function requireExecutionScopeId(scopeId: string | null | undefined): string {
   const value = scopeId?.trim();
   if (!value) {
-    throw new Error('EXECUTION_SCOPE_REQUIRED: a non-empty session or ephemeral scope id is required.');
+    throw new AppError('EXECUTION_SCOPE_REQUIRED', 'a non-empty session or ephemeral scope id is required.');
   }
   return value;
 }

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useI18n } from '../../../i18n';
+import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
-import { knowledgeErrorMessage } from './knowledgeCenterModel';
 import { beginSynchronousFlight, filterPickableCards, knowledgeCardKey, knowledgeExportScopeCounts } from './knowledgeImportExportModel';
 import type {
   KnowledgeExportFormat,
@@ -19,7 +18,6 @@ export function useKnowledgeExport(options: {
   filteredCount?: number;
   selected: { spaceId: string; relativePath: string } | null;
 }) {
-  const { t } = useI18n();
   const request = useKnowledgeRequestScope(options.active);
   const inFlight = useRef(false);
   const [open, setOpen] = useState(false);
@@ -41,7 +39,7 @@ export function useKnowledgeExport(options: {
     void window.electronAPI.knowledge.query({ spaceIds: [spaceId] }).then((listed) => {
       if (request.isCurrent(seq)) setSpaceCount(listed.hits.length);
     }).catch((err) => {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(errorDetail(err));
     });
   }, [open, request, spaceId]);
 
@@ -110,17 +108,12 @@ export function useKnowledgeExport(options: {
       // `null`: the person cancelled main's save dialog; the panel stays as it was.
       if (exported && request.isCurrent(seq)) setResult(exported);
     } catch (err) {
-      if (request.isCurrent(seq)) {
-        const raw = knowledgeErrorMessage(err);
-        setError(raw.includes('KNOWLEDGE_EXPORT_EMPTY_RESULT')
-          ? t('knowledgeCenter.exportNoEligibleCards')
-          : raw);
-      }
+      if (request.isCurrent(seq)) setError(errorDetail(err));
     } finally {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [format, options.hits, options.queryRequest, options.queryRevision, picked, request, scope, spaceId, t]);
+  }, [format, options.hits, options.queryRequest, options.queryRevision, picked, request, scope, spaceId]);
 
   return {
     open,

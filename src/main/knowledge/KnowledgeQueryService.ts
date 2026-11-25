@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, type KnowledgeCardDetail, type KnowledgeCardSummary, type KnowledgeSpace, type KnowledgeTopicDocument, type KnowledgeTopic } from '@shared/types/knowledge';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
@@ -193,7 +194,7 @@ export class KnowledgeQueryService {
       const available = this.deps.listSpaces().map(space => space.spaceId);
       const unknown = request.spaceIds.filter(spaceId => !available.includes(spaceId));
       if (unknown.length) {
-        throw new Error(`KNOWLEDGE_SPACE_UNKNOWN: ${JSON.stringify(unknown)}. Use exact space IDs from knowledge_browse: ${JSON.stringify(available)}.`);
+        throw new AppError('KNOWLEDGE_SPACE_UNKNOWN', `${JSON.stringify(unknown)}. Use exact space IDs from knowledge_browse: ${JSON.stringify(available)}.`);
       }
     }
     const [snapshot, vocabulary] = await Promise.all([this.deps.index.getOrRebuild(), this.deps.readTopics()]);
@@ -208,14 +209,14 @@ export class KnowledgeQueryService {
         ? assignment.topicIds.flatMap(id => topicById.has(id) ? [topicById.get(id)!] : []) : [];
     };
     if (request.expectedRevision && request.expectedRevision !== revision) {
-      throw new Error('KNOWLEDGE_INDEX_CHANGED: refresh the search before reading another page.');
+      throw new AppError('KNOWLEDGE_INDEX_CHANGED', 'refresh the search before reading another page.');
     }
     if (request.offset && !request.expectedRevision) {
-      throw new Error('KNOWLEDGE_REVISION_REQUIRED: subsequent pages require the search revision.');
+      throw new AppError('KNOWLEDGE_REVISION_REQUIRED', 'subsequent pages require the search revision.');
     }
     if ((request.offset !== undefined && (!Number.isInteger(request.offset) || request.offset < 0))
       || (request.limit !== undefined && (!Number.isInteger(request.limit) || request.limit < 1 || request.limit > 100))) {
-      throw new Error('KNOWLEDGE_PAGE_INVALID: offset must be non-negative and limit must be between 1 and 100.');
+      throw new AppError('KNOWLEDGE_PAGE_INVALID', 'offset must be non-negative and limit must be between 1 and 100.');
     }
     const allTypes = !!request.type && KNOWLEDGE_CARD_TYPES.every(type => request.type!.includes(type));
     const allLifecycles = !!request.lifecycle && KNOWLEDGE_LIFECYCLES.every(lifecycle => request.lifecycle!.includes(lifecycle));

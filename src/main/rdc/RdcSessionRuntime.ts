@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { shellInvocationService } from '../tools/ShellInvocationService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -53,9 +54,9 @@ async function callNative(
   try {
     signal?.throwIfAborted();
     const payload = parseRdcNativeResult(result, contextId, operation);
-    if (operation === 'rd.capture.open_file' && (typeof payload.data.capture_file_id !== 'string' || !payload.data.capture_file_id)) throw new Error('RDC_CLI_PROTOCOL: capture_file_id is required.');
-    if (operation === 'rd.capture.open_replay' && (typeof payload.data.session_id !== 'string' || !payload.data.session_id)) throw new Error('RDC_CLI_PROTOCOL: session_id is required.');
-    if (operation === 'rd.capture.open_replay' && payload.data.capture_file_id !== args.capture_file_id) throw new Error('RDC_CAPTURE_MISMATCH: replay capture identity does not match the opened file.');
+    if (operation === 'rd.capture.open_file' && (typeof payload.data.capture_file_id !== 'string' || !payload.data.capture_file_id)) throw new AppError('RDC_CLI_PROTOCOL', 'capture_file_id is required.');
+    if (operation === 'rd.capture.open_replay' && (typeof payload.data.session_id !== 'string' || !payload.data.session_id)) throw new AppError('RDC_CLI_PROTOCOL', 'session_id is required.');
+    if (operation === 'rd.capture.open_replay' && payload.data.capture_file_id !== args.capture_file_id) throw new AppError('RDC_CAPTURE_MISMATCH', 'replay capture identity does not match the opened file.');
     return { ok: true, data: payload.data };
   } catch (error) {
     if (error instanceof RdcNativeFailure) throw error;
@@ -93,14 +94,14 @@ export class RdcSessionRuntime {
     const scope = { projectId: request.projectId, sessionId: request.sessionId ?? '' };
     if (isRemoteReplay) {
       if (!this.isOwnedBy(scope) || !this.remoteConnection || this.remoteConnection.deviceId !== replayDevice.id) {
-        throw new Error('RDC_DEVICE_NOT_PREPARED');
+        throw new AppError('RDC_DEVICE_NOT_PREPARED');
       }
       const currentBinding = await this.resolveBinding(options);
       if (JSON.stringify(currentBinding.cli) !== JSON.stringify(this.lifecycleBinding?.cli)
-        || currentBinding.definitionsFingerprint !== this.lifecycleBinding?.definitionsFingerprint) throw new Error('RDC_CLI_BINDING_CHANGED');
+        || currentBinding.definitionsFingerprint !== this.lifecycleBinding?.definitionsFingerprint) throw new AppError('RDC_CLI_BINDING_CHANGED');
       if (this.runtimeContext) {
         const previous = this.runtimeContext;
-        if (!previous.captureFileId || !previous.replaySessionId) throw new Error('RDC_SWITCH_IDENTITY_INVALID: capture and replay identities are required.');
+        if (!previous.captureFileId || !previous.replaySessionId) throw new AppError('RDC_SWITCH_IDENTITY_INVALID', 'capture and replay identities are required.');
         await closeOwnedRemoteCapture({ scope, contextId: this.contextId!, replaySessionId: previous.replaySessionId,
           captureFileId: previous.captureFileId, binding: currentBinding, signal: options.signal,
           onClosed: () => {
@@ -158,7 +159,7 @@ export class RdcSessionRuntime {
         if (!result.ok) {
           throw new Error(result.error ?? 'Remote replay open failed.');
         }
-        if (result.data.remote_id !== preparedRemote.remoteId) throw new Error('RDC_REMOTE_MISMATCH: remote replay identity does not match the selected connection.');
+        if (result.data.remote_id !== preparedRemote.remoteId) throw new AppError('RDC_REMOTE_MISMATCH', 'remote replay identity does not match the selected connection.');
         resultData = {
           ...result.data,
           backend: 'remote',
@@ -183,8 +184,8 @@ export class RdcSessionRuntime {
         deviceId: replayDevice.id,
         deviceLabel: replayDevice.label,
       });
-      if (runtimeContext.contextId !== allocatedContextId) throw new Error('RDC_CONTEXT_MISMATCH: native operation returned a different owning context.');
-      if (isRemoteReplay && runtimeContext.remoteId !== preparedRemote?.remoteId) throw new Error('RDC_REMOTE_MISMATCH: native replay belongs to a different remote.');
+      if (runtimeContext.contextId !== allocatedContextId) throw new AppError('RDC_CONTEXT_MISMATCH', 'native operation returned a different owning context.');
+      if (isRemoteReplay && runtimeContext.remoteId !== preparedRemote?.remoteId) throw new AppError('RDC_REMOTE_MISMATCH', 'native replay belongs to a different remote.');
     } catch (error) {
       capture.status = 'error';
       this.captures = [capture];
@@ -267,7 +268,7 @@ export class RdcSessionRuntime {
     if (device.type === 'local') {
       if (this.openedCapture) {
         if (this.isOwnedBy(scope) && this.replayDevice?.id === device.id) return;
-        throw new Error('RDC_CAPTURE_CLOSE_REQUIRED');
+        throw new AppError('RDC_CAPTURE_CLOSE_REQUIRED');
       }
       await this.closeOrReplaceOpenedCapture(options);
       this.ownerScope = scope; this.replayDevice = device; this.deviceLabel = device.label;
@@ -276,19 +277,19 @@ export class RdcSessionRuntime {
     const binding = await this.resolveBinding(options);
     assertRemotePreparationContract(binding);
     if (options.expectedBindingIdentity && remotePreparationBindingIdentity(binding) !== options.expectedBindingIdentity) {
-      throw new Error('RDC_DEVICE_CONFIRMATION_STALE: native CLI or catalog changed before execution.');
+      throw new AppError('RDC_DEVICE_CONFIRMATION_STALE', 'native CLI or catalog changed before execution.');
     }
     if (this.openedCapture && (!this.isOwnedBy(scope) || this.remoteConnection?.deviceId !== device.id
       || JSON.stringify(binding.cli) !== JSON.stringify(this.lifecycleBinding?.cli)
-      || binding.definitionsFingerprint !== this.lifecycleBinding?.definitionsFingerprint)) throw new Error('RDC_CAPTURE_CLOSE_REQUIRED');
+      || binding.definitionsFingerprint !== this.lifecycleBinding?.definitionsFingerprint)) throw new AppError('RDC_CAPTURE_CLOSE_REQUIRED');
     if (this.remoteConnection && this.isOwnedBy(scope) && this.remoteConnection.deviceId === device.id
       && JSON.stringify(binding.cli) === JSON.stringify(this.lifecycleBinding?.cli)
       && binding.definitionsFingerprint === this.lifecycleBinding?.definitionsFingerprint) {
       const connection = this.remoteConnection;
-      if (connection.contextId !== this.contextId || connection.serial !== device.serial) throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: prepared remote binding changed.');
+      if (connection.contextId !== this.contextId || connection.serial !== device.serial) throw new AppError('RDC_REMOTE_IDENTITY_MISMATCH', 'prepared remote binding changed.');
       await revalidateSessionReplayDevice(connection, binding, options.signal);
       if (this.remoteConnection !== connection || this.contextId !== connection.contextId || !this.isOwnedBy(scope)) {
-        throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: prepared remote binding changed during verification.');
+        throw new AppError('RDC_REMOTE_IDENTITY_MISMATCH', 'prepared remote binding changed during verification.');
       }
       return;
     }
@@ -308,9 +309,9 @@ export class RdcSessionRuntime {
   async inspectReplayDeviceInstallation(scope: SessionScope, device: ReplayDeviceEntry, options: RdcLifecycleOptions): Promise<RemoteInstallationInspection> {
     const binding = await this.resolveBinding(options); assertRemotePreparationContract(binding);
     if (!options.expectedBindingIdentity || remotePreparationBindingIdentity(binding) !== options.expectedBindingIdentity) {
-      throw new Error('RDC_DEVICE_CONFIRMATION_STALE: installation inspection requires the original CLI and catalog.');
+      throw new AppError('RDC_DEVICE_CONFIRMATION_STALE', 'installation inspection requires the original CLI and catalog.');
     }
-    if (this.openedCapture) throw new Error('RDC_CAPTURE_CLOSE_REQUIRED');
+    if (this.openedCapture) throw new AppError('RDC_CAPTURE_CLOSE_REQUIRED');
     await this.closeOrReplaceOpenedCapture(options);
     this.ownerScope = scope; this.replayDevice = device; this.deviceLabel = device.label; this.lifecycleBinding = binding;
     const contextId = 'rdc-' + randomUUID();
@@ -475,9 +476,9 @@ export class RdcSessionRuntime {
     options = { ...options, binding: this.lifecycleBinding ?? options.binding };
     const ownerSessionId = this.ownerScope?.sessionId;
     if (ownerSessionId && getDelegatedChildSessionId(ownerSessionId)) {
-      throw new Error('RDC_LEASE_DUAL_OWNER: join delegated execution before capture lifecycle changes.');
+      throw new AppError('RDC_LEASE_DUAL_OWNER', 'join delegated execution before capture lifecycle changes.');
     }
-    if (this.contextId && shellInvocationService.hasUnconfirmedProcesses(this.contextId)) throw new Error('RDC_RECOVERY_BLOCKED: native process exit has not been observed.');
+    if (this.contextId && shellInvocationService.hasUnconfirmedProcesses(this.contextId)) throw new AppError('RDC_RECOVERY_BLOCKED', 'native process exit has not been observed.');
     const previousContext = this.runtimeContext;
 
     let closeOk = true;
@@ -504,16 +505,16 @@ export class RdcSessionRuntime {
       closeError = result.error ?? '';
     } else { return; }
 
-    if (!closeOk) throw new Error(`RDC_CLOSE_FAILED: ${closeError || 'runtime close was not confirmed'}; ownership is retained.`);
+    if (!closeOk) throw new AppError('RDC_CLOSE_FAILED', `${closeError || 'runtime close was not confirmed'}; ownership is retained.`);
     if (this.contextId) {
       const cli = options.binding?.cli;
-      if (!cli?.enabled || !cli.command) throw new Error('RDC_CLOSE_FAILED: owning CLI is unavailable for daemon shutdown.');
+      if (!cli?.enabled || !cli.command) throw new AppError('RDC_CLOSE_FAILED', 'owning CLI is unavailable for daemon shutdown.');
       const response = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('daemon', ['stop', '--daemon-context', this.contextId], {
         contextId: this.contextId, abortSignal: options.signal,
         settings: cli,
       }), this.contextId, 'rdc_tool.daemon.stop');
       options.signal?.throwIfAborted();
-      if (response.data.stopped !== true) throw new Error('RDC_CLOSE_FAILED: daemon shutdown was not confirmed.');
+      if (response.data.stopped !== true) throw new AppError('RDC_CLOSE_FAILED', 'daemon shutdown was not confirmed.');
       await options.onDaemonStopped?.({ contextId: this.contextId, stopped: true });
       forgetOwnedRdcDaemon(this.contextId);
     }
@@ -521,7 +522,7 @@ export class RdcSessionRuntime {
 
   private async ensureOwnedDaemon(contextId: string, binding: RdcTurnBinding, signal?: AbortSignal): Promise<void> {
     const cli = binding.cli;
-    if (!cli.enabled || !cli.command) throw new Error('RDC_CLOSE_FAILED: owning CLI is unavailable for daemon start.');
+    if (!cli.enabled || !cli.command) throw new AppError('RDC_CLOSE_FAILED', 'owning CLI is unavailable for daemon start.');
     signal?.throwIfAborted();
     const payload = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('daemon', ['start', '--daemon-context', contextId], {
       contextId, abortSignal: signal,
@@ -531,7 +532,7 @@ export class RdcSessionRuntime {
       ? payload.data.state as Record<string, unknown>
       : {};
     const ownerPid = Number(payload.data.owner_pid ?? state.owner_pid ?? 0);
-    if (ownerPid !== process.pid) throw new Error('RDC_CLOSE_FAILED: daemon start did not bind the application owner_pid.');
+    if (ownerPid !== process.pid) throw new AppError('RDC_CLOSE_FAILED', 'daemon start did not bind the application owner_pid.');
     const worker = state.worker && typeof state.worker === 'object' ? state.worker as { pid?: unknown; birth?: unknown } : {};
     const birth = (value: unknown): string => (typeof value === 'string' ? value : '');
     rememberOwnedRdcDaemon({

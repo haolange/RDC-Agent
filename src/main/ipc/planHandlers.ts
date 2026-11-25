@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { dialog, ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { nativeMessage } from '../window/nativeI18n';
 import { confirmInMainProcess } from '../window/mainConfirmation';
 import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
@@ -29,13 +30,13 @@ async function confirmPlanMutation(action: 'plan.saveToProject' | 'plan.export',
 
 function requireCurrentSession(context: WorkbenchIpcContext, sessionId: string): void {
   if (context.state.currentSessionId !== sessionId || !storageAdapter.sessions.findSessionLocation(sessionId)) {
-    throw new Error('PLAN_SESSION_DENIED: plan actions require the current session.');
+    throw new AppError('PLAN_SESSION_DENIED', 'plan actions require the current session.');
   }
 }
 
 function projectTarget(sessionId: string): string {
   const location = storageAdapter.sessions.findSessionLocation(sessionId);
-  if (!location) throw new Error('PLAN_SESSION_NOT_FOUND');
+  if (!location) throw new AppError('PLAN_SESSION_NOT_FOUND');
   return path.join(appPathService.getProjectRdcPaths(location.project.rootPath).plansPath, sessionId, 'plan.md');
 }
 
@@ -89,7 +90,7 @@ export function registerPlanHandlers(context: WorkbenchIpcContext): void {
     }
     requireCurrentSession(context, request.sessionId);
     const current = readReferencedPlan(request);
-    if (current.ownerSessionId !== selected.ownerSessionId) throw new Error('PLAN_REFERENCE_CHANGED');
+    if (current.ownerSessionId !== selected.ownerSessionId) throw new AppError('PLAN_REFERENCE_CHANGED');
     return { token: ipcApprovalTokenService.issue({
       action: request.action, scope: 'project', name: binding(request, current.ownerSessionId, targetPath),
     }), targetPath };

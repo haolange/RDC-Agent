@@ -16,7 +16,6 @@ import { useI18n } from '../i18n';
 import { useWindowControls } from '../hooks/useWindowControls';
 import { ProductLogo } from '../ui/ProductLogo';
 import { useSettingsNavigationStore } from '../stores/settingsNavigationStore';
-import { useNotificationStore } from '../stores/notificationStore';
 import { WorkbenchUtilities } from './WorkbenchUtilities';
 import { resolveActiveChrome } from './theme/applyChromeTheme';
 import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
@@ -70,10 +69,6 @@ const App: React.FC = () => {
     && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status),
   );
 
-  const showNotice = useCallback((message: string) => {
-    useNotificationStore.getState().add({ tone: 'info', title: message });
-  }, []);
-
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
   const handleToggleLeftSidebar = useCallback(() => {
     if (layout.isLeftDrawerMode) {
@@ -85,7 +80,6 @@ const App: React.FC = () => {
   }, [layout, toggleLeftSidebar]);
 
   const composer = useComposer({
-    showNotice,
     effectiveLeftCollapsed: layout.effectiveLeftCollapsed,
     leftToggleDisabled: layout.leftToggleDisabled,
     toggleLeftSidebar: handleToggleLeftSidebar,
@@ -103,7 +97,6 @@ const App: React.FC = () => {
 
   useIpcEventBridge({
     syncCapturesFromSnapshot,
-    showNotice,
     setSettingsModalOpen,
     setWindowMaximized,
     t,

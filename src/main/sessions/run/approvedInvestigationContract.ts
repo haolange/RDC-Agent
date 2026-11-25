@@ -1,4 +1,5 @@
 import { parseInvestigationPlanContract, type InvestigationPlanContract } from '@shared/types/planInvestigation';
+import { AppError } from '@shared/errors/appError';
 import type { ExecutionOffer } from '@shared/types/executionOffer';
 
 /** Old approved plans remain readable, but cannot claim the newer Mission completion contract. */
@@ -6,7 +7,7 @@ export function approvedInvestigationContract(offer: ExecutionOffer, markdown: s
   const contract = parseInvestigationPlanContract(markdown);
   const mission = ['debugger', 'analyzer', 'optimizer'].includes(offer.sourceAgentId) ? offer.sourceAgentId : null;
   if (mission && (!contract || contract.mission !== mission)) {
-    throw new Error('APPROVED_PLAN_REVIEW_REQUIRED: the historical Mission plan lacks a matching execution contract; return to the Mission and approve a current plan.');
+    throw new AppError('APPROVED_PLAN_REVIEW_REQUIRED', 'the historical Mission plan lacks a matching execution contract; return to the Mission and approve a current plan.');
   }
   return contract;
 }

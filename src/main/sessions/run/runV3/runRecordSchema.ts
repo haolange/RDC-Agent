@@ -1,4 +1,5 @@
 import { z, type ZodType } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import type { MissionKind, RunRecord } from '@shared/types/session';
 import type { PersistedRunRecord } from '../../store/storageTypes';
 
@@ -87,9 +88,7 @@ function collectRunV3StageFields(record: Record<string, unknown>): string[] {
 export function assertNoRunV3StageFields(record: Record<string, unknown>, source: string): void {
   const leftovers = collectRunV3StageFields(record);
   if (leftovers.length === 0) return;
-  throw new Error(
-    `STORAGE: RUN_V3_STAGE_FIELD: ${source} must not carry ${leftovers.join(', ')}`,
-  );
+  throw new AppError('STORAGE_SCHEMA', `RUN_V3_STAGE_FIELD: ${source} must not carry ${leftovers.join(', ')}`);
 }
 
 export const ConversationPersistedRunSchema = z.object({

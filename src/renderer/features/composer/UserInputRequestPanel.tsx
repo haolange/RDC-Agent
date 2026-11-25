@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppError } from '@shared/errors/appError';
 import { useI18n } from '../../i18n';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Button } from '../../ui/Button';
 import { Chevron } from '../../ui/Chevron';
+import { errorDetail } from '../../lib/errorDetail';
 import { InlineError } from '../../ui/InlineError';
 import { UserInputCustomAnswer, UserInputOptionList } from './UserInputRequestPanelParts';
 import { useUserInputRequestSubmit } from './useUserInputRequestSubmit';
@@ -78,15 +80,10 @@ export const UserInputRequestPanel: React.FC<{
     try {
       await submitUserInput(request, answers);
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('chat.userInputSubmitFailed');
-      const missingQuestionId = /question\s+([^:\s.]+)/i.exec(message)?.[1];
-      const missingQuestionIndex = missingQuestionId
-        ? request.questions.findIndex((question) => question.questionId === missingQuestionId)
-        : -1;
-      if (missingQuestionIndex >= 0) {
-        setCurrentIndex(missingQuestionIndex);
-      }
-      setError(message);
+      const rejectedQuestionId = err instanceof AppError ? err.params.questionId : undefined;
+      const rejectedQuestionIndex = request.questions.findIndex((question) => question.questionId === rejectedQuestionId);
+      if (rejectedQuestionIndex >= 0) setCurrentIndex(rejectedQuestionIndex);
+      setError(errorDetail(err));
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);

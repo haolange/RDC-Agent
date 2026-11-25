@@ -1,5 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { ProjectInputLifecycle } from '../rdc/captures/ProjectInputLifecycle';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -69,7 +70,7 @@ export function registerProjectInputLifecycleHandlers(context: WorkbenchIpcConte
       const [projectId, inputId, token] = parseIpcArgs(ProjectInputRemoveArgsSchema, rawArgs, { label: 'project:inputs:remove', maxBytes: 4096 });
       const prepared = await projectInputLifecycle.prepare(projectId, inputId);
       if (!ipcApprovalTokenService.consume({ token, action: 'project.input.delete', scope: 'project',
-        projectRoot: prepared.project.rootPath, name: prepared.approvalIdentity })) throw new Error('PROJECT_INPUT_APPROVAL_INVALID');
+        projectRoot: prepared.project.rootPath, name: prepared.approvalIdentity })) throw new AppError('PROJECT_INPUT_APPROVAL_INVALID');
       const result = await projectInputLifecycle.remove(projectId, inputId, prepared.approvalIdentity);
       if (result.success || result.fileDeleted) context.broadcastToRenderer('project:inputsChanged', { projectId, inputs: result.inputs });
       return result;

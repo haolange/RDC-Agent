@@ -58,7 +58,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   ...modelCommands
 }) => {
   const [scope, setScope] = useState<AgentScope>('user');
-  const models = useAgentModelControls(settings, modelCommands, t);
+  const models = useAgentModelControls(settings, modelCommands);
   const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
   const clearAgentRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
   const [missingAgentId, setMissingAgentId] = useState<string | null>(null);

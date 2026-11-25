@@ -3,6 +3,7 @@ import { DiffBlock } from '../../../../ui/DiffBlock';
 import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import type { useI18n } from '../../../../i18n';
 import type { DiffLine } from '@shared/utils/lineDiff';
 
@@ -41,7 +42,7 @@ export function AgentBuiltinDiffDialog({ state, onRestore, onClose, t }: {
       </>}
     >
       {!state.lines && !state.error ? <Spinner size="sm" /> : null}
-      {state.error ? <InlineError>{state.error}</InlineError> : null}
+      {state.error ? <InlineError detail={state.error}>{humanizeError(state.error, t, 'settings.agentBuiltinDiffFailed')}</InlineError> : null}
       {state.lines ? (
         <DiffBlock
           lines={state.lines}

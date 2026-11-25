@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { shellInvocationService } from '../tools/ShellInvocationService';
@@ -81,7 +82,7 @@ export class RdcSessionService {
     return { projectId, sessionId };
   }
   private binding(scope: SessionScope): Binding {
-    if (!scope.sessionId?.trim() || !scope.projectId?.trim()) throw new Error('RDC_SCOPE_REQUIRED');
+    if (!scope.sessionId?.trim() || !scope.projectId?.trim()) throw new AppError('RDC_SCOPE_REQUIRED');
     const key = keyOf(scope); let binding = this.bindings.get(key);
     if (!binding) { binding = { runtime: new RdcSessionRuntime(), state: empty(scope), deviceId: null }; this.bindings.set(key, binding); }
     return binding;
@@ -95,10 +96,10 @@ export class RdcSessionService {
   private assertInteraction(binding: Binding, options: RdcLifecycleOptions = {}): void {
     // Frozen probe lifecycle runs inside the owning Agent execution, not a human command.
     const lock = this.lock(binding);
-    if (lock && !(options.binding && lock === 'agent_running')) throw new Error(`RDC_INTERACTION_LOCKED: ${lock}`);
+    if (lock && !(options.binding && lock === 'agent_running')) throw new AppError('RDC_INTERACTION_LOCKED', lock);
   }
   private assertGeneration(binding: Binding, expected: number | undefined): void {
-    if (expected !== undefined && binding.state.generation !== expected) throw new Error('RDC_BINDING_CHANGED: refresh the current capture state.');
+    if (expected !== undefined && binding.state.generation !== expected) throw new AppError('RDC_BINDING_CHANGED', 'refresh the current capture state.');
   }
   private assertPreparationGeneration(binding: Binding, expected: number, confirmed = false): void {
     if (!confirmed && binding.preparation && expected >= binding.preparation.baseGeneration && expected <= binding.state.generation) return;
@@ -108,9 +109,9 @@ export class RdcSessionService {
     if (getRdcContextLease(binding.state.sessionId)?.quarantineReason) {
       this.publish(binding, { phase: 'error', error: binding.state.error?.retry === 'close' ? binding.state.error
         : { code: 'RDC_CONTEXT_QUARANTINED', message: 'Replay outcome is uncertain; close and reopen the capture.', retry: 'close' } });
-      throw new Error('RDC_CONTEXT_QUARANTINED');
+      throw new AppError('RDC_CONTEXT_QUARANTINED');
     }
-    if (!['ready', 'applying'].includes(binding.state.phase)) throw new Error('RDC_REPLAY_BUSY');
+    if (!['ready', 'applying'].includes(binding.state.phase)) throw new AppError('RDC_REPLAY_BUSY');
   }
   private publish(binding: Binding, patch: Partial<CaptureReplayState>): void {
     if (['ready', 'applying'].includes(patch.phase ?? binding.state.phase)
@@ -142,10 +143,10 @@ export class RdcSessionService {
   recoveryBinding(scope: SessionScope): RdcTurnBinding | null {
     const owner = this.bindings.get(keyOf(scope)); const contextId = owner?.runtime.getContextId();
     if (!owner || !contextId) return null;
-    if (owner.runtime.snapshotContextForSession(scope)?.contextId !== contextId) throw new Error('RDC_RECOVERY_OWNER_INVALID');
+    if (owner.runtime.snapshotContextForSession(scope)?.contextId !== contextId) throw new AppError('RDC_RECOVERY_OWNER_INVALID');
     const cli = owner.runtime.getCliSettings(); const lease = getRdcContextLease(scope.sessionId);
     if (!cli || (lease && (lease.ownerSessionId !== scope.sessionId || lease.ownerProjectId !== scope.projectId || lease.contextId !== contextId))) {
-      throw new Error('RDC_RECOVERY_OWNER_INVALID');
+      throw new AppError('RDC_RECOVERY_OWNER_INVALID');
     }
     return freezeRdcTurnBinding(cli, [], lease);
   }
@@ -177,7 +178,7 @@ export class RdcSessionService {
     const binding = this.binding(scope);
     const assertAuthorized = () => {
       authority?.signal?.throwIfAborted(); authority?.assertAuthorized();
-      if (authority && !ownsRdcInteractionLock(scope.sessionId, authority.turnId)) throw new Error('RDC_RECOVERY_OWNER_INVALID');
+      if (authority && !ownsRdcInteractionLock(scope.sessionId, authority.turnId)) throw new AppError('RDC_RECOVERY_OWNER_INVALID');
       this.assertInteraction(binding, authority);
     };
     assertAuthorized(); this.assertPreparationGeneration(binding, request.bindingGeneration, Boolean(request.confirmationToken));
@@ -186,9 +187,9 @@ export class RdcSessionService {
       return { success: false, state: this.snapshotReplayForSession(scope), error: recoveringIssue };
     }
     const device = replayDeviceService.getDeviceById(request.deviceId);
-    if (!device) throw new Error('RDC_DEVICE_NOT_FOUND');
+    if (!device) throw new AppError('RDC_DEVICE_NOT_FOUND');
     const owner = device.type === 'android' ? this.devices.get(device.id) : null;
-    if (owner && owner !== keyOf(scope)) throw new Error('RDC_DEVICE_IN_USE');
+    if (owner && owner !== keyOf(scope)) throw new AppError('RDC_DEVICE_IN_USE');
     if (binding.preparation?.deviceId === device.id && !request.confirmationToken) return binding.preparation.pending;
     if (!request.confirmationToken && binding.runtime.snapshotOpenedCaptureForSession(scope) && binding.state.replayDeviceId === device.id
       && (device.type === 'local' || binding.state.preparation.phase === 'ready')) {
@@ -201,18 +202,18 @@ export class RdcSessionService {
       if (!confirmation || confirmation.token !== request.confirmationToken || confirmation.deviceId !== device.id
         || confirmation.generation !== request.bindingGeneration) {
         this.revokePreparationConfirmation(binding);
-        throw new Error('RDC_DEVICE_CONFIRMATION_STALE');
+        throw new AppError('RDC_DEVICE_CONFIRMATION_STALE');
       }
       binding.confirmation = undefined;
       if (!ipcApprovalTokenService.consume({ token: request.confirmationToken, action: 'device.prepare', scope: 'project',
-        projectRoot: scope.projectId, name: confirmation.name })) throw new Error('RDC_DEVICE_CONFIRMATION_STALE');
+        projectRoot: scope.projectId, name: confirmation.name })) throw new AppError('RDC_DEVICE_CONFIRMATION_STALE');
       closeConfirmed = confirmation.kind === 'close_capture';
     } else if (binding.runtime.snapshotOpenedCaptureForSession(scope)
       && (binding.state.replayDeviceId !== device.id || binding.state.preparation.phase !== 'ready')) {
       return Promise.resolve(this.preparationConfirmation(binding, device.id, 'close_capture'));
     }
     if (binding.runtime.snapshotOpenedCaptureForSession(scope)
-      && (binding.state.replayDeviceId !== device.id || binding.state.preparation.phase !== 'ready') && !closeConfirmed) throw new Error('RDC_DEVICE_CLOSE_CONFIRMATION_REQUIRED');
+      && (binding.state.replayDeviceId !== device.id || binding.state.preparation.phase !== 'ready') && !closeConfirmed) throw new AppError('RDC_DEVICE_CLOSE_CONFIRMATION_REQUIRED');
     this.revokePreparationConfirmation(binding);
     const baseGeneration = binding.preparation?.baseGeneration ?? binding.state.generation;
     binding.preparation?.controller.abort();
@@ -235,9 +236,9 @@ export class RdcSessionService {
           const inspected = await binding.runtime.inspectReplayDeviceInstallation(scope, device, {
             signal: controller.signal, expectedBindingIdentity: evidence.bindingIdentity,
           });
-          if (!current()) throw controller.signal.reason ?? new Error('RDC_DEVICE_PREPARATION_CANCELLED');
+          if (!current()) throw controller.signal.reason ?? new AppError('RDC_DEVICE_PREPARATION_CANCELLED');
           if (inspected.deviceSerial !== evidence.deviceSerial || inspected.packageName !== evidence.packageName || inspected.apkSha256 !== evidence.apkSha256) {
-            throw new Error('RDC_REMOTE_INSTALLATION_IDENTITY_CHANGED');
+            throw new AppError('RDC_REMOTE_INSTALLATION_IDENTITY_CHANGED');
           }
           if (inspected.state !== 'clear') throw new Error(inspected.diagnostic ?? 'RDC_REMOTE_INSTALLATION_STILL_UNCONFIRMED');
           installationVerified = true;
@@ -250,13 +251,13 @@ export class RdcSessionService {
           await this.closeBinding(scope, binding, authority ? { binding: authority.binding } : {});
           this.publish(binding, { phase: 'closed', contextId: null, replayDeviceId: null, inputId: null, captureHash: null,
             image: null, observation: null, requestedEventId: null, appliedEventId: null, imageEventId: null, events: [], targets: [], target: null });
-        } else if (previousTarget && previousTarget !== device.id) throw new Error('RDC_DEVICE_BINDING_MISMATCH');
+        } else if (previousTarget && previousTarget !== device.id) throw new AppError('RDC_DEVICE_BINDING_MISMATCH');
         if (!current()) return { success: false, state: this.snapshotReplayForSession(scope) };
         if (device.type === 'android') {
           // Other sessions may have completed their cleanup while this queue was awaiting native close.
           // The final ownership check and reservation are one synchronous admission step.
           const currentOwner = this.devices.get(device.id);
-          if (currentOwner && currentOwner !== keyOf(scope)) throw new Error('RDC_DEVICE_IN_USE');
+          if (currentOwner && currentOwner !== keyOf(scope)) throw new AppError('RDC_DEVICE_IN_USE');
           this.devices.set(device.id, keyOf(scope)); binding.deviceId = device.id;
         }
         assertAuthorized();
@@ -271,7 +272,7 @@ export class RdcSessionService {
           },
           onDeviceAction: (issue, identity) => { unconfirmedIssue = issue; installationIdentity = identity; },
         });
-        if (!current()) throw controller.signal.reason ?? new Error('RDC_DEVICE_PREPARATION_CANCELLED');
+        if (!current()) throw controller.signal.reason ?? new AppError('RDC_DEVICE_PREPARATION_CANCELLED');
         assertAuthorized();
         this.publish(binding, { contextId: binding.runtime.getContextId(), preparation: { targetDeviceId: device.id, phase: 'ready', issue: null } });
         return { success: true, state: this.snapshotReplayForSession(scope) };
@@ -299,6 +300,7 @@ export class RdcSessionService {
           if (binding.state.generation === generation) this.publish(binding, { preparation: { targetDeviceId: device.id, phase: 'failed', issue: retainedIssue } });
           // Keep the primary native error and its details; failed cleanup retains ownership.
           if (error instanceof Error) { error.message = retainedIssue.diagnostic; throw error; }
+          // eslint-disable-next-line preserve-caught-error -- the native failure is the cause; the cleanup failure is in the message.
           throw new Error(retainedIssue.diagnostic, { cause: error });
         }
         if (!current()) return { success: false, state: this.snapshotReplayForSession(scope) };
@@ -319,7 +321,7 @@ export class RdcSessionService {
         this.revokePreparationConfirmation(binding);
         return { success: true, state: this.snapshotReplayForSession(request) };
       }
-      throw new Error('RDC_CAPTURE_CLOSE_REQUIRED');
+      throw new AppError('RDC_CAPTURE_CLOSE_REQUIRED');
     }
     binding.preparation?.controller.abort(); this.revokePreparationConfirmation(binding);
     if (!binding.state.preparation.issue?.deviceAction) this.publish(binding, { generation: binding.state.generation + 1,
@@ -332,19 +334,19 @@ export class RdcSessionService {
     });
   }
   openProjectInput(request: OpenProjectInputRequest, options: RdcLifecycleOptions = {}): Promise<OpenedCaptureState> {
-    if (!request.sessionId) return Promise.reject(new Error('RDC_SCOPE_REQUIRED'));
+    if (!request.sessionId) return Promise.reject(new AppError('RDC_SCOPE_REQUIRED'));
     const scope = { projectId: request.projectId, sessionId: request.sessionId };
     return this.serial(scope, async () => {
       const binding = this.binding(scope); this.assertInteraction(binding, options);
       this.assertGeneration(binding, options.expectedGeneration);
-      if (binding.state.preparation.issue?.deviceAction) throw new Error('RDC_DEVICE_ACTION_UNCONFIRMED');
-      if (this.blockedInputs.has(JSON.stringify([scope.projectId, request.inputId]))) throw new Error('RDC_INPUT_REMOVING');
+      if (binding.state.preparation.issue?.deviceAction) throw new AppError('RDC_DEVICE_ACTION_UNCONFIRMED');
+      if (this.blockedInputs.has(JSON.stringify([scope.projectId, request.inputId]))) throw new AppError('RDC_INPUT_REMOVING');
       const key = keyOf(scope); const remoteId = request.replayDevice.type === 'android' ? request.replayDevice.id : null;
       const deviceOwner = remoteId ? this.devices.get(remoteId) : null;
-      if (deviceOwner && deviceOwner !== key) throw new Error(`RDC_DEVICE_IN_USE: ${deviceOwner}`);
+      if (deviceOwner && deviceOwner !== key) throw new AppError('RDC_DEVICE_IN_USE', deviceOwner);
       const reusePrepared = Boolean(remoteId && binding.state.preparation.phase === 'ready'
         && binding.state.preparation.targetDeviceId === remoteId && binding.runtime.isPreparedFor(scope, remoteId));
-      if (remoteId && !reusePrepared) throw new Error('RDC_DEVICE_NOT_PREPARED');
+      if (remoteId && !reusePrepared) throw new AppError('RDC_DEVICE_NOT_PREPARED');
       const previousState = structuredClone(binding.state);
       const previousCapture = binding.runtime.snapshotOpenedCaptureForSession(scope);
       if (remoteId) this.devices.set(remoteId, key);
@@ -352,7 +354,7 @@ export class RdcSessionService {
       try {
         const project = storageAdapter.getProjectById(scope.projectId);
         const reference = project?.inputs?.find(input => input.inputId === request.inputId && input.source === 'external_reference');
-        if (reference && reference.filePath !== request.filePath) throw new Error('CAPTURE_REFERENCE_INVALID_PATH');
+        if (reference && reference.filePath !== request.filePath) throw new AppError('CAPTURE_REFERENCE_INVALID_PATH');
         const verifyInput = async () => {
           if (!reference) return hashCaptureFile(request.filePath);
           const verified = await verifyExternalCaptureReference(reference);
@@ -360,7 +362,7 @@ export class RdcSessionService {
         };
         const hashed = await verifyInput();
         if (options.expectedCaptureSha256 && hashed.sha256 !== options.expectedCaptureSha256) {
-          throw new Error('RDC_APPROVED_CAPTURE_CHANGED: capture bytes differ from the approved plan.');
+          throw new AppError('RDC_APPROVED_CAPTURE_CHANGED', 'capture bytes differ from the approved plan.');
         }
         this.assertInteraction(binding, options);
         if (!reusePrepared) await this.closeBinding(scope, binding, options, remoteId);
@@ -387,7 +389,7 @@ export class RdcSessionService {
         if (verified.sha256 !== hashed.sha256) {
           this.publish(binding, { captureHash: null, image: null, imageEventId: null });
           await this.closeBinding(scope, binding, options);
-          throw new Error('CAPTURE_CHANGED_DURING_OPEN: source bytes changed; reopen the current capture.');
+          throw new AppError('CAPTURE_CHANGED_DURING_OPEN', 'source bytes changed; reopen the current capture.');
         }
         this.publish(binding, { phase: 'loading_image', contextId: opened.contextId, replayDeviceId: request.replayDevice.id,
           ...(request.replayDevice.type === 'local' ? { preparation: { targetDeviceId: request.replayDevice.id, phase: 'ready' as const, issue: null } } : {}) });
@@ -455,7 +457,7 @@ export class RdcSessionService {
         const closed = await this.closeBinding(scope, binding, options);
         if (binding.state.preparation.issue?.deviceAction) {
           this.publish(binding, { contextId: binding.runtime.getContextId(), phase: 'closed', operationId });
-          throw new Error('RDC_DEVICE_ACTION_UNCONFIRMED: verify the device installation before closing or deleting its session.');
+          throw new AppError('RDC_DEVICE_ACTION_UNCONFIRMED', 'verify the device installation before closing or deleting its session.');
         }
         this.publish(binding, { ...empty(scope), operationId, generation: binding.state.generation + 1 });
         return closed;
@@ -482,7 +484,7 @@ export class RdcSessionService {
   }
   async blockInputOperations<T>(projectId: string, inputId: string, operation: () => Promise<T>): Promise<T> {
     const key = JSON.stringify([projectId, inputId]);
-    if (this.blockedInputs.has(key)) throw new Error('RDC_INPUT_REMOVING');
+    if (this.blockedInputs.has(key)) throw new AppError('RDC_INPUT_REMOVING');
     this.blockedInputs.add(key);
     try {
       await Promise.allSettled([...this.lifecycle.values()]);
@@ -497,7 +499,7 @@ export class RdcSessionService {
   }
   async closeMatchingCaptures(projectId: string, inputId: string): Promise<void> {
     const matches = this.listBindingsForProject(projectId).filter(binding => binding.inputId === inputId);
-    if (matches.some(binding => binding.interactionLock)) throw new Error('RDC_INTERACTION_LOCKED: stop associated sessions first.');
+    if (matches.some(binding => binding.interactionLock)) throw new AppError('RDC_INTERACTION_LOCKED', 'stop associated sessions first.');
     for (const binding of matches) await this.clearOpenedCaptureForSession(binding.scope);
   }
   async closeAll(): Promise<void> {
@@ -505,7 +507,7 @@ export class RdcSessionService {
     const harvest = await harvestOwnedRdcDaemons();
     const failures = results.filter(result => result.status === 'rejected');
     if (failures.length || harvest.failed.length) {
-      throw new Error(`RDC_CLOSE_FAILED: ${failures.length + harvest.failed.length} session resources remain owned.`);
+      throw new AppError('RDC_CLOSE_FAILED', `${failures.length + harvest.failed.length} session resources remain owned.`);
     }
   }
   async switchActiveCapture(scope: CaptureReplayBindingRequest, captureId: string): Promise<void> {
@@ -517,7 +519,7 @@ export class RdcSessionService {
   async applyEventForSession(request: CaptureReplayApplyRequest): Promise<CaptureReplayState> {
     const binding = this.binding(request); this.assertInteraction(binding);
     this.assertGeneration(binding, request.bindingGeneration); this.assertReplayAvailable(binding);
-    if (!binding.state.events.some(event => event.eventId === request.eventId)) throw new Error('RDC_EVENT_INVALID');
+    if (!binding.state.events.some(event => event.eventId === request.eventId)) throw new AppError('RDC_EVENT_INVALID');
     const operationId = randomUUID();
     this.publish(binding, { requestedEventId: request.eventId, operationId });
     return this.observe(request, { event_id: request.eventId, ...(request.target ? { target: { texture_id: request.target.textureId, rt_index: request.target.outputSlot } } : {}) }, true, undefined, false, operationId);
@@ -535,12 +537,12 @@ export class RdcSessionService {
         || identity.ownerSessionId !== request.sessionId || identity.contextId !== lease.contextId || identity.version !== lease.version
         || identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId
         || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
-        throw new Error('RDC_RESTORE_OWNER_INVALID: the prepared owning turn and replay are required.');
+        throw new AppError('RDC_RESTORE_OWNER_INVALID', 'the prepared owning turn and replay are required.');
       }
       this.assertInteraction(binding, options); this.assertGeneration(binding, request.bindingGeneration); this.assertReplayAvailable(binding);
     };
     authorize();
-    if (!binding.state.events.some(event => event.eventId === request.eventId)) throw new Error('RDC_EVENT_INVALID');
+    if (!binding.state.events.some(event => event.eventId === request.eventId)) throw new AppError('RDC_EVENT_INVALID');
     const operationId = randomUUID();
     this.publish(binding, { requestedEventId: request.eventId, operationId });
     const args = request.isFinalOutput ? { final_output: true } : { event_id: request.eventId,
@@ -550,7 +552,7 @@ export class RdcSessionService {
     authorize();
     if (state.operationId !== operationId || state.appliedEventId !== request.eventId || state.isFinalOutput !== request.isFinalOutput
       || JSON.stringify(state.target) !== JSON.stringify(request.target ?? null)) {
-      throw new Error('RDC_RESTORE_UNCONFIRMED: replay position or target does not match the saved state.');
+      throw new AppError('RDC_RESTORE_UNCONFIRMED', 'replay position or target does not match the saved state.');
     }
     return state;
   }
@@ -585,7 +587,7 @@ export class RdcSessionService {
     agentRestore?: { binding: RdcTurnBinding; signal?: AbortSignal; authorize: () => void }): Promise<CaptureReplayState> {
     const binding = this.binding(scope); if (human) this.assertInteraction(binding, agentRestore);
     const owner = binding.runtime.snapshotOpenedCaptureForSession(scope)?.runtimeContext;
-    if (!owner) throw new Error('RDC_NOT_OPEN');
+    if (!owner) throw new AppError('RDC_NOT_OPEN');
     const generation = binding.state.generation;
     const operation = async () => {
       if (generation !== binding.state.generation) return;

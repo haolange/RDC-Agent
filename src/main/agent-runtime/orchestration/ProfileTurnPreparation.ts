@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /**
  * ProfileTurnPreparation — unique prepare path for sendMessage / sendProfileMessage / subagent.
  * Builds the same frozen prepareTurnContext plan ConversationTurnStarter uses, without conversation commit.
@@ -119,7 +120,7 @@ export class ProfileTurnPreparation {
       planning.plan,
     );
     if (!input.effectiveProfile) {
-      throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
+      throw new AppError('AGENT_PROFILE_UNAVAILABLE', input.agentId);
     }
     const requestId = generateEventId('profile-prep');
     const turnId = input.turnId ?? generateEventId('turn');

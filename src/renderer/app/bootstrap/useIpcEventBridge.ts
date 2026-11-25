@@ -6,6 +6,7 @@ import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 
+import { notify } from '../../stores/notificationStore';
 import { createCaptureProjection, subscribeCaptureStatusChanged, subscribeDeviceStatusChanged } from './captureSubscriptions';
 import { subscribeConversation, subscribeToolExecutionComplete } from './conversationSubscriptions';
 import {
@@ -42,7 +43,7 @@ export function useSyncCapturesFromSnapshot() {
 }
 
 export function useIpcEventBridge(options: EventBridgeOptions): void {
-  const { syncCapturesFromSnapshot, showNotice, setSettingsModalOpen, setWindowMaximized, t } = options;
+  const { syncCapturesFromSnapshot, setSettingsModalOpen, setWindowMaximized, t } = options;
 
   const setSystemTheme = useAppSettingsStore((state) => state.setSystemTheme);
   const addActionEvent = useEvidenceStore((state) => state.addActionEvent);
@@ -54,8 +55,8 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     const key = activeSessionId + ':' + handoffNotice;
     if (shownHandoffNotices.current.has(key)) return;
     shownHandoffNotices.current.add(key);
-    showNotice(handoffNotice);
-  }, [activeSessionId, handoffNotice, showNotice]);
+    notify.info(handoffNotice);
+  }, [activeSessionId, handoffNotice]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
@@ -71,7 +72,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     const { projectScopedContext, projectScopedOpenedCapture } = captureProjection;
     const unsubscribeContextChanged = electronAPI.events.onContextChanged(projectScopedContext);
 
-    const conversation = subscribeConversation(electronAPI, showNotice, t);
+    const conversation = subscribeConversation(electronAPI, t);
     const unsubscribeToolExecutionComplete = subscribeToolExecutionComplete(electronAPI);
     const unsubscribeAgentStatusChanged = subscribeAgentStatusChanged(electronAPI);
     const unsubscribeCaptureStatusChanged = subscribeCaptureStatusChanged(electronAPI, projectScopedContext);
@@ -87,7 +88,7 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     const unsubscribeAppThemeChanged = subscribeAppThemeChanged(electronAPI, setSystemTheme);
 
     captureProjection.hydrate();
-    const unsubscribeShellCommands = subscribeShellCommands(electronAPI, { showNotice, t, setSettingsModalOpen, setWindowMaximized });
+    const unsubscribeShellCommands = subscribeShellCommands(electronAPI, { t, setSettingsModalOpen, setWindowMaximized });
 
     return () => {
       unsubscribePermissionState();
@@ -115,7 +116,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     setSettingsModalOpen,
     setSystemTheme,
     setWindowMaximized,
-    showNotice,
     syncCapturesFromSnapshot,
     t,
   ]);

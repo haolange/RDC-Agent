@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { AppError } from '@shared/errors/appError';
 import {
   computeTurnPreparation,
   type TurnPreparationComputationInput,
@@ -32,12 +33,12 @@ export class TurnPreparationWorkerPool {
     input: TurnPreparationComputationInput,
     signal?: AbortSignal,
   ): Promise<TurnPreparationComputationResult> {
-    if (signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
+    if (signal?.aborted) throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
     const workerPath = path.join(__dirname, 'turnPreparationWorker.js');
     // Only the bundle ships the compiled worker; running from source computes on this thread.
     if (!fs.existsSync(workerPath)) {
       await new Promise<void>((resolve) => setImmediate(resolve));
-      if (signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
+      if (signal?.aborted) throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
       return computeTurnPreparation(input);
     }
     return new Promise<TurnPreparationComputationResult>((resolve, reject) => {
@@ -59,7 +60,7 @@ export class TurnPreparationWorkerPool {
       const task = this.queue.shift()!;
       if (task.signal?.aborted) {
         task.signal.removeEventListener('abort', task.abort);
-        task.reject(new Error('REQUEST_CANCELLED: request preparation was cancelled.'));
+        task.reject(new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.'));
         continue;
       }
       slot.task = task;
@@ -95,7 +96,7 @@ export class TurnPreparationWorkerPool {
     const queueIndex = this.queue.indexOf(task);
     if (queueIndex >= 0) {
       this.queue.splice(queueIndex, 1);
-      task.reject(new Error('REQUEST_CANCELLED: request preparation was cancelled.'));
+      task.reject(new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.'));
       return;
     }
     const slot = this.slots.find((entry) => entry.task === task);
@@ -103,7 +104,7 @@ export class TurnPreparationWorkerPool {
     slot.task = null;
     this.slots.splice(this.slots.indexOf(slot), 1);
     void slot.worker.terminate();
-    task.reject(new Error('REQUEST_CANCELLED: request preparation was cancelled.'));
+    task.reject(new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.'));
     this.dispatch(path.join(__dirname, 'turnPreparationWorker.js'));
   }
 

@@ -3,6 +3,8 @@ import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
+import { humanizeError } from '../../../../i18n/humanizeError';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { modelOptionLabel } from './agentConfigStatus';
 import type { useI18n } from '../../../../i18n';
 import type { AgentModelBinding } from '@shared/types/settings';
@@ -48,7 +50,7 @@ export function AgentModelMigrationDialog({ target, options, onConfirm, onClose,
     try {
       await onConfirm(preview);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('settings.agentModelMigrationFailed'));
+      setError(errorDetail(reason));
       setBusy(false);
     }
   };
@@ -73,7 +75,7 @@ export function AgentModelMigrationDialog({ target, options, onConfirm, onClose,
       </>}
     >
       {!preview && !target.error ? <Spinner size="sm" /> : null}
-      {target.error ? <InlineError>{target.error}</InlineError> : null}
+      {target.error ? <InlineError detail={target.error}>{humanizeError(target.error, t, 'app.error.loadFailed')}</InlineError> : null}
       {preview ? (
         <dl className="settings-agent-migration-facts">
           <dt>{t('settings.agentModelMigrationFile')}</dt>
@@ -109,7 +111,7 @@ export function AgentModelMigrationDialog({ target, options, onConfirm, onClose,
           </> : null}
         </dl>
       ) : null}
-      {error ? <InlineError>{error}</InlineError> : null}
+      {error ? <InlineError detail={error}>{humanizeError(error, t, migrate ? 'settings.agentModelMigrationFailed' : 'app.error.actionFailed')}</InlineError> : null}
     </TaskDialog>
   );
 }

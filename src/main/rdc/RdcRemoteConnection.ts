@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
@@ -30,20 +31,20 @@ export function assertRemotePreparationContract(binding: RdcTurnBinding): void {
   const policy = definition?.timeout_policy as Record<string, unknown> | undefined;
   if (!schema?.properties?.options?.properties?.transport?.enum?.includes('adb_android')
     || definition?.preparation_policy !== 'automatic') {
-    throw new Error('RDC_REMOTE_UPGRADE_REQUIRED: configured Tools lacks automatic Android preparation.');
+    throw new AppError('RDC_REMOTE_UPGRADE_REQUIRED', 'configured Tools lacks automatic Android preparation.');
   }
   if (schema?.properties?.timeout_ms?.type !== 'integer' || policy?.argument !== 'timeout_ms' || !['default_timeout_ms', 'worker_grace_ms', 'transport_grace_ms', 'process_grace_ms']
     .every(key => Number.isSafeInteger(policy[key]) && Number(policy[key]) > 0)) {
-    throw new Error('RDC_REMOTE_UPGRADE_REQUIRED: configured Tools lacks the canonical remote timeout policy.');
+    throw new AppError('RDC_REMOTE_UPGRADE_REQUIRED', 'configured Tools lacks the canonical remote timeout policy.');
   }
   if (inspection?.scope !== 'global' || !Array.isArray(inspection.effects) || inspection.effects.length !== 0
-    || inspectionSchema?.properties?.device_serial?.type !== 'string') throw new Error('RDC_REMOTE_UPGRADE_REQUIRED: configured Tools lacks read-only installation verification.');
+    || inspectionSchema?.properties?.device_serial?.type !== 'string') throw new AppError('RDC_REMOTE_UPGRADE_REQUIRED', 'configured Tools lacks read-only installation verification.');
 }
 
 export async function inspectSessionReplayInstallation(device: ReplayDeviceEntry, contextId: string,
   binding: RdcTurnBinding, signal?: AbortSignal): Promise<RemoteInstallationInspection> {
   assertRemotePreparationContract(binding);
-  if (device.type !== 'android' || !device.serial || !contextId || contextId === 'default') throw new Error('RDC_REMOTE_CONTEXT_REQUIRED');
+  if (device.type !== 'android' || !device.serial || !contextId || contextId === 'default') throw new AppError('RDC_REMOTE_CONTEXT_REQUIRED');
   signal?.throwIfAborted();
   const result = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('call', [
     'rd.remote.inspect_installation', '--args-json', JSON.stringify({ device_serial: device.serial }), '--daemon-context', contextId,
@@ -54,7 +55,7 @@ export async function inspectSessionReplayInstallation(device: ReplayDeviceEntry
     || !Array.isArray(data.sessions)
     || !['clear', 'pending', 'unknown'].includes(String(data.installation_state))
     || ({ clear: 'verified', pending: 'pending', unknown: 'unreadable' } as Record<string, string>)[String(data.installation_state)] !== data.observation) {
-    throw new Error('RDC_REMOTE_INSTALLATION_PROTOCOL: inspection identity or state is invalid.');
+    throw new AppError('RDC_REMOTE_INSTALLATION_PROTOCOL', 'inspection identity or state is invalid.');
   }
   return { deviceSerial: data.device_serial, packageName: data.package_name, apkSha256: data.apk_sha256,
     state: data.installation_state as RemoteInstallationInspection['state'], ...(typeof data.diagnostic === 'string' ? { diagnostic: data.diagnostic } : {}) };
@@ -63,15 +64,15 @@ export async function inspectSessionReplayInstallation(device: ReplayDeviceEntry
 /** A connection is returned directly to its owning runtime, never to global discovery. */
 export async function connectSessionReplayDevice(device: ReplayDeviceEntry, contextId: string,
   binding: RdcTurnBinding, signal?: AbortSignal): Promise<RdcRemoteConnection> {
-  if (device.type !== 'android' || !device.serial || !contextId || contextId === 'default') throw new Error('RDC_REMOTE_CONTEXT_REQUIRED');
+  if (device.type !== 'android' || !device.serial || !contextId || contextId === 'default') throw new AppError('RDC_REMOTE_CONTEXT_REQUIRED');
   assertRemotePreparationContract(binding);
   if (device.adbState && device.adbState !== 'device') throw new Error(device.adbState === 'unauthorized' ? 'remote_unauthorized' : 'remote_device_offline');
   signal?.throwIfAborted();
   const policy = binding.definitions.find(value => value.name === 'rd.remote.connect')!.timeout_policy as Record<string, number>;
   const timeoutMs = binding.cli.timeoutMs;
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('RDC_REMOTE_TIMEOUT_INVALID');
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new AppError('RDC_REMOTE_TIMEOUT_INVALID');
   const processTimeout = Math.ceil(timeoutMs / 1000) * 1000 + policy.worker_grace_ms + policy.transport_grace_ms + policy.process_grace_ms;
-  if (!Number.isSafeInteger(processTimeout)) throw new Error('RDC_REMOTE_TIMEOUT_INVALID');
+  if (!Number.isSafeInteger(processTimeout)) throw new AppError('RDC_REMOTE_TIMEOUT_INVALID');
   const payload = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('call', [
     'rd.remote.connect', '--args-json', JSON.stringify({ timeout_ms: timeoutMs, options: {
       transport: 'adb_android', device_serial: device.serial,
@@ -79,7 +80,7 @@ export async function connectSessionReplayDevice(device: ReplayDeviceEntry, cont
   ], { contextId, abortSignal: signal, settings: binding.cli, timeout: processTimeout }), contextId, 'rd.remote.connect');
   signal?.throwIfAborted();
   const remoteId = payload.data.remote_id;
-  if (typeof remoteId !== 'string' || !remoteId.trim()) throw new Error('RDC_CLI_PROTOCOL: remote_id is required.');
+  if (typeof remoteId !== 'string' || !remoteId.trim()) throw new AppError('RDC_CLI_PROTOCOL', 'remote_id is required.');
   return { deviceId: device.id, serial: device.serial, contextId, remoteId, bootstrap: parseRemoteBootstrap(payload.data) };
 }
 
@@ -95,14 +96,14 @@ export async function revalidateSessionReplayDevice(connection: RdcRemoteConnect
     signal?.throwIfAborted();
     const payload = parseRdcNativeResult(result, undefined, operation);
     if (payload.data.context_id !== undefined && payload.data.context_id !== contextId) {
-      throw new Error('RDC_CONTEXT_MISMATCH: native response does not belong to the owning daemon context.');
+      throw new AppError('RDC_CONTEXT_MISMATCH', 'native response does not belong to the owning daemon context.');
     }
     return payload;
   };
   const processOf = (payload: Awaited<ReturnType<typeof invoke>>) => {
     const process = parseRdcProcessIdentity((payload.meta as Record<string, unknown> | undefined)?.process_identity);
     if (payload.data.process_identity && JSON.stringify(parseRdcProcessIdentity(payload.data.process_identity)) !== JSON.stringify(process)) {
-      throw new Error('RDC_PROCESS_IDENTITY_MISMATCH: native process identities disagree.');
+      throw new AppError('RDC_PROCESS_IDENTITY_MISMATCH', 'native process identities disagree.');
     }
     return JSON.stringify(process);
   };
@@ -111,7 +112,7 @@ export async function revalidateSessionReplayDevice(connection: RdcRemoteConnect
     const remote = payload.data.remote as Record<string, unknown> | undefined;
     if (payload.data.context_id !== contextId || remote?.state !== 'live_handle' || remote.remote_id !== remoteId
       || remote.origin_context_id !== contextId || remote.context_locality !== 'strict' || remote.device_serial !== serial) {
-      throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: prepared remote is not bound to the owning context and device.');
+      throw new AppError('RDC_REMOTE_IDENTITY_MISMATCH', 'prepared remote is not bound to the owning context and device.');
     }
     return processOf(payload);
   };
@@ -119,9 +120,9 @@ export async function revalidateSessionReplayDevice(connection: RdcRemoteConnect
   const ping = await invoke('rd.remote.ping', { remote_id: remoteId });
   const detail = ping.data.detail as Record<string, unknown> | undefined;
   if (detail?.remote_id !== remoteId || detail.connected !== true) {
-    throw new Error('RDC_REMOTE_IDENTITY_MISMATCH: ping did not confirm the prepared remote.');
+    throw new AppError('RDC_REMOTE_IDENTITY_MISMATCH', 'ping did not confirm the prepared remote.');
   }
   if (processOf(ping) !== process || await readContext() !== process) {
-    throw new Error('RDC_PROCESS_IDENTITY_MISMATCH: prepared remote process changed during verification.');
+    throw new AppError('RDC_PROCESS_IDENTITY_MISMATCH', 'prepared remote process changed during verification.');
   }
 }

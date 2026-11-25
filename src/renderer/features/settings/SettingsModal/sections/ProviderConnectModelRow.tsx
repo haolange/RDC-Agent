@@ -61,7 +61,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
             ? t('settings.providers.modelUnverified')
             : t('settings.providers.modelAvailable');
   const statusTitle = isUnavailable
-    ? (model.availabilityReason || t('settings.providers.modelUnavailableReason'))
+    ? t('settings.providers.modelUnavailableReason')
     : badge === 'refresh-failed'
       ? t('settings.providers.modelRefreshFailedReason')
       : badge === 'unverified'

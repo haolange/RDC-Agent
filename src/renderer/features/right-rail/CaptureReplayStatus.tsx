@@ -55,13 +55,9 @@ export function collectCaptureCallouts(args: {
   factLabels: { no_color_output: string; missing_target: string; export_failure: string };
 }): CaptureCallout[] {
   const items: CaptureCallout[] = [];
+  // The only replay warning is the final-output one; its tool text is a detail, never the title.
   if (args.warning) {
-    items.push({
-      id: `warning:${args.warning.code}`,
-      tone: 'warning',
-      title: args.warning.code === 'final_output_unavailable' ? args.finalPresentTitle : args.warning.message,
-      detail: args.warning.code === 'final_output_unavailable' ? args.warning.message : undefined,
-    });
+    items.push({ id: `warning:${args.warning.code}`, tone: 'warning', title: args.finalPresentTitle, detail: args.warning.message });
   }
   if (args.actionError) {
     items.push({ id: 'action', tone: 'error', title: args.actionFailureTitles?.[args.actionError.action] ?? args.failureTitle, detail: args.actionError.message, retry: args.actionError.action });

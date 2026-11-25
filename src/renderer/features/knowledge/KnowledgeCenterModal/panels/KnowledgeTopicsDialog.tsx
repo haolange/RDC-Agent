@@ -6,6 +6,7 @@ import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import { Skeleton } from '../../../../ui/Skeleton';
 import type { useKnowledgeTopics } from '../useKnowledgeTopics';
 
@@ -111,7 +112,7 @@ export function KnowledgeTopicsDialog({ topics }: { topics: ReturnType<typeof us
           ))}
         </>
       ) : null}
-      {topics.error ? <InlineError>{topics.error}</InlineError> : null}
+      {topics.error ? <InlineError detail={topics.error}>{humanizeError(topics.error, t, 'app.error.actionFailed')}</InlineError> : null}
     </TaskDialog>
   );
 }

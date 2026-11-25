@@ -17,7 +17,9 @@ export interface SearchMultiSelectProps {
   /** Selected references must be retained even if the catalog no longer contains them. */
   unavailable?: Readonly<Record<string, string>>;
   loading?: boolean;
+  /** One human sentence; the technical reason goes in `errorDetail`, which only "Copy details" carries. */
   error?: ReactNode;
+  errorDetail?: string;
   disabled?: boolean;
   onRetry?: () => void;
   className?: string;
@@ -33,7 +35,7 @@ export interface SearchMultiSelectProps {
 
 /** Presentational catalog picker. Resolution, permissions and persistence belong to its caller. */
 export function SearchMultiSelect({ value, options, onChange, unavailable = {}, loading = false,
-  error, disabled = false, onRetry, className, label, searchLabel, emptyLabel, noResultsLabel,
+  error, errorDetail, disabled = false, onRetry, className, label, searchLabel, emptyLabel, noResultsLabel,
   loadingLabel, unavailableLabel, removeLabel, retryLabel }: SearchMultiSelectProps) {
   const [query, setQuery] = useState('');
   const id = useId();
@@ -58,7 +60,7 @@ export function SearchMultiSelect({ value, options, onChange, unavailable = {}, 
       <SearchField aria-label={searchLabel} placeholder={searchLabel} value={query} disabled={disabled}
         onChange={(event) => setQuery(event.currentTarget.value)} />
       <div aria-live="polite" className="ui-search-multi-select-status">
-        {error ? <InlineError onRetry={onRetry} retryLabel={retryLabel} retryDisabled={disabled || loading}>{error}</InlineError>
+        {error ? <InlineError detail={errorDetail} onRetry={onRetry} retryLabel={retryLabel} retryDisabled={disabled || loading}>{error}</InlineError>
           : loading ? loadingLabel : candidates.length === 0 ? (query.trim() ? noResultsLabel : emptyLabel) : null}
       </div>
       {candidates.length > 0 && <ul className="ui-search-multi-select-options">

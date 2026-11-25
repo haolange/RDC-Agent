@@ -1,4 +1,5 @@
-import { isRendererEventChannel } from './channels';
+import { IPC_ERROR_KEY, isIpcErrorResult, RendererIpcError } from '../errors/appError';
+import { isRendererEventChannel, type RendererInvokeChannel } from './channels';
 import {
   createAppMetaApi,
   createAppShellApi,
@@ -30,7 +31,23 @@ import {
 import type { RendererApiTransport } from './transport';
 import type { ElectronAPI } from '../types/electron';
 
-export function createRendererApi(platform: NodeJS.Platform, transport: RendererApiTransport): ElectronAPI {
+/** Every invoke resolves with its value; a failed call throws `RendererIpcError` carrying the code and params. */
+function failingOnErrorResults(transport: RendererApiTransport): RendererApiTransport {
+  return {
+    invoke: async <TResult>(channel: RendererInvokeChannel, ...args: unknown[]): Promise<TResult> => {
+      const result = await transport.invoke<TResult>(channel, ...args);
+      if (isIpcErrorResult(result)) throw new RendererIpcError(channel, result[IPC_ERROR_KEY]);
+      return result;
+    },
+    subscribe: (channel, callback) => transport.subscribe(channel, callback),
+    addListener: (channel, callback) => transport.addListener(channel, callback),
+    removeListener: (channel, callback) => transport.removeListener(channel, callback),
+    removeAllListeners: (channel) => transport.removeAllListeners(channel),
+  };
+}
+
+export function createRendererApi(platform: NodeJS.Platform, ipcTransport: RendererApiTransport): ElectronAPI {
+  const transport = failingOnErrorResults(ipcTransport);
   const dialog = createDialogApi(transport);
   return {
     platform,

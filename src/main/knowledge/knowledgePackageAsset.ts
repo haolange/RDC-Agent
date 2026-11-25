@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { detectImageMagicMime } from '../conversation/attachmentClassify';
 import { knowledgeImageMime } from './knowledgeImages';
 import { normalizeZipEntryName } from './knowledgeZip';
@@ -14,7 +15,7 @@ export async function resolvePackageAsset(packageDir: string, relative: string):
   try {
     name = normalizeZipEntryName(relative);
   } catch {
-    throw new Error(`KNOWLEDGE_ASSET_PATH_INVALID: ${relative}`);
+    throw new AppError('KNOWLEDGE_ASSET_PATH_INVALID', relative);
   }
   const target = path.join(packageDir, ...name.split('/'));
   let stat;
@@ -24,12 +25,12 @@ export async function resolvePackageAsset(packageDir: string, relative: string):
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
   }
-  if (stat.isSymbolicLink()) throw new Error(`KNOWLEDGE_ASSET_LINK_REJECTED: ${relative}`);
+  if (stat.isSymbolicLink()) throw new AppError('KNOWLEDGE_ASSET_LINK_REJECTED', relative);
   if (!stat.isFile()) return null;
   const [root, real] = await Promise.all([fs.realpath(packageDir), fs.realpath(target)]);
   const inside = path.relative(root, real);
   if (!inside || inside.startsWith('..') || path.isAbsolute(inside)) {
-    throw new Error(`KNOWLEDGE_ASSET_LINK_REJECTED: ${relative}`);
+    throw new AppError('KNOWLEDGE_ASSET_LINK_REJECTED', relative);
   }
   return target;
 }
@@ -43,7 +44,7 @@ export async function readPackageImage(packageDir: string, relative: string, max
   const declared = knowledgeImageMime(relative);
   const actual = detectImageMagicMime(bytes.subarray(0, Math.min(bytes.length, 64)));
   if (!declared || actual !== declared) {
-    throw new Error(`KNOWLEDGE_IMAGE_INVALID: ${relative} is not the ${declared ?? 'image'} its name declares`);
+    throw new AppError('KNOWLEDGE_IMAGE_INVALID', `${relative} is not the ${declared ?? 'image'} its name declares`);
   }
   return bytes;
 }

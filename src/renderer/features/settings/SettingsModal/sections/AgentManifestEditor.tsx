@@ -12,6 +12,7 @@ import { CopyDiagnosticsMenu } from '../../../../patterns/CopyDiagnostics';
 import { SettingsSection } from '../parts';
 import { Badge } from '../../../../ui/Badge';
 import { InlineError } from '../../../../ui/InlineError';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import { AgentContractFields } from './AgentContractFields';
 import { AgentIdentityPanel } from './AgentIdentityPanel';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
@@ -203,7 +204,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               testIdPrefix="settings-agent"
               t={t}
             />
-            {modelError ? <InlineError>{modelError}</InlineError> : null}
+            {modelError ? <InlineError detail={modelError}>{humanizeError(modelError, t, 'settings.agentModelSaveFailed')}</InlineError> : null}
             {statusProblem ? (
               <div className="settings-agent-config-status" data-testid="settings-agent-config-status" data-tone={status.tone}
                 role="status" data-tooltip={status.detail}>

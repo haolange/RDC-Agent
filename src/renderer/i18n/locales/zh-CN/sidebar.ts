@@ -19,6 +19,7 @@ export const zhSidebar = {
   'sidebar.addSession': '新建会话',
   'sidebar.removeSession': '删除会话',
   'sidebar.removeSessionFailed': '删除会话失败。',
+  'sidebar.createSessionFailed': '新建会话失败。',
   'sidebar.removeSessionTitle': '删除会话？',
   'sidebar.removeSessionConfirm': '删除“{title}”？消息、工作过程、请求快照、派生上下文和会话产物都会从本机移除，且无法撤销。',
   'sidebar.removeProjectTitle': '移除项目？',

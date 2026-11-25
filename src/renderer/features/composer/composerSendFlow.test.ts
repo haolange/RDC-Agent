@@ -20,7 +20,7 @@ function options(preserveDraft = true): Parameters<typeof sendComposerConversati
     setConversationMessages: useConversationStore.getState().setConversationMessages,
     upsertConversationMessages: useConversationStore.getState().upsertConversationMessages,
     setBranchState: vi.fn(), setCurrentSession: vi.fn(), setSessions: vi.fn(), setCurrentRun: vi.fn(), setRuns: vi.fn(),
-    setTracePresentation: vi.fn(), showNotice: vi.fn(), failedSummary: 'Failed' };
+    setTracePresentation: vi.fn(), t: (key: string) => key };
 }
 beforeEach(() => {
   vi.clearAllMocks(); mock.configure.mockResolvedValue({ configurationCommit: { agentId: 'general' } });

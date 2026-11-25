@@ -1,4 +1,5 @@
 import { InlineError } from '../../../../ui/InlineError';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import { SettingsField } from '../parts';
 import { AgentModelBindingFields } from './AgentModelBindingFields';
 import type { AgentModelBinding, AppSettings } from '@shared/types/settings';
@@ -24,7 +25,7 @@ export function AgentDefaultModelSection({ settings, error, onChange, t }: {
           t={t}
         />
       </SettingsField>
-      {error ? <InlineError>{error}</InlineError> : null}
+      {error ? <InlineError detail={error}>{humanizeError(error, t, 'settings.agentModelSaveFailed')}</InlineError> : null}
     </div>
   );
 }

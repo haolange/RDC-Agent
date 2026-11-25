@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { resolvedPathKey, samePath } from '../platform/paths';
 import { rdcDefaultInstallationRoots, rdcHostLayout, rdcInstallationFiles, rdcRootFromPython } from '../platform/rdcLayout';
 import { assertRdcCliBinding } from './rdcCliBinding';
@@ -16,18 +17,18 @@ export function installationRootOfPython(command: string): string {
   const layout = rdcHostLayout();
   const root = rdcRootFromPython(command, layout);
   if (!root) {
-    throw new Error(`RDC_INSTALLATION_INVALID: ${command} is not the bundled ${layout.runtimeDir}/${layout.pythonExecutable} of an installation.`);
+    throw new AppError('RDC_INSTALLATION_INVALID', `${command} is not the bundled ${layout.runtimeDir}/${layout.pythonExecutable} of an installation.`);
   }
   return path.resolve(root);
 }
 
 export function resolveRdcInstallation(request: RdcInstallationRequest): RdcCliInvokerSettings {
-  if (!path.isAbsolute(request.root)) throw new Error('RDC_INSTALLATION_INVALID: select an absolute installation folder.');
+  if (!path.isAbsolute(request.root)) throw new AppError('RDC_INSTALLATION_INVALID', 'select an absolute installation folder.');
   const root = fs.realpathSync(request.root);
   const { python: command, entry } = rdcInstallationFiles(root);
   for (const file of [command, entry]) {
     if (!fs.statSync(file).isFile() || !samePath(fs.realpathSync(file), file)) {
-      throw new Error('RDC_INSTALLATION_INVALID: Python and CLI must be regular files in the same installation.');
+      throw new AppError('RDC_INSTALLATION_INVALID', 'Python and CLI must be regular files in the same installation.');
     }
   }
   const settings: RdcCliInvokerSettings = {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { diffLines } from '@shared/utils/lineDiff';
+import { errorDetail } from '../../../../lib/errorDetail';
 import type {
   AgentBuiltinComparison,
   AgentManifestDiagnostic,
@@ -9,12 +10,9 @@ import type {
   ProjectAgentTrustPreview,
 } from '@shared/types/agentManifest';
 import type { AgentModelBinding, AgentModelSettings, AppSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
 import type { AgentBuiltinDiffState } from './AgentBuiltinDiffDialog';
 import type { AgentOverrideFileAction } from './AgentModelMigrationDialog';
 import type { ProjectAgentTrustReview } from './ProjectAgentTrustDialog';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 /** Where a failed model write is reported: the default row, or one Agent's editor. */
 export const DEFAULT_MODEL_TARGET = '';
@@ -28,11 +26,10 @@ export interface AgentModelCommands {
   onTrustProjectAgent: (request: AgentOverrideFileRequest) => Promise<void>;
 }
 
-const errorText = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 const hasValue = (binding: AgentModelBinding): boolean => Boolean(binding.model || binding.reasoningLevel);
 
 /** Model settings and override-file dialogs of the Agents page. */
-export function useAgentModelControls(settings: AppSettings, commands: AgentModelCommands, t: Translate) {
+export function useAgentModelControls(settings: AppSettings, commands: AgentModelCommands) {
   const [modelError, setModelError] = useState<{ target: string; message: string } | null>(null);
   const [builtinDiff, setBuiltinDiff] = useState<AgentBuiltinDiffState | null>(null);
   const [overrideAction, setOverrideAction] = useState<AgentOverrideFileAction | null>(null);
@@ -41,7 +38,7 @@ export function useAgentModelControls(settings: AppSettings, commands: AgentMode
   const commit = (agentModels: AgentModelSettings, target: string) => {
     setModelError(null);
     void commands.onAgentModelsChange(agentModels).catch((error: unknown) => {
-      setModelError({ target, message: errorText(error, t('settings.agentModelSaveFailed')) });
+      setModelError({ target, message: errorDetail(error) });
     });
   };
 
@@ -58,7 +55,7 @@ export function useAgentModelControls(settings: AppSettings, commands: AgentMode
       (comparison) => setBuiltinDiff((current) => (current?.agentId === draft.id
         ? { ...current, lines: diffLines(comparison.builtinContent, comparison.overrideContent) } : current)),
       (error: unknown) => setBuiltinDiff((current) => (current?.agentId === draft.id
-        ? { ...current, error: errorText(error, t('settings.agentBuiltinDiffFailed')) } : current)),
+        ? { ...current, error: errorDetail(error) } : current)),
     );
   };
 
@@ -68,7 +65,7 @@ export function useAgentModelControls(settings: AppSettings, commands: AgentMode
     void commands.onPreviewAgentModelMigration(issue.sourcePath).then(
       (preview) => setOverrideAction((current) => (same(current) ? { ...current!, preview } : current)),
       (error: unknown) => setOverrideAction((current) => (same(current)
-        ? { ...current!, error: errorText(error, t('settings.agentModelMigrationFailed')) } : current)),
+        ? { ...current!, error: errorDetail(error) } : current)),
     );
   };
 
@@ -84,7 +81,7 @@ export function useAgentModelControls(settings: AppSettings, commands: AgentMode
     void commands.onPreviewProjectAgentTrust(issue.sourcePath).then(
       (preview) => setTrustReview((current) => (same(current) ? { ...current!, preview } : current)),
       (error: unknown) => setTrustReview((current) => (same(current)
-        ? { ...current!, error: errorText(error, t('settings.agentTrustFailed')) } : current)),
+        ? { ...current!, error: errorDetail(error) } : current)),
     );
   };
 

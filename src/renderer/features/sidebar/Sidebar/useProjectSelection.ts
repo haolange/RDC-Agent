@@ -13,7 +13,7 @@ import {
   handleSessionRemoveOp,
 } from './projectSelectionSessionOps';
 import { useProjectSelectionLoaders } from './useProjectSelectionLoaders';
-import type { ProjectSelectionHandlerOpsContext } from './projectSelectionContext';
+import type { ProjectSelectionHandlerOpsContext, SidebarError } from './projectSelectionContext';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 interface UseProjectSelectionOptions {
@@ -34,7 +34,7 @@ export function useProjectSelection({
   projectMenuOpen,
 }: UseProjectSelectionOptions) {
   const [isBusy, setIsBusy] = useState(false);
-  const [sidebarError, setSidebarError] = useState<string | null>(null);
+  const [sidebarError, setSidebarError] = useState<SidebarError | null>(null);
 
   const projects = useProjectStore((state) => state.projects);
   const sessions = useProjectStore((state) => state.sessions);

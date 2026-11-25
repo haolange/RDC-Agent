@@ -66,7 +66,6 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.exportRun': 'Export',
   'knowledgeCenter.exportDone': 'Exported {count} cards.',
   'knowledgeCenter.exportExcluded': '{count} cards were skipped because of missing attachments, secrets, or absolute paths.',
-  'knowledgeCenter.exportNoEligibleCards': 'No cards in this selection can be exported. Provide missing attachments or remove sensitive content and invalid paths.',
   'knowledgeCenter.importTitle': 'Import knowledge',
   'knowledgeCenter.importDescription': 'Imported cards become drafts in the chosen space. They are not verified and do not become candidates.',
   'knowledgeCenter.importInputMode': 'Input',

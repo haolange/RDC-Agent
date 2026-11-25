@@ -1,4 +1,5 @@
 import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import type { TaskCompletionResult, TaskExecutionRecord } from '../tasks';
 import type { TurnCompletionDeclaration } from './TurnCoordinator';
@@ -10,7 +11,7 @@ export function persistSubagentResult(sessionId: string, executionId: string, va
   const chunks = Array.from({ length: Math.ceil(serialized.length / 4_000) }, (_, index) => serialized.slice(index * 4_000, (index + 1) * 4_000));
   const saved = resolver.write(sessionId, formatSessionArtifactUri('tool-outputs', `subagent-${executionId}.json`), JSON.stringify({ encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks }, null, 2), { mimeType: 'application/json' });
   const verified = resolver.read(sessionId, saved.uri, { expectedHash: saved.hash, limit: 1 });
-  if (verified.hash !== saved.hash) throw new Error('SUBAGENT_RESULT_VERIFY_FAILED: persisted result hash differs on readback.');
+  if (verified.hash !== saved.hash) throw new AppError('SUBAGENT_RESULT_VERIFY_FAILED', 'persisted result hash differs on readback.');
   return { uri: saved.uri, hash: saved.hash };
 }
 export function normalizeSubagentResult(text: string, status: 'complete' | 'failed' | 'cancelled', declaration: TurnCompletionDeclaration | null | undefined, artifact?: PersistedSubagentResult, sourceFailure?: DelegationSourceFailure): TaskCompletionResult {
@@ -58,7 +59,7 @@ export function projectSubagentResult(result: TaskCompletionResult) {
     error: result.error ? keep('error', result.error, 500, 'Error details externalized.') : undefined,
     externalizedFields,
   };
-  if (externalizedFields.length && (!result.resultRef || !result.resultHash)) throw new Error('SUBAGENT_RESULT_REFERENCE_REQUIRED: cannot omit structured fields without a durable result reference.');
+  if (externalizedFields.length && (!result.resultRef || !result.resultHash)) throw new AppError('SUBAGENT_RESULT_REFERENCE_REQUIRED', 'cannot omit structured fields without a durable result reference.');
   return projection;
 }
 export function projectSubagentExecution(execution: TaskExecutionRecord | null | undefined) {

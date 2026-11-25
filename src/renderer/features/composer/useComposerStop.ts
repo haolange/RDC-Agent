@@ -8,6 +8,7 @@ import {
   useComposerSessionContextStore,
 } from '../../stores/composerSessionContextStore';
 import { stopWorkTrace } from '../../lib/stopWorkTrace';
+import { notify } from '../../stores/notificationStore';
 import { selectActiveAssistantForTurn } from './composerStopSelection';
 import { reconcileConversationStop } from './composerStopReconciliation';
 import type { useI18n } from '../../i18n';
@@ -19,7 +20,6 @@ export { stopWorkTrace };
 type Translate = ReturnType<typeof useI18n>['t'];
 
 export function useComposerStop(options: {
-  showNotice: (message: string) => void;
   t: Translate;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -28,7 +28,6 @@ export function useComposerStop(options: {
   setPendingSkillIds?: Dispatch<SetStateAction<string[]>>;
 }) {
   const {
-    showNotice,
     t,
     currentSession,
     currentRun,
@@ -132,7 +131,7 @@ export function useComposerStop(options: {
         if (workflowStopPromise) {
           void workflowStopPromise.catch(() => undefined);
         }
-        showNotice(t('app.stopRunSent'));
+        notify.info(t('app.stopRunSent'));
         return;
       }
 
@@ -147,13 +146,13 @@ export function useComposerStop(options: {
       if (!cancelResult.success) {
         const error = cancelResult.error;
         if (error && !error.includes('No active conversation')) {
-          showNotice(error);
+          notify.failure(error, t, 'app.stopRunFailed');
           return;
         }
       }
-      showNotice(t('app.stopRunSent'));
+      notify.info(t('app.stopRunSent'));
     } catch (error) {
-      showNotice(error instanceof Error ? error.message : t('app.stopRunFailed'));
+      notify.failure(error, t, 'app.stopRunFailed');
     }
   }, [
     currentRun,
@@ -162,7 +161,6 @@ export function useComposerStop(options: {
     setPendingAttachments,
     setPendingSkillIds,
     setPromptValue,
-    showNotice,
     t,
   ]);
 

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { generateEventId, nowIso } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../runtime/jsonl';
 import type { AgentRun, TraceEvent } from '@shared/types/agenticTrace';
 
@@ -121,7 +122,7 @@ export class TraceEventStore {
     const seen = new Set<number>();
     for (const event of events) {
       if (seen.has(event.seq)) {
-        throw new Error(`TRACE_SEQ_CONFLICT: duplicate seq ${event.seq} in run ${runId}`);
+        throw new AppError('TRACE_SEQ_CONFLICT', `duplicate seq ${event.seq} in run ${runId}`);
       }
       seen.add(event.seq);
     }

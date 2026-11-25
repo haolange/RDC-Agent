@@ -1,8 +1,9 @@
+import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 /**
  * RuntimeToolAssembly — resolveRuntimeTools / workbench / MCP catalog tools.
  */
 
-import path from 'node:path';
 import { UNRESOLVED_BLOCKERS, parseUnresolvedItems } from '@shared/types/unresolvedWork';
 import { isEphemeralScopeId, isSubagentScopeId } from '@shared/utils/executionScope';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '@shared/types/taskExecution';
@@ -126,7 +127,7 @@ export class RuntimeToolAssembly {
       async execute(_toolCallId, args) {
         const disposition = args.disposition;
         if (!['completed', 'partial', 'blocked', 'cancelled', 'budget_paused'].includes(String(disposition))) {
-          throw new Error('TURN_COMPLETION_INVALID: disposition is not supported.');
+          throw new AppError('TURN_COMPLETION_INVALID', 'disposition is not supported.');
         }
         const refs = Array.isArray(args.evidenceRefs) ? args.evidenceRefs : [];
         const evidenceRefs = refs.filter((ref): ref is { uri: string; hash: string } => (
@@ -136,7 +137,7 @@ export class RuntimeToolAssembly {
         if (turnHandle) {
           const supplied = args.result as (Omit<NonNullable<TurnCompletionDeclaration['result']>, 'unresolved'> & { unresolved?: unknown }) | undefined;
           if (supplied && Object.values(supplied.outputs ?? {}).some((value) => typeof value !== 'string')) {
-            throw new Error('TURN_COMPLETION_INVALID: result.outputs values must be strings.');
+            throw new AppError('TURN_COMPLETION_INVALID', 'result.outputs values must be strings.');
           }
           const rawResult = supplied ? { ...supplied, unresolved: parseUnresolvedItems(supplied.unresolved ?? []) } : undefined;
           const declaration = { disposition: disposition as TurnCompletionDeclaration['disposition'], evidenceRefs, ...(rawResult ? { result: rawResult } : {}) };
@@ -545,7 +546,7 @@ export class RuntimeToolAssembly {
           if (parts[0] !== 'references' || parts.length < 2
             || parts.some((part) => !part || part === '.' || part === '..' || part.includes(':')
               || [...part].some((char) => char.charCodeAt(0) < 32))) {
-            throw new Error('SKILL_REFERENCE_PATH_DENIED: use an exact relative path under this Skill references/ directory.');
+            throw new AppError('SKILL_REFERENCE_PATH_DENIED', 'use an exact relative path under this Skill references/ directory.');
           }
           // Reuse canonical file guards/windowing, but never inherit workspace
           // roots or successfulFileReads: method knowledge cannot grant edits.
@@ -559,7 +560,7 @@ export class RuntimeToolAssembly {
           };
         }
         if (args.offset !== undefined || args.limit !== undefined) {
-          throw new Error('SKILL_REFERENCE_REQUIRED: offset/limit require a reference path.');
+          throw new AppError('SKILL_REFERENCE_REQUIRED', 'offset/limit require a reference path.');
         }
 
         return {
@@ -669,7 +670,7 @@ export class RuntimeToolAssembly {
           generation: turnHandle.generation,
         });
         if (unfinished.length > 0) {
-          throw new Error(`TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${unfinished.map((item) => item.taskId).join(', ')}. If useful work remains executable, keep its Task in progress and continue; mark it blocked only for a concrete reason that prevents further work, not merely because the result is unknown or unfinished.`);
+          throw new AppError('TASK_COMPLETION_DENIED', `Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${unfinished.map((item) => item.taskId).join(', ')}. If useful work remains executable, keep its Task in progress and continue; mark it blocked only for a concrete reason that prevents further work, not merely because the result is unknown or unfinished.`);
         }
       }
       const scope = sessionId ? getDelegatedTaskScope(sessionId) : null;
@@ -678,20 +679,20 @@ export class RuntimeToolAssembly {
       }
       if (turnHandle?.requiresApprovedGoalClosure && ['partial', 'blocked', 'budget_paused'].includes(declaration.disposition)
         && (!declaration.result?.summary?.trim() || !declaration.result.unresolved.some(item => item.blocker !== 'not_required'))) {
-        throw new Error('TURN_COMPLETION_INVALID: partial, blocked and budget-paused goals require a summary and at least one unresolved item whose blocker prevents the work now (capability, permission, budget, strategy or external). If nothing blocks a remaining item, continue it instead of stopping.');
+        throw new AppError('TURN_COMPLETION_INVALID', 'partial, blocked and budget-paused goals require a summary and at least one unresolved item whose blocker prevents the work now (capability, permission, budget, strategy or external). If nothing blocks a remaining item, continue it instead of stopping.');
       }
       if (turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'budget_paused' && !completionBudgetEvidence(turnHandle)) {
-        throw new Error('TURN_COMPLETION_INVALID: no current root budget limit has been observed.');
+        throw new AppError('TURN_COMPLETION_INVALID', 'no current root budget limit has been observed.');
       }
       if (sessionId && turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'completed') {
         const active = await listActiveDelegations(sessionId);
-        if (active.length) throw new Error(`TASK_COMPLETION_DENIED: Join active delegated executions before completing the approved goal: ${active.map(item => item.id).join(', ')}.`);
+        if (active.length) throw new AppError('TASK_COMPLETION_DENIED', `Join active delegated executions before completing the approved goal: ${active.map(item => item.id).join(', ')}.`);
       }
       if (scope && declaration.disposition === 'completed') {
         const task = await new TaskRegistry(createSessionTaskStore(scope.ownerSessionId)).getTask(scope.rootTaskId);
-        if (!task) throw new Error('TASK_NOT_FOUND: cannot declare completion without the owning Task.');
+        if (!task) throw new AppError('TASK_NOT_FOUND', 'cannot declare completion without the owning Task.');
         const missing = task.completionRequirements.filter(key => !declaration.result?.outputs[key]);
-        if (missing.length) throw new Error(`TURN_COMPLETION_INVALID: result.outputs must contain these exact Task keys: ${JSON.stringify(missing)}. Correct the structured result before completing.`);
+        if (missing.length) throw new AppError('TURN_COMPLETION_INVALID', `result.outputs must contain these exact Task keys: ${JSON.stringify(missing)}. Correct the structured result before completing.`);
       }
       await turnHandle?.validateCompletionReadiness?.(declaration);
     });

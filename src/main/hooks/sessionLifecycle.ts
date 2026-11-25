@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { rdcSessionService } from '../sessions';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
@@ -17,7 +18,7 @@ export async function createSessionWithHooks(
     payload: { projectId, title },
   });
   if (!allowed) {
-    throw new Error('HOOK_DENIED: session.before-start');
+    throw new AppError('HOOK_DENIED', 'session.before-start');
   }
   return storageAdapter.createSession(projectId, title, goal);
 }

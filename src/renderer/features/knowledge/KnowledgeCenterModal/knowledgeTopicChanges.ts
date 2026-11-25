@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import type { KnowledgeTopic, KnowledgeTopicChanges, KnowledgeTopicProposal, KnowledgeTopicSuggestion } from '@shared/types/knowledge';
 
 export function parseTopicSynonyms(value: string): string[] {
@@ -26,7 +27,7 @@ export function buildTopicChanges(input: {
     for (const card of suggestion.cards) {
       if (!selected.has(card.cardId)) continue;
       const existing = assignments.get(card.cardId);
-      if (existing && existing.contentHash !== card.contentHash) throw new Error('KNOWLEDGE_TOPIC_SOURCE_CHANGED');
+      if (existing && existing.contentHash !== card.contentHash) throw new AppError('KNOWLEDGE_TOPIC_SOURCE_CHANGED');
       if (existing) existing.topicIds.push(id);
       else assignments.set(card.cardId, { cardId: card.cardId, contentHash: card.contentHash, topicIds: [id] });
     }

@@ -10,6 +10,7 @@ import {
   parseDelegationCapsule,
   type DelegationCapsule,
 } from '@shared/types/delegationCapsule';
+import { AppError } from '@shared/errors/appError';
 import { withDelegatedInteractionOwner } from '../interactions/DelegatedInteractionOwner';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { reviewEvidenceClosure } from '../../investigation/reviewEvidenceClosure';
@@ -156,7 +157,7 @@ export class SubagentRunner {
     };
     if (rdcDelegation.requiresLease && !definition.tools.some(tool => isRdcLeaseToolName(tool)
       || (tool === 'shell' && agentAccessCeiling(definition) === 'full'))) {
-      throw new Error('RDC_LEASE_DELEGATE_DENIED: target Agent has no live RDC capability.');
+      throw new AppError('RDC_LEASE_DELEGATE_DENIED', 'target Agent has no live RDC capability.');
     }
     if (!definition.compiledRoute?.providerId || !definition.compiledRoute.modelId) {
       return rejectConfiguration('MODEL_ROUTE_REQUIRED', `MODEL_ROUTE_REQUIRED: ${input.targetProfile} has no configured model route; configure this Agent in Settings.`);
@@ -168,18 +169,18 @@ export class SubagentRunner {
     assertSubagentBudgetAllowsChild(parentBudget);
     const policyBudget = input.policyBudget ?? input.parentTurn?.policyBudget;
     if (policyBudget && parentBudget.depth >= policyBudget.maxChildDepth) {
-      throw new Error(`POLICY_LIMIT_EXCEEDED: maxChildDepth ${policyBudget.maxChildDepth}.`);
+      throw new AppError('POLICY_LIMIT_EXCEEDED', `maxChildDepth ${policyBudget.maxChildDepth}.`);
     }
     const prepaid = consumeReservedSubagentSlot(policyBudget);
     if (policyBudget && !prepaid) {
       if (Date.now() - policyBudget.wallStartedAt >= policyBudget.maxWallTimeMs) {
-        throw new Error(`POLICY_LIMIT_EXCEEDED: maxWallTimeMs ${policyBudget.maxWallTimeMs}.`);
+        throw new AppError('POLICY_LIMIT_EXCEEDED', `maxWallTimeMs ${policyBudget.maxWallTimeMs}.`);
       }
       if (policyBudget.subagents >= policyBudget.maxSubagents) {
-        throw new Error(`POLICY_LIMIT_EXCEEDED: maxSubagents ${policyBudget.maxSubagents}.`);
+        throw new AppError('POLICY_LIMIT_EXCEEDED', `maxSubagents ${policyBudget.maxSubagents}.`);
       }
       const reserved = reserveDispatchBudget(policyBudget, { toolCalls: 0, subagents: 1 });
-      if (!reserved.ok) throw new Error(`POLICY_LIMIT_EXCEEDED: ${reserved.limit}.`);
+      if (!reserved.ok) throw new AppError('POLICY_LIMIT_EXCEEDED', `${reserved.limit}.`);
       await flushPolicyBudgetObservers(policyBudget);
       consumeReservedSubagentSlot(policyBudget);
     }
@@ -197,7 +198,7 @@ export class SubagentRunner {
       const remaining = childPolicyBudget.wallStartedAt + childPolicyBudget.maxWallTimeMs - Date.now();
       deadlineTimer = setTimeout(() => {
         if (remaining > 2_147_000_000) armDeadline();
-        else childAbort.abort(new Error('POLICY_LIMIT_EXCEEDED: maxWallTimeMs'));
+        else childAbort.abort(new AppError('POLICY_LIMIT_EXCEEDED', 'maxWallTimeMs'));
       }, Math.max(0, Math.min(remaining, 2_147_000_000)));
       deadlineTimer.unref?.();
     };
@@ -302,7 +303,7 @@ export class SubagentRunner {
           throw error;
         }
       } else if (frozenCapsule.inputArtifactRefs.length || frozenCapsule.challengeRefs.length || frozenCapsule.acceptedFacts.some(fact => fact.sourceRefs.length)) {
-        throw new Error('ARTIFACT_SESSION_DENIED: delegation references require a parent session.');
+        throw new AppError('ARTIFACT_SESSION_DENIED', 'delegation references require a parent session.');
       }
       const taskContract = ownedTask ? '\nRuntime Task completion contract (output keys, not source instructions): ' + JSON.stringify({
         taskId: ownedTask.id, completionRequirements: ownedTask.completionRequirements,
@@ -319,11 +320,11 @@ export class SubagentRunner {
       const capsuleSegments = [...compileDelegationCapsule(frozenCapsule), ...rdcDelegation.segments];
       if (rdcDelegation.requiresLease) {
         if (!input.parentSessionId?.trim()) {
-          throw new Error('RDC_LEASE_DELEGATE_DENIED: RDC capability requested but no parent session.');
+          throw new AppError('RDC_LEASE_DELEGATE_DENIED', 'RDC capability requested but no parent session.');
         }
         const ownerTurnId = input.parentTurn?.turnId?.trim() ?? '';
         if (!ownerTurnId) {
-          throw new Error('RDC_LEASE_DELEGATE_DENIED: RDC capability requested but parent turn id is missing.');
+          throw new AppError('RDC_LEASE_DELEGATE_DENIED', 'RDC capability requested but parent turn id is missing.');
         }
         grantDelegatedLease({
           parentSessionId: input.parentSessionId,
@@ -354,7 +355,7 @@ export class SubagentRunner {
           onTaskPreparation: async (preparation) => {
             if (ownedTask && input.executionId && input.taskExecutionGeneration !== undefined) {
               const capsuleHash = createHash('sha256').update(JSON.stringify(frozenCapsule)).digest('hex');
-              if (preparation.capsuleHash !== capsuleHash) throw new Error('TASK_EXECUTION_REQUIREMENTS: prepared Capsule differs from dispatched work.');
+              if (preparation.capsuleHash !== capsuleHash) throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'prepared Capsule differs from dispatched work.');
               await new TaskRegistry(createSessionTaskStore(inheritedTaskScope?.ownerSessionId ?? input.parentSessionId!))
                 .bindExecutionPreparation(input.executionId, input.taskExecutionGeneration, preparation);
             }
@@ -498,17 +499,17 @@ export class SubagentRunner {
           ? targetProfile === parentAgentId
           : targetProfile === parentAgentId || delegates.includes(targetProfile);
         if (!authorized) {
-          throw new Error(`SUBAGENT_DELEGATE_DENIED: ${targetProfile} is not in the frozen profileDelegates set.`);
+          throw new AppError('SUBAGENT_DELEGATE_DENIED', `${targetProfile} is not in the frozen profileDelegates set.`);
         }
         const parentAccessCeiling = turn?.runtimePlan?.accessCeiling;
         if (!parentAccessCeiling) {
-          throw new Error('SUBAGENT_PARENT_PLAN_REQUIRED: delegation needs the delegating turn\'s frozen runtime plan.');
+          throw new AppError('SUBAGENT_PARENT_PLAN_REQUIRED', 'delegation needs the delegating turn\'s frozen runtime plan.');
         }
         const resolvedSessionId = sessionId ?? turn?.eventSink?.sessionId ?? null;
         const inheritedScope = resolvedSessionId ? getDelegatedTaskScope(resolvedSessionId) : null;
         const ownerSessionId = inheritedScope?.ownerSessionId ?? resolvedSessionId;
         if (inheritedScope?.executionId && parentExecutionId && parentExecutionId !== inheritedScope.executionId) {
-          throw new Error('TASK_SCOPE_DENIED: parentExecutionId must match the delegated execution binding.');
+          throw new AppError('TASK_SCOPE_DENIED', 'parentExecutionId must match the delegated execution binding.');
         }
         const effectiveParentExecutionId = inheritedScope?.executionId ?? parentExecutionId;
         if (taskId && inheritedScope) {
@@ -520,11 +521,11 @@ export class SubagentRunner {
             if (current.parentTaskId === inheritedScope.rootTaskId) { allowed = true; break; }
             current = tasks.find((item) => item.id === current!.parentTaskId);
           }
-          if (!allowed) throw new Error('TASK_SCOPE_DENIED: nested delegation must target a descendant of the owning Task.');
+          if (!allowed) throw new AppError('TASK_SCOPE_DENIED', 'nested delegation must target a descendant of the owning Task.');
         }
         if (mode === 'background') {
           if (!taskId || !ownerSessionId || !startBackground) {
-            throw new Error('BACKGROUND_REQUIRES_TASK: background mode requires a session-owned task and background runtime.');
+            throw new AppError('BACKGROUND_REQUIRES_TASK', 'background mode requires a session-owned task and background runtime.');
           }
           const execution = await startBackground({
             sessionId: ownerSessionId,
@@ -557,7 +558,7 @@ export class SubagentRunner {
         let runPromise: Promise<Awaited<ReturnType<typeof runSubagent>>> | undefined;
         let releaseExecutionBudgetObserver: (() => void) | undefined;
         if (taskId) {
-          if (!ownerSessionId) throw new Error('TASK_EXECUTION_SESSION_REQUIRED: task-owned subagent requires a parent session.');
+          if (!ownerSessionId) throw new AppError('TASK_EXECUTION_SESSION_REQUIRED', 'task-owned subagent requires a parent session.');
           const registry = new TaskRegistry(createSessionTaskStore(ownerSessionId));
           const parentExecution = effectiveParentExecutionId
             ? await registry.getExecution(effectiveParentExecutionId)

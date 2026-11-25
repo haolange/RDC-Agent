@@ -3,6 +3,8 @@ import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
+import { humanizeError } from '../../../../i18n/humanizeError';
+import { errorDetail } from '../../../../lib/errorDetail';
 import type { useI18n } from '../../../../i18n';
 import type { ProjectAgentTrustPreview } from '@shared/types/agentManifest';
 
@@ -36,7 +38,7 @@ export function ProjectAgentTrustDialog({ review, onConfirm, onClose, t }: {
     try {
       await onConfirm(preview);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('settings.agentTrustFailed'));
+      setError(errorDetail(reason));
       setBusy(false);
     }
   };
@@ -61,7 +63,7 @@ export function ProjectAgentTrustDialog({ review, onConfirm, onClose, t }: {
       </>}
     >
       {!preview && !review.error ? <Spinner size="sm" /> : null}
-      {review.error ? <InlineError>{review.error}</InlineError> : null}
+      {review.error ? <InlineError detail={review.error}>{humanizeError(review.error, t, 'app.error.loadFailed')}</InlineError> : null}
       {preview ? (
         <>
           <dl className="settings-agent-migration-facts">
@@ -74,7 +76,7 @@ export function ProjectAgentTrustDialog({ review, onConfirm, onClose, t }: {
           </pre>
         </>
       ) : null}
-      {error ? <InlineError>{error}</InlineError> : null}
+      {error ? <InlineError detail={error}>{humanizeError(error, t, 'settings.agentTrustFailed')}</InlineError> : null}
     </TaskDialog>
   );
 }

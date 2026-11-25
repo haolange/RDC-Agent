@@ -6,10 +6,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId } from '@shared/utils/id';
 import { parse as parseYamlDocument } from 'yaml';
+import { AppError, errorCodeOf } from '@shared/errors/appError';
 import {
   assertNoUnsupportedSchemaVersion,
   CURRENT_STORE_SCHEMA_VERSION,
   parseStoredDocument,
+  schemaValidationError,
   StorageSchemaError,
   type StorageMigration,
 } from './storageSchema';
@@ -53,15 +55,15 @@ export class StorageIo {
       if (code === 'ENOENT') {
         return null;
       }
-      throw new Error(
-        `STORAGE_CORRUPT: failed to read JSON file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      throw new AppError(
+        'STORAGE_CORRUPT', `failed to read JSON file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`, { cause: error },
       );
     }
 
     try {
       return this.parseJsonPayload<T>(raw, filePath, validator);
     } catch (parseError) {
-      if (parseError instanceof StorageSchemaError && parseError.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) {
+      if (errorCodeOf(parseError) === 'STORAGE_SCHEMA_UNSUPPORTED') {
         throw parseError;
       }
       const bakPath = `${filePath}.bak`;
@@ -81,8 +83,8 @@ export class StorageIo {
       }
 
       this.quarantineCorruptFile(filePath);
-      throw new Error(
-        `STORAGE_CORRUPT: failed to parse JSON file: ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      throw new AppError(
+        'STORAGE_CORRUPT', `failed to parse JSON file: ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`, { cause: parseError },
       );
     }
   }
@@ -102,9 +104,7 @@ export class StorageIo {
     assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
     const result = validator.safeParse(parsed);
     if (!result.success) {
-      throw new StorageSchemaError(
-        `STORAGE_SCHEMA: ${filePath} failed runtime validation: ${result.error.issues.map((issue: { message: string }) => issue.message).join('; ')}`,
-      );
+      throw schemaValidationError(filePath, result.error.issues);
     }
     return result.data;
   }
@@ -121,20 +121,20 @@ export class StorageIo {
       if (code === 'ENOENT') {
         return null;
       }
-      throw new Error(
-        `STORAGE_CORRUPT: failed to read YAML file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      throw new AppError(
+        'STORAGE_CORRUPT', `failed to read YAML file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`, { cause: error },
       );
     }
 
     try {
       return this.parseYamlPayload<T>(raw, filePath, validator);
     } catch (parseError) {
-      if (parseError instanceof StorageSchemaError && parseError.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) {
+      if (errorCodeOf(parseError) === 'STORAGE_SCHEMA_UNSUPPORTED') {
         throw parseError;
       }
       this.quarantineCorruptFile(filePath);
-      throw new Error(
-        `STORAGE_CORRUPT: failed to parse YAML file: ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      throw new AppError(
+        'STORAGE_CORRUPT', `failed to parse YAML file: ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`, { cause: parseError },
       );
     }
   }
@@ -150,7 +150,7 @@ export class StorageIo {
   ): T {
     const parsed: unknown = parseYamlDocument(raw);
     if (parsed == null) {
-      throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} is empty or not a YAML document`);
+      throw new StorageSchemaError('STORAGE_SCHEMA', `${filePath} is empty or not a YAML document`);
     }
     if (!validator) {
       assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
@@ -162,9 +162,7 @@ export class StorageIo {
     assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
     const result = validator.safeParse(parsed);
     if (!result.success) {
-      throw new StorageSchemaError(
-        `STORAGE_SCHEMA: ${filePath} failed runtime validation: ${result.error.issues.map((issue: { message: string }) => issue.message).join('; ')}`,
-      );
+      throw schemaValidationError(filePath, result.error.issues);
     }
     return result.data;
   }

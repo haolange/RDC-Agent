@@ -27,6 +27,19 @@ export const hostPlatformRestrictions = [
   'TemplateElement[value.raw=/Get-CimInstance/i]',
 ].map((selector) => ({ selector, message: hostPlatformMessage }));
 
+// Error contract (docs/contracts/failure-model.md): a failure that crosses a boundary is an AppError with a registered
+// code, never a coded message string; a rethrow inside catch keeps what it caught as the cause.
+const errorContractMessage = 'Throw new AppError(code, detail) with a code from src/shared/errors/errorCodes.ts.';
+export const errorContractRestrictions = [
+  { selector: "NewExpression[callee.name='Error'] > Literal.arguments:first-child[value=/^[A-Z][A-Z0-9_]{2,}(:|$)/]", message: errorContractMessage },
+  { selector: "NewExpression[callee.name='Error'] > TemplateLiteral.arguments:first-child > TemplateElement:first-child[value.raw=/^[A-Z][A-Z0-9_]{2,}(:|$)/]", message: errorContractMessage },
+  {
+    selector: "CatchClause[param] ThrowStatement > NewExpression[callee.name='AppError']:not(:has(Property[key.name='cause']))",
+    message: 'A rethrow inside catch passes { cause } so the original failure stays inspectable.',
+  },
+];
+const productionSources = { files: ['src/**/*.{ts,tsx}'], ignores: ['src/**/*.test.{ts,tsx}', 'src/main/testing/**', 'src/**/*.d.ts'] };
+
 // Dependency direction (ARCHITECTURE.md): shared runs in every process, so it imports no Node
 // builtins and no process code; platform and provider-catalog are main-process leaves; ipc is the
 // outer adapter only the entry point and the browser bridge call into; nothing ships test support.
@@ -90,6 +103,13 @@ export default [
     },
   },
   {
+    ...productionSources,
+    rules: {
+      'no-restricted-syntax': ['error', ...errorContractRestrictions],
+      'preserve-caught-error': ['error', { requireCatchParameter: false }],
+    },
+  },
+  {
     files: ['src/main/**/*.ts'],
     ignores: ['src/main/**/*.test.ts', 'src/main/**/*.d.ts', 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'],
     rules: { 'max-lines': ['error', { max: 900, skipBlankLines: false, skipComments: false }] },
@@ -98,6 +118,11 @@ export default [
     files: ['src/main/**/*.ts', 'src/shared/**/*.ts', 'src/preload/**/*.ts'],
     ignores: ['src/main/platform/**', 'src/preload/index.ts'],
     rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions] },
+  },
+  {
+    files: ['src/main/**/*.ts', 'src/shared/**/*.ts', 'src/preload/**/*.ts'],
+    ignores: [...productionSources.ignores, 'src/main/platform/**', 'src/preload/index.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...hostPlatformRestrictions, ...errorContractRestrictions] },
   },
   {
     files: ['src/shared/**/*.ts'],
@@ -172,7 +197,7 @@ export default [
       'no-restricted-imports': ['error', {
         patterns: ['**/features/**', '**/platform/**', '**/app/**', '**/shell/**'],
       }],
-      'no-restricted-syntax': ['error', electronApiRestriction],
+      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions],
     },
   },
   {
@@ -193,7 +218,7 @@ export default [
         ],
         patterns: ['**/features/**', '**/ui/**', '**/patterns/**', '**/stores/**', '**/platform/**', '**/app/**', '**/shell/**'],
       }],
-      'no-restricted-syntax': ['error', electronApiRestriction],
+      'no-restricted-syntax': ['error', electronApiRestriction, ...errorContractRestrictions],
     },
   },
   {

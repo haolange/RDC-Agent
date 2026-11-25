@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { dialog, ipcMain } from 'electron';
 import { KNOWLEDGE_EXPORT_EXTENSION } from '@shared/types/knowledgeExport';
+import { AppError } from '@shared/errors/appError';
 import { nativeMessage } from '../window/nativeI18n';
 import { confirmInMainProcess } from '../window/mainConfirmation';
 import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
@@ -64,7 +65,7 @@ function assertKnownSpaces(spaceIds: string[] | undefined): void {
 
 function requireHumanConfirmation(confirmation: { explicitHumanConfirmation?: boolean }): void {
   if (confirmation.explicitHumanConfirmation !== true) {
-    const error = new Error('KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED');
+    const error = new AppError('KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED');
     (error as Error & { code: string }).code = 'KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED';
     throw error;
   }
@@ -126,7 +127,7 @@ function consumeKnowledgeToken(
     contentDigest: knowledgeCardDigest(card),
   });
   if (!consumed) {
-    const error = new Error('KNOWLEDGE_APPROVAL_TOKEN_INVALID');
+    const error = new AppError('KNOWLEDGE_APPROVAL_TOKEN_INVALID');
     (error as Error & { code: string }).code = 'KNOWLEDGE_APPROVAL_TOKEN_INVALID';
     throw error;
   }
@@ -204,7 +205,7 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
   ipcMain.handle('knowledge:topics:apply', async (_event, ...rawArgs: unknown[]) => {
     const [input] = parseIpcArgs(KnowledgeTopicApplyArgsSchema, rawArgs, { label: 'knowledge:topics:apply', maxBytes: 2 * 1024 * 1024 });
     const preview = await knowledgeTopicService.preview(input.changes);
-    if (preview.changeHash !== input.changeHash) throw new Error('KNOWLEDGE_TOPICS_PREVIEW_CHANGED: review the changes again.');
+    if (preview.changeHash !== input.changeHash) throw new AppError('KNOWLEDGE_TOPICS_PREVIEW_CHANGED', 'review the changes again.');
     const detail = `topics: ${preview.topics.map(topic => topic.label).join(', ')}; cards: ${preview.cards.length}`;
     if (!await confirmKnowledgeMutation('knowledge.write', 'user', detail)) return { cancelled: true as const };
     return knowledgeTopicService.apply(input.changes, input.changeHash);

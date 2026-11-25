@@ -3,7 +3,6 @@ import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagno
 import { AGENT_PROJECT_CEILING_NARROWED, AGENT_PROJECT_UNTRUSTED, type AgentManifestDiagnostic } from '@shared/types/agentManifest';
 import { useClipboardBridge } from '../../../../hooks/useClipboardBridge';
 import { Button } from '../../../../ui/Button';
-import { Details } from '../../../../ui/Details';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import type { useI18n } from '../../../../i18n';
 import './AgentManifestDiagnostics.css';
@@ -76,10 +75,6 @@ export function AgentManifestDiagnostics({ open, onClose, diagnostics, onMigrate
               </Button>
             </div>
           ) : null}
-          <Details summary={t('settings.agentDiagnosticsDetails')}>
-            <code>{issue.code}</code>
-            <p>{issue.message}</p>
-          </Details>
         </li>)}
       </ul>
     </div>

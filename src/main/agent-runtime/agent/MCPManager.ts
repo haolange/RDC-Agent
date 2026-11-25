@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /**
  * MCPManager — Model Context Protocol 连接与工具管理。
  *
@@ -339,7 +340,7 @@ export class MCPManager {
         supervised.abort('supervisor_kill');
         const exit = await supervised.join(5_000);
         if (exit.reason === 'unconfirmed_orphan') {
-          throw new Error(`MCP stdio server "${config.name}" became an unconfirmed orphan while connecting.`);
+          throw new Error(`MCP stdio server "${config.name}" became an unconfirmed orphan while connecting.`, { cause: err });
         }
         throw err;
       }
@@ -422,7 +423,7 @@ export class MCPManager {
       return conn.tools.map((t) => t.prefixedName);
     }
 
-    throw new Error(`MCP_TRANSPORT_UNSUPPORTED: ${String(config.type)}`);
+    throw new AppError('MCP_TRANSPORT_UNSUPPORTED', String(config.type));
   }
 
   /** 断开 MCP 服务器。 */
@@ -660,8 +661,8 @@ export class MCPManager {
         existing
         && (existing.serverId !== t.serverId || existing.originalName !== t.originalName)
       ) {
-        throw new Error(
-          `MCP_TOOL_NAME_COLLISION: prefixed name "${t.prefixedName}" already registered for `
+        throw new AppError(
+          'MCP_TOOL_NAME_COLLISION', `prefixed name "${t.prefixedName}" already registered for `
           + `${existing.serverId}/${existing.originalName}; refusing ${t.serverId}/${t.originalName}`,
         );
       }

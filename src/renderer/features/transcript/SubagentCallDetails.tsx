@@ -1,6 +1,8 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
+import { humanizeError } from '../../i18n/humanizeError';
 import { Button } from '../../ui/Button';
+import { InlineError } from '../../ui/InlineError';
 import { useClipboardBridge } from '../../hooks/useClipboardBridge';
 import { Skeleton } from '../../ui/Skeleton';
 import { useDelegationContent } from './useDelegationContent';
@@ -57,6 +59,6 @@ export const SubagentCallDetails: React.FC<{
       open={identifiersOpen} onToggle={toggleIdentifiers}><dl className="work-process-subagent-identifiers">
       {identifiers.map(([label, value]) => <div key={label}><dt>{label}</dt><dd data-tooltip={String(value)}>{value}<Button variant="ghost" size="sm" onClick={() => void copyText(String(value))}>{t('chat.subagentCopy')}</Button></dd></div>)}
     </dl></WorkDisclosure> : null}
-    {header?.error ? <p className="work-process-subagent-receipt-error" role="alert">{header.error}</p> : null}
+    {header?.error ? <InlineError detail={header.error}>{humanizeError(header.error, t, 'chat.subagentFailedSummary')}</InlineError> : null}
   </div>;
 };

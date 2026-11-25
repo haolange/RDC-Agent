@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { hashCaptureFile } from './replay/captureContentHash';
 import { safePath } from './replay/replayFileSafety';
 import type { ProjectInputRecord, ProjectInputRemoveResult, ProjectRecord } from '@shared/types/session';
@@ -21,17 +22,17 @@ export class ProjectInputLifecycle {
 
   async prepare(projectId: string, inputId: string): Promise<{ project: ProjectRecord; input: ProjectInputRecord; affectedSessionIds: string[]; approvalIdentity: string }> {
     const project = this.host.getProject(projectId);
-    if (!project) throw new Error('PROJECT_NOT_FOUND');
+    if (!project) throw new AppError('PROJECT_NOT_FOUND');
     const input = project.inputs.find((item) => item.inputId === inputId);
-    if (!input) throw new Error('PROJECT_INPUT_NOT_FOUND');
+    if (!input) throw new AppError('PROJECT_INPUT_NOT_FOUND');
     let verified = input;
     if (input.source === 'external_reference') {
       // Removing a reference must also work when the original is unavailable.
-      if (!input.referenceIdentity || !input.contentSha256) throw new Error('CAPTURE_REFERENCE_INVALID_RECORD');
+      if (!input.referenceIdentity || !input.contentSha256) throw new AppError('CAPTURE_REFERENCE_INVALID_RECORD');
     } else {
       const relative = path.relative(project.inputsPath, input.filePath);
       if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || path.extname(input.filePath).toLowerCase() !== '.rdc') {
-        throw new Error('PROJECT_INPUT_PATH_ESCAPE');
+        throw new AppError('PROJECT_INPUT_PATH_ESCAPE');
       }
       await safePath(project.rootPath, input.filePath);
       const hashed = await hashCaptureFile(input.filePath);
@@ -39,7 +40,7 @@ export class ProjectInputLifecycle {
     }
     const bindings = this.host.bindings(projectId).filter((binding) => binding.inputId === inputId);
     const busy = bindings.filter((binding) => binding.interactionLock);
-    if (busy.length) throw new Error(`PROJECT_INPUT_BUSY: ${busy.map((item) => item.scope.sessionId).join(', ')}`);
+    if (busy.length) throw new AppError('PROJECT_INPUT_BUSY', busy.map((item) => item.scope.sessionId).join(', '));
     return { project, input: verified, affectedSessionIds: bindings.map((item) => item.scope.sessionId),
       approvalIdentity: JSON.stringify([projectId, inputId, input.source, input.filePath, verified.contentSha256, input.referenceIdentity]) };
   }
@@ -49,11 +50,11 @@ export class ProjectInputLifecycle {
     try {
       return await this.host.block(projectId, inputId, async () => {
         const prepared = await this.prepare(projectId, inputId);
-        if (prepared.approvalIdentity !== approvedIdentity) throw new Error('PROJECT_INPUT_CHANGED_AFTER_APPROVAL');
+        if (prepared.approvalIdentity !== approvedIdentity) throw new AppError('PROJECT_INPUT_CHANGED_AFTER_APPROVAL');
         await this.host.close(projectId, inputId);
         // Revalidate both path ownership and original content after native handles are confirmed closed.
         const final = await this.prepare(projectId, inputId);
-        if (final.approvalIdentity !== approvedIdentity) throw new Error('PROJECT_INPUT_CHANGED_AFTER_APPROVAL');
+        if (final.approvalIdentity !== approvedIdentity) throw new AppError('PROJECT_INPUT_CHANGED_AFTER_APPROVAL');
         if (final.input.source === 'external_reference') {
           const inputs = await this.host.detachReference(projectId, inputId);
           return { success: true, inputs, fileDeleted: false, cleanupPending: false };
@@ -73,7 +74,7 @@ export class ProjectInputLifecycle {
 
   /** Called only after a complete scan commits its active index; cleanup has a separate durable pending record. */
   async reconcile(project: ProjectRecord, inputs: ProjectInputRecord[]): Promise<void> {
-    if (inputs.some((input) => !input.contentSha256)) throw new Error('PROJECT_INPUT_HASH_UNVERIFIED');
+    if (inputs.some((input) => !input.contentSha256)) throw new AppError('PROJECT_INPUT_HASH_UNVERIFIED');
     const byId = new Map(inputs.map((input) => [input.inputId, input]));
     for (const binding of this.host.bindings(project.projectId)) {
       if (!binding.inputId) continue;

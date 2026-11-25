@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
+import { AppError } from '@shared/errors/appError';
 import { openedFileIdentity, sameFileState } from '../../../platform/fileIdentity';
 
 /**
@@ -8,7 +9,7 @@ import { openedFileIdentity, sameFileState } from '../../../platform/fileIdentit
  */
 export async function hashCaptureFile(filePath: string): Promise<{ sha256: string; size: number; mtimeMs: number }> {
   const link = await fs.lstat(filePath);
-  if (!link.isFile() || link.isSymbolicLink()) throw new Error('CAPTURE_UNSAFE_FILE');
+  if (!link.isFile() || link.isSymbolicLink()) throw new AppError('CAPTURE_UNSAFE_FILE');
   const handle = await fs.open(filePath, 'r');
   try {
     const before = await handle.stat({ bigint: true });
@@ -18,7 +19,7 @@ export async function hashCaptureFile(filePath: string): Promise<{ sha256: strin
     const named = await openedFileIdentity(filePath);
     const linkAfter = await fs.lstat(filePath);
     if (!sameFileState(before, after) || !sameFileState(after, named) || !linkAfter.isFile() || linkAfter.isSymbolicLink()) {
-      throw new Error('CAPTURE_CHANGED_DURING_HASH');
+      throw new AppError('CAPTURE_CHANGED_DURING_HASH');
     }
     return { sha256: hash.digest('hex'), size: Number(after.size), mtimeMs: Number(after.mtimeNs) / 1e6 };
   } finally {

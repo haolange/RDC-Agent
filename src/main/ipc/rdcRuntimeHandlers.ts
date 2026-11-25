@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { dialog, ipcMain, shell } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { confirmResourceTrust } from '../window/trustConfirmation';
 import { nativeMessage } from '../window/nativeI18n';
 import { hookEngine } from '../hooks/HookEngine';
@@ -34,7 +35,7 @@ function ownedProjectRoot(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
   const target = path.resolve(raw);
   const project = storageAdapter.listProjects().find((entry) => samePath(entry.rootPath, target));
-  if (!project) throw new Error('PROJECT_ROOT_UNKNOWN: the folder is not an open project.');
+  if (!project) throw new AppError('PROJECT_ROOT_UNKNOWN', 'the folder is not an open project.');
   return project.rootPath;
 }
 
@@ -105,7 +106,7 @@ export function registerRdcRuntimeHandlers(): void {
     }) as [ScopedResourceImportRequest];
     const projectRoot = ownedProjectRoot(request.projectRoot);
     const extensions = SCOPED_IMPORT_EXTENSIONS[request.kind];
-    if (!extensions) throw new Error(`SCOPED_IMPORT_UNSUPPORTED: ${request.kind} resources are not imported from files.`);
+    if (!extensions) throw new AppError('SCOPED_IMPORT_UNSUPPORTED', `${request.kind} resources are not imported from files.`);
     const picked = await dialog.showOpenDialog({
       title: nativeMessage('importResource'),
       filters: [{ name: request.kind, extensions: [...extensions] }],
@@ -172,7 +173,7 @@ export function registerRdcRuntimeHandlers(): void {
     const projectRoot = ownedProjectRoot(rawRoot)!;
     const server = agentRuntimeConfigService.listMcpServers(projectRoot)
       .find((entry) => entry.id === descriptorId && entry.scope === 'project');
-    if (!server) throw new Error(`MCP_DESCRIPTOR_UNKNOWN: ${descriptorId} is not a project MCP server here.`);
+    if (!server) throw new AppError('MCP_DESCRIPTOR_UNKNOWN', `${descriptorId} is not a project MCP server here.`);
     if (!await confirmResourceTrust('mcp', server.id, mcpTrustDetail(server))) return scopedRuntimeService.overview(projectRoot);
     return scopedRuntimeService.trustProjectMcp(projectRoot, descriptorId);
   });

@@ -1,4 +1,5 @@
 import { shell } from 'electron';
+import { AppError } from '@shared/errors/appError';
 
 let trustedEntry: URL | null = null;
 
@@ -30,7 +31,7 @@ export async function openExternalHttps(url: string | undefined): Promise<void> 
   if (!url) return;
   const parsed = new URL(url);
   if (parsed.protocol !== 'https:') {
-    throw new Error(`EXTERNAL_URL_REJECTED: only https links open externally (${parsed.protocol}).`);
+    throw new AppError('EXTERNAL_URL_REJECTED', `only https links open externally (${parsed.protocol}).`);
   }
   await shell.openExternal(parsed.href);
 }

@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { operationFingerprint } from '../../rdc/RdcOperationCatalog';
 import { rebuildEffectiveRuntimePlan, type EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
@@ -15,14 +16,14 @@ export function prepareRdcRuntimeEpoch(input: {
   if (previousPlan.projectId !== input.projectId || previousPlan.rdcBindingFingerprint !== rdcBindingFingerprint(previousBinding)
     || rebuildEffectiveRuntimePlan(previousPlan, { rdcBindingFingerprint: rdcBindingFingerprint(previousBinding),
       systemPrompt: previousPrompt.systemPrompt }).fingerprint !== previousPlan.fingerprint) {
-    throw new Error('RDC_REPREPARE_FROZEN_PLAN_CHANGED: the prior plan, prompt and binding no longer agree.');
+    throw new AppError('RDC_REPREPARE_FROZEN_PLAN_CHANGED', 'the prior plan, prompt and binding no longer agree.');
   }
   if (lease && (lease.ownerSessionId !== input.sessionId || lease.ownerProjectId !== input.projectId || lease.delegatedFrom
     || lease.quarantineReason || !lease.runtimeContext.captureFileId || !lease.runtimeContext.replaySessionId)) {
-    throw new Error('RDC_REPREPARE_OWNER_INVALID: a complete owning replay is required.');
+    throw new AppError('RDC_REPREPARE_OWNER_INVALID', 'a complete owning replay is required.');
   }
   if (previousBinding.identity && operationFingerprint(input.catalog) !== previousBinding.definitionsFingerprint) {
-    throw new Error('RDC_REPREPARE_CATALOG_CHANGED: the native operation contract differs from the frozen turn.');
+    throw new AppError('RDC_REPREPARE_CATALOG_CHANGED', 'the native operation contract differs from the frozen turn.');
   }
   const binding = freezeRdcTurnBinding(previousBinding.cli, input.catalog, lease);
   const prompt = refreshPromptPlanRuntimeIdentity(previousPrompt, input.sessionId, input.permissionRevision, lease);

@@ -24,7 +24,7 @@ it.fails('keeps both Agents when their models are changed before the first save 
   const Probe = () => {
     controls = useAgentModelControls(settings, {
       onAgentModelsChange: async (agentModels: AgentModelSettings) => { writes.push(agentModels); },
-    } as never, ((key: string) => key) as never);
+    } as never);
     return null;
   };
   await act(async () => root.render(createElement(Probe)));

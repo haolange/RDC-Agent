@@ -1,7 +1,9 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
+import { humanizeError } from '../../i18n/humanizeError';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
+import { InlineError } from '../../ui/InlineError';
 import { Chevron } from '../../ui/Chevron';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { getRowStatusLabel } from './workProcessStatus';
@@ -113,7 +115,6 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
     ? row.verb
     : t('chat.workProcessAskCount', { verb: row.verb, count: row.questionCount });
   const pendingAnswerLabel = t(active ? 'chat.workProcessUserAnswerPending' : 'chat.workProcessUserAnswerMissing');
-  const transcriptError = row.incomplete ? t('chat.userInputIncomplete') : row.error;
 
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-user-input`} data-testid="work-process-user-input">
@@ -141,7 +142,12 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
               ))}
             </ol>
           ) : null}
-          {transcriptError ? <p className="work-process-user-input-transcript-error" role="alert">{transcriptError}</p> : null}
+          {row.incomplete ? <p className="work-process-user-input-transcript-error" role="alert">{t('chat.userInputIncomplete')}</p>
+            : row.error ? (
+              <InlineError className="work-process-user-input-transcript-error" detail={row.error}>
+                {humanizeError(row.error, t, 'chat.userInputFailed')}
+              </InlineError>
+            ) : null}
         </div>
       </div>
     </li>

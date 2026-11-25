@@ -231,7 +231,7 @@ it('restores the former selection when cross-project activation is rejected', as
     },
   });
 
-  expect(ctx.setSidebarError).toHaveBeenCalledWith('rejected');
+  expect(ctx.setSidebarError).toHaveBeenCalledWith({ contextKey: 'sidebar.selectProjectFailed', detail: 'rejected' });
   expect(setCurrentProject).toHaveBeenLastCalledWith(formerProject);
   expect(setCurrentSession).toHaveBeenLastCalledWith(formerSession);
   expect(activateSession).toHaveBeenCalledWith('session-a');

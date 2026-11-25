@@ -46,7 +46,7 @@ export async function selectSessionOp(
   }
   if (!result.success || !result.session) {
     restoreSelectionSnapshot(ctx, rollbackState);
-    ctx.setSidebarError(result.error || ctx.t('sidebar.selectSessionFailed'));
+    ctx.setSidebarError({ contextKey: 'sidebar.selectSessionFailed', detail: result.error });
     if (options.optimisticSession?.projectId) {
       await ctx.loadProjectSessionList(options.optimisticSession.projectId).catch(() => undefined);
     }
@@ -104,7 +104,7 @@ export async function handleSessionCreateOp(
       error: error instanceof Error ? error.message : String(error),
     }));
     if (!result.success || !result.session) {
-      ctx.setSidebarError(result.error || 'Unable to create a new session.');
+      ctx.setSidebarError({ contextKey: 'sidebar.createSessionFailed', detail: result.error });
       return;
     }
 
@@ -147,7 +147,7 @@ export async function handleSessionRemoveOp(
   try {
     const result = await window.electronAPI.session.remove(session.sessionId);
     if (!result.success) {
-      ctx.setSidebarError(result.error || ctx.t('sidebar.removeSessionFailed'));
+      ctx.setSidebarError({ contextKey: 'sidebar.removeSessionFailed', detail: result.error });
       return;
     }
 

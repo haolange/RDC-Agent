@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { AppError } from '@shared/errors/appError';
 import { pathComparisonKey } from '../../../platform/paths';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
@@ -12,6 +13,6 @@ export function recordSuccessfulFileRead(absolute: string, context?: ToolExecuti
 
 export function requireSuccessfulFileRead(absolute: string, context?: ToolExecutionContext): void {
   if (!context?.successfulFileReads?.has(readKey(absolute))) {
-    throw new Error('READ_BEFORE_EDIT_REQUIRED: successfully read_file this path in the current session before editing or overwriting it.');
+    throw new AppError('READ_BEFORE_EDIT_REQUIRED', 'successfully read_file this path in the current session before editing or overwriting it.');
   }
 }

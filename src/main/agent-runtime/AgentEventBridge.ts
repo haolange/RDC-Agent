@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /**
  * AgentEventBridge translates core runtime events into the shared AgentEvent
  * contract consumed by IPC, Trace, and ConversationService.
@@ -89,7 +90,7 @@ export function translateCoreToSharedAgentEvent(
   switch (event.type) {
     case 'agent_start': {
       const profileId = context.profileId ?? context.agentId;
-      if (!profileId) throw new Error('AGENT_IDENTITY_MISSING: run.started requires a profileId or agentId');
+      if (!profileId) throw new AppError('AGENT_IDENTITY_MISSING', 'run.started requires a profileId or agentId');
       return buildSharedAgentEvent(
         'run.started',
         {

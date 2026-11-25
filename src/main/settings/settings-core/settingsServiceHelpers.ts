@@ -106,7 +106,7 @@ export function readJsonFile<T>(filePath: string): T | null {
     parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw new StorageSchemaError(`STORAGE_CORRUPT: ${filePath} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new StorageSchemaError('STORAGE_CORRUPT', `${filePath} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
   assertPersistedSettingsSchemaVersion(parsed, filePath);
   return parsed;
@@ -115,20 +115,20 @@ export function readJsonFile<T>(filePath: string): T | null {
 export function assertPersistedSettingsSchemaVersion(raw: unknown, filePath: string): void {
   if (raw === null) return;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} must be a settings object`);
+    throw new StorageSchemaError('STORAGE_SCHEMA', `${filePath} must be a settings object`);
   }
   const version = (raw as { schemaVersion?: unknown }).schemaVersion;
   if (version !== SETTINGS_SCHEMA_VERSION) {
     throw new StorageSchemaError(
-      `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${String(version)}; requires ${SETTINGS_SCHEMA_VERSION}`,
+      'STORAGE_SCHEMA_UNSUPPORTED', `${filePath} has schemaVersion ${String(version)}; requires ${SETTINGS_SCHEMA_VERSION}`,
     );
   }
   const llm = (raw as { llm?: unknown }).llm;
   if (llm && typeof llm === 'object' && !Array.isArray(llm) && 'embedding' in llm) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} contains a retired embedding selection`);
+    throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${filePath} contains a retired embedding selection`);
   }
   if (llm && typeof llm === 'object' && !Array.isArray(llm) && 'agentRoutes' in llm) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} contains retired persisted agent routes`);
+    throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${filePath} contains retired persisted agent routes`);
   }
 }
 

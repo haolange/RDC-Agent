@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { samePath } from '../../platform/paths';
 import { rdcInstallationFiles } from '../../platform/rdcLayout';
 import { configuredInstallationRoot } from '../RdcInstallationService';
@@ -15,7 +16,7 @@ export class AdbExecutableCache {
 
   async resolveAdbExecutableAsync(settings: RdcCliInvokerSettings): Promise<string> {
     const root = configuredInstallationRoot(settings);
-    if (!root) throw new Error('RDC_INSTALLATION_INVALID: verify the selected RDC-Tool installation in Settings.');
+    if (!root) throw new AppError('RDC_INSTALLATION_INVALID', 'verify the selected RDC-Tool installation in Settings.');
     const override = (settings.env.RDC_TOOL_ANDROID_ADB_PATH ?? process.env.RDC_TOOL_ANDROID_ADB_PATH ?? '').trim();
     const key = JSON.stringify([root, override ?? '']);
     if (key === this.cacheKey && this.cachedPath) {
@@ -31,17 +32,17 @@ export class AdbExecutableCache {
         bundled_tools?: { adb?: { path?: string } }; files: Array<{ path: string; sha256: string }>;
       };
       const relative = manifest.bundled_tools?.adb?.path;
-      if (!relative || path.isAbsolute(relative)) throw new Error('ADB_MISSING: selected RDC-Tool has no bundled ADB metadata. Verify or repair the installation.');
+      if (!relative || path.isAbsolute(relative)) throw new AppError('ADB_MISSING', 'selected RDC-Tool has no bundled ADB metadata. Verify or repair the installation.');
       executable = path.resolve(binaryRoot, relative);
-      if (!executable.startsWith(`${binaryRoot}${path.sep}`)) throw new Error('ADB_INVALID: bundled ADB path escapes the installation.');
-      if (!samePath(await fs.realpath(executable), executable)) throw new Error('ADB_INVALID: bundled ADB must not redirect outside its installation.');
+      if (!executable.startsWith(`${binaryRoot}${path.sep}`)) throw new AppError('ADB_INVALID', 'bundled ADB path escapes the installation.');
+      if (!samePath(await fs.realpath(executable), executable)) throw new AppError('ADB_INVALID', 'bundled ADB must not redirect outside its installation.');
       const record = manifest.files.find((item) => item.path === relative);
       const bytes = await fs.readFile(executable);
       if (!record || createHash('sha256').update(bytes).digest('hex') !== record.sha256) {
-        throw new Error('ADB_INVALID: bundled ADB integrity check failed. Repair the selected RDC-Tool installation.');
+        throw new AppError('ADB_INVALID', 'bundled ADB integrity check failed. Repair the selected RDC-Tool installation.');
       }
     }
-    if (!(await fs.stat(executable)).isFile()) throw new Error('ADB_MISSING: configured ADB is not a regular file.');
+    if (!(await fs.stat(executable)).isFile()) throw new AppError('ADB_MISSING', 'configured ADB is not a regular file.');
     this.cachedPath = await fs.realpath(executable); this.cacheKey = key;
     return this.cachedPath;
   }

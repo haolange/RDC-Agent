@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import {
   assertSafeImageAttachment,
@@ -30,7 +31,7 @@ function resolveSessionPath(sessionId: string): string {
   const session = storageAdapter.readSession(sessionId);
   const sessionPath = session?.sessionPath?.trim();
   if (!sessionPath) {
-    throw new Error(`IMAGE_PREVIEW_SESSION_NOT_FOUND: ${sessionId}`);
+    throw new AppError('IMAGE_PREVIEW_SESSION_NOT_FOUND', sessionId);
   }
   return sessionPath;
 }
@@ -60,7 +61,7 @@ function resizeThumbnail(bytes: Buffer, mimeType: string): { data: Buffer; mimeT
     return { data: resized.toPNG(), mimeType: 'image/png', width: nextSize.width, height: nextSize.height };
   } catch {
     if (bytes.length > FALLBACK_MAX_BYTES) {
-      throw new Error('IMAGE_PREVIEW_TOO_LARGE');
+      throw new AppError('IMAGE_PREVIEW_TOO_LARGE');
     }
     return { data: bytes, mimeType };
   }
@@ -77,18 +78,18 @@ export async function recordToolImagePreview(input: {
   const sessionPath = resolveSessionPath(input.sessionId);
   const bytes = input.bytes ?? (input.sourcePath ? await fs.promises.readFile(input.sourcePath) : null);
   if (!bytes) {
-    throw new Error('IMAGE_PREVIEW_EMPTY');
+    throw new AppError('IMAGE_PREVIEW_EMPTY');
   }
   if (input.sourcePath) {
     await assertSafeImageAttachment(input.sourcePath, input.mimeType, input.fileName);
   } else {
     const magicMime = detectImageMagicMime(bytes.subarray(0, 64));
     if (!magicMime || !ACCEPTED_IMAGE_MIME_TYPES.has(magicMime)) {
-      throw new Error(`IMAGE_PREVIEW_INVALID: ${input.fileName} magic bytes do not match a supported image`);
+      throw new AppError('IMAGE_PREVIEW_INVALID', `${input.fileName} magic bytes do not match a supported image`);
     }
     if (magicMime !== input.mimeType) {
-      throw new Error(
-        `IMAGE_PREVIEW_INVALID: ${input.fileName} declared ${input.mimeType} but content is ${magicMime}`,
+      throw new AppError(
+        'IMAGE_PREVIEW_INVALID', `${input.fileName} declared ${input.mimeType} but content is ${magicMime}`,
       );
     }
   }
@@ -110,17 +111,17 @@ export async function recordToolImagePreview(input: {
 
 export function readToolImagePreviewDataUrl(sessionId: string, previewId: string): string {
   if (!/^[a-f0-9]{16,64}$/u.test(previewId)) {
-    throw new Error('IMAGE_PREVIEW_INVALID_ID');
+    throw new AppError('IMAGE_PREVIEW_INVALID_ID');
   }
   const sessionPath = resolveSessionPath(sessionId);
   const filePath = path.join(previewRoot(sessionPath), `${previewId}.png`);
   const resolvedRoot = path.resolve(previewRoot(sessionPath));
   const resolvedFile = path.resolve(filePath);
   if (!resolvedFile.startsWith(resolvedRoot + path.sep)) {
-    throw new Error('IMAGE_PREVIEW_PATH_ESCAPE');
+    throw new AppError('IMAGE_PREVIEW_PATH_ESCAPE');
   }
   if (!fs.existsSync(resolvedFile)) {
-    throw new Error('IMAGE_PREVIEW_NOT_FOUND');
+    throw new AppError('IMAGE_PREVIEW_NOT_FOUND');
   }
   const bytes = fs.readFileSync(resolvedFile);
   return `data:image/png;base64,${bytes.toString('base64')}`;

@@ -5,6 +5,7 @@ import { request as httpsRequest } from 'https';
 import { extname, isAbsolute, join, normalize, relative, resolve } from 'path';
 import { URL } from 'url';
 import { app } from 'electron';
+import { AppError, IPC_ERROR_KEY, isIpcErrorResult } from '@shared/errors/appError';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/provider-catalog/effectiveCatalogTypes';
 import {
@@ -222,7 +223,7 @@ async function readJsonBody(request: IncomingMessage, maxBytes = MAX_JSON_BODY_B
   const declaredLength = Number(request.headers['content-length'] ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     request.destroy();
-    throw new Error(`PAYLOAD_TOO_LARGE: bridge JSON body exceeds ${maxBytes} bytes.`);
+    throw new AppError('PAYLOAD_TOO_LARGE', `bridge JSON body exceeds ${maxBytes} bytes.`);
   }
   const chunks: Buffer[] = [];
   let total = 0;
@@ -231,7 +232,7 @@ async function readJsonBody(request: IncomingMessage, maxBytes = MAX_JSON_BODY_B
     total += buffer.byteLength;
     if (total > maxBytes) {
       request.destroy();
-      throw new Error(`PAYLOAD_TOO_LARGE: bridge JSON body exceeds ${maxBytes} bytes.`);
+      throw new AppError('PAYLOAD_TOO_LARGE', `bridge JSON body exceeds ${maxBytes} bytes.`);
     }
     chunks.push(buffer);
   }
@@ -341,7 +342,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
 
   if (url.pathname === '/api/settings/providers/catalog' && request.method === 'GET') {
     const catalog = await invokeRegisteredIpcChannel('settings:getProviderCatalog');
-    sendJson(response, 200, catalog, requestOrigin);
+    sendJson(response, isIpcErrorResult(catalog) ? 500 : 200, catalog, requestOrigin);
     return;
   }
 
@@ -385,6 +386,15 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
         }
         const args = Array.isArray(payload.args) ? payload.args : [];
         const result = await invokeRegisteredIpcChannel(payload.channel, args);
+        if (isIpcErrorResult(result)) {
+          const appError = result[IPC_ERROR_KEY];
+          sendJson(response, appError.code === 'INTERNAL_ERROR' ? 500 : 422, {
+            success: false,
+            error: appError.technical ?? appError.code,
+            appError,
+          }, requestOrigin);
+          return;
+        }
         sendJson(response, 200, { success: true, result }, requestOrigin);
       })
       .catch((error) => {

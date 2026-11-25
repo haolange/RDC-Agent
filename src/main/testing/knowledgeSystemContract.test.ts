@@ -17,10 +17,6 @@ import { sourceStatusImpliesVerified } from '../knowledge/knowledgeCardSchema';
 import { KNOWLEDGE_STATE_FILE } from '../knowledge/knowledgeStateSchema';
 import { KnowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import {
-  KnowledgeHumanConfirmationRequiredError,
-  KnowledgeLifecycleError,
-} from '../knowledge/knowledgeErrors';
-import {
   combineActiveSkillAllowlists,
   intersectSkillAllowedTools,
 } from '../agent-runtime/orchestration/RuntimeToolPolicy';
@@ -133,7 +129,7 @@ describe('knowledge system contract', () => {
       card: draftCard(),
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: false } as never,
-    })).rejects.toBeInstanceOf(KnowledgeHumanConfirmationRequiredError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED' });
     const saved = await write.write({
       spaceId: 'user',
       card: draftCard(),
@@ -273,13 +269,13 @@ describe('knowledge system contract', () => {
       card: { ...fixed, lifecycle: 'verified' },
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
     await expect(write.promote({
       spaceId: 'user',
       card: { ...fixed, lifecycle: 'candidate' },
       to: 'verified',
       permissionMode: 'full-access',
       confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
+    })).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
   });
 });

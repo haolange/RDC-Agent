@@ -1,5 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, type KnowledgeViewMode } from './knowledgeCenterModel';
+import { errorDetail } from '../../../lib/errorDetail';
+import { createRequestSeq, knowledgeQueryKey, type KnowledgeViewMode } from './knowledgeCenterModel';
 import { runKnowledgeCenterQuery } from './knowledgeCenterQuery';
 import type { KnowledgeLaneHit, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
@@ -28,7 +29,7 @@ export function useKnowledgeQueryRunner(input: {
       setPackQueryKey(knowledgeQueryKey(queryRequest));
       return true;
     } catch (error) {
-      if (querySeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(error));
+      if (querySeq.current.isCurrent(seq)) setError(errorDetail(error));
       return false;
     } finally {
       if (querySeq.current.isCurrent(seq)) setLoadingQuery(false);

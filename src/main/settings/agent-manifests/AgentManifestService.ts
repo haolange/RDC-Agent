@@ -14,6 +14,7 @@ import { AGENT_ROLES } from '@shared/constants/agents';
 import { canonicalAgentModelId, resolveAgentModel, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { getReasoningSelectionOrder } from '@shared/types/modelCapability';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
 import { resolvedPathKey, samePath } from '../../platform/paths';
@@ -56,7 +57,7 @@ const safeFileNameForDraft = (draft: Pick<AgentManifestDraft, 'id' | 'name' | 'f
   if (draft.fileName) {
     const candidate = path.basename(draft.fileName);
     if (idFromFileName(candidate) !== agentId) {
-      throw new Error(`AGENT_MANIFEST_FILENAME_MISMATCH: file stem must equal id ${agentId}.`);
+      throw new AppError('AGENT_MANIFEST_FILENAME_MISMATCH', `file stem must equal id ${agentId}.`);
     }
   }
   return expected;
@@ -149,7 +150,7 @@ const loadManifestCandidates = (
     );
     if (!parsed.ok) {
       if (failClosedOnInvalid) {
-        throw new Error(`BUILTIN_AGENT_MANIFEST_INVALID: ${filePath}: ${parsed.reason}`);
+        throw new AppError('BUILTIN_AGENT_MANIFEST_INVALID', `${filePath}: ${parsed.reason}`);
       }
       results.push({
         candidate: {
@@ -228,7 +229,7 @@ export class AgentManifestService {
 
     const builtinPath = appPathService.getBuiltinAgentsPath();
     if (!fs.existsSync(builtinPath)) {
-      throw new Error(`BUILTIN_AGENT_MANIFESTS_MISSING: ${builtinPath}`);
+      throw new AppError('BUILTIN_AGENT_MANIFESTS_MISSING', builtinPath);
     }
     for (const loaded of loadManifestCandidates(builtinPath, 'builtin', true)) {
       candidates.push(loaded.candidate);
@@ -277,7 +278,7 @@ export class AgentManifestService {
     const resolved = scopedResourceResolver.resolve(candidates);
     for (const entry of resolved.diagnostics) {
       const candidate = candidates.find(value => value.sourcePath === entry.sourcePath);
-      if (!candidate) throw new Error('AGENT_DIAGNOSTIC_SOURCE_MISSING');
+      if (!candidate) throw new AppError('AGENT_DIAGNOSTIC_SOURCE_MISSING');
       const movedPrefix = `${AGENT_MANIFEST_FIELD_MOVED}: `;
       const moved = entry.code === 'resource.invalid' && entry.message.startsWith(movedPrefix);
       diagnostics.push({
@@ -359,23 +360,23 @@ export class AgentManifestService {
     options: AgentManifestSaveOptions = { scope: 'user' },
   ): Promise<AgentManifestCommit> {
     if (options.scope !== 'user' && options.scope !== 'project') {
-      throw new Error('AGENT_MANIFEST_SCOPE_REQUIRED: save/delete must specify user or project.');
+      throw new AppError('AGENT_MANIFEST_SCOPE_REQUIRED', 'save/delete must specify user or project.');
     }
     const agentId = draft.id || toSlug(draft.name);
     if (!isSafeAgentProfileId(agentId)) {
       throw new Error(`Invalid agent profile id: ${agentId}`);
     }
     if (isReservedAgentId(agentId)) {
-      throw new Error(`AGENT_ID_RESERVED_HISTORICAL: ${agentId} cannot be saved as a current profile.`);
+      throw new AppError('AGENT_ID_RESERVED_HISTORICAL', `${agentId} cannot be saved as a current profile.`);
     }
     if (agentId === GENERAL_AGENT_ID && !draft.delete && draft.enabled === false) {
-      throw new Error('AGENT_DEFAULT_REQUIRED: General is the default Agent and cannot be switched off.');
+      throw new AppError('AGENT_DEFAULT_REQUIRED', 'General is the default Agent and cannot be switched off.');
     }
     const directory = options.scope === 'project'
       ? this.resolveProjectAgentsPath(options.projectRoot)
       : this.getAgentsDirectory(paths);
     if (options.scope === 'user' && path.resolve(directory) === path.resolve(appPathService.getBuiltinAgentsPath())) {
-      throw new Error('BUILTIN_AGENT_MANIFEST_READONLY: edit requires an explicit user copy-on-write.');
+      throw new AppError('BUILTIN_AGENT_MANIFEST_READONLY', 'edit requires an explicit user copy-on-write.');
     }
     await fs.promises.mkdir(directory, { recursive: true });
     const fileName = safeFileNameForDraft(draft);
@@ -385,14 +386,14 @@ export class AgentManifestService {
       options.scope === 'project' ? options.projectRoot : undefined,
     ).profiles.find((profile) => profile.id === agentId);
     if (options.sourceHash && current && current.provenance.sourceHash !== options.sourceHash) {
-      throw new Error('AGENT_MANIFEST_SOURCE_HASH_CONFLICT: the effective profile changed since the editor loaded.');
+      throw new AppError('AGENT_MANIFEST_SOURCE_HASH_CONFLICT', 'the effective profile changed since the editor loaded.');
     }
     // A copy of the current builtin records which builtin version it was taken from.
     const basedOn = draft.basedOn ?? (current?.provenance.scope === 'builtin' ? current.provenance.sourceHash : undefined);
     const resolutionRoot = options.scope === 'project' ? options.projectRoot : undefined;
     if (draft.delete) {
       if (current?.provenance.scope === 'builtin' && options.scope === 'user') {
-        throw new Error('BUILTIN_AGENT_MANIFEST_READONLY: deleting a builtin profile is not allowed.');
+        throw new AppError('BUILTIN_AGENT_MANIFEST_READONLY', 'deleting a builtin profile is not allowed.');
       }
       await fs.promises.rm(filePath, { force: true });
       if (options.scope === 'project') projectAgentTrust.revoke(options.projectRoot!, agentId);
@@ -410,7 +411,7 @@ export class AgentManifestService {
       false,
     );
     if (!parsed.ok) {
-      throw new Error(`AGENT_MANIFEST_INVALID: ${parsed.reason}`);
+      throw new AppError('AGENT_MANIFEST_INVALID', parsed.reason);
     }
     const content = serializeAgentMarkdown({
       ...draft,
@@ -428,7 +429,7 @@ export class AgentManifestService {
 
     const ownedFileName = fileNameForId(agentId);
     if (path.basename(filePath) !== ownedFileName) {
-      throw new Error(`AGENT_MANIFEST_FILENAME_MISMATCH: write path must be ${ownedFileName}.`);
+      throw new AppError('AGENT_MANIFEST_FILENAME_MISMATCH', `write path must be ${ownedFileName}.`);
     }
     // The user wrote these bytes through Settings; trust exactly them in this project.
     if (options.scope === 'project') projectAgentTrust.trust(options.projectRoot!, agentId, filePath);
@@ -448,7 +449,7 @@ export class AgentManifestService {
 
   private resolveProjectAgentsPath(projectRoot?: string): string {
     if (!projectRoot?.trim()) {
-      throw new Error('AGENT_MANIFEST_PROJECT_ROOT_REQUIRED: project-scoped save needs a project root.');
+      throw new AppError('AGENT_MANIFEST_PROJECT_ROOT_REQUIRED', 'project-scoped save needs a project root.');
     }
     return appPathService.getProjectRdcPaths(projectRoot).agentsPath;
   }
@@ -494,7 +495,7 @@ export class AgentManifestService {
       issue.code === code && issue.scope !== 'builtin' && samePath(issue.sourcePath, sourcePath)
     ));
     if (!diagnostic || diagnostic.scope === 'builtin') {
-      throw new Error(`AGENT_OVERRIDE_NOT_DIAGNOSED: ${sourcePath} has no current ${code} diagnostic.`);
+      throw new AppError('AGENT_OVERRIDE_NOT_DIAGNOSED', `${sourcePath} has no current ${code} diagnostic.`);
     }
     return { agentId: diagnostic.agentId, scope: diagnostic.scope, sourcePath: diagnostic.sourcePath, sourceHash: hashManifestFile(diagnostic.sourcePath) };
   }
@@ -508,7 +509,7 @@ export class AgentManifestService {
     const profile = this.resolveEffectiveSnapshot(paths, projectRoot).profiles.find((entry) => entry.id === agentId);
     const builtinPath = path.join(appPathService.getBuiltinAgentsPath(), `${agentId}.agent.md`);
     if (!profile || profile.provenance.scope === 'builtin' || !profile.builtinUpdate || !fs.existsSync(builtinPath)) {
-      throw new Error(`AGENT_BUILTIN_COMPARISON_UNAVAILABLE: ${agentId} does not override a builtin profile.`);
+      throw new AppError('AGENT_BUILTIN_COMPARISON_UNAVAILABLE', `${agentId} does not override a builtin profile.`);
     }
     return {
       agentId,

@@ -56,10 +56,10 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 ## Electron Sandbox
 
 - BrowserWindow：`sandbox: true`。
-- Preload：仅 `contextBridge` + `ipcRenderer` 受控暴露。
+- Preload：只经 `contextBridge` 暴露 `rdcIpc`（`invoke` / `subscribe`，逐次核对通道在 canonical manifest 内）与 `rdcDesktop.getPathForFile`；类型化的 `ElectronAPI` 在 renderer 内由 `createRendererApi` 构造。
 - Permission request：deny-by-default。
 - 导航：窗口只加载应用入口（开发服务器按 origin，打包按精确入口文件）；其它链接、重定向与拖入窗口的本地页面一律拒绝，不附加 webview。
-- IPC：每次 invoke 先核对发送方文档是应用入口，否则 `IPC_SENDER_REJECTED`；Browser QA 桥独立认证后直接调用已登记的处理器。
+- IPC：每次 invoke 先核对发送方文档是应用入口，否则 `IPC_SENDER_REJECTED`；Browser QA 桥独立认证后直接调用已登记的处理器。处理器失败统一以错误结果返回（code、params、分类、脱敏后的技术文本），见 `failure-model.md`「错误契约」。
 - 外部链接：账号与登录页只经 https 打开（`EXTERNAL_URL_REJECTED`）。
 - **出网**：主进程取公网内容只有一个入口 `src/main/runtime/net/publicEgress.ts` 的 `fetchPublic`，`web_fetch`、`web_search`、`web:fetchImage` 与 favicon 都经它。每一跳（含重定向）先校验协议与主机，再解析 DNS 并把连接 pin 到已校验的地址；任一解析地址落在非公网段就拒绝，请求不发出；不带 cookie，接收阶段即限制字节数。非公网判定是一张表（`publicAddress.ts`）：
   - IPv4：`0/8`、`10/8`、`100.64/10`、`127/8`、`169.254/16`、`172.16/12`、`192.0.0/24`、`192.0.2/24`、`192.88.99/24`、`192.168/16`、`198.18/15`、`198.51.100/24`、`203.0.113/24`、`224/4`、`240/4`。

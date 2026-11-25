@@ -11,6 +11,7 @@ import type {
   ConversationAskUserAnswer,
   ConversationAskUserQuestion,
 } from '@shared/types/conversation';
+import type { ConversationAnswerUserInputResult } from '@shared/types/conversation';
 
 interface PendingUserInputRequest {
   delegatedOwner?: DelegatedInteractionOwner;
@@ -46,10 +47,7 @@ export interface AgentUserInputAnswerInput {
   answers: ConversationAskUserAnswer[];
 }
 
-export interface AgentUserInputAnswerResult {
-  success: boolean;
-  error?: string;
-}
+export type AgentUserInputAnswerResult = ConversationAnswerUserInputResult;
 
 const keyFor = (turnId: string, toolCallId: string): string => `${turnId}::${toolCallId}`;
 
@@ -135,6 +133,7 @@ export class AgentUserInputRequestService {
     if (missingQuestion) {
       return {
         success: false,
+        questionId: missingQuestion.questionId,
         error: `Answer cannot be empty for question ${missingQuestion.questionId}: ${missingQuestion.prompt}`,
       };
     }
@@ -143,20 +142,20 @@ export class AgentUserInputRequestService {
       const answer = answerByQuestionId.get(question.questionId);
       if (!answer) continue;
       if (answer.responseKind === 'skipped' && question.required !== false) {
-        return { success: false, error: `Question ${question.questionId} is required; answer or choose unknown.` };
+        return { success: false, questionId: question.questionId, error: `Question ${question.questionId} is required; answer or choose unknown.` };
       }
       if (answer.responseKind === 'unknown' || answer.responseKind === 'skipped') {
-        if (answer.selectedOptionId) return { success: false, error: 'An unknown or skipped answer cannot select a proposed explanation.' };
+        if (answer.selectedOptionId) return { success: false, questionId: question.questionId, error: 'An unknown or skipped answer cannot select a proposed explanation.' };
         continue;
       }
       if (!question.allowFreeform && !answer.selectedOptionId) {
-        return { success: false, error: `Question ${question.questionId} requires one of the provided options.` };
+        return { success: false, questionId: question.questionId, error: `Question ${question.questionId} requires one of the provided options.` };
       }
       if (
         answer.selectedOptionId
         && !question.options.some((option) => option.optionId === answer.selectedOptionId)
       ) {
-        return { success: false, error: `Unknown option selected for question ${question.questionId}.` };
+        return { success: false, questionId: question.questionId, error: `Unknown option selected for question ${question.questionId}.` };
       }
     }
 

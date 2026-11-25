@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { knowledgeErrorMessage } from './knowledgeCenterModel';
+import { errorDetail } from '../../../lib/errorDetail';
 import { buildTopicChanges } from './knowledgeTopicChanges';
 import type { KnowledgeTopicChanges, KnowledgeTopicPreview, KnowledgeTopicProposal, KnowledgeTopicSuggestion } from '@shared/types/knowledge';
 
@@ -43,7 +43,7 @@ export function useKnowledgeTopics(active: boolean, onApplied: () => Promise<voi
       if (seq !== sequence.current) return;
       setProposal(result); setSuggestions(result.suggestions);
       setSynonyms(Object.fromEntries(result.suggestions.map(item => [item.topic.id, item.topic.synonyms.join(', ')])));
-    } catch (cause) { if (seq === sequence.current) setError(knowledgeErrorMessage(cause)); }
+    } catch (cause) { if (seq === sequence.current) setError(errorDetail(cause)); }
     finally { if (seq === sequence.current) setBusy(false); }
   }, []);
 
@@ -69,7 +69,7 @@ export function useKnowledgeTopics(active: boolean, onApplied: () => Promise<voi
       const result = await window.electronAPI.knowledge.topicPreview(next);
       if (seq !== sequence.current) return;
       setChanges(next); setPreview(result);
-    } catch (cause) { if (seq === sequence.current) setError(knowledgeErrorMessage(cause)); }
+    } catch (cause) { if (seq === sequence.current) setError(errorDetail(cause)); }
     finally { flight.current = false; if (seq === sequence.current) setBusy(false); }
   }, [customIds, mergeTargets, proposal, selected, suggestions, synonyms]);
 
@@ -83,7 +83,7 @@ export function useKnowledgeTopics(active: boolean, onApplied: () => Promise<voi
       if (seq !== sequence.current || 'cancelled' in result) return;
       await onAppliedRef.current();
       close();
-    } catch (cause) { if (seq === sequence.current) setError(knowledgeErrorMessage(cause)); }
+    } catch (cause) { if (seq === sequence.current) setError(errorDetail(cause)); }
     finally { flight.current = false; if (seq === sequence.current) setBusy(false); }
   }, [changes, close, preview]);
 

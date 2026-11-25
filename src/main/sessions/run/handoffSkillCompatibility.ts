@@ -1,5 +1,6 @@
 import { agentAccessCeiling, type AgentManifestDefinition } from '@shared/types/agentManifest';
 import { parsePlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { AppError } from '@shared/errors/appError';
 import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist, resolveAgentToolAllowlistFromDefinition } from '../../agent-runtime/orchestration/RuntimeToolPolicy';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
@@ -11,7 +12,7 @@ export function assertDirectTaskSkillPreparation(tasks: readonly PlanTaskRequire
   for (const task of tasks) {
     if (task.executionRequirements?.mode !== 'direct') continue;
     const missing = task.executionRequirements.requiredSkillIds.filter(id => !skillIds.includes(id));
-    if (missing.length) throw new Error(`TASK_EXECUTION_REQUIREMENTS: Task ${task.taskId} requires preloaded methods missing from the target preparation: ${missing.join(', ')}. If these are reading guidance, revise the same Task through plan_artifact; otherwise explicitly prepare them through the declared handoff/profile. No methods were added.`);
+    if (missing.length) throw new AppError('TASK_EXECUTION_REQUIREMENTS', `Task ${task.taskId} requires preloaded methods missing from the target preparation: ${missing.join(', ')}. If these are reading guidance, revise the same Task through plan_artifact; otherwise explicitly prepare them through the declared handoff/profile. No methods were added.`);
   }
 }
 
@@ -26,7 +27,7 @@ export function assertDeclaredHandoffSkillCompatibility(input: {
   assertDirectTaskSkillPreparation(input.tasks, ids);
   const skills = ids.map(id => {
     const skill = agentRuntimeConfigService.loadSkill(id, input.projectRoot ?? undefined, input.target.id);
-    if (!skill) throw new Error(`SKILL_UNAVAILABLE: ${id} is unavailable to ${input.target.id}; no execution was prepared.`);
+    if (!skill) throw new AppError('SKILL_UNAVAILABLE', `${id} is unavailable to ${input.target.id}; no execution was prepared.`);
     return skill;
   });
   const tools = resolveAgentToolAllowlistFromDefinition(input.target.id, input.target.tools, agentAccessCeiling(input.target));
@@ -38,7 +39,7 @@ export function assertDeclaredHandoffSkillCompatibility(input: {
   for (const tool of requiredTools) {
     if (policy.deniedTools.includes(tool) || !isToolAllowedByFrozenAllowlist(tool, input.target.id, tools)
       || (intersection !== null && !isToolAllowedByFrozenAllowlist(tool, input.target.id, intersection))) {
-      throw new Error(`EXECUTION_OFFER_SKILL_CONFLICT: ${input.target.id} cannot use ${tool} under the declared profile, methods and policy. Revise the explicit preparation or plan before approval.`);
+      throw new AppError('EXECUTION_OFFER_SKILL_CONFLICT', `${input.target.id} cannot use ${tool} under the declared profile, methods and policy. Revise the explicit preparation or plan before approval.`);
     }
   }
 }
@@ -56,13 +57,13 @@ export function assertExecutionOfferSkillCompatibility(input: {
   const plan = planArtifactWriter.readMarkdown(input.sessionId!, offer.plan.uri, offer.plan.hash);
   assertDirectTaskSkillPreparation(parsePlanTaskRequirements(plan.markdown), input.preloadedSkillIds);
   const missing = offer.requiredSkillIds.filter(id => !input.preloadedSkillIds.includes(id));
-  if (missing.length) throw new Error(`EXECUTION_OFFER_SKILL_CONFLICT: declared methods were not actually preloaded: ${missing.join(', ')}`);
+  if (missing.length) throw new AppError('EXECUTION_OFFER_SKILL_CONFLICT', `declared methods were not actually preloaded: ${missing.join(', ')}`);
   const tool = 'artifact_read';
   if (
     input.deniedTools.includes(tool)
     || !isToolAllowedByFrozenAllowlist(tool, input.agentId, input.tools)
     || (input.intersection !== null && !isToolAllowedByFrozenAllowlist(tool, input.agentId, input.intersection))
   ) {
-    throw new Error('EXECUTION_OFFER_SKILL_CONFLICT: bound execution cannot read its plan under the prepared tool permissions.');
+    throw new AppError('EXECUTION_OFFER_SKILL_CONFLICT', 'bound execution cannot read its plan under the prepared tool permissions.');
   }
 }

@@ -1,5 +1,6 @@
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { RDC_PROBE_ACTIONS, RDC_PROBE_READONLY_CLI_ACTIONS, RdcProbeInputSchema, compileRdcProbe, type RdcProbeInput } from '@shared/constants/rdcProbe';
+import { AppError } from '@shared/errors/appError';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
 import { parseRdcNativeResult, RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
 import { assertRdcContextLeaseOwnership, getRdcContextLease, type RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
@@ -121,20 +122,20 @@ export function createRdcProbeTool(
     async execute(_toolCallId, rawArgs, signal, _onUpdate, context) {
       try {
         const parsed = RdcProbeInputSchema.safeParse(rawArgs);
-        if (!parsed.success) throw new Error('RDC_PROBE_SCHEMA: ' + parsed.error.issues.map((issue) => issue.message).join('; ')
+        if (!parsed.success) throw new AppError('RDC_PROBE_SCHEMA', parsed.error.issues.map((issue) => issue.message).join('; ')
           + ' Example event list: {"action":"probe","args":{"action":"event_list"}}. Omit fields unrelated to the chosen action; placeholders such as "." are not valid event IDs or VFS paths.');
         const input = parsed.data;
         signal?.throwIfAborted();
-        if (context?.excludeRdcLeaseTools) throw new Error('RDC_PROBE_OWNER: offline child cannot access RDC.');
+        if (context?.excludeRdcLeaseTools) throw new AppError('RDC_PROBE_OWNER', 'offline child cannot access RDC.');
         const binding = context?.rdcBinding;
         const settings = deps.getRdcCliSettings?.() ?? binding?.cli;
-        if (!settings?.enabled || !settings.command.trim()) throw new Error('RDC_PROBE_UNCONFIGURED: no frozen native CLI binding.');
+        if (!settings?.enabled || !settings.command.trim()) throw new AppError('RDC_PROBE_UNCONFIGURED', 'no frozen native CLI binding.');
         const ownerSession = sessionId ?? context?.sessionId ?? null;
         const ownerProject = projectId ?? context?.projectId ?? null;
         if (input.action === 'capture_select' || input.action === 'capture_restore' || input.action === 'capture_recover') {
           if (!ownerSession || !ownerProject || context?.sessionId !== ownerSession || context.projectId !== ownerProject
             || context.agentId !== GENERAL_AGENT_ID || context.accessCeiling !== 'full' || !context.turnId || !context.captureControl) {
-            throw new Error('RDC_CAPTURE_SCOPE_DENIED: the approved owning General turn is required.');
+            throw new AppError('RDC_CAPTURE_SCOPE_DENIED', 'the approved owning General turn is required.');
           }
           const changed = input.action === 'capture_select'
             ? await context.captureControl.select(input.inputId!, signal)
@@ -155,21 +156,21 @@ export function createRdcProbeTool(
         }
         const lease = getLease(ownerSession);
         if (!deps.getLease && lease && !assertRdcContextLeaseOwnership({ sessionId: ownerSession, projectId: ownerProject })) {
-          throw new Error('RDC_PROBE_OWNER: control is delegated or the binding requires recovery.');
+          throw new AppError('RDC_PROBE_OWNER', 'control is delegated or the binding requires recovery.');
         }
         if (lease && (lease.ownerSessionId !== ownerSession || lease.ownerProjectId !== ownerProject)) {
-          throw new Error('RDC_PROBE_OWNER: lease ownership/context mismatch.');
+          throw new AppError('RDC_PROBE_OWNER', 'lease ownership/context mismatch.');
         }
         const compiled = compileRdcProbe(input, lease?.runtimeContext.replaySessionId);
         if (compiled.needsContext && (!lease || lease.contextId === 'default')) {
-          throw new Error('RDC_PROBE_OWNER: no non-default daemon context is owned by this session.');
+          throw new AppError('RDC_PROBE_OWNER', 'no non-default daemon context is owned by this session.');
         }
         if (!deps.getLease && compiled.needsContext && lease) {
           const identity = binding?.identity;
           if (!identity || identity.ownerSessionId !== ownerSession || identity.version !== lease.version || identity.contextId !== lease.contextId
             || identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId
             || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
-            throw new Error('RDC_PROBE_OWNER: binding changed since prepareTurn; prepare a new turn.');
+            throw new AppError('RDC_PROBE_OWNER', 'binding changed since prepareTurn; prepare a new turn.');
           }
         }
         const args = [...compiled.args];
@@ -191,11 +192,11 @@ export function createRdcProbeTool(
           throw error;
         }
         if (compiled.operation && payload.data.session_id !== undefined && payload.data.session_id !== lease?.runtimeContext.replaySessionId) {
-          throw new Error('RDC_CLI_PROTOCOL: replay session mismatch in native result.');
+          throw new AppError('RDC_CLI_PROTOCOL', 'replay session mismatch in native result.');
         }
         const current = getLease(ownerSession);
         if (lease && (!current || current.version !== lease.version || current.contextId !== lease.contextId)) {
-          throw new Error('RDC_PROBE_OWNER: lease changed during the call.');
+          throw new AppError('RDC_PROBE_OWNER', 'lease changed during the call.');
         }
         return {
           content: [{ type: 'text', text: JSON.stringify(payload) }],

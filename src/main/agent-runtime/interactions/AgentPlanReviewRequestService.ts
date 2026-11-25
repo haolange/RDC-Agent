@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { planArtifactWriter, type PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
@@ -122,7 +123,7 @@ export class AgentPlanReviewRequestService {
     const source = resolveRecoverablePlan(this.context(pending).sessionId, this.store);
     if (!source || source.state.status !== 'awaiting' || source.planReview.planId !== pending.planReview.planId
       || source.planReview.revision !== pending.planReview.revision || source.planReview.hash !== pending.planReview.hash) {
-      throw new Error('PLAN_REVIEW_SCOPE_CHANGED: review is no longer current.');
+      throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'review is no longer current.');
     }
   }
 
@@ -136,10 +137,10 @@ export class AgentPlanReviewRequestService {
   }
 
   reopen(reference: PlanReadRequest): PlanReviewProjection {
-    if (this.busy(reference.sessionId)) throw new Error('PLAN_REVIEW_BUSY: another request is active.');
+    if (this.busy(reference.sessionId)) throw new AppError('PLAN_REVIEW_BUSY', 'another request is active.');
     const source = resolveRecoverablePlan(reference.sessionId, this.store);
     if (!source || source.state.status !== 'cancelled' || Object.keys(source.reference).some(key =>
-      source.reference[key as keyof PlanReadRequest] !== reference[key as keyof PlanReadRequest])) throw new Error('PLAN_REVIEW_SCOPE_CHANGED: plan is no longer recoverable.');
+      source.reference[key as keyof PlanReadRequest] !== reference[key as keyof PlanReadRequest])) throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'plan is no longer recoverable.');
     this.store.reopenReview(source.ownerSessionId, source.turnId, source.planReview.planId, source.planReview.revision);
     return this.restore(reference.sessionId, source);
   }

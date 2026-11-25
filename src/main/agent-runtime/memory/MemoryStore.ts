@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { withMemoryDirectoryLock } from './memoryDirectoryLock';
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
@@ -89,7 +90,7 @@ function assertMemoryPathContained(memoryDir: string, targetPath: string): void 
   const resolved = path.resolve(targetPath);
   const relative = path.relative(root, resolved);
   if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error(`MEMORY_PATH_ESCAPE: path escaped memory directory: ${targetPath}`);
+    throw new AppError('MEMORY_PATH_ESCAPE', `path escaped memory directory: ${targetPath}`);
   }
 }
 
@@ -132,7 +133,7 @@ export class MemoryStore {
 
   private resolveMemoryFilePath(slug: string): string {
     if (!slug || slug.includes('/') || slug.includes('\\') || slug.includes('\0') || slug === '.' || slug === '..') {
-      throw new Error(`MEMORY_INVALID_SLUG: ${slug}`);
+      throw new AppError('MEMORY_INVALID_SLUG', slug);
     }
     const target = path.join(this.memoryDir, `${slug}.md`);
     assertMemoryPathContained(this.memoryDir, target);

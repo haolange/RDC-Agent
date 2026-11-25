@@ -5,6 +5,7 @@ import { Input } from '../../../../ui/Input';
 import { Select } from '../../../../ui/Select';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
 import { knowledgeCardKey } from '../knowledgeImportExportModel';
 import type { KnowledgeExportFormat, KnowledgeExportScope } from '@shared/types/knowledgeExport';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
@@ -157,7 +158,7 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
           )}
 
           <p className="knowledge-write-hint">{t('knowledgeCenter.exportLocationHint')}</p>
-          {exporter.error ? <InlineError>{exporter.error}</InlineError> : null}
+          {exporter.error ? <InlineError detail={exporter.error}>{humanizeError(exporter.error, t, 'app.error.actionFailed')}</InlineError> : null}
         </>
       )}
     </TaskDialog>

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../../i18n';
+import { humanizeError } from '../../../i18n/humanizeError';
 import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
+import { InlineError } from '../../../ui/InlineError';
 import { useProjectStore } from '../../../stores/projectStore';
 import { Icon } from '../../../ui/Icon';
 import { Skeleton } from '../../../ui/Skeleton';
@@ -104,7 +106,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
           ) : selection.projects.length > 0 ? (
             <div className="project-stack">
               {selection.sidebarError && (
-                <div className="sidebar-inline-error" role="alert">{selection.sidebarError}</div>
+                <InlineError className="sidebar-inline-error" detail={selection.sidebarError.detail}>
+                  {humanizeError(selection.sidebarError.detail, t, selection.sidebarError.contextKey)}
+                </InlineError>
               )}
               {selection.projects.map((project) => {
                 const isCurrentProject = selection.currentProject?.projectId === project.projectId;

@@ -1,5 +1,6 @@
 import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { charsToTokens } from '@shared/utils/tokens';
+import { AppError } from '@shared/errors/appError';
 import { delegableProfileIds } from '../agent-runtime/orchestration/delegableProfiles';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
@@ -39,7 +40,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   );
   const definition = effectiveProfiles.find((profile) => profile.id === input.agentId && profile.enabled) ?? null;
   if (!definition) {
-    throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
+    throw new AppError('AGENT_PROFILE_UNAVAILABLE', input.agentId);
   }
 
   const { promptPlan, preloadSkillIds, tools: allowedToolNames } = buildTurnPromptPlan({

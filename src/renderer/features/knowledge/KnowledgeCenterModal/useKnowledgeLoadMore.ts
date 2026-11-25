@@ -1,5 +1,6 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
-import { createRequestSeq, knowledgeErrorMessage } from './knowledgeCenterModel';
+import { errorDetail } from '../../../lib/errorDetail';
+import { createRequestSeq } from './knowledgeCenterModel';
 import type { KnowledgeLaneHit, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
 type Page = { revision?: string; total?: number; nextOffset?: number };
@@ -28,7 +29,7 @@ export function useKnowledgeLoadMore(input: {
       setHits(current => [...current, ...result.hits]);
       setPage({ revision: result.revision, total: result.total, nextOffset: result.nextOffset });
     } catch (error) {
-      if (querySeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(error));
+      if (querySeq.current.isCurrent(seq)) setError(errorDetail(error));
     } finally {
       setLoadingMore(false);
     }

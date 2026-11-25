@@ -84,7 +84,9 @@ function createRecorder(bootstrapUrl) {
         body: JSON.stringify({ channel, args }),
       });
       const body = await response.json().catch(() => ({ success: false, error: `HTTP ${response.status}` }));
-      const entry = body.success ? { result: body.result ?? null } : { error: String(body.error ?? `HTTP ${response.status}`) };
+      // A handler failure is an answer like any other: the desktop host hands the same error result to the renderer.
+      const entry = body.appError ? { result: { __rdcIpcError: body.appError } }
+        : body.success ? { result: body.result ?? null } : { error: String(body.error ?? `HTTP ${response.status}`) };
       (recorded[channel] ??= []).push(entry);
       if (entry.error) throw new Error(entry.error);
       return entry.result;

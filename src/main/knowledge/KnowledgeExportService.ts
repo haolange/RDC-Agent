@@ -8,6 +8,7 @@ import {
   type KnowledgePackage,
   type KnowledgePackageCard,
 } from '@shared/types/knowledgeExport';
+import { AppError } from '@shared/errors/appError';
 import { resolveWithinRoot } from './knowledgeFs';
 import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeSensitiveText';
 import { isSafeKnowledgeImageRelative, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
@@ -85,17 +86,17 @@ export class KnowledgeExportService {
     request: KnowledgeExportRequest,
   ): Promise<Array<{ spaceId: string; relativePath: string }>> {
     if (request.scope === 'space') {
-      if (!request.spaceId) throw new Error('KNOWLEDGE_EXPORT_SPACE_REQUIRED');
+      if (!request.spaceId) throw new AppError('KNOWLEDGE_EXPORT_SPACE_REQUIRED');
       return this.deps.listCards(request.spaceId);
     }
-    if (!request.cardRefs?.length) throw new Error('KNOWLEDGE_EXPORT_EMPTY_SELECTION');
+    if (!request.cardRefs?.length) throw new AppError('KNOWLEDGE_EXPORT_EMPTY_SELECTION');
     return request.cardRefs;
   }
 
   /** `targetPath` is the destination the person chose in main's save dialog; the renderer never supplies it. */
   async export(request: KnowledgeExportRequest, targetPath: string): Promise<KnowledgeExportResult> {
     if (!path.isAbsolute(targetPath)) {
-      throw new Error('KNOWLEDGE_EXPORT_TARGET_INVALID');
+      throw new AppError('KNOWLEDGE_EXPORT_TARGET_INVALID');
     }
     const refs = await this.resolveRefs(request);
     const cards: KnowledgePackageCard[] = [];
@@ -126,7 +127,7 @@ export class KnowledgeExportService {
       }
       cards.push(toPackageCard(card, present.length > 0 ? present : undefined));
     }
-    if (cards.length === 0) throw new Error('KNOWLEDGE_EXPORT_EMPTY_RESULT');
+    if (cards.length === 0) throw new AppError('KNOWLEDGE_EXPORT_EMPTY_RESULT');
 
     const payload = request.format === 'package'
       ? zipKnowledgeFiles([

@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import {
   MAX_ATTACHMENT_BYTES_PER_FILE,
@@ -54,7 +55,7 @@ export function sanitizeFileName(fileName: string): string {
     .trim();
   const stem = path.parse(stripped).name.toUpperCase();
   if (!stripped || stripped === '.' || stripped === '..' || WINDOWS_RESERVED_NAMES.has(stem)) {
-    throw new Error('ATTACHMENT_INVALID: file name is reserved or empty.');
+    throw new AppError('ATTACHMENT_INVALID', 'file name is reserved or empty.');
   }
   return stripped.slice(0, 240);
 }
@@ -62,11 +63,11 @@ export function sanitizeFileName(fileName: string): string {
 export function decodeStrictBase64(value: string): Buffer {
   const compact = value.replace(/\s+/g, '');
   if (!STRICT_BASE64_RE.test(compact)) {
-    throw new Error('ATTACHMENT_INVALID: attachment bytes are not valid base64.');
+    throw new AppError('ATTACHMENT_INVALID', 'attachment bytes are not valid base64.');
   }
   const decoded = Buffer.from(compact, 'base64');
   if (decoded.toString('base64').replace(/=+$/u, '') !== compact.replace(/=+$/u, '')) {
-    throw new Error('ATTACHMENT_INVALID: attachment bytes are not valid base64.');
+    throw new AppError('ATTACHMENT_INVALID', 'attachment bytes are not valid base64.');
   }
   return decoded;
 }
@@ -76,7 +77,7 @@ function assertInsideRoot(rootPath: string, candidatePath: string): string {
   const resolvedFile = fs.realpathSync(path.resolve(candidatePath));
   const relative = path.relative(resolvedRoot, resolvedFile);
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error('ATTACHMENT_INVALID: staged path escaped the staging directory.');
+    throw new AppError('ATTACHMENT_INVALID', 'staged path escaped the staging directory.');
   }
   return resolvedFile;
 }
@@ -115,10 +116,10 @@ export class AttachmentStagingService {
   ): Promise<ComposerAttachmentDescriptor[]> {
     this.sweepExpired();
     if (items.length > MAX_ATTACHMENT_COUNT) {
-      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
+      throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
     }
     if (this.records.size + items.length > MAX_STAGED_ITEMS) {
-      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${MAX_STAGED_ITEMS} staged attachments are allowed.`);
+      throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${MAX_STAGED_ITEMS} staged attachments are allowed.`);
     }
     fs.mkdirSync(this.stagingRoot(), { recursive: true });
     const descriptors: ComposerAttachmentDescriptor[] = [];

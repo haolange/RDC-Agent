@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { samePath } from '../../platform/paths';
 import { assertRdcContextLeaseOwnership, getDelegatedChildSessionId, getRdcContextLease, quarantineRdcContext } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
@@ -34,11 +35,11 @@ export function createApprovedCaptureHost(input: {
   const scope = { sessionId: input.sessionId, projectId: input.projectId };
   const captureScope = input.contract.captureScope;
   if (!captureScope || captureScope.projectId !== input.projectId || input.offer.targetAgentId !== 'general') {
-    throw new Error('RDC_CAPTURE_SCOPE_INVALID: an approved owning General capture scope is required.');
+    throw new AppError('RDC_CAPTURE_SCOPE_INVALID', 'an approved owning General capture scope is required.');
   }
   const assertOwningTurn = () => {
     if (!input.turn.isLive(input.turn.generation) || !ownsRdcInteractionLock(input.sessionId, input.turn.turnId)) {
-      throw new Error('RDC_CAPTURE_OWNER_INVALID: the owning active turn lock is required.');
+      throw new AppError('RDC_CAPTURE_OWNER_INVALID', 'the owning active turn lock is required.');
     }
   };
   const assertPlan = () => {
@@ -46,12 +47,12 @@ export function createApprovedCaptureHost(input: {
     assertApprovedExecutionCurrent(input.sessionId, 'general', input.offer);
     const markdown = planArtifactWriter.readMarkdown(input.sessionId, input.offer.plan.uri, input.offer.plan.hash).markdown;
     const current = approvedInvestigationContract(input.offer, markdown);
-    if (JSON.stringify(current) !== JSON.stringify(input.contract)) throw new Error('APPROVED_PLAN_CHANGED: capture scope changed after preparation.');
+    if (JSON.stringify(current) !== JSON.stringify(input.contract)) throw new AppError('APPROVED_PLAN_CHANGED', 'capture scope changed after preparation.');
   };
   const project = () => {
-    if (storageAdapter.readSession(input.sessionId)?.projectId !== input.projectId) throw new Error('RDC_CAPTURE_OWNER_INVALID');
+    if (storageAdapter.readSession(input.sessionId)?.projectId !== input.projectId) throw new AppError('RDC_CAPTURE_OWNER_INVALID');
     const value = storageAdapter.getProjectById(input.projectId);
-    if (!value) throw new Error('RDC_CAPTURE_PROJECT_MISSING');
+    if (!value) throw new AppError('RDC_CAPTURE_PROJECT_MISSING');
     return value;
   };
   const resolve = async (destination: Destination) => {
@@ -59,11 +60,11 @@ export function createApprovedCaptureHost(input: {
     const value = project();
     const capture = value.inputs.find(item => item.inputId === destination.inputId);
     if (!capture || capture.contentSha256 !== destination.contentSha256 || destination.deviceId !== captureScope.deviceId
-      || await verifyPlanInput(value, capture) !== destination.contentSha256) throw new Error('RDC_APPROVED_CAPTURE_CHANGED: the registered input no longer matches its frozen bytes.');
+      || await verifyPlanInput(value, capture) !== destination.contentSha256) throw new AppError('RDC_APPROVED_CAPTURE_CHANGED', 'the registered input no longer matches its frozen bytes.');
     const state = rdcSessionService.snapshotReplayForSession(scope);
-    if (selectedProbeDeviceId(state) !== destination.deviceId) throw new Error('RDC_APPROVED_DEVICE_CHANGED');
+    if (selectedProbeDeviceId(state) !== destination.deviceId) throw new AppError('RDC_APPROVED_DEVICE_CHANGED');
     const device = replayDeviceService.getDeviceById(destination.deviceId);
-    if (!device || device.status !== 'online') throw new Error('RDC_APPROVED_DEVICE_UNAVAILABLE');
+    if (!device || device.status !== 'online') throw new AppError('RDC_APPROVED_DEVICE_UNAVAILABLE');
     assertOwningTurn();
     return { capture, device };
   };
@@ -71,20 +72,20 @@ export function createApprovedCaptureHost(input: {
     assertPlan,
     assertNoPendingRecovery() {
       if (rdcLifecycleReceipts.pending(input.sessionId, input.projectId)) {
-        throw new Error('RDC_PREVIOUS_RESTORE_REQUIRED: restore the previous investigation position through Capture first.');
+        throw new AppError('RDC_PREVIOUS_RESTORE_REQUIRED', 'restore the previous investigation position through Capture first.');
       }
     },
     prepareReceipts: () => rdcLifecycleReceipts.prepare(),
     async quiescent(mode) {
       assertOwningTurn();
       if (getDelegatedChildSessionId(input.sessionId) || (mode !== 'recovery' && (await listActiveDelegations(input.sessionId)).length)) {
-        throw new Error('RDC_SWITCH_CHILD_ACTIVE: join delegated executions before changing capture.');
+        throw new AppError('RDC_SWITCH_CHILD_ACTIVE', 'join delegated executions before changing capture.');
       }
       const entries = investigationArtifactService.list(input.sessionId, { kind: 'experiment' });
       for (const entry of entries.filter(value => value.status === 'ready' || value.status === 'draft')) {
         const record = investigationArtifactService.readRecord(input.sessionId, entry.artifactId).record as ExperimentRecord;
         if (record.status === 'running' || record.status === 'polluted') {
-          throw new Error(`RDC_SWITCH_EXPERIMENT_OPEN: close experiment ${record.experimentId} before changing capture.`);
+          throw new AppError('RDC_SWITCH_EXPERIMENT_OPEN', `close experiment ${record.experimentId} before changing capture.`);
         }
       }
     },
@@ -98,13 +99,13 @@ export function createApprovedCaptureHost(input: {
         || !state.replayDeviceId || !state.observation || opened.status !== 'open' || opened.inputId !== state.inputId
         || opened.deviceId !== state.replayDeviceId || lease.runtimeContext.deviceId !== state.replayDeviceId
         || opened.contextId !== lease.contextId || opened.captureFileId !== lease.runtimeContext.captureFileId
-        || opened.replaySessionId !== lease.runtimeContext.replaySessionId) throw new Error('RDC_SWITCH_STATE_UNVERIFIED: current replay projection is incomplete or inconsistent.');
+        || opened.replaySessionId !== lease.runtimeContext.replaySessionId) throw new AppError('RDC_SWITCH_STATE_UNVERIFIED', 'current replay projection is incomplete or inconsistent.');
       const destination = { inputId: state.inputId, contentSha256: state.captureHash, deviceId: state.replayDeviceId };
       const resolved = await resolve(destination);
-      if (!samePath(opened.filePath, resolved.capture.filePath)) throw new Error('RDC_SWITCH_STATE_UNVERIFIED: opened capture path differs from the registered input.');
+      if (!samePath(opened.filePath, resolved.capture.filePath)) throw new AppError('RDC_SWITCH_STATE_UNVERIFIED', 'opened capture path differs from the registered input.');
       const native = await readRdcSwitchSnapshot({ ...scope, binding, signal });
       assertOwningTurn();
-      if (native.eventId !== state.appliedEventId) throw new Error('RDC_SWITCH_STATE_UNVERIFIED: native and displayed event positions differ.');
+      if (native.eventId !== state.appliedEventId) throw new AppError('RDC_SWITCH_STATE_UNVERIFIED', 'native and displayed event positions differ.');
       return { ...destination, native, target: state.target, isFinalOutput: state.isFinalOutput } satisfies RdcLifecyclePoint;
     },
     async verifyDestination(destination) { await resolve(destination); },
@@ -121,7 +122,7 @@ export function createApprovedCaptureHost(input: {
       assertPlan();
       const state = rdcSessionService.snapshotReplayForSession(scope);
       if (!await rdcSessionService.clearOpenedCaptureForSession(scope, { binding, signal, expectedGeneration: state.generation,
-        onDaemonStopped: receipt => onStopped(receipt.contextId) })) throw new Error('RDC_RESTORE_CLOSE_UNCONFIRMED');
+        onDaemonStopped: receipt => onStopped(receipt.contextId) })) throw new AppError('RDC_RESTORE_CLOSE_UNCONFIRMED');
     },
     async restorePosition(point, binding, signal) {
       assertPlan();
@@ -133,7 +134,7 @@ export function createApprovedCaptureHost(input: {
       assertPlan();
       return () => {
         assertPlan();
-        if (runtimePermissionStateService.getSnapshot().revision !== expectedRevision) throw new Error('RDC_RECOVERY_PERMISSION_CHANGED');
+        if (runtimePermissionStateService.getSnapshot().revision !== expectedRevision) throw new AppError('RDC_RECOVERY_PERMISSION_CHANGED');
       };
     },
     async joinRecoveryChild(signal) { await joinFaultedRdcChild(input.sessionId, input.turn, signal); },
@@ -147,15 +148,15 @@ export function createApprovedCaptureHost(input: {
         || lease.runtimeContext.captureFileId !== point.native.captureFileId || state.inputId !== point.inputId
         || state.captureHash !== point.contentSha256 || state.replayDeviceId !== point.deviceId || state.preparation.issue?.deviceAction
         || !opened || opened.inputId !== point.inputId || opened.contextId !== lease.contextId) {
-        throw new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED: the current failure does not match the last verified capture.');
+        throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the current failure does not match the last verified capture.');
       }
       const resolved = await resolve(destinationOf(point));
-      if (!samePath(opened.filePath, resolved.capture.filePath)) throw new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED: input path changed.');
+      if (!samePath(opened.filePath, resolved.capture.filePath)) throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'input path changed.');
       const observed = await readRdcRecoverySnapshot({ ...scope, binding, signal });
       if (observed.contextId !== point.native.contextId || observed.leaseVersion !== point.native.leaseVersion
         || observed.replaySessionId !== point.native.replaySessionId || observed.captureFileId !== point.native.captureFileId
         || JSON.stringify(observed.processIdentity) !== JSON.stringify(point.native.processIdentity)) {
-        throw new Error('RDC_RECOVERY_PROCESS_CHANGED: the live daemon or worker is not the last verified process.');
+        throw new AppError('RDC_RECOVERY_PROCESS_CHANGED', 'the live daemon or worker is not the last verified process.');
       }
       return { cause: lease.quarantineCause, observed };
     },
@@ -164,16 +165,16 @@ export function createApprovedCaptureHost(input: {
       const { capture, device } = await resolve(destination);
       const old = rdcSessionService.snapshotReplayForSession(scope);
       if (!await rdcSessionService.clearOpenedCaptureForSession(scope, { binding, signal, expectedGeneration: old.generation,
-        onDaemonStopped: receipt => onStopped(receipt.contextId) })) throw new Error('RDC_RECOVERY_CLOSE_UNCONFIRMED');
+        onDaemonStopped: receipt => onStopped(receipt.contextId) })) throw new AppError('RDC_RECOVERY_CLOSE_UNCONFIRMED');
       guard(); signal?.throwIfAborted();
       const closed = rdcSessionService.snapshotReplayForSession(scope);
       const prepared = await rdcSessionService.prepareAgentDevice({ ...scope, deviceId: device.id, bindingGeneration: closed.generation },
         { binding, turnId: input.turn.turnId, signal, assertAuthorized: guard });
-      if (!prepared.success) throw new Error(`RDC_RECOVERY_DEVICE_UNAVAILABLE: ${prepared.error?.code ?? 'device preparation did not complete'}`);
+      if (!prepared.success) throw new AppError('RDC_RECOVERY_DEVICE_UNAVAILABLE', prepared.error?.code ?? 'device preparation did not complete');
       guard(); signal?.throwIfAborted();
       const currentDevice = replayDeviceService.getDeviceById(device.id);
       if (!currentDevice || currentDevice.status !== 'online' || currentDevice.type !== device.type || currentDevice.serial !== device.serial) {
-        throw new Error('RDC_APPROVED_DEVICE_CHANGED');
+        throw new AppError('RDC_APPROVED_DEVICE_CHANGED');
       }
       await rdcSessionService.openProjectInput({ ...scope, inputId: capture.inputId, filePath: capture.filePath, replayDevice: currentDevice }, {
         binding, signal, expectedGeneration: prepared.state.generation, expectedCaptureSha256: destination.contentSha256,
@@ -185,12 +186,12 @@ export function createApprovedCaptureHost(input: {
       signal?.throwIfAborted();
       assertOwningTurn();
       const lease = getRdcContextLease(input.sessionId);
-      if (lease && !assertRdcContextLeaseOwnership(scope)) throw new Error('RDC_REPREPARE_OWNER_INVALID');
+      if (lease && !assertRdcContextLeaseOwnership(scope)) throw new AppError('RDC_REPREPARE_OWNER_INVALID');
       const catalog = lease ? (await rdcCliInvokerService.loadCatalog(previous.binding.cli, true)).tools : previous.binding.definitions;
       signal?.throwIfAborted();
       const after = getRdcContextLease(input.sessionId);
       if ((lease?.version ?? null) !== (after?.version ?? null) || (lease?.contextId ?? null) !== (after?.contextId ?? null)) {
-        throw new Error('RDC_REPREPARE_OWNER_INVALID: lease changed during catalog verification.');
+        throw new AppError('RDC_REPREPARE_OWNER_INVALID', 'lease changed during catalog verification.');
       }
       return prepareRdcRuntimeEpoch({ ...scope, permissionRevision: runtimePermissionStateService.getSnapshot().revision,
         previousPlan: previous.plan, previousPrompt: previous.prompt, previousBinding: previous.binding, lease, catalog });

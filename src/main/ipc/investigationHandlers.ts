@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { AppError } from '@shared/errors/appError';
 import { InvestigationError, isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -73,7 +74,7 @@ export function registerInvestigationHandlers(context: WorkbenchIpcContext): voi
   ipcMain.handle('investigation:list', (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(InvestigationListArgsSchema, rawArgs, { label: 'investigation:list', maxBytes: 4096 });
     const denied = assertActiveInvestigationOwner(context.state, request.sessionId);
-    if (denied || request.projectId !== context.state.currentProjectId) throw new Error('INVESTIGATION_SESSION_DENIED');
+    if (denied || request.projectId !== context.state.currentProjectId) throw new AppError('INVESTIGATION_SESSION_DENIED');
     return listInvestigationArtifacts(request.sessionId, request.cursor);
   });
   ipcMain.handle('investigation:read', async (_event, ...rawArgs: unknown[]) => {

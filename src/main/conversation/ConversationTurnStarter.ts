@@ -3,6 +3,7 @@ import { formatAgentManifestDiagnostic } from '@shared/utils/agentManifestDiagno
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
+import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
 import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
@@ -87,7 +88,7 @@ export async function startProfileTurn(
   const turnId = generateEventId('turn');
   const throwIfPreparationCancelled = () => {
     if (preparationController.signal.aborted) {
-      throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
+      throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
     }
   };
 
@@ -96,12 +97,12 @@ export async function startProfileTurn(
     configurationCommit?.agentId
     && configurationCommit.agentId !== conversationAgentId
   ) {
-    throw new Error('AGENT_COMMIT_NOT_FOUND: the committed Agent does not match the selected route.');
+    throw new AppError('AGENT_COMMIT_NOT_FOUND', 'the committed Agent does not match the selected route.');
   }
   const effectiveSnapshot = resolveEnabledAgentDefinition(conversationAgentId, pendingProjectRootPath);
   if (!effectiveSnapshot) {
-    throw new Error(
-      `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${conversationAgentId}\` is not enabled.`,
+    throw new AppError(
+      'CONVERSATION_AGENT_UNAVAILABLE', `requested profile \`${conversationAgentId}\` is not enabled.`,
     );
   }
   if (configurationCommit?.agentCommitHash) {
@@ -111,7 +112,7 @@ export async function startProfileTurn(
       ...writeTarget,
     });
     if (!latestCommit || latestCommit.commitHash !== configurationCommit.agentCommitHash) {
-      throw new Error('AGENT_COMMIT_NOT_FOUND: the selected Agent definition changed before preflight.');
+      throw new AppError('AGENT_COMMIT_NOT_FOUND', 'the selected Agent definition changed before preflight.');
     }
   }
   throwIfPreparationCancelled();
@@ -124,7 +125,7 @@ export async function startProfileTurn(
   const surfaceProviderId = modelOverride?.providerId ?? configuredRoute?.providerId;
   if (surfaceProviderId) {
     const surface = await loadProviderSurface(surfaceProviderId);
-    if (!surface) throw new Error(`PROVIDER_UNAVAILABLE: ${surfaceProviderId} is not in the compiled Catalog.`);
+    if (!surface) throw new AppError('PROVIDER_UNAVAILABLE', `${surfaceProviderId} is not in the compiled Catalog.`);
     await awaitFirstCatalogLoad(surfaceProviderId, settingsService.getAll(), preparationController.signal);
   }
   throwIfPreparationCancelled();
@@ -139,12 +140,12 @@ export async function startProfileTurn(
     throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}${overlay ? ` ${overlay}` : ''}`);
   }
   if (configurationCommit?.providerId && configurationCommit.providerId !== routePreflight.providerId) {
-    throw new Error('PROVIDER_UNAVAILABLE: the committed Provider does not match the selected Agent route.');
+    throw new AppError('PROVIDER_UNAVAILABLE', 'the committed Provider does not match the selected Agent route.');
   }
   if (configurationCommit?.providerCommitHash) {
     const providerCommit = await settingsService.getProviderDefinitionCommit(routePreflight.providerId);
     if (!providerCommit || providerCommit.commitHash !== configurationCommit.providerCommitHash) {
-      throw new Error('PROVIDER_UNAVAILABLE: the Provider configuration changed before preflight.');
+      throw new AppError('PROVIDER_UNAVAILABLE', 'the Provider configuration changed before preflight.');
     }
   }
   const credentialHandle = await agentOrchestrator.refreshProviderRuntimeCredentials(routePreflight.providerId);
@@ -168,16 +169,16 @@ export async function startProfileTurn(
     settings,
   );
   if (!effectiveModel) {
-    throw new Error(`MODEL_UNAVAILABLE: ${routePreflight.providerId}/${routePreflight.modelId}`);
+    throw new AppError('MODEL_UNAVAILABLE', `${routePreflight.providerId}/${routePreflight.modelId}`);
   }
   if (
     configurationCommit?.providerCatalogRevision
     && effectiveModel.catalogRevision !== configurationCommit.providerCatalogRevision
   ) {
-    throw new Error('MODEL_UNAVAILABLE: the effective Provider catalog changed before preflight.');
+    throw new AppError('MODEL_UNAVAILABLE', 'the effective Provider catalog changed before preflight.');
   }
   if (configurationCommit?.routeRevision && effectiveModel.routeRevision !== configurationCommit.routeRevision) {
-    throw new Error('MODEL_UNAVAILABLE: the selected model route changed before preflight.');
+    throw new AppError('MODEL_UNAVAILABLE', 'the selected model route changed before preflight.');
   }
   const requestedControls = conversationTurnControlInput(effectiveSnapshot.reasoningLevel, context.session?.turnControls, requestTurnControls);
   const planning = planEffectiveModelRequest({
@@ -199,7 +200,7 @@ export async function startProfileTurn(
     configurationCommit?.providerCatalogRevision
     && planning.plan.catalogRevision !== configurationCommit.providerCatalogRevision
   ) {
-    throw new Error('MODEL_UNAVAILABLE: the frozen RequestPlan catalog revision does not match the committed selection.');
+    throw new AppError('MODEL_UNAVAILABLE', 'the frozen RequestPlan catalog revision does not match the committed selection.');
   }
   // configurationCommit.routeRevision identifies the renderer-selected model and
   // was verified against effectiveModel above. A model-switch binding (for
@@ -248,7 +249,7 @@ export async function startProfileTurn(
         )
         : [];
   if (pendingAttachmentDescriptors.length > 0 && plannedAttachmentRecords.length === 0) {
-    throw new Error('ATTACHMENT_SESSION_REQUIRED: select or create a project session before attaching files.');
+    throw new AppError('ATTACHMENT_SESSION_REQUIRED', 'select or create a project session before attaching files.');
   }
   const plannedInputAttachments = pendingAttachmentDescriptors.map((attachment, index) => {
     const planned = plannedAttachmentRecords[index]!;
@@ -361,7 +362,7 @@ export async function startProfileTurn(
       persistedHistoryBeforeCommit = existingTurnCommit.beforeHistory;
       persistedBranchBeforeCommit = existingTurnCommit.beforeBranch;
     } else if (pendingAttachments.length > 0) {
-      throw new Error('ATTACHMENT_SESSION_REQUIRED: select or create a project session before attaching files.');
+      throw new AppError('ATTACHMENT_SESSION_REQUIRED', 'select or create a project session before attaching files.');
     }
     const sessionIdForBranch = workingSession?.sessionId ?? null;
     branchState = branchContext?.branchState ?? (sessionIdForBranch
@@ -493,7 +494,7 @@ export async function startProfileTurn(
       console.error(`[ConversationService] Failed to roll back turn ${turnId}:`, rollbackError);
     }
     await preparedTurn.runtime.mcpLease?.release({ discardIfIdle: true });
-    throw new Error(`TURN_COMMIT_FAILED: ${redactTechnicalMessage(error)}`);
+    throw new AppError('TURN_COMMIT_FAILED', redactTechnicalMessage(error), { cause: error });
   }
   const cancelAfterCommit = host.getPreparingRequestByRequestId(requestId)?.cancelAfterCommit === true;
   if (workingSession && conversationAgentId) {

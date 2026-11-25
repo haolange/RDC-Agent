@@ -6,6 +6,7 @@ import {
   expandCanonicalToolToken,
 } from '@shared/constants/agentToolTokens';
 import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
+import { AppError } from '@shared/errors/appError';
 import { executionProfileService } from '../../settings/settings-core/ExecutionProfileService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import type { AgentRole } from '@shared/types/agent';
@@ -81,7 +82,7 @@ function expandToken(toolName: string): string[] {
 function finalizeAllowlist(agentId: AgentRole, profileTools: readonly string[], ceiling: AgentAccessCeiling = DEFAULT_AGENT_ACCESS_CEILING): string[] {
   const unique = filterToolsWithinCeiling(Array.from(new Set(profileTools.flatMap(expandToken))), ceiling);
   if (unique.length === 0) {
-    throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
+    throw new AppError('AGENT_TOOLS_EMPTY', `profile ${agentId} has an empty tools list and cannot execute.`);
   }
   return unique;
 }

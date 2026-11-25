@@ -1,5 +1,6 @@
 import { lookup } from 'dns/promises';
 import * as net from 'net';
+import { AppError } from '@shared/errors/appError';
 
 export interface PinnedPublicHttpUrl {
   href: string;
@@ -13,7 +14,12 @@ export interface PinnedPublicHttpUrl {
 }
 
 /** The URL, or an address it resolves to, is not a public HTTP target. No request was sent. */
-export class PublicUrlDeniedError extends Error {}
+export class PublicUrlDeniedError extends AppError {
+  constructor(detail: string) {
+    super('EXTERNAL_URL_REJECTED', detail);
+    this.name = 'PublicUrlDeniedError';
+  }
+}
 
 interface AddressRange {
   network: bigint;

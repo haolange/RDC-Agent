@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { childScopePrefix } from '@shared/utils/executionScope';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { readRequestUsage } from './RequestUsageSnapshot';
 import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
@@ -35,7 +36,7 @@ export class RequestSnapshotStore {
     const childPrefix = safeSegment(childScopePrefix(sessionId));
     const entries = fs.readdirSync(base, { withFileTypes: true })
       .filter(entry => entry.name === own || entry.name.startsWith(childPrefix));
-    if (entries.some(entry => !entry.isDirectory())) throw new Error('REQUEST_SNAPSHOT_SCOPE_NOT_DIRECTORY');
+    if (entries.some(entry => !entry.isDirectory())) throw new AppError('REQUEST_SNAPSHOT_SCOPE_NOT_DIRECTORY');
     for (const entry of entries) {
       const scopePath = path.join(base, entry.name);
       fs.rmSync(scopePath, { recursive: true, force: true });

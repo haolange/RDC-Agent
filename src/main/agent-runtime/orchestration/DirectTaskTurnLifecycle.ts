@@ -1,4 +1,5 @@
 import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
+import { AppError } from '@shared/errors/appError';
 import { TaskRegistry, taskStoreForExecutionScope, getDelegatedTaskScope, type TaskExecutionRecord } from '../tasks';
 import { processSupervisor } from '../../runtime/ProcessSupervisor';
 
@@ -24,7 +25,7 @@ export function activeDelegations(executions: readonly TaskExecutionRecord[], pa
 
 export async function listActiveDelegations(sessionId: string): Promise<TaskExecutionRecord[]> {
   const scope = getDelegatedTaskScope(sessionId);
-  if (scope && !scope.executionId) throw new Error('TASK_SCOPE_UNVERIFIED: delegated execution identity is missing.');
+  if (scope && !scope.executionId) throw new AppError('TASK_SCOPE_UNVERIFIED', 'delegated execution identity is missing.');
   const registry = new TaskRegistry(taskStoreForExecutionScope(sessionId, scope?.ownerSessionId));
   return activeDelegations(await registry.listExecutions(), scope?.executionId);
 }

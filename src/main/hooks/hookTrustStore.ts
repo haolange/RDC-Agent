@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
+import { AppError } from '@shared/errors/appError';
 
 export const CURRENT_HOOK_TRUST_SCHEMA_VERSION = '2' as const;
 
@@ -64,8 +65,8 @@ export const readHookTrustStore = (trustStorePath: string): HookTrustStoreV2 => 
   if (version !== undefined) {
     const numeric = Number(version);
     if (Number.isFinite(numeric) && numeric > Number(CURRENT_HOOK_TRUST_SCHEMA_VERSION)) {
-      throw new Error(
-        `STORAGE_SCHEMA_UNSUPPORTED: ${trustStorePath} has schemaVersion ${version}; supported up to ${CURRENT_HOOK_TRUST_SCHEMA_VERSION}`,
+      throw new AppError(
+        'STORAGE_SCHEMA_UNSUPPORTED', `${trustStorePath} has schemaVersion ${version}; supported up to ${CURRENT_HOOK_TRUST_SCHEMA_VERSION}`,
       );
     }
   }

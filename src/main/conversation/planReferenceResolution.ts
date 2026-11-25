@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { planReviewStateStore } from '../sessions/run/PlanReviewStateStore';
 import { readReferencedPlan } from '../sessions/run/sessionPlanReference';
 import { resolveApprovedHandoff } from '../sessions/run/approvedHandoffRecovery';
@@ -25,7 +26,7 @@ export function resolvePlanReference(input: {
   message: string;
 }): ResolvedPlanReference {
   const { request } = input;
-  if (request.sessionId !== input.sessionId) throw new Error('PLAN_SESSION_DENIED: the plan belongs to another session.');
+  if (request.sessionId !== input.sessionId) throw new AppError('PLAN_SESSION_DENIED', 'the plan belongs to another session.');
   return request.intent === 'revise' ? resolveRevision(request, input.agentId) : resolveExecution(request, input.agentId, input.message);
 }
 
@@ -40,7 +41,7 @@ function resolveRevision(request: Extract<PlanReferenceRequest, { intent: 'revis
       && call.planReview.hash === request.expectedHash)?.planReview;
   if (source.agentId !== agentId || state?.status !== 'rejected' || state.ownerTurnId !== source.turnId
     || state.planId !== request.planId || state.revision !== request.revision || !review) {
-    throw new Error('PLAN_REVIEW_SCOPE_CHANGED: revision source is no longer current.');
+    throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'revision source is no longer current.');
   }
   return {
     reference: { intent: 'revise', planId: request.planId, revision: request.revision, hash: request.expectedHash,
@@ -51,12 +52,12 @@ function resolveRevision(request: Extract<PlanReferenceRequest, { intent: 'revis
 
 function resolveExecution(request: Extract<PlanReferenceRequest, { intent: 'execute' }>, agentId: string | null, message: string): ResolvedPlanReference {
   const handoff = resolveApprovedHandoff(request.sessionId, planReviewStateStore.read(request.sessionId));
-  if (!handoff) throw new Error('PLAN_REFERENCE_INVALID: no approved, unsent plan handoff is pending.');
+  if (!handoff) throw new AppError('PLAN_REFERENCE_INVALID', 'no approved, unsent plan handoff is pending.');
   if (handoff.planId !== request.planId || handoff.revision !== request.revision || handoff.planHash !== request.expectedHash) {
-    throw new Error('PLAN_REFERENCE_INVALID: the approved plan revision changed.');
+    throw new AppError('PLAN_REFERENCE_INVALID', 'the approved plan revision changed.');
   }
-  if (handoff.agent !== agentId) throw new Error('PLAN_REFERENCE_INVALID: the approved handoff targets another Agent.');
-  if (handoff.prompt.trim() !== message.trim()) throw new Error('PLAN_REFERENCE_INVALID: the message is not the declared handoff prompt.');
+  if (handoff.agent !== agentId) throw new AppError('PLAN_REFERENCE_INVALID', 'the approved handoff targets another Agent.');
+  if (handoff.prompt.trim() !== message.trim()) throw new AppError('PLAN_REFERENCE_INVALID', 'the message is not the declared handoff prompt.');
   return {
     reference: {
       intent: 'execute', planId: handoff.planId, revision: handoff.revision, hash: handoff.planHash, uri: handoff.planUri,

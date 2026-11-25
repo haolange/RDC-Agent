@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { policyBudgetChain } from './DelegationBudget';
 import type { UnresolvedItem } from '@shared/types/unresolvedWork';
 /**
@@ -79,7 +80,7 @@ export interface PolicyBudgetState {
 
 export function assertPolicyWallTimeAllowed(maxWallTimeMs: number): void {
   if (maxWallTimeMs === 0) {
-    throw new Error('POLICY_MAX_WALL_TIME_ZERO: maxWallTimeMs must be greater than zero for an executable turn.');
+    throw new AppError('POLICY_MAX_WALL_TIME_ZERO', 'maxWallTimeMs must be greater than zero for an executable turn.');
   }
 }
 
@@ -195,28 +196,28 @@ export function startSubagentBudgetChild(state: SubagentBudgetState, now = Date.
 }
 
 export function finishSubagentBudgetChild(state: SubagentBudgetState, now = Date.now()): void {
-  if (state.activeChildren <= 0) throw new Error('SUBAGENT_BUDGET: no active child to finish.');
+  if (state.activeChildren <= 0) throw new AppError('SUBAGENT_BUDGET', 'no active child to finish.');
   state.activeChildren -= 1;
   if (state.activeChildren === 0) state.wallPausedAt = now;
 }
 
 export function assertSubagentBudgetAllowsChild(state: SubagentBudgetState, now = Date.now()): void {
   if (state.depth >= state.budget.maxDepth) {
-    throw new Error(`SUBAGENT_BUDGET: maxDepth ${state.budget.maxDepth} exceeded.`);
+    throw new AppError('SUBAGENT_BUDGET', `maxDepth ${state.budget.maxDepth} exceeded.`);
   }
   if (state.childrenSpawned >= state.budget.maxChildren) {
-    throw new Error(`SUBAGENT_BUDGET: maxChildren ${state.budget.maxChildren} exceeded.`);
+    throw new AppError('SUBAGENT_BUDGET', `maxChildren ${state.budget.maxChildren} exceeded.`);
   }
   if (state.aggregateToolCalls >= state.budget.maxAggregateToolCalls) {
-    throw new Error(
-      `SUBAGENT_BUDGET: maxAggregateToolCalls ${state.budget.maxAggregateToolCalls} exceeded.`,
+    throw new AppError(
+      'SUBAGENT_BUDGET', `maxAggregateToolCalls ${state.budget.maxAggregateToolCalls} exceeded.`,
     );
   }
   // Only time with an active child spends the child wall window. Parent work
   // between delegations must not consume time reserved for child execution.
   if (subagentActiveWallMs(state, now) >= state.budget.maxAggregateWallMs) {
-    throw new Error(
-      `SUBAGENT_BUDGET: maxAggregateWallMs ${state.budget.maxAggregateWallMs} exceeded.`,
+    throw new AppError(
+      'SUBAGENT_BUDGET', `maxAggregateWallMs ${state.budget.maxAggregateWallMs} exceeded.`,
     );
   }
 }
@@ -434,7 +435,7 @@ export class TurnHandle {
 
   /** Abort only a named child; the owning turn and its budget remain live. */
   async abortProducerForRecovery(id: string): Promise<boolean> {
-    if (!this.isLive(this.generation)) throw new Error('RDC_TURN_NOT_ACTIVE');
+    if (!this.isLive(this.generation)) throw new AppError('RDC_TURN_NOT_ACTIVE');
     const producer = this.producers.get(id);
     if (!producer) return false;
     producer.abort('replay_recovery');
@@ -604,8 +605,8 @@ export class TurnCoordinator {
   private async beginTurnNow(input: BeginTurnInput): Promise<TurnHandle> {
     const orphaned = this.orphanedBySession.get(input.sessionKey);
     if (orphaned && !orphaned.isSettled) {
-      throw new Error(
-        `TURN_ORPHANED: session ${input.sessionKey} still has an orphaned turn (${orphaned.turnId}) awaiting producer settlement.`,
+      throw new AppError(
+        'TURN_ORPHANED', `session ${input.sessionKey} still has an orphaned turn (${orphaned.turnId}) awaiting producer settlement.`,
       );
     }
     if (orphaned && orphaned.isSettled) {
@@ -617,8 +618,8 @@ export class TurnCoordinator {
       await previous.abortAndJoin({ reason: 'edit_resend', graceMs: 500, forceAfterMs: 2_000 });
       if (previous.isOrphaned && !previous.isSettled) {
         this.retainOrphan(previous);
-        throw new Error(
-          `TURN_ORPHANED: session ${input.sessionKey} previous turn (${previous.turnId}) is orphaned and not settled.`,
+        throw new AppError(
+          'TURN_ORPHANED', `session ${input.sessionKey} previous turn (${previous.turnId}) is orphaned and not settled.`,
         );
       }
       if (this.activeBySession.get(input.sessionKey) === previous) {

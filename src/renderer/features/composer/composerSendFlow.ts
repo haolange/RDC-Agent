@@ -1,5 +1,7 @@
+import { errorCodeOf } from '@shared/errors/appError';
 import { selectOrderedConversationMessages, useConversationStore } from '../../stores/conversationStore';
 import { findPlanReview } from '../../lib/transcriptPlanLocation';
+import { errorDetail } from '../../lib/errorDetail';
 import { buildConversationConfigurationCommit } from '../../stores/conversationConfigurationCommit';
 import { useSessionStore } from '../../stores/sessionStore';
 import {
@@ -17,6 +19,7 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { createConversationRequestId } from '../../services/conversationRequestId';
+import { notify } from '../../stores/notificationStore';
 import { persistComposerDraftToSession } from './sessionModelOverride';
 import { inspectHandoffCommit, type ComposerSendOutcome } from './composerHandoffSend';
 import type { PendingAttachmentDraft } from '../../types/attachments';
@@ -25,6 +28,7 @@ import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentMode } from '@shared/types/layout';
+import type { Translator } from '../../i18n/messages';
 
 export { createConversationRequestId };
 
@@ -54,8 +58,7 @@ export async function sendComposerConversationTurn(options: {
   setCurrentRun: (run: RunSummary | null) => void;
   setRuns: (runs: RunSummary[]) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
-  showNotice: (message: string) => void;
-  failedSummary: string;
+  t: Translator;
   preserveDraft?: boolean;
   planReference?: import('@shared/types/planReview').PlanReferenceRequest;
 }): Promise<ComposerSendOutcome> {
@@ -82,8 +85,7 @@ export async function sendComposerConversationTurn(options: {
     setCurrentRun,
     setRuns,
     setTracePresentation,
-    showNotice,
-    failedSummary,
+    t,
   } = options;
 
   const { preserveDraft = false } = options;
@@ -174,11 +176,6 @@ export async function sendComposerConversationTurn(options: {
     return true;
   };
 
-  const isRequestCancelledError = (error: unknown): boolean => {
-    const message = error instanceof Error ? error.message : String(error);
-    return message.includes('REQUEST_CANCELLED');
-  };
-
   try {
     const configuration = await buildConversationConfigurationCommit({
       selectedAgentId,
@@ -227,8 +224,10 @@ export async function sendComposerConversationTurn(options: {
       useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
-      if (!preserveDraft) showNotice(result.error.message || failedSummary);
-      return { status: 'rejected', requestId, error: result.error.message || failedSummary };
+      // The message is technical; the code words the toast and both leave through "Copy details".
+      const failure = `${result.error.code}: ${result.error.message}`;
+      if (!preserveDraft) notify.failure(failure, t, 'app.conversationRequestFailed');
+      return { status: 'rejected', requestId, error: failure };
     }
 
     accepted = true;
@@ -288,10 +287,10 @@ export async function sendComposerConversationTurn(options: {
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
-    if (isRequestCancelledError(error)) return { status: 'cancelled', requestId };
-    if (!preserveDraft) showNotice(error instanceof Error ? error.message : failedSummary);
+    if (errorCodeOf(error) === 'REQUEST_CANCELLED') return { status: 'cancelled', requestId };
+    if (!preserveDraft) notify.failure(error, t, 'app.conversationRequestFailed');
     if (accepted) return { status: 'accepted', requestId };
     if (preserveDraft && dispatchStarted && owningSessionId) return inspectHandoffCommit(electronAPI.conversation, owningSessionId, requestId);
-    return { status: 'rejected', requestId, error: error instanceof Error ? error.message : failedSummary };
+    return { status: 'rejected', requestId, error: errorDetail(error) };
   }
 }

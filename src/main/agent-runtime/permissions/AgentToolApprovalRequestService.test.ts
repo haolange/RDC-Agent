@@ -31,7 +31,7 @@ it('does not treat a model reason or extra callback fields as host failure metad
   expect(onEvent.mock.calls[1][0].payload).toMatchObject({ reviewMethod: 'model', status: 'rejected', reason });
   expect(onEvent.mock.calls[1][0].payload.errorCode).toBeUndefined();
 });
-it.each(['PERMISSION_REVIEW_TIMEOUT', 'PERMISSION_REVIEW_INVALID', 'PERMISSION_REVIEW_INCOMPLETE'])('preserves host-confirmed %s without retry', async code => {
+it.each(['PERMISSION_REVIEW_TIMEOUT', 'PERMISSION_REVIEW_INVALID', 'PERMISSION_REVIEW_INCOMPLETE'] as const)('preserves host-confirmed %s without retry', async code => {
   const onEvent = vi.fn();
   const reviewer = vi.fn(async () => { throw new PermissionReviewError(code, 'host observation'); });
   await new AgentToolApprovalRequestService().autoReview({ ...base, reviewer, onEvent });

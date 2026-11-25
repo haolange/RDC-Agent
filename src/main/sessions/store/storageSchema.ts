@@ -1,5 +1,6 @@
 import { MaterialContextSchema } from '@shared/types/materialContext';
-import { z, type ZodType } from 'zod';
+import { z, type ZodIssue, type ZodType } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import type { StorageIo } from './StorageIo';
 import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type {
@@ -8,11 +9,26 @@ import type {
   ConversationTurnCommitJournal,
 } from './storageCommitTypes';
 
-export class StorageSchemaError extends Error {
-  constructor(message: string) {
-    super(message);
+/** A stored document that is unreadable, invalid, or written by a newer schema than this build supports. */
+export class StorageSchemaError extends AppError {
+  declare readonly code: 'STORAGE_SCHEMA' | 'STORAGE_SCHEMA_UNSUPPORTED' | 'STORAGE_CORRUPT';
+
+  constructor(code: StorageSchemaError['code'], detail: string) {
+    super(code, detail);
     this.name = 'StorageSchemaError';
   }
+}
+
+/**
+ * A schema rejection. A refinement that recognises a document from another store version marks its issue with
+ * `params.storageCode: 'STORAGE_SCHEMA_UNSUPPORTED'`, which callers keep visible instead of quarantining.
+ */
+export function schemaValidationError(filePath: string, issues: readonly ZodIssue[]): StorageSchemaError {
+  const unsupported = issues.some((issue) => issue.code === 'custom' && issue.params?.storageCode === 'STORAGE_SCHEMA_UNSUPPORTED');
+  return new StorageSchemaError(
+    unsupported ? 'STORAGE_SCHEMA_UNSUPPORTED' : 'STORAGE_SCHEMA',
+    `${filePath} failed runtime validation: ${issues.map((issue) => issue.message).join('; ')}`,
+  );
 }
 
 export function readCurrentStoredJson<T>(
@@ -25,11 +41,11 @@ export function readCurrentStoredJson<T>(
   if (raw === null) return null;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)
     || (raw as { schemaVersion?: unknown }).schemaVersion !== schemaVersion) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} requires schemaVersion ${schemaVersion}`);
+    throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${filePath} requires schemaVersion ${schemaVersion}`);
   }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} failed runtime validation: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+    throw schemaValidationError(filePath, parsed.error.issues);
   }
   return parsed.data;
 }
@@ -63,7 +79,7 @@ export function assertNoUnsupportedSchemaVersion(
   const currentNumeric = Number(currentVersion);
   if (Number.isFinite(numeric) && Number.isFinite(currentNumeric) && numeric > currentNumeric) {
     throw new StorageSchemaError(
-      `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${version}; supported up to ${currentVersion}`,
+      'STORAGE_SCHEMA_UNSUPPORTED', `${filePath} has schemaVersion ${version}; supported up to ${currentVersion}`,
     );
   }
 }
@@ -74,7 +90,7 @@ export function parseStoredDocument<T>(
   filePath: string,
 ): T {
   if (migrations.length === 0) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA: no migrations registered for ${filePath}`);
+    throw new StorageSchemaError('STORAGE_SCHEMA', `no migrations registered for ${filePath}`);
   }
   const current = migrations[migrations.length - 1]!;
   let version = readSchemaVersion(raw);
@@ -82,7 +98,7 @@ export function parseStoredDocument<T>(
     if (migrations.some((entry) => entry.schemaVersion === '0')) {
       version = '0';
     } else {
-      throw new StorageSchemaError(`STORAGE_SCHEMA: missing schemaVersion in ${filePath}`);
+      throw new StorageSchemaError('STORAGE_SCHEMA', `missing schemaVersion in ${filePath}`);
     }
   }
 
@@ -93,11 +109,11 @@ export function parseStoredDocument<T>(
     const currentNumeric = Number(current.schemaVersion);
     if (Number.isFinite(numeric) && Number.isFinite(currentNumeric) && numeric > currentNumeric) {
       throw new StorageSchemaError(
-        `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${version}; supported up to ${current.schemaVersion}`,
+        'STORAGE_SCHEMA_UNSUPPORTED', `${filePath} has schemaVersion ${version}; supported up to ${current.schemaVersion}`,
       );
     }
     throw new StorageSchemaError(
-      `STORAGE_SCHEMA: unknown schemaVersion ${version} in ${filePath} (known: ${knownVersions.join(', ')})`,
+      'STORAGE_SCHEMA', `unknown schemaVersion ${version} in ${filePath} (known: ${knownVersions.join(', ')})`,
     );
   }
 
@@ -112,9 +128,7 @@ export function parseStoredDocument<T>(
 
   const parsed = current.schema.safeParse(candidate);
   if (!parsed.success) {
-    throw new StorageSchemaError(
-      `STORAGE_SCHEMA: ${filePath} failed runtime validation: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
-    );
+    throw schemaValidationError(filePath, parsed.error.issues);
   }
   return parsed.data;
 }
@@ -193,7 +207,8 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z.object({
   if (value.schemaVersion !== '1' || Object.keys(value).some((key) => !allowed.has(key))) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'STORAGE_SCHEMA_UNSUPPORTED: session.json requires schemaVersion 1',
+      message: 'session.json requires schemaVersion 1',
+      params: { storageCode: 'STORAGE_SCHEMA_UNSUPPORTED' },
     });
   }
 }).transform((value) => ({ ...value, schemaVersion: '1' as const })) as ZodType<SessionRecord>;

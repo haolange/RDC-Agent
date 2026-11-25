@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { diffKnowledgeCard, rollbackBasis } from './knowledgeCardDiff';
-import { detailToRecord, knowledgeErrorMessage, type KnowledgeWriteAction } from './knowledgeCenterModel';
+import { detailToRecord, type KnowledgeWriteAction } from './knowledgeCenterModel';
 import {
   canSubmitKnowledgeWrite,
   collectCardContradicts,
@@ -92,7 +93,7 @@ export function useKnowledgeWriteConfirm(options: {
       setGatePack(nextPack);
       setPackReady(true);
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(errorDetail(err));
     }
   }, [options.pack, options.packQueryKey, options.queryRequest, request]);
 
@@ -101,11 +102,8 @@ export function useKnowledgeWriteConfirm(options: {
     if (!canSubmitKnowledgeWrite({
       after, changeReason, confirmed, contradicts, acknowledgedConflicts, packReady,
     })) return;
-    const block = evaluateWriteGate(action, before ?? after);
-    if (block) {
-      setError(block);
-      return;
-    }
+    // A blocked write is already explained by `block`; submitting it does nothing.
+    if (evaluateWriteGate(action, before ?? after)) return;
     const seq = request.next();
     setBusy(true);
     setError(null);
@@ -129,7 +127,7 @@ export function useKnowledgeWriteConfirm(options: {
       await options.onWritten();
       if (request.isCurrent(seq)) close();
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(errorDetail(err));
     } finally {
       if (request.isCurrent(seq)) setBusy(false);
     }

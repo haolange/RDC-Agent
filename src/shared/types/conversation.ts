@@ -512,6 +512,8 @@ export interface ConversationAnswerUserInputRequest {
 export interface ConversationAnswerUserInputResult {
   success: boolean;
   error?: string;
+  /** The question whose answer was rejected, so the panel can return to it. */
+  questionId?: string;
 }
 
 export interface ConversationAnswerToolApprovalRequest {

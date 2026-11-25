@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
 import type { TaskRegistry } from '../tasks';
 import type { PolicyBudgetState } from './TurnCoordinator';
@@ -45,7 +46,7 @@ async function bindRootBudgetLocked(
   const state = bindings.get(rootPolicyBudget);
   const id = existingRootBudgetId ?? state?.rootBudgetId ?? taskRootBudgetId(rootPolicyBudget);
   if (state && state.rootBudgetId !== id) {
-    throw new Error('TASK_ROOT_BUDGET_REBIND_DENIED: this turn is bound to a different durable root; continue the Task in a new turn and bind its existing root before other Task work.');
+    throw new AppError('TASK_ROOT_BUDGET_REBIND_DENIED', 'this turn is bound to a different durable root; continue the Task in a new turn and bind its existing root before other Task work.');
   }
   const durable = await registry.getRootBudget(id);
   const observers = state?.observers ?? new Map<string, () => void>();

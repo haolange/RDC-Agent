@@ -14,6 +14,7 @@ import { SettingsField } from '../parts';
 import { hookEventLabel, mcpTransportLabel, timeoutSeconds } from './resourceLabels';
 import { templateResourceId } from './runtimeScopeMutations';
 import { resourceDisplayName, type ResourceFormState } from './scopedResourceForm';
+import type { ScopeNotice } from './useRuntimeScopePanel';
 
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
 
@@ -34,7 +35,7 @@ export const ScopedResourceEditor: React.FC<{
   busy: boolean;
   dirty?: boolean;
   /** Validation / save outcome shown inside the editor body. */
-  message?: string | null;
+  notice?: ScopeNotice | null;
   /** Dialog presentation moves the title and actions into the dialog chrome. */
   showHeader?: boolean;
   onChange: (patch: Partial<ResourceFormState>) => void;
@@ -48,7 +49,7 @@ export const ScopedResourceEditor: React.FC<{
   idLocked,
   busy,
   dirty = false,
-  message = null,
+  notice = null,
   showHeader = true,
   onChange,
   onSave,
@@ -58,7 +59,6 @@ export const ScopedResourceEditor: React.FC<{
   const { t } = useI18n();
   const fieldId = useId();
   const kindLabel = t(kindLabelKey(kind));
-  const isError = Boolean(message) && message !== t('settings.scopeSaved') && message !== t('settings.scopeImported');
   return (
     <div className="settings-runtime-editor settings-manifest-editor" data-testid="settings-runtime-editor" data-resource-kind={kind}>
       {showHeader ? (
@@ -218,10 +218,10 @@ export const ScopedResourceEditor: React.FC<{
           {t('settings.policyProjectTightenOnly')}
         </p>
       ) : null}
-      {message ? (
-        isError
-          ? <InlineError data-testid="settings-runtime-editor-error">{message}</InlineError>
-          : <p className="settings-runtime-editor-status" role="status"><Icon name="check" size={14} />{message}</p>
+      {notice ? (
+        notice.tone === 'error'
+          ? <InlineError data-testid="settings-runtime-editor-error" detail={notice.detail}>{notice.message}</InlineError>
+          : <p className="settings-runtime-editor-status" role="status"><Icon name="check" size={14} />{notice.message}</p>
       ) : null}
     </div>
   );

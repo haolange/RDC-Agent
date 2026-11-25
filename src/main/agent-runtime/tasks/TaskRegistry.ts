@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { TaskExecutionRequirementsSchema, TaskRuntimeEpochSchema, type TaskExecutionRequirements, type TaskExecutionPreparation, type TaskRuntimeEpoch, type PlanTaskRequirement } from '@shared/types/taskExecution';
+import { AppError } from '@shared/errors/appError';
 import { FileTaskStore, type TaskStore } from './TaskStore';
 import {
   TASK_SCHEMA_VERSION, type SettleTaskExecutionOptions, type StartTaskExecutionOptions,
@@ -15,9 +16,9 @@ const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 const CANCELLING_TASK_TREES = new Set<string>();
 const INVALID_RESULT_REFERENCE = 'Task result reference validation failed: provide an accessible owning-session URI and exact hash for the result being reviewed. A supporting receipt is not the result unless it is the actual work product.';
 export const INVALIDATED_REVIEW_GUIDANCE = 'To revise a reviewed result, reexecute the source Task with its unchanged definition (for direct work use task_update status=in_progress), settle it with the new resultRef and resultHash, then dispatch the same review Task with that current source; preserve consumption and deadlines.';
-class TaskCompletionUnavailable extends Error {
+class TaskCompletionUnavailable extends AppError {
   constructor(message: string) {
-    super(message.startsWith('TASK_EXECUTION_REQUIREMENTS:') ? message : `TASK_EXECUTION_REQUIREMENTS: ${message}`);
+    super('TASK_EXECUTION_REQUIREMENTS', message.replace(/^TASK_EXECUTION_REQUIREMENTS:\s*/, ''));
   }
 }
 const isCompletionUnavailable = (error: unknown): error is Error => error instanceof TaskCompletionUnavailable
@@ -56,7 +57,7 @@ export class TaskRegistry {
         if (!input.subject.trim()) throw new Error('Task subject is required.');
         const createdAt = base + index; const id = this.id('task', createdAt); const blockedBy = dedupe(input.blockedBy ?? []);
         const executionRequirements = input.executionRequirements === undefined ? undefined : TaskExecutionRequirementsSchema.parse(input.executionRequirements);
-        if (executionRequirements && input.executionRequired === false) throw new Error('TASK_EXECUTION_REQUIREMENTS: constrained work requires an execution.');
+        if (executionRequirements && input.executionRequired === false) throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'constrained work requires an execution.');
         await this.assertDependenciesExist(blockedBy); await this.assertNoDependencyCycle(id, blockedBy);
         if (input.parentTaskId) {
           const parent = await this.store.loadTask(input.parentTaskId);
@@ -116,7 +117,7 @@ export class TaskRegistry {
       if (updates.owner !== undefined) task.owner = updates.owner;
       if (updates.completionRequirements !== undefined) task.completionRequirements = dedupe(updates.completionRequirements);
       if (updates.executionRequirements !== undefined) {
-        if (!task.executionRequired) throw new Error('TASK_EXECUTION_REQUIREMENTS: constrained work requires an execution.');
+        if (!task.executionRequired) throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'constrained work requires an execution.');
         task.executionRequirements = TaskExecutionRequirementsSchema.parse(updates.executionRequirements);
       }
       if (updates.metadata !== undefined) task.metadata = { ...(task.metadata ?? {}), ...updates.metadata };
@@ -208,10 +209,10 @@ export class TaskRegistry {
       if (terminal(execution.status) || execution.status === 'cancelling') throw new Error('Cannot prepare a settled or cancelling execution.');
       await this.assertApprovedRequirement(task);
       await assertTaskExecutionPreparation(task, execution.mode, preparation, this.store);
-      if (execution.preparation && JSON.stringify(execution.preparation) !== JSON.stringify(preparation)) throw new Error('TASK_EXECUTION_REQUIREMENTS: execution preparation is immutable.');
+      if (execution.preparation && JSON.stringify(execution.preparation) !== JSON.stringify(preparation)) throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'execution preparation is immutable.');
       execution.preparation = structuredClone(preparation);
       const independentSources = await readIndependentTaskSources(task, this.store);
-      if (execution.independentSources && JSON.stringify(execution.independentSources) !== JSON.stringify(independentSources)) throw new Error('TASK_EXECUTION_REQUIREMENTS: independent sources are immutable.');
+      if (execution.independentSources && JSON.stringify(execution.independentSources) !== JSON.stringify(independentSources)) throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'independent sources are immutable.');
       if (independentSources.length) execution.independentSources = independentSources;
       await this.store.saveExecution(execution);
     });
@@ -234,7 +235,7 @@ export class TaskRegistry {
           || (previous?.runtimeFingerprint ?? execution.preparation.runtimeFingerprint) !== epoch.previousFingerprint
           || epoch.previousFingerprint === epoch.runtimeFingerprint || !this.store.verifyRuntimeEpoch
           || !await this.store.verifyRuntimeEpoch(epoch, execution.preparation)) {
-          throw new Error('TASK_EXECUTION_REQUIREMENTS: invalid or unsigned runtime identity transition.');
+          throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'invalid or unsigned runtime identity transition.');
         }
         execution.runtimeEpochs = [...(execution.runtimeEpochs ?? []), epoch];
         execution.updatedAt = Date.now();
@@ -249,7 +250,7 @@ export class TaskRegistry {
     for (const snapshot of await this.store.readApprovedRequirements?.() ?? []) {
       const task = await this.requireTask(snapshot.taskId);
       await this.assertApprovedRequirement(task);
-      if (task.status !== 'completed') throw new Error(`TASK_EXECUTION_REQUIREMENTS: approved Task is not completed: ${task.id}`);
+      if (task.status !== 'completed') throw new AppError('TASK_EXECUTION_REQUIREMENTS', `approved Task is not completed: ${task.id}`);
       await this.assertCanComplete(task);
     }
   }
@@ -262,15 +263,15 @@ export class TaskRegistry {
         const task = await this.requireTask(snapshot.taskId);
         if (snapshot.replacesRevision === undefined) {
           assertApprovedTaskRequirement(task, [snapshot]);
-          if (task.revision !== snapshot.revision) throw new Error('TASK_PLAN_REVISION_CONFLICT: Task changed since plan submission.');
+          if (task.revision !== snapshot.revision) throw new AppError('TASK_PLAN_REVISION_CONFLICT', 'Task changed since plan submission.');
           continue;
         }
         if (task.revision === snapshot.revision) { assertApprovedTaskRequirement(task, [snapshot]); continue; }
-        if (task.status === 'completed') throw new Error('TASK_PLAN_REVISION_CONFLICT: completed Tasks cannot be reopened.');
+        if (task.status === 'completed') throw new AppError('TASK_PLAN_REVISION_CONFLICT', 'completed Tasks cannot be reopened.');
         const active = task.currentExecutionId ? await this.store.loadExecution(task.currentExecutionId) : null;
-        if (active && !terminal(active.status)) throw new Error('TASK_PLAN_REVISION_CONFLICT: cancel and join before revising active work.');
+        if (active && !terminal(active.status)) throw new AppError('TASK_PLAN_REVISION_CONFLICT', 'cancel and join before revising active work.');
         if (task.revision !== snapshot.replacesRevision || hashTaskRequirement(task) !== snapshot.previousRequirementHash) {
-          throw new Error('TASK_PLAN_REVISION_CONFLICT: Task changed since the approved proposal was prepared.');
+          throw new AppError('TASK_PLAN_REVISION_CONFLICT', 'Task changed since the approved proposal was prepared.');
         }
         changed.push({ ...task, subject: snapshot.subject, description: snapshot.description,
           completionRequirements: [...snapshot.completionRequirements], executionRequirements: snapshot.executionRequirements,
@@ -349,14 +350,14 @@ export class TaskRegistry {
   /** Stop one owned child for replay recovery without turning its logical Task into a user cancellation. */
   async interruptExecutionForRecovery(id: string, expectedGeneration: number): Promise<void> {
     const initial = await this.requireExecution(id);
-    if (CANCELLING_TASK_TREES.has(initial.taskId)) throw new Error('TASK_RECOVERY_INTERRUPT_BUSY');
+    if (CANCELLING_TASK_TREES.has(initial.taskId)) throw new AppError('TASK_RECOVERY_INTERRUPT_BUSY');
     CANCELLING_TASK_TREES.add(initial.taskId);
     try {
       const intent = await this.store.withLock('state', async () => {
         const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId);
         this.assertCurrent(task, execution, expectedGeneration);
         if (terminal(execution.status)) return null;
-        if (execution.mode !== 'subagent' || execution.status === 'cancelling') throw new Error('TASK_RECOVERY_INTERRUPT_DENIED');
+        if (execution.mode !== 'subagent' || execution.status === 'cancelling') throw new AppError('TASK_RECOVERY_INTERRUPT_DENIED');
         const previousStatus = execution.status; const previousReason = task.statusReason;
         execution.status = 'cancelling'; execution.updatedAt = Date.now();
         task.statusReason = 'Stopping the affected child before replay recovery.'; task.updatedAt = execution.updatedAt;
@@ -370,17 +371,17 @@ export class TaskRegistry {
         await this.store.withLock('state', async () => {
           const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId);
           this.assertCurrent(task, execution, expectedGeneration);
-          if (execution.status !== 'cancelling') throw new Error('TASK_RECOVERY_INTERRUPT_CHANGED');
+          if (execution.status !== 'cancelling') throw new AppError('TASK_RECOVERY_INTERRUPT_CHANGED');
           execution.status = intent.previousStatus; task.statusReason = intent.previousReason;
           execution.updatedAt = task.updatedAt = Date.now();
           await this.store.commit({ tasks: [task], executions: [execution] }); await this.emitTaskChange('updated', task);
         });
-        throw new Error('TASK_RECOVERY_INTERRUPT_OWNER_MISSING: child abort and join ownership is unavailable.');
+        throw new AppError('TASK_RECOVERY_INTERRUPT_OWNER_MISSING', 'child abort and join ownership is unavailable.');
       }
       await this.store.withLock('state', async () => {
         const execution = await this.requireExecution(id); const task = await this.requireTask(execution.taskId);
         this.assertCurrent(task, execution, expectedGeneration);
-        if (execution.status !== 'cancelling') throw new Error('TASK_RECOVERY_INTERRUPT_CHANGED');
+        if (execution.status !== 'cancelling') throw new AppError('TASK_RECOVERY_INTERRUPT_CHANGED');
         const summary = 'Child execution interrupted and joined for replay recovery; retry this Task with the remaining budget.';
         execution.status = 'interrupted'; execution.result = { disposition: 'blocked', summary, outputs: {} };
         execution.updatedAt = task.updatedAt = Date.now(); execution.settledAt = execution.updatedAt;

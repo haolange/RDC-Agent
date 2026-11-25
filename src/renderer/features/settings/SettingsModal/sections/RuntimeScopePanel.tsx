@@ -4,6 +4,7 @@ import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { EmptyState } from '../../../../ui/EmptyState';
+import { InlineError } from '../../../../ui/InlineError';
 import { ListRow } from '../../../../ui/ListRow';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { UnsavedChangesDialog } from '../../../../ui/UnsavedChangesDialog';
@@ -92,7 +93,7 @@ export const RuntimeScopePanel: React.FC<{
       idLocked={Boolean(panel.selected?.sourcePath) && !panel.creating}
       busy={panel.busy}
       dirty={panel.dirty}
-      message={dialogMode ? panel.message : null}
+      notice={dialogMode ? panel.notice : null}
       showHeader={!dialogMode}
       onChange={panel.patchForm}
       onSave={() => void panel.save()}
@@ -157,7 +158,8 @@ export const RuntimeScopePanel: React.FC<{
               </Button>
             </>
           )}
-          status={dialogMode && dialogOpen ? null : (panel.message || null)}
+          status={dialogMode && dialogOpen ? null : panel.notice?.tone === 'error'
+            ? <InlineError detail={panel.notice.detail}>{panel.notice.message}</InlineError> : panel.notice?.message}
           toolbar={(
             <>
               <SettingsScopeBar

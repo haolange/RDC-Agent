@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { shellInvocationService, type ShellInvocationService } from '../tools/ShellInvocationService';
 import { samePath } from '../platform/paths';
@@ -97,10 +98,10 @@ export class RdcCliInvokerService {
       const version = parseRdcNativeResult(await this.executeCLI('version', ['--json'], { settings: frozen }), undefined, 'rdc_tool.version');
       if (version.schema_version !== '3.0.0' || version.data.schema_version !== '3.0.0'
         || typeof version.data.tool_version !== 'string' || !version.data.tool_version.trim()) {
-        throw new Error('RDC_UPGRADE_REQUIRED: the configured CLI must provide the current canonical JSON contract.');
+        throw new AppError('RDC_UPGRADE_REQUIRED', 'the configured CLI must provide the current canonical JSON contract.');
       }
       const envelope = parseRdcNativeResult(await this.executeCLI('tools', ['list', '--full', '--json'], { settings: frozen }), undefined, 'rdc_tool.tools.list');
-      if (envelope.schema_version !== '3.0.0' || envelope.data.schema_version !== '1') throw new Error('RDC_UPGRADE_REQUIRED: unsupported catalog envelope schema.');
+      if (envelope.schema_version !== '3.0.0' || envelope.data.schema_version !== '1') throw new AppError('RDC_UPGRADE_REQUIRED', 'unsupported catalog envelope schema.');
       const tools = validateDefinitions(envelope.data.tools, envelope.data.tool_count, envelope.data.fingerprint);
       validateApplicationOperations(tools);
       const namespaces: ToolCatalog['namespaces'] = {};

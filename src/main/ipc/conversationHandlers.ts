@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { conversationService } from '../conversation/ConversationService';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
 import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
@@ -134,7 +135,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
     const [request] = parseIpcArgs(ConversationGetDelegationContentArgsSchema, rawArgs, {
       label: 'conversation:getDelegationContent', maxBytes: 4 * 1024,
     });
-    if (!state.currentSessionId || request.sessionId !== state.currentSessionId) throw new Error('DELEGATION_CONTENT_SESSION_DENIED');
+    if (!state.currentSessionId || request.sessionId !== state.currentSessionId) throw new AppError('DELEGATION_CONTENT_SESSION_DENIED');
     return delegationTraceStore.readContent(request.sessionId, request.parentToolCallId,
       { childSessionId: request.childSessionId, executionId: request.executionId, generation: request.generation },
       request.kind, request.offset, request.stepId);
@@ -205,7 +206,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       label: 'conversation:answerPlanReview',
       maxBytes: 32 * 1024,
     }) as [ConversationAnswerPlanReviewRequest];
-    if (request.sessionId !== state.currentSessionId) throw new Error('PLAN_SESSION_DENIED');
+    if (request.sessionId !== state.currentSessionId) throw new AppError('PLAN_SESSION_DENIED');
     return conversationService.answerPlanReview(request);
   });
 

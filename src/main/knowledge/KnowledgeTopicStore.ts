@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import { openedFileIdentity } from '../platform/fileIdentity';
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
 import type { KnowledgeTopicDocument } from '@shared/types/knowledge';
@@ -63,7 +64,7 @@ export class KnowledgeTopicStore {
     const target = path.join(this.root(), fileName);
     try {
       const stat = await fs.lstat(target);
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink > 1) throw new Error('KNOWLEDGE_TOPICS_UNSAFE_PATH');
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink > 1) throw new AppError('KNOWLEDGE_TOPICS_UNSAFE_PATH');
       const source = await fs.readFile(target, 'utf8');
       const document = documentSchema.parse(JSON.parse(source));
       return { document, revision: digest(source), source };
@@ -82,7 +83,7 @@ export class KnowledgeTopicStore {
     let handle: Awaited<ReturnType<typeof fs.open>>;
     try { handle = await fs.open(lockPath, 'wx'); }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('KNOWLEDGE_TOPICS_BUSY: a topic update is already in progress.');
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new AppError('KNOWLEDGE_TOPICS_BUSY', 'a topic update is already in progress.', { cause: error });
       throw error;
     }
     let initialized = false;
@@ -104,7 +105,7 @@ export class KnowledgeTopicStore {
   async write(expectedRevision: string, next: KnowledgeTopicDocument): Promise<string> {
     const valid = documentSchema.parse(next);
     const before = await this.read();
-    if (before.revision !== expectedRevision) throw new Error('KNOWLEDGE_TOPICS_CHANGED: refresh the preview.');
+    if (before.revision !== expectedRevision) throw new AppError('KNOWLEDGE_TOPICS_CHANGED', 'refresh the preview.');
     const target = await assertSafeKnowledgeWriteTarget(this.root(), fileName);
     const source = `${JSON.stringify(valid, null, 2)}\n`;
     try {

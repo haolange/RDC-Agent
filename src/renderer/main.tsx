@@ -3,14 +3,14 @@ import ReactDOM from 'react-dom/client';
 import App from './app/App';
 import { applyBootTheme } from './app/theme/bootTheme';
 import { enablePseudoLocale } from './i18n/pseudoLocale';
-import { browserAppBridgeInstalled, installBrowserAppBridge } from './platform/browserElectronApi';
+import { browserAppBridgeInstalled, installRendererApi } from './platform/rendererApi';
 import { installInteractionPerformanceProbe } from './platform/performance/InteractionPerformanceProbe';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import './styles/global.css';
 
 applyBootTheme();
-installBrowserAppBridge();
+installRendererApi();
 installInteractionPerformanceProbe();
 // Browser QA can render English pseudo-localized (?pseudoLocale) to prove every string is translated and layouts stretch.
 if (browserAppBridgeInstalled() && new URLSearchParams(window.location.search).has('pseudoLocale')) enablePseudoLocale();

@@ -3,6 +3,7 @@ import {
   type InvestigationReport,
   type MissionCheckpoint,
 } from '@shared/types/renderdocInvestigation';
+import { AppError } from '@shared/errors/appError';
 import { type TurnCompletionInput } from '../agent-runtime/agent/TurnCompletionValidator';
 import { allowsBudgetPause } from './missionBudgetPause';
 import { InvestigationArtifactService, investigationArtifactService } from './InvestigationArtifactService';
@@ -26,8 +27,7 @@ export type MissionCompletionDenialReason =
   | 'budget_evidence'
   | 'mission_method';
 
-export class MissionCompletionError extends Error {
-  readonly code = MISSION_COMPLETION_DENIED;
+export class MissionCompletionError extends AppError {
   readonly reason: MissionCompletionDenialReason;
   readonly details?: Record<string, unknown>;
   constructor(
@@ -35,7 +35,7 @@ export class MissionCompletionError extends Error {
     message: string,
     details?: Record<string, unknown>,
   ) {
-    super(`${MISSION_COMPLETION_DENIED}: ${message}`);
+    super(MISSION_COMPLETION_DENIED, message);
     this.name = 'MissionCompletionError';
     this.reason = reason;
     this.details = details;

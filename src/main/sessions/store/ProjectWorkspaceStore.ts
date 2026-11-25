@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId, nowMs, sanitizeToken } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { writeYaml } from '../../runtime/yaml';
 import { appPathService } from '../../runtime/AppPathService';
 import { hashCaptureFile } from '../../rdc/captures/replay/captureContentHash';
@@ -53,7 +54,7 @@ export class ProjectWorkspaceStore {
   }
 
   async createProject(rootPath: string): Promise<ProjectRecord> {
-    if (!path.isAbsolute(rootPath)) throw new Error('PROJECT_ROOT_ABSOLUTE_REQUIRED');
+    if (!path.isAbsolute(rootPath)) throw new AppError('PROJECT_ROOT_ABSOLUTE_REQUIRED');
     const resolvedRootPath = path.resolve(rootPath);
     if (!fs.existsSync(resolvedRootPath) || !fs.statSync(resolvedRootPath).isDirectory()) {
       throw new Error(`Project root is not a directory: ${resolvedRootPath}`);
@@ -227,7 +228,7 @@ export class ProjectWorkspaceStore {
   async referenceProjectInput(projectId: string, filePath: string): Promise<ProjectInputRecord[]> {
     return this.queueInputUpdate(projectId, async () => {
       const project = this.getProjectById(projectId);
-      if (!project) throw new Error('PROJECT_NOT_FOUND');
+      if (!project) throw new AppError('PROJECT_NOT_FOUND');
       const registered = await createExternalCaptureReference(filePath);
       const previous = project.inputs.find(entry => entry.inputId === registered.inputId);
       const input = { ...registered, discoveredAt: previous?.discoveredAt ?? registered.discoveredAt };
@@ -245,7 +246,7 @@ export class ProjectWorkspaceStore {
     return this.queueInputUpdate(projectId, async () => {
       const project = this.getProjectById(projectId);
       const input = project?.inputs.find(entry => entry.inputId === inputId);
-      if (!project || input?.source !== 'external_reference') throw new Error('CAPTURE_REFERENCE_NOT_FOUND');
+      if (!project || input?.source !== 'external_reference') throw new AppError('CAPTURE_REFERENCE_NOT_FOUND');
       const inputs = project.inputs.filter(entry => entry.inputId !== inputId);
       // Never touch the source file, even when it is missing or has changed.
       return this.commitProjectInputs(project, inputs);
@@ -540,13 +541,13 @@ export class ProjectWorkspaceStore {
 
     const walk = async (dirPath: string, depth: number): Promise<void> => {
       if (depth > ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH) {
-        throw new Error(`PROJECT_INPUTS_BUDGET_EXCEEDED: maxDepth ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH} exceeded under ${inputsPath}`);
+        throw new AppError('PROJECT_INPUTS_BUDGET_EXCEEDED', `maxDepth ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH} exceeded under ${inputsPath}`);
       }
       const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
       for (const entry of entries) {
         visited += 1;
         if (visited > ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES) {
-          throw new Error(`PROJECT_INPUTS_BUDGET_EXCEEDED: maxEntries ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES} exceeded under ${inputsPath}`);
+          throw new AppError('PROJECT_INPUTS_BUDGET_EXCEEDED', `maxEntries ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES} exceeded under ${inputsPath}`);
         }
         if (visited % ProjectWorkspaceStore.PROJECT_INPUTS_YIELD_EVERY === 0) {
           await new Promise<void>((resolve) => setImmediate(resolve));
@@ -554,7 +555,7 @@ export class ProjectWorkspaceStore {
 
         const fullPath = path.join(dirPath, entry.name);
         await safePath(projectRoot, fullPath);
-        if (entry.isSymbolicLink()) throw new Error('PROJECT_INPUTS_UNSAFE_LINK');
+        if (entry.isSymbolicLink()) throw new AppError('PROJECT_INPUTS_UNSAFE_LINK');
         if (entry.isDirectory()) {
           await walk(fullPath, depth + 1);
           continue;

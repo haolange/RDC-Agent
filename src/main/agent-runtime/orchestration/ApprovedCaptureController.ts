@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
+import { AppError } from '@shared/errors/appError';
 import { sameRdcLifecyclePosition, type RdcLifecyclePoint, type RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
 import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { InvestigationPlanContract } from '@shared/types/planInvestigation';
@@ -66,14 +67,14 @@ export class ApprovedCaptureController {
   async select(inputId: string, signal?: AbortSignal): Promise<{ changed: boolean; receipt?: InvestigationContentRef; current: RdcLifecyclePoint | null }> {
     this.assertReady();
     const chosen = this.input.captureScope.inputs.find(item => item.inputId === inputId);
-    if (!chosen) throw new Error('RDC_CAPTURE_NOT_APPROVED: input is not in the approved plan.');
+    if (!chosen) throw new AppError('RDC_CAPTURE_NOT_APPROVED', 'input is not in the approved plan.');
     const destination = { inputId, contentSha256: chosen.contentSha256, deviceId: this.input.captureScope.deviceId };
     this.input.host.assertPlan();
     await this.input.host.verifyDestination(destination);
     const from = await this.input.host.snapshot(this.current().binding, signal);
     this.lastVerified = from;
     if (sameCapture(from, destination)) return { changed: false, current: from };
-    if (this.original?.native.replacementCount) throw new Error('RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE: the original capture has active replacements.');
+    if (this.original?.native.replacementCount) throw new AppError('RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE', 'the original capture has active replacements.');
     const transition = await this.transition(from, destination, false, signal);
     return { changed: true, ...transition };
   }
@@ -128,7 +129,7 @@ export class ApprovedCaptureController {
     if (this.original && sameCapture(from, this.original)) {
       await this.input.host.quiescent();
       if (!from || from.native.replacementFingerprint !== this.original.native.replacementFingerprint) {
-        throw new Error('RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE: replacement state differs from the saved state.');
+        throw new AppError('RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE', 'replacement state differs from the saved state.');
       }
       // Event observation selects a target automatically; reopening can recover a
       // signed entry with no selected target without claiming that target was cleared.
@@ -147,14 +148,14 @@ export class ApprovedCaptureController {
         if (!to || !samePosition(to, this.original) || from.native.contextId !== to.native.contextId
           || from.native.leaseVersion !== to.native.leaseVersion
           || JSON.stringify(from.native.processIdentity) !== JSON.stringify(to.native.processIdentity)) {
-          throw new Error('RDC_RESTORE_UNCONFIRMED: position, target or process identity does not match the saved state.');
+          throw new AppError('RDC_RESTORE_UNCONFIRMED', 'position, target or process identity does not match the saved state.');
         }
         this.lastVerified = to;
         return { changed: true, receipt: this.input.host.writeReceipt({ ...base, recordedAt: Date.now(), event: 'position-restored',
           intent, from, to, runtimeFingerprint: this.current().plan.fingerprint }) };
       } catch (error) { this.fail(intent, base, from, error, true); throw error; }
     }
-    if (this.original?.native.replacementCount) throw new Error('RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE: cannot reconstruct original replacements after a capture switch.');
+    if (this.original?.native.replacementCount) throw new AppError('RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE', 'cannot reconstruct original replacements after a capture switch.');
     if (this.original) await this.input.host.verifyDestination(destinationOf(this.original));
     const transition = await this.transition(from, this.original ? destinationOf(this.original) : null, true, signal);
     return { changed: true, receipt: transition.receipt };
@@ -164,13 +165,13 @@ export class ApprovedCaptureController {
   async prepareRecovery(permissionRevision: number, signal?: AbortSignal): Promise<void> {
     this.assertReady(); this.input.host.assertPlan();
     if (this.recoveryAdmission) {
-      if (this.recoveryAdmission.revision !== permissionRevision) throw new Error('RDC_RECOVERY_PERMISSION_CHANGED');
+      if (this.recoveryAdmission.revision !== permissionRevision) throw new AppError('RDC_RECOVERY_PERMISSION_CHANGED');
       this.recoveryAdmission.guard(); return;
     }
     const guard = this.input.host.recoveryGuard(permissionRevision); guard();
     const from = this.lastVerified;
     if (!from || !this.input.captureScope.inputs.some(item => item.inputId === from.inputId && item.contentSha256 === from.contentSha256)
-      || from.deviceId !== this.input.captureScope.deviceId) throw new Error('RDC_RECOVERY_SCOPE_INVALID: no verified approved capture is available.');
+      || from.deviceId !== this.input.captureScope.deviceId) throw new AppError('RDC_RECOVERY_SCOPE_INVALID', 'no verified approved capture is available.');
     await this.input.host.joinRecoveryChild(signal); guard();
     this.recoveryAdmission = { revision: permissionRevision, guard };
   }
@@ -178,7 +179,7 @@ export class ApprovedCaptureController {
   /** Reopen only a main-observed fault on the same approved input and device. */
   async recover(signal?: AbortSignal): Promise<{ changed: true; receipt: InvestigationContentRef; current: RdcLifecyclePoint }> {
     const admission = this.recoveryAdmission;
-    if (!admission) throw new Error('RDC_RECOVERY_PREPARATION_REQUIRED');
+    if (!admission) throw new AppError('RDC_RECOVERY_PREPARATION_REQUIRED');
     try { return await this.performRecovery(admission.guard, signal); }
     finally { this.recoveryAdmission = null; }
   }
@@ -190,7 +191,7 @@ export class ApprovedCaptureController {
     const previous = this.current();
     const facts = await this.input.host.inspectRecovery(from, previous.binding, signal); guard();
     const failureKey = JSON.stringify({ inputId: from.inputId, contentSha256: from.contentSha256, deviceId: from.deviceId, ...facts.cause });
-    if (this.attemptedRecoveries.has(failureKey)) throw new Error('RDC_RECOVERY_REPEATED_FAILURE: this failure condition has already been recovered once.');
+    if (this.attemptedRecoveries.has(failureKey)) throw new AppError('RDC_RECOVERY_REPEATED_FAILURE', 'this failure condition has already been recovered once.');
     this.attemptedRecoveries.add(failureKey);
     this.input.host.prepareReceipts();
     const operationId = randomUUID(); const base = this.base(operationId);
@@ -199,7 +200,7 @@ export class ApprovedCaptureController {
       recovery: { cause: facts.cause, observed: facts.observed } });
     let stopped: InvestigationContentRef | undefined;
     const onStopped = (contextId: string) => {
-      if (stopped || contextId !== from.native.contextId) throw new Error('RDC_RECOVERY_STOP_RECEIPT_MISMATCH');
+      if (stopped || contextId !== from.native.contextId) throw new AppError('RDC_RECOVERY_STOP_RECEIPT_MISMATCH');
       stopped = this.input.host.writeReceipt({ ...base, recordedAt: Date.now(), event: 'daemon-stopped', intent, contextId, stopped: true });
     };
     try {
@@ -209,7 +210,7 @@ export class ApprovedCaptureController {
       const next = await this.input.host.reprepare(previous, signal); guard();
       const to = await this.input.host.snapshot(next.binding, signal); guard();
       if (!to || !sameCapture(to, destination) || !stopped || to.native.contextId === from.native.contextId) {
-        throw new Error('RDC_RECOVERY_RESULT_UNVERIFIED: the same input and device must reopen under a new confirmed context.');
+        throw new AppError('RDC_RECOVERY_RESULT_UNVERIFIED', 'the same input and device must reopen under a new confirmed context.');
       }
       const recordedAt = Date.now();
       const receipt = this.input.host.writeReceipt({ ...base, recordedAt, event: 'transition', intent, from, to,
@@ -225,15 +226,15 @@ export class ApprovedCaptureController {
 
   private async transition(from: RdcLifecyclePoint | null, destination: Destination | null, restored: boolean, signal?: AbortSignal): Promise<{ receipt: InvestigationContentRef; current: RdcLifecyclePoint | null }> {
     await this.input.host.quiescent();
-    if (from?.native.replacementCount) throw new Error('RDC_SWITCH_REPLACEMENTS_ACTIVE: restore replacements before changing capture.');
+    if (from?.native.replacementCount) throw new AppError('RDC_SWITCH_REPLACEMENTS_ACTIVE', 'restore replacements before changing capture.');
     const failureKey = JSON.stringify({ inputId: destination?.inputId ?? null, from: from?.inputId ?? null });
-    if (this.lastFailure === failureKey) throw new Error('RDC_SWITCH_REPEATED_FAILURE: the same transition already failed in this turn.');
+    if (this.lastFailure === failureKey) throw new AppError('RDC_SWITCH_REPEATED_FAILURE', 'the same transition already failed in this turn.');
     this.input.host.prepareReceipts();
     const previous = this.current(); const operationId = randomUUID(); const base = this.base(operationId);
     const intent = this.input.host.writeReceipt({ ...base, event: 'intent', original: this.original!, from, destination });
     let stopped: InvestigationContentRef | undefined;
     const onStopped = (contextId: string) => {
-      if (!from || stopped || contextId !== from.native.contextId) throw new Error('RDC_SWITCH_STOP_RECEIPT_MISMATCH');
+      if (!from || stopped || contextId !== from.native.contextId) throw new AppError('RDC_SWITCH_STOP_RECEIPT_MISMATCH');
       stopped = this.input.host.writeReceipt({ ...base, recordedAt: Date.now(), event: 'daemon-stopped', intent, contextId, stopped: true });
     };
     try {
@@ -248,13 +249,13 @@ export class ApprovedCaptureController {
       }
       const to = restored && this.original ? await this.input.host.snapshot(next.binding, signal) : opened;
       if (opened && to && (opened.native.contextId !== to.native.contextId || opened.native.leaseVersion !== to.native.leaseVersion
-        || JSON.stringify(opened.native.processIdentity) !== JSON.stringify(to.native.processIdentity))) throw new Error('RDC_RESTORE_PROCESS_MISMATCH');
-      if (destination ? !sameCapture(to, destination) : to !== null) throw new Error('RDC_SWITCH_RESULT_MISMATCH: the requested capture is not the verified current input.');
-      if (restored && !samePosition(to, this.original!)) throw new Error('RDC_RESTORE_UNCONFIRMED: original capture position or target was not restored.');
-      if (from && (!to || from.native.contextId !== to.native.contextId) && !stopped) throw new Error('RDC_SWITCH_STOP_RECEIPT_MISSING');
+        || JSON.stringify(opened.native.processIdentity) !== JSON.stringify(to.native.processIdentity))) throw new AppError('RDC_RESTORE_PROCESS_MISMATCH');
+      if (destination ? !sameCapture(to, destination) : to !== null) throw new AppError('RDC_SWITCH_RESULT_MISMATCH', 'the requested capture is not the verified current input.');
+      if (restored && !samePosition(to, this.original!)) throw new AppError('RDC_RESTORE_UNCONFIRMED', 'original capture position or target was not restored.');
+      if (from && (!to || from.native.contextId !== to.native.contextId) && !stopped) throw new AppError('RDC_SWITCH_STOP_RECEIPT_MISSING');
       if (from && to && from.native.contextId === to.native.contextId
         && (JSON.stringify(from.native.processIdentity) !== JSON.stringify(to.native.processIdentity)
-          || from.native.replaySessionId === to.native.replaySessionId)) throw new Error('RDC_SWITCH_PROCESS_MISMATCH');
+          || from.native.replaySessionId === to.native.replaySessionId)) throw new AppError('RDC_SWITCH_PROCESS_MISMATCH');
       const recordedAt = Date.now();
       const receipt = this.input.host.writeReceipt({ ...base, recordedAt, event: 'transition', intent, from, to,
         previousFingerprint: previous.plan.fingerprint, runtimeFingerprint: next.plan.fingerprint,
@@ -279,12 +280,12 @@ export class ApprovedCaptureController {
   private current(): Prepared {
     const plan = this.input.turn.runtimePlan; const prompt = this.input.turn.promptPlan;
     const binding = plan ? getRdcTurnBinding(plan) : undefined;
-    if (!plan || !prompt || !binding) throw new Error('RDC_REPREPARE_FROZEN_PLAN_CHANGED: prepared turn is missing.');
+    if (!plan || !prompt || !binding) throw new AppError('RDC_REPREPARE_FROZEN_PLAN_CHANGED', 'prepared turn is missing.');
     return { plan, prompt, binding };
   }
   private assertReady(): void {
-    if (this.initialError || this.original === undefined) throw new Error(`RDC_INITIAL_STATE_UNVERIFIED: ${this.initialError ?? 'initial state was not recorded'}`);
-    if (!this.input.turn.isLive(this.input.turn.generation)) throw new Error('RDC_TURN_NOT_ACTIVE');
+    if (this.initialError || this.original === undefined) throw new AppError('RDC_INITIAL_STATE_UNVERIFIED', this.initialError ?? 'initial state was not recorded');
+    if (!this.input.turn.isLive(this.input.turn.generation)) throw new AppError('RDC_TURN_NOT_ACTIVE');
   }
   private base(operationId: string) {
     return { schemaVersion: 1 as const, sessionId: this.input.sessionId, projectId: this.input.projectId,

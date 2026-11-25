@@ -2,6 +2,7 @@ import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import { buildMessageUpdateEvent, type MessageUpdateType } from '@shared/conversation/messageUpdateEvent';
 import { nowMs } from '@shared/utils/id';
 import { isHandoffOfferedAtTurnEnd } from '@shared/types/agentManifest';
+import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentOrchestrator, type PreparedAgentTurnContext } from '../agent-runtime/orchestration/AgentOrchestrator';
@@ -357,7 +358,7 @@ export async function completeProfileTurn(
 
   try {
       if (!capability) {
-        throw new Error(`MODEL_UNAVAILABLE: ${routePreflight.providerId}/${routePreflight.modelId}`);
+        throw new AppError('MODEL_UNAVAILABLE', `${routePreflight.providerId}/${routePreflight.modelId}`);
       }
       const prepared = input.preparedPrompt;
       const userInput = {
@@ -415,7 +416,7 @@ export async function completeProfileTurn(
       const receipt = terminalContext.value?.completionReceipt;
       if (terminalContext.value?.status !== 'complete' || !receipt
         || receipt.turnId !== assistantMessage.turnId) {
-        throw new Error('TURN_COMPLETION_RECEIPT_INVALID: the owning Agent turn did not confirm completion.');
+        throw new AppError('TURN_COMPLETION_RECEIPT_INVALID', 'the owning Agent turn did not confirm completion.');
       }
       assertTurnRuntimeEpochs({ sessionId, turnId: assistantMessage.turnId,
         initialFingerprint: input.preparedTurn.runtime.effectivePlan.fingerprint, receipt,

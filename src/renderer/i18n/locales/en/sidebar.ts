@@ -19,6 +19,7 @@ export const enSidebar = {
   'sidebar.addSession': 'New Session',
   'sidebar.removeSession': 'Remove Session',
   'sidebar.removeSessionFailed': 'Failed to remove session.',
+  'sidebar.createSessionFailed': 'Failed to create session.',
   'sidebar.removeSessionTitle': 'Delete session?',
   'sidebar.removeSessionConfirm': 'Delete “{title}”? Messages, work trace, request snapshots, derived context, and session artifacts will be removed from this device. This cannot be undone.',
   'sidebar.removeProjectTitle': 'Remove project?',

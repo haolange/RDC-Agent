@@ -16,7 +16,3 @@ const REJECT_KEYS: Record<AttachmentRejectCode, TranslationKey> = {
 export function attachmentRejectKey(code: AttachmentRejectCode): TranslationKey {
   return REJECT_KEYS[code];
 }
-
-export function isAttachmentStageOverflow(message: string): boolean {
-  return /PAYLOAD_TOO_LARGE|ATTACHMENT_LIMIT_EXCEEDED|expected array to have <=32 items/i.test(message);
-}

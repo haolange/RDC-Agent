@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
 import { canonicalJson } from './RdcOperationCatalog';
 import type { RdcOperationDefinition } from '@shared/types/tool';
@@ -12,7 +13,7 @@ const replacements = new Map<string, { contextId: string; experimentId: string }
 const digest = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest('hex');
 const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
 const eventId = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
-function invalid(): never { throw new Error('RDC_EVIDENCE_INVALID: native result does not provide supported execution evidence.'); }
+function invalid(): never { throw new AppError('RDC_EVIDENCE_INVALID', 'native result does not provide supported execution evidence.'); }
 export function isUnchangedShaderResult(definition: RdcOperationDefinition, result: Record<string, unknown>): boolean {
   if (definition.evidence_kind !== 'intervention' || !definition.effects.includes('shader_replacement')
     || result.status !== 'noop' || !eventId(result.resolved_event_id)) return false;
@@ -30,7 +31,7 @@ export function isUnchangedShaderResult(definition: RdcOperationDefinition, resu
 export function verifyRollbackIdentity(definition: RdcOperationDefinition, args: Record<string, unknown>, contextId: string, experimentId?: string): void {
   if (definition.evidence_kind !== 'rollback' || !experimentId) return;
   const known = replacements.get(String(args.replacement_id));
-  if (!known || known.contextId !== contextId || known.experimentId !== experimentId) throw new Error('RDC_EVIDENCE_INVALID: rollback must match a host-verified intervention for this experiment.');
+  if (!known || known.contextId !== contextId || known.experimentId !== experimentId) throw new AppError('RDC_EVIDENCE_INVALID', 'rollback must match a host-verified intervention for this experiment.');
 }
 export async function validateExecutionEvidence(definition: RdcOperationDefinition, args: Record<string, unknown>, result: Record<string, unknown>, context: ToolExecutionContext, contextId: string, experimentId: string): Promise<RdcValidatedEvidence> {
   if (definition.evidence_kind === 'intervention') {

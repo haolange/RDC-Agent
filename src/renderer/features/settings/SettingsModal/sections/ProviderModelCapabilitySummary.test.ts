@@ -95,7 +95,8 @@ it('shows warnings, tiers and the probe in the expanded model, and the probe out
     expect(host.querySelector('details')).toBeNull();
     expect(host.querySelector('[data-testid="settings-provider-tool-calling-unverified"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="settings-provider-model-tiers-model-a"]')).not.toBeNull();
-    expect(host.textContent).toContain('Unavailable route');
+    expect(host.textContent).toContain('settings.providers.modelUnavailableReason');
+    expect(host.textContent).not.toContain('Unavailable route');
     expect(host.textContent).not.toMatch(/settings\.providers\.capability\.(sources|protocolOwner|activation)/u);
     const probeRow = host.querySelector('[data-testid="settings-provider-model-probe-model-a"]')!;
     const probe = probeRow.querySelector('button')!;

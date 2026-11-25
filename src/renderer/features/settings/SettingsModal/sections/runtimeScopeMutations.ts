@@ -1,3 +1,4 @@
+import { errorDetail } from '../../../../lib/errorDetail';
 import { contentFromForm, type ResourceFormState } from './scopedResourceForm';
 import { importScopedResource, upsertScopedResource, validateScopedResource } from './runtimeScopeActions';
 import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
@@ -10,6 +11,7 @@ export const normalizeResourceId = (value: string): string =>
 export type SaveScopedResourceOutcome =
   | { ok: true; overview: RdcRuntimeOverview; id: string }
   | { ok: false; messageKey: 'resourceArgsInvalid' | 'resourceIdExists' | 'resourceIdRequired'; message?: string }
+  /** `message` is the technical reason (parser or validator text); it only leaves through "Copy details". */
   | { ok: false; messageKey: null; message: string };
 
 /**
@@ -30,7 +32,7 @@ export async function saveScopedResource(input: {
   } catch (error) {
     return input.kind === 'mcp'
       ? { ok: false, messageKey: 'resourceArgsInvalid' }
-      : { ok: false, messageKey: null, message: String(error) };
+      : { ok: false, messageKey: null, message: errorDetail(error) };
   }
 
   const nextId = normalizeResourceId(input.form.id);

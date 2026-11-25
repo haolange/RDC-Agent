@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 /**
  * AgentTurnRunner — runs one prepared agent turn; slot construction lives in AgentSlotFactory.
  */
 
-import { createHash } from 'node:crypto';
 import { resolveConversationLoopOutputPhase } from '@shared/conversation/loopOutputPhase';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { generateEventId, nowMs } from '@shared/utils/id';
@@ -140,7 +141,7 @@ export class AgentTurnRunner {
       throw new Error('RequestPlan is required for every provider request.');
     }
     if (!input.preparedRuntime) {
-      throw new Error('TURN_NOT_PREPARED: preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
+      throw new AppError('TURN_NOT_PREPARED', 'preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
     }
     const preparedRuntime = input.preparedRuntime;
     const promptPlan = preparedRuntime.promptPlan;
@@ -165,7 +166,7 @@ export class AgentTurnRunner {
     });
     if (!turnHooksAllowed) {
       await mcpLease?.release({ discardIfIdle: true });
-      throw new Error('HOOK_DENIED: turn.before-start');
+      throw new AppError('HOOK_DENIED', 'turn.before-start');
     }
     let turnHandle;
     try {
@@ -333,7 +334,7 @@ export class AgentTurnRunner {
     const approvedCapture = preparedRuntime.approvedExecution?.investigation?.captureScope;
     if (approvedCapture) {
       if (!input.sessionId || !input.projectId || input.agentId !== GENERAL_AGENT_ID || !preparedRuntime.approvedExecution?.investigation) {
-        throw new Error('RDC_CAPTURE_SCOPE_INVALID: approved capture work requires the owning General session.');
+        throw new AppError('RDC_CAPTURE_SCOPE_INVALID', 'approved capture work requires the owning General session.');
       }
       const approved = preparedRuntime.approvedExecution;
       const host = createApprovedCaptureHost({ sessionId: executionScopeId, projectId: input.projectId,
@@ -710,10 +711,10 @@ export class AgentTurnRunner {
     let completionReceipt: TurnCompletionReceipt | undefined;
     try {
       await activeSlot.agent.prompt(userMessage);
-      if (!turnHandle.isAborted && missionPlanningFeedback()) throw new Error('MISSION_PLAN_REQUIRED: the planning turn ended without a reviewed plan.');
-      if (await settleDirectTasks(false)) throw new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.');
+      if (!turnHandle.isAborted && missionPlanningFeedback()) throw new AppError('MISSION_PLAN_REQUIRED', 'the planning turn ended without a reviewed plan.');
+      if (await settleDirectTasks(false)) throw new AppError('TASK_COMPLETION_DENIED', 'Direct Task executions must be settled before the parent turn completes.');
       if (turnHandle.completionDeclaration?.disposition === 'cancelled' && !turnHandle.isAborted) {
-        throw new Error('TURN_COMPLETION_INVALID: cancelled requires an actual abort and joined execution.');
+        throw new AppError('TURN_COMPLETION_INVALID', 'cancelled requires an actual abort and joined execution.');
       }
       if (turnHandle.completionDeclaration?.disposition === 'completed' && preparedRuntime.approvedExecution) {
         assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
@@ -735,7 +736,7 @@ export class AgentTurnRunner {
         try { restored = await turnHandle.captureControl.recordTerminalRestoration(turnHandle.signal); }
         catch (error) { if (turnHandle.completionDeclaration?.disposition === 'completed') throw error; }
         if (!restored && turnHandle.completionDeclaration?.disposition === 'completed') {
-          throw new Error('RDC_RESTORE_UNCONFIRMED: the original capture position has no verified terminal receipt.');
+          throw new AppError('RDC_RESTORE_UNCONFIRMED', 'the original capture position has no verified terminal receipt.');
         }
       }
       completionReceipt = {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from '../errors/appError';
 
 export const RDC_PROBE_ACTIONS = ['enumerate', 'doctor', 'version', 'probe', 'capture_select', 'capture_restore', 'capture_recover', 'preview_status'] as const;
 export type RdcProbeAction = (typeof RDC_PROBE_ACTIONS)[number];
@@ -86,7 +87,7 @@ export interface CompiledRdcProbe {
 }
 
 function compileEventQuery(query: 'event_list' | 'event_search', args: NonNullable<RdcProbeInput['args']>, replaySessionId: string | undefined): CompiledRdcProbe {
-  if (!replaySessionId) throw new Error('RDC_PROBE_OWNER: no replay session is bound to this context.');
+  if (!replaySessionId) throw new AppError('RDC_PROBE_OWNER', 'no replay session is bound to this context.');
   const native: Record<string, unknown> = { session_id: replaySessionId };
   let operation: string;
   if (query === 'event_list') {
@@ -113,7 +114,7 @@ function compileEventQuery(query: 'event_list' | 'event_search', args: NonNullab
 export function compileRdcProbe(input: RdcProbeInput, replaySessionId?: string): CompiledRdcProbe {
   const parsed = RdcProbeInputSchema.parse(input);
   if (parsed.action === 'capture_select' || parsed.action === 'capture_restore' || parsed.action === 'capture_recover') {
-    throw new Error('RDC_PROBE_LIFECYCLE: capture lifecycle is not a CLI probe query.');
+    throw new AppError('RDC_PROBE_LIFECYCLE', 'capture lifecycle is not a CLI probe query.');
   }
   if (parsed.action === 'version' || parsed.action === 'doctor') {
     return { command: parsed.action, args: parsed.action === 'version' ? ['--json'] : [], needsContext: false };

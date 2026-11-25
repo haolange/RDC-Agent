@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
+import { AppError } from '@shared/errors/appError';
 import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReviewStore';
 import { useElectronApi } from '../../hooks/useElectronApi';
 import { useProjectStore } from '../../stores/projectStore';
@@ -48,7 +49,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
       if (!route || !isProviderExecutable(currentProvider) || currentProvider?.activeAccountId !== provider?.activeAccountId
         || currentProvider?.protocol !== provider?.protocol
         || !models.some((model) => model.providerId === route?.providerId && model.modelId === route.modelId)) {
-        throw new Error('MODEL_UNAVAILABLE: Please select an available model before executing the plan.');
+        throw new AppError('MODEL_UNAVAILABLE', 'Please select an available model before executing the plan.');
       }
       const assertSelectionCurrent = () => {
         const latest = useProjectStore.getState().currentSession;
@@ -60,7 +61,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
           || !isProviderExecutable(latestProvider) || latestProvider?.activeAccountId !== provider?.activeAccountId
           || latestProvider?.protocol !== provider?.protocol
           || buildSessionTurnControlsKey(useTurnControlsStore.getState().turnControls) !== buildSessionTurnControlsKey(controls)) {
-          throw new Error('MODEL_SELECTION_CHANGED: Review the current model and controls before executing the plan.');
+          throw new AppError('MODEL_SELECTION_CHANGED', 'Review the current model and controls before executing the plan.');
         }
       };
       assertSelectionCurrent();
@@ -87,7 +88,7 @@ export const usePlanReviewSubmit = (onReplan?: (payload: { sessionId: string; ag
     }
     if (!result.success) throw new Error(result.error || 'Unable to submit the plan review.');
     if (result.replan && !invalidated && isCurrent()) {
-      if (!onReplan) throw new Error('PLAN_REPLAN_UNAVAILABLE');
+      if (!onReplan) throw new AppError('PLAN_REPLAN_UNAVAILABLE');
       await onReplan({ sessionId: request.sessionId, agentId: result.replan.agentId, prompt: result.replan.feedback, planReference: { intent: 'revise', ...result.replan.source } });
     }
     if (!invalidated && isCurrent() && decision.kind === 'approve' && request.sessionId) {

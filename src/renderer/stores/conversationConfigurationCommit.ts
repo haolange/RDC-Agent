@@ -1,5 +1,6 @@
 import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
 import { isProviderExecutable } from '@shared/utils/providerExecutionAvailability';
+import { AppError } from '@shared/errors/appError';
 import { useAppSettingsStore } from './appSettingsStore';
 import type { ConversationSendRequest } from '@shared/types/conversation';
 
@@ -33,7 +34,7 @@ export async function buildConversationConfigurationCommit(input: {
   const providerId = input.modelOverride?.providerId || agentCommit?.route?.providerId;
   const modelId = input.modelOverride?.modelId || agentCommit?.route?.modelId;
   const provider = useAppSettingsStore.getState().settings.llm.providers.find((entry) => entry.id === providerId);
-  if (!isProviderExecutable(provider)) throw new Error('MODEL_UNAVAILABLE: provider is disabled or disconnected.');
+  if (!isProviderExecutable(provider)) throw new AppError('MODEL_UNAVAILABLE', 'provider is disabled or disconnected.');
   const providerCommit = providerId
     ? await useAppSettingsStore.getState().flushProviderSaves(providerId)
     : null;

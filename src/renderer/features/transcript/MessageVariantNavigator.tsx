@@ -7,7 +7,7 @@ import {
 import { switchConversationBranch } from '../../hooks/conversationPreview';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useI18n } from '../../i18n';
-import { useNotificationStore } from '../../stores/notificationStore';
+import { notify } from '../../stores/notificationStore';
 import { Chevron } from '../../ui/Chevron';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
@@ -60,7 +60,7 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
     });
     // A switch that did not happen says so; silently staying on the old branch reads as a broken control.
     if (!result?.success) {
-      useNotificationStore.getState().add({ tone: 'error', title: t('chat.messageVariantSwitchFailed') });
+      notify.error(t('chat.messageVariantSwitchFailed'));
       return;
     }
     hydrateLoadedSessionSurface({

@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
 import { replayLivePreviewStore } from '../rdc/captures/replay/ReplayLivePreviewStore';
 import { storageAdapter } from '../sessions/store/StorageAdapter';
@@ -8,7 +9,7 @@ import type { SessionScope } from '@shared/types/session';
 function authorize(scope: SessionScope) {
   const session = storageAdapter.readSession(scope.sessionId);
   const project = storageAdapter.getProjectById(scope.projectId);
-  if (!session || session.projectId !== scope.projectId || !project) throw new Error('REPLAY_SCOPE_DENIED');
+  if (!session || session.projectId !== scope.projectId || !project) throw new AppError('REPLAY_SCOPE_DENIED');
   return project.rootPath;
 }
 export function registerCaptureReplayReadHandlers(): void {

@@ -4,6 +4,7 @@ import { useLayoutStore } from '../../stores/layoutStore';
 import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { notify } from '../../stores/notificationStore';
 import { createConversationEventBatcher } from './conversationEventBatcher';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
@@ -52,7 +53,7 @@ function resolveMessageSessionId(message: { sessionId?: string | null }): string
   return message.sessionId ?? null;
 }
 
-export function subscribeConversation(electronAPI: ElectronAPI, showNotice: EventBridgeOptions['showNotice'], t: EventBridgeOptions['t']) {
+export function subscribeConversation(electronAPI: ElectronAPI, t: EventBridgeOptions['t']) {
   const conversationEventBatcher = createConversationEventBatcher({
     applyMessage: (event) => {
       const sessionId = resolveMessageSessionId(event.message) ?? event.sessionId;
@@ -115,7 +116,7 @@ export function subscribeConversation(electronAPI: ElectronAPI, showNotice: Even
           event.event.type === 'handoff.cancelled'
           && event.event.payload.cancelReason === 'restart_degrade'
         ) {
-          showNotice(t('chat.handoffRestartDegraded'));
+          notify.warning(t('chat.handoffRestartDegraded'));
         }
         return;
       }

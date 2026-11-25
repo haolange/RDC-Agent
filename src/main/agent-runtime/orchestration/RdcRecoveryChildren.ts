@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { getDelegatedChildSessionId, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { createSessionTaskStore, getDelegatedTaskScope, TaskRegistry, type TaskExecutionRecord } from '../tasks';
 import type { TurnHandle } from './TurnCoordinator';
@@ -10,27 +11,27 @@ export async function joinFaultedRdcChild(sessionId: string, turn: TurnHandle, s
   if (!childId) return;
   const lease = getRdcContextLease(childId);
   if (!lease?.quarantineReason || !lease.quarantineCause || lease.delegatedFrom !== sessionId || lease.ownerTurnId !== turn.turnId) {
-    throw new Error('RDC_RECOVERY_CHILD_ACTIVE: an unrelated or unverified delegated lease must finish first.');
+    throw new AppError('RDC_RECOVERY_CHILD_ACTIVE', 'an unrelated or unverified delegated lease must finish first.');
   }
   const scope = getDelegatedTaskScope(childId);
   if (!scope) {
     const joined = await boundedJoin(turn.abortProducerForRecovery(childId), signal);
-    if (!joined) throw new Error('RDC_RECOVERY_CHILD_OWNER_MISSING');
+    if (!joined) throw new AppError('RDC_RECOVERY_CHILD_OWNER_MISSING');
   } else {
-    if (scope.ownerSessionId !== sessionId || !scope.executionId || !scope.generation) throw new Error('RDC_RECOVERY_CHILD_OWNER_MISSING');
+    if (scope.ownerSessionId !== sessionId || !scope.executionId || !scope.generation) throw new AppError('RDC_RECOVERY_CHILD_OWNER_MISSING');
     const registry = new TaskRegistry(createSessionTaskStore(sessionId));
     const executions = await registry.listExecutions();
     const root = executions.find(value => value.id === scope.executionId && value.generation === scope.generation);
-    if (!root || TERMINAL.has(root.status)) throw new Error('RDC_RECOVERY_CHILD_OWNER_MISSING');
+    if (!root || TERMINAL.has(root.status)) throw new AppError('RDC_RECOVERY_CHILD_OWNER_MISSING');
     const selected = affectedExecutions(executions, root.id);
     for (const execution of selected) {
       signal?.throwIfAborted();
       await boundedJoin(registry.interruptExecutionForRecovery(execution.id, execution.generation), signal);
     }
-    if (affectedExecutions(await registry.listExecutions(), root.id).length) throw new Error('RDC_RECOVERY_CHILD_ACTIVE');
+    if (affectedExecutions(await registry.listExecutions(), root.id).length) throw new AppError('RDC_RECOVERY_CHILD_ACTIVE');
   }
   signal?.throwIfAborted();
-  if (getDelegatedChildSessionId(sessionId)) throw new Error('RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED');
+  if (getDelegatedChildSessionId(sessionId)) throw new AppError('RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED');
 }
 
 function affectedExecutions(executions: readonly TaskExecutionRecord[], rootId: string): TaskExecutionRecord[] {
@@ -56,7 +57,7 @@ async function boundedJoin<T>(joining: Promise<T>, signal?: AbortSignal): Promis
   const stop = new Promise<never>((_resolve, reject) => {
     abort = () => reject(new DOMException('Recovery was cancelled.', 'AbortError'));
     if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
-    timer = setTimeout(() => reject(new Error('RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED: child join timed out.')), 15_000);
+    timer = setTimeout(() => reject(new AppError('RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED', 'child join timed out.')), 15_000);
     timer.unref?.();
   });
   try { return await Promise.race([joining, stop]); }

@@ -5,7 +5,7 @@ import {
 import { useAgentStore } from '../../stores/agentStore';
 import { acceptsContextUsage } from '../../stores/contextUsageProjectionModel';
 import { useConversationStore } from '../../stores/conversationStore';
-import { useNotificationStore } from '../../stores/notificationStore';
+import { notify } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { isActiveSessionEvent, isActiveSessionScope } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
@@ -122,6 +122,6 @@ export function subscribeProjectInputsChanged(electronAPI: ElectronAPI) {
 export function subscribeProjectInputsError(electronAPI: ElectronAPI, t: EventBridgeOptions['t']) {
   return electronAPI.events.onProjectInputsError((payload) => {
     console.error('[project-inputs] reconcile failed', payload.error);
-    useNotificationStore.getState().add({ tone: 'error', title: t('project.inputs.reconcileFailed'), message: t('project.inputs.reconcileRetry') });
+    notify.error(t('project.inputs.reconcileFailed'), t('project.inputs.reconcileRetry'));
   });
 }

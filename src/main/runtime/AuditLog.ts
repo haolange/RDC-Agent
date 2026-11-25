@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from './AppPathService';
 import { hashScopedResource } from './ScopedResourceResolver';
 import type { AgentPermissionSettings } from '@shared/types/settings';
@@ -42,11 +43,9 @@ export function auditArgumentsHash(value: unknown): string {
 }
 
 /** The decision was not recorded, so the action it describes must not happen. */
-export class AuditWriteFailedError extends Error {
-  readonly code = 'AUDIT_WRITE_FAILED';
-
+export class AuditWriteFailedError extends AppError {
   constructor(cause: unknown) {
-    super(`AUDIT_WRITE_FAILED: the security audit log could not be written (${cause instanceof Error ? cause.message : String(cause)}); the action was not performed.`, { cause });
+    super('AUDIT_WRITE_FAILED', `the security audit log could not be written (${cause instanceof Error ? cause.message : String(cause)}); the action was not performed.`, { cause });
   }
 }
 
