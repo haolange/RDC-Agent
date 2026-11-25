@@ -4,6 +4,7 @@ import YAML from 'yaml';
 import { errorCodeOf } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
+import { directoryStamp } from '../settings/settings-core/externalInput';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
 import { canonicalRealpath } from '../runtime/fileIdentity';
 import { TrustStore, type TrustRecord, type TrustScope } from '../runtime/TrustStore';
@@ -67,6 +68,35 @@ const parseHookFile = (sourcePath: string): HookDefinition => {
   };
 };
 
+type HookScope = 'builtin' | 'user' | 'project';
+const isHookFile = (name: string): boolean => name.endsWith('.hook.yml');
+
+/** The parsed hook files of the hook directories, read once for one stamp of those directories. */
+interface HookFiles {
+  stamp: string;
+  candidates: Array<ScopedResourceCandidate<HookDefinition>>;
+  invalid: InvalidHookFile[];
+}
+
+function readHookFiles(directories: ReadonlyArray<readonly [string, HookScope]>, stamp: string): HookFiles {
+  const candidates: Array<ScopedResourceCandidate<HookDefinition>> = [];
+  const invalid: InvalidHookFile[] = [];
+  for (const [root, scope] of directories) {
+    if (!fs.existsSync(root)) continue;
+    for (const entry of fs.readdirSync(root).filter(isHookFile).sort()) {
+      const sourcePath = path.join(root, entry);
+      // One malformed file is reported on its own and never stops the other hooks from loading.
+      try {
+        const value = parseHookFile(sourcePath);
+        candidates.push({ id: value.id, kind: 'hook', scope, sourcePath, value, enabled: value.enabled });
+      } catch (error) {
+        invalid.push({ scope, sourcePath, reason: error instanceof Error ? error.message : String(error) });
+      }
+    }
+  }
+  return { stamp, candidates, invalid };
+}
+
 const untrustedReason = (scope: 'user' | 'project'): string => (
   `${scope === 'project' ? 'Project' : 'User'} hook requires explicit trust for its current trust fingerprint.`
 );
@@ -82,39 +112,30 @@ export class HookEngine {
 
   private loaded: LoadedHook[] = [];
   private invalid: InvalidHookFile[] = [];
+  private files: HookFiles | null = null;
 
   /** Hook files the last load could not parse; they are left out, not fatal. */
   invalidFiles(): InvalidHookFile[] {
     return [...this.invalid];
   }
 
+  /**
+   * Resolves the hooks of the three scopes and their trust. Every tool call loads, so the hook files are parsed only
+   * when the stamp of their directories (the `.hook.yml` names, each with its modification time and size) differs
+   * from the last parse; writes through the app also call `reloadFiles`. Trust is resolved on every load as before:
+   * the trust fingerprint (definition, referenced files, executable) and the trust records are read again each time.
+   */
   load(
     userHooksPath: string,
     projectRoot?: string,
     builtinHooksPath = appPathService.getBuiltinHooksPath(),
   ): LoadedHook[] {
-    const candidates: Array<ScopedResourceCandidate<HookDefinition>> = [];
-    const addDirectory = (root: string, scope: 'builtin' | 'user' | 'project') => {
-      if (!fs.existsSync(root)) return;
-      fs.readdirSync(root)
-        .filter((entry) => entry.endsWith('.hook.yml'))
-        .sort()
-        .forEach((entry) => {
-          const sourcePath = path.join(root, entry);
-          // One malformed file is reported on its own and never stops the other hooks from loading.
-          try {
-            const value = parseHookFile(sourcePath);
-            candidates.push({ id: value.id, kind: 'hook', scope, sourcePath, value, enabled: value.enabled });
-          } catch (error) {
-            invalid.push({ scope, sourcePath, reason: error instanceof Error ? error.message : String(error) });
-          }
-        });
-    };
-    const invalid: InvalidHookFile[] = [];
-    addDirectory(builtinHooksPath, 'builtin');
-    addDirectory(userHooksPath, 'user');
-    if (projectRoot) addDirectory(appPathService.getProjectRdcPaths(projectRoot).hooksPath, 'project');
-    this.invalid = invalid;
+    const directories: Array<readonly [string, HookScope]> = [[builtinHooksPath, 'builtin'], [userHooksPath, 'user']];
+    if (projectRoot) directories.push([appPathService.getProjectRdcPaths(projectRoot).hooksPath, 'project']);
+    const stamp = directories.map(([root, scope]) => `${scope}\u0000${root}\u0000${directoryStamp(root, isHookFile)}`).join('\n');
+    if (this.files?.stamp !== stamp) this.files = readHookFiles(directories, stamp);
+    const { candidates } = this.files;
+    this.invalid = [...this.files.invalid];
 
     // A damaged trust file is reported like a damaged hook file; until the user trusts again, nothing in it counts.
     let trustDamage: string | null = null;
@@ -159,6 +180,11 @@ export class HookEngine {
     });
     if (trustDamage) this.invalid.push({ scope: 'user', sourcePath: this.trustStorePath, reason: trustDamage });
     return this.list();
+  }
+
+  /** The next load parses the hook files again; called after the app writes one. */
+  reloadFiles(): void {
+    this.files = null;
   }
 
   list(): LoadedHook[] {

@@ -232,6 +232,7 @@ export class ScopedRuntimeService {
     assertInside(root, sourcePath);
     fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
     fs.writeFileSync(sourcePath, `${request.content.trim()}\n`, 'utf8');
+    if (request.kind === 'hook') this.hooks.reloadFiles();
     if (request.kind === 'agent' && request.scope === 'project') {
       projectAgentTrust.trust(this.requireProject(request.projectRoot), id, sourcePath);
     }
@@ -272,6 +273,7 @@ export class ScopedRuntimeService {
     const target = kind === 'skill' ? path.join(root, id) : path.join(root, `${id}${EXTENSIONS[kind]}`);
     assertInside(root, target);
     fs.rmSync(target, { recursive: kind === 'skill', force: true });
+    if (kind === 'hook') this.hooks.reloadFiles();
   }
 
   private readDocumentSafe(

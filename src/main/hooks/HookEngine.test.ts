@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import YAML from 'yaml';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HookEngine } from './HookEngine';
 
 const roots: string[] = [];
@@ -55,6 +55,48 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     expect(engine.invalidFiles()).toEqual([
       expect.objectContaining({ scope: 'user', sourcePath: path.join(userHooks, 'broken.hook.yml') }),
     ]);
+  });
+
+  it('parses hook files once per change, and a hook edited on disk applies to the next tool call', async () => {
+    const root = makeRoot();
+    const builtin = emptyBuiltin();
+    const userHooks = path.join(root, 'user-hooks');
+    fs.mkdirSync(userHooks, { recursive: true });
+    const source = path.join(builtin, 'echo.hook.yml');
+    // A builtin hook runs only scripts from its own directory.
+    const writeEcho = (text: string) => {
+      fs.writeFileSync(path.join(builtin, `echo-${text}.cjs`), `console.log(${JSON.stringify(text)});\n`);
+      fs.writeFileSync(source, YAML.stringify({
+        id: 'echo', event: 'tool.before-call', command: 'node', args: [`echo-${text}.cjs`], timeoutMs: 4000, failurePolicy: 'warn',
+      }));
+    };
+    const broken = path.join(userHooks, 'broken.hook.yml');
+    writeEcho('first');
+    fs.writeFileSync(broken, 'id: broken\nevent: [unclosed');
+    const engine = new HookEngine(path.join(root, 'trust.json'));
+    const toolCall = async () => {
+      engine.load(userHooks, undefined, builtin);
+      return (await engine.trigger('tool.before-call', { event: 'tool.before-call', toolName: 'read_file' }))
+        .map((result) => result.stdout.trim());
+    };
+    const hookFileReads = vi.spyOn(fs, 'readFileSync');
+    const readsOfHookFiles = () => hookFileReads.mock.calls.filter(([file]) => String(file).endsWith('.hook.yml')).length;
+    try {
+      expect(await toolCall()).toEqual(['first']);
+      expect(readsOfHookFiles()).toBe(2);
+      expect(await toolCall()).toEqual(['first']);
+      expect(readsOfHookFiles()).toBe(2);
+      expect(engine.invalidFiles()).toEqual([expect.objectContaining({ scope: 'user', sourcePath: broken })]);
+
+      writeEcho('second');
+      expect(await toolCall()).toEqual(['second']);
+      fs.writeFileSync(broken, YAML.stringify({ id: 'fixed', event: 'turn.before-start', command: process.execPath, failurePolicy: 'warn' }));
+      engine.load(userHooks, undefined, builtin);
+      expect(engine.invalidFiles()).toEqual([]);
+      expect(engine.list().map((hook) => hook.definition.id).sort()).toEqual(['echo', 'fixed']);
+    } finally {
+      hookFileReads.mockRestore();
+    }
   });
 
   it('resolves builtin < user < project with the same ScopedResourceResolver order', async () => {
