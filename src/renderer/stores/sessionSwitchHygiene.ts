@@ -20,6 +20,7 @@ export function applySessionSwitchHygiene(options: {
     monotonicStoppedTurnIds: [],
     monotonicStoppedRequestIds: [],
     revokedRequestIds: [],
+    surfaceSessionId: null,
   });
   useConversationStore.getState().setConversationSnapshot([], null);
   useConversationStore.getState().setTimeline([]);

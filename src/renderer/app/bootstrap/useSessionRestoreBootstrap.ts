@@ -52,7 +52,11 @@ export function useSessionRestoreBootstrap(shellReady: boolean): void {
       })
       .catch(() => undefined);
 
-    if (useWorkflowStore.getState().tracePresentation?.sessionId !== currentSession.sessionId) {
+    const conversation = useConversationStore.getState();
+    const traceLoaded = useWorkflowStore.getState().tracePresentation?.sessionId === currentSession.sessionId
+      || conversation.surfaceSessionId === currentSession.sessionId
+      || conversation.historyLoadingSessionId === currentSession.sessionId;
+    if (!traceLoaded) {
       void electronAPI.trace.getProjection(currentSession.sessionId)
         .then((result) => {
           useWorkflowStore.getState().setTracePresentation(result.presentation ?? null);

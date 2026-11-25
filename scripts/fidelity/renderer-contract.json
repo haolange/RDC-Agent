@@ -206,6 +206,7 @@
     "app.sessionSubscriptions": "src/renderer/app/bootstrap/sessionSubscriptions.ts",
     "app.captureSubscriptions": "src/renderer/app/bootstrap/captureSubscriptions.ts",
     "app.conversationSubscriptions": "src/renderer/app/bootstrap/conversationSubscriptions.ts",
+    "app.conversationMessageAssembler": "src/renderer/app/bootstrap/conversationMessageAssembler.ts",
     "app.shellSubscriptions": "src/renderer/app/bootstrap/shellSubscriptions.ts",
     "app.eventBridgeOptions": "src/renderer/app/bootstrap/eventBridgeOptions.ts",
     "app.conversationEventBatcher": "src/renderer/app/bootstrap/conversationEventBatcher.ts",

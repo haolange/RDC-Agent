@@ -5,7 +5,6 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTerminalStore } from '../../stores/terminalStore';
-import { useWorkflowStore } from '../../stores/workflowStore';
 import type { ActionEvent } from '@shared/types/evidence';
 
 export function useSessionSurfaceBootstrap(shellReady: boolean): void {
@@ -13,7 +12,6 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
   const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
-  const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const clearUsageSnapshot = useSessionStore((state) => state.clearUsageSnapshot);
   const setActiveTerminalContext = useTerminalStore((state) => state.setActiveContext);
   const refreshTerminalEntries = useTerminalStore((state) => state.refreshEntries);
@@ -42,47 +40,39 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
     }
     if (!shellReady) return;
 
+    const sessionId = currentSession.sessionId;
+    const conversation = useConversationStore.getState();
+    // The session opener loads history and trace in one request; only a session that became current another way
+    // (or whose surface was cleared since) loads here.
+    if (conversation.surfaceSessionId === sessionId || conversation.historyLoadingSessionId === sessionId) return;
+
     let cancelled = false;
     void (async () => {
-      const conversation = useConversationStore.getState();
-      const historyAlreadyBound = conversation.allConversationMessages.some(
-        (message) => message.sessionId === currentSession.sessionId,
-      );
-      const traceAlreadyBound = useWorkflowStore.getState().tracePresentation?.sessionId === currentSession.sessionId;
-      if (!historyAlreadyBound) conversation.setHistoryLoadingSessionId(currentSession.sessionId);
+      conversation.setHistoryLoadingSessionId(sessionId);
       const [historyResult, evidenceResult, traceResult] = await Promise.all([
-        historyAlreadyBound
-          ? Promise.resolve(null)
-          : electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [], branchState: null })),
-        historyAlreadyBound
-          ? Promise.resolve({ events: [] as ActionEvent[] })
-          : electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
-        traceAlreadyBound
-          ? Promise.resolve(null)
-          : electronAPI.trace.getProjection(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
+        electronAPI.conversation.getHistory(sessionId).catch(() => ({ messages: [], branchState: null, planReview: null })),
+        electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
+        electronAPI.trace.getProjection(sessionId).catch(() => ({ success: false, presentation: null })),
       ]);
       if (cancelled) return;
       useConversationStore.getState().setHistoryLoadingSessionId(null);
-      if (historyResult) {
-        hydrateLoadedSessionSurface({
-          messages: hydrateMessagesWithActionEvents(
-            historyResult.messages ?? [],
-            (evidenceResult.events ?? []) as ActionEvent[],
-          ),
-          branchState: historyResult.branchState ?? null,
-          planReview: 'planReview' in historyResult ? historyResult.planReview ?? null : null,
-          tracePresentation: traceResult ? traceResult.presentation ?? null : undefined,
-          applyTrace: Boolean(traceResult),
-        });
-      } else if (traceResult) {
-        setTracePresentation(traceResult.presentation ?? null);
-      }
+      hydrateLoadedSessionSurface({
+        sessionId,
+        messages: hydrateMessagesWithActionEvents(historyResult.messages ?? [], (evidenceResult.events ?? []) as ActionEvent[]),
+        branchState: historyResult.branchState ?? null,
+        planReview: historyResult.planReview ?? null,
+        tracePresentation: traceResult.presentation ?? null,
+        applyTrace: true,
+      });
     })();
     return () => {
       cancelled = true;
-      useConversationStore.getState().setHistoryLoadingSessionId(null);
+      // A switch may already have marked the next session as being opened; only this load's own mark is cleared.
+      if (useConversationStore.getState().historyLoadingSessionId === sessionId) {
+        useConversationStore.getState().setHistoryLoadingSessionId(null);
+      }
     };
-  }, [currentSession?.sessionId, shellReady, setConversationSnapshot, setTracePresentation]);
+  }, [currentSession?.sessionId, shellReady, setConversationSnapshot]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;

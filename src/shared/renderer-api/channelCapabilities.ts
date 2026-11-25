@@ -158,7 +158,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'session:create': 'mutation',
   'session:rename': 'mutation',
   'session:remove': 'mutation',
-  'session:select': 'mutation',
+  'session:open': 'mutation',
   'session:setModelOverride': 'mutation',
   'session:setAgentId': 'mutation',
   'session:applyDeclaredHandoff': 'mutation',

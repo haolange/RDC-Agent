@@ -7,12 +7,12 @@ import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene'
 import { hydrateComposerAgentFromSession } from '../../../stores/sessionAgentHydration';
 import {
   captureSelectionSnapshot,
-  loadRunsForSession,
   restoreSelectionSnapshot,
   type ProjectSelectionHandlerOpsContext,
   type ProjectSelectionLoaderOpsContext,
 } from './projectSelectionContext';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { SessionOpenResult } from '@shared/types/electron';
 import type { SelectSessionOptions } from './types';
 
 export async function selectSessionOp(
@@ -35,16 +35,19 @@ export async function selectSessionOp(
     ctx.setRuns([]);
   }
 
-  const result = await window.electronAPI.session.select(sessionId).catch((error) => ({
+  // The surface bootstraps leave a session being opened here alone, so its history and trace load once.
+  useConversationStore.getState().setHistoryLoadingSessionId(sessionId);
+  const result = await window.electronAPI.session.open(sessionId).catch((error): SessionOpenResult => ({
     success: false,
-    session: undefined,
-    currentRun: null,
     error: error instanceof Error ? error.message : String(error),
   }));
+  if (useConversationStore.getState().historyLoadingSessionId === sessionId) {
+    useConversationStore.getState().setHistoryLoadingSessionId(null);
+  }
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return false;
   }
-  if (!result.success || !result.session) {
+  if (!result.success) {
     restoreSelectionSnapshot(ctx, rollbackState);
     ctx.setSidebarError({ contextKey: 'sidebar.selectSessionFailed', detail: result.error });
     if (options.optimisticSession?.projectId) {
@@ -61,25 +64,18 @@ export async function selectSessionOp(
   }
   ctx.setCurrentSession(result.session);
   hydrateComposerAgentFromSession(result.session);
-  const history = await window.electronAPI.conversation.getHistory(result.session.sessionId).catch(() => null);
-  const trace = await window.electronAPI.trace.getProjection(result.session.sessionId).catch(() => null);
-  if (history && ctx.isLatestSelectionRequest(options.requestId)) {
-    hydrateLoadedSessionSurface({
-      messages: history.messages ?? [],
-      branchState: history.branchState ?? null,
-      planReview: history.planReview ?? null,
-      tracePresentation: trace?.presentation ?? null,
-      applyTrace: Boolean(trace?.presentation),
-    });
-  }
+  hydrateLoadedSessionSurface({
+    sessionId: result.session.sessionId,
+    messages: result.history.messages,
+    branchState: result.history.branchState ?? null,
+    planReview: result.history.planReview,
+    tracePresentation: result.trace.presentation ?? null,
+    applyTrace: Boolean(result.trace.presentation),
+  });
   ctx.setRightRailTarget('session');
-  ctx.setCurrentRun(result.currentRun ?? null);
+  ctx.setCurrentRun(result.currentRun);
   ctx.setCaptures(result.currentRun?.captures ?? []);
-  const nextRuns = await loadRunsForSession(sessionId);
-  if (!ctx.isLatestSelectionRequest(options.requestId)) {
-    return false;
-  }
-  ctx.setRuns(nextRuns);
+  ctx.setRuns(result.runs);
   return true;
 }
 
@@ -113,6 +109,7 @@ export async function handleSessionCreateOp(
     }
 
     const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
+    const sameProject = ctx.getCurrentProject()?.projectId === targetProject.projectId;
     applySessionSwitchHygiene({
       previousSessionId,
       nextSessionId: result.session.sessionId,
@@ -124,11 +121,21 @@ export async function handleSessionCreateOp(
     ctx.setCaptures([]);
     ctx.setRuns([]);
     ctx.ensureProjectExpanded(targetProject.projectId);
-    await ctx.loadProjects(targetProject.projectId, result.session.sessionId, {
-      autoSelectSession: true,
-      rightRailTarget: 'session',
-      requestId,
-    });
+    if (!sameProject) {
+      // Another project becomes current: its selection and project-scoped settings load with it.
+      await ctx.loadProjects(targetProject.projectId, result.session.sessionId, {
+        autoSelectSession: true,
+        rightRailTarget: 'session',
+        requestId,
+      });
+      return;
+    }
+    // Same project: the list gains the new session, and the session opens in one request alongside it.
+    const [nextSessions] = await Promise.all([
+      ctx.loadProjectSessionList(targetProject.projectId),
+      selectSessionOp(ctx, result.session.sessionId, { optimisticSession: result.session, requestId }),
+    ]);
+    if (ctx.isLatestSelectionRequest(requestId)) ctx.setSessions(nextSessions);
   } finally {
     ctx.setIsBusy(false);
   }
@@ -176,11 +183,7 @@ export async function handleSessionRemoveOp(
         ctx.setRightRailTarget('session');
         ctx.setCurrentRun(result.nextRun ?? null);
         ctx.setCaptures(result.nextRun?.captures ?? []);
-        const nextRuns = await loadRunsForSession(nextSession.sessionId);
-        if (!ctx.isLatestSelectionRequest(requestId)) {
-          return;
-        }
-        ctx.setRuns(nextRuns);
+        await selectSessionOp(ctx, nextSession.sessionId, { optimisticSession: nextSession, requestId });
       } else {
         ctx.setRightRailTarget('project');
         ctx.setCurrentRun(null);

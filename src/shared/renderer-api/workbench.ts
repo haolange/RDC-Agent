@@ -50,7 +50,7 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
     create: (projectId, title) => transport.invoke(INVOKE.session.create, projectId, title),
     rename: (id, title) => transport.invoke(INVOKE.session.rename, id, title),
     remove: (id) => transport.invoke(INVOKE.session.remove, id),
-    select: (id) => transport.invoke(INVOKE.session.select, id),
+    open: (id) => transport.invoke(INVOKE.session.open, id),
     setModelOverride: (id, modelOverride, turnControls) => (
       turnControls ? transport.invoke(INVOKE.session.setModelOverride, id, modelOverride, turnControls)
         : transport.invoke(INVOKE.session.setModelOverride, id, modelOverride)

@@ -118,6 +118,18 @@ import type {
 } from './renderdocInvestigation';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
+/** `session:open`: the opened session with its history, trace projection and runs, or why it could not open. */
+export type SessionOpenResult =
+  | {
+    success: true;
+    session: SessionRecord;
+    currentRun: RunSummary | null;
+    runs: RunSummary[];
+    history: { messages: ConversationMessage[]; planReview: PlanReviewProjection | null; branchState?: import('./conversationBranch').ConversationBranchState | null };
+    trace: TraceSessionResult;
+  }
+  | { success: false; error: string };
+
 export interface MemorySummary {
   scope: 'user' | 'project';
   /** Canonical storage key; use displayName for user-facing text. */
@@ -499,12 +511,8 @@ export interface ElectronAPI {
       nextRun?: RunSummary | null;
       error?: string;
     }>;
-    select: (id: string) => Promise<{
-      success: boolean;
-      session?: SessionRecord;
-      currentRun?: RunSummary | null;
-      error?: string;
-    }>;
+    /** Makes the session current and returns what its surfaces show. */
+    open: (id: string) => Promise<SessionOpenResult>;
     setModelOverride: (
       id: string,
       modelOverride: SessionRecord['modelOverride'],

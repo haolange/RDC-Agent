@@ -68,6 +68,8 @@ export interface ConversationState {
   latestMessageActivityAt: number;
   /** The session whose saved history is being read; the transcript shows a placeholder, not the empty home. */
   historyLoadingSessionId: string | null;
+  /** The session whose history and trace this renderer last loaded from main (cleared on every switch). */
+  surfaceSessionId: string | null;
   setHistoryLoadingSessionId: (sessionId: string | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
@@ -99,4 +101,5 @@ export const initialConversationState = {
   revokedRequestIds: [] as string[],
   latestMessageActivityAt: 0,
   historyLoadingSessionId: null as string | null,
+  surfaceSessionId: null as string | null,
 };

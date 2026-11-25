@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 import { handleProjectSelectOp, loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
-import { handleSessionActivateOp, selectSessionOp } from './projectSelectionSessionOps';
+import { handleSessionActivateOp, handleSessionCreateOp, selectSessionOp } from './projectSelectionSessionOps';
 import type { ProjectSelectionHandlerOpsContext, ProjectSelectionLoaderOpsContext } from './projectSelectionContext';
 import type { ProjectRecord } from '@shared/types/session';
 
@@ -9,8 +9,9 @@ const reloadSettings = vi.fn(async () => ({ agents: { definitions: [{ id: 'proje
 const activateSession = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../stores/conversationStore', () => ({
-  useConversationStore: { getState: () => ({ setTimeline: vi.fn() }) },
+  useConversationStore: { getState: () => ({ setTimeline: vi.fn(), historyLoadingSessionId: null, setHistoryLoadingSessionId: vi.fn() }) },
 }));
+vi.mock('../../../stores/sessionProjectionHydration', () => ({ hydrateLoadedSessionSurface: vi.fn() }));
 vi.mock('../../../stores/projectStore', () => ({
   useProjectStore: { getState: () => ({ currentProject: null, currentSession: null, rightRailTarget: 'project' }) },
 }));
@@ -46,8 +47,8 @@ function project(projectId: string): ProjectRecord {
 it.each([false, true])('preserves review and handoff state on same-session revalidation (optimistic=%s)', async optimistic => {
   vi.mocked(applySessionSwitchHygiene).mockClear();
   const session = { sessionId: 'session-a', projectId: 'proj_a', agentId: 'general' } as never;
-  vi.stubGlobal('window', { electronAPI: { session: { select: async () => ({ success: true, session }) },
-    conversation: { getHistory: async () => null }, trace: { getProjection: async () => null }, run: { list: async () => ({ runs: [] }) } } });
+  vi.stubGlobal('window', { electronAPI: { session: { open: async () => ({ success: true, session, currentRun: null, runs: [],
+    history: { messages: [], planReview: null, branchState: null }, trace: { success: true, presentation: null } }) } } });
   const ctx = { getCurrentSession: () => session, isLatestSelectionRequest: () => true,
     setCurrentSession: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
   } as unknown as ProjectSelectionLoaderOpsContext;
@@ -293,4 +294,31 @@ describe('loadProjectsOp listing gate', () => {
     expect(order.slice(0, 2)).toEqual(['setProjects', 'onProjectsListed']);
     expect(order).toContain('reloadSettings');
   });
+});
+
+it('creates a session in the current project with one open request and no project reload', async () => {
+  const current = project('proj_a');
+  const created = { sessionId: 'session-new', projectId: 'proj_a' } as never;
+  const calls: string[] = [];
+  vi.stubGlobal('window', { electronAPI: { session: {
+    create: async () => { calls.push('create'); return { success: true, session: created }; },
+    open: async () => {
+      calls.push('open');
+      return { success: true, session: created, currentRun: null, runs: [],
+        history: { messages: [], planReview: null, branchState: null }, trace: { success: true, presentation: null } };
+    },
+  } } });
+  const ctx = {
+    setSidebarError: vi.fn(), getCurrentProject: () => current, projectMenuOpen: false, beginSelectionRequest: () => 1,
+    setIsBusy: vi.fn(), isLatestSelectionRequest: () => true, getCurrentSession: () => null, setCurrentProject: vi.fn(),
+    setCurrentSession: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
+    ensureProjectExpanded: vi.fn(), loadProjects: vi.fn(), setSessions: vi.fn(),
+    loadProjectSessionList: vi.fn(async () => { calls.push('list'); return [created]; }),
+  } as unknown as ProjectSelectionHandlerOpsContext;
+  try {
+    await handleSessionCreateOp(ctx);
+    expect([...calls].sort()).toEqual(['create', 'list', 'open']);
+    expect(ctx.loadProjects).not.toHaveBeenCalled();
+    expect(ctx.setSessions).toHaveBeenCalledWith([created]);
+  } finally { vi.unstubAllGlobals(); }
 });

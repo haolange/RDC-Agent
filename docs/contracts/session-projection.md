@@ -9,7 +9,7 @@
 - `projectStore.currentSession.sessionId` 是 renderer 唯一 active session。
 - 跨项目选择项目根而不选会话时，先缓存并清空旧 session 的 transcript、运行态、右栏与 Composer 上下文，再投影目标项目；此时 `currentSession=null` 不代表旧 turn 又成为前台。旧 turn 的流事件及最终返回留在所属 session cache，不能重新选择旧项目或会话。仅从当前所选项目的无会话 Composer 发出的首轮结果可以建立前台新 session。
 - Sidebar 每个项目节点只投影 `session.projectId` 与该节点一致的会话；乐观切换期间旧项目的 session 列表不能暂挂到新项目标题下。
-- Main `session:select` / `session:create` 更新权威 current；不 abort 其它 session 的 active turn（多 session 并行是契约意图，见 `concurrencyContract`）。
+- Main `session:open` / `session:create` 更新权威 current；不 abort 其它 session 的 active turn（多 session 并行是契约意图，见 `concurrencyContract`）。`session:open` 一次返回会话、当前 run、run 列表、history 与 trace 投影；renderer 打开期间以 `historyLoadingSessionId` 标记该会话，加载完成记为 `surfaceSessionId`，两个 surface bootstrap 见到任一标记即不再重复拉取，每次切换由 switch hygiene 清空 `surfaceSessionId`。同项目新建会话只发 create、open 与会话列表三个请求，跨项目才走项目选择与项目级设置重载。
 - Capture 所有权仍按 `ownerSessionId` fail-closed（见 `permissions.md`）。
 
 ## IPC 门控

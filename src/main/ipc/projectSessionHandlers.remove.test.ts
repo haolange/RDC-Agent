@@ -12,6 +12,7 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
   conversation: {
     cancelActiveTurn: vi.fn(async () => ({ success: true })),
     isTurnActive: vi.fn(() => false),
+    getHistory: vi.fn(async () => ({ messages: [], planReview: null, branchState: null })),
   },
   storage: {
     projects: { referenceProjectInput: vi.fn() },
@@ -47,6 +48,9 @@ vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
 }));
 vi.mock('../conversation/ConversationService', () => ({
   conversationService: conversation,
+}));
+vi.mock('../agent-trace/TraceService', () => ({
+  traceService: { getSession: vi.fn(async (sessionId: string) => ({ success: true, sessionId, presentation: null })) },
 }));
 vi.mock('../conversation/ConversationRoutePreflight', () => ({
   resolveEnabledAgentDefinition: vi.fn(() => ({ id: 'general' })),
@@ -172,7 +176,7 @@ describe('session:remove slot sync', () => {
     expect(syncSessionSlots).toHaveBeenCalledWith('sess_1');
   });
 
-  it('returns the persisted session agentId on session:select', async () => {
+  it('opens a session with its persisted agentId, history, trace and runs in one result', async () => {
     storage.readSession.mockReturnValue({
       sessionId: 'sess_1',
       projectId: 'proj_1',
@@ -193,15 +197,19 @@ describe('session:remove slot sync', () => {
       initializeIpcState: vi.fn(async () => undefined),
     } as unknown as WorkbenchIpcContext);
 
-    const handler = handlers.get('session:select');
+    const handler = handlers.get('session:open');
     const result = await handler!({}, 'sess_1');
     expect(result).toMatchObject({
       success: true,
       session: expect.objectContaining({ sessionId: 'sess_1', agentId: 'general' }),
+      runs: [],
+      history: { messages: [], planReview: null },
+      trace: { success: true, sessionId: 'sess_1' },
     });
+    expect(conversation.getHistory).toHaveBeenCalledWith('sess_1');
   });
 
-  it('does not interrupt an active conversation run when the session is selected', async () => {
+  it('does not interrupt an active conversation run when the session is opened', async () => {
     storage.readSession.mockReturnValue({ sessionId: 'sess_1', projectId: 'proj_1', title: 't' });
     const running = { runId: 'run_1', turnId: 'turn_1', sessionId: 'sess_1', status: 'running' };
     storage.getLatestRun.mockReturnValue(running as RunSummary);
@@ -214,7 +222,7 @@ describe('session:remove slot sync', () => {
       initializeIpcState: vi.fn(async () => undefined),
     } as unknown as WorkbenchIpcContext);
 
-    const result = await handlers.get('session:select')!({}, 'sess_1');
+    const result = await handlers.get('session:open')!({}, 'sess_1');
     expect(result).toMatchObject({ success: true, currentRun: running });
     expect(conversation.isTurnActive).toHaveBeenCalledWith('sess_1', 'turn_1');
     expect(storage.updateRun).not.toHaveBeenCalled();
@@ -233,7 +241,7 @@ describe('session:remove slot sync', () => {
       initializeIpcState: vi.fn(async () => undefined),
     } as unknown as WorkbenchIpcContext);
 
-    await handlers.get('session:select')!({}, 'sess_1');
+    await handlers.get('session:open')!({}, 'sess_1');
     expect(storage.updateRun).toHaveBeenCalledWith('sess_1', 'run_1', expect.objectContaining({
       status: 'interrupted', stopReason: 'Recovered after app restart',
     }));

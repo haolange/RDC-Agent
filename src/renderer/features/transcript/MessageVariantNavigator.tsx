@@ -64,6 +64,7 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
       return;
     }
     hydrateLoadedSessionSurface({
+      sessionId: message.sessionId,
       messages: result.messages,
       branchState: result.branchState ?? null,
       tracePresentation: result.tracePresentation ?? null,

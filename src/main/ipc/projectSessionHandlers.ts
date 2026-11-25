@@ -2,6 +2,7 @@ import { dialog, ipcMain } from 'electron';
 import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
 import { conversationService } from '../conversation/ConversationService';
+import { traceService } from '../agent-trace/TraceService';
 import { applyDeclaredHandoff } from '../conversation/applyDeclaredHandoff';
 import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
 import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
@@ -330,10 +331,12 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     }
   });
 
-  ipcMain.handle('session:select', async (_event, ...rawArgs: unknown[]) => {
+  // Opening a session is one round trip: it becomes current, and its history, trace projection and runs come back
+  // with it instead of in four follow-up requests.
+  ipcMain.handle('session:open', async (_event, ...rawArgs: unknown[]) => {
     try {
       const [id] = parseIpcArgs(SessionIdOnlyArgsSchema, rawArgs, {
-        label: 'session:select',
+        label: 'session:open',
         maxBytes: 4 * 1024,
       });
       const session = storageAdapter.readSession(id);
@@ -346,10 +349,14 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       const currentRun = await recoverStaleRunOnSelection(storageAdapter.getLatestRun(id));
       state.currentRunId = currentRun?.runId || session.lastRunId || null;
       storageAdapter.setCurrentSessionId(id);
+      const [history, trace] = await Promise.all([conversationService.getHistory(id), traceService.getSession(id)]);
       return {
         success: true,
         session: projectSessionForClient(session),
         currentRun,
+        runs: storageAdapter.listRuns(id),
+        history,
+        trace,
       };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };

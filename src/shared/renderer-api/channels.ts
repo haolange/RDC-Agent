@@ -174,7 +174,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     create: 'session:create',
     rename: 'session:rename',
     remove: 'session:remove',
-    select: 'session:select',
+    open: 'session:open',
     setModelOverride: 'session:setModelOverride',
     setAgentId: 'session:setAgentId',
     applyDeclaredHandoff: 'session:applyDeclaredHandoff',

@@ -2,6 +2,8 @@ import { translate, type TranslationKey } from '../../i18n';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { applySessionSwitchHygiene } from '../../stores/sessionSwitchHygiene';
+import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { notify } from '../../stores/notificationStore';
@@ -62,27 +64,33 @@ const downloadTextFile = (fileName: string, content: string, mimeType: string): 
   URL.revokeObjectURL(url);
 };
 
-async function loadSession(sessionId: string, context: SlashCommandContext): Promise<void> {
+async function loadSession(sessionId: string): Promise<void> {
   const electronAPI = window.electronAPI;
-  const result = await electronAPI.session.select(sessionId);
-  if (!result.success || !result.session) {
+  const projectStore = useProjectStore.getState();
+  const previousSessionId = projectStore.currentSession?.sessionId ?? null;
+  const result = await electronAPI.session.open(sessionId);
+  if (!result.success) {
     notify.failure(result.error, currentText, 'composer.commandSessionMissing');
     return;
   }
 
-  const projectStore = useProjectStore.getState();
-  const sessionStore = useSessionStore.getState();
+  if (previousSessionId !== result.session.sessionId) {
+    applySessionSwitchHygiene({ previousSessionId, nextSessionId: result.session.sessionId });
+  }
   projectStore.setCurrentSession(result.session);
-  sessionStore.setCurrentRun(result.currentRun ?? null);
-
-  const [sessionsResult, runsResult, historyResult] = await Promise.all([
-    electronAPI.session.list(result.session.projectId),
-    electronAPI.run.list(result.session.sessionId),
-    electronAPI.conversation.getHistory(result.session.sessionId),
-  ]);
+  const sessionStore = useSessionStore.getState();
+  sessionStore.setCurrentRun(result.currentRun);
+  sessionStore.setRuns(result.runs);
+  hydrateLoadedSessionSurface({
+    sessionId: result.session.sessionId,
+    messages: result.history.messages,
+    branchState: result.history.branchState ?? null,
+    planReview: result.history.planReview,
+    tracePresentation: result.trace.presentation ?? null,
+    applyTrace: Boolean(result.trace.presentation),
+  });
+  const sessionsResult = await electronAPI.session.list(result.session.projectId);
   projectStore.setSessions(sessionsResult.sessions);
-  sessionStore.setRuns(runsResult.runs);
-  context.setConversationMessages(historyResult.messages);
 }
 
 async function switchModel(modelId: string, context: SlashCommandContext): Promise<void> {
@@ -162,7 +170,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     case 'resume-session': {
       const sessionId = getPayloadString(action, 'sessionId');
       if (sessionId) {
-        await loadSession(sessionId, context);
+        await loadSession(sessionId);
         return;
       }
       const result = await electronAPI.workflow.resume();

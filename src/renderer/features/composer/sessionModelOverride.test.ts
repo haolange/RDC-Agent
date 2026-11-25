@@ -9,7 +9,7 @@ vi.mock('../../platform/getElectronApi', () => ({
     session: {
       setModelOverride: persistInvoke,
       create: vi.fn(),
-      select: vi.fn(),
+      open: vi.fn(),
     },
   }),
 }));
