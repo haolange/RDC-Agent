@@ -12,26 +12,24 @@
  */
 
 import { z } from 'zod';
-import { EventStream } from '../core/EventStream';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
+import { AlternatingTextThinkingChannels, StreamChannelRefs } from './internal/streamChannelRefs';
+import { ProviderHttpError } from './internal/http';
 import {
-  AlternatingTextThinkingChannels,
-  StreamChannelRefs,
-  closeSwitchedChannel,
-} from './internal/streamChannelRefs';
-import {
-  composeAbortSignals,
-  ensureOk,
-  normalizeError,
-  parseSSE,
-  ProviderHttpError,
-} from './internal/http';
+  readProviderFrames,
+  sendProviderRequest,
+  startProviderStream,
+  type ProviderFrameStream,
+  type ProviderStreamRun,
+} from './internal/providerStreamDriver';
+import { ToolCallAccumulator } from './internal/toolCallAccumulator';
+import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
 import { applyGeminiReasoning, reasoningVisibilityRequest } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
+import type { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import type { EventStream } from '../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -40,6 +38,7 @@ import type {
   Model,
   StopReason,
   StreamOptions,
+  ThinkingArtifactSource,
   ToolDefinition,
 } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
@@ -70,6 +69,21 @@ const GeminiStreamChunkSchema = z.object({
     thoughtsTokenCount: z.number().optional(),
   }).passthrough().optional(),
 }).passthrough();
+type GeminiStreamChunk = z.infer<typeof GeminiStreamChunkSchema>;
+type GeminiCandidate = NonNullable<GeminiStreamChunk['candidates']>[number];
+type GeminiPart = NonNullable<NonNullable<GeminiCandidate['content']>['parts']>[number];
+
+const GEMINI_FRAMES: ProviderFrameStream<GeminiStreamChunk> = {
+  providerApi: PROVIDER_API,
+  framing: 'sse',
+  frameSchema: GeminiStreamChunkSchema,
+};
+
+const GEMINI_USAGE_FIELDS: UsageFieldMap<NonNullable<GeminiStreamChunk['usageMetadata']>> = {
+  inputTokens: (usage) => usage.promptTokenCount,
+  outputTokens: (usage) => usage.candidatesTokenCount,
+  totalTokens: (usage) => usage.totalTokenCount,
+};
 
 export interface GeminiProviderOptions {
   baseUrl?: string;
@@ -97,169 +111,29 @@ export class GeminiProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
-    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-      (event) => event.type === 'done',
-      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
-
-    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
-    const apiKey = options.apiKey ?? this.defaultApiKey;
-
-    void this.run(stream, builder, model, context, options, baseUrl, apiKey);
-    return stream;
+    return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
+      const response = await this.send(model, context, options, run.signal);
+      return consumeGeminiStream(response, run, options);
+    });
   }
 
-  private async run(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    builder: AssistantStreamBuilder,
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-    baseUrl: string,
-    apiKey: string | undefined,
-  ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
-
-    try {
-      builder.start();
-
-      if (!apiKey) {
-        throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Gemini provider');
-      }
-
-      const body = applyRequestPlanBody(this.buildRequestBody(context, options), options.requestPlan);
-      const url = buildGeminiStreamUrl(baseUrl, model.id, apiKey, this.surface);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.surface === 'vertex' ? { Authorization: `Bearer ${apiKey}` } : {}),
-          ...this.defaultHeaders,
-          ...requestPlanHeaders(options.requestPlan),
-        },
-        body: JSON.stringify(body),
-        signal: composed.signal,
-      });
-
-      recordQuotaFromResponse(options.requestPlan, response);
-      await ensureOk(response, PROVIDER_API);
-
-      let toolCallCounter = 0;
-      const channels = new StreamChannelRefs(PROVIDER_API);
-      const alternating = new AlternatingTextThinkingChannels(channels);
-      const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
-      const signatureSource = reasoningProjectionSource(options.requestPlan, 'opaque');
-      let sawOutput = false;
-
-      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
-        if (composed.signal.aborted) break;
-        const chunk = parseProviderFrame(data, PROVIDER_API, GeminiStreamChunkSchema);
-
-        if (chunk.usageMetadata) {
-          builder.setUsage({
-            inputTokens: chunk.usageMetadata.promptTokenCount ?? 0,
-            outputTokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
-            totalTokens:
-              chunk.usageMetadata.totalTokenCount
-              ?? (chunk.usageMetadata.promptTokenCount ?? 0)
-                + (chunk.usageMetadata.candidatesTokenCount ?? 0),
-          });
-        }
-
-        const candidate = chunk.candidates?.[0];
-        if (!candidate) continue;
-
-        const parts = candidate.content?.parts ?? [];
-        for (const [partIndex, part] of parts.entries()) {
-          const thoughtSignature = part.thoughtSignature;
-          const partBindingKey = 'candidate:' + (candidate.index ?? 0) + ':part:' + partIndex;
-          if (typeof part.text === 'string') {
-            if (part.thought) {
-              sawOutput = true;
-              const continuation = thoughtSignature
-                ? createContinuationArtifact(options.requestPlan, {
-                    type: 'thought_signature',
-                    thoughtSignature,
-                    containerBinding: { providerBlockKey: partBindingKey },
-                  })
-                : undefined;
-              const switched = alternating.ensure('thinking');
-              closeSwitchedChannel(builder, switched.close);
-              if (switched.started) {
-                builder.startThinking(switched.ref, {
-                  kind: 'summary',
-                  source: summarySource,
-                  visibility: 'summary',
-                  continuation,
-                });
-              }
-              builder.appendThinking(switched.ref, part.text, {
-                kind: 'summary',
-                source: summarySource,
-                visibility: 'summary',
-                continuation,
-              });
-            } else {
-              sawOutput = true;
-              const switched = alternating.ensure('text');
-              closeSwitchedChannel(builder, switched.close);
-              if (switched.started) builder.startText(switched.ref);
-              builder.appendText(switched.ref, part.text);
-            }
-            continue;
-          }
-          if (part.functionCall) {
-            const fc = part.functionCall;
-            toolCallCounter += 1;
-            const callId = 'gemini-call-' + Date.now() + '-' + toolCallCounter;
-            sawOutput = true;
-            if (thoughtSignature) {
-              const signatureRef = channels.ref({
-                providerBlockKey: partBindingKey + ':thought-signature',
-                sourceIndex: partIndex,
-              });
-              const continuation = createContinuationArtifact(options.requestPlan, {
-                type: 'thought_signature',
-                thoughtSignature,
-                containerBinding: { providerBlockKey: partBindingKey, toolCallIds: [callId] },
-              });
-              builder.startThinking(signatureRef, {
-                kind: 'opaque',
-                source: signatureSource,
-                visibility: 'hidden',
-                continuation,
-              });
-              builder.endThinking(signatureRef);
-            }
-            const toolRef = channels.ref({
-              providerBlockKey: `function:${toolCallCounter - 1}`,
-              sourceIndex: toolCallCounter - 1,
-            });
-            builder.startToolCall(toolRef, callId, fc.name);
-            const args = JSON.stringify(fc.args ?? {});
-            builder.appendToolCallArgs(toolRef, args);
-            builder.endToolCall(toolRef);
-          }
-          // inlineData / 其它 part 暂不处理。
-        }
-
-        if (candidate.finishReason) {
-          builder.markTerminal(mapFinishReason(candidate.finishReason, toolCallCounter > 0));
-        }
-      }
-
-      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
-    } catch (err) {
-      const thrown = normalizeError(err);
-      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
-        ? composed.signal.reason
-        : thrown;
-      builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
-    } finally {
-      composed.dispose();
+  private async send(model: Model, context: Context, options: StreamOptions, signal: AbortSignal): Promise<Response> {
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    if (!apiKey) {
+      throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Gemini provider');
     }
+    const body = applyRequestPlanBody(this.buildRequestBody(context, options), options.requestPlan);
+    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
+      url: buildGeminiStreamUrl(baseUrl, model.id, apiKey, this.surface),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.surface === 'vertex' ? { Authorization: `Bearer ${apiKey}` } : {}),
+        ...this.defaultHeaders,
+        ...requestPlanHeaders(options.requestPlan),
+      },
+      body,
+    });
   }
 
   private buildRequestBody(
@@ -304,6 +178,101 @@ export function buildGeminiStreamUrl(
       : `${trimmed}/v1beta`;
   const endpoint = `${versionedBase}/models/${encodeURIComponent(modelId)}:streamGenerateContent?alt=sse`;
   return surface === 'vertex' ? endpoint : `${endpoint}&key=${encodeURIComponent(apiKey)}`;
+}
+
+/**
+ * Gemini chunks carry no block ids: text and thought summaries alternate as segments. Each functionCall part is a
+ * whole call; its thoughtSignature becomes a hidden thinking block bound to that call.
+ */
+async function consumeGeminiStream(
+  response: Response,
+  run: ProviderStreamRun,
+  options: StreamOptions,
+): Promise<{ sawOutput: boolean }> {
+  const state = new GeminiStreamState(run.builder, options.requestPlan);
+  for await (const chunk of readProviderFrames(response, run.signal, options, GEMINI_FRAMES)) state.handle(chunk);
+  return { sawOutput: state.sawOutput };
+}
+
+class GeminiStreamState {
+  sawOutput = false;
+  private readonly channels = new StreamChannelRefs(PROVIDER_API);
+  private readonly alternating = new AlternatingTextThinkingChannels(this.channels);
+  private readonly toolCalls: ToolCallAccumulator<number>;
+  private readonly summarySource: ThinkingArtifactSource;
+  private readonly signatureSource: ThinkingArtifactSource;
+
+  constructor(
+    private readonly builder: AssistantStreamBuilder,
+    private readonly requestPlan: RequestPlan,
+  ) {
+    this.toolCalls = new ToolCallAccumulator(builder);
+    this.summarySource = reasoningProjectionSource(requestPlan, 'summary');
+    this.signatureSource = reasoningProjectionSource(requestPlan, 'opaque');
+  }
+
+  handle(chunk: GeminiStreamChunk): void {
+    if (chunk.usageMetadata) this.builder.setUsage(normalizeUsage(chunk.usageMetadata, GEMINI_USAGE_FIELDS));
+    const candidate = chunk.candidates?.[0];
+    if (!candidate) return;
+    for (const [partIndex, part] of (candidate.content?.parts ?? []).entries()) {
+      this.handlePart(candidate, partIndex, part);
+    }
+    if (candidate.finishReason) {
+      this.builder.markTerminal(mapFinishReason(candidate.finishReason, this.toolCalls.count > 0));
+    }
+  }
+
+  private handlePart(candidate: GeminiCandidate, partIndex: number, part: GeminiPart): void {
+    const thoughtSignature = part.thoughtSignature;
+    const partBindingKey = 'candidate:' + (candidate.index ?? 0) + ':part:' + partIndex;
+    if (typeof part.text === 'string') {
+      this.sawOutput = true;
+      if (part.thought) {
+        const continuation = thoughtSignature
+          ? createContinuationArtifact(this.requestPlan, {
+              type: 'thought_signature',
+              thoughtSignature,
+              containerBinding: { providerBlockKey: partBindingKey },
+            })
+          : undefined;
+        this.alternating.appendThinking(this.builder, part.text, {
+          kind: 'summary',
+          source: this.summarySource,
+          visibility: 'summary',
+          continuation,
+        });
+      } else {
+        this.alternating.appendText(this.builder, part.text);
+      }
+      return;
+    }
+    if (part.functionCall) {
+      const callIndex = this.toolCalls.count;
+      const callId = 'gemini-call-' + Date.now() + '-' + (callIndex + 1);
+      this.sawOutput = true;
+      if (thoughtSignature) {
+        const signatureRef = this.channels.ref({
+          providerBlockKey: partBindingKey + ':thought-signature',
+          sourceIndex: partIndex,
+        });
+        this.builder.startThinking(signatureRef, {
+          kind: 'opaque',
+          source: this.signatureSource,
+          visibility: 'hidden',
+          continuation: createContinuationArtifact(this.requestPlan, {
+            type: 'thought_signature',
+            thoughtSignature,
+            containerBinding: { providerBlockKey: partBindingKey, toolCallIds: [callId] },
+          }),
+        });
+        this.builder.endThinking(signatureRef);
+      }
+      const toolRef = this.channels.ref({ providerBlockKey: `function:${callIndex}`, sourceIndex: callIndex });
+      this.toolCalls.addComplete(callIndex, toolRef, callId, part.functionCall.name, JSON.stringify(part.functionCall.args ?? {}));
+    }
+    // inlineData / 其它 part 暂不处理。
+  }
 }
 
 // =====================================================================

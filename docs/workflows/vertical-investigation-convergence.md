@@ -422,7 +422,7 @@ M1–M3 通过后，调查方法不再改动。本节处理五个遗留问题：
 
 一个回合内，instructions 与 tools 在上表列出的少数事件之外逐字节不变。跨回合时 PromptPlan 重建，tool-loop 内的 reasoning 项从 journal 丢弃（`SessionContextJournal.ts:104-106,237-246`），新回合的历史从上一回合第一条带工具调用的助手消息起与前一请求不同。
 
-缓存键与亲和：ChatGPT 账号路由沿用 `openai-responses` 协议的 `cache.mode: unknown`（`profiles/openai-responses.json:35`，`surfaces/chatgpt-account.json` 未覆盖），`PromptCacheCompiler.ts:30-33` 因此关闭缓存，请求既不带 `prompt_cache_key`，也不带 `session-id` 请求头（`responsesShared.ts:340-351`、`OpenAIResponsesProvider.ts:130-140`）。Codex CLI 对同一后端在请求体带 `prompt_cache_key`、请求头带 `session-id`，源码注释写明 ChatGPT 从 `session-id` 请求头推导缓存亲和（`openai/codex` 的 `codex-rs/core/src/client.rs`、`codex-rs/codex-api/src/requests/headers.rs`）。[源码]
+缓存键与亲和：ChatGPT 账号路由沿用 `openai-responses` 协议的 `cache.mode: unknown`（`profiles/openai-responses.json:35`，`surfaces/chatgpt-account.json` 未覆盖），`PromptCacheCompiler.ts:30-33` 因此关闭缓存，请求既不带 `prompt_cache_key`，也不带 `session-id` 请求头（`responsesShared.ts:354-358`、`OpenAIResponsesProvider.ts:86-90`）。Codex CLI 对同一后端在请求体带 `prompt_cache_key`、请求头带 `session-id`，源码注释写明 ChatGPT 从 `session-id` 请求头推导缓存亲和（`openai/codex` 的 `codex-rs/core/src/client.rs`、`codex-rs/codex-api/src/requests/headers.rs`）。[源码]
 
 据此，命中约 25% 有两种可能的主因，交接单 A 用同一份统计区分：
 

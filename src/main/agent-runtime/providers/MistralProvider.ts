@@ -10,38 +10,69 @@
  * 使用原生 fetch + 自实现 SSE 解析，不引入第三方 SDK。
  */
 
-import { EventStream } from '../core/EventStream';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
-import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
-import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { AssistantStreamBuilder, parseProviderFrame, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
-import { ChatCompletionsChunkSchema } from './internal/chatCompletionsFrame';
+import { ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import {
-  AlternatingTextThinkingChannels,
-  StreamChannelRefs,
-  closeSwitchedChannel,
-} from './internal/streamChannelRefs';
-import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
-import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+  consumeChatCompletionsStream,
+  toChatCompletionsMessage,
+  toChatCompletionsTool,
+  type ChatCompletionsChoice,
+  type ChatCompletionsDialect,
+  type ChatCompletionsMessage,
+  type ChatCompletionsUsage,
+} from './internal/chatCompletionsWire';
+import { ProviderHttpError } from './internal/http';
+import { sendProviderRequest, startProviderStream } from './internal/providerStreamDriver';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
-import { reasoningProjectionSource } from './reasoningProjection';
+import type { UsageFieldMap } from './internal/usageNormalizer';
+import type { EventStream } from '../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
   Context,
-  Message,
   Model,
-  StopReason,
+  ProviderOutputRef,
   StreamOptions,
-  ToolDefinition,
 } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
 const DEFAULT_BASE_URL = 'https://api.mistral.ai/v1';
 const PROVIDER_API = 'mistral-conversations';
+
+/** Mistral's first choice is read; once finish_reason arrived, any further choice ends the stream as a violation. */
+function selectFirstChoice(
+  choices: ChatCompletionsChoice[],
+  finishReasonSeen: boolean,
+  terminalRef: ProviderOutputRef,
+): ChatCompletionsChoice | undefined {
+  const choice = choices[0];
+  if (choice && finishReasonSeen) {
+    throw new ProviderStreamProtocolError(
+      'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+      terminalRef,
+      'Provider emitted another Chat Completions choice after finish_reason.',
+    );
+  }
+  return choice;
+}
+
+/** Mistral reports token counts, cached prompt tokens and reasoning tokens, but no cache writes or native hit/miss. */
+const MISTRAL_USAGE_FIELDS: UsageFieldMap<ChatCompletionsUsage> = {
+  inputTokens: (usage) => usage.prompt_tokens,
+  outputTokens: (usage) => usage.completion_tokens,
+  totalTokens: (usage) => usage.total_tokens,
+  cacheReadTokens: (usage) => usage.prompt_tokens_details?.cached_tokens,
+  reasoningTokens: (usage) => usage.completion_tokens_details?.reasoning_tokens,
+};
+
+const MISTRAL_DIALECT: ChatCompletionsDialect = {
+  providerApi: PROVIDER_API,
+  selectChoice: selectFirstChoice,
+  usageFields: MISTRAL_USAGE_FIELDS,
+  recordsExecution: false,
+};
 
 export interface MistralProviderOptions {
   /** 默认 baseUrl，可被 `StreamOptions.baseUrl` 覆盖。 */
@@ -69,173 +100,30 @@ export class MistralProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
-    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-      (event) => event.type === 'done',
-      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
-
-    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
-    const apiKey = options.apiKey ?? this.defaultApiKey;
-
-    void this.run(stream, builder, model, context, options, baseUrl, apiKey);
-    return stream;
+    return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
+      const response = await this.send(model, context, options, run.signal);
+      return consumeChatCompletionsStream(response, run, options, MISTRAL_DIALECT);
+    });
   }
 
-  private async run(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    builder: AssistantStreamBuilder,
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-    baseUrl: string,
-    apiKey: string | undefined,
-  ): Promise<void> {
-    const externalSignal = options.signal;
-    const internalSignal = stream.signal;
-    const composed = composeAbortSignals(externalSignal, internalSignal, { providerApi: PROVIDER_API, ...options });
-
-    try {
-      builder.start();
-
-      if (!apiKey) {
-        throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Mistral provider');
-      }
-
-      const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
-      const url = buildMistralChatCompletionsUrl(baseUrl);
-      const headers = {
+  private async send(model: Model, context: Context, options: StreamOptions, signal: AbortSignal): Promise<Response> {
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    if (!apiKey) {
+      throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Mistral provider');
+    }
+    const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
+    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
+      url: buildMistralChatCompletionsUrl(baseUrl),
+      headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
         'User-Agent': 'RDC-Agent',
         ...this.defaultHeaders,
         ...requestPlanHeaders(options.requestPlan),
-      };
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: composed.signal,
-      });
-
-      recordQuotaFromResponse(options.requestPlan, response);
-      await ensureOk(response, PROVIDER_API);
-
-      let finishReason: string | null = null;
-      const channels = new StreamChannelRefs(PROVIDER_API);
-      const alternating = new AlternatingTextThinkingChannels(channels);
-      const terminalRef = channels.ref({ providerBlockKey: 'response:terminal' });
-      const toolRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
-      let reasoningBuffer = '';
-      const reasoningSource = reasoningProjectionSource(options.requestPlan, 'raw');
-      let sawOutput = false;
-
-      const sseOptions = {
-        providerApi: PROVIDER_API,
-        ...options,
-        onDoneSentinel: () => builder.markTerminal(mapFinishReason(finishReason)),
-      };
-      for await (const data of parseSSE(response, composed.signal, sseOptions)) {
-        if (composed.signal.aborted) break;
-        const chunk = parseProviderFrame(data, PROVIDER_API, ChatCompletionsChunkSchema);
-
-        if (chunk.usage) {
-          const cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens;
-          const reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens;
-          builder.setUsage(finalizeProviderUsage({
-            inputTokens: chunk.usage.prompt_tokens ?? 0,
-            outputTokens: chunk.usage.completion_tokens ?? 0,
-            totalTokens:
-              chunk.usage.total_tokens
-              ?? (chunk.usage.prompt_tokens ?? 0) + (chunk.usage.completion_tokens ?? 0),
-            ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
-            ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
-          }));
-        }
-
-        const choice = chunk.choices?.[0];
-        if (!choice) continue;
-        if (finishReason !== null) {
-          throw new ProviderStreamProtocolError(
-            'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
-            terminalRef,
-            'Provider emitted another Chat Completions choice after finish_reason.',
-          );
-        }
-
-        const delta = choice.delta ?? {};
-        const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
-        if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
-          sawOutput = true;
-          reasoningBuffer += reasoningDelta;
-          const continuation = createContinuationArtifact(options.requestPlan, {
-            type: 'reasoning_content',
-            reasoningContent: reasoningBuffer,
-          });
-          const switched = alternating.ensure('thinking');
-          closeSwitchedChannel(builder, switched.close);
-          if (switched.started) {
-            builder.startThinking(switched.ref, {
-              kind: 'raw',
-              source: reasoningSource,
-              visibility: 'raw-collapsed',
-              continuation,
-            });
-          }
-          builder.appendThinking(switched.ref, reasoningDelta, {
-            kind: 'raw',
-            source: reasoningSource,
-            visibility: 'raw-collapsed',
-            continuation,
-          });
-        }
-        if (typeof delta.content === 'string' && delta.content.length > 0) {
-          sawOutput = true;
-          const switched = alternating.ensure('text');
-          closeSwitchedChannel(builder, switched.close);
-          if (switched.started) builder.startText(switched.ref);
-          builder.appendText(switched.ref, delta.content);
-        }
-
-        if (Array.isArray(delta.tool_calls)) {
-          for (const tc of delta.tool_calls) {
-            const callIndex = typeof tc.index === 'number' ? tc.index : 0;
-            sawOutput = true;
-            let toolRef = toolRefs.get(callIndex);
-            if (!toolRef) {
-              toolRef = channels.ref({
-                providerBlockKey: `virtual:tool:${callIndex}`,
-                sourceIndex: callIndex,
-              });
-              toolRefs.set(callIndex, toolRef);
-              builder.startToolCall(toolRef, tc.id ?? '', tc.function?.name ?? '');
-            } else {
-              builder.updateToolCall(toolRef, tc.id ?? '', tc.function?.name ?? '');
-            }
-            const args = tc.function?.arguments;
-            if (typeof args === 'string' && args.length > 0) {
-              builder.appendToolCallArgs(toolRef, args);
-            }
-          }
-        }
-
-        if (choice.finish_reason) {
-          finishReason = choice.finish_reason;
-          builder.markTerminal(mapFinishReason(finishReason));
-        }
-      }
-
-      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
-    } catch (err) {
-      const thrown = normalizeError(err);
-      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
-        ? composed.signal.reason
-        : thrown;
-      builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
-    } finally {
-      composed.dispose();
-    }
+      },
+      body,
+    });
   }
 
   private buildRequestBody(
@@ -255,7 +143,7 @@ export class MistralProvider implements ProviderStrategy {
     const maxTokens = options.maxTokens ?? model.maxTokens;
     if (typeof maxTokens === 'number' && maxTokens > 0) body.max_tokens = maxTokens;
     if (context.tools && context.tools.length > 0) {
-      body.tools = context.tools.map(toMistralTool);
+      body.tools = context.tools.map(toChatCompletionsTool);
       body.tool_choice = 'auto';
     }
     body.stream_options = { include_usage: true };
@@ -272,126 +160,19 @@ export function buildMistralChatCompletionsUrl(baseUrl: string): string {
 // 转换辅助
 // =====================================================================
 
-interface MistralMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content?: unknown;
-  name?: string;
-  tool_call_id?: string;
-  tool_calls?: Array<{
-    id: string;
-    type: 'function';
-    function: { name: string; arguments: string };
-  }>;
-  reasoning_content?: string;
-}
-
 function toMistralMessages(
   context: Context,
   requestPlan: RequestPlan,
-): MistralMessage[] {
-  const out: MistralMessage[] = [];
+): ChatCompletionsMessage[] {
+  const out: ChatCompletionsMessage[] = [];
   const prompt = partitionSystemPrompt(context);
   if (prompt.combinedText) {
     out.push({ role: 'system', content: prompt.combinedText });
   }
   for (const message of context.messages) {
-    out.push(...convertMessage(message, requestPlan));
+    out.push(toChatCompletionsMessage(message, requestPlan, false));
   }
   return out;
 }
 
-function convertMessage(message: Message, requestPlan: RequestPlan): MistralMessage[] {
-  if (message.role === 'user') {
-    if (typeof message.content === 'string') {
-      return [{ role: 'user', content: message.content }];
-    }
-    const parts: Array<Record<string, unknown>> = [];
-    for (const block of message.content) {
-      if (block.type === 'text') {
-        parts.push({ type: 'text', text: block.text });
-      } else if (block.type === 'image') {
-        parts.push({
-          type: 'image_url',
-          image_url: { url: `data:${block.mimeType};base64,${block.data}` },
-        });
-      }
-    }
-    return [{ role: 'user', content: parts }];
-  }
-
-  if (message.role === 'assistant') {
-    const text: string[] = [];
-    const reasoning: string[] = [];
-    const toolCalls: Required<MistralMessage>['tool_calls'] = [];
-    for (const block of message.content) {
-      if (block.type === 'text') text.push(block.text);
-      else if (block.type === 'thinking') {
-        const sameToolLoop = message.content.some((candidate) => candidate.type === 'toolCall');
-        const decision = decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop });
-        if (
-          decision.action === 'replay'
-          && block.continuation?.carrier === 'reasoning-content'
-          && block.continuation.reasoningContent
-        ) reasoning.push(block.continuation.reasoningContent);
-      } else if (block.type === 'toolCall') {
-        toolCalls.push({
-          id: block.id,
-          type: 'function',
-          function: {
-            name: block.name,
-            arguments: JSON.stringify(block.arguments ?? {}),
-          },
-        });
-      }
-    }
-    const out: MistralMessage = {
-      role: 'assistant',
-      content: text.length > 0 ? text.join('') : null,
-    };
-    if (toolCalls.length > 0) out.tool_calls = toolCalls;
-    if (reasoning.length > 0) out.reasoning_content = reasoning.join('');
-    return [out];
-  }
-
-  // toolResult
-  const textBlocks: string[] = [];
-  for (const block of message.content) {
-    if (block.type === 'text') textBlocks.push(block.text);
-  }
-  return [
-    {
-      role: 'tool',
-      tool_call_id: message.toolCallId,
-      content: textBlocks.join('\n'),
-    },
-  ];
-}
-
-function toMistralTool(tool: ToolDefinition): Record<string, unknown> {
-  return {
-    type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    },
-  };
-}
-
-function mapFinishReason(reason: string | null | undefined): StopReason {
-  switch (reason) {
-    case 'stop':
-      return 'stop';
-    case 'length':
-      return 'length';
-    case 'tool_calls':
-    case 'function_call':
-      return 'toolUse';
-    case 'content_filter':
-      return 'refusal';
-    default:
-      return 'stop';
-  }
-}
-
-export { mapFinishReason, toMistralMessages };
+export { toMistralMessages };

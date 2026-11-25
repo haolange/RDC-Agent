@@ -3,15 +3,18 @@ import {
   streamText,
   tool,
   type LanguageModel,
+  type LanguageModelUsage,
   type ModelMessage,
   type TextStreamPart,
   type ToolSet,
 } from 'ai';
-import { EventStream } from '../core/EventStream';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
-import { composeAbortSignals, normalizeError } from './internal/http';
-import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+import { normalizeError } from './internal/http';
+import { startProviderStream, type ProviderStreamFailure } from './internal/providerStreamDriver';
+import { ToolCallAccumulator } from './internal/toolCallAccumulator';
+import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
+import type { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import type { EventStream } from '../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -25,6 +28,25 @@ import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { SharedV3ProviderOptions } from '@ai-sdk/provider';
 
 type RuntimeLanguageModel = Exclude<LanguageModel, string>;
+
+const AI_SDK_USAGE_FIELDS: UsageFieldMap<LanguageModelUsage> = {
+  inputTokens: (usage) => usage.inputTokens,
+  outputTokens: (usage) => usage.outputTokens,
+  totalTokens: (usage) => usage.totalTokens,
+  cacheReadTokens: (usage) => usage.inputTokenDetails.cacheReadTokens,
+  cacheWriteTokens: (usage) => usage.inputTokenDetails.cacheWriteTokens,
+  reasoningTokens: (usage) => usage.outputTokenDetails.reasoningTokens,
+};
+
+/**
+ * The SDK owns the transport and reports an aborted request its own way, so any failure after the signal fired is an
+ * abort, reported with the error the SDK threw.
+ */
+function sdkStreamFailure(thrown: unknown, signal: AbortSignal): ProviderStreamFailure {
+  const error = normalizeError(thrown);
+  return { error, reason: signal.aborted || error.name === 'AbortError' ? 'aborted' : 'error' };
+}
+
 export interface AiSdkStreamingProviderOptions {
   api: string;
   createModel: (model: Model, context: Context, options: StreamOptions) => Promise<RuntimeLanguageModel>;
@@ -40,24 +62,8 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
     this.resolveProviderOptions = options.providerOptions;
   }
   stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
-    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-      (event) => event.type === 'done',
-      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
-    void this.run(stream, builder, model, context, options);
-    return stream;
-  }
-  private async run(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    builder: AssistantStreamBuilder,
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: this.api, ...options });
-    try {
-      builder.start();
+    const request = { providerApi: this.api, model, options, failure: sdkStreamFailure };
+    return startProviderStream(request, async ({ builder, signal }) => {
       if (options.requestPlan.effectiveModelId !== model.id) throw new Error(
         `RequestPlan model ${options.requestPlan.effectiveModelId} does not match ${model.id}.`,
       );
@@ -71,19 +77,11 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
         temperature: options.temperature,
         topP: options.topP,
         providerOptions: this.resolveProviderOptions?.(options),
-        abortSignal: composed.signal,
+        abortSignal: signal,
         maxRetries: 0,
       });
-      const sawOutput = await consumeFullStream(result.fullStream, builder, model);
-      builder.finish({ signal: composed.signal, sawOutput, providerApi: this.api });
-    } catch (error) {
-      if (!builder.isFinished) {
-        const normalized = normalizeError(error);
-        builder.fail(normalized, composed.signal.aborted || normalized.name === 'AbortError' ? 'aborted' : 'error');
-      }
-    } finally {
-      composed.dispose();
-    }
+      return { sawOutput: await consumeFullStream(result.fullStream, builder, model) };
+    });
   }
 }
 
@@ -148,8 +146,8 @@ async function consumeFullStream(
   model: Model,
 ): Promise<boolean> {
   const channels = new StreamChannelRefs(model.api);
-  const startedKinds = new Map<string, 'text' | 'thinking' | 'tool_call'>();
-  const toolBuffers = new Map<string, string>();
+  const toolCalls = new ToolCallAccumulator<string>(builder);
+  let sawTextOrThinking = false;
   const refFor = (id: string) => channels.ref({
     providerBlockKey: `part:${id}`,
     itemId: id,
@@ -164,52 +162,31 @@ async function consumeFullStream(
     const partWithId = part as TextStreamPart<ToolSet> & { id?: string };
     if (part.type === 'text-start') {
       builder.startText(refFor(part.id));
-      startedKinds.set(part.id, 'text');
+      sawTextOrThinking = true;
     } else if (part.type === 'text-delta') {
       builder.appendText(refFor(part.id), part.text);
     } else if (part.type === 'text-end') {
       builder.endText(refFor(part.id));
     } else if (part.type === 'reasoning-start') {
       builder.startThinking(refFor(part.id), thinkingInput);
-      startedKinds.set(part.id, 'thinking');
+      sawTextOrThinking = true;
     } else if (part.type === 'reasoning-delta') {
       builder.appendThinking(refFor(part.id), part.text, thinkingInput);
     } else if (part.type === 'reasoning-end') {
       builder.endThinking(refFor(part.id));
     } else if (part.type === 'tool-input-start') {
-      builder.startToolCall(refFor(part.id), part.id, part.toolName);
-      startedKinds.set(part.id, 'tool_call');
-      toolBuffers.set(part.id, '');
+      toolCalls.start(part.id, refFor(part.id), part.id, part.toolName);
     } else if (part.type === 'tool-input-delta') {
-      builder.appendToolCallArgs(refFor(part.id), part.delta);
-      toolBuffers.set(part.id, `${toolBuffers.get(part.id) ?? ''}${part.delta}`);
+      toolCalls.appendArguments(part.id, refFor(part.id), part.delta);
     } else if (part.type === 'tool-call') {
       const ref = refFor(part.toolCallId);
-      if (startedKinds.get(part.toolCallId) === 'tool_call') {
-        builder.updateToolCall(ref, part.toolCallId, part.toolName);
-      } else {
-        builder.startToolCall(ref, part.toolCallId, part.toolName);
-        startedKinds.set(part.toolCallId, 'tool_call');
+      toolCalls.open(part.toolCallId, ref, part.toolCallId, part.toolName);
+      if (!toolCalls.hasArguments(part.toolCallId)) {
+        toolCalls.appendArguments(part.toolCallId, ref, JSON.stringify(part.input ?? {}));
       }
-      if (!toolBuffers.get(part.toolCallId)) {
-        builder.appendToolCallArgs(ref, JSON.stringify(part.input ?? {}));
-      }
-      builder.endToolCall(ref);
+      toolCalls.close(part.toolCallId, ref);
     } else if (part.type === 'finish') {
-      builder.setUsage(finalizeProviderUsage({
-        inputTokens: part.totalUsage.inputTokens ?? 0,
-        outputTokens: part.totalUsage.outputTokens ?? 0,
-        totalTokens: part.totalUsage.totalTokens ?? undefined,
-        ...(typeof part.totalUsage.inputTokenDetails.cacheReadTokens === 'number'
-          ? { cacheReadTokens: part.totalUsage.inputTokenDetails.cacheReadTokens }
-          : {}),
-        ...(typeof part.totalUsage.inputTokenDetails.cacheWriteTokens === 'number'
-          ? { cacheWriteTokens: part.totalUsage.inputTokenDetails.cacheWriteTokens }
-          : {}),
-        ...(typeof part.totalUsage.outputTokenDetails.reasoningTokens === 'number'
-          ? { reasoningTokens: part.totalUsage.outputTokenDetails.reasoningTokens }
-          : {}),
-      }));
+      builder.setUsage(normalizeUsage(part.totalUsage, AI_SDK_USAGE_FIELDS));
       builder.markTerminal(mapFinishReason(part.finishReason));
     } else if (part.type === 'abort') {
       throw new DOMException('The provider stream was aborted.', 'AbortError');
@@ -219,7 +196,7 @@ async function consumeFullStream(
       refFor(partWithId.id);
     }
   }
-  return startedKinds.size > 0;
+  return sawTextOrThinking || toolCalls.count > 0;
 }
 
 function mapFinishReason(reason: string): StopReason {

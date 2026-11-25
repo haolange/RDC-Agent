@@ -1,19 +1,13 @@
-import { EventStream } from '../core/EventStream';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { AssistantStreamBuilder, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
-import {
-  composeAbortSignals,
-  ensureOk,
-  normalizeError,
-  parseSSE,
-  ProviderHttpError,
-} from './internal/http';
+import { ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import { parseSSE, ProviderHttpError } from './internal/http';
+import { sendProviderRequest, startProviderStream, type ProviderStreamRun } from './internal/providerStreamDriver';
 import {
   buildGoogleInteractionsRequest,
   buildGoogleInteractionsUrl,
 } from './GoogleInteractionsWire';
 import { GoogleInteractionsStreamState } from './GoogleInteractionsStreamState';
+import type { EventStream } from '../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -49,85 +43,58 @@ export class GoogleInteractionsProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
-    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-      (event) => event.type === 'done',
-      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
+      const response = await this.send(model, context, options, run.signal);
+      return consumeGoogleInteractionsStream(response, run, options);
+    });
+  }
+
+  private async send(model: Model, context: Context, options: StreamOptions, signal: AbortSignal): Promise<Response> {
     const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/u, '');
     const apiKey = options.apiKey ?? this.defaultApiKey;
-    void this.run(stream, builder, model, context, options, baseUrl, apiKey);
-    return stream;
-  }
-
-  private async run(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    builder: AssistantStreamBuilder,
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-    baseUrl: string,
-    apiKey: string | undefined,
-  ): Promise<void> {
-    const composed = composeAbortSignals(
-      options.signal,
-      stream.signal,
-      { providerApi: PROVIDER_API, ...options },
-    );
-    try {
-      builder.start();
-      if (!apiKey) {
-        throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Google Interactions provider');
-      }
-      const body = applyRequestPlanBody(
-        buildGoogleInteractionsRequest(model, context, options),
-        options.requestPlan,
-      );
-      const response = await fetch(buildGoogleInteractionsUrl(baseUrl), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-          'x-goog-api-key': apiKey,
-          ...this.defaultHeaders,
-          ...requestPlanHeaders(options.requestPlan),
-        },
-        body: JSON.stringify(body),
-        signal: composed.signal,
-      });
-      recordQuotaFromResponse(options.requestPlan, response);
-      await ensureOk(response, PROVIDER_API);
-
-      const state = new GoogleInteractionsStreamState(builder, options.requestPlan);
-      for await (const data of parseSSE(
-        response,
-        composed.signal,
-        { providerApi: PROVIDER_API, ...options },
-      )) {
-        if (composed.signal.aborted) break;
-        const event = parseEvent(data);
-        if (!event) {
-          throw new ProviderStreamProtocolError(
-            'PROVIDER_STREAM_MALFORMED_FRAME',
-            { protocol: PROVIDER_API, providerBlockKey: 'frame', contentIndex: 0 },
-            'Google Interactions sent a stream frame that is not a valid event.',
-          );
-        }
-        state.handle(event);
-      }
-      const outcome = state.outcome();
-      if (outcome.terminalSeen) builder.markTerminal(outcome.finishReason);
-      builder.finish({ signal: composed.signal, sawOutput: outcome.sawOutput, providerApi: PROVIDER_API });
-    } catch (cause) {
-      const thrown = normalizeError(cause);
-      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
-        ? composed.signal.reason
-        : thrown;
-      builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
-    } finally {
-      composed.dispose();
+    if (!apiKey) {
+      throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Google Interactions provider');
     }
+    const body = applyRequestPlanBody(
+      buildGoogleInteractionsRequest(model, context, options),
+      options.requestPlan,
+    );
+    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
+      url: buildGoogleInteractionsUrl(baseUrl),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        'x-goog-api-key': apiKey,
+        ...this.defaultHeaders,
+        ...requestPlanHeaders(options.requestPlan),
+      },
+      body,
+    });
   }
+}
+
+/** Interaction events are validated field by field in the stream state, so a frame only has to be a JSON object. */
+async function consumeGoogleInteractionsStream(
+  response: Response,
+  { builder, signal }: ProviderStreamRun,
+  options: StreamOptions,
+): Promise<{ sawOutput: boolean }> {
+  const state = new GoogleInteractionsStreamState(builder, options.requestPlan);
+  for await (const data of parseSSE(response, signal, { providerApi: PROVIDER_API, ...options })) {
+    if (signal.aborted) break;
+    const event = parseEvent(data);
+    if (!event) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_MALFORMED_FRAME',
+        { protocol: PROVIDER_API, providerBlockKey: 'frame', contentIndex: 0 },
+        'Google Interactions sent a stream frame that is not a valid event.',
+      );
+    }
+    state.handle(event);
+  }
+  const outcome = state.outcome();
+  if (outcome.terminalSeen) builder.markTerminal(outcome.finishReason);
+  return { sawOutput: outcome.sawOutput };
 }
 
 export { buildGoogleInteractionsUrl };

@@ -172,6 +172,15 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
 
+每个 adapter 只声明自己的 wire 差异：请求（URL、认证、body）、帧 schema 与逐帧语义、stop reason 映射和 usage 字段表。各 adapter 共用的流机械在 `providers/internal/`：
+
+- `providerStreamDriver.ts`：`startProviderStream` 持有 EventStream、`AssistantStreamBuilder`、合成的 abort signal 与终止契约，adapter 读完流后由它调用 `finish`，异常时 `fail`。HTTP adapter 的 abort 报告 signal 的原因（超时仍是超时）；AI SDK adapter 传入自己的失败映射，因为传输与 abort 由 SDK 报告。`sendProviderRequest` 以 JSON 文本发送 body（SigV4 路线对该文本签名）、记录 429 配额并 `ensureOk`；`readProviderFrames` 按 SSE 或 JSON lines 读帧，逐帧经 `parseProviderFrame` 校验。
+- `toolCallAccumulator.ts`：按调用 index 或 item id 组装跨帧的工具调用。首见即 start，之后只补缺失的 id／name；记录是否已收到参数，收尾帧重复的整段参数只在未流式时补上；整段到达的调用（Gemini、Ollama）一次 start、填参、close。
+- `usageNormalizer.ts`：`normalizeUsage` 按 wire 的 `UsageFieldMap` 读取 input、output、total、cache read／write、reasoning、原生 hit／miss 与 speed，再经 `finalizeProviderUsage` 得出 hit／miss。字段表由各 adapter 声明；wire 未报告的字段没有 reader，结果里缺省。
+- `chatCompletionsWire.ts`：OpenAI-compatible 与 Mistral 共用的 Chat Completions 帧 schema、流读取、消息转换与 finish_reason 映射。每个 surface 用 `ChatCompletionsDialect` 声明选 choice 的规则、usage 字段表以及是否记录 execution。
+
+Google Interactions 的事件由 `GoogleInteractionsStreamState` 逐字段校验，帧只需是 JSON 对象，因此它沿用自己的帧解析，只共用 driver 与请求发送。
+
 `OpenAIResponsesProvider` 与 Azure 共用 `consumeResponsesEventStream`。该循环必须处理 `response.reasoning_text.delta/done`、raw reasoning item、function-call continuation、terminal usage/error。推理摘要按 `item_id + summary_index` 分段：`reasoning_summary_text.delta` 累计流式文本；`reasoning_summary_text.done`、`reasoning_summary_part.done` 与完成 item 的 `summary[]` 携带整段时，只补流式缺失的部分（未流式则补全文，流式是前缀则补后缀，二者不一致时保留已显示文本）。每次响应的推理事件计数与各摘要段的流式/完成长度（不含正文）写入该请求快照的 `reasoningEvents`，用于对照真实上游与持久记录。DeepSeek 工具 loop 回放 Provider 要求的 raw reasoning/function-call item，且不使用 `previous_response_id`；Chat/Anthropic route 则按各自 continuation contract 回放 `reasoning_content`。Anthropic、AI SDK 与 Google Interactions 的内容通道经 `StreamChannelRefs` 分配。
 
 `OpenAIResponsesProvider` 的 function tool 显式发送 `strict: false`，保持 canonical `parameters.required` 的可选字段语义，不依赖服务端对省略 strict 的自动规范。否则“省略”可能变为必填默认值（例如图片读取意外携带启用 JSON 校验的空数组）。这是模型生成格式选项，不改变主进程参数验证、权限、委派引用或操作执行门禁；不通过删除参数或静默忽略不适用字段消除错误。依据：[OpenAI function calling strict mode](https://developers.openai.com/api/docs/guides/function-calling)。
@@ -209,7 +218,7 @@ Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入
 
 - **Mistral Conversations**（`MistralProvider.ts`）：adapter 源码仍在，但当前没有 compiled selectable surface；产品面保持不可选，该 adapter 不是已上线的续接能力。
 - **Azure OpenAI Responses**（`AzureOpenAIResponsesProvider.ts`）：只保留 Azure URL（`api-version`）和 `api-key` 鉴权。Responses 请求体与 SSE 事件循环在 `providers/internal/responsesShared.ts`，与 OpenAI Responses 共用。
-- **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记，流式帧走共享 `parseSSE` / `StreamChannelRefs`。
+- **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记，流式帧走共享 `readProviderFrames` / `StreamChannelRefs`。
 
 ## 成本（Cost）
 

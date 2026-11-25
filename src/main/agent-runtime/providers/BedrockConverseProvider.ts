@@ -8,31 +8,31 @@
  * - SigV4 signing via ProviderRequestAuthorizer
  * - Endpoint: https://bedrock-runtime.{region}.amazonaws.com/model/{modelId}/converse-stream
  *
- * 使用原生 fetch。流式帧走共享 parseSSE，不引入第三方 SDK。
+ * 使用原生 fetch。流式帧走共享 readProviderFrames，不引入第三方 SDK。
  */
 
 import { z } from 'zod';
-import { EventStream } from '../core/EventStream';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
-import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
+import { ProviderHttpError } from './internal/http';
 import {
-  composeAbortSignals,
-  ensureOk,
-  normalizeError,
-  parseSSE,
-  ProviderHttpError,
-  type ProviderStreamReadOptions,
-} from './internal/http';
-import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+  readProviderFrames,
+  sendProviderRequest,
+  startProviderStream,
+  type ProviderFrameStream,
+  type ProviderStreamRun,
+} from './internal/providerStreamDriver';
+import { ToolCallAccumulator } from './internal/toolCallAccumulator';
+import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
+import type { EventStream } from '../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
   Context,
   Message,
   Model,
+  ProviderOutputRef,
   StopReason,
   StreamOptions,
   ToolDefinition,
@@ -132,6 +132,21 @@ const BedrockStreamEventSchema = z.object({
   }).passthrough().optional(),
 }).passthrough();
 type BedrockStreamEvent = z.infer<typeof BedrockStreamEventSchema>;
+type BedrockUsage = NonNullable<NonNullable<BedrockStreamEvent['metadata']>['usage']>;
+
+const BEDROCK_FRAMES: ProviderFrameStream<BedrockStreamEvent> = {
+  providerApi: PROVIDER_API,
+  framing: 'sse',
+  frameSchema: BedrockStreamEventSchema,
+};
+
+const BEDROCK_USAGE_FIELDS: UsageFieldMap<BedrockUsage> = {
+  inputTokens: (usage) => usage.inputTokens,
+  outputTokens: (usage) => usage.outputTokens,
+  totalTokens: (usage) => usage.totalTokens,
+  cacheReadTokens: (usage) => usage.cacheReadInputTokens,
+  cacheWriteTokens: (usage) => usage.cacheWriteInputTokens,
+};
 
 export class BedrockConverseProvider implements ProviderStrategy {
   readonly api = PROVIDER_API;
@@ -152,183 +167,29 @@ export class BedrockConverseProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
-    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-      (event) => event.type === 'done',
-      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
-
-    void this.run(stream, builder, model, context, options);
-    return stream;
+    return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
+      const response = await this.send(model, context, options, run.signal);
+      return consumeBedrockStream(response, run, options);
+    });
   }
 
-  private async run(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    builder: AssistantStreamBuilder,
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
-
-    try {
-      builder.start();
-
-      if (!this.requestAuthorizer) {
-        throw new ProviderHttpError(PROVIDER_API, 401, 'missing requestAuthorizer for Bedrock Converse provider');
-      }
-
-      const url = this.buildEndpointUrl(model.id, options.baseUrl);
-      const body = applyRequestPlanBody(this.buildRequestBody(model, context, options) as unknown as Record<string, unknown>, options.requestPlan);
-      const bodyText = JSON.stringify(body);
-      const unsignedHeaders = {
+  private async send(model: Model, context: Context, options: StreamOptions, signal: AbortSignal): Promise<Response> {
+    if (!this.requestAuthorizer) {
+      throw new ProviderHttpError(PROVIDER_API, 401, 'missing requestAuthorizer for Bedrock Converse provider');
+    }
+    const url = this.buildEndpointUrl(model.id, options.baseUrl);
+    const body = applyRequestPlanBody(this.buildRequestBody(model, context, options) as unknown as Record<string, unknown>, options.requestPlan);
+    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
+      url,
+      headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...this.defaultHeaders,
         ...requestPlanHeaders(options.requestPlan),
-      };
-      const headers = await this.requestAuthorizer({ url, method: 'POST', headers: unsignedHeaders, body: bodyText });
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: bodyText,
-        signal: composed.signal,
-      });
-
-      recordQuotaFromResponse(options.requestPlan, response);
-      await ensureOk(response, PROVIDER_API);
-
-      const channels = new StreamChannelRefs(PROVIDER_API);
-      const textRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
-      const thinkingRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
-      const toolRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
-      const toolNames = new Map<number, string>();
-      const toolIds = new Map<number, string>();
-      let sawOutput = false;
-      const thinkingMeta = {
-        kind: 'raw' as const,
-        source: 'unknown' as const,
-        visibility: 'raw-collapsed' as const,
-      };
-
-      for await (const event of parseBedrockSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
-        if (composed.signal.aborted) break;
-
-        if (event.messageStart) {
-          // Message started; role is typically 'assistant'
-          continue;
-        }
-
-        if (event.contentBlockStart) {
-          const blockIndex = event.contentBlockStart.contentBlockIndex ?? 0;
-          const start = event.contentBlockStart.start;
-          if (start?.toolUse) {
-            const toolId = start.toolUse.toolUseId ?? '';
-            const toolName = start.toolUse.name ?? '';
-            toolIds.set(blockIndex, toolId);
-            toolNames.set(blockIndex, toolName);
-            const toolRef = channels.ref({
-              providerBlockKey: `virtual:tool:${blockIndex}`,
-              sourceIndex: blockIndex,
-            });
-            toolRefs.set(blockIndex, toolRef);
-            sawOutput = true;
-            builder.startToolCall(toolRef, toolId, toolName);
-          }
-          continue;
-        }
-
-        if (event.contentBlockDelta) {
-          const blockIndex = event.contentBlockDelta.contentBlockIndex ?? 0;
-          const delta = event.contentBlockDelta.delta;
-
-          if (delta?.text) {
-            sawOutput = true;
-            let textRef = textRefs.get(blockIndex);
-            if (!textRef) {
-              textRef = channels.ref({
-                providerBlockKey: `output:text:${blockIndex}`,
-                sourceIndex: blockIndex,
-              });
-              textRefs.set(blockIndex, textRef);
-              builder.startText(textRef);
-            }
-            builder.appendText(textRef, delta.text);
-          }
-
-          if (delta?.reasoningContent?.text) {
-            sawOutput = true;
-            let thinkingRef = thinkingRefs.get(blockIndex);
-            if (!thinkingRef) {
-              thinkingRef = channels.ref({
-                providerBlockKey: `output:thinking:${blockIndex}`,
-                sourceIndex: blockIndex,
-              });
-              thinkingRefs.set(blockIndex, thinkingRef);
-              builder.startThinking(thinkingRef, thinkingMeta);
-            }
-            builder.appendThinking(thinkingRef, delta.reasoningContent.text, thinkingMeta);
-          }
-
-          if (delta?.toolUse?.input) {
-            const toolRef = toolRefs.get(blockIndex);
-            if (toolRef) {
-              sawOutput = true;
-              builder.appendToolCallArgs(toolRef, delta.toolUse.input);
-            }
-          }
-          continue;
-        }
-
-        if (event.contentBlockStop) {
-          const blockIndex = event.contentBlockStop.contentBlockIndex ?? 0;
-          const toolRef = toolRefs.get(blockIndex);
-          if (toolRef) {
-            builder.endToolCall(toolRef);
-            toolRefs.delete(blockIndex);
-          }
-          const textRef = textRefs.get(blockIndex);
-          if (textRef) {
-            builder.endText(textRef);
-            textRefs.delete(blockIndex);
-          }
-          const thinkingRef = thinkingRefs.get(blockIndex);
-          if (thinkingRef) {
-            builder.endThinking(thinkingRef, thinkingMeta);
-            thinkingRefs.delete(blockIndex);
-          }
-          continue;
-        }
-
-        if (event.messageStop) {
-          builder.markTerminal(mapBedrockStopReason(event.messageStop.stopReason));
-          continue;
-        }
-
-        if (event.metadata?.usage) {
-          const usage = event.metadata.usage;
-          builder.setUsage(finalizeProviderUsage({
-            inputTokens: usage.inputTokens ?? 0,
-            outputTokens: usage.outputTokens ?? 0,
-            totalTokens: usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
-            ...(typeof usage.cacheReadInputTokens === 'number' ? { cacheReadTokens: usage.cacheReadInputTokens } : {}),
-            ...(typeof usage.cacheWriteInputTokens === 'number' ? { cacheWriteTokens: usage.cacheWriteInputTokens } : {}),
-          }));
-          continue;
-        }
-      }
-
-      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
-    } catch (err) {
-      const thrown = normalizeError(err);
-      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
-        ? composed.signal.reason
-        : thrown;
-      builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
-    } finally {
-      composed.dispose();
-    }
+      },
+      body,
+      authorizer: this.requestAuthorizer,
+    });
   }
 
   private buildEndpointUrl(modelId: string, baseUrlOverride?: string): string {
@@ -386,14 +247,110 @@ export class BedrockConverseProvider implements ProviderStrategy {
   }
 }
 
-async function* parseBedrockSSE(
+/**
+ * Reads Converse stream events. Content blocks are addressed by contentBlockIndex: text and reasoning open on their
+ * first delta, a tool call opens on contentBlockStart, and contentBlockStop closes whatever the index holds.
+ */
+async function consumeBedrockStream(
   response: Response,
-  signal: AbortSignal | undefined,
-  options: ProviderStreamReadOptions,
-): AsyncGenerator<BedrockStreamEvent> {
-  for await (const data of parseSSE(response, signal, options)) {
-    yield parseProviderFrame(data, options.providerApi, BedrockStreamEventSchema);
+  { builder, signal }: ProviderStreamRun,
+  options: StreamOptions,
+): Promise<{ sawOutput: boolean }> {
+  const channels = new StreamChannelRefs(PROVIDER_API);
+  const textRefs = new Map<number, ProviderOutputRef>();
+  const thinkingRefs = new Map<number, ProviderOutputRef>();
+  const toolCalls = new ToolCallAccumulator<number>(builder);
+  const toolRef = (blockIndex: number) => channels.ref({ providerBlockKey: `virtual:tool:${blockIndex}`, sourceIndex: blockIndex });
+  let sawOutput = false;
+  const thinkingMeta = {
+    kind: 'raw' as const,
+    source: 'unknown' as const,
+    visibility: 'raw-collapsed' as const,
+  };
+
+  for await (const event of readProviderFrames(response, signal, options, BEDROCK_FRAMES)) {
+    if (event.messageStart) {
+      // Message started; role is typically 'assistant'
+      continue;
+    }
+
+    if (event.contentBlockStart) {
+      const blockIndex = event.contentBlockStart.contentBlockIndex ?? 0;
+      const start = event.contentBlockStart.start;
+      if (start?.toolUse) {
+        const ref = toolRef(blockIndex);
+        sawOutput = true;
+        toolCalls.start(blockIndex, ref, start.toolUse.toolUseId ?? '', start.toolUse.name ?? '');
+      }
+      continue;
+    }
+
+    if (event.contentBlockDelta) {
+      const blockIndex = event.contentBlockDelta.contentBlockIndex ?? 0;
+      const delta = event.contentBlockDelta.delta;
+
+      if (delta?.text) {
+        sawOutput = true;
+        let textRef = textRefs.get(blockIndex);
+        if (!textRef) {
+          textRef = channels.ref({
+            providerBlockKey: `output:text:${blockIndex}`,
+            sourceIndex: blockIndex,
+          });
+          textRefs.set(blockIndex, textRef);
+          builder.startText(textRef);
+        }
+        builder.appendText(textRef, delta.text);
+      }
+
+      if (delta?.reasoningContent?.text) {
+        sawOutput = true;
+        let thinkingRef = thinkingRefs.get(blockIndex);
+        if (!thinkingRef) {
+          thinkingRef = channels.ref({
+            providerBlockKey: `output:thinking:${blockIndex}`,
+            sourceIndex: blockIndex,
+          });
+          thinkingRefs.set(blockIndex, thinkingRef);
+          builder.startThinking(thinkingRef, thinkingMeta);
+        }
+        builder.appendThinking(thinkingRef, delta.reasoningContent.text, thinkingMeta);
+      }
+
+      if (delta?.toolUse?.input && toolCalls.isOpen(blockIndex)) {
+        sawOutput = true;
+        toolCalls.appendArguments(blockIndex, toolRef(blockIndex), delta.toolUse.input);
+      }
+      continue;
+    }
+
+    if (event.contentBlockStop) {
+      const blockIndex = event.contentBlockStop.contentBlockIndex ?? 0;
+      if (toolCalls.isOpen(blockIndex)) toolCalls.close(blockIndex, toolRef(blockIndex));
+      const textRef = textRefs.get(blockIndex);
+      if (textRef) {
+        builder.endText(textRef);
+        textRefs.delete(blockIndex);
+      }
+      const thinkingRef = thinkingRefs.get(blockIndex);
+      if (thinkingRef) {
+        builder.endThinking(thinkingRef, thinkingMeta);
+        thinkingRefs.delete(blockIndex);
+      }
+      continue;
+    }
+
+    if (event.messageStop) {
+      builder.markTerminal(mapBedrockStopReason(event.messageStop.stopReason));
+      continue;
+    }
+
+    if (event.metadata?.usage) {
+      builder.setUsage(normalizeUsage(event.metadata.usage, BEDROCK_USAGE_FIELDS));
+      continue;
+    }
   }
+  return { sawOutput };
 }
 
 // =====================================================================

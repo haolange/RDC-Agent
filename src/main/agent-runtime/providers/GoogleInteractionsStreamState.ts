@@ -5,12 +5,21 @@ import {
 } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { ProviderHttpError } from './internal/http';
-import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
 import { GoogleInteractionsStepState } from './GoogleInteractionsStepState';
 import type { StopReason } from '../core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
 const PROVIDER_API = 'google-interactions';
+
+const INTERACTIONS_USAGE_FIELDS: UsageFieldMap<Record<string, unknown>> = {
+  inputTokens: (usage) => numberValue(usage.total_input_tokens),
+  outputTokens: (usage) => numberValue(usage.total_output_tokens),
+  // The interaction's own total; one that reports none counts zero rather than a sum.
+  totalTokens: (usage) => numberValue(usage.total_tokens) ?? 0,
+  cacheReadTokens: (usage) => numberValue(usage.total_cached_tokens),
+  reasoningTokens: (usage) => numberValue(usage.total_thought_tokens),
+};
 
 export interface GoogleInteractionsOutcome {
   terminalSeen: boolean;
@@ -113,16 +122,7 @@ export class GoogleInteractionsStreamState {
   }
 
   private applyUsage(usage: Record<string, unknown> | null): void {
-    if (!usage) return;
-    const cacheReadTokens = numberValue(usage.total_cached_tokens);
-    const reasoningTokens = numberValue(usage.total_thought_tokens);
-    this.builder.setUsage(finalizeProviderUsage({
-      inputTokens: numberValue(usage.total_input_tokens) ?? 0,
-      outputTokens: numberValue(usage.total_output_tokens) ?? 0,
-      totalTokens: numberValue(usage.total_tokens) ?? 0,
-      ...(cacheReadTokens !== null ? { cacheReadTokens } : {}),
-      ...(reasoningTokens !== null ? { reasoningTokens } : {}),
-    }));
+    if (usage) this.builder.setUsage(normalizeUsage(usage, INTERACTIONS_USAGE_FIELDS));
   }
 }
 

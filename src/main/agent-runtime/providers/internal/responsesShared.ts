@@ -6,13 +6,12 @@ import { createProviderStateRef, findLatestProviderState } from '../../reasoning
 import { partitionSystemPrompt } from '../promptCacheWire';
 import { buildOpenAiResponsesReasoning, reasoningVisibilityRequest } from '../reasoningWire';
 import { reasoningProjectionSource } from '../reasoningProjection';
-import { AssistantStreamBuilder, createProviderOutputRef, parseProviderFrame, ProviderStreamProtocolError } from './AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './AssistantStreamBuilder';
 import { ResponsesItemChannels } from './responsesItemChannels';
-import {
-  createResponsesStreamFailure,
-  parseSSE,
-} from './http';
-import { finalizeProviderUsage } from './normalizeCacheUsage';
+import { createResponsesStreamFailure } from './http';
+import { readProviderFrames, type ProviderStreamRun } from './providerStreamDriver';
+import { ToolCallAccumulator } from './toolCallAccumulator';
+import { normalizeUsage, type UsageFieldMap } from './usageNormalizer';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type {
   Context,
@@ -52,16 +51,31 @@ type ResponsesInputContentPart =
   | { type: 'input_text'; text: string; prompt_cache_breakpoint?: { mode: 'explicit' } }
   | { type: 'input_image'; image_url: string };
 
-export async function consumeResponsesEventStream(input: {
+const RESPONSES_USAGE_FIELDS: UsageFieldMap<NonNullable<ResponsesCompletedPayload['usage']>> = {
+  inputTokens: (usage) => usage.input_tokens,
+  outputTokens: (usage) => usage.output_tokens,
+  totalTokens: (usage) => usage.total_tokens,
+  cacheReadTokens: (usage) => usage.input_tokens_details?.cached_tokens,
+  cacheWriteTokens: (usage) => usage.input_tokens_details?.cache_write_tokens,
+  reasoningTokens: (usage) => usage.output_tokens_details?.reasoning_tokens,
+};
+
+/** One Responses stream frame is a JSON object; its fields are read through the typed readers below. */
+const ResponsesFrameSchema = z.record(z.string(), z.unknown());
+
+/** The Responses surface a stream comes from: its protocol name and the messages its failures fall back to. */
+export interface ResponsesStreamSurface {
   protocol: string;
-  response: Response;
-  signal: AbortSignal;
-  options: StreamOptions;
-  builder: AssistantStreamBuilder;
   failureMessages: { failed: string; error: string };
-}): Promise<void> {
-  const { protocol, response, signal, options, builder } = input;
-  const toolArgBuffers = new Map<string, string>();
+}
+
+export async function consumeResponsesEventStream(
+  response: Response,
+  { builder, signal }: ProviderStreamRun,
+  options: StreamOptions,
+  surface: ResponsesStreamSurface,
+): Promise<{ sawOutput: boolean }> {
+  const { protocol } = surface;
   const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
   const rawSource = reasoningProjectionSource(options.requestPlan, 'raw');
   const opaqueSource = reasoningProjectionSource(options.requestPlan, 'opaque');
@@ -72,7 +86,7 @@ export async function consumeResponsesEventStream(input: {
     sources: { summary: summarySource, raw: rawSource, opaque: opaqueSource },
     deepSeekResponses,
   });
-  const toolStarted = new Set<string>();
+  const toolCalls = new ToolCallAccumulator<string>(builder);
   let rawReasoningText = '';
   let sawToolCall = false;
   let sawOutput = false;
@@ -86,10 +100,8 @@ export async function consumeResponsesEventStream(input: {
   const toolKey = (outputIndex: number, itemId?: string) => itemId || `index:${outputIndex}`;
 
   const reasoningEventCounts: Record<string, number> = {};
-  for await (const data of parseSSE(response, signal, { providerApi: protocol, ...options })) {
-    if (signal.aborted) break;
-    const event = parseProviderFrame(data, protocol, ResponsesFrameSchema);
-
+  const frames = { providerApi: protocol, framing: 'sse', frameSchema: ResponsesFrameSchema } as const;
+  for await (const event of readProviderFrames(response, signal, options, frames)) {
     const eventType = readString(event.type);
     if (eventType.startsWith('response.reasoning')) reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
     if (providerTerminalSeen) {
@@ -175,34 +187,26 @@ export async function consumeResponsesEventStream(input: {
         } else if (readString(item?.type) === 'function_call') {
           sawToolCall = true;
           sawOutput = true;
-          const toolRef = items.toolRef(identity);
-          builder.startToolCall(
-            toolRef,
+          toolCalls.start(
+            toolKey(identity.outputIndex, identity.itemId),
+            items.toolRef(identity),
             readString(item?.call_id) || readString(item?.id) || '',
             readString(item?.name) || '',
           );
-          toolStarted.add(toolKey(identity.outputIndex, identity.itemId));
         }
         break;
       }
       case 'response.function_call_arguments.delta': {
         const identity = items.identityFromEvent(event);
         const delta = readString(event.delta);
-        if (delta) {
-          const key = toolKey(identity.outputIndex, identity.itemId);
-          toolArgBuffers.set(key, `${toolArgBuffers.get(key) ?? ''}${delta}`);
-          builder.appendToolCallArgs(items.toolRef(identity), delta);
-        }
+        if (delta) toolCalls.appendArguments(toolKey(identity.outputIndex, identity.itemId), items.toolRef(identity), delta);
         break;
       }
       case 'response.function_call_arguments.done': {
         const identity = items.identityFromEvent(event);
         const args = readString(event.arguments);
         const key = toolKey(identity.outputIndex, identity.itemId);
-        if (args && !toolArgBuffers.get(key)) {
-          toolArgBuffers.set(key, args);
-          builder.appendToolCallArgs(items.toolRef(identity), args);
-        }
+        if (args && !toolCalls.hasArguments(key)) toolCalls.appendArguments(key, items.toolRef(identity), args);
         break;
       }
       case 'response.output_item.done': {
@@ -230,18 +234,10 @@ export async function consumeResponsesEventStream(input: {
           sawOutput = true;
           const toolRef = items.toolRef(identity);
           const key = toolKey(identity.outputIndex, identity.itemId);
-          if (toolStarted.has(key)) {
-            builder.updateToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
-          } else {
-            builder.startToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
-            toolStarted.add(key);
-          }
+          toolCalls.open(key, toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
           const args = readString(item?.arguments);
-          if (args && !toolArgBuffers.get(key)) {
-            toolArgBuffers.set(key, args);
-            builder.appendToolCallArgs(toolRef, args);
-          }
-          builder.endToolCall(toolRef);
+          if (args && !toolCalls.hasArguments(key)) toolCalls.appendArguments(key, toolRef, args);
+          toolCalls.close(key, toolRef);
         } else if (readString(item?.type) === 'message') {
           items.setTextPhase(identity, readOutputPhase(item?.phase));
           items.closeText(identity);
@@ -283,14 +279,14 @@ export async function consumeResponsesEventStream(input: {
         throw createResponsesStreamFailure(protocol, {
           error,
           event,
-          fallbackMessage: input.failureMessages.failed,
+          fallbackMessage: surface.failureMessages.failed,
         });
       }
       case 'error': {
         throw createResponsesStreamFailure(protocol, {
           error: readRecord(event.error) ?? event,
           event,
-          fallbackMessage: input.failureMessages.error,
+          fallbackMessage: surface.failureMessages.error,
         });
       }
       default:
@@ -303,7 +299,7 @@ export async function consumeResponsesEventStream(input: {
   if (Object.keys(reasoningEventCounts).length || summaryParts.length) {
     builder.setExecution({ reasoningEvents: { events: reasoningEventCounts, summaryParts } });
   }
-  builder.finish({ signal, sawOutput, providerApi: protocol });
+  return { sawOutput };
 }
 
 /** `summary[]` of a finished Responses reasoning item, by summary index; empty entries keep their index. */
@@ -503,20 +499,7 @@ function applyCompletedUsage(builder: AssistantStreamBuilder, payload: Responses
     ...(typeof payload.model === 'string' ? { modelId: payload.model } : {}),
     ...(typeof payload.service_tier === 'string' ? { serviceTier: payload.service_tier } : {}),
   });
-  if (!payload.usage) return;
-  const cacheReadTokens = payload.usage.input_tokens_details?.cached_tokens;
-  const cacheWriteTokens = payload.usage.input_tokens_details?.cache_write_tokens;
-  const reasoningTokens = payload.usage.output_tokens_details?.reasoning_tokens;
-  builder.setUsage(finalizeProviderUsage({
-    inputTokens: payload.usage.input_tokens ?? 0,
-    outputTokens: payload.usage.output_tokens ?? 0,
-    totalTokens:
-      payload.usage.total_tokens
-      ?? (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0),
-    ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
-    ...(typeof cacheWriteTokens === 'number' ? { cacheWriteTokens } : {}),
-    ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
-  }));
+  if (payload.usage) builder.setUsage(normalizeUsage(payload.usage, RESPONSES_USAGE_FIELDS));
 }
 
 function createResponsesReasoningArtifact(
@@ -532,9 +515,6 @@ function createResponsesReasoningArtifact(
     raw: item ?? undefined,
   });
 }
-
-/** One Responses stream frame is a JSON object; its fields are read through the typed readers below. */
-const ResponsesFrameSchema = z.record(z.string(), z.unknown());
 
 function readRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)

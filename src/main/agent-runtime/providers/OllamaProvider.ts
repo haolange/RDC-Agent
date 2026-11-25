@@ -11,25 +11,23 @@
  */
 
 import { z } from 'zod';
-import { EventStream } from '../core/EventStream';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
-import { AssistantStreamBuilder, parseProviderFrame } from './internal/AssistantStreamBuilder';
+import { AlternatingTextThinkingChannels, StreamChannelRefs } from './internal/streamChannelRefs';
+import { toChatCompletionsTool } from './internal/chatCompletionsWire';
 import {
-  AlternatingTextThinkingChannels,
-  StreamChannelRefs,
-  closeSwitchedChannel,
-} from './internal/streamChannelRefs';
-import {
-  composeAbortSignals,
-  ensureOk,
-  normalizeError,
-  parseJsonLines,
-} from './internal/http';
+  readProviderFrames,
+  sendProviderRequest,
+  startProviderStream,
+  type ProviderFrameStream,
+  type ProviderStreamRun,
+} from './internal/providerStreamDriver';
+import { ToolCallAccumulator } from './internal/toolCallAccumulator';
+import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
 import { reasoningProjectionSource } from './reasoningProjection';
 import { applyOllamaThink } from './reasoningWire';
+import type { EventStream } from '../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -38,7 +36,6 @@ import type {
   Model,
   StopReason,
   StreamOptions,
-  ToolDefinition,
 } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -66,6 +63,19 @@ const OllamaChunkSchema = z.object({
   eval_count: z.number().nullish(),
   total_duration: z.number().nullish(),
 }).passthrough();
+type OllamaChunk = z.infer<typeof OllamaChunkSchema>;
+
+const OLLAMA_FRAMES: ProviderFrameStream<OllamaChunk> = {
+  providerApi: PROVIDER_API,
+  framing: 'json-lines',
+  frameSchema: OllamaChunkSchema,
+};
+
+/** The final line reports prompt and generated token counts; Ollama reports no total and no cache figures. */
+const OLLAMA_USAGE_FIELDS: UsageFieldMap<OllamaChunk> = {
+  inputTokens: (chunk) => chunk.prompt_eval_count,
+  outputTokens: (chunk) => chunk.eval_count,
+};
 
 export interface OllamaProviderOptions {
   baseUrl?: string;
@@ -91,136 +101,23 @@ export class OllamaProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
-    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-      (event) => event.type === 'done',
-      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
-
-    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
-    const apiKey = options.apiKey ?? this.defaultApiKey;
-
-    void this.run(stream, builder, model, context, options, baseUrl, apiKey);
-    return stream;
+    return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
+      const response = await this.send(model, context, options, run.signal);
+      return consumeOllamaStream(response, run, options);
+    });
   }
 
-  private async run(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    builder: AssistantStreamBuilder,
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-    baseUrl: string,
-    apiKey: string | undefined,
-  ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
-
-    try {
-      builder.start();
-
-      const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
-      const url = `${baseUrl}/api/chat`;
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...this.defaultHeaders,
-        ...requestPlanHeaders(options.requestPlan),
-      };
-      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: composed.signal,
-      });
-
-      recordQuotaFromResponse(options.requestPlan, response);
-      await ensureOk(response, PROVIDER_API);
-
-      let toolCallCounter = 0;
-      const channels = new StreamChannelRefs(PROVIDER_API);
-      const alternating = new AlternatingTextThinkingChannels(channels);
-      const thinkingSource = reasoningProjectionSource(options.requestPlan, 'raw');
-      let thinkingBuffer = '';
-      let sawOutput = false;
-
-      for await (const line of parseJsonLines(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
-        if (composed.signal.aborted) break;
-        const chunk = parseProviderFrame(line, PROVIDER_API, OllamaChunkSchema);
-
-        const message = chunk.message;
-        if (message) {
-          if (typeof message.thinking === 'string' && message.thinking.length > 0) {
-            sawOutput = true;
-            thinkingBuffer += message.thinking;
-            const continuation = createContinuationArtifact(options.requestPlan, {
-              type: 'thinking',
-              reasoningContent: thinkingBuffer,
-            });
-            const thinkingMeta = {
-              kind: 'raw' as const,
-              source: thinkingSource,
-              visibility: 'raw-collapsed' as const,
-              continuation,
-            };
-            const switched = alternating.ensure('thinking');
-            closeSwitchedChannel(builder, switched.close);
-            if (switched.started) builder.startThinking(switched.ref, thinkingMeta);
-            builder.appendThinking(switched.ref, message.thinking, thinkingMeta);
-          }
-          if (typeof message.content === 'string' && message.content.length > 0) {
-            sawOutput = true;
-            const switched = alternating.ensure('text');
-            closeSwitchedChannel(builder, switched.close);
-            if (switched.started) builder.startText(switched.ref);
-            builder.appendText(switched.ref, message.content);
-          }
-          if (Array.isArray(message.tool_calls)) {
-            for (const tc of message.tool_calls) {
-              const fn = tc.function;
-              if (!fn || !fn.name) continue;
-              toolCallCounter += 1;
-              const callId = `ollama-call-${Date.now()}-${toolCallCounter}`;
-              sawOutput = true;
-              const toolRef = channels.ref({
-                providerBlockKey: `function:${toolCallCounter - 1}`,
-                sourceIndex: toolCallCounter - 1,
-              });
-              builder.startToolCall(toolRef, callId, fn.name);
-              const argsRaw =
-                typeof fn.arguments === 'string'
-                  ? fn.arguments
-                  : JSON.stringify(fn.arguments ?? {});
-              builder.appendToolCallArgs(toolRef, argsRaw);
-              builder.endToolCall(toolRef);
-            }
-          }
-        }
-
-        if (chunk.done) {
-          builder.markTerminal(mapDoneReason(chunk.done_reason ?? 'stop', toolCallCounter > 0));
-          if (typeof chunk.prompt_eval_count === 'number' || typeof chunk.eval_count === 'number') {
-            builder.setUsage({
-              inputTokens: chunk.prompt_eval_count ?? 0,
-              outputTokens: chunk.eval_count ?? 0,
-              totalTokens: (chunk.prompt_eval_count ?? 0) + (chunk.eval_count ?? 0),
-            });
-          }
-          break;
-        }
-      }
-
-      builder.finish({ signal: composed.signal, sawOutput, providerApi: PROVIDER_API });
-    } catch (err) {
-      const thrown = normalizeError(err);
-      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
-        ? composed.signal.reason
-        : thrown;
-      builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
-    } finally {
-      composed.dispose();
-    }
+  private async send(model: Model, context: Context, options: StreamOptions, signal: AbortSignal): Promise<Response> {
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this.defaultHeaders,
+      ...requestPlanHeaders(options.requestPlan),
+    };
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, { url: `${baseUrl}/api/chat`, headers, body });
   }
 
   private buildRequestBody(
@@ -243,10 +140,69 @@ export class OllamaProvider implements ProviderStrategy {
     if (Object.keys(optionsBlock).length > 0) body.options = optionsBlock;
 
     if (context.tools && context.tools.length > 0) {
-      body.tools = context.tools.map(toOllamaTool);
+      body.tools = context.tools.map(toChatCompletionsTool);
     }
     return body;
   }
+}
+
+/**
+ * Reads Ollama's JSON lines. Lines carry no block ids, so thinking and text alternate as segments; each tool call
+ * arrives whole. The `done` line is the terminal signal and the last line read.
+ */
+async function consumeOllamaStream(
+  response: Response,
+  { builder, signal }: ProviderStreamRun,
+  options: StreamOptions,
+): Promise<{ sawOutput: boolean }> {
+  const channels = new StreamChannelRefs(PROVIDER_API);
+  const alternating = new AlternatingTextThinkingChannels(channels);
+  const toolCalls = new ToolCallAccumulator<number>(builder);
+  const thinkingSource = reasoningProjectionSource(options.requestPlan, 'raw');
+  let thinkingBuffer = '';
+  let sawOutput = false;
+
+  for await (const chunk of readProviderFrames(response, signal, options, OLLAMA_FRAMES)) {
+    const message = chunk.message;
+    if (message) {
+      if (typeof message.thinking === 'string' && message.thinking.length > 0) {
+        sawOutput = true;
+        thinkingBuffer += message.thinking;
+        const continuation = createContinuationArtifact(options.requestPlan, {
+          type: 'thinking',
+          reasoningContent: thinkingBuffer,
+        });
+        alternating.appendThinking(builder, message.thinking, {
+          kind: 'raw',
+          source: thinkingSource,
+          visibility: 'raw-collapsed',
+          continuation,
+        });
+      }
+      if (typeof message.content === 'string' && message.content.length > 0) {
+        sawOutput = true;
+        alternating.appendText(builder, message.content);
+      }
+      for (const toolCall of message.tool_calls ?? []) {
+        const fn = toolCall.function;
+        if (!fn || !fn.name) continue;
+        const callIndex = toolCalls.count;
+        sawOutput = true;
+        const toolRef = channels.ref({ providerBlockKey: `function:${callIndex}`, sourceIndex: callIndex });
+        const argumentsText = typeof fn.arguments === 'string' ? fn.arguments : JSON.stringify(fn.arguments ?? {});
+        toolCalls.addComplete(callIndex, toolRef, `ollama-call-${Date.now()}-${callIndex + 1}`, fn.name, argumentsText);
+      }
+    }
+
+    if (chunk.done) {
+      builder.markTerminal(mapDoneReason(chunk.done_reason ?? 'stop', toolCalls.count > 0));
+      if (typeof chunk.prompt_eval_count === 'number' || typeof chunk.eval_count === 'number') {
+        builder.setUsage(normalizeUsage(chunk, OLLAMA_USAGE_FIELDS));
+      }
+      break;
+    }
+  }
+  return { sawOutput };
 }
 
 // =====================================================================
@@ -328,17 +284,6 @@ function convertMessage(message: Message, requestPlan?: RequestPlan): OllamaMess
       tool_name: message.toolName,
     },
   ];
-}
-
-function toOllamaTool(tool: ToolDefinition): Record<string, unknown> {
-  return {
-    type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    },
-  };
 }
 
 function mapDoneReason(reason: string | null | undefined, hadToolCall: boolean): StopReason {
