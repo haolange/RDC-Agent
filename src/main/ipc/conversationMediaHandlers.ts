@@ -12,6 +12,11 @@ import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { ConversationAccessAttachmentArgsSchema, ConversationResolveMediaArgsSchema } from './validation/conversationSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
+function isMissingFileError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
+}
+
 /** Media an answer embeds, resolved only inside the current session's artifacts, attachments and project. */
 export function registerConversationMediaHandlers({ state }: WorkbenchIpcContext): void {
   const documentCopyRoot = join(appPathService.getAppStatePaths().appStateRoot, 'attachment-open-copies');
@@ -38,8 +43,10 @@ export function registerConversationMediaHandlers({ state }: WorkbenchIpcContext
       const stillOwned = () => owner.scope === 'session' ? state.currentSessionId === owner.sessionId
         : Boolean(attachmentStagingService.getOwnedAttachment(owner.stagingId, owner.composerScopeKey));
       return await accessOwnedAttachment(attachment, action, shell, stillOwned, documentCopyRoot);
-    } catch {
-      return { kind: 'error', code: 'unavailable' };
+    } catch (error) {
+      // A file that vanished between listing and reading is an ordinary outcome; anything else is a real fault.
+      if (isMissingFileError(error)) return { kind: 'error', code: 'unavailable' };
+      throw error;
     }
   });
 

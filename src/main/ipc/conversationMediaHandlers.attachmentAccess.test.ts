@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { promises as fsPromises, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { strToU8, zipSync } from 'fflate';
@@ -192,5 +192,29 @@ describe('conversation:accessAttachment', () => {
     await expect(invoke({ owner, action: 'reveal' })).resolves.toEqual({ kind: 'error', code: 'denied' });
     expect(deps.openPath).not.toHaveBeenCalled();
     expect(deps.showItemInFolder).not.toHaveBeenCalled();
+  });
+
+  const sessionMarkdown = (source: string) => {
+    const fileName = 'notes.md';
+    const filePath = join(deps.root, 'owned', fileName);
+    writeFileSync(filePath, source);
+    deps.sessionAttachments.mockReturnValue([{ attachmentId: ATTACHMENT, sessionId: SESSION, filePath, fileName, mimeType: 'text/markdown', kind: 'file' }]);
+    return { owner: { scope: 'session', attachmentId: ATTACHMENT, sessionId: SESSION } as const, filePath };
+  };
+
+  it('refuses bytes that changed between the listing stat and the read', async () => {
+    const { owner, filePath } = sessionMarkdown('# before\n');
+    const open = fsPromises.open.bind(fsPromises);
+    vi.spyOn(fsPromises, 'open').mockImplementationOnce(async (...args: Parameters<typeof fsPromises.open>) => {
+      writeFileSync(filePath, '# replaced with a longer body\n');
+      return open(...args);
+    });
+    await expect(invoke({ owner, action: 'preview' })).resolves.toEqual({ kind: 'error', code: 'unavailable' });
+  });
+
+  it('propagates an unexpected read fault instead of reporting the attachment as unavailable', async () => {
+    const { owner } = sessionMarkdown('# notes\n');
+    vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }));
+    await expect(invoke({ owner, action: 'preview' })).rejects.toThrow('EACCES');
   });
 });

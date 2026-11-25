@@ -45,23 +45,29 @@ function scopedFile(attachment: OwnedAttachment): string | null {
   }
 }
 
+/** Compares two stats taken through the same API: handle against handle, or path against path. */
 function sameSnapshot(before: fs.Stats, after: fs.Stats): boolean {
   return before.dev === after.dev && before.ino === after.ino && before.size === after.size
     && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs;
 }
 
+/**
+ * Reads the whole file through one handle. Identity fields differ between a path stat and a handle stat on some hosts,
+ * so the handle's own stat is the baseline; the path stat only has to agree on size and modification time.
+ */
 async function readAttachmentSnapshot(file: string, stat: fs.Stats): Promise<Buffer | null> {
   const source = await fs.promises.open(file, 'r');
   try {
-    if (!sameSnapshot(stat, await source.stat())) return null;
-    const bytes = Buffer.allocUnsafe(stat.size);
+    const opened = await source.stat();
+    if (!opened.isFile() || opened.size !== stat.size || opened.mtimeMs !== stat.mtimeMs) return null;
+    const bytes = Buffer.allocUnsafe(opened.size);
     let offset = 0;
     while (offset < bytes.length) {
       const { bytesRead } = await source.read(bytes, offset, bytes.length - offset, offset);
       if (!bytesRead) return null;
       offset += bytesRead;
     }
-    return sameSnapshot(stat, await source.stat()) ? bytes : null;
+    return sameSnapshot(opened, await source.stat()) ? bytes : null;
   } finally {
     await source.close();
   }
