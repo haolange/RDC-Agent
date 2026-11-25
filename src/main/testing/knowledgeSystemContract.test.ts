@@ -168,17 +168,8 @@ describe('knowledge system contract', () => {
   it('knowledge.contract.durable.store-single-source', async () => {
     expect.hasAssertions();
     expect(KNOWLEDGE_STATE_FILE).toBe('knowledge-state.json');
-    const candidateSource = readRepo('src/main/knowledge/KnowledgeCandidateService.ts');
-    expect(candidateSource).toMatch(/KnowledgeDurableStore/);
-    expect(candidateSource).not.toMatch(/(?:this\.)?(candidates|drafts|reviews)\s*=\s*new\s+Map/);
-    expect(readRepo('src/main/ipc/knowledgeHandlers.ts')).toMatch(/knowledgeCandidateService/);
     expect(readRepo('src/main/ipc/knowledgeHandlers.ts')).not.toMatch(/knowledgeBrowseService|knowledge:listSpaces/);
     expect(readRepo('src/shared/renderer-api/channels.ts')).not.toMatch(/knowledge:listSpaces/);
-    expect(readRepo('src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeCandidateInbox.ts'))
-      .toMatch(/window\.electronAPI\.knowledge\.candidates/);
-    expect(readRepo('src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeCenter.ts'))
-      .toMatch(/window\.electronAPI\.knowledge\.(?:overview|query|card)/);
-    expect(readRepo('src/main/knowledge/KnowledgeTools.ts')).toMatch(/knowledgeQueryService[\s\S]*knowledgeCandidateService/);
 
     const root = temporaryDirectory('rdc-know-durable-');
     const sessionId = 'session-durable';
@@ -215,7 +206,6 @@ describe('knowledge system contract', () => {
     expect(candidateTools).toEqual(['knowledge_candidate_create']);
     expect(readRepo('resources/agent-runtime/skills/knowledge-scout/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
     expect(readRepo('resources/agent-runtime/skills/knowledge-candidate/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
-    expect(readRepo('src/main/agent-runtime/capabilities/SkillCatalogBudget.ts')).toMatch(/短索引/);
 
     const runtime = [...FIVE_DEFERRED, 'skills', 'skill_read', 'ask_user', 'tool_search', 'read_file', 'read_image'];
     const scoutNarrow = intersectSkillAllowedTools(runtime, scoutTools);

@@ -12,15 +12,13 @@
  *  - component CSS may only set backdrop-filter to var(--modal-backdrop-filter);
  *    literal blur() stays in the token definition file.
  *
- * Hits are locked by scripts/fidelity/design-tokens-baseline.json (B0 ratchet).
- * Debt may only decrease; a decrease must update the baseline in the same change.
- * B1 sets the baseline to 0, after which any hit fails.
+ * Any hit fails the gate.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyDebtRatchet } from './renderer-contract.mjs';
+import { requireZeroHits } from './renderer-contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -125,11 +123,7 @@ if (hits.length > 60) {
 }
 
 if (hits.length > 0) {
-  console.error(`[design-tokens] current debt ${hits.length} hit(s)`);
+  console.error(`[design-tokens] ${hits.length} hit(s)`);
 }
 
-applyDebtRatchet({
-  id: 'design-tokens',
-  hits: hits.length,
-  baselineRel: 'scripts/fidelity/design-tokens-baseline.json',
-});
+requireZeroHits({ id: 'design-tokens', hits: hits.length });

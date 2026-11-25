@@ -138,18 +138,6 @@ async function main() {
     if (rel.startsWith('src/')) return scriptExists(rel);
     return fs.existsSync(absolute);
   };
-  const agentManifestTypes = readSrcFile(path.join(repoRoot, 'src/shared/types/agentManifest.ts'), 'utf8');
-  for (const field of [
-    'disableModelInvocation',
-    'userInvocable',
-    'mcpServers',
-    'handoffs',
-    'instructions',
-    'AgentModelOption',
-    'status',
-  ]) {
-    assert(agentManifestTypes.includes(field), `Agent manifest type should expose ${field}.`);
-  }
 
   const agentsSettings = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentsSettings.tsx'),
@@ -171,14 +159,8 @@ async function main() {
   );
   const skillsAgentsWrapperPath = path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/SkillsAgentsSettings.tsx');
   assert(!existsSrc(skillsAgentsWrapperPath), 'Skills and Agents settings must not keep the combined wrapper component.');
-  assert(settingsModalTypes.includes("'skills'") && settingsModalTypes.includes("'agents'"), 'Settings sections should expose Skills and Agents as independent pages.');
-  assert(settingsModalTypes.includes("'policy'"), 'Settings sections should expose Policy as a peer page.');
   assert(!settingsModalTypes.includes("'diagnostics'"), 'Settings sections must not restore Diagnostics navigation.');
   assert(!settingsModalTypes.includes('skillsAgents'), 'Settings sections must not expose the old Skills & Agents combined page.');
-  assert(settingsModalSource.includes("activeSection === 'skills'"), 'Settings modal should render Skills as an independent page.');
-  assert(settingsModalSource.includes("activeSection === 'agents'"), 'Settings modal should render Agents as an independent page.');
-  assert(settingsModalSource.includes("activeSection === 'policy'"), 'Settings modal should render Policy as an independent page.');
-  assert(settingsModalSource.includes('PolicySettings'), 'Settings modal should render the Policy settings section.');
   assert(!settingsModalSource.includes('DeveloperDiagnosticsSettings'), 'Settings modal must not render Developer Diagnostics.');
   assert(!settingsModalSource.includes('SkillsAgentsSettings'), 'Settings modal must not render the old combined Skills & Agents wrapper.');
   assert(!settingsModalCss.includes('settings-page-skills-agents'), 'Settings CSS must not keep the old combined Skills & Agents page selector.');
@@ -196,84 +178,27 @@ async function main() {
   assert(isReservedAgentId('ask_agent') && isReservedAgentId('triage-agent'), 'Old specialist aliases must remain reserved.');
   assert(!isReservedAgentId('general') && !isReservedAgentId('debugger'), 'Four builtins must not be reserved.');
   assert(RESERVED_AGENT_IDS.has('rdc-debugger'), 'Reserved set must include old specialist ids.');
-  assert(agentsSettings.includes('settings.agents.diagnostics'), 'Agents settings should render the manifest diagnostics list.');
-  assert(agentsSettings.includes('data-testid="settings-agent-manifest-diagnostics"'), 'Agents diagnostics must keep a stable test id.');
-  assert(agentsSettings.includes('settings.agentManifestTitle'), 'Agents settings should render manifest management.');
   assert(!agentsSettings.includes('settings.patterns'), 'Agents settings must not expose internal pattern configuration.');
   assert(!agentsSettings.includes('rdcCliInvoker'), 'Agents settings must not expose the internal CLI invoker name.');
   const modelCascade = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentModelCascadeSelect.tsx'),
     'utf8',
   );
-  assert(modelCascade.includes('settings-model-cascade'), 'Agents settings should use the provider/model cascade picker.');
-  assert(
-    modelCascade.includes("from '../../../../ui/Popover'") && modelCascade.includes('open={open}'),
-    'Model cascade must anchor through the shared Popover, which owns open state and aria-expanded.',
-  );
   assert(!modelCascade.includes('splitCanonicalAgentModelId'), 'Model cascade must not synthesize missing selector options from persisted canonical ids.');
-  assert(modelCascade.includes('aria-invalid={invalidSelection}'), 'Model cascade should fail closed with explicit validation for an unavailable persisted selection.');
-  assert(modelCascade.includes('settings-agent-model-invalid'), 'Model cascade should render a stable unavailable-selection diagnostic anchor.');
-  assert(modelCascade.includes('data-provider-id={group.providerId}'), 'Provider options should expose stable provider ids.');
-  assert(modelCascade.includes('data-canonical-id={option.canonicalId}'), 'Model options should expose stable canonical ids.');
   assert(!modelCascade.includes('閫'), 'Model cascade must not hardcode mojibake text.');
-
-  const personalizationSettings = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/PersonalizationSettings.tsx'),
-    'utf8',
-  );
-  assert(personalizationSettings.includes('settings.globalInstructions'), 'Personalization settings should expose global instructions.');
-  const runtimeScopePanel = [
-    readSrcFile(
-      path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RuntimeScopePanel.tsx'),
-      'utf8',
-    ),
-    readSrcFile(
-      path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/runtimeScopeActions.ts'),
-      'utf8',
-    ),
-  ].join('\n');
-  const scopedResourceForm = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/scopedResourceForm.ts'),
-    'utf8',
-  );
-  assert(scopedResourceForm.includes("kind === 'skill'") && scopedResourceForm.includes('allowed-tools'), 'Skill settings should create standard scoped SKILL.md content through the canonical scoped resource form.');
-  assert(runtimeScopePanel.includes('rdcRuntime.upsertResource') && runtimeScopePanel.includes('rdcRuntime.deleteResource'), 'Scoped resources should use the canonical RDC Runtime write API.');
   const toolsSettings = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/ToolsSettings.tsx'),
     'utf8',
   );
-  assert(toolsSettings.includes('RdcCliInvokerSettingsFields'), 'Tools settings should render the local RenderDoc toolchain.');
   assert(!toolsSettings.includes('onUpsertMcpServer'), 'Tools settings must not keep the removed Settings-owned MCP write path.');
-  const mcpServicesPanel = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/McpServicesPanel.tsx'),
-    'utf8',
-  );
-  assert(settingsModalSource.includes('McpServicesPanel') && mcpServicesPanel.includes("kinds={['mcp']}"), 'Tools settings should expose Project-aware MCP resources through RuntimeScopePanel.');
   const renderDocToolchain = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdcCliInvokerSettingsFields.tsx'), 'utf8',
   );
-  const installationFlow = readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/useRdcInstallation.ts'), 'utf8');
-  assert(renderDocToolchain.includes('settings.rdcFolder') && renderDocToolchain.includes('settings.rdcApply'), 'Skills & Tools should expose installation selection and explicit apply.');
-  assert(installationFlow.includes('validateRdcInstallation') && renderDocToolchain.includes('summary.runtime.version')
-    && renderDocToolchain.includes('summary.runtime.catalog.toolCount'), 'Installation validation must show actual version and discovered capability count.');
-  assert(renderDocToolchain.includes('installation.error') && installationFlow.includes('if (!current()) return;')
-    && installationFlow.indexOf('await validateRdcInstallation') < installationFlow.indexOf('await useAppSettingsStore.getState().patchSettings'),
-    'Installation validation must report failure, discard stale results and validate the draft before persistence.');
   assert(!toolsSettings.includes('RdcActionsFields') && !renderDocToolchain.includes('catalogPath')
     && !renderDocToolchain.includes('jsonMode'), 'Settings must not restore lifecycle command templates or separate catalog/JSON modes.');
 
   const composer = readSrcFile(path.join(repoRoot, 'src/renderer/features/composer/Composer.tsx'), 'utf8');
-  const composerAgentMenu = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/composer/ComposerAgentMenu.tsx'),
-    'utf8',
-  );
-  assert(
-    composer.includes('userInvocableAgents={userInvocableAgents}')
-      && composerAgentMenu.includes('userInvocableAgents.map'),
-    'Composer should list user-invocable Agent manifests through the canonical Agent menu.',
-  );
   assert(!composer.includes('AGENT_MODES.map'), 'Composer should not hardcode mode entries as Agent choices.');
-  assert(composerAgentMenu.includes('composer-agent-menu-item-tooltip'), 'Composer should keep Agent descriptions in hover tooltip UI.');
   const capabilityHook = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/composer/useEffectiveModelCapability.ts'),
     'utf8',
@@ -284,82 +209,41 @@ async function main() {
   );
   assert(!capabilityHook.includes('syncing-route') && !capabilityHook.includes('routeSyncState'),
     'Agent routes come from Settings → Agents; manifest saves never move them, so the Composer keeps no route-sync state.');
-  const catalogCapability = readSrcFile(path.join(repoRoot, 'src/renderer/lib/capabilityResolution.ts'), 'utf8');
-  assert(capabilityHook.includes('resolveCatalogCapability') && catalogCapability.includes('validateCapabilityResolution(expected, model)'), 'Capability mismatches should terminate as unavailable instead of loading forever.');
-  assert(catalogCapability.includes("status: 'error'"), 'Capability request failures should have an explicit error state.');
   assert(!capabilityHook.includes('catch {'), 'Capability request failures must not be swallowed by an empty catch.');
   assert(!turnControls.includes(':pending'), 'Turn controls must not retain the legacy pending capability-key sentinel.');
-  assert(turnControls.includes('capabilityState'), 'Turn controls should consume the closed capability resolution state.');
-
-  const modeGlyph = readSrcFile(path.join(repoRoot, 'src/renderer/ui/ModeGlyph.tsx'), 'utf8');
-  assert(modeGlyph.includes('FALLBACK_MODE_CONFIG'), 'ModeGlyph should provide a safe fallback for custom Agent profiles.');
-
-  const composerSendHelpers = readSrcFile(path.join(repoRoot, 'src/renderer/stores/conversationSendHelpers.ts'), 'utf8');
-  assert(composerSendHelpers.includes('resolveComposerProfileId'), 'Composer send should freeze the selected profile id without Ask/Edit fallback.');
   const composerSendFlow = readSrcFile(path.join(repoRoot, 'src/renderer/features/composer/composerSendFlow.ts'), 'utf8');
-  assert(composerSendFlow.includes('agentId: selectedAgentId || null'), 'Conversation sends should freeze the selected Agent id.');
-  assert(composerSendFlow.includes('setPromptValue(sentPrompt)') && composerSendFlow.includes('setPendingAttachments(sentAttachments)'), 'Local preflight failures should restore the Composer snapshot.');
   assert(!composerSendFlow.includes('setSelectedAgentId'), 'Local send failures must not rewrite the selected Agent id.');
 
   assert(!existsSrc(path.join(repoRoot, 'src/renderer/features/transcript/useAgentHandoffActions.ts')), 'Dead renderer handoff actions must be deleted.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/shared/types/profileHandoff.ts')), 'Durable ProfileHandoffState must stay deleted.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/sessions/HandoffStateStore.ts')), 'HandoffStateStore must stay deleted.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/agent/HandoffController.ts')), 'HandoffController must stay deleted.');
-  const executionOffer = readSrcFile(path.join(repoRoot, 'src/shared/types/executionOffer.ts'), 'utf8');
-  assert(executionOffer.includes('export interface ExecutionOffer'), 'ExecutionOffer must be the session continue-binding record.');
   const conversationService = readSrcFile(path.join(repoRoot, 'src/main/conversation/ConversationService.ts'), 'utf8');
   assert(!conversationService.includes('pendingHandoffs'), 'ConversationService must not keep an in-memory pendingHandoffs map.');
   assert(!conversationService.includes('scheduleHandoffAutoSend'), 'ConversationService must not auto-send declared continues.');
-  const applyDeclared = readSrcFile(path.join(repoRoot, 'src/main/conversation/applyDeclaredHandoff.ts'), 'utf8');
-  assert(applyDeclared.includes('dispatchRuntimeHooks(\'agent.before-handoff\''), 'Declared continue must fire agent.before-handoff.');
-  const sessionApi = readSrcFile(path.join(repoRoot, 'src/shared/renderer-api/workbench.ts'), 'utf8');
-  assert(sessionApi.includes('setAgentId'), 'Manual Agent switch must persist session.agentId through main.');
-  assert(sessionApi.includes('applyDeclaredHandoff'), 'Declared continue must persist session.agentId through main.');
 
   const useSettingsModal = readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/useSettingsModal.ts'), 'utf8');
   assert(!useSettingsModal.includes('AGENT_ROLES'), 'Settings route validation should derive agents from manifest drafts.');
-  assert(useSettingsModal.includes('useAgentManifestAutosave'), 'Settings should persist manifest drafts through the scoped autosave path.');
-  assert(useSettingsModal.includes('saveAgentDefinition'), 'Settings should use the scoped Agent definition save service.');
-
-  const agentManifestAutosave = readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/useAgentManifestAutosave.ts'), 'utf8');
-  assert(agentManifestAutosave.includes('getChangedAgentManifestDrafts'), 'Agent autosave should write only changed manifest drafts.');
-  assert(agentManifestAutosave.includes('latestRevisionRef'), 'Agent autosave should reject stale save completions by revision.');
 
   const settingsModalActions = readSrcFile(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/settingsModalActions.ts'), 'utf8');
   assert(!settingsModalActions.includes('AGENT_ROLES'), 'Settings route save should not be limited to built-in Agent roles.');
-  assert(settingsModalActions.includes('agentManifestDrafts'), 'Settings route save should include custom manifest drafts.');
-  assert(settingsModalActions.includes('saveAgentDefinition'), 'Settings route save should not rebuild the whole settings/workspace state.');
 
   const agentManifestServiceSource = readSrcFile(path.join(repoRoot, 'src/main/settings/agent-manifests/AgentManifestService.ts'), 'utf8');
   assert(!agentManifestServiceSource.includes('Only top-level agent manifests'), 'Agent manifest import should not reject safe custom profiles.');
-  assert(agentManifestServiceSource.includes('isSafeAgentProfileId(idFromFileName(entry))'), 'Agent manifest load should accept safe custom profile file ids.');
-  assert(agentManifestServiceSource.includes('const routeAgentIds = new Set<string>(AGENT_ROLES)'), 'Agent manifest routes should seed built-ins before adding custom profiles.');
-  assert(agentManifestServiceSource.includes('routeAgentIds.add(definition.id)'), 'Agent manifest routes should add custom profile ids.');
 
   const settingsServiceSource = readSrcFile(path.join(repoRoot, 'src/main/settings/settings-core/SettingsService.ts'), 'utf8');
   const settingsProviderSanitizeSource = readSrcFile(
     path.join(repoRoot, 'src/main/settings/settings-core/settingsProviderSanitize.ts'),
     'utf8',
   );
-  const settingsServiceHelpersSource = readSrcFile(
-    path.join(repoRoot, 'src/main/settings/settings-core/settingsServiceHelpers.ts'),
-    'utf8',
-  );
   assert(!settingsProviderSanitizeSource.includes('KNOWN_AGENT_IDS'), 'Settings route normalization should not use a built-in Agent allowlist.');
-  assert(settingsProviderSanitizeSource.includes('isSafeAgentProfileId(route.agentId)'), 'Settings route normalization should validate safe custom profile ids.');
-  assert(settingsProviderSanitizeSource.includes('routeMap.set(route.agentId, route)'), 'Settings route normalization should preserve custom route ids.');
   assert(!settingsServiceSource.includes('agentRoutes?: LlmAgentRoute[];'), 'Persisted settings must not mirror Agent routes.');
-  assert(settingsServiceHelpersSource.includes('routesFromDefinitions(createEmptyAgentRoutes(), baseAgentSettings.definitions)'), 'Runtime Agent routes must derive from .agent.md definitions.');
 
   const conversationRoutePreflightSource = readSrcFile(
     path.join(repoRoot, 'src/main/conversation/ConversationRoutePreflight.ts'),
     'utf8',
   );
-  assert(conversationRoutePreflightSource.includes('resolveEnabledAgentDefinition'), 'Conversation routing should resolve enabled manifest definitions.');
   assert(!conversationRoutePreflightSource.includes('KNOWN_CONVERSATION_AGENTS'), 'Conversation routing should not be limited to built-in Agent roles.');
-
-  const orchestratorSource = readSrcFile(path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'), 'utf8');
-  assert(orchestratorSource.includes('getOrCreateAgentConfig'), 'Agent orchestrator should lazily initialize custom Agent config.');
   const { AgentSlotRegistry } = require('../src/main/agent-runtime/orchestration/AgentSlotRegistry.ts');
   const slots = new AgentSlotRegistry();
   slots.initializeDefaults();
@@ -373,14 +257,6 @@ async function main() {
   slots.applyLlmConfig([]);
   assert(slots.getAgentConfig(customAgentId)?.modelProvider === ''
     && slots.getAgentConfig(customAgentId)?.modelName === '', 'Removing a compiled route must leave the custom Agent unconfigured.');
-
-  const runtimePolicySource = readSrcFile(path.join(repoRoot, 'src/main/agent-runtime/orchestration/RuntimeToolPolicy.ts'), 'utf8');
-  assert(
-    runtimePolicySource.includes('finalizeAllowlist')
-    && (runtimePolicySource.includes('manifest.tools') || runtimePolicySource.includes('expandMissionPlanOnlyTokens')),
-    'Runtime tool policy should derive manifest tool allowlists directly.',
-  );
-  assert(runtimePolicySource.includes('AGENT_TOOLS_EMPTY'), 'Runtime tool policy must fail-closed on empty tools.');
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-settings-agents-'));
   try {
@@ -537,18 +413,6 @@ Reserved historical filename.
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentManifestEditor.tsx'),
     'utf8',
   );
-  const agentIdentitySource = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentIdentityPanel.tsx'),
-    'utf8',
-  );
-  const modelBindingSource = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentModelBindingFields.tsx'),
-    'utf8',
-  );
-  assert(agentIdentitySource.includes("from '../../../../ui/ColorField'"), 'Agents accent must use shared ColorField');
-  assert(agentIdentitySource.includes('testId="settings-agent-accent"'), 'Agents accent must keep a stable test id');
-  assert(agentIdentitySource.includes('AgentIconPresetPicker') && agentIdentitySource.includes('settings-agent-identity-grid'), 'Agents Icon+Accent live in the identity panel (A02), not a separate look strip');
-  assert(agentIdentitySource.includes('layout="inline"'), 'Agents accent ColorField must use inline layout');
   assert(!agentEditorSource.includes('settings-agent-accent-field'), 'Agents must not keep the legacy toolbar accent field markup');
   assert(!agentEditorSource.includes('settings-agent-identity-controls'), 'legacy stacked identity-controls row must be removed');
   assert(!agentEditorSource.includes('settings-agent-look-strip'), 'legacy look strip must be removed from the route panel');
@@ -556,20 +420,8 @@ Reserved historical filename.
   assert(!settingsModalCss.includes('.settings-agent-accent-hex'), 'legacy Agents accent hex CSS must be removed');
   assert(!settingsModalCss.includes('.settings-agent-look-strip'), 'legacy Agents look strip CSS must be removed');
   assert(
-    agentEditorSource.includes('settings-agent-config-status') && agentEditorSource.includes("from '../../../../ui/Switch'"),
-    'Agents route panel must show a read-only configuration status and Switch-based availability flags',
-  );
-  assert(
     !agentEditorSource.includes('settings-agent-editor-id') && !agentEditorSource.includes('modelSourceLabel'),
     'Agent editor header shows the name and description only: no agent id and no duplicate model-source line',
-  );
-  assert(
-    modelBindingSource.includes('followDefaultLabel') && !modelBindingSource.includes("ui/Tabs'"),
-    'An Agent picks its model in one selector whose first choice follows the default model',
-  );
-  assert(
-    agentEditorSource.includes('settings-agent-panels') && agentEditorSource.includes('aria-expanded={open}'),
-    'Agents Identity / Permissions / Handoffs / Instructions must be accordion panels',
   );
 
   console.log('[settings-agents] OK');

@@ -117,25 +117,12 @@ export const assertContractIntegrity = (fail) => {
   assertRetiredAbsent(fail);
 };
 
-export const applyDebtRatchet = ({ id, hits, baselineRel }) => {
-  const baselinePath = path.join(root, baselineRel);
-  if (!fs.existsSync(baselinePath)) {
-    console.error(`[${id}] missing baseline ${baselineRel}`);
-    process.exit(1);
-  }
-  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+/** Structural rules hold at zero: any hit fails the gate. */
+export const requireZeroHits = ({ id, hits }) => {
   const current = typeof hits === 'number' ? hits : hits.length;
-  if (typeof baseline.hits !== 'number') {
-    console.error(`[${id}] baseline.hits must be a number`);
+  if (current > 0) {
+    console.error(`[${id}] ${current} hit(s); the rule allows none.`);
     process.exit(1);
   }
-  if (current > baseline.hits) {
-    console.error(`[${id}] debt increased: ${baseline.hits} → ${current}`);
-    process.exit(1);
-  }
-  if (current < baseline.hits) {
-    console.error(`[${id}] debt decreased: ${baseline.hits} → ${current}. Update ${baselineRel} to lock progress.`);
-    process.exit(1);
-  }
-  console.log(`[${id}] OK (hits=${current}, baseline=${baseline.hits})`);
+  console.log(`[${id}] OK (0 hits)`);
 };

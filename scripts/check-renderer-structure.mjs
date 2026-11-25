@@ -11,7 +11,7 @@ import ts from 'typescript';
 import { moduleReferences, patternStoreActions } from './renderer-source-analysis.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyDebtRatchet, assertContractIntegrity, contractRel } from './renderer-contract.mjs';
+import { assertContractIntegrity, contractRel, requireZeroHits } from './renderer-contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -169,8 +169,4 @@ for (const key of ['shell.appShellCss', 'shell.appShellMiscCss']) {
 
 assertContractIntegrity(fail);
 
-applyDebtRatchet({
-  id: 'renderer-structure',
-  hits: hitCount,
-  baselineRel: 'scripts/fidelity/renderer-structure-baseline.json',
-});
+requireZeroHits({ id: 'renderer-structure', hits: hitCount });

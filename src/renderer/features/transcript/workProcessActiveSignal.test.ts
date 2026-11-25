@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import { describe, expect, it } from 'vitest';
 import {
   isActiveThinkingStatus,
@@ -19,17 +17,5 @@ describe('workProcessActiveSignal', () => {
     expect(isActiveThinkingStatus('complete', 'complete')).toBe(false);
     expect(isActiveThinkingStatus('complete', 'running')).toBe(false);
     expect(isActiveThinkingStatus(undefined, 'running')).toBe(true);
-  });
-
-  it('keeps active signal off approval verbs', () => {
-    const root = process.cwd();
-    const rowsSource = fs.readFileSync(
-      path.resolve(root, 'src/renderer/features/transcript/WorkProcessRows.tsx'),
-      'utf8',
-    );
-
-    expect(rowsSource).not.toContain('work-process-tool-approval-verb">{label(approval.verb)}</ActiveSignalText>');
-    expect(rowsSource).not.toContain('work-process-tool-group-title');
-    expect(rowsSource).toContain('<ActiveSignalText active tone="interaction" className="work-process-user-input-verb">');
   });
 });

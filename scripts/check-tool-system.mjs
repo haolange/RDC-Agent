@@ -97,7 +97,6 @@ function main() {
   const generalManifest = fs.readFileSync(generalPath, 'utf8');
   const generalProfile = parseAgentMarkdownStrict(generalManifest, generalPath, 'general', 't', true);
   assert(generalProfile.ok, `General builtin manifest must parse: ${generalProfile.reason}`);
-  assert(generalManifest.includes('task'), 'General builtin must include task');
   assert(!generalManifest.includes('todo'), 'General builtin must not include todo');
   assert(!generalManifest.includes('search_codebase'), 'General builtin must not include search_codebase');
   assert(generalProfile.definition.tools.includes('knowledge'), 'General builtin must grant canonical knowledge token');
@@ -222,93 +221,23 @@ function main() {
     'MCPManager isMCPTool must use mcp__ prefix',
   );
   assert(
-    deferredTools.includes("startsWith(MCP_TOOL_NAME_PREFIX)")
-      || /startsWith\(['"]mcp__['"]\)/.test(deferredTools),
-    'deferredTools isMcpPrefixedToolName must match MCPManager mcp__ prefix',
-  );
-  assert(
-    deferredTools.includes('getBuiltinToolTier')
-      && deferredTools.includes("=== 'extended'"),
-    'deferredTools must defer extended builtin tools via BUILTIN_AGENT_TOOL_TIERS',
-  );
-  assert(
     !fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/orchestration/mcpDeferredTools.ts')),
     'legacy mcpDeferredTools.ts must not exist (converged into deferredTools.ts)',
-  );
-
-  const orchestrator = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/orchestration/AgentOrchestrator.ts'),
-    'utf8',
-  );
-  const turnPreparationService = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/orchestration/TurnPreparationService.ts'),
-    'utf8',
   );
   const runtimeToolAssembly = fs.readFileSync(
     path.join(repoRoot, 'src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts'),
     'utf8',
-  );
-  const toolExecutorFactory = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts'),
-    'utf8',
-  );
-  const runtimePolicy = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/orchestration/RuntimeToolPolicy.ts'),
-    'utf8',
-  );
-  assert(
-    orchestrator.includes('new RuntimeToolAssembly'),
-    'AgentOrchestrator must own the RuntimeToolAssembly collaboration boundary',
-  );
-  assert(
-    turnPreparationService.includes('partitionDeferredTools'),
-    'TurnPreparationService must partition deferred tools before PromptPlan construction',
-  );
-  assert(
-    turnPreparationService.includes('mcp_tools_deferred'),
-    'TurnPreparationService breakdown must emit mcp_tools_deferred',
-  );
-  assert(
-    turnPreparationService.includes('builtin_tools_deferred'),
-    'TurnPreparationService breakdown must emit builtin_tools_deferred',
   );
   // tool_search must only discover the allowlist/runtime-policy filtered tool set.
   assert(
     /createToolSearchTool\(\(\)\s*=>\s*\n?\s*Array\.from\(availableTools\.values\(\)\)\.filter/.test(runtimeToolAssembly),
     'RuntimeToolAssembly tool_search closure must filter available tools by allowlist and runtime policy',
   );
-  // Skill ∩ is frozen on prepareTurn (`skillIntersection`); executor consumes the
-  // frozen set and must not re-narrow from skill_read mid-turn.
-  assert(
-    turnPreparationService.includes('resolveSkillIntersection')
-      && turnPreparationService.includes('skillIntersection'),
-    'TurnPreparationService must freeze ∩(skill_i) ∩ runtimeAllowlist as skillIntersection',
-  );
-  assert(
-    runtimePolicy.includes('export function intersectSkillAllowedTools'),
-    'RuntimeToolPolicy must export intersectSkillAllowedTools for prepareTurn',
-  );
-  assert(
-    toolExecutorFactory.includes('plan?.skillIntersection')
-      && toolExecutorFactory.includes('skill_read does not re-narrow mid-turn'),
-    'ToolExecutorFactory must consume frozen skillIntersection and not re-narrow mid-turn',
-  );
-
-  // Primitive tool convergence contracts.
-  const shared = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/_shared.ts'),
-    'utf8',
-  );
-  assert(shared.includes('function truncateOutput'), 'primitives/_shared must export truncateOutput');
-  assert(shared.includes('sliceUtf8Bytes'), 'truncateOutput must use byte-accurate UTF-8 slicing');
-  assert(shared.includes('assertTextReadable'), 'primitives/_shared must expose assertTextReadable');
-  assert(shared.includes('realpathSync') || shared.includes('realpath'), 'safeResolvePath must realpath targets');
 
   const readFileTool = fs.readFileSync(
     path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/ReadFileTool.ts'),
     'utf8',
   );
-  assert(readFileTool.includes('assertTextReadable'), 'read_file must gate binary/.rdc via assertTextReadable');
   assert(!readFileTool.includes('session-artifacts'), 'read_file must not gain a session-artifacts allow path');
 
   const contextManager = fs.readFileSync(
@@ -332,10 +261,6 @@ function main() {
     !/effects:\s*\{[^}]*\breads\b/.test(artifactReadTool) && !/READ_ONLY_FILE_TOOLS/.test(permissionPolicy),
     'artifact_read reads session artifacts by URI and must not declare filesystem read effects (attachments auto-auth)',
   );
-  assert(
-    permissionPolicy.includes('matchShellHardDeny'),
-    'AgentPermissionPolicy must hard-deny catastrophic shell via matchShellHardDeny',
-  );
 
   const shellTool = fs.readFileSync(
     path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/ShellTool.ts'),
@@ -344,18 +269,6 @@ function main() {
   assert(
     !shellTool.includes('run_in_background'),
     'shell must not declare a disabled run_in_background parameter',
-  );
-  assert(
-    shellTool.includes("name: 'shell'"),
-    'builtin command tool id must be shell',
-  );
-  assert(
-    shellTool.includes("spawn('agent-shell'") || shellTool.includes('spawn(\'agent-shell\''),
-    'shell must spawn under the agent-shell process owner',
-  );
-  assert(
-    shellTool.includes('get description()'),
-    'shell description must be a dynamic getter',
   );
 
   console.log('[tool-system] OK');

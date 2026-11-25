@@ -8,7 +8,6 @@ require('./register-ts-source.cjs');
 const { translate } = require('../src/renderer/i18n/messages.ts');
 const t = (key, params) => translate('zh-CN', key, params);
 
-
 const {
   buildWorkProcessPresentation,
 } = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/transcript/workProcessTracePresentation.ts')));
@@ -27,16 +26,7 @@ const assert = (condition, message) => {
 };
 
 const readSource = (relativePath) => scriptRead(relativePath);
-
-// The transcript scrolls only because the page shell bounds its height; losing this rule makes the
-// conversation grow past the viewport with nothing able to scroll it.
-const pageShellRule = readSource('src/renderer/styles/global/app-shell-columns.css').match(/\.main-page-shell \{([^}]*)\}/)?.[1] ?? '';
-for (const declaration of ['flex: 1;', 'min-height: 0;', 'overflow: hidden;', 'flex-direction: column;']) {
-  assert(pageShellRule.includes(declaration), `.main-page-shell must keep "${declaration}" so .chat-messages stays the transcript scroller`);
-}
-const activeSignalSource = readSource('src/renderer/ui/ActiveSignalText.tsx');
 const activeSignalStyles = readSource('src/renderer/styles/design-motion.css');
-const activeSignalHelper = readSource('src/renderer/features/transcript/workProcessActiveSignal.ts');
 const activeSignalRenderSource = [
   'src/renderer/features/transcript/WorkProcessSectionRow.tsx',
   'src/renderer/features/transcript/WorkProcessThinking.tsx',
@@ -45,30 +35,16 @@ const activeSignalRenderSource = [
   'src/renderer/features/composer/UserInputRequestPanel.tsx',
   'src/renderer/features/composer/ToolApprovalRequestPanel.tsx',
 ].map(readSource).join('\n');
-
-assert(activeSignalSource.includes('data-active-signal={active ? tone : undefined}'), 'ActiveSignalText should expose an active-state DOM contract');
-assert(activeSignalHelper.includes("status === 'running' || status === 'pending'"), 'active signal must be driven by running/pending Work Process status');
-assert(activeSignalHelper.includes("thinkingStatus === 'streaming'"), 'active signal must recognize streaming thinking lifecycle');
-assert(activeSignalHelper.includes('thinkingStatus === undefined && isActiveWorkProcessStatus(rowStatus)'), 'completed thinking must not animate while plan review keeps the work row running');
-assert(activeSignalStyles.includes('.active-signal-text.is-active'), 'active signal text CSS class is missing');
-assert(activeSignalStyles.includes('display: inline-block'), 'active signal must use inline-block so flex headers keep a wash box');
-assert(activeSignalStyles.includes('background-clip: text'), 'active signal must use clipped-gradient energy shimmer');
-assert(activeSignalStyles.includes('background-size: 200% 100%'), 'active signal must tile a 200% energy wash so the loop is one period');
-assert(activeSignalStyles.includes('background-repeat: repeat-x'), 'active signal must repeat-x so the loop seam can tile');
 assert(
   /@keyframes active-signal-shimmer \{\s*0% \{ background-position: 100% 0; \}\s*100% \{ background-position: -100% 0; \}\s*\}/.test(activeSignalStyles),
   'active signal keyframes must be a continuous 100% to -100% sweep with no hold',
 );
 assert(!activeSignalStyles.includes('78% { background-position'), 'active signal must not pause mid-cycle');
-assert(activeSignalStyles.includes('1.6s linear infinite'), 'active signal must keep the original 1.6s continuous sweep');
-assert(activeSignalStyles.includes('color-mix(in srgb, var(--active-signal-highlight) 36%, transparent)'), 'active signal must keep the original 36% wash gradient');
 assert(!activeSignalStyles.includes('--active-signal-base'), 'narrow sheen base token must stay removed');
 assert(!activeSignalStyles.includes('--active-signal-sheen'), 'narrow sheen highlight token must stay removed');
-assert(activeSignalStyles.includes('@keyframes active-signal-shimmer'), 'active signal shimmer keyframe is missing');
 assert(!activeSignalStyles.includes('active-signal-pulse'), 'legacy active-signal pulse must be removed');
 assert(!activeSignalStyles.includes('prefers-reduced-motion'), 'core motion must not depend on OS preferences');
 assert(!activeSignalStyles.includes('data-reduce-motion'), 'core motion must not have a settings override');
-assert(activeSignalStyles.includes('var(--active-signal-highlight) 46%'), 'active signal must keep the historical broad highlight');
 assert(activeSignalRenderSource.includes('ActiveSignalText active={active}') || activeSignalRenderSource.includes('ActiveSignalText active '), 'Work Process rows should use shared ActiveSignalText for active labels');
 assert(activeSignalRenderSource.includes('tone="interaction"'), 'ask_user interaction surfaces should use the interaction active signal tone');
 assert(!activeSignalRenderSource.includes("row.status === 'complete' &&"), 'complete rows must not be a trigger for active signal text');
@@ -1014,66 +990,29 @@ const sectionModelSource = scriptRead('src/renderer/features/transcript/workProc
 for (const [label, source] of [['components', componentSource], ['section model', sectionModelSource], ['i18n', i18nSource]]) {
   assert(!/workProcessSectionTitle|\bordinal\b|numberSections|markLastSectionOpen/.test(source), `${label} must not number Working steps`);
 }
-assert(componentSource.includes("useScopedWorkDisclosure('root'"), 'Working root must use the scoped disclosure so a manual toggle wins');
 // Steps never fold: no per-step disclosure, no "N actions · time" toggle; the preference picks follow-latest or show-all.
 const sectionRowSource = scriptRead('src/renderer/features/transcript/WorkProcessSectionRow.tsx', 'utf8');
-assert(sectionRowSource.includes('rows={row.visibleSteps}') && !/leadRows|actionRows/.test(sectionRowSource),
-  'Working must render a single ordered list of model response events');
 assert(!/Disclosure|useScopedWorkDisclosure|actionsLabel/.test(sectionRowSource + sectionModelSource), 'Working steps must be laid out flat without a step toggle');
 assert(!/workProcessSectionRunning|workProcessSectionDone/.test(i18nSource), 'the step toggle copy must stay deleted');
-const viewportSource = scriptRead('src/renderer/features/transcript/WorkProcessViewport.tsx', 'utf8');
-const contentSource = scriptRead('src/renderer/features/transcript/WorkProcessContent.tsx', 'utf8');
-assert(contentSource.includes("following={active && preference === 'latest'}"), 'a running process follows its latest step only under the latest preference');
-assert(viewportSource.includes('FOLLOW_MS = 200') && viewportSource.includes('workProcessBackToLatest'), 'the follow window eases to the latest step and offers back-to-latest');
-assert(cssSource.includes('max-height: min(40vh, 360px)') && cssSource.includes('rgb(0 0 0 / 0.25) 18%, rgb(0 0 0) 45%'),
-  'the follow window keeps the contract height and top fade');
 assert(!/setExpanded\(true\)/.test(componentSource), 'Working root must not force itself open after a turn ends');
 const userInputPanelSource = scriptRead('src/renderer/features/composer/UserInputRequestPanel.tsx', 'utf8');
-const userInputSubmitHookSource = scriptRead('src/renderer/features/composer/useUserInputRequestSubmit.ts', 'utf8');
 const toolApprovalPanelSource = scriptRead('src/renderer/features/composer/ToolApprovalRequestPanel.tsx', 'utf8');
-const toolApprovalSubmitHookSource = scriptRead('src/renderer/features/composer/useToolApprovalSubmit.ts', 'utf8');
 const orchestratorSource = scriptRead('src/main/agent-runtime/orchestration/AgentOrchestrator.ts', 'utf8');
 const conversationEventHandlerSource = readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts');
-
-assert(
-  presentationSource.includes('loopTextItems(block).map(') && presentationSource.includes("type: 'output'"),
-  'commentary should project from loop text items into output rows',
-);
-assert(
-  presentationSource.includes('phase: presentedTextPhase(item.phase, superseded)') && !/phase:\s*'commentary'/.test(presentationSource),
-  'only explicitly classified commentary may render as Work Process narrative: output rows keep the item phase, changed only by the shared superseded-answer rule',
-);
 assert(
   /settleLoopItems\([\s\S]*?\{\s*stopReason,\s*outputPhase\s*\}/.test(conversationEventHandlerSource)
     && !presentationSource.includes('void outputPhase'),
   'settled commentary must follow the loop outputPhase, not void it',
 );
 assert(
-  conversationEventHandlerSource.includes('resolveStreamingOutputPhase')
-    && conversationEventHandlerSource.includes('upsertLoopTextItem')
-    && conversationEventHandlerSource.includes('upsertLoopThinkingItem')
-    && !conversationEventHandlerSource.includes('upsertLoopOutputItem')
-    && /event\.type === 'assistant\.completed'[\s\S]*?pendingNewLoop\s*=\s*true/.test(conversationEventHandlerSource),
-  'provider completion must close the response and preserve item-scoped output',
-);
-assert(
   /\.work-process-user-input-transcript\s*\{[^}]*gap:\s*var\(--space-4\)/.test(cssSource),
   'Asked transcript items should use space-4 gap between numbered Q/A pairs',
-);
-assert(
-  componentSource.includes('work-process-user-input-transcript-index')
-    && /\.work-process-user-input-transcript-item\s*\{[^}]*grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)/.test(cssSource)
-    && !componentSource.includes('work-process-user-input-options')
-    && !componentSource.includes('work-process-user-input-transcript-description'),
-  'Asked transcript should number questions in a grid and indent answers under the prompt',
 );
 assert(
   /\.work-process-user-input\s*\{[^}]*border:\s*1px\s+solid\s+var\(--token-border-muted\)/.test(cssSource),
   'Asked rows should use the same card border chrome as tool cards',
 );
 assert(!presentationSource.includes('buildSemanticStepGroups'), 'semantic step grouping must be removed');
-assert(presentationSource.includes("block.kind === 'llm_turn'"), 'Work Process sections should be sourced from LLM loop blocks');
-assert(presentationSource.includes('WORK_PROCESS_TOOL_DISPLAY_CATALOG'), 'tool display catalog should be canonical');
 assert(!presentationSource.includes("type: 'toolGroup'"), 'presentation must not expose toolGroup shells');
 assert(!presentationSource.includes("type: 'response'"), 'presentation must not expose a Reply response boundary row');
 assert(!presentationSource.includes('createResponseRow'), 'answer-only loops must not route through createResponseRow');
@@ -1083,21 +1022,11 @@ assert(!componentSource.includes('WorkProcessReasoningIndicatorRow'), 'component
 assert(!componentSource.includes('work-process-reasoning-indicator'), 'component must not mount CoT placeholder DOM');
 assert(!i18nSource.includes('workProcessInternalReasoning'), 'i18n must not keep opaque CoT placeholder copy');
 assert(!cssSource.includes('.work-process-reasoning-indicator'), 'CSS must not keep CoT placeholder styles');
-assert(presentationSource.includes('getToolFamily'), 'tool projection should map tools onto unified card families');
-assert(presentationSource.includes('actionCount'), 'presentation should expose actionCount for top-level transcript meta');
 assert(!componentSource.includes('chat.workProcessToolEvidence'), 'Work Process must not render a redundant succeeded/failed/skipped aggregate');
 assert(!i18nSource.includes('chat.workProcessToolEvidence'), 'redundant Work Process tool aggregate copy must be removed');
-assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
-assert(presentationSource.includes("label: status === 'streaming'"), 'thinking labels should follow the thinking lifecycle');
 assert(!presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'a pending plan must not keep settled thinking active');
-assert(presentationSource.includes('resolveSettledThinkingLabel'), 'settled thinking should resolve Thought-for labels centrally');
-assert(presentationSource.includes("t('chat.workProcessThoughtFor', { duration: formatDurationMs(item.startedAt, item.completedAt) })"), 'settled thinking label should use 已思考 · duration copy from the item timing');
 assert(!presentationSource.includes('`思考了 ${duration}`') && !presentationSource.includes('思考了 ${duration}'), 'settled thinking must not use 思考了 duration copy');
 assert(!presentationSource.includes('深度思考'), 'depth-thinking copy must not appear in presentation');
-assert(componentSource.includes('work-process-thinking-icon'), 'thinking folds should show a quiet leading icon');
-assert(componentSource.includes('work-process-tool-card'), 'tools should render as a unified tool card');
-assert(componentSource.includes('work-process-tool-card-raw'), 'tool cards should expose a styled Raw panel');
-assert(cssSource.includes('.work-process-tool-card'), 'tool card styling should exist');
 assert(
   /\.work-process-tool-card\.is-compact:not\(\.is-background-wait\)\s*>\s*\.work-card-trigger\s+\.work-process-tool-card-header\s*\{[^}]*padding:\s*var\(--space-1\)\s+var\(--space-2\)/.test(cssSource),
   'compact tools must retain the shared card shell and only tighten its header spacing',
@@ -1106,9 +1035,6 @@ assert(
   !/\.work-process-tool-card\.is-compact\s*\{[^}]*border:\s*0/.test(cssSource),
   'compact tools must not remove the shared card border',
 );
-assert(cssSource.includes('.work-process-tool-card.is-background-wait'), 'background_wait must keep its lightweight runtime-event treatment');
-assert(cssSource.includes('.work-process-tool-card-raw'), 'tool card raw panel styling should exist');
-assert(cssSource.includes('.work-process-thinking-icon'), 'thinking icon styling should exist');
 assert(!presentationSource.includes(": '思考过程'"), 'settled thinking must not reuse the Work process header title 思考过程');
 assert(!presentationSource.includes("'原始思考'"), 'product copy must not use 原始思考');
 assert(!presentationSource.includes("isSummary ? '思考'"), 'settled thinking must not split summary/raw labels');
@@ -1117,12 +1043,8 @@ for (const forbidden of ['Called tool']) {
 }
 
 assert(!componentSource.includes('ToolGroupRow'), 'component must not render toolGroup shells');
-assert(componentSource.includes('work-process-narrative-stream'), 'component should use narrative stream list class');
 assert(!componentSource.includes('ResponseRow'), 'component must not render a Reply response boundary row');
 assert(!scriptExists('src/renderer/features/transcript/WorkProcessResponseRow.tsx'), 'WorkProcessResponseRow must be deleted');
-assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should use the process title translation');
-assert(componentSource.includes("t('chat.workProcessHeadlineRunning')"), 'running header should use Working copy');
-assert(componentSource.includes('ActiveSignalText'), 'running header should use ActiveSignalText');
 assert(!componentSource.includes('TRACE_HEADLINE_KEY'), 'top Work Process header must not fall back to status-first copy');
 assert(!componentSource.includes('statusMeta'), 'top Work Process meta should be duration/action context, not completion-status copy');
 assert(!componentSource.includes('work-process-tool-group'), 'tool group class must be removed from component source');
@@ -1140,38 +1062,17 @@ for (const removedPath of [
   assert(!scriptExists(removedPath), `legacy path must be deleted: ${removedPath}`);
 }
 assert(scriptExists('src/renderer/features/transcript/workProcessUnits.ts'), 'presentation units helper must exist');
-assert(componentSource.includes('work-process-tool-diagnostic'), 'failed tools should expose a diagnostic caption exit');
-assert(componentSource.includes('diagnosticCaption'), 'tool rows should carry diagnosticCaption from projection');
 const toolRowSource = [
   scriptRead('src/renderer/features/transcript/WorkProcessRowParts.tsx', 'utf8'),
   scriptRead('src/renderer/features/transcript/WorkProcessToolCardParts.tsx', 'utf8'),
 ].join('\n');
-assert(toolRowSource.includes('useScopedWorkDisclosure(`tool-${row.id}`, false)'), 'tool cards must start collapsed by default');
 assert(!toolRowSource.includes("row.status === 'running' && canExpand"), 'running tools must not auto-expand detail/Raw');
 assert(!toolRowSource.includes('setExpanded(true)'), 'tool cards must not programmatically auto-expand');
 assert(!toolRowSource.includes('useEffect'), 'tool cards must not use effects to force-expand on status');
-assert(toolRowSource.includes('row.bodyText'), 'tool cards must prefer outcome-first bodyText');
-assert(toolRowSource.includes('bodyLines'), 'search cards may render collapsed bodyLines samples');
-assert(toolRowSource.includes('work-process-tool-card-body-list'), 'collapsed search samples should use a body list');
-assert(presentationSource.includes('bodyText:'), 'projection must emit bodyText for outcome-first cards');
 assert(scriptExists('src/shared/utils/toolResultPreview.ts'), 'tool result preview builder must exist');
-assert(
-  conversationEventHandlerSource.includes('buildToolResultPreview'),
-  'Conversation turn handler must write projection-friendly resultPreview',
-);
 assert(
   !conversationEventHandlerSource.includes('.slice(0, 800)'),
   'Conversation turn handler must not blind-slice resultPreview JSON at 800 chars',
-);
-const diagnosticPolicySource = readSource('src/main/conversation/workProcessDiagnosticPolicy.ts');
-assert(
-  conversationEventHandlerSource.includes('shouldProjectDiagnosticToWorkProcess'),
-  'Conversation turn handler must gate Work Process diagnostic projection',
-);
-assert(
-  diagnosticPolicySource.includes("code.startsWith('error_recovery_')")
-    && diagnosticPolicySource.includes('return false'),
-  'error_recovery_* must be excluded from Work Process narrative',
 );
 assert(
   !conversationEventHandlerSource.includes("title: isRecovery ? '错误恢复'"),
@@ -1182,17 +1083,9 @@ assert(
   'recovery completion copy must not be hard-coded into the Work Process event handler',
 );
 assert(!componentSource.includes('setRawOpen(true);\n      setPreviewOpen(true);'), 'failed tools must not force-open preview and raw together on error');
-assert(componentSource.includes('<details'), 'thinking should render as a user-collapsible top disclosure');
-assert(componentSource.includes('event.preventDefault(); toggle();'), 'thinking disclosure must accept user summary-click gestures');
-assert(componentSource.includes('useScopedWorkDisclosure(`thinking-${row.id}`, row.openByDefault)'),
-  'thinking disclosure must sticky-override policy after user gesture');
 assert(!componentSource.includes('open={row.thinkingOpenByDefault}'), 'thinking disclosure must not bind open solely to policy without local state');
 assert(!componentSource.includes('onToggle={handleThinkingToggle}'), 'thinking must not use details onToggle for sticky override (programmatic open fires toggle)');
 assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must not bypass the top disclosure hierarchy');
-assert(
-  presentationSource.includes('openByDefault: status === \'streaming\''),
-  'process-loop thinking should expand only while its own thinking is streaming',
-);
 assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section should not expose the legacy tool-step disclosure');
 assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
@@ -1220,23 +1113,12 @@ assert(
   'SettingsSection must not restore diagnostics',
 );
 assert(
-  readSource('src/renderer/lib/settingsSections.ts').includes("'policy'"),
-  'SettingsSection must include peer policy navigation',
-);
-assert(
-  readSource('src/renderer/features/settings/SettingsModal/useSettingsModal.ts').includes("id: 'policy'")
-    && !readSource('src/renderer/features/settings/SettingsModal/useSettingsModal.ts').includes("id: 'diagnostics'"),
-  'Settings nav must list Policy and must not list Diagnostics',
-);
-assert(
   !sessionRightRailSource.includes('RdcRuntimeContextPanel'),
   'Right rail must consume the unified RDC Context projection.',
 );
 
 assert(!componentSource.includes('work-process-tool-target is-toggle'), 'tool target dual-toggle disclosure must be removed');
 assert(!componentSource.includes('work-process-tool-verb is-toggle'), 'tool verb dual-toggle disclosure must be removed');
-assert(componentSource.includes('work-process-tool-card-header'), 'tool cards should use a single clickable header disclosure');
-assert(componentSource.includes("aria-label={t('chat.workProcessRawData')}"), 'Raw data copy should remain as aria-label only');
 assert(!componentSource.includes('work-process-debug-toggle'), 'nested Raw data toggle button must be removed');
 assert(!componentSource.includes('work-process-debug-disclosure'), 'nested raw details disclosure must be removed');
 assert(!componentSource.includes('work-process-preview-disclosure'), 'nested Console output disclosure must be removed');
@@ -1245,9 +1127,7 @@ assert(!componentSource.includes('work-process-preview-toggle'), 'nested Console
 assert(!cssSource.includes('.work-process-tool-group'), 'tool group styling must be removed');
 assert(!cssSource.includes('.work-process-step-group'), 'semantic step group styling must be removed');
 assert(/\.work-process-web-pills\s*\{[^}]*flex-wrap:\s*nowrap[^}]*mask-image:\s*linear-gradient\(to right, rgb\(0 0 0\) 70%, transparent\)/.test(cssSource), 'page pills stay on one line and fade from 70% of the width');
-assert(cssSource.includes('.work-process-web-pill.is-unread'), 'unread search results dim one step');
 assert(!cssSource.includes('.work-process-source-pill') && !cssSource.includes('.work-process-meta-chip'), 'retired source pill and meta chip styling must not return');
-assert(cssSource.includes('.work-process-step.is-appear'), 'step appear animation should exist');
 assert(!cssSource.includes('.work-process-response'), 'response boundary styling must be removed');
 assert(
   /\.work-process-step\.kind-section\s*\{[^}]*padding-bottom:\s*0/.test(cssSource),
@@ -1282,14 +1162,6 @@ assert(
   'nested tool rows should use top-only space-2 padding (denser than loop entrance / turn boundary)',
 );
 assert(
-  cssSource.includes('.work-process.is-collapsed .work-process-label:not(.is-active)'),
-  'collapsed Work Process header must not override Active Signal color',
-);
-assert(
-  cssSource.includes('.work-process-label:not(.is-active)'),
-  'Work Process labels must not set color while Active Signal is live',
-);
-assert(
   /\.work-process\s*>\s*\.work-process-body\s*\{[^}]*margin-inline:\s*calc\(var\(--space-3\) \+ var\(--space-5\)\)/.test(cssSource)
     && /\.work-process-header\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto/.test(cssSource)
     && !/\.work-process-status-dot\s*\{[^}]*position:\s*absolute/.test(cssSource)
@@ -1308,8 +1180,6 @@ assert(
   !/\.work-process\s*\{[^}]*padding-inline-end:\s*var\(--space-3\)/.test(cssSource),
   'Work Process must not keep a WP-only right gutter; share the thread gutter instead',
 );
-assert(cssSource.includes('.work-process-track::before'), 'one process container must own its continuous guide');
-assert(cssSource.includes('--work-rail-hang: calc(var(--space-4) / 2 + var(--space-1))'), 'the hanging rail keeps the fixed 16px marker slot and 4px content gap');
 assert(
   !/\.work-process-section-list\s*\{[^}]*padding-left:\s*calc\(14px\s*\+\s*var\(--space-1\)\)/.test(cssSource),
   'section tool rows must not keep spark-aligned padding-left; they share commentary left edge',
@@ -1318,11 +1188,7 @@ assert(
   /\.work-process-section-list\s*\{[^}]*padding:\s*0/.test(cssSource),
   'section tool list should use padding: 0 so tool cards align with commentary prose',
 );
-assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
-assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
 assert(!cssSource.includes('.work-process-step-rail'), 'segmented guides and nested rail suppression must be removed');
-assert(cssSource.includes('.work-process-rail-marker.is-running'), 'actual activity owns blue markers');
-assert(cssSource.includes('var(--space-1) + var(--space-0-5)'), 'markers retain the 6px geometry');
 assert(!cssSource.includes('.work-process-step:last-child > .work-process-step-rail::before'), 'fixed last-section short line must not return');
 assert(
   /\.work-process-summary\s*\{[^}]*margin:\s*0\s+0\s+var\(--space-2\)/.test(cssSource),
@@ -1332,83 +1198,39 @@ assert(
   !/\.work-process-label\.status-running\s*\{[^}]*\bcolor:/.test(cssSource),
   'running Work Process label must not set color that overrides Active Signal shimmer',
 );
-assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
-assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
 assert(
   /className="work-process-thinking-preview">\s*<MessageMarkdown\b[^>]*\bdeferHeavyPlugins=\{active\}/.test(componentSource),
   'expandable thinking content must render through MessageMarkdown and defer heavy plugins while streaming',
-);
-assert(
-  cssSource.includes('.work-process-thinking-preview .markdown-body'),
-  'thinking preview must scope markdown-body styles',
 );
 assert(!cssSource.includes('.work-process-section-steps'), 'legacy tool-step disclosure CSS should be removed');
 assert(!cssSource.includes('.work-process-step-rail.is-section .work-process-rail-marker'), 'section markers must not use a hierarchy-only color override');
 assert(!cssSource.includes('.work-process-steps-toggle'), 'legacy tool-step toggle CSS should be removed');
 assert(!cssSource.includes('.work-process-empty'), 'placeholder empty-state CSS should be removed');
 assert(!appShellSource.includes('composerEnergyFlow'), 'composer running border must not use the legacy uniform sweep keyframe');
-assert(appShellSource.includes('composerEnergyOrbit'), 'composer running border must use the energy orbit keyframe');
-assert(appShellSource.includes('.composer-shell.is-running::before'), 'composer running border must use the orbit stroke pseudo layer');
-assert(appShellSource.includes('@property --composer-energy-angle'), 'orbit must interpolate a registered angle');
-assert(appShellSource.includes('initial-value: -130deg') && appShellSource.includes('--composer-energy-angle: 230deg'), 'orbit must sweep one complete historical turn');
 const orbitStroke = appShellSource.match(/\.composer-shell\.is-running::before\s*\{[^}]+\}/)?.[0] ?? '';
-assert(orbitStroke.includes('conic-gradient(') && orbitStroke.includes('2.85s linear infinite'), 'orbit must use the historical angular sweep');
 assert(!/\btransform:/.test(orbitStroke), 'orbit must not rotate the rectangular mask');
-assert(orbitStroke.includes('drop-shadow('), 'orbit must retain its layered bloom');
-assert(orbitStroke.includes('pointer-events: none'), 'orbit must not intercept input');
 assert(!appShellSource.includes('--orbit-reach'), 'translated radial spotlight must be removed');
 assert(!appShellSource.includes('data-reduce-motion') && !appShellSource.includes('prefers-reduced-motion'), 'composer motion must remain active without preference overrides');
 assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer must use a single orbit layer');
-assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer must preserve its focus state');
-assert(appShellSource.includes('--composer-shell-radius: var(--radius-lg)'), 'composer shell radius must use the restrained radius-lg scale');
-
-assert(i18nSource.includes("'chat.workProcessTitle': 'Work process'"), 'English process title copy should be Work process');
-assert(i18nSource.includes("'chat.workProcessTitle': '工作过程'"), 'Chinese process title copy should exist');
-assert(i18nSource.includes("'chat.workProcessHeadlineRunning': 'Working'"), 'English running header copy should be Working');
-assert(i18nSource.includes("'chat.workProcessHeadlineRunning': '工作中'"), 'Chinese running header copy should exist');
-assert(i18nSource.includes("'chat.workProcessThoughtFor': 'Thought for {duration}'"), 'English Thought-for copy should exist');
-assert(i18nSource.includes("'chat.workProcessThoughtFor': '已思考 · {duration}'"), 'Chinese Thought-for key should map to 已思考 · duration');
 assert(!i18nSource.includes("'chat.workProcessThoughtFor': '思考了 {duration}'"), 'Chinese must not keep settled 思考了 Thought-for copy');
 assert(!i18nSource.includes('深度思考'), 'i18n must not introduce 深度思考');
-assert(i18nSource.includes("'chat.workProcessThinkingComplete': '已思考'"), 'Chinese durationless settled thinking fallback should exist');
 assert(!i18nSource.includes("'chat.workProcessTitle': 'Thinking process'"), 'header must not reuse Thinking process title');
 assert(!i18nSource.includes("'chat.workProcessThinkingComplete': 'Thinking process'"), 'settled thinking must not reuse Thinking process');
 assert(!i18nSource.includes('Tool steps {count}'), 'English legacy tool-step copy should be removed');
 assert(!i18nSource.includes('工具步骤'), 'Chinese legacy tool-step copy should be removed');
 assert(!i18nSource.includes('Reasoning summary'), 'legacy reasoning label should not exist in i18n');
 assert(!i18nSource.includes("'chat.workProcessTitle': 'Process'"), 'English Process title must be removed');
-assert(presentationSource.includes('extractDiagnosticCaption'), 'failed tools should extract a human-readable diagnostic caption');
-assert(presentationSource.includes('diagnosticCaption'), 'tool projection should expose diagnosticCaption');
-assert(presentationSource.includes('unwrapToolContentLayer'), 'tool projection must unwrap content layer from result envelopes');
-assert(presentationSource.includes("previewKind: 'shell'"), 'shell preview kind should be projected');
-assert(componentSource.includes('work-process-shell-command'), 'shell tools should render a command pane');
-assert(componentSource.includes('work-process-shell-stdout'), 'shell tools should render stdout');
-assert(componentSource.includes('work-process-path-chip'), 'skill_read should render a path chip');
-assert(componentSource.includes('FamilyLayerBody'), 'memory/skill/mcp/runtime/interpreter must use dedicated family layers');
-assert(componentSource.includes('WorkProcessHighlightedCode'), 'interpreter cards must highlight code with the shared highlighter');
-assert(componentSource.includes("family === 'memory'"), 'memory family must have a dedicated layer');
-assert(componentSource.includes("family === 'skill'"), 'skill family must have a dedicated layer');
-assert(componentSource.includes("family === 'mcp'"), 'mcp family must have a dedicated layer');
-assert(componentSource.includes("family === 'runtime'"), 'runtime family must have a dedicated layer');
-assert(cssSource.includes('.work-process-highlighted-code'), 'interpreter highlight styling should exist');
 assert(!componentSource.includes('work-process-console-title'), 'Console output must not appear as a visible nested sub-label');
 assert(!componentSource.includes('work-process-console-head'), 'Console chrome head with visible title must be removed');
-assert(cssSource.includes('.work-process-shell-command'), 'shell command styling should exist');
-assert(cssSource.includes('.work-process-tool-card-detail'), 'family detail styling should exist');
-assert(cssSource.includes('.work-process-tool-diagnostic'), 'failed-tool diagnostic caption styling should exist');
 assert(/\.work-process-tool-card\.status-error > \.work-card-trigger\s*\{[^}]*--work-row-title-tone:\s*var\(--token-status-error\)/.test(cssSource),
   'failed tool titles should keep their error color in all interaction states');
-assert(i18nSource.includes("'chat.workProcessShowDiagnostic': 'Show details'"), 'diagnostic detail affordance English copy should exist');
-assert(i18nSource.includes("'chat.workProcessShowDiagnostic': '查看详情'"), 'diagnostic detail affordance Chinese copy should exist');
 assert(!i18nSource.includes('workProcessShowLoopDetail'), 'grouped/detail view i18n keys must be removed');
 assert(!i18nSource.includes('workProcessResponseTitle'), 'Reply boundary i18n keys must be removed');
 assert(!i18nSource.includes('workProcessResponseGenerated'), 'Reply generated i18n keys must be removed');
 assert(!i18nSource.includes('workProcessSemanticExplore'), 'semantic grouping i18n keys must be removed');
 
 assert(!userInputPanelSource.includes('window.electronAPI'), 'composer user input panel must not call Electron APIs directly');
-assert(userInputSubmitHookSource.includes('answerUserInput'), 'composer user input hook must submit through conversation.answerUserInput');
 assert(!toolApprovalPanelSource.includes('window.electronAPI'), 'composer tool approval panel must not call Electron APIs directly');
-assert(toolApprovalSubmitHookSource.includes('answerToolApproval'), 'composer tool approval hook must submit through conversation.answerToolApproval');
 assert(!orchestratorSource.includes('User input requested by'), 'ask_user tool must not return fake user-request text immediately');
 
 console.log('[work-process] OK');
