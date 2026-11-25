@@ -58,6 +58,11 @@ jobs:
         env:
           RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:gates
+      # Informational: net growth of production, test and docs lines since the base, in the run summary.
+      - name: Growth report
+        env:
+          RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
+        run: node scripts/growth-report.mjs
       # The focused check:* vitest scripts (scoped resources, project instructions, prompt plan
       # snapshot, skills, hooks, memory policy, contracts, catalog compiler) run inside
       # test:coverage above; only their non-vitest halves run here.
