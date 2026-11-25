@@ -33,11 +33,6 @@ export function isTopOverlayLayer(id: number | null): boolean {
   return stack.length > 0 && stack[stack.length - 1] === id;
 }
 
-export function getOverlayLayerDepth(id: number | null): number {
-  if (id === null) return 0;
-  return stack.indexOf(id) + 1;
-}
-
 /**
  * Registers an overlay layer while `open` is true and reports whether it is
  * currently the topmost one.

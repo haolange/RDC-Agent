@@ -53,7 +53,6 @@ export async function sendComposerConversationTurn(options: {
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentRun: (run: RunSummary | null) => void;
-  setRuns: (runs: RunSummary[]) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
   t: Translator;
   preserveDraft?: boolean;
@@ -78,7 +77,6 @@ export async function sendComposerConversationTurn(options: {
     upsertConversationMessages,
     setSessions,
     setCurrentRun,
-    setRuns,
     setTracePresentation,
     t,
   } = options;
@@ -248,7 +246,6 @@ export async function sendComposerConversationTurn(options: {
       currentProject,
       setSessions,
       setCurrentRun,
-      setRuns,
       setTracePresentation,
       setConversationMessages,
       setBranchState,

@@ -57,7 +57,6 @@ export async function loadSessionsOp(
       ctx.setCurrentSessionId(null);
       ctx.setCurrentRun(null);
       ctx.setCaptures([]);
-      ctx.setRuns([]);
     }
     return;
   }
@@ -82,7 +81,6 @@ export async function loadSessionsOp(
     ctx.setCurrentSessionId(null);
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
     return;
   }
 
@@ -129,7 +127,6 @@ export async function loadProjectsOp(
     ctx.resetTree();
     ctx.setCaptures([]);
     ctx.setSessions([]);
-    ctx.setRuns([]);
     await ctx.reloadSettings(null);
     return;
   }
@@ -198,7 +195,6 @@ export async function handleProjectSelectOp(
     ctx.setCurrentSessionId(null);
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
   }
   ctx.setCurrentProject(project);
   ctx.updateProjectInputs(project.projectId, project.inputs ?? []);

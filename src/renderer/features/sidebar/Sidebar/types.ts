@@ -52,5 +52,4 @@ export interface SelectionSnapshot {
   rightRailTarget: RightRailTarget;
   currentRun: ReturnType<typeof useSessionStore.getState>['currentRun'];
   captures: CaptureDescriptor[];
-  runs: ReturnType<typeof useSessionStore.getState>['runs'];
 }

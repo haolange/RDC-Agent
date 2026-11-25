@@ -37,7 +37,6 @@ export async function applyConversationTurnResult(options: {
   currentProject: ProjectRecord | null;
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentRun: (run: RunSummary | null) => void;
-  setRuns: (runs: RunSummary[]) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
@@ -53,7 +52,6 @@ export async function applyConversationTurnResult(options: {
     currentProject,
     setSessions,
     setCurrentRun,
-    setRuns,
     setTracePresentation,
     setConversationMessages,
     setBranchState,
@@ -166,9 +164,6 @@ export async function applyConversationTurnResult(options: {
 
   if (result.runUpdate && isActiveSessionEvent(result.runUpdate.sessionId)) {
     setCurrentRun(result.runUpdate);
-    refreshTasks.push(electronAPI.run.list(result.runUpdate.sessionId).then((runsResult) => {
-      setRuns(runsResult.runs ?? []);
-    }));
   }
 
   if (result.tracePresentation) {

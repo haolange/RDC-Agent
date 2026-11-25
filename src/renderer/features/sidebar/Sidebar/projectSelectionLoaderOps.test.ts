@@ -16,7 +16,7 @@ vi.mock('../../../stores/projectStore', () => ({
   useProjectStore: { getState: () => ({ currentProject: null, currentSessionId: null, rightRailTarget: 'project' }) },
 }));
 vi.mock('../../../stores/sessionStore', () => ({
-  useSessionStore: { getState: () => ({ currentRun: null, runs: [], clearUsageSnapshot: vi.fn() }) },
+  useSessionStore: { getState: () => ({ currentRun: null, clearUsageSnapshot: vi.fn() }) },
 }));
 vi.mock('../../../stores/captureStore', () => ({
   useCaptureStore: { getState: () => ({ captures: [] }) },
@@ -50,7 +50,7 @@ it.each([false, true])('preserves review and handoff state on same-session reval
   vi.stubGlobal('window', { electronAPI: { session: { open: async () => ({ success: true, session: { record: session, revision: { epoch: 'e', n: 1 } }, currentRun: null, runs: [],
     history: { messages: [], planReview: null, branchState: null }, trace: { success: true, presentation: null } }) } } });
   const ctx = { getCurrentSession: () => session, isLatestSelectionRequest: () => true,
-    setCurrentSessionId: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
+    setCurrentSessionId: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(),
   } as unknown as ProjectSelectionLoaderOpsContext;
   try {
     expect(await selectSessionOp(ctx, 'session-a', optimistic ? { optimisticSession: session } : {})).toBe(true);
@@ -107,7 +107,6 @@ describe('loadSessionsOp project-aware settings refresh', () => {
       updateProjectInputs: vi.fn(),
       setRightRailTarget: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setCaptures: vi.fn(),
       getCurrentSession: () => null,
       reloadSettings,
@@ -135,7 +134,6 @@ describe('loadSessionsOp project-aware settings refresh', () => {
       updateProjectInputs: vi.fn(),
       setRightRailTarget: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setCaptures: vi.fn(),
       getCurrentSession: () => ({ sessionId: 'session-a', projectId: 'proj_a' }),
       reloadSettings,
@@ -158,7 +156,6 @@ it('clears the active session before projecting another project root', async () 
     setCurrentSessionId: () => { order.push('clearSession'); },
     setCurrentRun: vi.fn(),
     setCaptures: vi.fn(),
-    setRuns: vi.fn(),
     setCurrentProject: () => { order.push('setProject'); },
     updateProjectInputs: vi.fn(),
     setRightRailTarget: vi.fn(),
@@ -186,7 +183,6 @@ it('clears the former session before projecting a session in another project', a
     setRightRailTarget: vi.fn(),
     setCurrentRun: vi.fn(),
     setCaptures: vi.fn(),
-    setRuns: vi.fn(),
     ensureProjectExpanded: vi.fn(),
     setIsBusy: vi.fn(),
     loadSessions: async () => { order.push('loadSessions'); },
@@ -217,7 +213,6 @@ it('restores the former selection when cross-project activation is rejected', as
     setRightRailTarget: vi.fn(),
     setCurrentRun: vi.fn(),
     setCaptures: vi.fn(),
-    setRuns: vi.fn(),
     ensureProjectExpanded: vi.fn(),
   } as unknown as ProjectSelectionLoaderOpsContext;
 
@@ -228,7 +223,6 @@ it('restores the former selection when cross-project activation is rejected', as
       rightRailTarget: 'session',
       currentRun: null,
       captures: [],
-      runs: [],
     },
   });
 
@@ -283,7 +277,6 @@ describe('loadProjectsOp listing gate', () => {
       updateProjectInputs: vi.fn(),
       setRightRailTarget: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setCaptures: vi.fn(),
       getCurrentSession: () => null,
       reloadSettings,
@@ -311,7 +304,7 @@ it('creates a session in the current project with one open request and no projec
   const ctx = {
     setSidebarError: vi.fn(), getCurrentProject: () => current, projectMenuOpen: false, beginSelectionRequest: () => 1,
     setIsBusy: vi.fn(), isLatestSelectionRequest: () => true, getCurrentSession: () => null, setCurrentProject: vi.fn(),
-    setCurrentSessionId: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(), setRuns: vi.fn(),
+    setCurrentSessionId: vi.fn(), setRightRailTarget: vi.fn(), setCurrentRun: vi.fn(), setCaptures: vi.fn(),
     ensureProjectExpanded: vi.fn(), loadProjects: vi.fn(), setSessions: vi.fn(),
     loadProjectSessionList: vi.fn(async () => { calls.push('list'); return [created]; }),
   } as unknown as ProjectSelectionHandlerOpsContext;

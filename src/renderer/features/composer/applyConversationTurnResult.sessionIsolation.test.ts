@@ -96,7 +96,6 @@ describe('applyConversationTurnResult session isolation', () => {
     const electronAPI = {
       project: { list: async () => ({ projects: [] }) },
       session: { list: async () => ({ sessions: [] }) },
-      run: { list: async () => ({ runs: [] }) },
     } as never;
 
     await applyConversationTurnResult({
@@ -105,7 +104,6 @@ describe('applyConversationTurnResult session isolation', () => {
       currentProject: { projectId: 'project-1' } as never,
       setSessions: () => undefined,
       setCurrentRun: () => undefined,
-      setRuns: () => undefined,
       setTracePresentation: () => undefined,
       setConversationMessages: useConversationStore.getState().setConversationMessages,
       setBranchState: useConversationStore.getState().setBranchState,
@@ -124,7 +122,6 @@ describe('applyConversationTurnResult session isolation', () => {
     const electronAPI = {
       project: { list: async () => ({ projects: [] }) },
       session: { list: async () => ({ sessions: [] }) },
-      run: { list: async () => ({ runs: [] }) },
     } as never;
 
     await applyConversationTurnResult({
@@ -133,7 +130,6 @@ describe('applyConversationTurnResult session isolation', () => {
       currentProject: { projectId: 'project-1' } as never,
       setSessions: () => undefined,
       setCurrentRun: () => undefined,
-      setRuns: () => undefined,
       setTracePresentation: () => undefined,
       setConversationMessages: useConversationStore.getState().setConversationMessages,
       setBranchState: useConversationStore.getState().setBranchState,
@@ -159,13 +155,11 @@ describe('applyConversationTurnResult session isolation', () => {
       electronAPI: {
         project: { list: projectList },
         session: { list: async () => ({ sessions: [] }) },
-        run: { list: async () => ({ runs: [] }) },
       } as never,
       result: baseTurn(),
       currentProject: { projectId: 'project-1' } as never,
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages: useConversationStore.getState().setConversationMessages,
       setBranchState: useConversationStore.getState().setBranchState,
@@ -186,13 +180,11 @@ describe('applyConversationTurnResult session isolation', () => {
       electronAPI: {
         project: { list: async () => ({ projects: [] }) },
         session: { list: async () => ({ sessions: [] }) },
-        run: { list: async () => ({ runs: [] }) },
       } as never,
       result: baseTurn(),
       currentProject: { projectId: 'project-1' } as never,
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages: useConversationStore.getState().setConversationMessages,
       setBranchState: useConversationStore.getState().setBranchState,

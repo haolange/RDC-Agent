@@ -3,7 +3,6 @@ import { RevisionLanes } from '../../lib/revisionLanes';
 import { hydrateMessagesWithActionEvents, mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useConversationStore } from '../../stores/conversationStore';
-import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTerminalStore } from '../../stores/terminalStore';
@@ -20,7 +19,6 @@ import type { WorkflowState } from '@shared/types/workflow';
 const reads = new RevisionLanes();
 
 function applyEvidence(events: ActionEvent[], messagesFrom: () => ConversationMessage[]): ConversationMessage[] {
-  useEvidenceStore.getState().setActionEvents(events);
   useConversationStore.getState().setTimeline(events
     .map((event) => mapActionEventToTimelineEntry(event))
     .filter((entry): entry is AgentTimelineEntry => entry !== null));

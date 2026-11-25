@@ -52,7 +52,6 @@ export function useComposerSend(options: {
   promptValueRef.current = promptValue;
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setSessions = useProjectStore((state) => state.setSessions);
-  const setRuns = useSessionStore((state) => state.setRuns);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
   const setBranchState = useConversationStore((state) => state.setBranchState);
@@ -145,7 +144,6 @@ export function useComposerSend(options: {
         upsertConversationMessages,
         setSessions,
         setCurrentRun,
-        setRuns,
         setTracePresentation,
         t,
         preserveDraft: Boolean(handoff),
@@ -161,7 +159,7 @@ export function useComposerSend(options: {
     setSelectedAgentId, openSettings, setConversationMessages, setBranchState,
     setConversationSnapshot, setCurrentRun, setIsPromptSending,
     setPendingAttachments, setPendingSkillIds, setPromptValue, setTracePresentation,
-    setRuns, setSessions, t, upsertConversationMessages,
+    setSessions, t, upsertConversationMessages,
   ]);
   const handlePromptSend = useCallback(async () => { await performSend(); }, [performSend]);
   const sendHandoffPrompt = useCallback((payload: HandoffSendPayload) => performSend(payload), [performSend]);

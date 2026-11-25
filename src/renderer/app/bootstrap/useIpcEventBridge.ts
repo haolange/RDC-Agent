@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 import { mergeCapturesWithSnapshot } from '../../services/conversationTimeline';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useCaptureStore } from '../../stores/captureStore';
-import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -11,7 +10,6 @@ import { notify } from '../../stores/notificationStore';
 import { createCaptureProjection, subscribeCaptureStatusChanged, subscribeDeviceStatusChanged } from './captureSubscriptions';
 import { subscribeConversation, subscribeToolExecutionComplete } from './conversationSubscriptions';
 import {
-  subscribeAgentStatusChanged,
   subscribeEvidenceEventAdded,
   subscribeProjectInputsChanged,
   subscribeProjectInputsError,
@@ -48,7 +46,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
   const { syncCapturesFromSnapshot, setSettingsModalOpen, setWindowMaximized, t } = options;
 
   const setSystemTheme = useAppSettingsStore((state) => state.setSystemTheme);
-  const addActionEvent = useEvidenceStore((state) => state.addActionEvent);
   const activeSessionId = useProjectStore((state) => state.currentSessionId);
   const handoffNotice = useCurrentSessionView()?.handoffNotice;
   const shownHandoffNotices = useRef(new Set<string>());
@@ -77,9 +74,8 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
 
     const conversation = subscribeConversation(electronAPI, t);
     const unsubscribeToolExecutionComplete = subscribeToolExecutionComplete(electronAPI);
-    const unsubscribeAgentStatusChanged = subscribeAgentStatusChanged(electronAPI);
     const unsubscribeCaptureStatusChanged = subscribeCaptureStatusChanged(electronAPI, projectScopedContext);
-    const unsubscribeEvidenceEventAdded = subscribeEvidenceEventAdded(electronAPI, addActionEvent);
+    const unsubscribeEvidenceEventAdded = subscribeEvidenceEventAdded(electronAPI);
     const unsubscribeRunStatusChanged = subscribeRunStatusChanged(electronAPI);
     const unsubscribeDeviceStatusChanged = subscribeDeviceStatusChanged(electronAPI);
     const unsubscribeProjectInputsChanged = subscribeProjectInputsChanged(electronAPI);
@@ -101,7 +97,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
       unsubscribeTraceProjectionChanged();
       unsubscribeContextChanged();
       unsubscribeToolExecutionComplete();
-      unsubscribeAgentStatusChanged();
       unsubscribeCaptureStatusChanged();
       unsubscribeEvidenceEventAdded();
       unsubscribeRunStatusChanged();
@@ -116,7 +111,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     };
   }, [
     activeSessionId,
-    addActionEvent,
     setSettingsModalOpen,
     setSystemTheme,
     setWindowMaximized,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button, CheckPill, ConfirmationDialog, Details, Divider, InlineError, Kbd, ListRow,
+import { Badge, Button, CheckPill, ConfirmationDialog, Details, InlineError, ListRow,
   ContextMenu, Menu, Panel, SearchMultiSelect, SectionHeader, Spinner, Tabs, Toast } from '../../src/renderer/ui';
 
 export function ExtraControls() {
@@ -46,15 +46,15 @@ export function ExtraControls() {
       <Panel header={<SectionHeader title="资源列表" />}>
         <ListRow selected={checked} onClick={() => setChecked(!checked)} trailing={<Badge variant="outline">示例</Badge>}
           description="第二行说明保留上下文，不截掉身份">选择资源</ListRow>
-        <ListRow disabled>不可用资源</ListRow><Divider />
+        <ListRow disabled>不可用资源</ListRow>
         <CheckPill checked={checked} onCheckedChange={setChecked}>加入当前选择</CheckPill>
       </Panel>
       <p>Panel header；ListRow selected / leading / trailing；选择与运行状态分开。</p>
     </Details>
-    <Details summary="InlineError / Toast / Spinner / Kbd · 反馈">
+    <Details summary="InlineError / Toast / Spinner · 反馈">
       <InlineError>保存失败，草稿仍保留。此处是明确标注的错误示例。</InlineError>
       <Toast open title="已保存" message="操作结果反馈示例" tone="success" dismissLabel="关闭" onDismiss={() => undefined} onExited={() => undefined} />
-      <div className="catalog-row"><Spinner /><Kbd>Esc</Kbd><span>关闭顶层浮层</span></div>
+      <div className="catalog-row"><Spinner /></div>
       <p>InlineError 保持可见；Toast 用于操作结果；Spinner 不替代文字状态。</p>
     </Details>
     {confirm && <ConfirmationDialog title="确认示例" message="此操作只更新本地展示状态。"

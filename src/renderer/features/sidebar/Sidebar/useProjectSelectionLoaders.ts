@@ -8,7 +8,6 @@ import { useSessionStore } from '../../../stores/sessionStore';
 import { useI18n } from '../../../i18n';
 import {
   captureSelectionSnapshot,
-  loadRunsForSession,
   restoreSelectionSnapshot,
   type ProjectSelectionLoaderOpsContext,
   type SidebarError,
@@ -50,7 +49,6 @@ export function useProjectSelectionLoaders({
   const setCurrentProject = useProjectStore((state) => state.setCurrentProject);
   const setCurrentSessionId = useProjectStore((state) => state.setCurrentSessionId);
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
-  const setRuns = useSessionStore((state) => state.setRuns);
   const setCaptures = useCaptureStore((state) => state.setCaptures);
   const setProjectInputs = useProjectStore((state) => state.setProjectInputs);
   const updateProjectInputs = useProjectStore((state) => state.updateProjectInputs);
@@ -78,7 +76,6 @@ export function useProjectSelectionLoaders({
     updateProjectInputs,
     setRightRailTarget,
     setCurrentRun,
-    setRuns,
     setCaptures,
     getCurrentSession: getCurrentSessionView,
     reloadSettings: (projectId) => useAppSettingsStore.getState().reloadSettings(projectId),
@@ -98,11 +95,9 @@ export function useProjectSelectionLoaders({
     updateProjectInputs,
     setRightRailTarget,
     setCurrentRun,
-    setRuns,
     setCaptures,
   ]);
 
-  const loadRuns = useCallback((sessionId: string) => loadRunsForSession(sessionId), []);
   const captureSelectionSnapshotFn = useCallback(() => captureSelectionSnapshot(), []);
   const restoreSelectionSnapshotFn = useCallback(
     (snapshot: SelectionSnapshot) => restoreSelectionSnapshot(loaderCtx, snapshot),
@@ -142,7 +137,6 @@ export function useProjectSelectionLoaders({
     isLoading,
     beginSelectionRequest,
     isLatestSelectionRequest,
-    loadRuns,
     captureSelectionSnapshot: captureSelectionSnapshotFn,
     restoreSelectionSnapshot: restoreSelectionSnapshotFn,
     selectSession,

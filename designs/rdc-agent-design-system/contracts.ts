@@ -53,8 +53,8 @@ export const contracts = {
   'SearchMultiSelect / Menu / ListRow / Feedback': {
     avoid: '多选不静默丢弃不可用引用；Toast 不取代字段错误；菜单不伪装导航。',
     states: '多选：加载/失败/重试/空/无匹配/禁用/不可用；菜单：禁用/焦点；列表：selected 与 disabled；反馈：成功/失败。',
-    layout: 'Panel/SectionHeader/Divider 组织容器；ListRow 仅负责一行；菜单共享锚定边界。',
-    motion: 'Spinner 只表示等待；Badge/Kbd 为静态内容；CheckPill 切换不发起业务调用。',
+    layout: 'Panel/SectionHeader 组织容器；ListRow 仅负责一行；菜单共享锚定边界。',
+    motion: 'Spinner 只表示等待；Badge 为静态内容；CheckPill 切换不发起业务调用。',
     consumers: 'Settings Agent 工具选择、Knowledge 列表、左栏菜单、app/NotificationLayer；精确路径见消费者索引。',
   },
   Button: {

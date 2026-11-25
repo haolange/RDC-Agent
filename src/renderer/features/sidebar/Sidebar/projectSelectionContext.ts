@@ -29,7 +29,6 @@ export interface ProjectSelectionLoaderOpsContext {
   updateProjectInputs: ReturnType<typeof useProjectStore.getState>['updateProjectInputs'];
   setRightRailTarget: ReturnType<typeof useProjectStore.getState>['setRightRailTarget'];
   setCurrentRun: ReturnType<typeof useSessionStore.getState>['setCurrentRun'];
-  setRuns: ReturnType<typeof useSessionStore.getState>['setRuns'];
   setCaptures: ReturnType<typeof useCaptureStore.getState>['setCaptures'];
   /** The current session's record view; the sidebar reads only its id and project. */
   getCurrentSession: () => SessionRecord | null;
@@ -61,11 +60,6 @@ export interface ProjectSelectionHandlerOpsContext extends ProjectSelectionLoade
   onCloseProjectMenu: () => void;
 }
 
-export async function loadRunsForSession(sessionId: string) {
-  const result = await window.electronAPI.run.list(sessionId);
-  return result.runs ?? [];
-}
-
 export function captureSelectionSnapshot(): SelectionSnapshot {
   const project = useProjectStore.getState();
   const session = useSessionStore.getState();
@@ -76,7 +70,6 @@ export function captureSelectionSnapshot(): SelectionSnapshot {
     rightRailTarget: project.rightRailTarget,
     currentRun: session.currentRun,
     captures: capture.captures,
-    runs: session.runs,
   };
 }
 
@@ -89,7 +82,6 @@ export function restoreSelectionSnapshot(
   ctx.setRightRailTarget(snapshot.rightRailTarget);
   ctx.setCurrentRun(snapshot.currentRun);
   ctx.setCaptures(snapshot.captures);
-  ctx.setRuns(snapshot.runs);
   if (snapshot.currentSessionId) {
     useSessionProjectionStore.getState().activateSession(snapshot.currentSessionId);
   }

@@ -7,7 +7,6 @@ import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/util
 import { formatTokenCount } from '@shared/utils/tokens';
 import { formatPricePerMillion } from '@shared/utils/cost';
 import type { useI18n } from '../../../i18n';
-import type { LlmProviderEntry } from '@shared/types/settings';
 import type {
   CapabilityState,
   ContextTier,
@@ -60,19 +59,6 @@ export function buildPricingRows(model: EffectiveModel | null, t: Translate): Mo
     rows.push({ id: 'cacheWrite', label: t('settings.providers.capability.pricingCacheWrite'), value: price(model.cost.cacheWrite) });
   }
   return rows;
-}
-
-export function snapshotMatchesProvider(
-  snapshot: EffectiveCatalogSnapshot,
-  provider: Pick<LlmProviderEntry, 'id' | 'activeAccountId' | 'protocol'>,
-  discoveryAccountId?: string | null,
-): boolean {
-  const accountId = discoveryAccountId?.trim()
-    || provider.activeAccountId
-    || `anonymous:${provider.id}`;
-  return snapshot.providerId === provider.id
-    && snapshot.accountId === accountId
-    && snapshot.protocol === provider.protocol;
 }
 
 export function getReasoningLabelKey(level: ReasoningSelection): typeof REASONING_LABEL_KEYS[ReasoningSelection] {

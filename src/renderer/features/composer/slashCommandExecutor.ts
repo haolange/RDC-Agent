@@ -81,7 +81,6 @@ async function loadSession(sessionId: string): Promise<void> {
   projectStore.setCurrentSessionId(opened.sessionId);
   const sessionStore = useSessionStore.getState();
   sessionStore.setCurrentRun(result.currentRun);
-  sessionStore.setRuns(result.runs);
   hydrateLoadedSessionSurface({
     sessionId: opened.sessionId,
     messages: result.history.messages,

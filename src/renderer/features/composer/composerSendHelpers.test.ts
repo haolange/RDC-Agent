@@ -83,7 +83,6 @@ const preparedContext: ConversationTurnResult['preparedContext'] = {
 const makeElectronApi = () => ({
   project: { list: vi.fn().mockResolvedValue({ projects: [] }) },
   session: { list: vi.fn().mockResolvedValue({ sessions: [] }) },
-  run: { list: vi.fn().mockResolvedValue({ runs: [] }) },
   conversation: { getHistory: vi.fn() },
   trace: { getProjection: vi.fn().mockResolvedValue(null) },
 }) as unknown as NonNullable<Window['electronAPI']>;
@@ -150,7 +149,6 @@ describe('composerSendHelpers', () => {
       currentProject: null,
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages,
       setBranchState,
@@ -197,7 +195,6 @@ describe('composerSendHelpers', () => {
       currentProject: null,
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages,
       setBranchState: vi.fn(),
@@ -228,7 +225,6 @@ describe('composerSendHelpers', () => {
       currentProject: null,
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages,
       setBranchState: vi.fn(),

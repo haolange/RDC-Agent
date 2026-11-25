@@ -20,7 +20,6 @@ export interface CatalogProjection {
   /** The technical reason a load failed; surfaces word it themselves and keep this for "Copy details". */
   error?: string;
 }
-const EMPTY: CatalogProjection = { snapshot: null, loading: false };
 const accountOf = (scope: CatalogScope): string => scope.activeAccountId || `anonymous:${scope.id}`;
 export const catalogScopeKey = (scope: CatalogScope): string => JSON.stringify([scope.id, accountOf(scope), scope.protocol]);
 /**
@@ -112,10 +111,6 @@ export const useEffectiveCatalogStore = create<CatalogState>((set, get) => {
     },
   };
 });
-
-export function readCatalogProjection(scope: CatalogScope): CatalogProjection {
-  return useEffectiveCatalogStore.getState().entries[catalogScopeKey(scope)] ?? EMPTY;
-}
 
 export function startCatalogProjection(): () => void {
   return observeEffectiveCatalog(getElectronApi(), (change) => useEffectiveCatalogStore.getState().accept(change));

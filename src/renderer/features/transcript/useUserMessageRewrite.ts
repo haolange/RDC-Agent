@@ -16,14 +16,6 @@ import { readComposerAgentId } from '../../hooks/useComposerAgentId';
 import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
 import type { ConversationMessage } from '@shared/types/conversation';
 
-export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: string | null): boolean {
-  const state = useConversationStore.getState();
-  if (activeLeafBranchId && state.branchState?.activeLeafBranchId !== activeLeafBranchId) {
-    return false;
-  }
-  return state.conversationMessages.some((entry) => entry.turnId === turnId && entry.role === 'user');
-}
-
 export function useUserMessageRewrite(message: ConversationMessage) {
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
   const setBranchState = useConversationStore((state) => state.setBranchState);
@@ -32,7 +24,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
   const currentProject = useProjectStore((state) => state.currentProject);
   const setSessions = useProjectStore((state) => state.setSessions);
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
-  const setRuns = useSessionStore((state) => state.setRuns);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
 
   return useCallback(async (nextContent: string) => {
@@ -115,7 +106,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         currentProject,
         setSessions,
         setCurrentRun,
-        setRuns,
         setTracePresentation,
         setConversationMessages,
         setBranchState,
@@ -145,7 +135,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     setConversationMessages,
     setConversationSnapshot,
     setCurrentRun,
-    setRuns,
     setSessions,
     setTracePresentation,
     upsertConversationMessages,

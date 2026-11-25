@@ -11,7 +11,6 @@ export {
 export { ContextMenu, type ContextMenuProps } from './ContextMenu';
 export { ActiveSignalText, type ActiveSignalTone } from './ActiveSignalText';
 export { DiffBlock, type DiffBlockProps } from './DiffBlock';
-export { Divider, type DividerProps } from './Divider';
 export { Disclosure, type DisclosureProps } from './Disclosure';
 export { EmptyState, type EmptyStateProps, type EmptyStateVariant } from './EmptyState';
 export { Chevron, type ChevronDirection, type ChevronProps } from './Chevron';
@@ -19,7 +18,6 @@ export { Icon, type IconName, type IconProps, type IconSize } from './Icon';
 export { IconButton, type IconButtonProps, type IconButtonSize } from './IconButton';
 export { InlineError, type InlineErrorProps } from './InlineError';
 export { Input, type InputProps, type InputSize } from './Input';
-export { Kbd, type KbdProps } from './Kbd';
 export { ListRow, type ListRowProps } from './ListRow';
 export { Menu, type MenuItem, type MenuProps } from './Menu';
 export { ModeGlyph } from './ModeGlyph';

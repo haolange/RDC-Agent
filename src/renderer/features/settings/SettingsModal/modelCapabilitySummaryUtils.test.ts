@@ -6,7 +6,6 @@ import {
   formatFastControl,
   formatReasoningCapability,
   formatReasoningDefault,
-  snapshotMatchesProvider,
 } from './modelCapabilitySummaryUtils';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
@@ -158,21 +157,5 @@ describe('modelCapabilitySummaryUtils', () => {
     expect(formatContextCapability(null, t)).toBe('Unknown');
     expect(formatReasoningCapability(null, t)).toBe('Unknown');
     expect(formatFastControl(null, t)).toBe('Unknown');
-  });
-
-  it('filters snapshots by provider, account and protocol', () => {
-    const snapshot = {
-      providerId: 'provider-a', accountId: 'account-a', protocol: 'AnthropicMessages' as const,
-      scopeGeneration: 'fixture', projectionVersion: 1,
-      catalogRevision: 'test-catalog', models: [], generatedAt: '2026-07-13T00:00:00.000Z',
-      stale: false, refreshing: false,
-    };
-    expect(snapshotMatchesProvider(snapshot, { id: 'provider-a', activeAccountId: 'account-a', protocol: 'AnthropicMessages' })).toBe(true);
-    expect(snapshotMatchesProvider(snapshot, { id: 'provider-a', activeAccountId: 'account-b', protocol: 'AnthropicMessages' })).toBe(false);
-    expect(snapshotMatchesProvider(
-      snapshot,
-      { id: 'provider-a', activeAccountId: 'account-b', protocol: 'AnthropicMessages' },
-      'account-a',
-    )).toBe(true);
   });
 });

@@ -2,7 +2,6 @@ import { hydrateLoadedSessionSurface } from '../../../stores/sessionProjectionHy
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
-import { useAgentStore } from '../../../stores/agentStore';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 import { acceptSessionSnapshot } from '../../../stores/sessionRecordStore';
 import {
@@ -32,7 +31,6 @@ export async function selectSessionOp(
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
   }
 
   // The surface bootstraps leave a session being opened here alone, so its history and trace load once.
@@ -76,7 +74,6 @@ export async function selectSessionOp(
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(result.currentRun);
   ctx.setCaptures(result.currentRun?.captures ?? []);
-  ctx.setRuns(result.runs);
   return true;
 }
 
@@ -122,7 +119,6 @@ export async function handleSessionCreateOp(
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
     ctx.ensureProjectExpanded(targetProject.projectId);
     if (!sameProject) {
       // Another project becomes current: its selection and project-scoped settings load with it.
@@ -162,7 +158,6 @@ export async function handleSessionRemoveOp(
     }
 
     useSessionProjectionStore.getState().evictSession(session.sessionId);
-    useAgentStore.getState().clearScope(session.sessionId);
 
     const nextSessions = await ctx.loadProjectSessionList(session.projectId);
     if (!ctx.isLatestSelectionRequest(requestId)) {
@@ -192,7 +187,6 @@ export async function handleSessionRemoveOp(
         ctx.setRightRailTarget('project');
         ctx.setCurrentRun(null);
         ctx.setCaptures([]);
-        ctx.setRuns([]);
         useConversationStore.getState().setTimeline([]);
       }
     }
@@ -222,7 +216,6 @@ export async function handleSessionActivateOp(
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(null);
   ctx.setCaptures([]);
-  ctx.setRuns([]);
   ctx.ensureProjectExpanded(project.projectId);
   ctx.setIsBusy(true);
   try {

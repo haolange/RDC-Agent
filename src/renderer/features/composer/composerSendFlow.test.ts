@@ -20,7 +20,7 @@ function options(preserveDraft = true): Parameters<typeof sendComposerConversati
     setPromptValue: prompt, setPendingAttachments: attachments, setPendingSkillIds: skills,
     setConversationMessages: useConversationStore.getState().setConversationMessages,
     upsertConversationMessages: useConversationStore.getState().upsertConversationMessages,
-    setBranchState: vi.fn(), setSessions: vi.fn(), setCurrentRun: vi.fn(), setRuns: vi.fn(),
+    setBranchState: vi.fn(), setSessions: vi.fn(), setCurrentRun: vi.fn(),
     setTracePresentation: vi.fn(), t: (key: string) => key };
 }
 beforeEach(() => {

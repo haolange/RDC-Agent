@@ -3,18 +3,10 @@ import type { TranslationKey } from '../../../i18n';
 import type {
   LlmProviderCategory,
   LlmProviderEntry,
-  LlmProviderModel,
 } from '@shared/types/settings';
 import type { ProviderProtocol } from './types';
 
 export const STORED_SECRET_MASK = '************************';
-
-export const joinPath = (root: string, ...segments: string[]): string => {
-  const separator = root.includes('\\') ? '\\' : '/';
-  return [root.replace(/[\\/]+$/, ''), ...segments.map((segment) => segment.replace(/^[\\/]+/, ''))]
-    .filter(Boolean)
-    .join(separator);
-};
 
 export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => ({
   ...provider,
@@ -64,19 +56,6 @@ export const getProviderCategoryTranslation = (category: LlmProviderCategory) =>
 export const getProviderProtocolLabel = (protocol: ProviderProtocol): string => {
   const definition = LLM_PROVIDER_PROTOCOL_DEFINITIONS.find((entry) => entry.id === protocol);
   return definition?.label ?? protocol;
-};
-
-export const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isConfigured'>): TranslationKey => {
-  if (provider.status === 'verified' && provider.isConfigured) return 'settings.providerConnected';
-  if (provider.status === 'failed') return 'settings.providerFailed';
-  if (provider.status === 'unavailable') return 'settings.providerUnavailable';
-  return 'settings.providerUnconfigured';
-};
-
-export const getModelSummary = (models: LlmProviderModel[], fallback: string): string => {
-  if (models.length === 0) return fallback;
-  if (models.length <= 2) return models.map((model) => model.label).join(', ');
-  return `${models.slice(0, 2).map((model) => model.label).join(', ')} +${models.length - 2}`;
 };
 
 export const sortProvidersByLabel = (providers: LlmProviderEntry[]): LlmProviderEntry[] =>

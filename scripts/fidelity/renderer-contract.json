@@ -314,6 +314,9 @@
     "src/renderer/hooks/useModalFocus.ts",
     "src/main/ipc/sessionOutputs.ts",
     "designs/rdc-agent-design-system/Design System Preview.html",
-    "src/renderer/features/captures/DeviceSelector/useDeviceDropdownPosition.ts"
+    "src/renderer/features/captures/DeviceSelector/useDeviceDropdownPosition.ts",
+    "src/renderer/stores/agentStore.ts",
+    "src/renderer/stores/evidenceStore.ts",
+    "src/renderer/lib/sessionCaptureOwnership.ts"
   ]
 }

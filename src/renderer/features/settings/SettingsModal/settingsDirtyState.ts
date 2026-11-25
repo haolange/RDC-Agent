@@ -47,10 +47,6 @@ export function computeSettingsDirty(
   };
 }
 
-export function dirtyForms(state: SettingsDirtyState): ManualSaveForm[] {
-  return (Object.keys(state) as ManualSaveForm[]).filter((key) => state[key]);
-}
-
 /** Memoized dirty state for the Settings modal drafts. */
 export function useSettingsDirty(
   settings: AppSettings,
