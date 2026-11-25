@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '../../../../ui/Button';
 import { useI18n } from '../../../../i18n';
 import { authModeLabelKey } from './providerCardModel';
 import type { LlmProviderAuthMode, LlmProviderEntry } from '@shared/types/settings';
@@ -35,10 +36,10 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
           const reason = availability.reason
             ?? (unavailable ? t('settings.providerAuthUnavailable') : undefined);
           return (
-            <button
+            <Button
               key={mode}
-              type="button"
-              className={`button button-secondary settings-provider-auth-option${mode === value ? ' is-active' : ''}`}
+              variant="secondary"
+              className={`settings-provider-auth-option${mode === value ? ' is-active' : ''}`}
               data-testid={`settings-provider-auth-mode-${mode}`}
               role="radio"
               aria-checked={mode === value}
@@ -47,7 +48,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
               onClick={() => onChange(mode)}
             >
               {t(authModeLabelKey(mode, provider))}
-            </button>
+            </Button>
           );
         })}
       </div>
