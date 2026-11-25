@@ -25,6 +25,7 @@ import { rdcCliInvokerService } from './rdc/RdcCliInvokerService';
 import { replayDeviceService } from './rdc/captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
 import { installProcessFaultHandlers, reportProcessFault } from './runtime/processFaultHandlers';
+import { isDevelopmentRun } from './runtime/developmentRun';
 import { onJsonlTailRepair } from './runtime/jsonl';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import {
@@ -131,8 +132,7 @@ function registerShutdownDisposables(): void {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Development environment detection.
-const isDev = process.env.NODE_ENV === 'development' && process.env.RDC_AGENT_TEST_MODE !== '1';
+const isDev = isDevelopmentRun({ isPackaged: app.isPackaged, env: process.env });
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
 const isBrowserQa = shouldStartBrowserAppBridge();
