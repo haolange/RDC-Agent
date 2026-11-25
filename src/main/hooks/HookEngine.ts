@@ -151,12 +151,16 @@ export class HookEngine {
     };
     this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {
       const scope = resource.provenance.scope;
-      const trustFingerprint = computeHookTrustFingerprint({
-        definition: resource.value,
-        scope,
-        sourcePath: resource.provenance.sourcePath,
-        projectRoot,
-      });
+      // Built-in hooks ship with the app and are trusted by scope, so their identity is their shipped bytes. Computing
+      // the full fingerprint would hash the runtime they launch (the app's own Electron binary, ~200 MB) for nothing.
+      const trustFingerprint = scope === 'builtin'
+        ? `builtin:${resource.provenance.sourceHash}`
+        : computeHookTrustFingerprint({
+          definition: resource.value,
+          scope,
+          sourcePath: resource.provenance.sourcePath,
+          projectRoot,
+        });
       const ownerRoot = scope === 'project' && projectRoot
         ? canonicalRealpath(projectRoot)
         : canonicalRealpath(path.dirname(resource.provenance.sourcePath));

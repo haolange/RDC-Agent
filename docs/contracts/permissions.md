@@ -115,7 +115,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 ## Hook Trust
 
 - Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。任一变化 → `needsRetrust`。
-- builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
+- builtin 默认信任且内容变化必须随仓库发布，其指纹只是 `builtin:<sourceHash>`，不哈希它启动的运行时（即应用自身的 Electron 可执行文件）；user/project 必须显式 trust。
 - 12 canonical events 保持单一 `HookEngine` 路径。见 `ARCHITECTURE.md` 裁决 K。
 - 信任记录存于 `hook-trust.json`，与 MCP、Agent 信任共用 `TrustStore`（schemaVersion 3），匹配只认 `trustFingerprint`；其他版本的文件不被采信，要求重新 trust；损坏的文件作为无效 hook 文件上报，重新 trust 后覆盖。
 

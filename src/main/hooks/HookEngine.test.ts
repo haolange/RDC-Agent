@@ -437,4 +437,22 @@ describe('report Hook publication boundary', { timeout: 20_000 }, () => {
       status: 'failed', allowed: false, reason: expect.stringContaining('raises epistemic rank'),
     });
   });
+
+  it('trusts a built-in hook by scope without hashing the runtime it launches', () => {
+    const root = makeRoot();
+    const builtin = emptyBuiltin();
+    fs.writeFileSync(path.join(builtin, 'noop.cjs'), '\n');
+    fs.writeFileSync(path.join(builtin, 'node-runtime.hook.yml'), YAML.stringify({
+      id: 'node-runtime', event: 'tool.before-call', command: 'node', args: ['noop.cjs'], timeoutMs: 4000, failurePolicy: 'warn',
+    }));
+    const readFileSync = vi.spyOn(fs, 'readFileSync');
+    try {
+      const [hook] = new HookEngine(path.join(root, 'trust.json')).load(path.join(root, 'user-hooks'), undefined, builtin);
+      expect(hook.trust.trusted).toBe(true);
+      expect(hook.trustFingerprint).toBe(`builtin:${hook.sourceHash}`);
+      expect(readFileSync.mock.calls.some(([target]) => String(target) === process.execPath)).toBe(false);
+    } finally {
+      readFileSync.mockRestore();
+    }
+  });
 });
