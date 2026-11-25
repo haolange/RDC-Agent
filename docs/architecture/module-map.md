@@ -29,7 +29,7 @@ Rules:
 
 ## Renderer 职责地图
 
-renderer 按 `app/`、`features/`（composer、transcript、right-rail、sidebar、terminal、settings、knowledge、onboarding、captures）、`patterns/`、`ui/`、`lib/` 分层；feature 的局部边界见各 feature 的 README。组件级职责、视觉与交互规则见 `docs/ui/`：
+renderer 按 `app/`、`features/`（composer、transcript、right-rail、sidebar、terminal、settings、knowledge、captures）、`patterns/`、`ui/`、`lib/` 分层；feature 的局部边界见各 feature 的 README。组件级职责、视觉与交互规则见 `docs/ui/`：
 
 - [`docs/ui/README.md`](../ui/README.md)：UI 文档入口。
 - [`docs/ui/workbench-and-transcript.md`](../ui/workbench-and-transcript.md)：Workbench、Composer、Transcript 与 Work Process。

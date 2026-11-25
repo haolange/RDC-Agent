@@ -43,7 +43,7 @@
 
 - **写**：`writeFileAtomic(Sync)` 在目标旁写临时文件 → fsync → 改名覆盖目标 → fsync 目录（POSIX；Windows 由 NTFS 日志保证改名持久）。读者只会看到旧内容或新内容。Windows 上读者、索引或杀毒短暂占用目标时改名报 `EBUSY`/`EPERM`/`EACCES`，有界重试后仍失败才报错；不存在先删目标再改名、也不存在 `.bak` 交换。ESLint 禁止平台层之外调用 `rename`。
 - **读**：`readValidatedSync` 区分三态。文件不存在为 `null`；存在但无法解析或校验为损坏：报 `STORAGE_CORRUPT`（Integrity），**每次读都报**，直到属主重新写入，绝不读成空值；损坏字节按内容哈希在旁边保留一份 `<file>.corrupt-<hash>`，后续写入不会毁掉证据。更高的 schemaVersion 报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件；I/O 失败报 `STORAGE_UNREADABLE`（Availability），文件原样保留。
-- **信任记录**：hook、项目 MCP 与项目 Agent 的信任决定共用 `src/main/runtime/TrustStore.ts`（`{ schemaVersion: 3, records }`，原子写）。损坏的信任文件读时报 `STORAGE_CORRUPT`，用户重新 trust 即覆盖它；hook 加载时把它作为无效文件上报，其中的 hook 全部按未信任处理。其他版本写下的信任文件不被采信，用户会被重新询问。
+- **信任记录**：hook、项目 MCP 与项目 Agent 的信任决定共用 `src/main/runtime/TrustStore.ts`（`{ schemaVersion: 3, records }`，原子写）。损坏的信任文件读时报 `STORAGE_CORRUPT`，用户重新 trust 即覆盖它；hook 加载时把它作为无效文件上报，其中的 hook 全部按未信任处理。缺版本或更早版本写下的信任文件读作无信任，用户会被重新询问；更高版本报 `STORAGE_SCHEMA_UNSUPPORTED`。
 
 ## 关键点分类标注
 
@@ -91,8 +91,8 @@
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，原件保留 |
 | Settings 文件（`config.json`）损坏、无法读取、结构不合法或不是 schemaVersion 9 | Integrity（启动 fail-fast） | 启动时主进程按 `app.getLocale()` 的语言弹原生错误框（headless / Browser QA 写 stderr），点名要删除的 `config.json`，说明下次启动以默认设置重建，经正常资源释放后以非零状态退出，不留活锁；不转换旧版本、不修复、不改写原件。provider secret 文件无需删除：凭据按 secretRef 寻址，重新连接时写入新条目。目录已不再列出的 provider 条目原样保留，不进运行时视图，记 `settings_provider_not_in_catalog` 设置诊断 |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
-| Session attachments.json | Integrity | 写入 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
-| Session shell-state.json | Integrity | 写入 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本 / 损坏 quarantine 或 `STORAGE_SCHEMA`；未知更高 `schemaVersion` 不 quarantine |
+| Session attachments.json | Integrity | 只读 schemaVersion `'1'` 的 `{ schemaVersion, attachments }`；缺版本、纯数组或其他版本报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件；无法解析报 `STORAGE_CORRUPT`，结构不合法报 `STORAGE_SCHEMA` |
+| Session shell-state.json | Integrity | 写入 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本、未知旧版本、无法解析或结构不合法时读报 `STORAGE_CORRUPT`（旁存损坏副本，原件留在原处）；更高 `schemaVersion` 报 `STORAGE_SCHEMA_UNSUPPORTED` |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |
 | Context 无法装入 → `CONTEXT_CANNOT_FIT` | Integrity | hard degrade 后仍失败则报错 |
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |

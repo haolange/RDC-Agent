@@ -51,7 +51,13 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 `read_file` 的显式 `mode: audit` 沿用该工具的冻结可用性与读取权限；`path` 和 `compareWith.path` 分别提取并审批，第一路径在工程内不自动授权第二路径。执行层对两者分别 realpath/根边界校验，且校验各自预期hash；不由模型脚本直接读磁盘，不增加新工具身份或向受限reviewer授予 `read_file`。审计只返回有界字节信息和整文件比较结果，不授予编辑前置读取资格。capture拒绝、8MiB输入上限和取消合同见 runtime-kernel。
 
-canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 spec 声明 `knowledgeRoots: 'read-access'` 的工具（内置为 `read_file` / `read_image` / `glob` / `grep`）把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `ARCHITECTURE.md` 裁决 G。
+canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。
+
+- `AgentPermissionPolicy` **仅**对 spec 声明 `knowledgeRoots: 'read-access'` 的工具（内置为 `read_file` / `read_image` / `glob` / `grep`）把它们并入免审批读根。
+- `write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。
+- sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。
+- 写入 Knowledge 仍只经 `knowledge_*` + human review。
+- 见 `ARCHITECTURE.md` 裁决 G。
 
 ### 权限特征来自工具 spec
 
@@ -79,11 +85,21 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
   - IPv6：只有 `2000::/3` 是公网，其中再排除 `2001:db8::/32` 与 `3fff::/20`；`::ffff:0:0/96`、`::/96`、`64:ff9b::/96`、`2002::/16` 按内嵌的 IPv4 地址判定。
   - Provider、OAuth 与 MCP 的 HTTP 端点由用户配置，可以是本机服务，不经这条公网通道。
 - **Shell routine**：只有静态简单命令（无引号、变量、子 shell、重定向）且每个参数都留在工作区内时，才按 routine 自动放行。工作区外的绝对路径、盘符根或盘符相对路径（`D:`、`D:/`）、UNC（`//host/share`）、`~`、`..`、PowerShell provider 驱动器（`Env:`、`HKLM:` 等）逐个 token 判定，任何一个出界就改为审批；命令里另外出现工作区路径不能抵消。
-- CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`；`img-src 'self' data: blob:` 不放行远程主机，回答里的远程图片由主进程 `web:fetchImage` 代取（仅 https 公网地址、≤5MB、按内容嗅探、不带 cookie）。`web:fetchImage` 先过 active-session 门；`intent: 'auto'` 只放行在本会话非模型来源（用户消息、`web_fetch` / `web_search` / knowledge 工具结果）里出现过的 URL，其余 URL 不发请求、渲染为占位，用户点击后以 `intent: 'click'` 代取，取之前先写 `network` 审计记录（主机与 URL 指纹，写失败即不取）；`connect-src 'self'`；`media-src 'self' blob:` 只播放 `conversation:resolveMedia` 解析出的会话产物、附件与项目内视频。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。开发态 CSP（放行 Vite 开发服务器与 `unsafe-eval`）只在未打包的源码运行且 `NODE_ENV=development` 时使用；打包版无论环境变量如何都用生产 CSP（`src/main/runtime/developmentRun.ts`）。
+- CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`；`img-src 'self' data: blob:` 不放行远程主机，回答里的远程图片由主进程 `web:fetchImage` 代取（仅 https 公网地址、≤5MB、按内容嗅探、不带 cookie）。
+  - `web:fetchImage` 先过 active-session 门；`intent: 'auto'` 只放行在本会话非模型来源（用户消息、`web_fetch` / `web_search` / knowledge 工具结果）里出现过的 URL，其余 URL 不发请求、渲染为占位，用户点击后以 `intent: 'click'` 代取，取之前先写 `network` 审计记录（主机与 URL 指纹，写失败即不取）；`connect-src 'self'`；`media-src 'self' blob:` 只播放 `conversation:resolveMedia` 解析出的会话产物、附件与项目内视频。
+  - 动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。
+  - 开发态 CSP（放行 Vite 开发服务器与 `unsafe-eval`）只在未打包的源码运行且 `NODE_ENV=development` 时使用；打包版无论环境变量如何都用生产 CSP（`src/main/runtime/developmentRun.ts`）。
 
 ## IPC Schema（Zod）
 
-**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdc-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。见 `ARCHITECTURE.md` 裁决 B / E。产品级 Browser QA 的现场证据见 [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
+**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdc-runtime / trace / web 等）。
+
+- 非法 payload fail-closed。
+- `approvalToken` 单次消费（`IpcApprovalTokenService`）。
+- 契约测试：`IpcPayloadGuard.test.ts`。
+- Renderer 读取 Investigation 正文的唯一通道是 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。
+- 见 `ARCHITECTURE.md` 裁决 B / E。
+- 产品级 Browser QA 的现场证据见 [`docs/product/acceptance-ledger.md`](../product/acceptance-ledger.md)。
 
 ## Browser Bridge（QA-only / debug-only）
 - /qa is a QA bootstrap surface: the launcher logs a one-time qaBootstrap, which is consumed before minting the bridge cookie. It isolates browser origins; it is not authentication against a malicious local process.
@@ -92,7 +108,10 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - 同产品 API、异传输：桌面 `preload → IPC` 与 Browser QA `BrowserAppBridge → HTTP/SSE` 共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；不是第二套 UI 或第二套能力面。
 - Authoritative entry: use the complete http://127.0.0.1:<port>/qa?qaBootstrap=... URL printed by the launcher. It consumes a one-time bootstrap, mints an HttpOnly `rdcBridgeToken` cookie (`SameSite=Strict`, and `Secure` for HTTPS), and redirects to clean `/app` on the same bridge origin. In `browser-dev`, Vite is reverse-proxied through the bridge (including HMR WebSocket); bridge auth is never placed in a URL query and there is no cross-port challenge handshake.
 - **鉴权**（`resolveProvidedBridgeToken`）：programmatic clients may use an explicit Bearer header（允许无 Origin）；browser navigation 与同源 fetch 使用 HttpOnly `rdcBridgeToken` cookie；事件流固定为 `POST /events`，不再使用原生 EventSource GET。Cookie 认证的 `/invoke`、`/events`、`/api/*` 要求 `Origin` 精确等于 bridge origin。Query `rdcBridgeToken|token` is never accepted. 截断/无凭证 → **401 JSON**（`Content-Type: application/json`），勿当「已打开 Workbench」。
-- Channel capability（`src/shared/renderer-api/channelCapabilities.ts` + `pnpm run check:browser-capability`）：闭合 `Record<RendererInvokeChannel, BridgeChannelCapability>`，每个 invoke channel 恰好一类 — `read`/`mutation` 默认允许；`high-impact` 需 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`；`desktop-only`（window chrome 等）永拒。未知 channel 运行时 fail-closed。`dialog:*` / `app:copyText` / `app:openPath` 属 mutation（Browser QA 加项目/选文件需要）。`app:readClipboardText` 属 `read`，只在可编辑右键菜单判定粘贴 disabled 时读取一次。
+- Channel capability（`src/shared/renderer-api/channelCapabilities.ts` + `pnpm run check:browser-capability`）：闭合 `Record<RendererInvokeChannel, BridgeChannelCapability>`，每个 invoke channel 恰好一类 — `read`/`mutation` 默认允许；`high-impact` 需 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`；`desktop-only`（window chrome 等）永拒。
+  - 未知 channel 运行时 fail-closed。
+  - `dialog:*` / `app:copyText` / `app:openPath` 属 mutation（Browser QA 加项目/选文件需要）。
+  - `app:readClipboardText` 属 `read`，只在可编辑右键菜单判定粘贴 disabled 时读取一次。
 - Cookie 认证的 `/invoke`、`/events`、`/api/*` 要求 `Origin` 精确等于 bridge origin。`browser-dev` 反代 Vite 时剥离 `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*`。
 - 精确 Origin allowlist（仅 bridge origin）；仅 canonical renderer channel 且存在已注册 handler 时可调用。未知 channel、内部 channel、未注册 handler 与不存在的明文 `settings:getProviderSecret` → 403。
 - **完整产品面 parity**：Settings、Models Override、Runtime Log、Memory、Command、Tool Approval、MCP 状态、Hook/MCP trust/revoke/test 等 preload 已公开能力在 Browser 中走同一 main-owned Zod、PermissionPolicy、单次 approval token、MCP trust 与 `safeStorage` 边界；Browser 不保留拒绝桩或专用禁用 UI。完整矩阵见 [`docs/architecture/browser-qa-surface.md`](../architecture/browser-qa-surface.md)。
@@ -123,7 +142,12 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - **禁止** RDC global mirror、`legacyGlobalMirror`、`getRdcRuntimeContext` 全局 API。
 - 工具读上下文前必须校验 lease 所有权；空 `sessionId` fail-closed（不写任何全局镜像）。
 - UI 无 session 摘要可经 `getMostRecentRdcContextLease`；工具路径仍须显式 `sessionId` + ownership assert。
-- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `domainExtensions.rdc.requiresLease=true` 的 child 取得 parent RDC context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。child 结束后须携带实际停止证明调用 `revokeDelegatedLease`；缺证明或存在 quarantine 时隔离 parent lease。child lease 不可再转授。未请求 RDC 领域扩展的 child **在 allowlist 层**不能拿到 `rdc_probe`（`runtime_context` 保留但不返回 rdc 载荷；`shell` 可保留，但 `shell.rdc` 在执行入口拒绝，且不继承 parent lease）。禁止并发 RDC 双 owner。Mission 只读面走 `rdc_probe`，不得获得 generic shell。
+- **Delegated lease**：parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease（`delegatedFrom`），使 `domainExtensions.rdc.requiresLease=true` 的 child 取得 parent RDC context 并串行；同一 parent 同时只允许一条 live delegated lease；无 parent lease 则 fail-closed，不得静默创建。
+  - child 结束后须携带实际停止证明调用 `revokeDelegatedLease`；缺证明或存在 quarantine 时隔离 parent lease。
+  - child lease 不可再转授。
+  - 未请求 RDC 领域扩展的 child **在 allowlist 层**不能拿到 `rdc_probe`（`runtime_context` 保留但不返回 rdc 载荷；`shell` 可保留，但 `shell.rdc` 在执行入口拒绝，且不继承 parent lease）。
+  - 禁止并发 RDC 双 owner。
+  - Mission 只读面走 `rdc_probe`，不得获得 generic shell。
 
 ## Hook Trust
 
@@ -149,25 +173,52 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 ## Shell 分析
 
 - Agent 命令工具 id 是 `shell`；解释器由 `ShellResolver` 解析（Settings 本机覆盖 → pwsh 7 → Windows PowerShell 5.1；POSIX `$SHELL`∈zsh/bash/sh/dash → zsh → bash → sh）。fish/csh/nu 等 fail-closed。全失败 `SHELL_UNAVAILABLE`。
-- 灾难命令由 `shellHardDeny` 单独维护；文件/RDC 路由硬拒绝是独立规则，两者都先于权限模式求值。PowerShell 先统一 splitter（含 `&`）、折叠反引号、静态别名展开与最短唯一参数 bind，再匹配 `Remove-Item -Recurse -Force` 根路径（含 `$env:SystemDrive` / `\\?\C:\` / UNC 根 / hive 根）、`iwr|iex`（右端含 `bash`/`sh`/`pwsh`/`cmd`）、`-EncodedCommand`、嵌套 `powershell -Command` / `&` 调用运算符、launcher `-ExecutionPolicy Bypass`。cmd 覆盖 `rd /s /q`、`del /s /q`、`diskpart`、`shutdown /s`、`format`。POSIX 覆盖 `rm -rf /`、`dd if=`、`mkfs*`、`> /dev/sd|hd|nvme|xvd`、fork bomb、`chmod 777`；`sudo` 只在与这些灾难组合叠加时硬拒。allow 与 deny 都用词边界匹配。
+- 灾难命令由 `shellHardDeny` 单独维护；文件/RDC 路由硬拒绝是独立规则，两者都先于权限模式求值。
+  - PowerShell 先统一 splitter（含 `&`）、折叠反引号、静态别名展开与最短唯一参数 bind，再匹配 `Remove-Item -Recurse -Force` 根路径（含 `$env:SystemDrive` / `\\?\C:\` / UNC 根 / hive 根）、`iwr|iex`（右端含 `bash`/`sh`/`pwsh`/`cmd`）、`-EncodedCommand`、嵌套 `powershell -Command` / `&` 调用运算符、launcher `-ExecutionPolicy Bypass`。
+  - cmd 覆盖 `rd /s /q`、`del /s /q`、`diskpart`、`shutdown /s`、`format`。
+  - POSIX 覆盖 `rm -rf /`、`dd if=`、`mkfs*`、`> /dev/sd|hd|nvme|xvd`、fork bomb、`chmod 777`；`sudo` 只在与这些灾难组合叠加时硬拒。
+  - allow 与 deny 都用词边界匹配。
 - RDC / 通用 shell 经 `ShellInvocationService`；exitCode：`code ?? (signal ? 128+n : 1)`。
 - `ShellCommandRiskAnalyzer`：结构分析 + denied 词边界与路径前缀；最高分档为 `high`，只做审批路由，没有 `critical` 档位。
 - **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + 原生身份/路径等执行检查与操作系统权限。Electron renderer sandbox 不隔离主进程派生的普通 shell；不得宣称存在命令级 OS sandbox。
-- shell.rdc 与 shell.command 互斥。严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning root 的 full 天花板 profile、冻结 binding/catalog、lease、scope/effects、参数与路径。已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。实际执行再次验证，保留串行、取消、恢复及签名证据合同。
-- 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；用户允许 `git status` 不授权后续 `git reset --hard`。shell 里的 git 不属于例行命令：仓库配置可以指定 git 运行的程序。仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。专用 Git 工具以命令行配置覆盖 fsmonitor、hooks、外部 diff 与 sshCommand，仓库本地配置声明可执行程序（fsmonitor、hooksPath、textconv、filter、include 等）时拒绝执行；shell 不增加 Git 权限。
+- shell.rdc 与 shell.command 互斥。
+  - 严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning root 的 full 天花板 profile、冻结 binding/catalog、lease、scope/effects、参数与路径。
+  - 已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。
+  - 未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。
+  - 实际执行再次验证，保留串行、取消、恢复及签名证据合同。
+- 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；用户允许 `git status` 不授权后续 `git reset --hard`。
+  - shell 里的 git 不属于例行命令：仓库配置可以指定 git 运行的程序。
+  - 仓库脚本不因 typecheck/check 名称免审；动态展开、重定向、引用或无法确认的组合进入审核；灾难和文件/RDC 旁路硬拒绝优先。
+  - 专用 Git 工具以命令行配置覆盖 fsmonitor、hooks、外部 diff 与 sshCommand，仓库本地配置声明可执行程序（fsmonitor、hooksPath、textconv、filter、include 等）时拒绝执行；shell 不增加 Git 权限。
 - project 内普通 write_file/edit_file 可按 low risk 自动批准；执行层仍要求 realpath、无链接写入、文本大小及覆盖前同 session 成功读取。capture 输入、Git 元数据与 canonical knowledge 不作为通用写入目标；Agent/Skill/Hook/Policy/MCP/Memory、secret 与环境配置需要明确审核，不获得通用自动编辑许可。
 
 ### 独立权限审核
 
 原生动作同时传递已经验证的冻结操作合同：说明、完整 input schema、路径参数及前置条件。审核据此解释参数的 before/after 身份语义，不从字段名称猜测；合同仅说明动作，不建立用户授权，也不替代实际执行校验。
 
-审核复用冻结 RequestPlan、opaque credential、PromptPlan、Provider adapter 与请求快照；没有工具、Agent 身份、Task 或 RDC lease。输入包含当前精确动作、当前主进程控制与预算事实、真实 user 消息、经 hash 验证的已批准计划，以及当前隔离 slot 的有界工具观察。历史原生回执须先由主进程校验签名、hash 和归属，保留原 context/time；持久记录仅证明 bytes/schema/存在，不把其正文或 intent 自述升级为执行证明。敏感文件观察不进入审核，凭据型动作在发送前拒绝；模型的工具参数和授权自述均不是用户许可。父执行历史不泄露给隔离子执行。原生变更审核还直接取得同一冻结目录的完整能力摘要和其中已准入的 rollback 定义，复用目录查询的规范投影，不依赖历史正文是否仍在窗口内；这些只证明声明的能力边界和接口合同，不能证明当前状态、实际回滚成功或科学结论。
+审核复用冻结 RequestPlan、opaque credential、PromptPlan、Provider adapter 与请求快照；没有工具、Agent 身份、Task 或 RDC lease。
 
-工具观察最多保留 16 种不同实际调用的最后结果，以工具名和实际调用参数区分；只有相同调用可替代旧观察，不把不同文件、审计选择器或目录目标合并。其中最多 8 条优先保留当前动作明确引用或实际参数键值相同的既有成功观察，再用最近观察填满；不读取其它执行历史或现场，不按领域判断重要性。参数只整理观察，不提供授权，也不将失败调用变成成功证明。实际调用参数、主进程身份、调用回执元数据分别有界传递，避免正文前缀挤掉身份；截断附原始长度与 hash。JSON 先结构化脱敏，受保护文件正文省略。文件审计的实际差异与原生结果正文随观察传递，不能仅有调用参数却声称已提供结果。该投影不推断前置条件、不重读现场、不赋予记录正文执行证明。
+- 输入包含当前精确动作、当前主进程控制与预算事实、真实 user 消息、经 hash 验证的已批准计划，以及当前隔离 slot 的有界工具观察。
+- 历史原生回执须先由主进程校验签名、hash 和归属，保留原 context/time；持久记录仅证明 bytes/schema/存在，不把其正文或 intent 自述升级为执行证明。
+- 敏感文件观察不进入审核，凭据型动作在发送前拒绝；模型的工具参数和授权自述均不是用户许可。
+- 父执行历史不泄露给隔离子执行。
+- 原生变更审核还直接取得同一冻结目录的完整能力摘要和其中已准入的 rollback 定义，复用目录查询的规范投影，不依赖历史正文是否仍在窗口内；这些只证明声明的能力边界和接口合同，不能证明当前状态、实际回滚成功或科学结论。
+
+工具观察最多保留 16 种不同实际调用的最后结果，以工具名和实际调用参数区分；只有相同调用可替代旧观察，不把不同文件、审计选择器或目录目标合并。
+
+- 其中最多 8 条优先保留当前动作明确引用或实际参数键值相同的既有成功观察，再用最近观察填满；不读取其它执行历史或现场，不按领域判断重要性。
+- 参数只整理观察，不提供授权，也不将失败调用变成成功证明。
+- 实际调用参数、主进程身份、调用回执元数据分别有界传递，避免正文前缀挤掉身份；截断附原始长度与 hash。
+- JSON 先结构化脱敏，受保护文件正文省略。
+- 文件审计的实际差异与原生结果正文随观察传递，不能仅有调用参数却声称已提供结果。
+- 该投影不推断前置条件、不重读现场、不赋予记录正文执行证明。
 
 待审命令字面引用的文件，其同执行槽成功 `read_file` 观察优先保留并以 8192 字符为正文上限；超限仍明确截断，受保护路径与凭据脱敏规则不变。读取是历史观察，不证明文件当前字节，也不构成执行授权。
 
-审核必须使用现有回执合同：签名 `evidence.kind` 只有 measurement、intervention、rollback；Experiment.executionEvidence 中的 baseline、variant、restored 是三个不同 measurement 回执的引用角色，不存在额外的 baseline kind 或工具 phase 参数。介入前核验当前实验、归属、采样条件及时间匹配的真实基线和来源/安全控制，不索取未来阶段回执；不能因为合法基线的 kind 为 measurement 就拒绝。该准入判断不追认未来执行，实验关闭仍由现有门禁检查五个不同引用、真实签名、时序、采样条件和 daemon/worker 身份。
+审核必须使用现有回执合同：签名 `evidence.kind` 只有 measurement、intervention、rollback；Experiment.executionEvidence 中的 baseline、variant、restored 是三个不同 measurement 回执的引用角色，不存在额外的 baseline kind 或工具 phase 参数。
+
+- 介入前核验当前实验、归属、采样条件及时间匹配的真实基线和来源/安全控制，不索取未来阶段回执；不能因为合法基线的 kind 为 measurement 就拒绝。
+- 该准入判断不追认未来执行，实验关闭仍由现有门禁检查五个不同引用、真实签名、时序、采样条件和 daemon/worker 身份。
 
 每个待审批调用最多一次审核，30 秒上限；输入最多 32768 估算 tokens，并服从冻结模型的更紧输入预算及扣除1024输出预留后的窗口；输出最多1024 tokens。只接受终态、无工具的严格 approved/reason JSON。超限、缺路由、服务失败、非法响应、超时、取消或过期 generation 均拒绝，保留原因；不重试、不静默 fallback、不自动重启 Turn。明确 user policy floor 仍人工审批，deny 仍不可覆写。
 
@@ -180,7 +231,9 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 `.policy.yml` 损坏或非法 → `POLICY_INVALID` fail-closed。Project policy 只能收紧，不能放宽。Policy 优先级为 `built-in hard deny > user/project policy floor > Full access > tool metadata`；数值预算必须是非负整数，`0` 明确表示禁止任何对应执行（例如 `maxTurns: 0`、`maxWallTimeMs: 0` 返回 typed error），且该 floor 即使在 Full access 下仍生效。
 
 Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByTool` 是该格上的下界：`user` 永远至少 `ask_user`，**不得**被 Permission Mode（含 Auto-review）降回 `auto_review`；`auto_review` 永远至少 `auto_review`。Mode 只影响 baseline，floor 与 baseline 取更严者。
-- Runtime budget limits are frozen in the turn plan and enforced by one shared budget: `maxTurns`、`maxToolCalls`、`maxSubagents`、`maxChildDepth`、`maxWallTimeMs`；disabled policy files are filtered before merge. 根执行深度为 0；全部启用策略未声明 `maxChildDepth` 时默认 1，显式 0 禁止创建子代理，多个显式声明取最严格值。prepareTurn 按实际深度与继承预算冻结可见工具；深度或可创建子代理的预算耗尽时，模型声明、工具搜索和执行入口都排除新建 `subagent`，不移除既有 Task 的合法管理能力。同步、后台、重试与恢复沿用原深度和预算，不重新计数。
+- Runtime budget limits are frozen in the turn plan and enforced by one shared budget: `maxTurns`、`maxToolCalls`、`maxSubagents`、`maxChildDepth`、`maxWallTimeMs`；disabled policy files are filtered before merge. 根执行深度为 0；全部启用策略未声明 `maxChildDepth` 时默认 1，显式 0 禁止创建子代理，多个显式声明取最严格值。
+  - prepareTurn 按实际深度与继承预算冻结可见工具；深度或可创建子代理的预算耗尽时，模型声明、工具搜索和执行入口都排除新建 `subagent`，不移除既有 Task 的合法管理能力。
+  - 同步、后台、重试与恢复沿用原深度和预算，不重新计数。
 
 ## 相关测试入口
 
@@ -195,12 +248,20 @@ Decision lattice 为 `allow < auto_review < ask_user < deny`。`approvalFloorByT
 - `src/main/rdc/RdcRuntimeContextRegistry.test.ts`
 - `src/main/agent-runtime/permissions/*`
 - `src/main/testing/contracts/securityContract.test.ts`（矩阵入口）
-- 门禁：`pnpm run check:orchestrator-facade`（禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext`）
+- 门禁：`pnpm run check:legacy-residue`（禁止恢复 `legacyGlobalMirror` / `getRdcRuntimeContext`）
 
 
 ## 原生 RDC 执行证据
 
-shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。结构化模式仍进入 shell 的同一审批入口；low 分类须来自已验证的具体语义，不能仅凭工具名称或模型声称只读。原生 RDC 执行要求 owning root turn 的 `full` 天花板 profile（内置为 General），Full access 权限模式不能抬高天花板，天花板不足即拒绝；仅 `capture_select` / `capture_restore` / `capture_recover` 另要求 agentId 为 general；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。模型不可传 capture/replay/context identity。操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。回放生命周期自动审查接收主进程定义的操作目标和效果；当前权限模式、审批下限及执行时的归属检查仍然适用。Skill 仅提供知识，不能扩权。
+shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重检查。
+
+- 结构化模式仍进入 shell 的同一审批入口；low 分类须来自已验证的具体语义，不能仅凭工具名称或模型声称只读。
+- 原生 RDC 执行要求 owning root turn 的 `full` 天花板 profile（内置为 General），Full access 权限模式不能抬高天花板，天花板不足即拒绝；仅 `capture_select` / `capture_restore` / `capture_recover` 另要求 agentId 为 general；本机冻结配置、owning project/session lease、非 default context、非 delegated/offline child 同时成立才执行。
+- 模型不可传 capture/replay/context identity。
+- 操作权限按冻结 catalog 的 scope、effects、前置条件、参数和路径声明校验，不按命名空间授权。
+- 未知操作或影响 fail-closed；生命周期、remote、全局配置、窗口及销毁仍由应用专门入口管理。
+- 回放生命周期自动审查接收主进程定义的操作目标和效果；当前权限模式、审批下限及执行时的归属检查仍然适用。
+- Skill 仅提供知识，不能扩权。
 
 执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdc-runtime.md。
 
@@ -231,6 +292,15 @@ Agent 只绑定同安装捆绑 Python（按宿主布局，见 docs/architecture/
 
 ## 会话 Remote 自动准备
 
-设备选择是会话 rd.remote.connect 自动准备的明确入口，包含替换所选设备上目标 RenderDoc 辅助包的授权：必要时覆盖、降级、卸载重装及辅助包自身数据清除，无额外桌面修复确认。Tools 每次变更前核对设备、包和同安装 APK 身份；设备独占、未知归属、busy、Agent/恢复/原生进程锁与冻结 CLI/catalog 边界不变。手机系统授权由用户完成。renderer 不能提交任意 adb 参数或绕过主进程准入。已有 Capture 切换设备仍由主进程发出绑定 scope、generation 和目标的一次性关闭确认，取消或关闭撤销未使用 token。
+设备选择是会话 rd.remote.connect 自动准备的明确入口，包含替换所选设备上目标 RenderDoc 辅助包的授权：必要时覆盖、降级、卸载重装及辅助包自身数据清除，无额外桌面修复确认。
 
-安装回执缺失或矛盾时，Tools 在同一次连接预算内串行只读核验，只有设备安装结束且目标包身份确认后才继续启动与握手；无活动安装会话本身不证明安装成功。预算耗尽仍未确认的安装不能通过取消、context 释放或更换目标清除。用户统一“重试连接”复用同设备准备入口，经原冻结 CLI/catalog 和目标 APK 证据先执行只读 rd.remote.inspect_installation；pending/unknown 保留占用，clear 才进入 Tools 自动准备。只读检查不安装、停止服务或放弃 PM session，不存在独立面向用户的核验操作或旧修复 token。
+- Tools 每次变更前核对设备、包和同安装 APK 身份；设备独占、未知归属、busy、Agent/恢复/原生进程锁与冻结 CLI/catalog 边界不变。
+- 手机系统授权由用户完成。
+- renderer 不能提交任意 adb 参数或绕过主进程准入。
+- 已有 Capture 切换设备仍由主进程发出绑定 scope、generation 和目标的一次性关闭确认，取消或关闭撤销未使用 token。
+
+安装回执缺失或矛盾时，Tools 在同一次连接预算内串行只读核验，只有设备安装结束且目标包身份确认后才继续启动与握手；无活动安装会话本身不证明安装成功。
+
+- 预算耗尽仍未确认的安装不能通过取消、context 释放或更换目标清除。
+- 用户统一“重试连接”复用同设备准备入口，经原冻结 CLI/catalog 和目标 APK 证据先执行只读 rd.remote.inspect_installation；pending/unknown 保留占用，clear 才进入 Tools 自动准备。
+- 只读检查不安装、停止服务或放弃 PM session，不存在独立面向用户的核验操作或旧修复 token。

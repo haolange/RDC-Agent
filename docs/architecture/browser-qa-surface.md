@@ -7,7 +7,11 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
 | Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap → HttpOnly `rdcBridgeToken` cookie（同源 `/app`）；explicit Bearer for programmatic clients |
 
-唯一入口：launcher 记录一次性 `GET /qa?qaBootstrap=...`，消费一次后签发 bridge cookie，并重定向到**同一 bridge origin** 上的干净 `/app`。 In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。仅未打包构建在 `RDC_AGENT_BROWSER_QA=1` 时启动该 surface，打包产物无论环境变量如何都不启动；请求的 `Host` 必须是 bridge 自身（否则 421）；bootstrap 缺失、重复或无效返回 401。 JSON body 上限 1 MiB，唯一例外是 `conversation:stageAttachments`（经 `x-rdc-invoke-channel` 与 payload.channel 一致校验后上限 96 MiB），用于 Browser QA 的 bytes 拖放/粘贴/隐藏 file input。
+唯一入口：launcher 记录一次性 `GET /qa?qaBootstrap=...`，消费一次后签发 bridge cookie，并重定向到**同一 bridge origin** 上的干净 `/app`。
+
+- In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。
+- 仅未打包构建在 `RDC_AGENT_BROWSER_QA=1` 时启动该 surface，打包产物无论环境变量如何都不启动；请求的 `Host` 必须是 bridge 自身（否则 421）；bootstrap 缺失、重复或无效返回 401。
+- JSON body 上限 1 MiB，唯一例外是 `conversation:stageAttachments`（经 `x-rdc-invoke-channel` 与 payload.channel 一致校验后上限 96 MiB），用于 Browser QA 的 bytes 拖放/粘贴/隐藏 file input。
 
 ## 单轨接口
 
@@ -44,7 +48,13 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 
 ## 状态与实例
 
-Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时默认使用经过校验的临时 `os.tmpdir()/rdc-agent/qa-*` userData，并在 `will-quit` 清理；显式路径或 canonical 开关才会共享真实数据。进入该 disposable 分支时，主进程在读取任何路径之前调用 `appPathService.isolateUserRdcRoot()`，把用户资源根指到同一目录下的 `.rdc-agent`，使 provider 配置与 `userData/secrets` 落在同一隔离边界，不读写真实 `~/.rdc-agent`。只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才落真实 `~/.rdc-agent`。两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。涉及真实本机数据的验收必须显式指定 userData。设置文件不可用（损坏或不是当前 schema 版本）时，headless 实例不弹窗，把与桌面错误框相同的提示（含要删除的 `config.json` 路径）写到 stderr，并以非零状态退出。
+Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时默认使用经过校验的临时 `os.tmpdir()/rdc-agent/qa-*` userData，并在 `will-quit` 清理；显式路径或 canonical 开关才会共享真实数据。
+
+- 进入该 disposable 分支时，主进程在读取任何路径之前调用 `appPathService.isolateUserRdcRoot()`，把用户资源根指到同一目录下的 `.rdc-agent`，使 provider 配置与 `userData/secrets` 落在同一隔离边界，不读写真实 `~/.rdc-agent`。
+- 只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才落真实 `~/.rdc-agent`。
+- 两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。
+- 涉及真实本机数据的验收必须显式指定 userData。
+- 设置文件不可用（损坏或不是当前 schema 版本）时，headless 实例不弹窗，把与桌面错误框相同的提示（含要删除的 `config.json` 路径）写到 stderr，并以非零状态退出。
 
 `instance.lock` 回收不能只凭 PID 存活判断 owner：锁记录 owner 的进程身份（pid 与 birth，见 [`host-platform.md`](host-platform.md)），只有身份证明已退出（pid 不存在或 birth 不同，即 PID 被复用）才回收；身份不可读或未记录 birth 的活 pid 保持拒绝，也不向该进程发送终止信号。
 
@@ -56,16 +66,34 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
 - 手动：运行 `start:agent-browser`，从最新日志复制完整的一次性 `/qa?qaBootstrap=...` URL，核对真实 Settings / Project / Session / usage、语言持久化与 parity；高风险 channel 分别在未设置与设置 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时检查；仅在获授权的真实数据流程中显式使用 canonical userData。
-- 对话走查：`node scripts/qa-ollama-stub.mjs [端口]` 在本机起一个确定性的 Ollama 协议桩（`/api/tags`、`/api/show`、`/api/chat` NDJSON），无需凭据或模型即可在 disposable 实例里连接内置「Ollama」供应商。默认回合是流式思考、一次 `glob` 调用与最终答复；用户消息含 `qa:loops`（多轮，含任务创建与更新）、`qa:long`（五轮并行工具调用加长答复，触发窗口化与滚动）或 `qa:plan`（Mission Agent 提交计划进入计划门）时走对应剧本。批准后的执行回合按真实契约以 `turn_complete` 声明 blocked（工作区没有 capture），运行时的跟进提示（以 `# ` 开头）延续当前剧本而不是重开。它只是 QA 工具，不进打包产物，也不代表真实模型的质量。
-- 运行态走查：桩启动后，用 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1 TMPDIR=/dev/shm` 启动 disposable 实例，再运行 `node scripts/qa-walkthrough.mjs <日志> <截图目录> [--capture <file.rdc>]`。它经真实设置连接桩、经真实 Composer 依次发送 `qa:loops` / `qa:long` / `qa:markdown` / `qa:subagent` / `qa:plan` 剧本，按状态截图（首页、知识中心（经粘贴导入两张案例卡后再截列表与阅读）、模型服务、智能体、工具、钩子、常规、外观、Effort 与模型面板、运行中与完成的工作过程、任务、上下文用量、正文排版、子代理、计划门、阅读器、交接、浅色、英文、伪本地化、命令面板、720px），并断言滚轮能把消息列表向上滚动。每张非伪本地化截图都扫描默认画面的可见文字：出现 `session://`、12 位以上的十六进制哈希或 `HTTP 4xx/5xx` 即记为失败（用户与模型内容、展开的技术层、诊断与运行记录不扫描）。任何一步失败即非零退出。设 `QA_VIDEO_DIR` 时整段走查录成视频，截图日志带相对时间，便于剪出动效片段。截图目录放在仓库外，只留验收需要的一组。
-- 结果评测：`node scripts/eval-investigation.mjs --print-prompt` 给出 `scripts/evals/vkcube-lavapipe.json` 的问题（基于 RDC-Tool 的 `vkcube_lavapipe.rdc`，答案来自真实回放：唯一 draw 的事件、顶点数、渲染目标格式与尺寸、action 数、present 事件、着色器阶段）。在应用里用任一模型完成这次调查后，`node scripts/eval-investigation.mjs <会话目录>` 按会话最后的答复与 InvestigationReport 记录逐题判分，并检查报告结论回指的每条 observed 源 Claim 都引用了会话里实际记录的 Evidence（与 `S-EVIDENCE-01` 一致），缺证据即判失败。判分本身不依赖模型；CI 只跑 `--self-test` 校验两种判分，真实会话的评测需要模型与可回放的 capture。
-- 可读性：`RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 启动一个 disposable 实例（切换外观需要写设置），把日志路径交给 `node scripts/qa-readability.mjs <日志> [截图目录]`。它用这次的一次性 URL 进入，在 Settings › Appearance 切换深色/浅色并断言主题确实生效（未开放写设置时直接失败，不把深色结果记成浅色），对首页、设置与 720px 窄屏逐一检查可见文字小于 12px、文字对比度低于 WCAG AA（正文 4.5:1、大字 3:1）与水平溢出，有问题即非零退出。两个脚本共用 `scripts/qa-browser-shared.mjs`。Playwright 来自 QA 环境；CI 只执行静态的一半（`check:design-tokens` 的排版角色规则）。打印日志时遮去 `qaBootstrap` 令牌。
+- 对话走查：`node scripts/qa-ollama-stub.mjs [端口]` 在本机起一个确定性的 Ollama 协议桩（`/api/tags`、`/api/show`、`/api/chat` NDJSON），无需凭据或模型即可在 disposable 实例里连接内置「Ollama」供应商。
+  - 默认回合是流式思考、一次 `glob` 调用与最终答复；用户消息含 `qa:loops`（多轮，含任务创建与更新）、`qa:long`（五轮并行工具调用加长答复，触发窗口化与滚动）或 `qa:plan`（Mission Agent 提交计划进入计划门）时走对应剧本。
+  - 批准后的执行回合按真实契约以 `turn_complete` 声明 blocked（工作区没有 capture），运行时的跟进提示（以 `# ` 开头）延续当前剧本而不是重开。
+  - 它只是 QA 工具，不进打包产物，也不代表真实模型的质量。
+- 运行态走查：桩启动后，用 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1 TMPDIR=/dev/shm` 启动 disposable 实例，再运行 `node scripts/qa-walkthrough.mjs <日志> <截图目录> [--capture <file.rdc>]`。
+  - 它经真实设置连接桩、经真实 Composer 依次发送 `qa:loops` / `qa:long` / `qa:markdown` / `qa:subagent` / `qa:plan` 剧本，按状态截图（首页、知识中心（经粘贴导入两张案例卡后再截列表与阅读）、模型服务、智能体、工具、钩子、常规、外观、Effort 与模型面板、运行中与完成的工作过程、任务、上下文用量、正文排版、子代理、计划门、阅读器、交接、浅色、英文、伪本地化、命令面板、720px），并断言滚轮能把消息列表向上滚动。
+  - 每张非伪本地化截图都扫描默认画面的可见文字：出现 `session://`、12 位以上的十六进制哈希或 `HTTP 4xx/5xx` 即记为失败（用户与模型内容、展开的技术层、诊断与运行记录不扫描）。
+  - 任何一步失败即非零退出。
+  - 设 `QA_VIDEO_DIR` 时整段走查录成视频，截图日志带相对时间，便于剪出动效片段。
+  - 截图目录放在仓库外，只留验收需要的一组。
+- 结果评测：`node scripts/eval-investigation.mjs --print-prompt` 给出 `scripts/evals/vkcube-lavapipe.json` 的问题（基于 RDC-Tool 的 `vkcube_lavapipe.rdc`，答案来自真实回放：唯一 draw 的事件、顶点数、渲染目标格式与尺寸、action 数、present 事件、着色器阶段）。
+  - 在应用里用任一模型完成这次调查后，`node scripts/eval-investigation.mjs <会话目录>` 按会话最后的答复与 InvestigationReport 记录逐题判分，并检查报告结论回指的每条 observed 源 Claim 都引用了会话里实际记录的 Evidence（与 `S-EVIDENCE-01` 一致），缺证据即判失败。
+  - 判分本身不依赖模型；CI 只跑 `--self-test` 校验两种判分，真实会话的评测需要模型与可回放的 capture。
+- 可读性：`RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 启动一个 disposable 实例（切换外观需要写设置），把日志路径交给 `node scripts/qa-readability.mjs <日志> [截图目录]`。
+  - 它用这次的一次性 URL 进入，在 Settings › Appearance 切换深色/浅色并断言主题确实生效（未开放写设置时直接失败，不把深色结果记成浅色），对首页、设置与 720px 窄屏逐一检查可见文字小于 12px、文字对比度低于 WCAG AA（正文 4.5:1、大字 3:1）与水平溢出，有问题即非零退出。
+  - 两个脚本共用 `scripts/qa-browser-shared.mjs`。
+  - Playwright 来自 QA 环境；CI 只执行静态的一半（`check:design-tokens` 的排版角色规则）。
+  - 打印日志时遮去 `qaBootstrap` 令牌。
 
 ## 原生交互性能观察
 
 真实 `/app?qaPerformance=1` 安装 `InteractionPerformanceProbe`；普通入口不安装监听器或观察器。默认统计 Composer 模型入口、模型选择按钮及 Fast/Max/Effort 控件；增加 `qaPerformanceScope=transcript` 时统计真实消息列表内按钮与 summary；`qaPerformanceScope=devices` 统计正式 Remote 入口及菜单内按钮。`qaPerformanceWindowMs` 可指定 1–300000 ms 固定观察区间，用于没有点击的流式期间收集页面 Long Task。到期和 pagehide 会 drain 并释放观察器、监听器与计时器。
 
-根元素 `data-rdc-qa-performance` 提供范围、实际区间、原生支持标志、观察条目数和汇总。`pointerToPaintP95Ms` 是基于原生 Event Timing、对未观察点击按 16 ms 补值的估算；必须同时记录 `eventTimingObservedCount` 与 `interactionCount`，不能将缺失 target 或尚未送达的条目视作已测得低延迟。Long Task 属于页面整体，按与区间相交计入完整任务时长，不能宣称全由 Transcript 引起。前后比较须使用相同探针、内容、视口、外观、观察区间和动作；工具调用耗时与 RAF 不作为替代指标。
+根元素 `data-rdc-qa-performance` 提供范围、实际区间、原生支持标志、观察条目数和汇总。
+
+- `pointerToPaintP95Ms` 是基于原生 Event Timing、对未观察点击按 16 ms 补值的估算；必须同时记录 `eventTimingObservedCount` 与 `interactionCount`，不能将缺失 target 或尚未送达的条目视作已测得低延迟。
+- Long Task 属于页面整体，按与区间相交计入完整任务时长，不能宣称全由 Transcript 引起。
+- 前后比较须使用相同探针、内容、视口、外观、观察区间和动作；工具调用耗时与 RAF 不作为替代指标。
 
 ## Capture Replay QA
 

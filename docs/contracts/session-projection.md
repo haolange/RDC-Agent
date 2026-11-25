@@ -9,7 +9,9 @@
 - `projectStore.currentSessionId` 是 renderer 唯一 active session；`projectStore` 只另存侧栏列表行，会话事实读 `useSessionView`（见「Session 记录与 revision」）。
 - 跨项目选择项目根而不选会话时，先缓存并清空旧 session 的 transcript、运行态、右栏与 Composer 上下文，再投影目标项目；此时 `currentSession=null` 不代表旧 turn 又成为前台。旧 turn 的流事件及最终返回留在所属 session cache，不能重新选择旧项目或会话。仅从当前所选项目的无会话 Composer 发出的首轮结果可以建立前台新 session。
 - Sidebar 每个项目节点只投影 `session.projectId` 与该节点一致的会话；乐观切换期间旧项目的 session 列表不能暂挂到新项目标题下。
-- Main `session:open` / `session:create` 更新权威 current；不 abort 其它 session 的 active turn（多 session 并行是契约意图，见 `concurrencyContract`）。`session:open` 一次返回会话、当前 run、run 列表、history 与 trace 投影；renderer 打开期间以 `historyLoadingSessionId` 标记该会话，加载完成记为 `surfaceSessionId`，唯一的 `useSessionSurfaceBootstrap` 按 session id 订阅，见到任一标记只补拉证据链与 workflow 状态、不再重复拉取 history 与 trace，会话记录（Agent、模型、标题）变化不触发重拉；每次切换由 switch hygiene 清空 `surfaceSessionId`。同项目新建会话只发 create、open 与会话列表三个请求，跨项目才走项目选择与项目级设置重载。
+- Main `session:open` / `session:create` 更新权威 current；不 abort 其它 session 的 active turn（多 session 并行是契约意图，见 `concurrencyContract`）。
+  - `session:open` 一次返回会话、当前 run、run 列表、history 与 trace 投影；renderer 打开期间以 `historyLoadingSessionId` 标记该会话，加载完成记为 `surfaceSessionId`，唯一的 `useSessionSurfaceBootstrap` 按 session id 订阅，见到任一标记只补拉证据链与 workflow 状态、不再重复拉取 history 与 trace，会话记录（Agent、模型、标题）变化不触发重拉；每次切换由 switch hygiene 清空 `surfaceSessionId`。
+  - 同项目新建会话只发 create、open 与会话列表三个请求，跨项目才走项目选择与项目级设置重载。
 - Capture 所有权仍按 `ownerSessionId` fail-closed（见 `permissions.md`）。
 
 ## Session 记录与 revision
@@ -17,7 +19,9 @@
 会话事实（`agentId`、`modelOverride`、`turnControls`、标题等）只有一个 renderer 来源。
 
 - 主进程 `SessionRevisionRegistry` 在内存中持有 `{ epoch, n }`：`epoch` 是本次主进程运行的标识，`n` 是本次运行内的会话写入计数；不落盘，持久 schema 不变。`SessionRecordStore` 的每次 session.json 写入（创建、提交暂存会话、更新、标题对账）取下一个 `n`，并广播 `session:recordChanged { record, revision }`。
-- `SessionRecordStore.findSessionLocation` 在内存中记住每个会话所在的项目：每次流式提交都要定位会话，命中时只检查该项目目录下的 `session.json` 是否仍在，不读项目 registry、不取 `.registry.lock`。文件不在（会话被删除或移走）、`removeSession`、以及任何一次 registry 写入（项目创建、改名、删除，会话创建或 touch；`ProjectWorkspaceStore` 唯一的写入点调用 `forgetSessionLocations`）都使记忆失效；未命中照旧在锁内读 registry，找不到的结果不记住。registry 写入仍在锁内。
+- `SessionRecordStore.findSessionLocation` 在内存中记住每个会话所在的项目：每次流式提交都要定位会话，命中时只检查该项目目录下的 `session.json` 是否仍在，不读项目 registry、不取 `.registry.lock`。
+  - 文件不在（会话被删除或移走）、`removeSession`、以及任何一次 registry 写入（项目创建、改名、删除，会话创建或 touch；`ProjectWorkspaceStore` 唯一的写入点调用 `forgetSessionLocations`）都使记忆失效；未命中照旧在锁内读 registry，找不到的结果不记住。
+  - registry 写入仍在锁内。
 - 每个携带会话的响应都附带该会话最后一次写入的 revision，形状是 `SessionRecordSnapshot { record, revision }`：`project:select`、`session:list/create/rename/remove/open/setModelOverride/setAgentId/applyDeclaredHandoff`，以及 `conversation:sendMessage` / `rewriteFromMessage` 的 `turn.session`。记录与 revision 在同一同步段内配对，中间不跨 await；之后的写入经新的广播到达。
 - Renderer `sessionRecordStore.records` 按会话只接受更新的 revision：epoch 不同（主进程已重启）一律接受，同 epoch 只接受更大的 `n`；迟到的旧响应或旧事件不覆盖新记录。该 store 按会话分键，后台会话的记录也是当前事实，`session:recordChanged` 不经 active-session gate。
 - `pending` 是在途意图的覆盖层：人改 Agent 或模型时先 `beginIntent`，界面立刻显示；主进程应答（无论是否被接受）后 `settleIntent`。同一字段的后一个意图替换前一个，前一个的迟到应答不再影响显示；失败只移除覆盖层，视图回到主进程持有的记录。`useSessionView(id)` 返回 record 加覆盖层；`useCurrentSessionView()` 是当前会话的视图。
@@ -36,21 +40,40 @@
 | `workflow:runStatusChanged` / `workflow:runUsageChanged` | `runId` 或 `sessionId` | 已有 currentRun/session 比对 | ignore / cache |
 | tool / evidence patches | turn 所属 `sessionId` 或 message 归属 | 仅更新 active message | cache |
 
+`conversation:*` 的流式更新以 `message_delta` 到达。renderer 先由 `conversationMessageAssembler` 重建整条消息，再经上表门控进入 active 或后台路径；接续不上上次已应用更新的增量被丢弃，消息经 `conversation:getMessageSnapshot` 续流（协议见 [`../architecture/data-flow.md`](../architecture/data-flow.md)「Agent Turn」）。
+
 **禁止**未门控直接 `upsertConversationMessage` / `setTracePresentation` / `setWorkflowState`。门禁：`pnpm run check:session-projection`。
 
 ## Composer Draft 与恢复
 
 - Draft / pending attachments / pending skills 按 `{projectId}:{sessionId}` scope 隔离（`buildComposerSessionScopeKey`）。
-- `lastSentPrompt` / `restoreComposerDraft` / Stop 恢复必须携带 owning `sessionId`（及 `projectId`）；恢复前校验与 `currentSessionId` 一致，否则跳过。
+- `lastSent`（`composerSessionContextStore`）/ `restoreComposerDraft` / Stop 恢复必须携带 owning `sessionId`（及 `projectId`）；恢复前校验与 `currentSessionId` 一致，否则跳过。
 - Markdown Composer 输入以 `key={scopeKey}` remount，避免 CodeMirror 文档残留。
 
 ## Active Turn Context
 
-计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。审批区复用 SessionRecord.modelOverride 与 turnControls，模型和参数保存按会话 lane 的客户端 revision 立即提交（见「Session 记录与 revision」）；保存中或失败阻止批准但允许停止，批准前等待该会话所有在途保存落地，最新一次失败则不批准。迟到的保存应答按 revision 落到所属会话的记录，不回填新面板。覆盖只影响之后的新请求，不能改动已冻结的当前请求；拒绝后仍恢复原冻结请求。进入审批不改变 Composer 的配置来源，无覆盖时沿用当前对话的有效模型；审批与胶囊共用同一能力状态，加载、读取失败和明确不可用分别表达。批准前等待排队中的模型与参数保存落地，再以一次 `answerPlanReview` 把计划 hash、声明交接、当前有效模型（含继承的对话模型）、全部回合参数和所读会话记录的 revision 交给主进程；主进程在同一事务内校验并提交它们与 Agent 切换，期间会话记录变化则以 `SESSION_REVISION_STALE` 拒绝旧决定。计划选项及建议行冻结声明的 label 与可选 labelTranslations；通用组件按当前语言展示对应译文，未声明译文时使用 label，不按目标身份统一改名。批准和交接仅提交 agent+label，不把译文写入批准身份或 execution offer。历史不因当前声明变化而重写；声明改名使旧计划不再匹配时须重新修订并批准，不匹配旧名称别名。
+计划审批局部状态按session、turn、toolCall及计划身份隔离，切换会话/修订时销毁意见、错误和弹层；模型保存的迟到反馈不能回填新面板。
+
+- 审批区复用 SessionRecord.modelOverride 与 turnControls，模型和参数保存按会话 lane 的客户端 revision 立即提交（见「Session 记录与 revision」）；保存中或失败阻止批准但允许停止，批准前等待该会话所有在途保存落地，最新一次失败则不批准。
+- 迟到的保存应答按 revision 落到所属会话的记录，不回填新面板。
+- 覆盖只影响之后的新请求，不能改动已冻结的当前请求；拒绝后仍恢复原冻结请求。
+- 进入审批不改变 Composer 的配置来源，无覆盖时沿用当前对话的有效模型；审批与胶囊共用同一能力状态，加载、读取失败和明确不可用分别表达。
+- 批准前等待排队中的模型与参数保存落地，再以一次 `answerPlanReview` 把计划 hash、声明交接、当前有效模型（含继承的对话模型）、全部回合参数和所读会话记录的 revision 交给主进程；主进程在同一事务内校验并提交它们与 Agent 切换，期间会话记录变化则以 `SESSION_REVISION_STALE` 拒绝旧决定。
+- 计划选项及建议行冻结声明的 label 与可选 labelTranslations；通用组件按当前语言展示对应译文，未声明译文时使用 label，不按目标身份统一改名。
+- 批准和交接仅提交 agent+label，不把译文写入批准身份或 execution offer。
+- 历史不因当前声明变化而重写；声明改名使旧计划不再匹配时须重新修订并批准，不匹配旧名称别名。
 
 执行准备期间保留本次提交的模型/参数作为待确认选择，阶段提示与模型身份分开；不得将旧请求配置标为本轮事实；主进程返回 PreparedTurnContextSummary 后，禁用的 Composer 从其 route 与 controls 显示实际请求。provider 停用/断连、模型不可执行时，保存的引用保持不变，选择区明确不可用，发送与批准均阻止；恢复可用后原引用可继续使用，在途请求不读取可变设置。
 
-工具声明时间 startedAt 与实际执行时间 executionStartedAt 分开。后者仅由 tool.started 事件写入并在后续合并中保持；事件在权限、前置 Hook 与资源队列准入后、真实工具 effect 前产生。审批通过本身不代表工具已经开始。迟到参数声明不能将已运行或终止调用降为 pending。普通 pending/未执行跳过记录保留审计但不投影成主轨道工具卡；审批、输入和执行前错误仍可见。耗时以真实起点计算，历史缺少起点时留空。普通工具调用逐项呈现，各自的状态、耗时与交互绑定同一调用身份。Task 快照按原事件身份与内容保留，默认展开及手动开合按所属 scope 记忆。
+工具声明时间 startedAt 与实际执行时间 executionStartedAt 分开。
+
+- 后者仅由 tool.started 事件写入并在后续合并中保持；事件在权限、前置 Hook 与资源队列准入后、真实工具 effect 前产生。
+- 审批通过本身不代表工具已经开始。
+- 迟到参数声明不能将已运行或终止调用降为 pending。
+- 普通 pending/未执行跳过记录保留审计但不投影成主轨道工具卡；审批、输入和执行前错误仍可见。
+- 耗时以真实起点计算，历史缺少起点时留空。
+- 普通工具调用逐项呈现，各自的状态、耗时与交互绑定同一调用身份。
+- Task 快照按原事件身份与内容保留，默认展开及手动开合按所属 scope 记忆。
 
 Send 与 Rewrite 共用 session-scoped `ActiveTurnContext`：
 
@@ -63,10 +86,18 @@ interface ActiveTurnContext {
 }
 ```
 
-- 一次请求的 turn、user/assistant 消息、模型切换提示与改写分支的 id 都由 `conversationTurnIds(requestId)`（`src/shared/conversation/conversationTurnIds.ts`）派生，主进程创建它们与 renderer 先显示的消息用同一函数。renderer 先显示的消息即主进程消息的 id，主进程的版本（流事件或发送回包，先到者）按 id 原位更新它，没有占位替换或重新分键；被拒绝或在 preparing 被 Stop 撤销的请求按 `requestId` 移除其消息。转录行以消息 id 为身份。`requestId` 遵循 IPC id 语法（≤ 120 字符），派生 id 同样合法。
+- 一次请求的 turn、user/assistant 消息、模型切换提示与改写分支的 id 都由 `conversationTurnIds(requestId)`（`src/shared/conversation/conversationTurnIds.ts`）派生，主进程创建它们与 renderer 先显示的消息用同一函数。
+  - renderer 先显示的消息即主进程消息的 id，主进程的版本（流事件或发送回包，先到者）按 id 原位更新它，没有占位替换或重新分键；被拒绝或在 preparing 被 Stop 撤销的请求按 `requestId` 移除其消息。
+  - 转录行以消息 id 为身份。
+  - `requestId` 遵循 IPC id 语法（≤ 120 字符），派生 id 同样合法。
 
 - Session 切换时清空 context 与 `isPromptSending`；Agent 运行态只读取当前 context 的 `agentId`，禁止扫描历史 draft/streaming 消息推断。
-- Work Process 的模型段落内，文本项、thinking、工具、审批和 Tasks 快照以首次可见顺序排列，更新按输出项身份或 toolCallId 原位落位；子代理过程沿用相同规则。同回合新增记录使用主进程记录的顺序，旧记录只按已有时间及存储顺序投影。中性流式文本确认成 commentary 时原位显示。一次模型响应结束即关闭对应工作段，后续响应建立新段。Provider 标记的终答待宿主验收，主会话从已结算消息读取正文，放在 Working 之后。停止时保留已公开的工作记录与停止状态。
+- Work Process 的模型段落内，文本项、thinking、工具、审批和 Tasks 快照以首次可见顺序排列，更新按输出项身份或 toolCallId 原位落位；子代理过程沿用相同规则。
+  - 同回合新增记录使用主进程记录的顺序，旧记录只按已有时间及存储顺序投影。
+  - 中性流式文本确认成 commentary 时原位显示。
+  - 一次模型响应结束即关闭对应工作段，后续响应建立新段。
+  - Provider 标记的终答待宿主验收，主会话从已结算消息读取正文，放在 Working 之后。
+  - 停止时保留已公开的工作记录与停止状态。
 - Stop 只读当前 session 的 context；禁止依赖跨 session 的 stale `activeRequestIdRef`。
 - Send、Rewrite、Stop 与运行中菜单状态都按 `sessionId + requestId + agentId` 投影。Monotonic stop 以 **`requestId` 为主**、`turnId` 为辅；turn id 从发送起就是主进程的 id，已停止的 request 拒绝迟到 `draft`/`streaming` patch。
 
@@ -118,7 +149,13 @@ Agent preparing 与 active turn 使用独立锁 owner，准备转入运行时不
 
 Capture 的人工与 Agent 控制共用同一当前回放状态、图片、原生事件列表与控件，不按控制者选择图片来源，不提供独立历史滑条。interactionLock 仅决定人工操作可用性，不卸载控件；Agent 观察成功时 requestedEventId 同步该次 appliedEventId，失败时不保留旧 requested/image 归属。图片刷新包含 image.updatedAt，避免同 EID replacement 留旧图；迟到图片与状态仍按 scope/generation/revision 隔离。既有操作证据保留在主进程存档，不向 renderer 暴露第二套图片镜像。
 
-子代理卡片由父消息中的 tool call 定位；会话拥有的委派日志独立增量持久化。`conversation:getDelegationTrace` 的零页只返回头部，含子执行状态及后台 Task Execution 状态；两者含义不同。步骤页带稳定 ID、revision 和可见 `ConversationWorkBlock`；工作过程首次展开取最近 40 步，向前每页 40 步，运行中按 revision 合并。`conversation:getDelegationContent` 校验当前 session、父调用、child session、execution ID 与 generation，再以 UTF-8 字节偏移分块读取结构化任务、实际发送载荷、final、父调用/回执或指定子工具回执；分页不得拆断字符。`conversation:delegationChanged` 携带 session、父调用与 revision，仅刷新对应卡片；切换 session、取消及身份变化后的迟到结果不得进入当前视图。后台 Task 在父消息结束后仍可更新其记录，终态后迟到通知不得重新激活。
+子代理卡片由父消息中的 tool call 定位；会话拥有的委派日志独立增量持久化。
+
+- `conversation:getDelegationTrace` 的零页只返回头部，含子执行状态及后台 Task Execution 状态；两者含义不同。
+- 步骤页带稳定 ID、revision 和可见 `ConversationWorkBlock`；工作过程首次展开取最近 40 步，向前每页 40 步，运行中按 revision 合并。
+- `conversation:getDelegationContent` 校验当前 session、父调用、child session、execution ID 与 generation，再以 UTF-8 字节偏移分块读取结构化任务、实际发送载荷、final、父调用/回执或指定子工具回执；分页不得拆断字符。
+- `conversation:delegationChanged` 携带 session、父调用与 revision，仅刷新对应卡片；切换 session、取消及身份变化后的迟到结果不得进入当前视图。
+- 后台 Task 在父消息结束后仍可更新其记录，终态后迟到通知不得重新激活。
 
 Tasks 的任务定位仅通过 renderer 内部有类型的请求收集工作记录中的候选卡，由窗口化列表负责展开、滚动与聚焦；请求不提供任务状态，也不增加公共 IPC。历史 Task 卡保留事件发生时的列表，右栏仍读取最新 `taskProjection`。
 
@@ -150,7 +187,10 @@ Composer 与计划审批使用同一目录能力状态解析：尚在加载/刷�
 
 ### 计划审批恢复投影
 
-主进程以 plan-state.json 加持久历史、可见分支和计划 hash 验证归属，签发 PlanReviewProjection 与运行时 reviewId；getHistory 和 plan:reviewChanged 共用同一投影。Renderer 不从 streaming 或工具历史重建审批权限。answerPlanReview 的拒绝只带 sessionId/reviewId/decision；批准另带 expectedPlanHash、model、controls 与 baseRevision，由 `PlanApprovalTransaction` 一次提交（见 runtime-kernel「Declared Continue and Execution Offer」），失败经 IPC 统一错误出口返回登记码；reopenReview 与 cancelReview 共用来源和决定处理链。
+主进程以 plan-state.json 加持久历史、可见分支和计划 hash 验证归属，签发 PlanReviewProjection 与运行时 reviewId；getHistory 和 plan:reviewChanged 共用同一投影。
+
+- Renderer 不从 streaming 或工具历史重建审批权限。
+- answerPlanReview 的拒绝只带 sessionId/reviewId/decision；批准另带 expectedPlanHash、model、controls 与 baseRevision，由 `PlanApprovalTransaction` 一次提交（见 runtime-kernel「Declared Continue and Execution Offer」），失败经 IPC 统一错误出口返回登记码；reopenReview 与 cancelReview 共用来源和决定处理链。
 
 Stop 后 cancelled 只提供阅读器“重新审批”，有效 awaiting 在进入所属 session 时恢复原 Composer 审批区，不执行模型。approved/rejected/superseded、草稿不自动恢复；文件、hash、owner 或分支证明无效时拒绝恢复。存在其他请求禁止重开，重复或旧 reviewId 不能提交。重开不改旧历史；批准沿既有冻结、Task、offer 与声明 handoff，恢复不重启旧循环。决定响应不确定时读取当前状态，不自动重发或执行。
 
@@ -170,7 +210,12 @@ TaskRailItem 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、
 
 ### 计划批准与交接
 
-Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。批准是一次 renderer→main 调用：返回的会话记录（含 revision）与审批投影先被接受，Agent 胶囊随会话视图变为声明目标；`send: true` 时只排队一个带 `planReference: execute` 的执行回合，待规划回合释放后发送一次，`send: false` 只预填。该执行回合不再调用 `applyDeclaredHandoff`，也不附配置提交；回合结束的建议行与重启后的已批准交接仍经 `applyDeclaredHandoff`。批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。准备时保留本次选择并标待确认，不能投影旧请求模型/参数。
+Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。
+
+- 批准是一次 renderer→main 调用：返回的会话记录（含 revision）与审批投影先被接受，Agent 胶囊随会话视图变为声明目标；`send: true` 时只排队一个带 `planReference: execute` 的执行回合，待规划回合释放后发送一次，`send: false` 只预填。
+- 该执行回合不再调用 `applyDeclaredHandoff`，也不附配置提交；回合结束的建议行与重启后的已批准交接仍经 `applyDeclaredHandoff`。
+- 批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。
+- 准备时保留本次选择并标待确认，不能投影旧请求模型/参数。
 
 
 ## 权限挡位事实与审批换代
@@ -187,6 +232,11 @@ CaptureReplayState.preparation 与 capture phase 分离：targetDeviceId 表示�
 
 取消后的 preparation.installation 仅来自对应原生操作的持久回执，记录安装是否提交、是否卸载旧包和安装方式；连接已取消不代表 APK 已撤回。没有回执时不虚构安装或回滚事实。新的设备准备不会继承旧操作的安装回执。
 
-issue.deviceAction 的 package_install/unconfirmed 表示设备侧动作尚未确认；uninstalledExisting 只记录已观察到的旧包卸载事实。它必须在取消、native 清理及 queued selection 失效后保留；contextId=null 只能表达主进程自有 context 已释放，不能显示设备可重新安装或操作已回滚。原冻结 CLI/catalog 与实际目标 APK 身份证据完整时，recovery=retry 通过同设备 prepare 先只读核验，只有 clear 才继续本次连接请求；证据不足为 null，不显示盲重试。同阶段轮询不推进 revision，初始空 trace 占位不是运行阶段。顶部和右栏消费同一准备投影；当前目标的运行状态优先于发现状态，只显示一个条目状态，普通连接无修复弹窗或 Verify 操作。
+issue.deviceAction 的 package_install/unconfirmed 表示设备侧动作尚未确认；uninstalledExisting 只记录已观察到的旧包卸载事实。
+
+- 它必须在取消、native 清理及 queued selection 失效后保留；contextId=null 只能表达主进程自有 context 已释放，不能显示设备可重新安装或操作已回滚。
+- 原冻结 CLI/catalog 与实际目标 APK 身份证据完整时，recovery=retry 通过同设备 prepare 先只读核验，只有 clear 才继续本次连接请求；证据不足为 null，不显示盲重试。
+- 同阶段轮询不推进 revision，初始空 trace 占位不是运行阶段。
+- 顶部和右栏消费同一准备投影；当前目标的运行状态优先于发现状态，只显示一个条目状态，普通连接无修复弹窗或 Verify 操作。
 
 只读核验期间的设备离线或未授权可以取消查询，但不能把未决安装降级成普通离线错误或释放设备占用；发现查询失败也不能清除原事实。未决安装时，关闭生命周期仍可清理自有原生进程，但必须返回明确失败，阻止后续会话或项目删除，让核验入口及其 owner 保持可见。
